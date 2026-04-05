@@ -34,10 +34,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<VisualizerSettings>(() => {
-    const randomPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
-    return { ...DEFAULT_SETTINGS, ...randomPreset.settings };
-  });
+  const [settings, setSettings] = useState<VisualizerSettings>(() => ({ ...DEFAULT_SETTINGS }));
   const [seedCount, setSeedCount] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);

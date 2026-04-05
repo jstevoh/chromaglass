@@ -258,22 +258,18 @@ class FluidSimulation {
       const midNorm    = Math.min(1, audioData.mid    / 100);
       const trebleNorm = Math.min(1, audioData.treble / 100);
 
-      // Bass → radial outward impulse (simulates plate being struck by kick drum).
-      // Multiple impact points create organic splash patterns.
-      if (bassNorm > 0.5 && settings.platePressure > 0.05) {
-        const impulseCount = Math.floor(1 + bassNorm * 2);
-        for (let k = 0; k < impulseCount; k++) {
-          const impX = Math.floor(this.size * 0.15 + Math.random() * this.size * 0.7);
-          const impY = Math.floor(this.size * 0.15 + Math.random() * this.size * 0.7);
-          const radius = Math.floor(6 + bassNorm * 18);
-          const strength = bassNorm * settings.platePressure * 0.06;
-          this.applyRadialImpulse(impX, impY, radius, strength);
-        }
+      // Bass → single gentle radial pulse (plate resonance).
+      if (bassNorm > 0.6 && settings.platePressure > 0.05) {
+        const impX = Math.floor(this.size * 0.2 + Math.random() * this.size * 0.6);
+        const impY = Math.floor(this.size * 0.2 + Math.random() * this.size * 0.6);
+        const radius = Math.floor(4 + bassNorm * 10);
+        const strength = bassNorm * settings.platePressure * 0.018;
+        this.applyRadialImpulse(impX, impY, radius, strength);
       }
 
-      // Treble → fine-grained turbulence (high-frequency randomness like the document describes).
-      if (trebleNorm > 0.35) {
-        const turbCount = Math.floor(trebleNorm * 25 * (settings.airVelocity + 0.1));
+      // Treble → fine-grained turbulence.
+      if (trebleNorm > 0.45) {
+        const turbCount = Math.floor(trebleNorm * 12 * (settings.airVelocity + 0.05));
         for (let k = 0; k < turbCount; k++) {
           const tx = Math.floor(1 + Math.random() * (this.size - 2));
           const ty = Math.floor(1 + Math.random() * (this.size - 2));
@@ -1082,31 +1078,31 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
             const ag = c0.g * (1 - blend) + c1.g * blend;
             const ab = c0.b * (1 - blend) + c1.b * blend;
 
-            af.addDensity(ambientX, ambientY, 0.1, ar, ag, ab);
-            af.addTemp(ambientX, ambientY, 0.05);
+            af.addDensity(ambientX, ambientY, 0.018, ar, ag, ab);
+            af.addTemp(ambientX, ambientY, 0.008);
 
-            // Boiling
+            // Boiling — audio treble gently raises heat; boilingPoint acts as a gate
             let dynamicHeatIntensity = currentSettings.heatIntensity;
-            if (currentAudioData) dynamicHeatIntensity += (currentAudioData.treble / 255) * 2.0;
+            if (currentAudioData) dynamicHeatIntensity += (currentAudioData.treble / 255) * 0.6;
             if (dynamicHeatIntensity > currentSettings.boilingPoint) {
-              const burstCount = Math.floor((dynamicHeatIntensity - currentSettings.boilingPoint) * 10);
+              const burstCount = Math.floor((dynamicHeatIntensity - currentSettings.boilingPoint) * 6);
               for (let i = 0; i < burstCount; i++) {
                 const bx = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                 const by = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                af.createBubble(bx, by, Math.floor(Math.random() * 3) + 1, 1.5, 0.1);
-                af.addTemp(bx, by, 2.0);
+                af.createBubble(bx, by, Math.floor(Math.random() * 2) + 1, 0.6, 0.05);
+                af.addTemp(bx, by, 0.5);
               }
             }
 
-            // Ambient bubbles
-            if (Math.random() < 0.15) {
+            // Ambient bubbles — very sparse
+            if (currentSettings.bubbleAmount > 0 && Math.random() < 0.03) {
               const bx = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
               const by = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-              af.createBubble(bx, by, Math.floor(Math.random() * 2) + 1, 0.5, 0.2);
+              af.createBubble(bx, by, 1, 0.3, 0.1);
             }
 
-            const driftX = noise2D(time * 0.1, 0) * 2;
-            const driftY = noise2D(0, time * 0.1) * 2;
+            const driftX = noise2D(time * 0.1, 0) * 0.25;
+            const driftY = noise2D(0, time * 0.1) * 0.25;
             af.addVelocity(ambientX, ambientY, driftX, driftY);
           }
 
@@ -1119,7 +1115,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
             if (currentAudioData.volume > 5) {
               const centerX = Math.floor(GRID_SIZE / 2);
               const centerY = Math.floor(GRID_SIZE / 2);
-              const radius = Math.floor(8 + densityMod * 15);
+              const radius = Math.floor(5 + densityMod * 8);
 
               const timeOffset = time * 1.5 + colorMod * Math.PI;
               const ci = Math.floor(timeOffset % PALETTE_COUNT);
@@ -1138,9 +1134,9 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
                       const x = centerX + i;
                       const y = centerY + j;
                       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-                        activeFluid.addDensity(x, y, densityMod * 0.5, ar_a, ag_a, ab_a);
-                        activeFluid.addTemp(x, y, densityMod * 0.2);
-                        activeFluid.addVelocity(x, y, i * 0.02 * currentSettings.platePressure, j * 0.02 * currentSettings.platePressure);
+                        activeFluid.addDensity(x, y, densityMod * 0.08, ar_a, ag_a, ab_a);
+                        activeFluid.addTemp(x, y, densityMod * 0.04);
+                        activeFluid.addVelocity(x, y, i * 0.004 * currentSettings.platePressure, j * 0.004 * currentSettings.platePressure);
                       }
                     }
                   }
