@@ -96,9 +96,13 @@ class FluidSimulation {
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
     const index = x + y * this.size;
     this.density[index] += amount;
-    this.densityR[index] += amount * (1 - r);
-    this.densityG[index] += amount * (1 - g);
-    this.densityB[index] += amount * (1 - b);
+    // Store log-space absorptions for Scott Burns geometric mean mixing.
+    // At render time: channel = exp(-densityChannel / density)
+    // This gives r1^w1 * r2^w2 weighted mixing — physically correct subtractive colorimetry.
+    const eps = 0.002;
+    this.densityR[index] += amount * (-Math.log(Math.max(eps, r)));
+    this.densityG[index] += amount * (-Math.log(Math.max(eps, g)));
+    this.densityB[index] += amount * (-Math.log(Math.max(eps, b)));
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
@@ -247,6 +251,44 @@ class FluidSimulation {
       const densityMod  = getAudioValue(audioData, settings.audioMappings.density as AudioFeatureKey);
       const colorMod    = getAudioValue(audioData, settings.audioMappings.color as AudioFeatureKey);
       const rotationMod = getAudioValue(audioData, settings.audioMappings.rotation as AudioFeatureKey);
+
+      const bassNorm   = Math.min(1, audioData.bass   / 100);
+      const midNorm    = Math.min(1, audioData.mid    / 100);
+      const trebleNorm = Math.min(1, audioData.treble / 100);
+
+      // Bass → radial outward impulse (simulates plate being struck by kick drum).
+      // Multiple impact points create organic splash patterns.
+      if (bassNorm > 0.5 && settings.platePressure > 0.05) {
+        const impulseCount = Math.floor(1 + bassNorm * 2);
+        for (let k = 0; k < impulseCount; k++) {
+          const impX = Math.floor(this.size * 0.15 + Math.random() * this.size * 0.7);
+          const impY = Math.floor(this.size * 0.15 + Math.random() * this.size * 0.7);
+          const radius = Math.floor(6 + bassNorm * 18);
+          const strength = bassNorm * settings.platePressure * 0.06;
+          this.applyRadialImpulse(impX, impY, radius, strength);
+        }
+      }
+
+      // Treble → fine-grained turbulence (high-frequency randomness like the document describes).
+      if (trebleNorm > 0.35) {
+        const turbCount = Math.floor(trebleNorm * 25 * (settings.airVelocity + 0.1));
+        for (let k = 0; k < turbCount; k++) {
+          const tx = Math.floor(1 + Math.random() * (this.size - 2));
+          const ty = Math.floor(1 + Math.random() * (this.size - 2));
+          const idx = tx + ty * this.size;
+          if (this.density[idx] > 0.03) {
+            const angle = Math.random() * Math.PI * 2;
+            const strength = trebleNorm * 0.25;
+            this.vx[idx] += Math.cos(angle) * strength;
+            this.vy[idx] += Math.sin(angle) * strength;
+          }
+        }
+      }
+
+      // Mid → smooth vorticity injection (swirling orbital patterns).
+      if (midNorm > 0.25 && settings.glassSmear > 0.05) {
+        this.injectVorticity(midNorm * settings.glassSmear * 0.8, time, noise2D);
+      }
 
       if (velocityMod > 0.7) {
         const squishForce = velocityMod * 0.02 * settings.platePressure;
@@ -727,6 +769,41 @@ class FluidSimulation {
       x[(this.size - 2) + (this.size - 1) * this.size] + x[(this.size - 1) + (this.size - 2) * this.size]
     );
   }
+
+  // Radial outward velocity impulse — simulates bass-frequency plate strike
+  applyRadialImpulse(cx: number, cy: number, radius: number, strength: number) {
+    const r2 = radius * radius;
+    for (let j = cy - radius; j <= cy + radius; j++) {
+      for (let i = cx - radius; i <= cx + radius; i++) {
+        const dx = i - cx, dy = j - cy;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < r2 && distSq > 0 && i > 0 && i < this.size - 1 && j > 0 && j < this.size - 1) {
+          const dist = Math.sqrt(distSq);
+          const falloff = (1 - dist / radius) * (1 - dist / radius); // quadratic falloff
+          this.vx[i + j * this.size] += (dx / dist) * strength * falloff;
+          this.vy[i + j * this.size] += (dy / dist) * strength * falloff;
+        }
+      }
+    }
+  }
+
+  // Inject curl-noise vorticity into dense fluid regions — driven by mid/treble
+  injectVorticity(strength: number, time: number, noise2D: (x: number, y: number) => number) {
+    const step = 3; // sample every 3 cells for performance
+    for (let j = 1; j < this.size - 1; j += step) {
+      for (let i = 1; i < this.size - 1; i += step) {
+        const idx = i + j * this.size;
+        if (this.density[idx] > 0.05) {
+          // Curl noise: perpendicular to gradient of noise field
+          const n = noise2D(i * 0.025, j * 0.025 + time * 0.08);
+          const dn_dx = noise2D(i * 0.025 + 0.01, j * 0.025 + time * 0.08) - n;
+          const dn_dy = noise2D(i * 0.025, j * 0.025 + 0.01 + time * 0.08) - n;
+          this.vx[idx] +=  dn_dy * strength * this.density[idx];
+          this.vy[idx] += -dn_dx * strength * this.density[idx];
+        }
+      }
+    }
+  }
 }
 
 
@@ -1107,31 +1184,41 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
 
             if (d > 0.001) hasContent = true;
 
+            // ── Scott Burns geometric mean (Beer-Lambert) color ──────
+            // densityR/G/B store log-space absorptions.
+            // channel = exp(-absorption/density) = r1^w1 * r2^w2 (weighted geometric mean).
             let r = 1, g = 1, b = 1;
             if (d > 0.001) {
-              r = Math.max(0, 1.0 - dr / d);
-              g = Math.max(0, 1.0 - dg / d);
-              b = Math.max(0, 1.0 - db / d);
-              const maxColor = Math.max(r, g, b);
-              if (maxColor > 0 && maxColor < 1.0) {
-                const boost = 1.0 / maxColor;
-                r *= boost; g *= boost; b *= boost;
-              }
+              const norm = 1.0 / d;
+              r = Math.exp(-dr * norm);
+              g = Math.exp(-dg * norm);
+              b = Math.exp(-db * norm);
             }
 
-            let alpha = Math.min(0.9, d * 1.5);
+            // ── Beer-Lambert volumetric opacity ──────────────────────
+            // alpha = 1 - exp(-k * thickness): exponential saturation,
+            // thin films near-transparent, deep pools near-opaque.
+            const thickness = d * 2.8;
+            let alpha = 1.0 - Math.exp(-thickness);
+            alpha = Math.min(0.95, alpha);
 
-            // 3D lighting
+            // ── Sobel normal reconstruction (wider kernel = smoother normals) ──
             const xi = i % GRID_SIZE;
             const yi = (i - xi) / GRID_SIZE;
-            if (xi > 0 && xi < GRID_SIZE - 1 && yi > 0 && yi < GRID_SIZE - 1) {
-              const dL = fluid.density[i - 1];
-              const dR = fluid.density[i + 1];
-              const dB = fluid.density[i - GRID_SIZE];
-              const dT = fluid.density[i + GRID_SIZE];
-              const gradX = dR - dL;
-              const gradY = dT - dB;
-              const zScale = 0.8;
+            if (xi > 1 && xi < GRID_SIZE - 2 && yi > 1 && yi < GRID_SIZE - 2) {
+              // Sobel operator — matches the finite-difference approach described in SSFR
+              const gradX = (
+                -fluid.density[i - 1 - GRID_SIZE] - 2.0 * fluid.density[i - 1] - fluid.density[i - 1 + GRID_SIZE] +
+                 fluid.density[i + 1 - GRID_SIZE] + 2.0 * fluid.density[i + 1] + fluid.density[i + 1 + GRID_SIZE]
+              ) * 0.125;
+              const gradY = (
+                -fluid.density[i - 1 - GRID_SIZE] - 2.0 * fluid.density[i - GRID_SIZE] - fluid.density[i + 1 - GRID_SIZE] +
+                 fluid.density[i - 1 + GRID_SIZE] + 2.0 * fluid.density[i + GRID_SIZE] + fluid.density[i + 1 + GRID_SIZE]
+              ) * 0.125;
+              const gradMag = Math.sqrt(gradX * gradX + gradY * gradY);
+
+              // Surface normal from depth gradient (cross product of tangent vectors)
+              const zScale = 0.9;
               const nx = -gradX * zScale;
               const ny = -gradY * zScale;
               const len = Math.sqrt(nx * nx + ny * ny + 1.0);
@@ -1139,21 +1226,42 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
               const nny = ny / len;
               const nnz = 1.0 / len;
 
+              // Blinn-Phong diffuse + specular
               const lx = -0.577, ly = -0.577, lz = 0.577;
               const diffuse = Math.max(0, nnx * lx + nny * ly + nnz * lz);
-              const dotNL = nnx * lx + nny * ly + nnz * lz;
-              const rz = 2 * dotNL * nnz - lz;
-              const specular = Math.pow(Math.max(0, rz), 32) * 0.6;
+              // Blinn-Phong half-vector specular (softer than Phong for liquids)
+              const hx = (-lx + 0.0) * 0.5, hy = (-ly + 0.0) * 0.5, hz = (lz + 1.0) * 0.5;
+              const hLen = Math.sqrt(hx*hx + hy*hy + hz*hz);
+              const specNdotH = Math.max(0, nnx * hx/hLen + nny * hy/hLen + nnz * hz/hLen);
+              const specular = Math.pow(specNdotH, 48) * 0.7;
+
+              // Fresnel reflectance (Schlick approximation) — edges are more mirror-like
+              // This simulates light refracting at the curved meniscus edge
+              const cosTheta = Math.max(0, nnz); // dot with view direction (0,0,1)
+              const f0 = 0.04; // water/oil-like base reflectance
+              const fresnel = f0 + (1.0 - f0) * Math.pow(1.0 - cosTheta, 5);
+              const specularTotal = specular + fresnel * 0.6;
+
+              // Meniscus capillary rim — bright white edge at fluid boundaries.
+              // The Young-Laplace curved surface reflects strongly at grazing angle.
+              // Brightens thin-edge pixels where gradient is high (capillary rise zone).
+              if (d > 0.015 && d < 0.6 && gradMag > 0.08) {
+                const meniscusFactor = Math.min(1.0, gradMag * 2.5) * Math.max(0, 1.0 - d * 1.8);
+                const rimBright = meniscusFactor * 0.45;
+                r = Math.min(1, r + rimBright);
+                g = Math.min(1, g + rimBright);
+                b = Math.min(1, b + rimBright);
+              }
 
               if (isDarkBlend) {
                 const lf = 0.6 + 0.4 * diffuse;
                 r *= lf; g *= lf; b *= lf;
-                alpha = Math.max(0, alpha - specular * 1.5);
+                alpha = Math.max(0, alpha - specularTotal * 1.2);
               } else {
                 const lf = 0.5 + 0.5 * diffuse;
-                r = r * lf + specular;
-                g = g * lf + specular;
-                b = b * lf + specular;
+                r = r * lf + specularTotal;
+                g = g * lf + specularTotal;
+                b = b * lf + specularTotal;
               }
             }
 
