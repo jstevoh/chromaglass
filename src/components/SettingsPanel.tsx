@@ -7,10 +7,12 @@ import { PRESETS } from '../presets';
 interface SettingsPanelProps {
   settings: VisualizerSettings;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
+  onApplyPreset: (presetId: string, settings: Partial<VisualizerSettings>) => void;
+  activePresetId: string | null;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, onClose }) => {
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
 
   const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
@@ -58,17 +60,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Palette size={12} /> Presets
         </h3>
         <div className="grid grid-cols-2 gap-2">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => onUpdate(preset.settings)}
-              className="flex flex-col items-start p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all text-left group"
-              title={preset.description}
-            >
-              <span className="text-xs font-bold mb-1 group-hover:text-white text-white/80 transition-colors">{preset.name}</span>
-              <span className="text-[9px] opacity-50 line-clamp-2 leading-tight">{preset.description}</span>
-            </button>
-          ))}
+          {PRESETS.map((preset) => {
+            const isActive = activePresetId === preset.id;
+            return (
+              <button
+                key={preset.id}
+                onClick={() => onApplyPreset(preset.id, preset.settings)}
+                className={`flex flex-col items-start p-2 border rounded-lg transition-all text-left group ${
+                  isActive
+                    ? 'bg-white/15 border-white/40 shadow-[0_0_8px_rgba(255,255,255,0.1)]'
+                    : 'bg-white/5 hover:bg-white/10 border-white/10'
+                }`}
+                title={preset.description}
+              >
+                <div className="flex items-center gap-1 mb-1 w-full">
+                  <span className={`text-xs font-bold transition-colors flex-1 ${isActive ? 'text-white' : 'group-hover:text-white text-white/80'}`}>{preset.name}</span>
+                  {isActive && <span className="text-[7px] px-1 py-0.5 rounded bg-white/20 text-white font-bold uppercase tracking-wider shrink-0">ON</span>}
+                </div>
+                <span className="text-[9px] opacity-50 line-clamp-2 leading-tight">{preset.description}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
