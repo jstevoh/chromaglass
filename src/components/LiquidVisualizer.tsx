@@ -179,31 +179,17 @@ class FluidSimulation {
     }
 
     if (Math.random() < spawnChance) {
-      // Spawn tiny — radius here is the disturbance zone, not the bubble size.
-      const spawnRadius = 0.4 + Math.random() * 0.8;
+      const spawnRadius = 0.2 + Math.random() * 0.4;
       this.bubbles.push({
         x, y,
-        vx: (Math.random() - 0.5) * Math.min(strength, 1.0),
-        vy: (Math.random() - 0.5) * Math.min(strength, 1.0),
+        vx: (Math.random() - 0.5) * 0.03,
+        vy: -Math.random() * 0.05 - 0.01,
         radius: spawnRadius,
         life: 0,
-        maxLife: 200 + Math.random() * 400,
+        maxLife: 300 + Math.random() * 400,
         type: Math.random() > 0.6 ? 'color' : 'clear',
         color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
       });
-    }
-
-    for (const b of this.bubbles) {
-      const dx = b.x - x;
-      const dy = b.y - y;
-      const distSq = dx * dx + dy * dy;
-      const pushRadius = radius * 3;
-      if (distSq > 0 && distSq < pushRadius * pushRadius) {
-        const dist = Math.sqrt(distSq);
-        const pushForce = (1 - dist / pushRadius) * strength * 2;
-        b.vx += (dx / dist) * pushForce;
-        b.vy += (dy / dist) * pushForce;
-      }
     }
   }
 
@@ -395,26 +381,27 @@ class FluidSimulation {
   private stepBubbles(settings: VisualizerSettings, audioData: AudioData | null) {
     let currentBubbleAmount = settings.bubbleAmount;
     if (audioData && settings.audioMappings) {
-      currentBubbleAmount += getAudioValue(audioData, settings.audioMappings.bubbles as AudioFeatureKey) * 2.0;
+      // Audio adds gently — not 2× the base amount
+      currentBubbleAmount += getAudioValue(audioData, settings.audioMappings.bubbles as AudioFeatureKey) * 0.4;
     }
     if (currentBubbleAmount <= 0) return;
 
-    // Spawn — always tiny at birth; grow only through merging.
-    // bubbleSizeVariance adds a small jitter to the spawn radius.
-    if (Math.random() < currentBubbleAmount * 0.5) {
+    // Cap total bubble count so merging/splitting stays manageable
+    const maxBubbles = 60;
+    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.3) {
       const x = Math.random() * this.size;
       const y = this.size - 2 - Math.random() * (this.size * 0.25);
-      const jitter = (settings.bubbleSizeVariance || 1) * 0.3;
-      const radius = 0.3 + Math.random() * 0.8 + jitter * Math.random();
+      const jitter = (settings.bubbleSizeVariance || 1) * 0.15;
+      const radius = 0.2 + Math.random() * 0.5 + jitter * Math.random();
 
       const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
       this.bubbles.push({
         x, y,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: -Math.random() * 0.6 - 0.2,
+        vx: (Math.random() - 0.5) * 0.04,   // very slow horizontal drift
+        vy: -Math.random() * 0.06 - 0.01,    // slow gentle rise
         radius,
         life: 0,
-        maxLife: 180 + Math.random() * 300,
+        maxLife: 300 + Math.random() * 500,
         type: Math.random() > 0.6 ? 'color' : 'clear',
         color: c,
       });
@@ -430,20 +417,24 @@ class FluidSimulation {
 
       if (ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1) {
         const idx = ix + iy * this.size;
-        b.vx += this.vx[idx] * 0.1;
-        b.vy += this.vy[idx] * 0.1;
-        b.vy -= settings.buoyancy * 0.05;
+        // Gentle fluid coupling — tiny bubbles are viscous and barely drift with flow
+        b.vx += this.vx[idx] * 0.012;
+        b.vy += this.vy[idx] * 0.012;
+        b.vy -= settings.buoyancy * 0.006;
         if (settings.airVelocity > 0) {
-          b.vy -= settings.airVelocity * 0.15;
-          b.vx += (Math.random() - 0.5) * settings.airVelocity * 0.2;
+          b.vy -= settings.airVelocity * 0.02;
+          b.vx += (Math.random() - 0.5) * settings.airVelocity * 0.015;
         }
       }
 
-      b.vx *= 0.95;
-      b.vy *= 0.95;
+      b.vx *= 0.97;   // stronger damping — bubbles slow down fast
+      b.vy *= 0.97;
+      // Clamp speed so bubbles never teleport
+      const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (spd > 0.15) { b.vx = b.vx / spd * 0.15; b.vy = b.vy / spd * 0.15; }
       b.x += b.vx;
       b.y += b.vy;
-      b.x += Math.sin(b.life * 0.1 + b.y) * 0.2;
+      b.x += Math.sin(b.life * 0.05 + b.y * 0.1) * 0.03;  // barely perceptible wobble
 
       // Remove if dead / out of bounds
       if (b.life >= b.maxLife || b.x < 0 || b.x >= this.size || b.y < 0 || b.y >= this.size) {
@@ -469,7 +460,7 @@ class FluidSimulation {
         const dy = b.y - other.y;
         const distSq = dx * dx + dy * dy;
         const rSum = b.radius + other.radius;
-        if (distSq < (rSum * 0.8) * (rSum * 0.8)) {
+        if (distSq < (rSum * 0.45) * (rSum * 0.45)) {  // must actually overlap to merge
           const m1 = b.radius * b.radius;
           const m2 = other.radius * other.radius;
           const totalM = m1 + m2;
@@ -487,22 +478,21 @@ class FluidSimulation {
       }
       if (merged) continue;
 
-      // Splitting — only when bubble grows large enough via merging.
-      // bubbleBaseSize is the cap: above it, bubbles become unstable and split.
-      const splitCap = Math.max(3, settings.bubbleBaseSize || 4);
+      // Splitting — only when merged large enough.
+      const splitCap = Math.max(1.5, settings.bubbleBaseSize || 4);
       const speedSq = b.vx * b.vx + b.vy * b.vy;
-      const splitChance = (b.radius > splitCap * 1.5 ? 0.03 : 0) + (speedSq > 1.5 ? 0.015 : 0);
+      const splitChance = b.radius > splitCap * 1.3 ? 0.02 : (speedSq > 0.04 ? 0.005 : 0);
       if (b.radius > splitCap && Math.random() < splitChance) {
-        const r1 = b.radius * 0.7;
+        const r1 = b.radius * 0.65;
         b.radius = r1;
         const angle = Math.random() * Math.PI * 2;
-        const pushForce = 0.3;
+        const pushForce = 0.03;  // tiny separation impulse
         const pushX = Math.cos(angle) * pushForce;
         const pushY = Math.sin(angle) * pushForce;
         b.vx += pushX;
         b.vy += pushY;
         this.bubbles.push({
-          x: b.x - pushX, y: b.y - pushY,
+          x: b.x - pushX * 2, y: b.y - pushY * 2,
           vx: b.vx - pushX * 2, vy: b.vy - pushY * 2,
           radius: r1, life: b.life, maxLife: b.maxLife, type: b.type, color: b.color,
         });
@@ -1037,7 +1027,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
               const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const isBlow = Math.random() > 0.6 - (spectralCentroid / 128) * 0.4;
               if (isBlow) {
-                af.createBubble(rx, ry, Math.floor(10 + Math.random() * 15 + energy * 20), 0.5 + Math.random() * 0.5 + energy * 2);
+                af.createBubble(rx, ry, 2, 0.1, 0.3);
               } else {
                 const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
                 af.addDensity(rx, ry, 8.0 + Math.random() * 8.0 + energy * 20, color.r, color.g, color.b);
