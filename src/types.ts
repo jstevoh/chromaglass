@@ -99,6 +99,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   heatDecay: 0.95,
   automateRate: 0.1,
   bubbleAmount: 0.2,
-  bubbleBaseSize: 12,
-  bubbleSizeVariance: 8,
+  bubbleBaseSize: 4,
+  bubbleSizeVariance: 1,
 };

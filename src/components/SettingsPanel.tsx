@@ -275,19 +275,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ bubbleAmount: v })}
         />
         <Slider
-          label="Bubble Base Size"
+          label="Bubble Max Size"
           value={settings.bubbleBaseSize}
-          min={2}
-          max={50}
-          step={1}
+          min={1}
+          max={15}
+          step={0.5}
           onChange={(v: number) => onUpdate({ bubbleBaseSize: v })}
         />
         <Slider
-          label="Bubble Size Variance"
+          label="Bubble Spawn Jitter"
           value={settings.bubbleSizeVariance}
           min={0}
-          max={40}
-          step={1}
+          max={3}
+          step={0.1}
           onChange={(v: number) => onUpdate({ bubbleSizeVariance: v })}
         />
         <Slider

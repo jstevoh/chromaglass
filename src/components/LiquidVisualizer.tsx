@@ -179,14 +179,16 @@ class FluidSimulation {
     }
 
     if (Math.random() < spawnChance) {
+      // Spawn tiny — radius here is the disturbance zone, not the bubble size.
+      const spawnRadius = 0.4 + Math.random() * 0.8;
       this.bubbles.push({
         x, y,
-        vx: (Math.random() - 0.5) * strength,
-        vy: (Math.random() - 0.5) * strength,
-        radius: radius * 0.8,
+        vx: (Math.random() - 0.5) * Math.min(strength, 1.0),
+        vy: (Math.random() - 0.5) * Math.min(strength, 1.0),
+        radius: spawnRadius,
         life: 0,
-        maxLife: 300 + Math.random() * 500,
-        type: Math.random() > 0.7 ? 'color' : 'clear',
+        maxLife: 200 + Math.random() * 400,
+        type: Math.random() > 0.6 ? 'color' : 'clear',
         color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
       });
     }
@@ -401,28 +403,25 @@ class FluidSimulation {
     }
     if (currentBubbleAmount <= 0) return;
 
-    // Spawn
+    // Spawn — always tiny at birth; grow only through merging.
+    // bubbleSizeVariance adds a small jitter to the spawn radius.
     if (Math.random() < currentBubbleAmount * 0.5) {
       const x = Math.random() * this.size;
-      const y = this.size - 2 - Math.random() * (this.size * 0.2);
-      const baseSize = settings.bubbleBaseSize || 12;
-      const variance = settings.bubbleSizeVariance || 8;
-      const radius = Math.max(1, baseSize + (Math.random() * 2 - 1) * variance);
+      const y = this.size - 2 - Math.random() * (this.size * 0.25);
+      const jitter = (settings.bubbleSizeVariance || 1) * 0.3;
+      const radius = 0.3 + Math.random() * 0.8 + jitter * Math.random();
 
+      const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
       this.bubbles.push({
         x, y,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: -Math.random() * 0.5 - 0.5,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: -Math.random() * 0.6 - 0.2,
         radius,
         life: 0,
-        maxLife: 100 + Math.random() * 200,
-        type: Math.random() > 0.7 ? 'color' : 'clear',
-        color: PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)],
-      } as any);
-      // Fix: bubble color should be hex for rendering
-      const last = this.bubbles[this.bubbles.length - 1];
-      const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
-      last.color = c;
+        maxLife: 180 + Math.random() * 300,
+        type: Math.random() > 0.6 ? 'color' : 'clear',
+        color: c,
+      });
     }
 
     // Update
@@ -455,10 +454,11 @@ class FluidSimulation {
         if (b.life >= b.maxLife && b.x >= 1 && b.x < this.size - 1 && b.y >= 1 && b.y < this.size - 1) {
           if (b.type === 'color' && b.color) {
             const rgb = hexToRgb(b.color);
-            this.addDensity(Math.floor(b.x), Math.floor(b.y), b.radius * 2.0, rgb.r, rgb.g, rgb.b);
-            this.addTemp(Math.floor(b.x), Math.floor(b.y), 1.0);
+            const burstAmount = Math.max(0.3, b.radius * 1.5);
+            this.addDensity(Math.floor(b.x), Math.floor(b.y), burstAmount, rgb.r, rgb.g, rgb.b);
+            this.addTemp(Math.floor(b.x), Math.floor(b.y), 0.5);
           } else {
-            this.blowAir(Math.floor(b.x), Math.floor(b.y), Math.max(1, b.radius * 0.5), 0.5);
+            this.blowAir(Math.floor(b.x), Math.floor(b.y), Math.max(1, Math.floor(b.radius * 0.8)), 0.3);
           }
         }
         this.bubbles.splice(i, 1);
@@ -491,10 +491,12 @@ class FluidSimulation {
       }
       if (merged) continue;
 
-      // Splitting
+      // Splitting — only when bubble grows large enough via merging.
+      // bubbleBaseSize is the cap: above it, bubbles become unstable and split.
+      const splitCap = Math.max(3, settings.bubbleBaseSize || 4);
       const speedSq = b.vx * b.vx + b.vy * b.vy;
-      const splitChance = (b.radius > 15 ? 0.02 : 0) + (speedSq > 2.0 ? 0.01 : 0);
-      if (b.radius > 8 && Math.random() < splitChance) {
+      const splitChance = (b.radius > splitCap * 1.5 ? 0.03 : 0) + (speedSq > 1.5 ? 0.015 : 0);
+      if (b.radius > splitCap && Math.random() < splitChance) {
         const r1 = b.radius * 0.7;
         b.radius = r1;
         const angle = Math.random() * Math.PI * 2;

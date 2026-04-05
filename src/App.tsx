@@ -139,7 +139,7 @@ export default function App() {
       buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
       damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
       automateRate: Math.random() * 0.2,
-      bubbleAmount: Math.random(), bubbleBaseSize: Math.random() * 20 + 5, bubbleSizeVariance: Math.random() * 15 + 2,
+      bubbleAmount: Math.random(), bubbleBaseSize: Math.random() * 8 + 2, bubbleSizeVariance: Math.random() * 2 + 0.3,
     });
     setActivePresetId(null);
     setSeedCount(prev => prev + 1);
