@@ -1035,18 +1035,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
           const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
-          if (Math.random() < rate * 0.3 + energy * 0.6) {
+          if (Math.random() < rate * 0.3 + energy * 0.8) {
             const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
             if (af) {
               const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const isBlow = Math.random() > 0.6 - (spectralCentroid / 128) * 0.4;
+              const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
               if (isBlow) {
-                af.blowAir(rx, ry, 2, 0.1);
+                af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
               } else {
                 const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
-                af.addDensity(rx, ry, 8.0 + Math.random() * 8.0 + energy * 20, color.r, color.g, color.b);
-                af.addTemp(rx, ry, 1.0 + Math.random() * 2 + trebleBoost * 3);
+                af.addDensity(rx, ry, 6.0 + energy * 35, color.r, color.g, color.b);
+                af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
               }
             }
           }
@@ -1106,13 +1106,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           }
 
-          // ── Audio input to fluid — density/heat only, no velocity ──
-          // All motion comes from fluid physics reacting to density/heat gradients.
+          // ── Audio input to fluid ──────────────────────────────
           if (currentAudioData && currentSettings.audioMappings) {
             const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
             const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
-            if (currentAudioData.volume > 5 && densityMod > 0.01) {
+            if (currentAudioData.volume > 3 && densityMod > 0.005) {
               const timeOffset = time * 0.3 + colorMod * Math.PI;
               const ci = Math.floor(timeOffset % PALETTE_COUNT);
               const ni = (ci + 1) % PALETTE_COUNT;
@@ -1123,48 +1122,74 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               const activeFluid = fluidsRef.current[activeLayerRef.current];
               if (activeFluid) {
-                // Scatter injection across the fluid proportional to audio energy
-                const bass01  = Math.min(1, currentAudioData.bass   / 80);
-                const treble01= Math.min(1, currentAudioData.treble  / 80);
-                const energy01= Math.min(1, currentAudioData.energy  / 80);
+                const bass01   = Math.min(1, currentAudioData.bass   / 70);
+                const treble01 = Math.min(1, currentAudioData.treble / 70);
+                const energy01 = Math.min(1, currentAudioData.energy / 70);
+                const mid01    = Math.min(1, currentAudioData.mid    / 70);
+
+                // Auto mode amplifier — everything hits harder when automated
+                const autoAmp = isAutomatedRef.current ? 2.2 : 1.0;
 
                 // Center pulse — scales with density mapping
                 const centerX = Math.floor(GRID_SIZE / 2);
                 const centerY = Math.floor(GRID_SIZE / 2);
-                activeFluid.addDensity(centerX, centerY, densityMod * 0.025, ar_a, ag_a, ab_a);
-                activeFluid.addTemp(centerX, centerY, densityMod * 0.015);
+                activeFluid.addDensity(centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a);
+                activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
 
-                // Bass hit: radial velocity burst from center
-                if (bass01 > 0.45) {
-                  const burstR = 18;
+                // Bass hit: radial velocity burst — lower threshold, larger burst in auto
+                if (bass01 > 0.25) {
+                  const burstR = isAutomatedRef.current ? 28 : 18;
+                  const bassStr = (bass01 - 0.25) * autoAmp;
                   for (let bj = -burstR; bj <= burstR; bj += 3) {
                     for (let bi = -burstR; bi <= burstR; bi += 3) {
                       const dist = Math.sqrt(bi * bi + bj * bj);
                       if (dist < 2 || dist > burstR) continue;
                       const bx = centerX + bi, by = centerY + bj;
                       if (bx > 0 && bx < GRID_SIZE - 1 && by > 0 && by < GRID_SIZE - 1) {
-                        const f = (bass01 - 0.45) * 0.6 * (1 - dist / burstR);
+                        const f = bassStr * 0.65 * (1 - dist / burstR);
                         activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
                       }
                     }
                   }
-                }
-
-                // Treble: scattered heat sparks across the field
-                if (treble01 > 0.3) {
-                  const sparks = Math.floor(treble01 * 6);
-                  for (let s = 0; s < sparks; s++) {
-                    const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                    const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                    activeFluid.addTemp(sx, sy, treble01 * 0.4);
+                  // In auto mode, also inject colored density in a ring on bass hits
+                  if (isAutomatedRef.current && bass01 > 0.4) {
+                    activeFluid.addDensity(centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a);
+                    activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
                   }
                 }
 
-                // Energy: slow swell of density at a roaming point
-                if (energy01 > 0.2) {
-                  const ex = Math.floor(GRID_SIZE / 2 + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
-                  const ey = Math.floor(GRID_SIZE / 2 + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
-                  activeFluid.addDensity(ex, ey, energy01 * 0.03, ar_a, ag_a, ab_a);
+                // Mid: orbital injection points react to mid frequencies
+                if (mid01 > 0.2) {
+                  const orbitR = GRID_SIZE * 0.3;
+                  const mx = Math.floor(centerX + Math.cos(time * 0.6) * orbitR);
+                  const my = Math.floor(centerY + Math.sin(time * 0.8) * orbitR);
+                  if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
+                    activeFluid.addDensity(mx, my, mid01 * 0.04 * autoAmp, ar_a, ag_a, ab_a);
+                    activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
+                  }
+                }
+
+                // Treble: scattered heat sparks
+                if (treble01 > 0.2) {
+                  const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6));
+                  for (let s = 0; s < sparks; s++) {
+                    const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                    const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                    activeFluid.addTemp(sx, sy, treble01 * 0.45 * autoAmp);
+                  }
+                }
+
+                // Energy: roaming swell of density
+                if (energy01 > 0.15) {
+                  const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
+                  const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
+                  activeFluid.addDensity(ex, ey, energy01 * 0.04 * autoAmp, ar_a, ag_a, ab_a);
+                  if (isAutomatedRef.current) {
+                    // Second roaming point on opposite orbit in auto mode
+                    const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
+                    const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
+                    activeFluid.addDensity(ex2, ey2, energy01 * 0.035, ar_a, ag_a, ab_a);
+                  }
                 }
               }
             }
