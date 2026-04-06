@@ -27,12 +27,6 @@ export const DROPPER_COLORS = PALETTE.map(c => c.hex);
 // RGB-only list for the fluid simulation (avoids re-parsing hex every frame).
 export const PALETTE_RGB = PALETTE.map(({ r, g, b }) => ({ r, g, b }));
 
-// Bubble-specific subset (slightly different from the full palette).
-export const BUBBLE_COLORS = [
-  '#00FFFF', '#FF00FF', '#FFFF00', '#00FF00',
-  '#FF4500', '#8A2BE2', '#E30B5D', '#ffffff',
-] as const;
-
 // ── Audio helpers ──────────────────────────────────────────────────────
 
 export type AudioFeatureKey = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';

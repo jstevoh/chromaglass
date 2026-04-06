@@ -12,7 +12,6 @@ const DEFAULT_MAPPINGS: AudioMappings = {
   density: 'bass',
   color: 'treble',
   rotation: 'none',
-  bubbles: 'bass',
 };
 
 export const PRESETS: Preset[] = [
@@ -35,9 +34,6 @@ export const PRESETS: Preset[] = [
       damping: 0.98,
       heatDecay: 0.95,
       automateRate: 0.1,
-      bubbleAmount: 0.2,
-      bubbleBaseSize: 4,
-      bubbleSizeVariance: 1.5,
       platePressure: 0.3,
       glassSmear: 0.5,
       rainDrip: 0.5,
@@ -72,9 +68,6 @@ export const PRESETS: Preset[] = [
       damping: 0.99,
       heatDecay: 0.98,
       automateRate: 0.05,
-      bubbleAmount: 0.6,
-      bubbleBaseSize: 3,
-      bubbleSizeVariance: 0.4,
       platePressure: 0.1,
       glassSmear: 0.2,
       rainDrip: 0.8,
@@ -90,7 +83,6 @@ export const PRESETS: Preset[] = [
         density: 'bass',
         color: 'none',
         rotation: 'energy',
-        bubbles: 'complexity',
       },
     }
   },
@@ -115,9 +107,6 @@ export const PRESETS: Preset[] = [
       damping: 0.95,
       heatDecay: 0.9,
       automateRate: 0.2,
-      bubbleAmount: 0.1,
-      bubbleBaseSize: 3,
-      bubbleSizeVariance: 0.8,
       platePressure: 0.6,
       glassSmear: 0.8,
       rainDrip: 0.2,
@@ -133,7 +122,6 @@ export const PRESETS: Preset[] = [
         density: 'treble',
         color: 'timbre',
         rotation: 'complexity',
-        bubbles: 'mid',
       },
     }
   },
@@ -158,9 +146,6 @@ export const PRESETS: Preset[] = [
       damping: 0.97,
       heatDecay: 0.99,
       automateRate: 0.1,
-      bubbleAmount: 0.8,
-      bubbleBaseSize: 9,
-      bubbleSizeVariance: 2.5,
       platePressure: 0.2,
       glassSmear: 0.3,
       rainDrip: 0.1,
@@ -176,7 +161,6 @@ export const PRESETS: Preset[] = [
         density: 'volume',
         color: 'none',
         rotation: 'none',
-        bubbles: 'energy',
       },
     }
   },
@@ -202,9 +186,6 @@ export const PRESETS: Preset[] = [
       damping: 0.96,
       heatDecay: 0.94,
       automateRate: 0.15,
-      bubbleAmount: 0.0,
-      bubbleBaseSize: 2.5,
-      bubbleSizeVariance: 0.4,
       platePressure: 0.4,
       glassSmear: 0.1,
       rainDrip: 0.9,
@@ -220,7 +201,6 @@ export const PRESETS: Preset[] = [
         density: 'energy',
         color: 'none',
         rotation: 'timbre',
-        bubbles: 'none',
       },
     }
   },
@@ -245,9 +225,6 @@ export const PRESETS: Preset[] = [
       damping: 0.95,
       heatDecay: 0.97,
       automateRate: 0.25,
-      bubbleAmount: 1.0,
-      bubbleBaseSize: 5,
-      bubbleSizeVariance: 1.5,
       platePressure: 0.8,
       glassSmear: 0.9,
       rainDrip: 0.4,
@@ -263,7 +240,6 @@ export const PRESETS: Preset[] = [
         density: 'timbre',
         color: 'complexity',
         rotation: 'energy',
-        bubbles: 'volume',
       },
     }
   },
@@ -286,9 +262,6 @@ export const PRESETS: Preset[] = [
       damping: 0.94,
       heatDecay: 0.92,
       automateRate: 0.05,
-      bubbleAmount: 0.5,
-      bubbleBaseSize: 6,
-      bubbleSizeVariance: 2,
       platePressure: 0.9,
       glassSmear: 0.7,
       rainDrip: 0.3,
@@ -304,7 +277,6 @@ export const PRESETS: Preset[] = [
         density: 'bass',
         color: 'none',
         rotation: 'none',
-        bubbles: 'bass',
       },
     }
   },
@@ -329,9 +301,6 @@ export const PRESETS: Preset[] = [
       damping: 0.98,
       heatDecay: 0.96,
       automateRate: 0.15,
-      bubbleAmount: 0.1,
-      bubbleBaseSize: 8,
-      bubbleSizeVariance: 0.8,
       platePressure: 0.4,
       glassSmear: 0.5,
       rainDrip: 0.6,
@@ -347,14 +316,13 @@ export const PRESETS: Preset[] = [
         density: 'volume',
         color: 'timbre',
         rotation: 'timbre',
-        bubbles: 'none',
       },
     }
   },
   {
     id: 'boiling-point',
     name: 'Boiling Point',
-    description: 'High heat and complexity create a chaotic, bubbling cauldron.',
+    description: 'High heat and complexity create a chaotic, churning cauldron of fluid.',
     settings: {
       globalSpeed: 0.07,
       layerCount: 4,
@@ -372,9 +340,6 @@ export const PRESETS: Preset[] = [
       damping: 0.9,
       heatDecay: 0.99,
       automateRate: 0.2,
-      bubbleAmount: 1.0,
-      bubbleBaseSize: 4,
-      bubbleSizeVariance: 1.5,
       platePressure: 0.5,
       glassSmear: 0.6,
       rainDrip: 0.7,
@@ -390,39 +355,35 @@ export const PRESETS: Preset[] = [
         density: 'complexity',
         color: 'treble',
         rotation: 'complexity',
-        bubbles: 'complexity',
       },
     }
   },
   {
     id: 'microscopic-chaos',
     name: 'Microscopic Chaos',
-    description: 'Extremely dense, high-contrast cellular bubbles resembling oil and water under a microscope.',
+    description: 'Extremely dense, high-contrast cellular fluid resembling oil and water under a microscope.',
     settings: {
       globalSpeed: 0.04,
       layerCount: 4,
       blendMode: 'screen',
-      gooeyEffect: 0.15, // Low gooey effect keeps bubbles distinct
+      gooeyEffect: 0.15,
       rotationSpeed: 0.01,
       centerGravity: 0.5,
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.08,
-      surfaceTension: 0.25, // High surface tension for distinct droplets
+      surfaceTension: 0.25,
       diffusionRate: 0.00005,
       buoyancy: 0.4,
       advection: 0.3,
       damping: 0.98,
       heatDecay: 0.95,
       automateRate: 0.3,
-      bubbleAmount: 1.0, // Maximum bubbles
-      bubbleBaseSize: 2.5, // Very small base size
-      bubbleSizeVariance: 2, // Spawn jitter
       platePressure: 0.8,
       glassSmear: 0.2,
       rainDrip: 0.1,
       viscosity: 'thick',
-      polarity: 0.95, // High repulsion
+      polarity: 0.95,
       heatIntensity: 0.2,
       boilingPoint: 0.8,
       evaporationRate: 0.01,
@@ -433,7 +394,6 @@ export const PRESETS: Preset[] = [
         density: 'energy',
         color: 'timbre',
         rotation: 'none',
-        bubbles: 'volume',
       },
     }
   }

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
-import { PALETTE_RGB, BUBBLE_COLORS, hexToRgb, getAudioValue, type AudioFeatureKey } from '../constants';
+import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey } from '../constants';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -22,18 +22,6 @@ const GRID_AREA = GRID_SIZE * GRID_SIZE;
 // Pre-compute the full-palette color count once.
 const PALETTE_COUNT = PALETTE_RGB.length;
 
-interface Bubble {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  radius: number;
-  life: number;
-  maxLife: number;
-  type: 'clear' | 'color';
-  color?: string;
-}
-
 // ─── Fluid Simulation ────────────────────────────────────────────────
 
 class FluidSimulation {
@@ -41,8 +29,6 @@ class FluidSimulation {
   dt: number;
   diff: number;
   visc: number;
-
-  bubbles: Bubble[] = [];
 
   s: Float32Array;
   sR: Float32Array;
@@ -152,48 +138,6 @@ class FluidSimulation {
           this.densityB[idx] *= 0.8;
         }
       }
-    }
-  }
-
-  createBubble(x: number, y: number, radius: number, strength: number, spawnChance: number = 1.0) {
-    const r2 = radius * radius;
-    for (let i = -radius; i <= radius; i++) {
-      for (let j = -radius; j <= radius; j++) {
-        const distSq = i * i + j * j;
-        if (distSq >= r2) continue;
-        const nx = Math.floor(x + i);
-        const ny = Math.floor(y + j);
-        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
-          const idx = nx + ny * this.size;
-          if (distSq > 0) {
-            const dist = Math.sqrt(distSq);
-            this.vx[idx] += (i / dist) * strength;
-            this.vy[idx] += (j / dist) * strength;
-          }
-          this.density[idx] *= 0.1;
-          this.densityR[idx] *= 0.1;
-          this.densityG[idx] *= 0.1;
-          this.densityB[idx] *= 0.1;
-        }
-      }
-    }
-
-    const ix = Math.floor(x), iy = Math.floor(y);
-    if (Math.random() < spawnChance && ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1
-        && this.density[ix + iy * this.size] > 0.05) {
-      const u1 = Math.random(), u2 = Math.random();
-      const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-      const spawnRadius = Math.max(0.008, Math.min(0.06, 0.025 + gauss * 0.008));
-      this.bubbles.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 0.015,
-        vy: -Math.random() * 0.025 - 0.005,
-        radius: spawnRadius,
-        life: 0,
-        maxLife: 400 + Math.random() * 500,
-        type: Math.random() > 0.5 ? 'color' : 'clear',
-        color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
-      });
     }
   }
 
@@ -332,144 +276,6 @@ class FluidSimulation {
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
 
-    // 11. Bubble system
-    this.stepBubbles(settings, audioData);
-  }
-
-  // ── Bubble system (extracted from step for clarity) ──────────────
-  private stepBubbles(settings: VisualizerSettings, audioData: AudioData | null) {
-    let currentBubbleAmount = settings.bubbleAmount;
-    if (audioData && settings.audioMappings) {
-      currentBubbleAmount += getAudioValue(audioData, settings.audioMappings.bubbles as AudioFeatureKey) * 0.05;
-    }
-    if (currentBubbleAmount <= 0) return;
-
-    // Very rare spawns — bubbles should be an occasional occurrence, not constant
-    const maxBubbles = 20;
-    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.003) {
-      // Only spawn inside existing fluid
-      let spawnX = -1, spawnY = -1;
-      for (let attempts = 0; attempts < 12; attempts++) {
-        const tx = Math.floor(1 + Math.random() * (this.size - 2));
-        const ty = Math.floor(1 + Math.random() * (this.size - 2));
-        if (this.density[tx + ty * this.size] > 0.08) {
-          spawnX = tx; spawnY = ty;
-          break;
-        }
-      }
-      if (spawnX < 0) return;
-
-      // Box-Muller normal distribution: mean ~0.22 grid cells (~5px at 22px/cell),
-      // σ = 0.07. Nearly all bubbles land between 0.08 and 0.45 (2–10px).
-      // Tail allows rare slightly larger bubbles naturally.
-      const u1 = Math.random(), u2 = Math.random();
-      const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-      const radius = Math.max(0.008, Math.min(0.06, 0.025 + gauss * 0.008));
-
-      const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
-      this.bubbles.push({
-        x: spawnX, y: spawnY,
-        vx: (Math.random() - 0.5) * 0.02,
-        vy: -Math.random() * 0.03 - 0.005,
-        radius,
-        life: 0,
-        maxLife: 400 + Math.random() * 600,
-        type: Math.random() > 0.5 ? 'color' : 'clear',
-        color: c,
-      });
-    }
-
-    // Update
-    for (let i = this.bubbles.length - 1; i >= 0; i--) {
-      const b = this.bubbles[i];
-      b.life++;
-
-      const ix = Math.floor(b.x);
-      const iy = Math.floor(b.y);
-
-      if (ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1) {
-        const idx = ix + iy * this.size;
-        // Gentle fluid coupling — tiny bubbles are viscous and barely drift with flow
-        b.vx += this.vx[idx] * 0.012;
-        b.vy += this.vy[idx] * 0.012;
-        b.vy -= settings.buoyancy * 0.006;
-        if (settings.airVelocity > 0) {
-          b.vy -= settings.airVelocity * 0.02;
-          b.vx += (Math.random() - 0.5) * settings.airVelocity * 0.015;
-        }
-      }
-
-      b.vx *= 0.97;   // stronger damping — bubbles slow down fast
-      b.vy *= 0.97;
-      // Clamp speed so bubbles never teleport
-      const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      if (spd > 0.15) { b.vx = b.vx / spd * 0.15; b.vy = b.vy / spd * 0.15; }
-      b.x += b.vx;
-      b.y += b.vy;
-      b.x += Math.sin(b.life * 0.05 + b.y * 0.1) * 0.03;  // barely perceptible wobble
-
-      // Remove if dead / out of bounds
-      if (b.life >= b.maxLife || b.x < 0 || b.x >= this.size || b.y < 0 || b.y >= this.size) {
-        if (b.life >= b.maxLife && b.x >= 1 && b.x < this.size - 1 && b.y >= 1 && b.y < this.size - 1) {
-          if (b.type === 'color' && b.color) {
-            const rgb = hexToRgb(b.color);
-            const burstAmount = Math.max(0.3, b.radius * 1.5);
-            this.addDensity(Math.floor(b.x), Math.floor(b.y), burstAmount, rgb.r, rgb.g, rgb.b);
-            this.addTemp(Math.floor(b.x), Math.floor(b.y), 0.5);
-          } else {
-            this.blowAir(Math.floor(b.x), Math.floor(b.y), Math.max(1, Math.floor(b.radius * 0.8)), 0.3);
-          }
-        }
-        this.bubbles.splice(i, 1);
-        continue;
-      }
-
-      // Merging
-      let merged = false;
-      for (let j = i - 1; j >= 0; j--) {
-        const other = this.bubbles[j];
-        const dx = b.x - other.x;
-        const dy = b.y - other.y;
-        const distSq = dx * dx + dy * dy;
-        const rSum = b.radius + other.radius;
-        if (distSq < (rSum * 0.45) * (rSum * 0.45)) {  // must actually overlap to merge
-          const m1 = b.radius * b.radius;
-          const m2 = other.radius * other.radius;
-          const totalM = m1 + m2;
-          other.x = (b.x * m1 + other.x * m2) / totalM;
-          other.y = (b.y * m1 + other.y * m2) / totalM;
-          other.vx = (b.vx * m1 + other.vx * m2) / totalM;
-          other.vy = (b.vy * m1 + other.vy * m2) / totalM;
-          other.radius = Math.sqrt(totalM);
-          other.life = Math.min(b.life, other.life);
-          other.maxLife = Math.max(b.maxLife, other.maxLife);
-          this.bubbles.splice(i, 1);
-          merged = true;
-          break;
-        }
-      }
-      if (merged) continue;
-
-      // Splitting — only when merged large enough.
-      const splitCap = Math.max(1.5, settings.bubbleBaseSize || 4);
-      const speedSq = b.vx * b.vx + b.vy * b.vy;
-      const splitChance = b.radius > splitCap * 1.3 ? 0.02 : (speedSq > 0.04 ? 0.005 : 0);
-      if (b.radius > splitCap && Math.random() < splitChance) {
-        const r1 = b.radius * 0.65;
-        b.radius = r1;
-        const angle = Math.random() * Math.PI * 2;
-        const pushForce = 0.03;  // tiny separation impulse
-        const pushX = Math.cos(angle) * pushForce;
-        const pushY = Math.sin(angle) * pushForce;
-        b.vx += pushX;
-        b.vy += pushY;
-        this.bubbles.push({
-          x: b.x - pushX * 2, y: b.y - pushY * 2,
-          vx: b.vx - pushX * 2, vy: b.vy - pushY * 2,
-          radius: r1, life: b.life, maxLife: b.maxLife, type: b.type, color: b.color,
-        });
-      }
-    }
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -969,7 +775,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
           const af = fluidsRef.current[activeLayerRef.current];
           if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
             if (activeToolRef.current === 'blow') {
-              af.createBubble(x, y, 12, 0.5, 0.1);
+              af.blowAir(x, y, 12, 0.5);
             } else {
               const rgb = hexToRgb(selectedColorRef.current);
               af.addDensity(x, y, 2.0, rgb.r, rgb.g, rgb.b);
@@ -992,7 +798,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
               const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const isBlow = Math.random() > 0.6 - (spectralCentroid / 128) * 0.4;
               if (isBlow) {
-                af.createBubble(rx, ry, 2, 0.1, 0.3);
+                af.blowAir(rx, ry, 2, 0.1);
               } else {
                 const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
                 af.addDensity(rx, ry, 8.0 + Math.random() * 8.0 + energy * 20, color.r, color.g, color.b);
@@ -1035,26 +841,6 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
 
             af.addDensity(ambientX, ambientY, 0.018, ar, ag, ab);
             af.addTemp(ambientX, ambientY, 0.008);
-
-            // Boiling — audio treble gently raises heat; boilingPoint acts as a gate
-            let dynamicHeatIntensity = currentSettings.heatIntensity;
-            if (currentAudioData) dynamicHeatIntensity += (currentAudioData.treble / 255) * 0.6;
-            if (dynamicHeatIntensity > currentSettings.boilingPoint) {
-              const burstCount = Math.floor((dynamicHeatIntensity - currentSettings.boilingPoint) * 6);
-              for (let i = 0; i < burstCount; i++) {
-                const bx = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                const by = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                af.createBubble(bx, by, Math.floor(Math.random() * 2) + 1, 0.6, 0.05);
-                af.addTemp(bx, by, 0.5);
-              }
-            }
-
-            // Ambient bubbles — very sparse
-            if (currentSettings.bubbleAmount > 0 && Math.random() < 0.03) {
-              const bx = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-              const by = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-              af.createBubble(bx, by, 1, 0.3, 0.1);
-            }
 
             const driftX = noise2D(time * 0.1, 0) * 0.001;
             const driftY = noise2D(0, time * 0.1) * 0.001;
@@ -1310,34 +1096,6 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
             const scale = Math.max(tCanvas.width, tCanvas.height) * 1.5 / GRID_SIZE;
             tCtx.scale(scale, scale);
             tCtx.drawImage(offscreenCanvas, -GRID_SIZE / 2, -GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
-
-            // Draw bubbles — subtle rings only, no solid fills
-            if (fluid.bubbles.length > 0) {
-              tCtx.globalCompositeOperation = 'source-over';
-              for (const bub of fluid.bubbles) {
-                const bx = bub.x - GRID_SIZE / 2;
-                const by = bub.y - GRID_SIZE / 2;
-                // Fade in/out over lifetime
-                const lifeT = bub.life / bub.maxLife;
-                const opacity = Math.min(lifeT * 8, 1, (1 - lifeT) * 8) * 0.35;
-                if (opacity < 0.01) continue;
-
-                tCtx.beginPath();
-                tCtx.arc(bx, by, Math.max(0.1, bub.radius), 0, Math.PI * 2);
-                // Thin translucent ring — no fill
-                tCtx.strokeStyle = bub.type === 'color'
-                  ? `rgba(255,255,255,${opacity * 0.7})`
-                  : `rgba(255,255,255,${opacity})`;
-                tCtx.lineWidth = 0.4 / scale;
-                tCtx.stroke();
-                // Tiny specular glint at top-left — max 20% of radius
-                const glintR = bub.radius * 0.12;
-                tCtx.beginPath();
-                tCtx.arc(bx - bub.radius * 0.25, by - bub.radius * 0.25, Math.max(0.05, glintR), 0, Math.PI * 2);
-                tCtx.fillStyle = `rgba(255,255,255,${opacity * 0.5})`;
-                tCtx.fill();
-              }
-            }
 
             tCtx.restore();
 

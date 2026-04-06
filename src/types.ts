@@ -7,7 +7,6 @@ export interface AudioMappings {
   density: AudioFeature;
   color: AudioFeature;
   rotation: AudioFeature;
-  bubbles: AudioFeature;
 }
 
 export interface VisualizerSettings {
@@ -54,11 +53,6 @@ export interface VisualizerSettings {
   
   // Automation
   automateRate: number;
-  
-  // Bubbles
-  bubbleAmount: number;
-  bubbleBaseSize: number;
-  bubbleSizeVariance: number;
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
@@ -70,7 +64,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     density: 'bass',
     color: 'treble',
     rotation: 'none',
-    bubbles: 'none',
   },
   platePressure: 0.1,
   glassSmear: 0.15,
@@ -98,7 +91,4 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   damping: 0.995,           // high damping — energy dissipates quickly
   heatDecay: 0.98,
   automateRate: 0.02,
-  bubbleAmount: 0.0,
-  bubbleBaseSize: 4,
-  bubbleSizeVariance: 1,
 };

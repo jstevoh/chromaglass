@@ -120,7 +120,7 @@ export default function App() {
       sensitivity: Math.random() * 0.8 + 0.2,
       bassBoost: Math.random() * 1.5 + 0.5,
       globalSpeed: Math.random() * 0.08 + 0.02,
-      audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature(), bubbles: randomFeature() },
+      audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
       platePressure: Math.random(), glassSmear: Math.random(), rainDrip: Math.random(),
       viscosity: Math.random() > 0.5 ? 'thick' : 'thin', polarity: Math.random(),
       heatIntensity: Math.random() * 0.5, boilingPoint: Math.random(), evaporationRate: Math.random() * 0.05,
@@ -136,7 +136,6 @@ export default function App() {
       buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
       damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
       automateRate: Math.random() * 0.2,
-      bubbleAmount: Math.random(), bubbleBaseSize: Math.random() * 8 + 2, bubbleSizeVariance: Math.random() * 2 + 0.3,
     });
     setActivePresetId(null);
     setSeedCount(prev => prev + 1);
@@ -207,7 +206,7 @@ export default function App() {
                     <button
                       onClick={() => setActiveTool('blow')}
                       className={`relative z-10 flex-1 flex justify-center items-center gap-1.5 py-2 transition-colors ${activeTool === 'blow' ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                      title="Blow air bubbles through the fluid"
+                      title="Blow air through the fluid"
                     >
                       <Wind size={12} />
                       <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
@@ -418,10 +417,10 @@ export default function App() {
             </div>
             <div className="flex flex-col gap-3 text-[11px] text-white/70 leading-relaxed">
               <div>
-                <span className="text-white/90 font-bold">Click & drag</span> on the canvas to interact with the fluid. Use the <span className="text-white/90">Drop</span> tool to add color, or <span className="text-white/90">Blow</span> to push air bubbles.
+                <span className="text-white/90 font-bold">Click & drag</span> on the canvas to interact with the fluid. Use the <span className="text-white/90">Drop</span> tool to add color, or <span className="text-white/90">Blow</span> to push air through the liquid.
               </div>
               <div>
-                <span className="text-white/90 font-bold">Auto mode</span> generates drops and bubbles driven by the audio input.
+                <span className="text-white/90 font-bold">Auto mode</span> generates drops and airflow driven by the audio input.
               </div>
               <div>
                 <span className="text-white/90 font-bold">Layers</span> are independent fluid simulations composited together. Switch layers to paint on different planes.

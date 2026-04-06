@@ -121,7 +121,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Activity size={12} /> Audio Mappings
         </h3>
         
-        {['velocity', 'density', 'color', 'rotation', 'bubbles'].map((param) => (
+        {['velocity', 'density', 'color', 'rotation'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">{param}</span>
             <select
@@ -266,30 +266,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
-        <Slider
-          label="Bubble Amount"
-          value={settings.bubbleAmount}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ bubbleAmount: v })}
-        />
-        <Slider
-          label="Bubble Max Size"
-          value={settings.bubbleBaseSize}
-          min={1}
-          max={15}
-          step={0.5}
-          onChange={(v: number) => onUpdate({ bubbleBaseSize: v })}
-        />
-        <Slider
-          label="Bubble Spawn Jitter"
-          value={settings.bubbleSizeVariance}
-          min={0}
-          max={3}
-          step={0.1}
-          onChange={(v: number) => onUpdate({ bubbleSizeVariance: v })}
-        />
         <Slider
           label="Diffusion Rate"
           value={settings.diffusionRate}
