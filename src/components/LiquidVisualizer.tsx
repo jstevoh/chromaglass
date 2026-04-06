@@ -302,7 +302,7 @@ class FluidSimulation {
     }
 
     // 11. Insects
-    this.stepInsects();
+    this.stepInsects(audioData);
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -591,7 +591,14 @@ class FluidSimulation {
       angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0 });
   }
 
-  private stepInsects() {
+  private stepInsects(audioData: AudioData | null) {
+    // Normalize audio bands to 0–1 range (raw values are 0–100 scale)
+    const bass    = audioData ? Math.min(1, audioData.bass    / 80) : 0;
+    const mid     = audioData ? Math.min(1, audioData.mid     / 80) : 0;
+    const treble  = audioData ? Math.min(1, audioData.treble  / 80) : 0;
+    const energy  = audioData ? Math.min(1, audioData.energy  / 80) : 0;
+    const volume  = audioData ? Math.min(1, audioData.volume  / 80) : 0;
+
     for (let i = this.insects.length - 1; i >= 0; i--) {
       const ins = this.insects[i];
       ins.life++;
@@ -615,13 +622,16 @@ class FluidSimulation {
       const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
 
       if (ins.type === 'water_strider') {
-        const speed = ins.state === 'burst' ? 2.2 : 0.75;
+        // Bass triggers burst mode — kick drums send it skittering
+        if (bass > 0.6 && ins.state !== 'burst') { ins.state = 'burst'; ins.stateTimer = 0; }
+        const audioSpeed = 1 + bass * 2.5;
+        const speed = ins.state === 'burst' ? 2.2 * audioSpeed : 0.75 * (1 + mid * 0.8);
         ins.vx = ins.vx * 0.82 + Math.cos(ins.angle) * speed * 0.18;
         ins.vy = ins.vy * 0.82 + Math.sin(ins.angle) * speed * 0.18;
         if (ins.state === 'burst' && ins.stateTimer > 8) { ins.state = 'glide'; ins.stateTimer = 0; }
         else if (ins.state !== 'burst' && ins.stateTimer > 35 + Math.random() * 25) {
           ins.state = Math.random() < 0.3 ? 'burst' : 'glide';
-          ins.angle += (Math.random() - 0.5) * 0.9;
+          ins.angle += (Math.random() - 0.5) * (0.9 + energy * 1.5);
           ins.stateTimer = 0;
         }
         // Four leg-contact dimples (2 per side)
@@ -638,16 +648,22 @@ class FluidSimulation {
           if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
             const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 0.18 * ins.strength * (ins.state === 'burst' ? 3.5 : 1);
+            const f = 0.18 * ins.strength * (ins.state === 'burst' ? 3.5 + bass * 3 : 1 + mid * 0.5);
             this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
           }
         }
 
       } else if (ins.type === 'ant') {
-        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * 0.55 * 0.22;
-        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * 0.55 * 0.22;
-        if (ins.stateTimer > 55 + Math.random() * 55) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.9; ins.stateTimer = 0; }
-        // Six-legged alternating footfall every 4 frames
+        // Mid frequencies control pace — busy mids = faster march, more erratic turns
+        const pace = 0.55 * (1 + mid * 1.5);
+        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * pace * 0.22;
+        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * pace * 0.22;
+        const turnFreq = Math.max(20, 55 - mid * 35);
+        if (ins.stateTimer > turnFreq + Math.random() * 30) {
+          ins.angle += (Math.random() - 0.5) * Math.PI * (0.9 + energy * 1.2);
+          ins.stateTimer = 0;
+        }
+        // Six-legged alternating footfall every 4 frames — bass boosts footfall force
         if (ins.life % 4 === 0 && safe) {
           const { px, py } = perp(ins.angle);
           const side = ins.life % 8 < 4 ? 1 : -1;
@@ -655,18 +671,21 @@ class FluidSimulation {
             const lx = Math.floor(ins.x + px * side * 1.3 + Math.cos(ins.angle) * leg);
             const ly = Math.floor(ins.y + py * side * 1.3 + Math.sin(ins.angle) * leg);
             if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-              this.addVelocity(lx, ly, Math.cos(ins.angle) * 0.08, Math.sin(ins.angle) * 0.08);
+              this.addVelocity(lx, ly, Math.cos(ins.angle) * (0.08 + bass * 0.12), Math.sin(ins.angle) * (0.08 + bass * 0.12));
           }
         }
 
       } else if (ins.type === 'butterfly') {
-        ins.angle += (Math.random() - 0.5) * 0.18;
-        const flapSpd = 0.18 * ins.strength;
+        // Treble and energy control flap agitation — high frequencies = panicked flapping
+        const agitation = treble * 1.8 + energy * 0.8;
+        ins.angle += (Math.random() - 0.5) * (0.18 + agitation * 0.3);
+        const flapSpd = (0.18 + agitation * 0.25) * ins.strength;
         ins.vx = ins.vx * 0.88 + (Math.random() - 0.5) * flapSpd;
         ins.vy = ins.vy * 0.88 + (Math.random() - 0.5) * flapSpd;
-        // Alternating wing flaps every 10 frames
-        if (ins.stateTimer % 10 < 2 && ins.strength > 0.05) {
-          const leftWing = Math.floor(ins.stateTimer / 10) % 2 === 0;
+        // Wing flaps — frequency increases with treble
+        const flapInterval = Math.max(4, Math.floor(10 - treble * 6));
+        if (ins.stateTimer % flapInterval < 2 && ins.strength > 0.05) {
+          const leftWing = Math.floor(ins.stateTimer / flapInterval) % 2 === 0;
           const { px, py } = perp(ins.angle);
           const sx = leftWing ? 1 : -1;
           const wingR = Math.max(3, Math.floor(8 * ins.strength));
@@ -674,7 +693,7 @@ class FluidSimulation {
             const wx = Math.floor(ins.x + px * sx * w);
             const wy = Math.floor(ins.y + py * sx * w);
             if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = 0.35 * ins.strength * (1 - w / wingR);
+              const f = (0.35 + agitation * 0.25) * ins.strength * (1 - w / wingR);
               this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.4,
                                        py * sx * f - Math.sin(ins.angle) * f * 0.4);
             }
@@ -682,48 +701,55 @@ class FluidSimulation {
         }
 
       } else if (ins.type === 'beetle') {
+        // Bass makes it start walking; volume controls plowing force
         if (ins.state === 'stopped') {
-          if (ins.stateTimer > 50 + Math.random() * 50) { ins.state = 'walking'; ins.stateTimer = 0; }
+          if (bass > 0.5 || ins.stateTimer > 50 + Math.random() * 50) { ins.state = 'walking'; ins.stateTimer = 0; }
         } else {
-          ins.vx = ins.vx * 0.87 + Math.cos(ins.angle) * 0.11 * 0.13;
-          ins.vy = ins.vy * 0.87 + Math.sin(ins.angle) * 0.11 * 0.13;
+          const plowSpeed = 0.11 * (1 + volume * 1.2);
+          ins.vx = ins.vx * 0.87 + Math.cos(ins.angle) * plowSpeed * 0.13;
+          ins.vy = ins.vy * 0.87 + Math.sin(ins.angle) * plowSpeed * 0.13;
           if (ins.stateTimer > 90 + Math.random() * 80) {
             ins.state = Math.random() < 0.35 ? 'stopped' : 'walking';
-            ins.angle += (Math.random() - 0.5) * 0.6;
+            ins.angle += (Math.random() - 0.5) * (0.6 + bass * 1.0);
             ins.stateTimer = 0;
           }
-          // Bow wave + side displacement
+          // Bow wave + side displacement — volume boosts plow force
+          const plowF = 0.35 + volume * 0.4;
           const bx = Math.floor(ins.x + Math.cos(ins.angle) * 2.2);
           const by = Math.floor(ins.y + Math.sin(ins.angle) * 2.2);
           if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
-            this.addVelocity(bx, by, Math.cos(ins.angle) * 0.35, Math.sin(ins.angle) * 0.35);
+            this.addVelocity(bx, by, Math.cos(ins.angle) * plowF, Math.sin(ins.angle) * plowF);
           const { px, py } = perp(ins.angle);
           for (const s of [-1, 1]) {
             const sx2 = Math.floor(ins.x + px * s * 2);
             const sy2 = Math.floor(ins.y + py * s * 2);
             if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-              this.addVelocity(sx2, sy2, px * s * 0.22, py * s * 0.22);
+              this.addVelocity(sx2, sy2, px * s * (0.22 + volume * 0.25), py * s * (0.22 + volume * 0.25));
           }
         }
 
       } else if (ins.type === 'fly') {
-        if (ins.stateTimer > 4 + Math.random() * 9) {
-          ins.angle += (Math.random() - 0.5) * Math.PI * 1.6;
+        // Energy and treble control dash interval and speed
+        const dashInterval = Math.max(2, Math.floor(9 - energy * 6));
+        if (ins.stateTimer > dashInterval + Math.random() * dashInterval) {
+          ins.angle += (Math.random() - 0.5) * Math.PI * (1.6 + treble * 1.5);
           ins.stateTimer = 0;
         }
-        ins.vx = ins.vx * 0.68 + Math.cos(ins.angle) * 0.65 * 0.32;
-        ins.vy = ins.vy * 0.68 + Math.sin(ins.angle) * 0.65 * 0.32;
-        // Micro-swirl every 6 frames
+        const flySpeed = 0.65 * (1 + energy * 1.5 + treble * 0.8);
+        ins.vx = ins.vx * 0.68 + Math.cos(ins.angle) * flySpeed * 0.32;
+        ins.vy = ins.vy * 0.68 + Math.sin(ins.angle) * flySpeed * 0.32;
+        // Micro-swirl every 6 frames — energy boosts swirl
         if (ins.life % 6 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          this.addVelocity(ix, iy, ins.vx * 0.18, ins.vy * 0.18);
-          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * 0.14,  py * 0.14);
-          this.addVelocity(Math.max(1,              ix - 1), iy, -px * 0.14, -py * 0.14);
+          const swirlF = 0.14 + energy * 0.18;
+          this.addVelocity(ix, iy, ins.vx * (0.18 + energy * 0.2), ins.vy * (0.18 + energy * 0.2));
+          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
+          this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
         }
       }
 
-      // Clamp speed per type
-      const maxSpd = ins.type === 'fly' ? 1.2 : ins.type === 'water_strider' ? 0.85 : 0.35;
+      // Clamp speed per type — audio can push near the cap but not blow it up
+      const maxSpd = ins.type === 'fly' ? 1.8 : ins.type === 'water_strider' ? 1.4 : 0.6;
       const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
       if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
       ins.x += ins.vx;
@@ -980,7 +1006,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const af = fluidsRef.current[activeLayerRef.current];
           if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
             if (activeToolRef.current === 'blow') {
-              af.blowAir(x, y, 10, 0.3);
+              af.blowAir(x, y, 4, 0.06);
             } else {
               const liq = selectedLiquidRef.current;
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
@@ -1087,9 +1113,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
             if (currentAudioData.volume > 5 && densityMod > 0.01) {
-              const centerX = Math.floor(GRID_SIZE / 2);
-              const centerY = Math.floor(GRID_SIZE / 2);
-
               const timeOffset = time * 0.3 + colorMod * Math.PI;
               const ci = Math.floor(timeOffset % PALETTE_COUNT);
               const ni = (ci + 1) % PALETTE_COUNT;
@@ -1100,9 +1123,49 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               const activeFluid = fluidsRef.current[activeLayerRef.current];
               if (activeFluid) {
-                // Add a tiny dot of colored density at center — physics diffuses it
-                activeFluid.addDensity(centerX, centerY, densityMod * 0.004, ar_a, ag_a, ab_a);
-                activeFluid.addTemp(centerX, centerY, densityMod * 0.002);
+                // Scatter injection across the fluid proportional to audio energy
+                const bass01  = Math.min(1, currentAudioData.bass   / 80);
+                const treble01= Math.min(1, currentAudioData.treble  / 80);
+                const energy01= Math.min(1, currentAudioData.energy  / 80);
+
+                // Center pulse — scales with density mapping
+                const centerX = Math.floor(GRID_SIZE / 2);
+                const centerY = Math.floor(GRID_SIZE / 2);
+                activeFluid.addDensity(centerX, centerY, densityMod * 0.025, ar_a, ag_a, ab_a);
+                activeFluid.addTemp(centerX, centerY, densityMod * 0.015);
+
+                // Bass hit: radial velocity burst from center
+                if (bass01 > 0.45) {
+                  const burstR = 18;
+                  for (let bj = -burstR; bj <= burstR; bj += 3) {
+                    for (let bi = -burstR; bi <= burstR; bi += 3) {
+                      const dist = Math.sqrt(bi * bi + bj * bj);
+                      if (dist < 2 || dist > burstR) continue;
+                      const bx = centerX + bi, by = centerY + bj;
+                      if (bx > 0 && bx < GRID_SIZE - 1 && by > 0 && by < GRID_SIZE - 1) {
+                        const f = (bass01 - 0.45) * 0.6 * (1 - dist / burstR);
+                        activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
+                      }
+                    }
+                  }
+                }
+
+                // Treble: scattered heat sparks across the field
+                if (treble01 > 0.3) {
+                  const sparks = Math.floor(treble01 * 6);
+                  for (let s = 0; s < sparks; s++) {
+                    const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                    const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                    activeFluid.addTemp(sx, sy, treble01 * 0.4);
+                  }
+                }
+
+                // Energy: slow swell of density at a roaming point
+                if (energy01 > 0.2) {
+                  const ex = Math.floor(GRID_SIZE / 2 + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
+                  const ey = Math.floor(GRID_SIZE / 2 + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
+                  activeFluid.addDensity(ex, ey, energy01 * 0.03, ar_a, ag_a, ab_a);
+                }
               }
             }
           }
