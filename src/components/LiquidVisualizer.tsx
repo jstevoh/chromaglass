@@ -615,7 +615,7 @@ class FluidSimulation {
       const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
 
       if (ins.type === 'water_strider') {
-        const speed = ins.state === 'burst' ? 1.1 : 0.38;
+        const speed = ins.state === 'burst' ? 2.2 : 0.75;
         ins.vx = ins.vx * 0.82 + Math.cos(ins.angle) * speed * 0.18;
         ins.vy = ins.vy * 0.82 + Math.sin(ins.angle) * speed * 0.18;
         if (ins.state === 'burst' && ins.stateTimer > 8) { ins.state = 'glide'; ins.stateTimer = 0; }
@@ -638,14 +638,14 @@ class FluidSimulation {
           if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
             const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 0.018 * ins.strength * (ins.state === 'burst' ? 2.2 : 1);
+            const f = 0.18 * ins.strength * (ins.state === 'burst' ? 3.5 : 1);
             this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
           }
         }
 
       } else if (ins.type === 'ant') {
-        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * 0.17 * 0.22;
-        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * 0.17 * 0.22;
+        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * 0.55 * 0.22;
+        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * 0.55 * 0.22;
         if (ins.stateTimer > 55 + Math.random() * 55) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.9; ins.stateTimer = 0; }
         // Six-legged alternating footfall every 4 frames
         if (ins.life % 4 === 0 && safe) {
@@ -655,7 +655,7 @@ class FluidSimulation {
             const lx = Math.floor(ins.x + px * side * 1.3 + Math.cos(ins.angle) * leg);
             const ly = Math.floor(ins.y + py * side * 1.3 + Math.sin(ins.angle) * leg);
             if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-              this.addVelocity(lx, ly, Math.cos(ins.angle) * 0.007, Math.sin(ins.angle) * 0.007);
+              this.addVelocity(lx, ly, Math.cos(ins.angle) * 0.08, Math.sin(ins.angle) * 0.08);
           }
         }
 
@@ -669,12 +669,12 @@ class FluidSimulation {
           const leftWing = Math.floor(ins.stateTimer / 10) % 2 === 0;
           const { px, py } = perp(ins.angle);
           const sx = leftWing ? 1 : -1;
-          const wingR = Math.max(2, Math.floor(6 * ins.strength));
+          const wingR = Math.max(3, Math.floor(8 * ins.strength));
           for (let w = 1; w <= wingR; w++) {
             const wx = Math.floor(ins.x + px * sx * w);
             const wy = Math.floor(ins.y + py * sx * w);
             if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = 0.055 * ins.strength * (1 - w / wingR);
+              const f = 0.35 * ins.strength * (1 - w / wingR);
               this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.4,
                                        py * sx * f - Math.sin(ins.angle) * f * 0.4);
             }
@@ -696,13 +696,13 @@ class FluidSimulation {
           const bx = Math.floor(ins.x + Math.cos(ins.angle) * 2.2);
           const by = Math.floor(ins.y + Math.sin(ins.angle) * 2.2);
           if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
-            this.addVelocity(bx, by, Math.cos(ins.angle) * 0.045, Math.sin(ins.angle) * 0.045);
+            this.addVelocity(bx, by, Math.cos(ins.angle) * 0.35, Math.sin(ins.angle) * 0.35);
           const { px, py } = perp(ins.angle);
           for (const s of [-1, 1]) {
             const sx2 = Math.floor(ins.x + px * s * 2);
             const sy2 = Math.floor(ins.y + py * s * 2);
             if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-              this.addVelocity(sx2, sy2, px * s * 0.028, py * s * 0.028);
+              this.addVelocity(sx2, sy2, px * s * 0.22, py * s * 0.22);
           }
         }
 
@@ -716,9 +716,9 @@ class FluidSimulation {
         // Micro-swirl every 6 frames
         if (ins.life % 6 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          this.addVelocity(ix, iy, ins.vx * 0.022, ins.vy * 0.022);
-          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * 0.016,  py * 0.016);
-          this.addVelocity(Math.max(1,              ix - 1), iy, -px * 0.016, -py * 0.016);
+          this.addVelocity(ix, iy, ins.vx * 0.18, ins.vy * 0.18);
+          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * 0.14,  py * 0.14);
+          this.addVelocity(Math.max(1,              ix - 1), iy, -px * 0.14, -py * 0.14);
         }
       }
 
@@ -1023,6 +1023,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 af.addTemp(rx, ry, 1.0 + Math.random() * 2 + trebleBoost * 3);
               }
             }
+          }
+
+          // Auto-deploy insects periodically
+          const insectAutoTypes = ['water_strider', 'ant', 'butterfly', 'beetle', 'fly'] as const;
+          const af0 = fluidsRef.current[0];
+          if (af0 && af0.insects.length < 4 && Math.random() < rate * 0.004 + energy * 0.003) {
+            const type = insectAutoTypes[Math.floor(Math.random() * insectAutoTypes.length)];
+            af0.deployInsect(type);
           }
         }
 
