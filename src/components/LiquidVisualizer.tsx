@@ -178,11 +178,12 @@ class FluidSimulation {
       }
     }
 
-    // Only spawn if there's fluid at this location
     const ix = Math.floor(x), iy = Math.floor(y);
     if (Math.random() < spawnChance && ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1
         && this.density[ix + iy * this.size] > 0.05) {
-      const spawnRadius = 0.15 + Math.random() * 0.25;
+      const u1 = Math.random(), u2 = Math.random();
+      const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
+      const spawnRadius = Math.max(0.08, Math.min(0.5, 0.22 + gauss * 0.07));
       this.bubbles.push({
         x, y,
         vx: (Math.random() - 0.5) * 0.015,
@@ -339,30 +340,32 @@ class FluidSimulation {
   private stepBubbles(settings: VisualizerSettings, audioData: AudioData | null) {
     let currentBubbleAmount = settings.bubbleAmount;
     if (audioData && settings.audioMappings) {
-      // Audio adds gently — not 2× the base amount
-      currentBubbleAmount += getAudioValue(audioData, settings.audioMappings.bubbles as AudioFeatureKey) * 0.4;
+      currentBubbleAmount += getAudioValue(audioData, settings.audioMappings.bubbles as AudioFeatureKey) * 0.05;
     }
     if (currentBubbleAmount <= 0) return;
 
-    // Cap total bubble count
-    const maxBubbles = 40;
-    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.2) {
-      // Only spawn inside existing fluid — no random blank-space appearances
-      let attempts = 0;
+    // Very rare spawns — bubbles should be an occasional occurrence, not constant
+    const maxBubbles = 20;
+    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.003) {
+      // Only spawn inside existing fluid
       let spawnX = -1, spawnY = -1;
-      while (attempts < 8) {
+      for (let attempts = 0; attempts < 12; attempts++) {
         const tx = Math.floor(1 + Math.random() * (this.size - 2));
         const ty = Math.floor(1 + Math.random() * (this.size - 2));
         if (this.density[tx + ty * this.size] > 0.08) {
           spawnX = tx; spawnY = ty;
           break;
         }
-        attempts++;
       }
-      if (spawnX < 0) return; // no fluid found, skip
+      if (spawnX < 0) return;
 
-      const jitter = (settings.bubbleSizeVariance || 1) * 0.1;
-      const radius = 0.15 + Math.random() * 0.3 + jitter * Math.random();
+      // Box-Muller normal distribution: mean ~0.22 grid cells (~5px at 22px/cell),
+      // σ = 0.07. Nearly all bubbles land between 0.08 and 0.45 (2–10px).
+      // Tail allows rare slightly larger bubbles naturally.
+      const u1 = Math.random(), u2 = Math.random();
+      const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
+      const radius = Math.max(0.08, Math.min(0.5, 0.22 + gauss * 0.07));
+
       const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
       this.bubbles.push({
         x: spawnX, y: spawnY,
