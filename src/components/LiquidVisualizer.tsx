@@ -951,30 +951,19 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
               const hx = (-lx + 0.0) * 0.5, hy = (-ly + 0.0) * 0.5, hz = (lz + 1.0) * 0.5;
               const hLen = Math.sqrt(hx*hx + hy*hy + hz*hz);
               const specNdotH = Math.max(0, nnx * hx/hLen + nny * hy/hLen + nnz * hz/hLen);
-              const specular = Math.pow(specNdotH, 48) * 0.7;
+              const specular = Math.pow(specNdotH, 48) * 0.25;
 
               // Fresnel reflectance (Schlick approximation) — edges are more mirror-like
               // This simulates light refracting at the curved meniscus edge
               const cosTheta = Math.max(0, nnz); // dot with view direction (0,0,1)
               const f0 = 0.04; // water/oil-like base reflectance
               const fresnel = f0 + (1.0 - f0) * Math.pow(1.0 - cosTheta, 5);
-              const specularTotal = specular + fresnel * 0.6;
-
-              // Meniscus capillary rim — bright white edge at fluid boundaries.
-              // The Young-Laplace curved surface reflects strongly at grazing angle.
-              // Brightens thin-edge pixels where gradient is high (capillary rise zone).
-              if (d > 0.015 && d < 0.6 && gradMag > 0.08) {
-                const meniscusFactor = Math.min(1.0, gradMag * 2.5) * Math.max(0, 1.0 - d * 1.8);
-                const rimBright = meniscusFactor * 0.45;
-                r = Math.min(1, r + rimBright);
-                g = Math.min(1, g + rimBright);
-                b = Math.min(1, b + rimBright);
-              }
+              const specularTotal = specular + fresnel * 0.12;
 
               if (isDarkBlend) {
                 const lf = 0.6 + 0.4 * diffuse;
                 r *= lf; g *= lf; b *= lf;
-                alpha = Math.max(0, alpha - specularTotal * 1.2);
+                alpha = Math.max(0, alpha - specularTotal * 0.5);
               } else {
                 const lf = 0.5 + 0.5 * diffuse;
                 r = r * lf + specularTotal;
@@ -1139,7 +1128,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
         style={{
-          filter: `blur(${settings.gooeyEffect * 15}px) contrast(${1.5 + settings.gooeyEffect * 8})`,
+          filter: `blur(${settings.gooeyEffect * 10}px) contrast(${1.2 + settings.gooeyEffect * 4})`,
           transform: 'scale(1.05)',
         }}
         id="liquid-canvas"
