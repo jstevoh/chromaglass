@@ -777,6 +777,18 @@ class FluidSimulation {
 }
 
 
+// ─── WebGL2 resource types ────────────────────────────────────────────
+
+interface GLResources {
+  gl: WebGL2RenderingContext;
+  program: WebGLProgram;
+  vao: WebGLVertexArrayObject;
+  posBuffer: WebGLBuffer;
+  textures: WebGLTexture[];
+  texData: Uint8Array[];
+  uLocs: Record<string, WebGLUniformLocation | null>;
+}
+
 // ─── React Component ─────────────────────────────────────────────────
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
@@ -785,15 +797,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   isAutomated = false, isActive = true,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offscreenCanvasesRef = useRef<HTMLCanvasElement[]>([]);
   const fluidsRef = useRef<FluidSimulation[]>([]);
   const noise2D = useMemo(() => createNoise2D(), []);
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
   const rotationAnglesRef = useRef<number[]>([]);
-
-  // Pre-allocated ImageData objects — one per layer. Avoids GC churn.
-  const imageDataRef = useRef<ImageData[]>([]);
+  const webGLRef = useRef<GLResources | null>(null);
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -807,8 +816,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const mousePosRef = useRef({ x: 0, y: 0 });
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
-  const grainCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const tempLayerCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useImperativeHandle(ref, () => ({
     deployInsect: (type: string) => {
@@ -858,19 +865,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = GRID_SIZE;
-        canvas.height = GRID_SIZE;
-        offscreenCanvasesRef.current.push(canvas);
-
-        // Pre-allocate ImageData for this layer.
-        imageDataRef.current.push(new ImageData(GRID_SIZE, GRID_SIZE));
+        // Allocate GPU texture data buffer for this layer
+        if (webGLRef.current) {
+          const glr = webGLRef.current;
+          const gl = glr.gl;
+          // Ensure textures/texData arrays are large enough
+          while (glr.textures.length <= i) {
+            const tex = gl.createTexture()!;
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            glr.textures.push(tex);
+            glr.texData.push(new Uint8Array(GRID_AREA * 4));
+          }
+        }
       }
     } else if (currentCount > targetCount) {
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
-      offscreenCanvasesRef.current = offscreenCanvasesRef.current.slice(0, targetCount);
-      imageDataRef.current = imageDataRef.current.slice(0, targetCount);
     }
   }, [settings.layerCount]);
 
@@ -878,33 +892,357 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
+    // ── WebGL2 initialization ──────────────────────────────────────────
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false }) as WebGL2RenderingContext | null;
+    if (!gl) { console.error('WebGL2 not supported'); return; }
+
+    const vertSrc = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+    const fragSrc = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 fragColor;
+
+uniform sampler2D u_layer0;
+uniform sampler2D u_layer1;
+uniform int u_layerCount;
+uniform float u_rotation0;
+uniform float u_rotation1;
+uniform vec2 u_resolution;
+uniform float u_gooey;
+uniform int u_darkBlend;
+uniform int u_blendMode;
+uniform int u_ledPlatform;
+uniform int u_ledMode;
+uniform vec3 u_ledColor;
+uniform float u_ledAngle;
+uniform float u_time;
+
+const float PI = 3.14159265359;
+const float DENSITY_SCALE = 8.0;
+const float TEX_STEP = 1.5 / 128.0;
+
+// Hash-based film grain
+float hash(vec2 p) {
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+
+// Decode Beer-Lambert from packed texture
+// R/G/B channels store log-space absorptions, A stores total density
+// At packing: R=clamp(densityR/8*255), alpha=clamp(density/8*255)
+// densityR = -log(r_channel)*density, so r_channel = exp(-densityR/density)
+// We store absorption proportional: decoded = raw_channel/255*8 = absorption_value
+// Then color = exp(-absorption / totalDensity)
+// But we packed R=densityR/8*255 directly, and density=A/255*8
+// So: absorption = R/255 * 8, totalDensity = A/255 * 8
+// color_channel = exp(-absorption / totalDensity)
+
+float decodeDensity(float a) {
+  return a * DENSITY_SCALE;
+}
+
+vec4 sampleLayer(sampler2D tex, vec2 uv) {
+  return texture(tex, uv);
+}
+
+// UV transform: screen UV -> fluid simulation UV
+vec2 uvToFluid(vec2 uv, float c, float s) {
+  vec2 p = (uv - 0.5) * u_resolution;
+  p = vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+  float scale = max(u_resolution.x, u_resolution.y) * 1.5 / 128.0;
+  return p / (scale * 128.0) + 0.5;
+}
+
+// Approximate Gaussian blur on density alpha in fluid UV space
+float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
+  // 5x5 Gaussian kernel weights (sigma~1)
+  const float w[25] = float[25](
+    0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902,
+    0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+    0.02193823, 0.09832033, 0.16210282, 0.09832033, 0.02193823,
+    0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+    0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902
+  );
+  float result = 0.0;
+  for (int j = -2; j <= 2; j++) {
+    for (int i = -2; i <= 2; i++) {
+      vec2 offset = vec2(float(i), float(j)) * blurFluid;
+      float a = texture(tex, fuv + offset).a;
+      result += a * w[(j + 2) * 5 + (i + 2)];
+    }
+  }
+  return result;
+}
+
+// Decode fluid color from packed RGBA texture
+// Returns (r, g, b, alpha) in linear [0,1]
+vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
+  vec4 raw = texture(tex, fuv);
+
+  float rawAlpha = useBlur ? blurAlpha(tex, fuv, blurFluid) : raw.a;
+
+  float totalDensity = decodeDensity(rawAlpha);
+  if (totalDensity < 0.001 / DENSITY_SCALE) return vec4(0.0);
+
+  float absTotalDensity = decodeDensity(raw.a);
+  if (absTotalDensity < 0.001 / DENSITY_SCALE) return vec4(0.0, 0.0, 0.0, 0.0);
+
+  // densityR packed as: densityR / 8 * 255 -> R/255 * 8 = densityR
+  // color = exp(-densityR / density) = exp(-absorption_per_unit)
+  float norm = 1.0 / absTotalDensity;
+  float r = exp(-decodeDensity(raw.r) * norm);
+  float g = exp(-decodeDensity(raw.g) * norm);
+  float b = exp(-decodeDensity(raw.b) * norm);
+
+  // Beer-Lambert volumetric opacity using blurred density for gooey edges
+  float thickness = totalDensity * 2.8;
+  float alpha = 1.0 - exp(-thickness);
+  alpha = min(0.95, alpha);
+
+  return vec4(r, g, b, alpha);
+}
+
+// Sobel normals in fluid UV space
+vec3 sobelNormal(sampler2D tex, vec2 fuv) {
+  float d00 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP, -TEX_STEP)).a);
+  float d10 = decodeDensity(texture(tex, fuv + vec2(0.0,       -TEX_STEP)).a);
+  float d20 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP, -TEX_STEP)).a);
+  float d01 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP,  0.0     )).a);
+  float d21 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP,  0.0     )).a);
+  float d02 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP,  TEX_STEP)).a);
+  float d12 = decodeDensity(texture(tex, fuv + vec2(0.0,        TEX_STEP)).a);
+  float d22 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP,  TEX_STEP)).a);
+  float gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
+  float gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
+  return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
+}
+
+// Blinn-Phong + Fresnel shading
+vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
+  vec3 L = normalize(vec3(-0.577, -0.577, 0.577));
+  vec3 V = vec3(0.0, 0.0, 1.0);
+  vec3 H = normalize(L + V);
+  float diffuse = max(0.0, dot(normal, L));
+  float specNdotH = max(0.0, dot(normal, H));
+  float specular = pow(specNdotH, 48.0) * 0.25;
+  float cosTheta = max(0.0, normal.z);
+  float f0 = 0.04;
+  float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+  float specularTotal = specular + fresnel * 0.12;
+
+  if (darkBlend) {
+    float lf = 0.6 + 0.4 * diffuse;
+    return color * lf;
+  } else {
+    float lf = 0.5 + 0.5 * diffuse;
+    return color * lf + specularTotal;
+  }
+}
+
+// Blend mode functions
+vec3 blendScreen(vec3 a, vec3 b)      { return 1.0 - (1.0 - a) * (1.0 - b); }
+vec3 blendLighter(vec3 a, vec3 b)     { return max(a, b); }
+vec3 blendExclusion(vec3 a, vec3 b)   { return a + b - 2.0 * a * b; }
+vec3 blendMultiply(vec3 a, vec3 b)    { return a * b; }
+vec3 blendOverlay(vec3 a, vec3 b) {
+  return mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, b));
+}
+
+vec3 applyBlend(vec3 dst, vec3 src, int mode) {
+  if (mode == 0) return blendScreen(dst, src);
+  if (mode == 1) return blendLighter(dst, src);
+  if (mode == 2) return blendExclusion(dst, src);
+  if (mode == 3) return blendMultiply(dst, src);
+  if (mode == 4) return blendOverlay(dst, src);
+  return blendScreen(dst, src);
+}
+
+// LED platform analytical conic gradient
+vec3 ledColor(float t) {
+  // ledMode: 0=single, 1=ocean, 2=fire, 3=cyberpunk, 4=rainbow
+  if (u_ledMode == 0) {
+    return u_ledColor;
+  } else if (u_ledMode == 1) {
+    // ocean
+    if (t < 0.25) return mix(vec3(0.0,0.0,0.2), vec3(0.0,0.2,0.4), t * 4.0);
+    if (t < 0.5)  return mix(vec3(0.0,0.2,0.4), vec3(0.0,0.4,0.6), (t - 0.25) * 4.0);
+    if (t < 0.75) return mix(vec3(0.0,0.4,0.6), vec3(0.0,0.6,0.8), (t - 0.5) * 4.0);
+    return mix(vec3(0.0,0.6,0.8), vec3(0.0,0.0,0.2), (t - 0.75) * 4.0);
+  } else if (u_ledMode == 2) {
+    // fire
+    if (t < 0.25) return mix(vec3(0.2,0.0,0.0), vec3(0.8,0.0,0.0), t * 4.0);
+    if (t < 0.5)  return mix(vec3(0.8,0.0,0.0), vec3(1.0,0.4,0.0), (t - 0.25) * 4.0);
+    if (t < 0.75) return mix(vec3(1.0,0.4,0.0), vec3(1.0,0.8,0.0), (t - 0.5) * 4.0);
+    return mix(vec3(1.0,0.8,0.0), vec3(0.2,0.0,0.0), (t - 0.75) * 4.0);
+  } else if (u_ledMode == 3) {
+    // cyberpunk
+    if (t < 0.33) return mix(vec3(1.0,0.0,0.235), vec3(0.0,0.94,1.0), t / 0.33);
+    if (t < 0.66) return mix(vec3(0.0,0.94,1.0), vec3(0.988,0.933,0.039), (t - 0.33) / 0.33);
+    return mix(vec3(0.988,0.933,0.039), vec3(1.0,0.0,0.235), (t - 0.66) / 0.34);
+  } else {
+    // rainbow
+    if (t < 0.16667) return mix(vec3(1,0,0), vec3(1,1,0), t * 6.0);
+    if (t < 0.33333) return mix(vec3(1,1,0), vec3(0,1,0), (t - 0.16667) * 6.0);
+    if (t < 0.5)     return mix(vec3(0,1,0), vec3(0,1,1), (t - 0.33333) * 6.0);
+    if (t < 0.66667) return mix(vec3(0,1,1), vec3(0,0,1), (t - 0.5) * 6.0);
+    if (t < 0.83333) return mix(vec3(0,0,1), vec3(1,0,1), (t - 0.66667) * 6.0);
+    return mix(vec3(1,0,1), vec3(1,0,0), (t - 0.83333) * 6.0);
+  }
+}
+
+void main() {
+  vec2 uv = v_uv;
+  bool darkBlend = u_darkBlend != 0;
+
+  // ── LED Platform background ────────────────────────────────────────
+  vec3 bgColor = darkBlend ? vec3(1.0) : vec3(0.0);
+  if (u_ledPlatform != 0) {
+    vec2 centered = (uv - 0.5) * u_resolution;
+    float t = fract(atan(centered.y, centered.x) / (2.0 * PI) + 0.5 + u_ledAngle);
+    vec3 lc = ledColor(t);
+    // Radial vignette for bevel effect
+    float dist = length(centered);
+    float maxR = max(u_resolution.x, u_resolution.y) * 0.8;
+    float bevel = 1.0 - smoothstep(maxR * 0.5, maxR, dist) * 0.8;
+    bgColor = lc * bevel;
+  }
+
+  // ── Gooey blur parameters ─────────────────────────────────────────
+  float blurStep = u_gooey * 8.0 / max(u_resolution.x, u_resolution.y);
+  float fluidScale = max(u_resolution.x, u_resolution.y) * 1.5 / 128.0;
+  float blurFluid = blurStep / fluidScale / 128.0;
+  bool useBlur = u_gooey > 0.01;
+
+  // ── Layer 0 ──────────────────────────────────────────────────────
+  float c0 = cos(-u_rotation0), s0 = sin(-u_rotation0);
+  vec2 fuv0 = uvToFluid(uv, c0, s0);
+  vec4 fluid0 = decodeFluid(u_layer0, fuv0, blurFluid, useBlur);
+
+  // Gooey contrast on alpha
+  if (useBlur && fluid0.a > 0.0) {
+    float contrast = 1.2 + u_gooey * 4.0;
+    float mid = 0.5;
+    fluid0.a = clamp((fluid0.a - mid) * contrast + mid, 0.0, 1.0);
+  }
+
+  // Lighting
+  vec3 normal0 = sobelNormal(u_layer0, fuv0);
+  fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend);
+  if (darkBlend) fluid0.a *= 0.6;
+
+  vec3 outColor = bgColor;
+  outColor = mix(outColor, fluid0.rgb, fluid0.a);
+
+  // ── Layer 1 (if present) ──────────────────────────────────────────
+  if (u_layerCount > 1) {
+    float c1 = cos(-u_rotation1), s1 = sin(-u_rotation1);
+    vec2 fuv1 = uvToFluid(uv, c1, s1);
+    vec4 fluid1 = decodeFluid(u_layer1, fuv1, blurFluid, useBlur);
+
+    if (useBlur && fluid1.a > 0.0) {
+      float contrast = 1.2 + u_gooey * 4.0;
+      float mid = 0.5;
+      fluid1.a = clamp((fluid1.a - mid) * contrast + mid, 0.0, 1.0);
+    }
+
+    vec3 normal1 = sobelNormal(u_layer1, fuv1);
+    fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend);
+    if (darkBlend) fluid1.a *= 0.6;
+
+    vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
+    outColor = mix(outColor, blended, fluid1.a);
+  }
+
+  // ── Film grain ────────────────────────────────────────────────────
+  float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.035;
+  outColor = clamp(outColor + grain, 0.0, 1.0);
+
+  fragColor = vec4(outColor, 1.0);
+}`;
+
+    const compileShader = (type: number, src: string): WebGLShader | null => {
+      const sh = gl.createShader(type)!;
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(sh));
+        gl.deleteShader(sh);
+        return null;
+      }
+      return sh;
+    };
+
+    const vert = compileShader(gl.VERTEX_SHADER, vertSrc);
+    const frag = compileShader(gl.FRAGMENT_SHADER, fragSrc);
+    if (!vert || !frag) return;
+
+    const program = gl.createProgram()!;
+    gl.attachShader(program, vert);
+    gl.attachShader(program, frag);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      return;
+    }
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
+
+    // Full-screen quad
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const posBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(program, 'a_pos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    // Create textures for existing layers + 2 slots minimum
+    const maxLayers = Math.max(2, fluidsRef.current.length);
+    const textures: WebGLTexture[] = [];
+    const texData: Uint8Array[] = [];
+    for (let i = 0; i < maxLayers; i++) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      // Initialize with empty texture
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      textures.push(tex);
+      texData.push(new Uint8Array(GRID_AREA * 4));
+    }
+
+    // Collect uniform locations
+    const uniformNames = [
+      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1',
+      'u_resolution','u_gooey','u_darkBlend','u_blendMode',
+      'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
+    ];
+    const uLocs: Record<string, WebGLUniformLocation | null> = {};
+    for (const name of uniformNames) {
+      uLocs[name] = gl.getUniformLocation(program, name);
+    }
+
+    webGLRef.current = { gl, program, vao, posBuffer, textures, texData, uLocs };
 
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
     resize();
-
-    // ── Pre-bake a grain texture so we don't draw 200 rects per frame ──
-    const bakeGrainTexture = (w: number, h: number, dark: boolean): HTMLCanvasElement => {
-      const gc = document.createElement('canvas');
-      gc.width = w;
-      gc.height = h;
-      const g = gc.getContext('2d')!;
-      const color = dark ? '0,0,0' : '255,255,255';
-      for (let i = 0; i < 400; i++) {
-        g.fillStyle = `rgba(${color},${Math.random() * 0.04})`;
-        g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
-      }
-      return gc;
-    };
-    let grainDark = bakeGrainTexture(canvas.width, canvas.height, false);
-    let grainLight = bakeGrainTexture(canvas.width, canvas.height, true);
-    let grainW = canvas.width;
-    let grainH = canvas.height;
 
     // ── Mouse / touch handlers ─────────────────────────────────────
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
@@ -966,11 +1304,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId: number;
 
     const render = () => {
-      const offscreenCanvases = offscreenCanvasesRef.current;
       const currentAudioData = audioDataRef.current;
       const currentSettings = settingsRef.current;
+      const glr = webGLRef.current;
 
-      if (fluidsRef.current.length > 0 && offscreenCanvases.length > 0 && canvas.width > 0 && canvas.height > 0) {
+      if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
         const now = Date.now() * 0.001;
         const realDt = now - lastTimeRef.current;
         lastTimeRef.current = now;
@@ -1090,11 +1428,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const colorIndex = Math.floor((time * 0.25) % PALETTE_COUNT);
             const nextColorIndex = (colorIndex + 1) % PALETTE_COUNT;
             const blend = (time * 0.25) % 1;
-            const c0 = PALETTE_RGB[colorIndex];
-            const c1 = PALETTE_RGB[nextColorIndex];
-            const ar = c0.r * (1 - blend) + c1.r * blend;
-            const ag = c0.g * (1 - blend) + c1.g * blend;
-            const ab = c0.b * (1 - blend) + c1.b * blend;
+            const c0_amb = PALETTE_RGB[colorIndex];
+            const c1_amb = PALETTE_RGB[nextColorIndex];
+            const ar = c0_amb.r * (1 - blend) + c1_amb.r * blend;
+            const ag = c0_amb.g * (1 - blend) + c1_amb.g * blend;
+            const ab = c0_amb.b * (1 - blend) + c1_amb.b * blend;
 
             for (const pt of injPts) {
               const px = Math.floor(pt.x), py = Math.floor(pt.y);
@@ -1200,7 +1538,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
         }
 
-        // ── Step & render to offscreen canvases ───────────────
+        // ── Step simulations & update rotation ────────────────
         let hasContent = false;
         const isDarkBlend = currentSettings.blendMode === 'multiply';
 
@@ -1208,101 +1546,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const fluid = fluidsRef.current[l];
           if (isActiveRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
 
-          const offscreenCanvas = offscreenCanvases[l];
-          if (!offscreenCanvas) continue;
-          const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-          if (!offscreenCtx) continue;
-
-          // Re-use pre-allocated ImageData instead of creating a new one each frame.
-          const imageData = imageDataRef.current[l];
-          if (!imageData) continue;
-          const data = imageData.data;
-
+          // Check if there's content
           for (let i = 0; i < GRID_AREA; i++) {
-            const dr = fluid.densityR[i];
-            const dg = fluid.densityG[i];
-            const db = fluid.densityB[i];
-            const d  = fluid.density[i];
-            const idx = i * 4;
-
-            if (d > 0.001) hasContent = true;
-
-            // ── Scott Burns geometric mean (Beer-Lambert) color ──────
-            // densityR/G/B store log-space absorptions.
-            // channel = exp(-absorption/density) = r1^w1 * r2^w2 (weighted geometric mean).
-            let r = 1, g = 1, b = 1;
-            if (d > 0.001) {
-              const norm = 1.0 / d;
-              r = Math.exp(-dr * norm);
-              g = Math.exp(-dg * norm);
-              b = Math.exp(-db * norm);
-            }
-
-            // ── Beer-Lambert volumetric opacity ──────────────────────
-            // alpha = 1 - exp(-k * thickness): exponential saturation,
-            // thin films near-transparent, deep pools near-opaque.
-            const thickness = d * 2.8;
-            let alpha = 1.0 - Math.exp(-thickness);
-            alpha = Math.min(0.95, alpha);
-
-            // ── Sobel normal reconstruction (wider kernel = smoother normals) ──
-            const xi = i % GRID_SIZE;
-            const yi = (i - xi) / GRID_SIZE;
-            if (xi > 1 && xi < GRID_SIZE - 2 && yi > 1 && yi < GRID_SIZE - 2) {
-              // Sobel operator — matches the finite-difference approach described in SSFR
-              const gradX = (
-                -fluid.density[i - 1 - GRID_SIZE] - 2.0 * fluid.density[i - 1] - fluid.density[i - 1 + GRID_SIZE] +
-                 fluid.density[i + 1 - GRID_SIZE] + 2.0 * fluid.density[i + 1] + fluid.density[i + 1 + GRID_SIZE]
-              ) * 0.125;
-              const gradY = (
-                -fluid.density[i - 1 - GRID_SIZE] - 2.0 * fluid.density[i - GRID_SIZE] - fluid.density[i + 1 - GRID_SIZE] +
-                 fluid.density[i - 1 + GRID_SIZE] + 2.0 * fluid.density[i + GRID_SIZE] + fluid.density[i + 1 + GRID_SIZE]
-              ) * 0.125;
-              const gradMag = Math.sqrt(gradX * gradX + gradY * gradY);
-
-              // Surface normal from depth gradient (cross product of tangent vectors)
-              const zScale = 0.9;
-              const nx = -gradX * zScale;
-              const ny = -gradY * zScale;
-              const len = Math.sqrt(nx * nx + ny * ny + 1.0);
-              const nnx = nx / len;
-              const nny = ny / len;
-              const nnz = 1.0 / len;
-
-              // Blinn-Phong diffuse + specular
-              const lx = -0.577, ly = -0.577, lz = 0.577;
-              const diffuse = Math.max(0, nnx * lx + nny * ly + nnz * lz);
-              // Blinn-Phong half-vector specular (softer than Phong for liquids)
-              const hx = (-lx + 0.0) * 0.5, hy = (-ly + 0.0) * 0.5, hz = (lz + 1.0) * 0.5;
-              const hLen = Math.sqrt(hx*hx + hy*hy + hz*hz);
-              const specNdotH = Math.max(0, nnx * hx/hLen + nny * hy/hLen + nnz * hz/hLen);
-              const specular = Math.pow(specNdotH, 48) * 0.25;
-
-              // Fresnel reflectance (Schlick approximation) — edges are more mirror-like
-              // This simulates light refracting at the curved meniscus edge
-              const cosTheta = Math.max(0, nnz); // dot with view direction (0,0,1)
-              const f0 = 0.04; // water/oil-like base reflectance
-              const fresnel = f0 + (1.0 - f0) * Math.pow(1.0 - cosTheta, 5);
-              const specularTotal = specular + fresnel * 0.12;
-
-              if (isDarkBlend) {
-                const lf = 0.6 + 0.4 * diffuse;
-                r *= lf; g *= lf; b *= lf;
-                alpha = Math.max(0, alpha - specularTotal * 0.5);
-              } else {
-                const lf = 0.5 + 0.5 * diffuse;
-                r = r * lf + specularTotal;
-                g = g * lf + specularTotal;
-                b = b * lf + specularTotal;
-              }
-            }
-
-            if (isDarkBlend) alpha *= 0.6;
-
-            data[idx]     = Math.max(0, Math.min(255, r * 255));
-            data[idx + 1] = Math.max(0, Math.min(255, g * 255));
-            data[idx + 2] = Math.max(0, Math.min(255, b * 255));
-            data[idx + 3] = Math.max(0, Math.min(255, alpha * 255));
+            if (fluid.density[i] > 0.001) { hasContent = true; break; }
           }
 
           // Emergency seeding
@@ -1311,123 +1557,103 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             fluid.addDensity(GRID_SIZE / 2, GRID_SIZE / 2, 5.0, color.r, color.g, color.b);
           }
 
-          offscreenCtx.putImageData(imageData, 0, 0);
-        }
+          // Update rotation angles
+          if (isActiveRef.current) {
+            let rotationMod = 0;
+            let dirMod = l % 2 === 0 ? 1 : -1;
 
-        // ── Composite to main canvas ──────────────────────────
-        ctx.fillStyle = isDarkBlend ? '#fff' : '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // LED Platform
-        if (currentSettings.ledPlatform) {
-          ctx.save();
-          ctx.translate(canvas.width / 2, canvas.height / 2);
-          ctx.rotate(time * currentSettings.ledSpeed * 0.5);
-          const ledR = Math.max(canvas.width, canvas.height) * 0.8;
-          const gradient = ctx.createConicGradient(0, 0, 0);
-
-          if (currentSettings.ledMode === 'single') {
-            gradient.addColorStop(0, currentSettings.ledColor);
-            gradient.addColorStop(1, currentSettings.ledColor);
-          } else if (currentSettings.ledMode === 'ocean') {
-            gradient.addColorStop(0, '#000033'); gradient.addColorStop(0.25, '#003366');
-            gradient.addColorStop(0.5, '#006699'); gradient.addColorStop(0.75, '#0099cc');
-            gradient.addColorStop(1, '#000033');
-          } else if (currentSettings.ledMode === 'fire') {
-            gradient.addColorStop(0, '#330000'); gradient.addColorStop(0.25, '#cc0000');
-            gradient.addColorStop(0.5, '#ff6600'); gradient.addColorStop(0.75, '#ffcc00');
-            gradient.addColorStop(1, '#330000');
-          } else if (currentSettings.ledMode === 'cyberpunk') {
-            gradient.addColorStop(0, '#ff003c'); gradient.addColorStop(0.33, '#00f0ff');
-            gradient.addColorStop(0.66, '#fcee0a'); gradient.addColorStop(1, '#ff003c');
-          } else {
-            gradient.addColorStop(0, '#ff0000'); gradient.addColorStop(0.16, '#ffff00');
-            gradient.addColorStop(0.33, '#00ff00'); gradient.addColorStop(0.5, '#00ffff');
-            gradient.addColorStop(0.66, '#0000ff'); gradient.addColorStop(0.83, '#ff00ff');
-            gradient.addColorStop(1, '#ff0000');
-          }
-
-          ctx.fillStyle = gradient;
-          ctx.beginPath(); ctx.arc(0, 0, ledR, 0, Math.PI * 2); ctx.fill();
-
-          const bevel = ctx.createRadialGradient(0, 0, ledR * 0.5, 0, 0, ledR);
-          bevel.addColorStop(0, 'rgba(0,0,0,0)');
-          bevel.addColorStop(0.8, 'rgba(0,0,0,0.4)');
-          bevel.addColorStop(1, 'rgba(0,0,0,0.8)');
-          ctx.fillStyle = bevel;
-          ctx.beginPath(); ctx.arc(0, 0, ledR, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-        }
-
-        ctx.imageSmoothingEnabled = true;
-
-        // Ensure temp layer canvas matches
-        if (!tempLayerCanvasRef.current || tempLayerCanvasRef.current.width !== canvas.width || tempLayerCanvasRef.current.height !== canvas.height) {
-          const tc = document.createElement('canvas');
-          tc.width = canvas.width; tc.height = canvas.height;
-          tempLayerCanvasRef.current = tc;
-        }
-        const tCanvas = tempLayerCanvasRef.current;
-        const tCtx = tCanvas.getContext('2d');
-
-        if (tCtx) {
-          for (let l = 0; l < fluidsRef.current.length; l++) {
-            const offscreenCanvas = offscreenCanvases[l];
-            const fluid = fluidsRef.current[l];
-            if (!offscreenCanvas) continue;
-
-            // Update rotation
-            if (isActiveRef.current) {
-              let rotationMod = 0;
-              let dirMod = l % 2 === 0 ? 1 : -1;
-
-              if (currentAudioData && currentSettings.audioMappings) {
-                const mappedFeature = currentSettings.audioMappings.rotation;
-                if (mappedFeature !== 'none') {
-                  const mappedSpeed = getAudioValue(currentAudioData, mappedFeature as AudioFeatureKey);
-                  const layerFeatures = [
-                    getAudioValue(currentAudioData, 'timbre'),
-                    getAudioValue(currentAudioData, 'complexity'),
-                    getAudioValue(currentAudioData, 'energy'),
-                    getAudioValue(currentAudioData, 'treble'),
-                  ];
-                  const layerFeature = layerFeatures[l % layerFeatures.length];
-                  rotationMod = mappedSpeed * 0.04 + layerFeature * 0.03;
-                  const sway = (layerFeature - 0.4) * 3.0;
-                  dirMod = (l % 2 === 0 ? 1 : -1) * 0.4 + sway;
-                }
+            if (currentAudioData && currentSettings.audioMappings) {
+              const mappedFeature = currentSettings.audioMappings.rotation;
+              if (mappedFeature !== 'none') {
+                const mappedSpeed = getAudioValue(currentAudioData, mappedFeature as AudioFeatureKey);
+                const layerFeatures = [
+                  getAudioValue(currentAudioData, 'timbre'),
+                  getAudioValue(currentAudioData, 'complexity'),
+                  getAudioValue(currentAudioData, 'energy'),
+                  getAudioValue(currentAudioData, 'treble'),
+                ];
+                const layerFeature = layerFeatures[l % layerFeatures.length];
+                rotationMod = mappedSpeed * 0.04 + layerFeature * 0.03;
+                const sway = (layerFeature - 0.4) * 3.0;
+                dirMod = (l % 2 === 0 ? 1 : -1) * 0.4 + sway;
               }
-
-              // Use realDt only — never timeMultiplier, which spikes with audio energy
-              const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod) * 0.3;
-              rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt;
             }
 
-            tCtx.clearRect(0, 0, tCanvas.width, tCanvas.height);
-            tCtx.save();
-            tCtx.translate(tCanvas.width / 2, tCanvas.height / 2);
-            tCtx.rotate(rotationAnglesRef.current[l]);
-            const scale = Math.max(tCanvas.width, tCanvas.height) * 1.5 / GRID_SIZE;
-            tCtx.scale(scale, scale);
-            tCtx.drawImage(offscreenCanvas, -GRID_SIZE / 2, -GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
-
-            tCtx.restore();
-
-            ctx.globalCompositeOperation = l === 0 ? 'source-over' : currentSettings.blendMode as GlobalCompositeOperation;
-            ctx.drawImage(tCanvas, 0, 0);
+            // Use realDt only — never timeMultiplier, which spikes with audio energy
+            const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod) * 0.3;
+            rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt;
           }
         }
 
-        ctx.globalCompositeOperation = 'source-over';
+        // ── WebGL GPU render ──────────────────────────────────
+        if (glr) {
+          const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
 
-        // ── Film grain (pre-baked texture) ─────────────────────
-        if (canvas.width !== grainW || canvas.height !== grainH) {
-          grainDark = bakeGrainTexture(canvas.width, canvas.height, false);
-          grainLight = bakeGrainTexture(canvas.width, canvas.height, true);
-          grainW = canvas.width;
-          grainH = canvas.height;
+          // Expand texture arrays if layer count increased
+          while (texs.length < fluidsRef.current.length) {
+            const tex = glCtx.createTexture()!;
+            glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+            glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MIN_FILTER, glCtx.LINEAR);
+            glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MAG_FILTER, glCtx.LINEAR);
+            glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_S, glCtx.CLAMP_TO_EDGE);
+            glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_T, glCtx.CLAMP_TO_EDGE);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
+            texs.push(tex);
+            tData.push(new Uint8Array(GRID_AREA * 4));
+          }
+
+          // Pack fluid data into textures
+          for (let l = 0; l < fluidsRef.current.length; l++) {
+            const fluid = fluidsRef.current[l];
+            const td = tData[l];
+            const scale = 255 / 8.0;
+            for (let i = 0; i < GRID_AREA; i++) {
+              const i4 = i * 4;
+              td[i4]     = Math.max(0, Math.min(255, fluid.densityR[i] * scale + 0.5));
+              td[i4 + 1] = Math.max(0, Math.min(255, fluid.densityG[i] * scale + 0.5));
+              td[i4 + 2] = Math.max(0, Math.min(255, fluid.densityB[i] * scale + 0.5));
+              td[i4 + 3] = Math.max(0, Math.min(255, fluid.density[i]  * scale + 0.5));
+            }
+            glCtx.activeTexture(glCtx.TEXTURE0 + l);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
+          }
+
+          // Set uniforms and draw
+          glCtx.useProgram(prog);
+          glCtx.bindVertexArray(vaoObj);
+
+          glCtx.uniform1i(uLocs['u_layer0'], 0);
+          glCtx.uniform1i(uLocs['u_layer1'], 1);
+          glCtx.uniform1i(uLocs['u_layerCount'], fluidsRef.current.length);
+          glCtx.uniform1f(uLocs['u_rotation0'], rotationAnglesRef.current[0] ?? 0);
+          glCtx.uniform1f(uLocs['u_rotation1'], rotationAnglesRef.current[1] ?? 0);
+          glCtx.uniform2f(uLocs['u_resolution'], canvas.width, canvas.height);
+          glCtx.uniform1f(uLocs['u_gooey'], currentSettings.gooeyEffect ?? 0);
+          glCtx.uniform1i(uLocs['u_darkBlend'], isDarkBlend ? 1 : 0);
+
+          // Map blend mode string to int: screen=0, lighter=1, exclusion=2, multiply=3, overlay=4
+          const blendModeMap: Record<string, number> = {
+            'screen': 0, 'lighter': 1, 'exclusion': 2, 'multiply': 3, 'overlay': 4,
+          };
+          glCtx.uniform1i(uLocs['u_blendMode'], blendModeMap[currentSettings.blendMode] ?? 0);
+
+          glCtx.uniform1i(uLocs['u_ledPlatform'], currentSettings.ledPlatform ? 1 : 0);
+          const ledModeMap: Record<string, number> = { 'single': 0, 'ocean': 1, 'fire': 2, 'cyberpunk': 3, 'rainbow': 4 };
+          glCtx.uniform1i(uLocs['u_ledMode'], ledModeMap[currentSettings.ledMode] ?? 0);
+
+          // Parse ledColor hex to vec3
+          const lcRgb = hexToRgb(currentSettings.ledColor ?? '#ffffff');
+          glCtx.uniform3f(uLocs['u_ledColor'], lcRgb.r, lcRgb.g, lcRgb.b);
+
+          const ledAngle = time * (currentSettings.ledSpeed ?? 1) * 0.5 / (2 * Math.PI);
+          glCtx.uniform1f(uLocs['u_ledAngle'], ledAngle);
+          glCtx.uniform1f(uLocs['u_time'], time);
+
+          glCtx.viewport(0, 0, canvas.width, canvas.height);
+          glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
+          glCtx.bindVertexArray(null);
         }
-        ctx.drawImage(isDarkBlend ? grainLight : grainDark, 0, 0);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -1444,6 +1670,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
+
+      // Clean up WebGL resources
+      const glr = webGLRef.current;
+      if (glr) {
+        const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs } = glr;
+        for (const tex of texs) glCtx.deleteTexture(tex);
+        glCtx.deleteBuffer(pb);
+        glCtx.deleteVertexArray(vaoObj);
+        glCtx.deleteProgram(prog);
+        webGLRef.current = null;
+      }
     };
   }, [noise2D, seedCount]);
 
@@ -1452,10 +1689,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
-        style={{
-          filter: `blur(${settings.gooeyEffect * 10}px) contrast(${1.2 + settings.gooeyEffect * 4})`,
-          transform: 'scale(1.05)',
-        }}
         id="liquid-canvas"
       />
     </div>
