@@ -4,9 +4,8 @@ import { LiquidVisualizer } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { VisualizerSettings, DEFAULT_SETTINGS } from './types';
+import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
-import { DROPPER_COLORS } from './constants';
 
 type AudioSource = 'none' | 'microphone' | 'system';
 
@@ -38,8 +37,15 @@ export default function App() {
   const [seedCount, setSeedCount] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
-  const [selectedColor, setSelectedColor] = useState(DROPPER_COLORS[0]);
+  const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
+  const [selectedLiquidId, setSelectedLiquidId] = useState('water');
   const [activeTool, setActiveTool] = useState<'dropper' | 'blow'>('dropper');
+
+  const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
+
+  const updateLiquidColor = useCallback((id: string, color: string) => {
+    setLiquidTypes(prev => prev.map(t => t.id === id ? { ...t, color } : t));
+  }, []);
   const [isAutomated, setIsAutomated] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
@@ -130,7 +136,7 @@ export default function App() {
       gooeyEffect: Math.random(), rotationSpeed: Math.random() * 0.1, centerGravity: Math.random(),
       ledPlatform: Math.random() > 0.5,
       ledMode: ledModes[Math.floor(Math.random() * ledModes.length)],
-      ledColor: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
+      ledColor: liquidTypes[Math.floor(Math.random() * liquidTypes.length)].color,
       ledSpeed: Math.random() * 0.5,
       surfaceTension: Math.random() * 0.2, diffusionRate: Math.random() * 0.002,
       buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
@@ -151,7 +157,7 @@ export default function App() {
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white">
       <LiquidVisualizer
         audioData={audioData} settings={settings} seedCount={seedCount}
-        selectedColor={selectedColor} activeLayer={activeLayer} clearTrigger={clearTrigger}
+        selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
       />
 
@@ -216,25 +222,53 @@ export default function App() {
 
                 <div className="h-px w-full bg-white/10"></div>
 
-                {/* Color Palette */}
+                {/* Liquid Type Selector */}
                 <AnimatePresence>
                   {activeTool === 'dropper' && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="grid grid-cols-2 gap-1.5 overflow-hidden"
+                      className="flex flex-col gap-1 overflow-hidden w-full"
                     >
-                      {DROPPER_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setSelectedColor(color)}
-                          className={`w-5 h-5 rounded-full border-2 transition-all hover:scale-110 ${
-                            selectedColor === color ? 'border-white scale-125 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-transparent opacity-50 hover:opacity-100'
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
+                      {liquidTypes.map((liq) => {
+                        const isSelected = liq.id === selectedLiquidId;
+                        return (
+                          <div key={liq.id} className="flex flex-col gap-1">
+                            <button
+                              onClick={() => setSelectedLiquidId(liq.id)}
+                              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border transition-all text-left ${
+                                isSelected
+                                  ? 'border-white/40 bg-white/15'
+                                  : 'border-white/10 bg-white/5 hover:bg-white/10'
+                              }`}
+                            >
+                              <span
+                                className="w-3 h-3 rounded-full flex-shrink-0 border border-white/20"
+                                style={{ backgroundColor: liq.color }}
+                              />
+                              <span className="text-[10px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
+                            </button>
+                            {isSelected && (
+                              <div className="flex items-center gap-2 px-2">
+                                <span className="text-[9px] text-white/40 flex-1 leading-tight">{liq.description}</span>
+                                <label className="relative cursor-pointer flex-shrink-0" title="Pick color">
+                                  <span
+                                    className="block w-5 h-5 rounded-full border-2 border-white/30 hover:border-white/60 transition-all"
+                                    style={{ backgroundColor: liq.color }}
+                                  />
+                                  <input
+                                    type="color"
+                                    value={liq.color}
+                                    onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -1,14 +1,14 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
-import { VisualizerSettings } from '../types';
+import { VisualizerSettings, LiquidType } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey } from '../constants';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
   settings: VisualizerSettings;
   seedCount?: number;
-  selectedColor?: string;
+  selectedLiquid?: LiquidType;
   activeLayer?: number;
   clearTrigger?: number;
   activeTool?: 'dropper' | 'blow';
@@ -570,7 +570,7 @@ class FluidSimulation {
 // ─── React Component ─────────────────────────────────────────────────
 
 export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
-  audioData, settings, seedCount = 0, selectedColor = '#ffffff',
+  audioData, settings, seedCount = 0, selectedLiquid,
   activeLayer = 0, clearTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true,
 }) => {
@@ -588,7 +588,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
   const settingsRef = useRef(settings);
-  const selectedColorRef = useRef(selectedColor);
+  const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
   const activeToolRef = useRef(activeTool);
   const isAutomatedRef = useRef(isAutomated);
@@ -602,7 +602,7 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
-  useEffect(() => { selectedColorRef.current = selectedColor; }, [selectedColor]);
+  useEffect(() => { selectedLiquidRef.current = selectedLiquid; }, [selectedLiquid]);
   useEffect(() => { activeLayerRef.current = activeLayer; }, [activeLayer]);
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
@@ -792,19 +792,22 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
             if (activeToolRef.current === 'blow') {
               af.blowAir(x, y, 10, 0.3);
             } else {
-              const rgb = hexToRgb(selectedColorRef.current);
-              // Inject over a small radius for a natural drop shape
-              for (let dy = -3; dy <= 3; dy++) {
-                for (let dx = -3; dx <= 3; dx++) {
-                  const dist = Math.sqrt(dx*dx + dy*dy);
-                  if (dist > 3) continue;
+              const liq = selectedLiquidRef.current;
+              const rgb = hexToRgb(liq?.color ?? '#ffffff');
+              const r = liq?.injectRadius ?? 3;
+              const amt = liq?.injectAmount ?? 0.8;
+              const heat = liq?.heatAmount ?? 0.05;
+              for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist > r) continue;
                   const nx = x + dx, ny = y + dy;
                   if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                  const w = (1 - dist / 3) ** 2;
-                  af.addDensity(nx, ny, 0.8 * w, rgb.r, rgb.g, rgb.b);
+                  const w = (1 - dist / r) ** 2;
+                  af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                  if (heat > 0) af.addTemp(nx, ny, heat * w);
                 }
               }
-              af.addTemp(x, y, 0.2);
             }
           }
         }

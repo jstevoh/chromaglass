@@ -1,4 +1,22 @@
 export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
+
+export interface LiquidType {
+  id: string;
+  name: string;
+  color: string;
+  description: string;
+  injectRadius: number;   // cells — how wide each drop spreads
+  injectAmount: number;   // density injected per frame while held
+  heatAmount: number;     // heat injected (drives buoyancy-based rise)
+}
+
+export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
+  { id: 'water',   name: 'Water',   color: '#4488ff', description: 'Flows freely, spreads evenly',         injectRadius: 3, injectAmount: 0.6, heatAmount: 0.05 },
+  { id: 'oil',     name: 'Oil',     color: '#ffaa22', description: 'Thick, repels water, stays in blobs',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0  },
+  { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Thin, rises and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5  },
+  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0  },
+  { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Very heavy, barely moves once placed', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0  },
+];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 export type AudioFeature = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
 
