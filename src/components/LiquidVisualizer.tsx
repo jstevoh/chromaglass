@@ -1001,7 +1001,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
 
         // ── Manual injection ───────────────────────────────────
-        if (isMouseDownRef.current && !isAutomatedRef.current) {
+        if (isMouseDownRef.current) {
           const { x, y } = mousePosRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
           if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {

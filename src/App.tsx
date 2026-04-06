@@ -285,38 +285,10 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 flex flex-col items-end gap-4 transition-all duration-300 max-h-[calc(100vh-120px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 transition-all duration-300 max-h-[calc(100vh-120px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
             >
-              {/* Layer Selection */}
-              <div className="flex flex-col items-center gap-2 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-2 py-3 shadow-2xl">
-                <div className="flex flex-col items-center gap-0.5 mb-1">
-                  <Layers size={12} className="text-white/50" />
-                  <span className="text-[8px] uppercase tracking-widest font-bold opacity-40">Layers</span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {Array.from({ length: settings.layerCount }).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveLayer(idx)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[10px] font-bold ${
-                        activeLayer === idx ? 'border-white bg-white text-black scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-white/20 text-white/50 hover:border-white/50'
-                      }`}
-                    >
-                      {idx + 1}
-                    </button>
-                  ))}
-                </div>
-                <div className="w-5 h-px bg-white/20 my-1" />
-                <button
-                  onClick={() => setClearTrigger(prev => prev + 1)}
-                  className="text-[8px] uppercase tracking-widest font-bold opacity-40 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
-                >
-                  Clear
-                </button>
-              </div>
+              <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
-              {/* Main Controls */}
-              <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 flex flex-col items-center gap-4 shadow-2xl">
                 {/* Play/Pause */}
                 <button
                   onClick={() => setIsActive(!isActive)}
@@ -330,29 +302,70 @@ export default function App() {
                   {isActive ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
                 </button>
 
-                <div className="w-7 h-px bg-white/15" />
+                <div className="w-full h-px bg-white/10" />
+
+                {/* Settings */}
+                <button
+                  onClick={() => { setShowSettings(!showSettings); setShowHelp(false); }}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    showSettings ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title="Open settings"
+                >
+                  <Settings size={16} className={showSettings ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
+                </button>
 
                 {/* Randomize */}
                 <button
                   onClick={triggerLucky}
-                  className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group"
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group w-full"
                   title="Randomize all settings"
                 >
                   <Sparkles size={16} className="text-yellow-400 group-hover:scale-110 transition-transform" />
                   <span className="text-[7px] font-bold uppercase tracking-widest">Random</span>
                 </button>
 
-                <div className="w-7 h-px bg-white/15" />
+                <div className="w-full h-px bg-white/10" />
+
+                {/* Layers */}
+                <div className="flex flex-col items-center gap-2 w-full">
+                  <div className="flex items-center gap-1.5">
+                    <Layers size={11} className="text-white/40" />
+                    <span className="text-[8px] uppercase tracking-widest font-bold opacity-40">Layers</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {Array.from({ length: settings.layerCount }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveLayer(idx)}
+                        className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[10px] font-bold ${
+                          activeLayer === idx ? 'border-white bg-white text-black scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-white/20 text-white/50 hover:border-white/50'
+                        }`}
+                      >
+                        {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setClearTrigger(prev => prev + 1)}
+                    className="text-[8px] uppercase tracking-widest font-bold opacity-40 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="w-full h-px bg-white/10" />
 
                 {/* Audio Sources */}
-                <div className="flex flex-col items-center gap-1.5">
+                <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[7px] uppercase tracking-widest font-bold opacity-30">Audio</span>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'microphone' ? 'none' : 'microphone')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'microphone'
                         ? 'text-green-400 bg-green-400/10 border border-green-400/30'
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'microphone' ? "Mic is active — click to mute" : "Enable microphone input"}
                   >
@@ -361,10 +374,10 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'system' ? 'none' : 'system')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'system'
                         ? 'text-blue-400 bg-blue-400/10 border border-blue-400/30'
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'system' ? "System audio active — click to stop" : "Capture system/tab audio"}
                   >
@@ -372,6 +385,7 @@ export default function App() {
                     <span>System</span>
                   </button>
                 </div>
+
               </div>
             </motion.div>
           </>
@@ -419,20 +433,11 @@ export default function App() {
 
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
           <button
-            onClick={() => { setShowSettings(!showSettings); setShowHelp(false); }}
-            className={`p-2 rounded-full transition-all ${
-              showSettings ? 'bg-white text-black' : 'hover:bg-white/10'
-            }`}
-            title="Open settings"
-          >
-            <Settings size={16} className={showSettings ? "opacity-100" : "opacity-60"} />
-          </button>
-          <button
             onClick={() => setShowHelp(!showHelp)}
             className={`p-2 rounded-full transition-all text-[9px] font-bold ${
               showHelp ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60'
             }`}
-            title="Keyboard shortcuts & help"
+            title="Help"
           >
             ?
           </button>
