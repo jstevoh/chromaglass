@@ -183,7 +183,7 @@ class FluidSimulation {
         && this.density[ix + iy * this.size] > 0.05) {
       const u1 = Math.random(), u2 = Math.random();
       const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-      const spawnRadius = Math.max(0.08, Math.min(0.5, 0.22 + gauss * 0.07));
+      const spawnRadius = Math.max(0.008, Math.min(0.06, 0.025 + gauss * 0.008));
       this.bubbles.push({
         x, y,
         vx: (Math.random() - 0.5) * 0.015,
@@ -364,7 +364,7 @@ class FluidSimulation {
       // Tail allows rare slightly larger bubbles naturally.
       const u1 = Math.random(), u2 = Math.random();
       const gauss = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-      const radius = Math.max(0.08, Math.min(0.5, 0.22 + gauss * 0.07));
+      const radius = Math.max(0.008, Math.min(0.06, 0.025 + gauss * 0.008));
 
       const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
       this.bubbles.push({
