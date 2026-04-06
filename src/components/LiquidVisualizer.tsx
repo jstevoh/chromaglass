@@ -589,9 +589,9 @@ class FluidSimulation {
     }
     if (x < 0) { x = Math.floor(vx0 + Math.random() * (vx1 - vx0)); y = Math.floor(vy0 + Math.random() * (vy1 - vy0)); }
     const angle = Math.random() * Math.PI * 2;
-    const maxLife = type === 'ant' ? 1400 : type === 'butterfly' ? 900 : type === 'beetle' ? 1200 : type === 'minnow' ? 1100 : type === 'crab' ? 1300 : 700;
+    const maxLife = type === 'ant' ? 2800 : type === 'butterfly' ? 1800 : type === 'beetle' ? 3000 : type === 'minnow' ? 2200 : type === 'crab' ? 2600 : 1400;
     const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : type === 'crab' ? 'walking' : 'active';
-    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.2, vy: Math.sin(angle) * 0.2,
+    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.05, vy: Math.sin(angle) * 0.05,
       angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0 });
   }
 
@@ -616,29 +616,36 @@ class FluidSimulation {
       const ix = Math.floor(ins.x), iy = Math.floor(ins.y);
       const safe = ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1;
 
-      // Fluid carries insect gently
+      // Fluid carries insect — stronger influence so insects are swept by currents they create
       if (safe) {
         const fi = ix + iy * this.size;
-        ins.vx += this.vx[fi] * 0.04;
-        ins.vy += this.vy[fi] * 0.04;
+        ins.vx += this.vx[fi] * 0.18;
+        ins.vy += this.vy[fi] * 0.18;
       }
 
       const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
 
       if (ins.type === 'water_strider') {
-        // Bass triggers burst mode — kick drums send it skittering
-        if (bass > 0.6 && ins.state !== 'burst') { ins.state = 'burst'; ins.stateTimer = 0; }
-        const audioSpeed = 1 + bass * 2.5;
-        const speed = ins.state === 'burst' ? 2.2 * audioSpeed : 0.75 * (1 + mid * 0.8);
-        ins.vx = ins.vx * 0.82 + Math.cos(ins.angle) * speed * 0.18;
-        ins.vy = ins.vy * 0.82 + Math.sin(ins.angle) * speed * 0.18;
-        if (ins.state === 'burst' && ins.stateTimer > 8) { ins.state = 'glide'; ins.stateTimer = 0; }
-        else if (ins.state !== 'burst' && ins.stateTimer > 35 + Math.random() * 25) {
-          ins.state = Math.random() < 0.3 ? 'burst' : 'glide';
-          ins.angle += (Math.random() - 0.5) * (0.9 + energy * 1.5);
-          ins.stateTimer = 0;
+        // Bass triggers a short skitter burst; otherwise glides smoothly at low speed
+        if (bass > 0.65 && ins.state !== 'burst') { ins.state = 'burst'; ins.stateTimer = 0; }
+        if (ins.state === 'burst') {
+          const speed = 0.38 * (1 + bass * 0.8);
+          ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * speed * 0.22;
+          ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * speed * 0.22;
+          if (ins.stateTimer > 14) { ins.state = 'glide'; ins.stateTimer = 0; }
+        } else {
+          // Slow steady glide with a gentle drift
+          const speed = 0.10 * (1 + mid * 0.4);
+          ins.vx = ins.vx * 0.92 + Math.cos(ins.angle) * speed * 0.08;
+          ins.vy = ins.vy * 0.92 + Math.sin(ins.angle) * speed * 0.08;
+          // Lazy direction shift every ~100 frames, very small angle change
+          if (ins.stateTimer > 80 + Math.random() * 80) {
+            ins.state = Math.random() < 0.15 ? 'burst' : 'glide';
+            ins.angle += (Math.random() - 0.5) * (0.5 + energy * 0.6);
+            ins.stateTimer = 0;
+          }
         }
-        // Four leg-contact dimples (2 per side)
+        // Four leg-contact dimples pushing outward from body — strong circular disturbance
         const { px, py } = perp(ins.angle);
         const fwd = { x: Math.cos(ins.angle), y: Math.sin(ins.angle) };
         const legs = [
@@ -652,192 +659,218 @@ class FluidSimulation {
           if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
             const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 0.72 * ins.strength * (ins.state === 'burst' ? 3.5 + bass * 3 : 1 + mid * 0.5);
+            const f = 1.0 * ins.strength * (ins.state === 'burst' ? 4.5 + bass * 3 : 1.2 + mid * 0.8);
             this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
           }
         }
 
       } else if (ins.type === 'ant') {
-        // Mid frequencies control pace — busy mids = faster march, more erratic turns
-        const pace = 0.55 * (1 + mid * 1.5);
-        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * pace * 0.22;
-        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * pace * 0.22;
-        const turnFreq = Math.max(20, 55 - mid * 35);
-        if (ins.stateTimer > turnFreq + Math.random() * 30) {
-          ins.angle += (Math.random() - 0.5) * Math.PI * (0.9 + energy * 1.2);
+        // Slow methodical march, sharp ~90° turns every ~150 frames, mid boosts pace
+        const pace = 0.08 * (1 + mid * 0.6);
+        ins.vx = ins.vx * 0.88 + Math.cos(ins.angle) * pace * 0.12;
+        ins.vy = ins.vy * 0.88 + Math.sin(ins.angle) * pace * 0.12;
+        // Deliberate near-right-angle turns, less frequent
+        if (ins.stateTimer > 120 + Math.random() * 80) {
+          // Ants turn roughly 90° left or right, occasionally reverse
+          const turns = [-Math.PI * 0.5, -Math.PI * 0.4, Math.PI * 0.4, Math.PI * 0.5];
+          ins.angle += turns[Math.floor(Math.random() * turns.length)] * (1 + energy * 0.3);
           ins.stateTimer = 0;
         }
-        // Six-legged alternating footfall every 4 frames — bass boosts footfall force
-        if (ins.life % 4 === 0 && safe) {
+        // Six-legged alternating footfall every 8 frames — wider area imprint
+        if (ins.life % 8 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const side = ins.life % 8 < 4 ? 1 : -1;
+          const side = ins.life % 16 < 8 ? 1 : -1;
           for (let leg = -1; leg <= 1; leg++) {
-            const lx = Math.floor(ins.x + px * side * 1.3 + Math.cos(ins.angle) * leg);
-            const ly = Math.floor(ins.y + py * side * 1.3 + Math.sin(ins.angle) * leg);
-            if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-              this.addVelocity(lx, ly, Math.cos(ins.angle) * (0.32 + bass * 0.48), Math.sin(ins.angle) * (0.32 + bass * 0.48));
+            for (let reach = 1; reach <= 2; reach++) {
+              const lx = Math.floor(ins.x + px * side * reach * 1.3 + Math.cos(ins.angle) * leg);
+              const ly = Math.floor(ins.y + py * side * reach * 1.3 + Math.sin(ins.angle) * leg);
+              if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
+                const footF = (0.5 + bass * 0.7) * (1 / reach);
+                this.addVelocity(lx, ly, Math.cos(ins.angle) * footF, Math.sin(ins.angle) * footF);
+              }
+            }
           }
         }
 
       } else if (ins.type === 'butterfly') {
-        // Treble and energy control flap agitation — high frequencies = panicked flapping
-        const agitation = treble * 1.8 + energy * 0.8;
-        ins.angle += (Math.random() - 0.5) * (0.18 + agitation * 0.3);
-        const flapSpd = (0.18 + agitation * 0.25) * ins.strength;
-        ins.vx = ins.vx * 0.88 + (Math.random() - 0.5) * flapSpd;
-        ins.vy = ins.vy * 0.88 + (Math.random() - 0.5) * flapSpd;
-        // Wing flaps — frequency increases with treble
-        const flapInterval = Math.max(4, Math.floor(10 - treble * 6));
-        if (ins.stateTimer % flapInterval < 2 && ins.strength > 0.05) {
+        // Gentle drift with slow wing-beat oscillation; treble accelerates the flutter
+        const agitation = treble * 1.0 + energy * 0.4;
+        // Smooth heading drift — like a butterfly riding air currents
+        ins.angle += Math.sin(ins.life * 0.025) * 0.04 + (Math.random() - 0.5) * (0.05 + agitation * 0.08);
+        const driftSpd = 0.05 * (1 + agitation * 0.5) * ins.strength;
+        ins.vx = ins.vx * 0.93 + Math.cos(ins.angle) * driftSpd * 0.07;
+        ins.vy = ins.vy * 0.93 + Math.sin(ins.angle) * driftSpd * 0.07;
+        // Wing flap every ~18 frames — alternating left/right, big slow beats
+        const flapInterval = Math.max(10, Math.floor(18 - treble * 8));
+        if (ins.stateTimer % flapInterval < 3 && ins.strength > 0.05) {
           const leftWing = Math.floor(ins.stateTimer / flapInterval) % 2 === 0;
           const { px, py } = perp(ins.angle);
           const sx = leftWing ? 1 : -1;
-          const wingR = Math.max(3, Math.floor(8 * ins.strength));
+          const wingR = Math.max(4, Math.floor(9 * ins.strength));
           for (let w = 1; w <= wingR; w++) {
             const wx = Math.floor(ins.x + px * sx * w);
             const wy = Math.floor(ins.y + py * sx * w);
             if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = (1.4 + agitation * 1.0) * ins.strength * (1 - w / wingR);
-              this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.4,
-                                       py * sx * f - Math.sin(ins.angle) * f * 0.4);
+              const f = (1.8 + agitation * 1.2) * ins.strength * (1 - w / wingR);
+              this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.3,
+                                       py * sx * f - Math.sin(ins.angle) * f * 0.3);
             }
           }
         }
 
       } else if (ins.type === 'beetle') {
-        // Bass makes it start walking; volume controls plowing force
+        // Very slow heavy plow; long stops, bass kicks it into motion
         if (ins.state === 'stopped') {
-          if (bass > 0.5 || ins.stateTimer > 50 + Math.random() * 50) { ins.state = 'walking'; ins.stateTimer = 0; }
+          if (bass > 0.55 || ins.stateTimer > 120 + Math.random() * 150) { ins.state = 'walking'; ins.stateTimer = 0; }
         } else {
-          const plowSpeed = 0.11 * (1 + volume * 1.2);
-          ins.vx = ins.vx * 0.87 + Math.cos(ins.angle) * plowSpeed * 0.13;
-          ins.vy = ins.vy * 0.87 + Math.sin(ins.angle) * plowSpeed * 0.13;
-          if (ins.stateTimer > 90 + Math.random() * 80) {
-            ins.state = Math.random() < 0.35 ? 'stopped' : 'walking';
-            ins.angle += (Math.random() - 0.5) * (0.6 + bass * 1.0);
+          const plowSpeed = 0.032 * (1 + volume * 0.5);
+          ins.vx = ins.vx * 0.94 + Math.cos(ins.angle) * plowSpeed * 0.06;
+          ins.vy = ins.vy * 0.94 + Math.sin(ins.angle) * plowSpeed * 0.06;
+          if (ins.stateTimer > 180 + Math.random() * 120) {
+            ins.state = Math.random() < 0.4 ? 'stopped' : 'walking';
+            ins.angle += (Math.random() - 0.5) * (0.5 + bass * 0.7);
             ins.stateTimer = 0;
           }
-          // Bow wave + side displacement — volume boosts plow force
-          const plowF = 1.4 + volume * 1.6;
-          const bx = Math.floor(ins.x + Math.cos(ins.angle) * 2.2);
-          const by = Math.floor(ins.y + Math.sin(ins.angle) * 2.2);
-          if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
-            this.addVelocity(bx, by, Math.cos(ins.angle) * plowF, Math.sin(ins.angle) * plowF);
+          // Large bow wave — beetle's heavy body creates a wide forward push
+          const plowF = 2.0 + volume * 2.0;
+          for (let reach = 1; reach <= 3; reach++) {
+            const bx = Math.floor(ins.x + Math.cos(ins.angle) * (reach + 1));
+            const by = Math.floor(ins.y + Math.sin(ins.angle) * (reach + 1));
+            if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
+              this.addVelocity(bx, by, Math.cos(ins.angle) * plowF / reach, Math.sin(ins.angle) * plowF / reach);
+          }
+          // Wide side displacement — pushing fluid out from flanks
           const { px, py } = perp(ins.angle);
           for (const s of [-1, 1]) {
-            const sx2 = Math.floor(ins.x + px * s * 2);
-            const sy2 = Math.floor(ins.y + py * s * 2);
-            if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-              this.addVelocity(sx2, sy2, px * s * (0.88 + volume * 1.0), py * s * (0.88 + volume * 1.0));
+            for (let reach = 1; reach <= 3; reach++) {
+              const sx2 = Math.floor(ins.x + px * s * reach * 1.5);
+              const sy2 = Math.floor(ins.y + py * s * reach * 1.5);
+              if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
+                this.addVelocity(sx2, sy2, px * s * (1.2 + volume * 1.2) / reach, py * s * (1.2 + volume * 1.2) / reach);
+            }
           }
         }
 
       } else if (ins.type === 'fly') {
-        // Energy and treble control dash interval and speed
-        const dashInterval = Math.max(2, Math.floor(9 - energy * 6));
-        if (ins.stateTimer > dashInterval + Math.random() * dashInterval) {
-          ins.angle += (Math.random() - 0.5) * Math.PI * (1.6 + treble * 1.5);
-          ins.stateTimer = 0;
+        // Short rapid darts (15-25 frames) alternating with brief resting stops (10-20 frames)
+        if (ins.state === 'active') {
+          const dashSpd = 0.22 * (1 + energy * 0.8 + treble * 0.5);
+          ins.vx = ins.vx * 0.80 + Math.cos(ins.angle) * dashSpd * 0.20;
+          ins.vy = ins.vy * 0.80 + Math.sin(ins.angle) * dashSpd * 0.20;
+          if (ins.stateTimer > 15 + Math.random() * 20) {
+            ins.state = 'stopped'; ins.stateTimer = 0;
+          }
+        } else {
+          // Resting — nearly still, wings create a tiny circular disturbance
+          ins.vx *= 0.85;
+          ins.vy *= 0.85;
+          if (safe && ins.life % 4 === 0) {
+            const { px, py } = perp(ins.angle);
+            const buzzF = 0.35 + energy * 0.45;
+            this.addVelocity(ix, iy, 0, 0);
+            this.addVelocity(Math.min(this.size-2, ix+1), iy,  px * buzzF,  py * buzzF);
+            this.addVelocity(Math.max(1,            ix-1), iy, -px * buzzF, -py * buzzF);
+            this.addVelocity(ix, Math.min(this.size-2, iy+1),  py * buzzF, -px * buzzF);
+            this.addVelocity(ix, Math.max(1,            iy-1), -py * buzzF,  px * buzzF);
+          }
+          if (ins.stateTimer > 10 + Math.random() * 15) {
+            ins.angle += (Math.random() - 0.5) * Math.PI * (1.2 + treble * 1.0);
+            ins.state = 'active'; ins.stateTimer = 0;
+          }
         }
-        const flySpeed = 0.65 * (1 + energy * 1.5 + treble * 0.8);
-        ins.vx = ins.vx * 0.68 + Math.cos(ins.angle) * flySpeed * 0.32;
-        ins.vy = ins.vy * 0.68 + Math.sin(ins.angle) * flySpeed * 0.32;
-        // Micro-swirl every 6 frames — energy boosts swirl
-        if (ins.life % 6 === 0 && safe) {
+        // Chaotic micro-vortex when moving
+        if (ins.state === 'active' && ins.life % 5 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const swirlF = 0.56 + energy * 0.72;
-          this.addVelocity(ix, iy, ins.vx * (0.72 + energy * 0.8), ins.vy * (0.72 + energy * 0.8));
+          const swirlF = 0.7 + energy * 0.8;
           this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
           this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
+          this.addVelocity(ix, Math.min(this.size - 2, iy + 1),  py * swirlF, -px * swirlF);
+          this.addVelocity(ix, Math.max(1,              iy - 1), -py * swirlF,  px * swirlF);
         }
 
       } else if (ins.type === 'minnow') {
-        // Smooth sinusoidal swimming — treble/energy control speed
-        const swimSpeed = 0.9 * (1 + treble * 1.2 + energy * 0.8);
-        // Gradually curve heading
-        ins.angle += Math.sin(ins.life * 0.08) * 0.06 + (Math.random() - 0.5) * 0.03;
-        ins.vx = ins.vx * 0.75 + Math.cos(ins.angle) * swimSpeed * 0.25;
-        ins.vy = ins.vy * 0.75 + Math.sin(ins.angle) * swimSpeed * 0.25;
-        // Bass causes sudden direction change
-        if (bass > 0.55 && ins.stateTimer > 20) { ins.angle += (Math.random() - 0.5) * Math.PI * 1.2; ins.stateTimer = 0; }
-        // Trailing body-wave wake every 3 frames
-        if (ins.life % 3 === 0 && safe) {
+        // Slow smooth sinusoidal swimming; lazy S-curve heading drift
+        const swimSpeed = 0.18 * (1 + treble * 0.5 + energy * 0.3);
+        // Gentle sinusoidal heading oscillation — the S-curve of a fish
+        ins.angle += Math.sin(ins.life * 0.04) * 0.04 + (Math.random() - 0.5) * 0.01;
+        ins.vx = ins.vx * 0.90 + Math.cos(ins.angle) * swimSpeed * 0.10;
+        ins.vy = ins.vy * 0.90 + Math.sin(ins.angle) * swimSpeed * 0.10;
+        // Bass causes a slow lazy turn
+        if (bass > 0.6 && ins.stateTimer > 40) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.7; ins.stateTimer = 0; }
+        // Body-wave wake every 4 frames — wider alternating side-wash
+        if (ins.life % 4 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          // Alternating side-wash from tail fin
-          const side = ins.life % 6 < 3 ? 1 : -1;
-          const tailX = Math.floor(ins.x - Math.cos(ins.angle) * 3);
-          const tailY = Math.floor(ins.y - Math.sin(ins.angle) * 3);
-          if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
-            const f = (0.88 + energy * 0.8) * ins.strength;
-            this.addVelocity(tailX, tailY, px * side * f, py * side * f);
+          const side = ins.life % 8 < 4 ? 1 : -1;
+          // Tail fin: broad alternating wash
+          for (let t = 1; t <= 3; t++) {
+            const tailX = Math.floor(ins.x - Math.cos(ins.angle) * (t + 1));
+            const tailY = Math.floor(ins.y - Math.sin(ins.angle) * (t + 1));
+            if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
+              const f = (1.2 + energy * 1.0) * ins.strength / t;
+              this.addVelocity(tailX, tailY, px * side * f, py * side * f);
+            }
           }
           // Bow pressure wave
           const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2);
           const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2);
           if (bowX > 0 && bowX < this.size - 1 && bowY > 0 && bowY < this.size - 1)
-            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.72 * ins.strength, Math.sin(ins.angle) * 0.72 * ins.strength);
+            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.9 * ins.strength, Math.sin(ins.angle) * 0.9 * ins.strength);
         }
 
       } else if (ins.type === 'crab') {
-        // Sideways scuttling — heading stays fixed, velocity is perpendicular
+        // Very slow sideways scuttle; big radial pinch claws on bass
         if (ins.state === 'pinching') {
-          // Radial outward burst (pinch)
-          if (ins.stateTimer === 1 && safe) {
-            for (let pr = -4; pr <= 4; pr++) {
-              for (let pc = -4; pc <= 4; pc++) {
+          // Radial outward burst — large radius pinch claw attack
+          if (ins.stateTimer < 5 && safe) {
+            for (let pr = -5; pr <= 5; pr++) {
+              for (let pc = -5; pc <= 5; pc++) {
                 const dist = Math.sqrt(pr * pr + pc * pc);
-                if (dist < 1 || dist > 4) continue;
+                if (dist < 1 || dist > 5) continue;
                 const bx = Math.floor(ins.x) + pc, by = Math.floor(ins.y) + pr;
                 if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1) {
-                  const f = (1.6 + volume * 1.4) * ins.strength * (1 - dist / 4);
+                  const f = (2.2 + volume * 1.8) * ins.strength * (1 - dist / 5);
                   this.addVelocity(bx, by, (pc / dist) * f, (pr / dist) * f);
                 }
               }
             }
           }
-          if (ins.stateTimer > 40) { ins.state = 'walking'; ins.stateTimer = 0; }
+          if (ins.stateTimer > 60) { ins.state = 'walking'; ins.stateTimer = 0; }
         } else {
-          // Sideways walk — velocity mostly perpendicular to heading
+          // Very slow sideways walk
           const { px, py } = perp(ins.angle);
-          const sideDir = ins.life % 300 < 150 ? 1 : -1; // alternate direction every 150 frames
-          const sideSpeed = (0.35 + mid * 0.4) * sideDir;
-          ins.vx = ins.vx * 0.82 + px * sideSpeed * 0.18;
-          ins.vy = ins.vy * 0.82 + py * sideSpeed * 0.18;
-          // Occasional turn
-          if (ins.stateTimer > 80 + Math.random() * 60) {
-            ins.angle += (Math.random() - 0.5) * Math.PI * 0.5;
+          const sideDir = ins.life % 600 < 300 ? 1 : -1; // alternate every 300 frames
+          const sideSpeed = 0.065 * (1 + mid * 0.4) * sideDir;
+          ins.vx = ins.vx * 0.92 + px * sideSpeed * 0.08;
+          ins.vy = ins.vy * 0.92 + py * sideSpeed * 0.08;
+          // Rare facing turn
+          if (ins.stateTimer > 200 + Math.random() * 150) {
+            ins.angle += (Math.random() - 0.5) * Math.PI * 0.4;
             ins.stateTimer = 0;
           }
           // Bass or random triggers pinch
-          if ((bass > 0.6 || Math.random() < 0.002) && ins.stateTimer > 30) {
+          if ((bass > 0.65 || Math.random() < 0.001) && ins.stateTimer > 60) {
             ins.state = 'pinching'; ins.stateTimer = 0;
           }
-          // Leg displacement (4 legs each side, alternating)
-          if (ins.life % 5 === 0 && safe) {
-            const legSide = ins.life % 10 < 5 ? 1 : -1;
-            for (let leg = -1; leg <= 1; leg++) {
-              const lx = Math.floor(ins.x + px * legSide * 2 + Math.cos(ins.angle) * leg);
-              const ly = Math.floor(ins.y + py * legSide * 2 + Math.sin(ins.angle) * leg);
-              if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-                this.addVelocity(lx, ly, px * legSide * (0.4 + volume * 0.32), py * legSide * (0.4 + volume * 0.32));
+          // 8-legged ripple every 10 frames — alternating deep leg drag
+          if (ins.life % 10 === 0 && safe) {
+            const legSide = ins.life % 20 < 10 ? 1 : -1;
+            for (let leg = -2; leg <= 2; leg++) {
+              for (let reach = 1; reach <= 3; reach++) {
+                const lx = Math.floor(ins.x + px * legSide * reach * 1.4 + Math.cos(ins.angle) * leg);
+                const ly = Math.floor(ins.y + py * legSide * reach * 1.4 + Math.sin(ins.angle) * leg);
+                if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
+                  const legF = (0.6 + volume * 0.5) / reach;
+                  this.addVelocity(lx, ly, px * legSide * legF, py * legSide * legF);
+                }
+              }
             }
           }
         }
       }
 
-      // Inject a small dye splash at the insect position each frame so you can see it
-      if (safe && ins.life % 3 === 0) {
-        const trailAmt = (ins.type === 'beetle' ? 0.08 : ins.type === 'crab' ? 0.07 : ins.type === 'minnow' ? 0.06 : 0.05) * ins.strength;
-        // Each insect type gets a distinctive hue rotation based on type and life phase
-        const hue = ins.life * 0.03;
-        const tr = 0.5 + 0.5 * Math.sin(hue);
-        const tg = 0.5 + 0.5 * Math.sin(hue + 2.094);
-        const tb = 0.5 + 0.5 * Math.sin(hue + 4.189);
-        this.addDensity(ix, iy, trailAmt, tr, tg, tb);
-      }
 
       // Clamp speed per type — audio can push near the cap but not blow it up
-      const maxSpd = ins.type === 'fly' ? 1.8 : ins.type === 'water_strider' ? 1.4 : ins.type === 'minnow' ? 2.0 : 0.6;
+      const maxSpd = ins.type === 'fly' ? 0.35 : ins.type === 'water_strider' ? 0.45 : ins.type === 'minnow' ? 0.28 : ins.type === 'ant' ? 0.15 : ins.type === 'beetle' ? 0.07 : ins.type === 'crab' ? 0.12 : ins.type === 'butterfly' ? 0.12 : 0.2;
       const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
       if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
       ins.x += ins.vx;
@@ -885,7 +918,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   isAutomated = false, isActive = true,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
   const noise2D = useMemo(() => createNoise2D(), []);
   const lastSeedCount = useRef(seedCount);
@@ -1360,8 +1392,6 @@ void main() {
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      const overlay = overlayRef.current;
-      if (overlay) { overlay.width = window.innerWidth; overlay.height = window.innerHeight; }
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -1779,46 +1809,6 @@ void main() {
         }
       }
 
-      // ── Draw insect emoji overlay ──────────────────────────
-      const overlayCanvas = overlayRef.current;
-      if (overlayCanvas) {
-        const ctx2d = overlayCanvas.getContext('2d');
-        if (ctx2d) {
-          ctx2d.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-          const W = overlayCanvas.width;
-          const H = overlayCanvas.height;
-          const scale2 = Math.max(W, H) * 1.5;
-          const rot0 = rotationAnglesRef.current[0] ?? 0;
-          const cosA = Math.cos(rot0);
-          const sinA = Math.sin(rot0);
-          const insects = fluidsRef.current[0]?.insects ?? [];
-          for (const ins of insects) {
-            // Map grid pos to screen pos (inverse of uvToFluid shader function)
-            const fRx = (ins.x / 128.0 - 0.5) * scale2;
-            const fRy = (ins.y / 128.0 - 0.5) * scale2;
-            const pUx = cosA * fRx + sinA * fRy;
-            const pUy = -sinA * fRx + cosA * fRy;
-            const sx = pUx + W / 2;
-            const sy = pUy + H / 2;
-            const insectType = INSECT_TYPES.find(t => t.id === ins.type);
-            const emoji = insectType?.emoji ?? '🐛';
-            const alpha = Math.min(1, ins.strength * 1.5);
-            ctx2d.save();
-            ctx2d.globalAlpha = alpha;
-            ctx2d.shadowColor = 'rgba(255,255,255,0.9)';
-            ctx2d.shadowBlur = 18;
-            ctx2d.font = '26px serif';
-            ctx2d.textAlign = 'center';
-            ctx2d.textBaseline = 'middle';
-            // Draw twice for brighter glow
-            ctx2d.fillText(emoji, sx, sy);
-            ctx2d.shadowBlur = 8;
-            ctx2d.fillText(emoji, sx, sy);
-            ctx2d.restore();
-          }
-        }
-      }
-
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -1853,11 +1843,6 @@ void main() {
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
         id="liquid-canvas"
-      />
-      <canvas
-        ref={overlayRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        id="insect-overlay"
       />
     </div>
   );
