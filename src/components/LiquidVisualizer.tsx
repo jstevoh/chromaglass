@@ -1111,7 +1111,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
             const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
-            if (currentAudioData.volume > 3 && densityMod > 0.005) {
+            const impact = currentSettings.audioImpact ?? 0.45;
+            if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
               const timeOffset = time * 0.3 + colorMod * Math.PI;
               const ci = Math.floor(timeOffset % PALETTE_COUNT);
               const ni = (ci + 1) % PALETTE_COUNT;
@@ -1127,8 +1128,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const energy01 = Math.min(1, currentAudioData.energy / 70);
                 const mid01    = Math.min(1, currentAudioData.mid    / 70);
 
-                // Auto mode amplifier — everything hits harder when automated
-                const autoAmp = isAutomatedRef.current ? 2.2 : 1.0;
+                // audioImpact (0–1) controls visual punch; auto mode adds extra multiplier
+                // At impact=0.45 (default) + no auto → ~1.0x baseline
+                // At impact=1.0 + auto → ~4.9x baseline
+                const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
+                const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
 
                 // Center pulse — scales with density mapping
                 const centerX = Math.floor(GRID_SIZE / 2);
@@ -1136,9 +1140,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 activeFluid.addDensity(centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a);
                 activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
 
-                // Bass hit: radial velocity burst — lower threshold, larger burst in auto
+                // Bass hit: radial velocity burst — scales with impact + auto mode
                 if (bass01 > 0.25) {
-                  const burstR = isAutomatedRef.current ? 28 : 18;
+                  const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * Math.max(0.4, impactMul));
                   const bassStr = (bass01 - 0.25) * autoAmp;
                   for (let bj = -burstR; bj <= burstR; bj += 3) {
                     for (let bi = -burstR; bi <= burstR; bi += 3) {
@@ -1171,7 +1175,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                 // Treble: scattered heat sparks
                 if (treble01 > 0.2) {
-                  const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6));
+                  const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6) * impactMul);
                   for (let s = 0; s < sparks; s++) {
                     const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                     const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;

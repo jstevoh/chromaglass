@@ -286,6 +286,27 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
+                {/* Sound Drive */}
+                <div className="flex flex-col items-center gap-2 w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Sound Drive</span>
+                    <span className="text-[8px] font-bold text-white/50">{Math.round(settings.audioImpact * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={settings.audioImpact}
+                    onChange={e => updateSettings({ audioImpact: parseFloat(e.target.value) })}
+                    className="w-full h-1 appearance-none rounded-full cursor-pointer accent-purple-400"
+                    style={{ background: `linear-gradient(to right, rgb(192,132,252) ${settings.audioImpact * 100}%, rgba(255,255,255,0.1) ${settings.audioImpact * 100}%)` }}
+                    title="Controls how strongly sound impacts the visuals"
+                  />
+                </div>
+
+                <div className="w-full h-px bg-white/10" />
+
                 {/* Random Evolve */}
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Random Evolve</span>

@@ -71,6 +71,9 @@ export interface VisualizerSettings {
   
   // Automation
   automateRate: number;
+
+  // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
+  audioImpact: number;
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
@@ -109,4 +112,5 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   damping: 0.97,
   heatDecay: 0.98,
   automateRate: 0.02,
+  audioImpact: 0.45,
 };
