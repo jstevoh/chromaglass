@@ -236,45 +236,11 @@ class FluidSimulation {
     let heatIntensity = settings.heatIntensity || 0.15;
 
     // ── Audio → Physics bridge ───────────────────────────────
+    // Audio adds ONLY heat (which creates buoyancy-driven motion via physics).
+    // No direct velocity injection — the fluid dynamics create all movement.
     if (audioData && settings.audioMappings) {
-      const velocityMod = getAudioValue(audioData, settings.audioMappings.velocity as AudioFeatureKey);
-      const densityMod  = getAudioValue(audioData, settings.audioMappings.density as AudioFeatureKey);
-      const colorMod    = getAudioValue(audioData, settings.audioMappings.color as AudioFeatureKey);
-      const rotationMod = getAudioValue(audioData, settings.audioMappings.rotation as AudioFeatureKey);
-
-      const bassNorm   = Math.min(1, audioData.bass   / 100);
-      const midNorm    = Math.min(1, audioData.mid    / 100);
-      const trebleNorm = Math.min(1, audioData.treble / 100);
-
-      // Bass → very rare, subtle radial breath (only on strong beats, probabilistic).
-      if (bassNorm > 0.75 && settings.platePressure > 0.05 && Math.random() < 0.08) {
-        const impX = Math.floor(this.size * 0.25 + Math.random() * this.size * 0.5);
-        const impY = Math.floor(this.size * 0.25 + Math.random() * this.size * 0.5);
-        const radius = Math.floor(3 + bassNorm * 5);
-        const strength = bassNorm * settings.platePressure * 0.003;
-        this.applyRadialImpulse(impX, impY, radius, strength);
-      }
-
-      // Treble → very sparse micro-perturbations.
-      if (trebleNorm > 0.6 && Math.random() < 0.15) {
-        const tx = Math.floor(1 + Math.random() * (this.size - 2));
-        const ty = Math.floor(1 + Math.random() * (this.size - 2));
-        const idx = tx + ty * this.size;
-        if (this.density[idx] > 0.05) {
-          const angle = Math.random() * Math.PI * 2;
-          this.vx[idx] += Math.cos(angle) * 0.02;
-          this.vy[idx] += Math.sin(angle) * 0.02;
-        }
-      }
-
-      // Mid → very gentle vorticity.
-      if (midNorm > 0.4 && settings.glassSmear > 0.05 && Math.random() < 0.1) {
-        this.injectVorticity(midNorm * settings.glassSmear * 0.08, time, noise2D);
-      }
-
-      heatIntensity += colorMod * 0.1;
-      visc = visc * 0.95 + Math.max(0.1, visc - densityMod * 0.3) * 0.05;
-      damping = Math.min(0.999, damping + rotationMod * 0.002);
+      const colorMod = getAudioValue(audioData, settings.audioMappings.color as AudioFeatureKey);
+      heatIntensity += colorMod * 0.02;
     }
 
     // 1. Squeeze-Film Flow
@@ -315,15 +281,15 @@ class FluidSimulation {
     const fingeringStrength = (settings.polarity || 0) * 0.15;
     if (fingeringStrength > 0) this.applyFingering(fingeringStrength, time, noise2D);
 
-    // 8. Vibration — very subtle
-    if (audioData && settings.vibrationFrequency > 0) {
-      this.applyVibration(audioData.energy * settings.vibrationFrequency * 0.04, settings.vibrationFrequency * 5, time);
+    // 8. Vibration — only when explicitly cranked up
+    if (audioData && settings.vibrationFrequency > 0.3) {
+      this.applyVibration(audioData.energy * settings.vibrationFrequency * 0.002, settings.vibrationFrequency * 3, time);
     }
 
-    // 8.5-8.7 Dripping, smearing, airflow
-    if (settings.rainDrip > 0) this.applyDripping(settings.rainDrip, dt, time, noise2D);
-    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
-    if (settings.airVelocity > 0) this.applyAirflow(settings.airVelocity, dt, time, noise2D);
+    // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
+    if (settings.rainDrip > 0.1) this.applyDripping(settings.rainDrip, dt, time, noise2D);
+    if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
+    if (settings.airVelocity > 0.1) this.applyAirflow(settings.airVelocity, dt, time, noise2D);
 
     // 9. Diffuse & advect density + temp
     this.diffuse(0, this.s,     this.density,  diff, dt);
@@ -343,8 +309,8 @@ class FluidSimulation {
       this.vx[i] *= damping;
       this.vy[i] *= damping;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
-      if (speedSq > 0.04) {
-        const factor = 0.2 / Math.sqrt(speedSq);
+      if (speedSq > 0.000004) {
+        const factor = 0.002 / Math.sqrt(speedSq);
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
@@ -1087,23 +1053,22 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
               af.createBubble(bx, by, 1, 0.3, 0.1);
             }
 
-            const driftX = noise2D(time * 0.1, 0) * 0.25;
-            const driftY = noise2D(0, time * 0.1) * 0.25;
+            const driftX = noise2D(time * 0.1, 0) * 0.001;
+            const driftY = noise2D(0, time * 0.1) * 0.001;
             af.addVelocity(ambientX, ambientY, driftX, driftY);
           }
 
-          // ── Audio input to fluid ──────────────────────────
+          // ── Audio input to fluid — density/heat only, no velocity ──
+          // All motion comes from fluid physics reacting to density/heat gradients.
           if (currentAudioData && currentSettings.audioMappings) {
-            const velocityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.velocity as AudioFeatureKey);
-            const densityMod  = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
-            const colorMod    = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
+            const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
+            const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
-            if (currentAudioData.volume > 5) {
+            if (currentAudioData.volume > 5 && densityMod > 0.01) {
               const centerX = Math.floor(GRID_SIZE / 2);
               const centerY = Math.floor(GRID_SIZE / 2);
-              const radius = Math.floor(5 + densityMod * 8);
 
-              const timeOffset = time * 1.5 + colorMod * Math.PI;
+              const timeOffset = time * 0.3 + colorMod * Math.PI;
               const ci = Math.floor(timeOffset % PALETTE_COUNT);
               const ni = (ci + 1) % PALETTE_COUNT;
               const bl = timeOffset % 1;
@@ -1113,30 +1078,9 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
 
               const activeFluid = fluidsRef.current[activeLayerRef.current];
               if (activeFluid) {
-                const r2 = radius * radius;
-                for (let i = -radius; i <= radius; i++) {
-                  for (let j = -radius; j <= radius; j++) {
-                    if (i * i + j * j < r2) {
-                      const x = centerX + i;
-                      const y = centerY + j;
-                      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-                        activeFluid.addDensity(x, y, densityMod * 0.015, ar_a, ag_a, ab_a);
-                        activeFluid.addTemp(x, y, densityMod * 0.008);
-                        activeFluid.addVelocity(x, y, i * 0.0008 * currentSettings.platePressure, j * 0.0008 * currentSettings.platePressure);
-                      }
-                    }
-                  }
-                }
-
-                // Sparse velocity stirring — just a few points, very gentle
-                if (Math.random() < 0.3) {
-                  const x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                  const y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                  if (activeFluid.density[x + y * GRID_SIZE] > 0.05) {
-                    const angle = noise2D(x * 0.05, y * 0.05 + time) * Math.PI * 2;
-                    activeFluid.addVelocity(x, y, Math.cos(angle) * velocityMod * 0.08, Math.sin(angle) * velocityMod * 0.08);
-                  }
-                }
+                // Add a tiny dot of colored density at center — physics diffuses it
+                activeFluid.addDensity(centerX, centerY, densityMod * 0.004, ar_a, ag_a, ab_a);
+                activeFluid.addTemp(centerX, centerY, densityMod * 0.002);
               }
             }
           }
