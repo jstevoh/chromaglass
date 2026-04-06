@@ -178,16 +178,19 @@ class FluidSimulation {
       }
     }
 
-    if (Math.random() < spawnChance) {
-      const spawnRadius = 0.2 + Math.random() * 0.4;
+    // Only spawn if there's fluid at this location
+    const ix = Math.floor(x), iy = Math.floor(y);
+    if (Math.random() < spawnChance && ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1
+        && this.density[ix + iy * this.size] > 0.05) {
+      const spawnRadius = 0.15 + Math.random() * 0.25;
       this.bubbles.push({
         x, y,
-        vx: (Math.random() - 0.5) * 0.03,
-        vy: -Math.random() * 0.05 - 0.01,
+        vx: (Math.random() - 0.5) * 0.015,
+        vy: -Math.random() * 0.025 - 0.005,
         radius: spawnRadius,
         life: 0,
-        maxLife: 300 + Math.random() * 400,
-        type: Math.random() > 0.6 ? 'color' : 'clear',
+        maxLife: 400 + Math.random() * 500,
+        type: Math.random() > 0.5 ? 'color' : 'clear',
         color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
       });
     }
@@ -375,23 +378,34 @@ class FluidSimulation {
     }
     if (currentBubbleAmount <= 0) return;
 
-    // Cap total bubble count so merging/splitting stays manageable
-    const maxBubbles = 60;
-    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.3) {
-      const x = Math.random() * this.size;
-      const y = this.size - 2 - Math.random() * (this.size * 0.25);
-      const jitter = (settings.bubbleSizeVariance || 1) * 0.15;
-      const radius = 0.2 + Math.random() * 0.5 + jitter * Math.random();
+    // Cap total bubble count
+    const maxBubbles = 40;
+    if (this.bubbles.length < maxBubbles && Math.random() < currentBubbleAmount * 0.2) {
+      // Only spawn inside existing fluid — no random blank-space appearances
+      let attempts = 0;
+      let spawnX = -1, spawnY = -1;
+      while (attempts < 8) {
+        const tx = Math.floor(1 + Math.random() * (this.size - 2));
+        const ty = Math.floor(1 + Math.random() * (this.size - 2));
+        if (this.density[tx + ty * this.size] > 0.08) {
+          spawnX = tx; spawnY = ty;
+          break;
+        }
+        attempts++;
+      }
+      if (spawnX < 0) return; // no fluid found, skip
 
+      const jitter = (settings.bubbleSizeVariance || 1) * 0.1;
+      const radius = 0.15 + Math.random() * 0.3 + jitter * Math.random();
       const c = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
       this.bubbles.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 0.04,   // very slow horizontal drift
-        vy: -Math.random() * 0.06 - 0.01,    // slow gentle rise
+        x: spawnX, y: spawnY,
+        vx: (Math.random() - 0.5) * 0.02,
+        vy: -Math.random() * 0.03 - 0.005,
         radius,
         life: 0,
-        maxLife: 300 + Math.random() * 500,
-        type: Math.random() > 0.6 ? 'color' : 'clear',
+        maxLife: 400 + Math.random() * 600,
+        type: Math.random() > 0.5 ? 'color' : 'clear',
         color: c,
       });
     }
@@ -1350,43 +1364,31 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
             tCtx.scale(scale, scale);
             tCtx.drawImage(offscreenCanvas, -GRID_SIZE / 2, -GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
 
-            // Draw bubbles
+            // Draw bubbles — subtle rings only, no solid fills
             if (fluid.bubbles.length > 0) {
+              tCtx.globalCompositeOperation = 'source-over';
               for (const bub of fluid.bubbles) {
                 const bx = bub.x - GRID_SIZE / 2;
                 const by = bub.y - GRID_SIZE / 2;
-                tCtx.beginPath();
-                tCtx.arc(bx, by, bub.radius, 0, Math.PI * 2);
+                // Fade in/out over lifetime
+                const lifeT = bub.life / bub.maxLife;
+                const opacity = Math.min(lifeT * 8, 1, (1 - lifeT) * 8) * 0.35;
+                if (opacity < 0.01) continue;
 
-                if (bub.type === 'clear') {
-                  tCtx.globalCompositeOperation = 'source-over';
-                  const rimGrad = tCtx.createLinearGradient(bx - bub.radius, by - bub.radius, bx + bub.radius, by + bub.radius);
-                  rimGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
-                  rimGrad.addColorStop(0.3, 'rgba(255,255,255,0.1)');
-                  rimGrad.addColorStop(0.8, 'rgba(255,255,255,0.0)');
-                  rimGrad.addColorStop(1, 'rgba(255,255,255,0.4)');
-                  tCtx.strokeStyle = rimGrad;
-                  tCtx.lineWidth = 1.5 / scale;
-                  tCtx.stroke();
-                  tCtx.fillStyle = 'rgba(255,255,255,0.8)';
-                  tCtx.beginPath();
-                  tCtx.arc(bx - bub.radius * 0.3, by - bub.radius * 0.3, bub.radius * 0.15, 0, Math.PI * 2);
-                  tCtx.fill();
-                } else {
-                  tCtx.globalCompositeOperation = 'source-over';
-                  const grad = tCtx.createRadialGradient(
-                    bx - bub.radius * 0.3, by - bub.radius * 0.3, bub.radius * 0.1,
-                    bx, by, bub.radius
-                  );
-                  grad.addColorStop(0, '#ffffff');
-                  grad.addColorStop(0.4, bub.color || '#fff');
-                  grad.addColorStop(1, bub.color || '#fff');
-                  tCtx.fillStyle = grad;
-                  tCtx.fill();
-                  tCtx.strokeStyle = 'rgba(255,255,255,0.4)';
-                  tCtx.lineWidth = 1 / scale;
-                  tCtx.stroke();
-                }
+                tCtx.beginPath();
+                tCtx.arc(bx, by, Math.max(0.1, bub.radius), 0, Math.PI * 2);
+                // Thin translucent ring — no fill
+                tCtx.strokeStyle = bub.type === 'color'
+                  ? `rgba(255,255,255,${opacity * 0.7})`
+                  : `rgba(255,255,255,${opacity})`;
+                tCtx.lineWidth = 0.4 / scale;
+                tCtx.stroke();
+                // Tiny specular glint at top-left — max 20% of radius
+                const glintR = bub.radius * 0.12;
+                tCtx.beginPath();
+                tCtx.arc(bx - bub.radius * 0.25, by - bub.radius * 0.25, Math.max(0.05, glintR), 0, Math.PI * 2);
+                tCtx.fillStyle = `rgba(255,255,255,${opacity * 0.5})`;
+                tCtx.fill();
               }
             }
 
