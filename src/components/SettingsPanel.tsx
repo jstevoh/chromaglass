@@ -324,7 +324,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Projector Layers"
           value={settings.layerCount}
           min={1}
-          max={5}
+          max={2}
           step={1}
           onChange={(v: number) => onUpdate({ layerCount: Math.round(v) })}
         />

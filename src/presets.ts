@@ -21,7 +21,7 @@ export const PRESETS: Preset[] = [
     description: 'The standard 1960s psychedelic liquid light show.',
     settings: {
       globalSpeed: 0.05,
-      layerCount: 3,
+      layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.4,
       rotationSpeed: 0.02,
@@ -92,7 +92,7 @@ export const PRESETS: Preset[] = [
     description: 'High contrast, fast-moving neon fluids over a cyberpunk LED base.',
     settings: {
       globalSpeed: 0.08,
-      layerCount: 4,
+      layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.1,
       rotationSpeed: 0.05,
@@ -170,7 +170,7 @@ export const PRESETS: Preset[] = [
     description: 'Sharp, high-contrast ink bleeding over a stark white backlight.',
     settings: {
       globalSpeed: 0.05,
-      layerCount: 3,
+      layerCount: 2,
       blendMode: 'multiply',
       gooeyEffect: 0.0,
       rotationSpeed: 0.0,
@@ -210,7 +210,7 @@ export const PRESETS: Preset[] = [
     description: 'Chaotic, rapidly rotating colors with strange blending physics.',
     settings: {
       globalSpeed: 0.08,
-      layerCount: 3,
+      layerCount: 2,
       blendMode: 'exclusion',
       gooeyEffect: 0.5,
       rotationSpeed: 0.1,
@@ -286,7 +286,7 @@ export const PRESETS: Preset[] = [
     description: 'The brightness of the sound controls the color and rotation of the fluid.',
     settings: {
       globalSpeed: 0.06,
-      layerCount: 3,
+      layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.3,
       rotationSpeed: 0.03,
@@ -325,7 +325,7 @@ export const PRESETS: Preset[] = [
     description: 'High heat and complexity create a chaotic, churning cauldron of fluid.',
     settings: {
       globalSpeed: 0.07,
-      layerCount: 4,
+      layerCount: 2,
       blendMode: 'overlay',
       gooeyEffect: 0.7,
       rotationSpeed: 0.02,
@@ -364,7 +364,7 @@ export const PRESETS: Preset[] = [
     description: 'Extremely dense, high-contrast cellular fluid resembling oil and water under a microscope.',
     settings: {
       globalSpeed: 0.04,
-      layerCount: 4,
+      layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.15,
       rotationSpeed: 0.01,

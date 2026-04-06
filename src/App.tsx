@@ -125,7 +125,7 @@ export default function App() {
       viscosity: Math.random() > 0.5 ? 'thick' : 'thin', polarity: Math.random(),
       heatIntensity: Math.random() * 0.5, boilingPoint: Math.random(), evaporationRate: Math.random() * 0.05,
       airVelocity: Math.random() * 0.5, vibrationFrequency: Math.random(),
-      layerCount: Math.floor(Math.random() * 4) + 1,
+      layerCount: Math.random() > 0.5 ? 2 : 1,
       blendMode: blendModes[Math.floor(Math.random() * blendModes.length)],
       gooeyEffect: Math.random(), rotationSpeed: Math.random() * 0.1, centerGravity: Math.random(),
       ledPlatform: Math.random() > 0.5,
