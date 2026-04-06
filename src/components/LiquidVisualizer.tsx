@@ -243,39 +243,35 @@ class FluidSimulation {
       const midNorm    = Math.min(1, audioData.mid    / 100);
       const trebleNorm = Math.min(1, audioData.treble / 100);
 
-      // Bass → single gentle radial pulse (plate resonance).
-      if (bassNorm > 0.6 && settings.platePressure > 0.05) {
-        const impX = Math.floor(this.size * 0.2 + Math.random() * this.size * 0.6);
-        const impY = Math.floor(this.size * 0.2 + Math.random() * this.size * 0.6);
-        const radius = Math.floor(4 + bassNorm * 10);
-        const strength = bassNorm * settings.platePressure * 0.018;
+      // Bass → very rare, subtle radial breath (only on strong beats, probabilistic).
+      if (bassNorm > 0.75 && settings.platePressure > 0.05 && Math.random() < 0.08) {
+        const impX = Math.floor(this.size * 0.25 + Math.random() * this.size * 0.5);
+        const impY = Math.floor(this.size * 0.25 + Math.random() * this.size * 0.5);
+        const radius = Math.floor(3 + bassNorm * 5);
+        const strength = bassNorm * settings.platePressure * 0.003;
         this.applyRadialImpulse(impX, impY, radius, strength);
       }
 
-      // Treble → fine-grained turbulence.
-      if (trebleNorm > 0.45) {
-        const turbCount = Math.floor(trebleNorm * 12 * (settings.airVelocity + 0.05));
-        for (let k = 0; k < turbCount; k++) {
-          const tx = Math.floor(1 + Math.random() * (this.size - 2));
-          const ty = Math.floor(1 + Math.random() * (this.size - 2));
-          const idx = tx + ty * this.size;
-          if (this.density[idx] > 0.03) {
-            const angle = Math.random() * Math.PI * 2;
-            const strength = trebleNorm * 0.25;
-            this.vx[idx] += Math.cos(angle) * strength;
-            this.vy[idx] += Math.sin(angle) * strength;
-          }
+      // Treble → very sparse micro-perturbations.
+      if (trebleNorm > 0.6 && Math.random() < 0.15) {
+        const tx = Math.floor(1 + Math.random() * (this.size - 2));
+        const ty = Math.floor(1 + Math.random() * (this.size - 2));
+        const idx = tx + ty * this.size;
+        if (this.density[idx] > 0.05) {
+          const angle = Math.random() * Math.PI * 2;
+          this.vx[idx] += Math.cos(angle) * 0.02;
+          this.vy[idx] += Math.sin(angle) * 0.02;
         }
       }
 
-      // Mid → smooth vorticity injection (swirling orbital patterns).
-      if (midNorm > 0.25 && settings.glassSmear > 0.05) {
-        this.injectVorticity(midNorm * settings.glassSmear * 0.8, time, noise2D);
+      // Mid → very gentle vorticity.
+      if (midNorm > 0.4 && settings.glassSmear > 0.05 && Math.random() < 0.1) {
+        this.injectVorticity(midNorm * settings.glassSmear * 0.08, time, noise2D);
       }
 
-      heatIntensity += colorMod * 0.5;
-      visc = visc * 0.9 + Math.max(0.1, visc - densityMod * 0.8) * 0.1;
-      damping = Math.min(0.999, damping + rotationMod * 0.01);
+      heatIntensity += colorMod * 0.1;
+      visc = visc * 0.95 + Math.max(0.1, visc - densityMod * 0.3) * 0.05;
+      damping = Math.min(0.999, damping + rotationMod * 0.002);
     }
 
     // 1. Squeeze-Film Flow
@@ -310,15 +306,15 @@ class FluidSimulation {
     this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
 
-    // 7. Immiscibility & fingering
-    const surfaceTension = (settings.polarity || 0) * 0.15;
+    // 7. Immiscibility & fingering — reduced to prevent rapid boundary motion
+    const surfaceTension = (settings.polarity || 0) * 0.04;
     this.applyImmiscibility(surfaceTension, time, noise2D);
-    const fingeringStrength = (settings.polarity || 0) * 0.8;
+    const fingeringStrength = (settings.polarity || 0) * 0.15;
     if (fingeringStrength > 0) this.applyFingering(fingeringStrength, time, noise2D);
 
-    // 8. Vibration
+    // 8. Vibration — very subtle
     if (audioData && settings.vibrationFrequency > 0) {
-      this.applyVibration(audioData.energy * settings.vibrationFrequency * 0.5, settings.vibrationFrequency * 10, time);
+      this.applyVibration(audioData.energy * settings.vibrationFrequency * 0.04, settings.vibrationFrequency * 5, time);
     }
 
     // 8.5-8.7 Dripping, smearing, airflow
@@ -344,8 +340,8 @@ class FluidSimulation {
       this.vx[i] *= damping;
       this.vy[i] *= damping;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
-      if (speedSq > 0.25) {
-        const factor = 0.5 / Math.sqrt(speedSq);
+      if (speedSq > 0.04) {
+        const factor = 0.2 / Math.sqrt(speedSq);
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
@@ -607,21 +603,21 @@ class FluidSimulation {
   }
 
   private applyAirflow(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const upwardForce = -strength * 150.0 * dt;
+    const upwardForce = -strength * 8.0 * dt;
     for (let i = 0; i < GRID_AREA; i++) {
       if (this.density[i] > 0.01) {
         const xi = i % this.size;
         const yi = (i - xi) / this.size;
-        this.vx[i] += noise2D(xi * 0.05, yi * 0.05 - time) * strength * 50.0 * dt;
-        this.vy[i] += upwardForce + noise2D(yi * 0.05, xi * 0.05 + time) * strength * 50.0 * dt;
+        this.vx[i] += noise2D(xi * 0.05, yi * 0.05 - time) * strength * 4.0 * dt;
+        this.vy[i] += upwardForce + noise2D(yi * 0.05, xi * 0.05 + time) * strength * 4.0 * dt;
       }
     }
   }
 
   private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number, audioData: AudioData | null) {
-    const smearSpeed = time * (0.5 + (audioData ? audioData.energy * 0.5 : 0));
-    const shearX = noise2D(smearSpeed, 100) * strength * 150.0 * dt;
-    const shearY = noise2D(100, smearSpeed) * strength * 150.0 * dt;
+    const smearSpeed = time * 0.3;
+    const shearX = noise2D(smearSpeed, 100) * strength * 12.0 * dt;
+    const shearY = noise2D(100, smearSpeed) * strength * 12.0 * dt;
 
     const totalShearX = shearX;
     const totalShearY = shearY;
@@ -638,7 +634,7 @@ class FluidSimulation {
   }
 
   private applyDripping(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const dripGravity = 2.0 * dt * strength;
+    const dripGravity = 0.3 * dt * strength;
     for (let j = 1; j < this.size - 1; j++) {
       for (let i = 1; i < this.size - 1; i++) {
         const idx = i + j * this.size;
@@ -1110,20 +1106,21 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
                       const x = centerX + i;
                       const y = centerY + j;
                       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-                        activeFluid.addDensity(x, y, densityMod * 0.08, ar_a, ag_a, ab_a);
-                        activeFluid.addTemp(x, y, densityMod * 0.04);
-                        activeFluid.addVelocity(x, y, i * 0.004 * currentSettings.platePressure, j * 0.004 * currentSettings.platePressure);
+                        activeFluid.addDensity(x, y, densityMod * 0.015, ar_a, ag_a, ab_a);
+                        activeFluid.addTemp(x, y, densityMod * 0.008);
+                        activeFluid.addVelocity(x, y, i * 0.0008 * currentSettings.platePressure, j * 0.0008 * currentSettings.platePressure);
                       }
                     }
                   }
                 }
 
-                for (let i = 0; i < 15; i++) {
+                // Sparse velocity stirring — just a few points, very gentle
+                if (Math.random() < 0.3) {
                   const x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                   const y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                   if (activeFluid.density[x + y * GRID_SIZE] > 0.05) {
                     const angle = noise2D(x * 0.05, y * 0.05 + time) * Math.PI * 2;
-                    activeFluid.addVelocity(x, y, Math.cos(angle) * velocityMod * 1.5, Math.sin(angle) * velocityMod * 1.5);
+                    activeFluid.addVelocity(x, y, Math.cos(angle) * velocityMod * 0.08, Math.sin(angle) * velocityMod * 0.08);
                   }
                 }
               }
