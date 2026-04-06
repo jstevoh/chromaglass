@@ -43,6 +43,8 @@ export const INSECT_TYPES = [
   { id: 'butterfly',     name: 'Butterfly',     emoji: '🦋', description: 'Panicked wing flaps, weakens and stills' },
   { id: 'beetle',        name: 'Beetle',        emoji: '🪲', description: 'Slow heavy plow, strong bow wave' },
   { id: 'fly',           name: 'Fly',           emoji: '🪰', description: 'Frantic zigzag, chaotic micro-swirls' },
+  { id: 'minnow', name: 'Minnow', emoji: '🐟', description: 'Fast sinusoidal swimmer, curving wake' },
+  { id: 'crab',   name: 'Crab',   emoji: '🦀', description: 'Sideways scuttle, powerful pinch burst' },
 ] as const;
 
 // ─── Fluid Simulation ────────────────────────────────────────────────
@@ -578,15 +580,17 @@ class FluidSimulation {
     if (this.insects.length >= 10) return;
     // Find a position with some fluid; fall back to random
     let x = -1, y = -1;
+    // Visible grid region: center ± ~42 cells in x, ± ~24 cells in y (for typical 16:9 screen)
+    const vx0 = 22, vx1 = 106, vy0 = 38, vy1 = 90;
     for (let t = 0; t < 30; t++) {
-      const tx = Math.floor(6 + Math.random() * (this.size - 12));
-      const ty = Math.floor(6 + Math.random() * (this.size - 12));
+      const tx = Math.floor(vx0 + Math.random() * (vx1 - vx0));
+      const ty = Math.floor(vy0 + Math.random() * (vy1 - vy0));
       if (this.density[tx + ty * this.size] > 0.03) { x = tx; y = ty; break; }
     }
-    if (x < 0) { x = Math.floor(this.size / 2); y = Math.floor(this.size / 2); }
+    if (x < 0) { x = Math.floor(vx0 + Math.random() * (vx1 - vx0)); y = Math.floor(vy0 + Math.random() * (vy1 - vy0)); }
     const angle = Math.random() * Math.PI * 2;
-    const maxLife = type === 'ant' ? 1400 : type === 'butterfly' ? 900 : type === 'beetle' ? 1200 : 700;
-    const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : 'active';
+    const maxLife = type === 'ant' ? 1400 : type === 'butterfly' ? 900 : type === 'beetle' ? 1200 : type === 'minnow' ? 1100 : type === 'crab' ? 1300 : 700;
+    const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : type === 'crab' ? 'walking' : 'active';
     this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.2, vy: Math.sin(angle) * 0.2,
       angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0 });
   }
@@ -746,10 +750,83 @@ class FluidSimulation {
           this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
           this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
         }
+
+      } else if (ins.type === 'minnow') {
+        // Smooth sinusoidal swimming — treble/energy control speed
+        const swimSpeed = 0.9 * (1 + treble * 1.2 + energy * 0.8);
+        // Gradually curve heading
+        ins.angle += Math.sin(ins.life * 0.08) * 0.06 + (Math.random() - 0.5) * 0.03;
+        ins.vx = ins.vx * 0.75 + Math.cos(ins.angle) * swimSpeed * 0.25;
+        ins.vy = ins.vy * 0.75 + Math.sin(ins.angle) * swimSpeed * 0.25;
+        // Bass causes sudden direction change
+        if (bass > 0.55 && ins.stateTimer > 20) { ins.angle += (Math.random() - 0.5) * Math.PI * 1.2; ins.stateTimer = 0; }
+        // Trailing body-wave wake every 3 frames
+        if (ins.life % 3 === 0 && safe) {
+          const { px, py } = perp(ins.angle);
+          // Alternating side-wash from tail fin
+          const side = ins.life % 6 < 3 ? 1 : -1;
+          const tailX = Math.floor(ins.x - Math.cos(ins.angle) * 3);
+          const tailY = Math.floor(ins.y - Math.sin(ins.angle) * 3);
+          if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
+            const f = (0.22 + energy * 0.2) * ins.strength;
+            this.addVelocity(tailX, tailY, px * side * f, py * side * f);
+          }
+          // Bow pressure wave
+          const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2);
+          const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2);
+          if (bowX > 0 && bowX < this.size - 1 && bowY > 0 && bowY < this.size - 1)
+            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.18 * ins.strength, Math.sin(ins.angle) * 0.18 * ins.strength);
+        }
+
+      } else if (ins.type === 'crab') {
+        // Sideways scuttling — heading stays fixed, velocity is perpendicular
+        if (ins.state === 'pinching') {
+          // Radial outward burst (pinch)
+          if (ins.stateTimer === 1 && safe) {
+            for (let pr = -4; pr <= 4; pr++) {
+              for (let pc = -4; pc <= 4; pc++) {
+                const dist = Math.sqrt(pr * pr + pc * pc);
+                if (dist < 1 || dist > 4) continue;
+                const bx = Math.floor(ins.x) + pc, by = Math.floor(ins.y) + pr;
+                if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1) {
+                  const f = (0.4 + volume * 0.35) * ins.strength * (1 - dist / 4);
+                  this.addVelocity(bx, by, (pc / dist) * f, (pr / dist) * f);
+                }
+              }
+            }
+          }
+          if (ins.stateTimer > 40) { ins.state = 'walking'; ins.stateTimer = 0; }
+        } else {
+          // Sideways walk — velocity mostly perpendicular to heading
+          const { px, py } = perp(ins.angle);
+          const sideDir = ins.life % 300 < 150 ? 1 : -1; // alternate direction every 150 frames
+          const sideSpeed = (0.35 + mid * 0.4) * sideDir;
+          ins.vx = ins.vx * 0.82 + px * sideSpeed * 0.18;
+          ins.vy = ins.vy * 0.82 + py * sideSpeed * 0.18;
+          // Occasional turn
+          if (ins.stateTimer > 80 + Math.random() * 60) {
+            ins.angle += (Math.random() - 0.5) * Math.PI * 0.5;
+            ins.stateTimer = 0;
+          }
+          // Bass or random triggers pinch
+          if ((bass > 0.6 || Math.random() < 0.002) && ins.stateTimer > 30) {
+            ins.state = 'pinching'; ins.stateTimer = 0;
+          }
+          // Leg displacement (4 legs each side, alternating)
+          if (ins.life % 5 === 0 && safe) {
+            const legSide = ins.life % 10 < 5 ? 1 : -1;
+            for (let leg = -1; leg <= 1; leg++) {
+              const lx = Math.floor(ins.x + px * legSide * 2 + Math.cos(ins.angle) * leg);
+              const ly = Math.floor(ins.y + py * legSide * 2 + Math.sin(ins.angle) * leg);
+              if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
+                this.addVelocity(lx, ly, px * legSide * (0.1 + volume * 0.08), py * legSide * (0.1 + volume * 0.08));
+            }
+          }
+        }
       }
 
       // Clamp speed per type — audio can push near the cap but not blow it up
-      const maxSpd = ins.type === 'fly' ? 1.8 : ins.type === 'water_strider' ? 1.4 : 0.6;
+      const maxSpd = ins.type === 'fly' ? 1.8 : ins.type === 'water_strider' ? 1.4 : ins.type === 'minnow' ? 2.0 : 0.6;
       const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
       if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
       ins.x += ins.vx;
@@ -926,7 +1003,40 @@ uniform float u_time;
 
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
-const float TEX_STEP = 1.5 / 128.0;
+const float TEX_STEP = 3.0 / 128.0;
+
+// Catmull-Rom bicubic weights
+vec4 cubic(float v) {
+  vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
+  vec4 s = n * n * n;
+  float x = s.x;
+  float y = s.y - 4.0 * s.x;
+  float z = s.z - 4.0 * s.y + 6.0 * s.x;
+  float w = 6.0 - x - y - z;
+  return vec4(x, y, z, w) * (1.0 / 6.0);
+}
+
+// Bicubic texture sampling — smooth C1 upscaling, eliminates grid aliasing
+vec4 textureBicubic(sampler2D tex, vec2 uv) {
+  const vec2 texSize = vec2(128.0);
+  vec2 invTex = 1.0 / texSize;
+  uv = uv * texSize - 0.5;
+  vec2 fxy = fract(uv);
+  uv -= fxy;
+  vec4 xcubic = cubic(fxy.x);
+  vec4 ycubic = cubic(fxy.y);
+  vec4 c = uv.xxyy + vec2(-0.5, 1.5).xyxy;
+  vec4 s = vec4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+  vec4 offset = c + vec4(xcubic.yw, ycubic.yw) / s;
+  offset *= invTex.xxyy;
+  vec4 s0 = texture(tex, offset.xz);
+  vec4 s1 = texture(tex, offset.yz);
+  vec4 s2 = texture(tex, offset.xw);
+  vec4 s3 = texture(tex, offset.yw);
+  float sx = s.x / (s.x + s.y);
+  float sy = s.z / (s.z + s.w);
+  return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy);
+}
 
 // Hash-based film grain
 float hash(vec2 p) {
@@ -950,7 +1060,7 @@ float decodeDensity(float a) {
 }
 
 vec4 sampleLayer(sampler2D tex, vec2 uv) {
-  return texture(tex, uv);
+  return textureBicubic(tex, uv);
 }
 
 // UV transform: screen UV -> fluid simulation UV
@@ -975,7 +1085,7 @@ float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
   for (int j = -2; j <= 2; j++) {
     for (int i = -2; i <= 2; i++) {
       vec2 offset = vec2(float(i), float(j)) * blurFluid;
-      float a = texture(tex, fuv + offset).a;
+      float a = textureBicubic(tex, fuv + offset).a;
       result += a * w[(j + 2) * 5 + (i + 2)];
     }
   }
@@ -985,7 +1095,7 @@ float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
 // Decode fluid color from packed RGBA texture
 // Returns (r, g, b, alpha) in linear [0,1]
 vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
-  vec4 raw = texture(tex, fuv);
+  vec4 raw = textureBicubic(tex, fuv);
 
   float rawAlpha = useBlur ? blurAlpha(tex, fuv, blurFluid) : raw.a;
 
@@ -1012,14 +1122,14 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
 
 // Sobel normals in fluid UV space
 vec3 sobelNormal(sampler2D tex, vec2 fuv) {
-  float d00 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP, -TEX_STEP)).a);
-  float d10 = decodeDensity(texture(tex, fuv + vec2(0.0,       -TEX_STEP)).a);
-  float d20 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP, -TEX_STEP)).a);
-  float d01 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP,  0.0     )).a);
-  float d21 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP,  0.0     )).a);
-  float d02 = decodeDensity(texture(tex, fuv + vec2(-TEX_STEP,  TEX_STEP)).a);
-  float d12 = decodeDensity(texture(tex, fuv + vec2(0.0,        TEX_STEP)).a);
-  float d22 = decodeDensity(texture(tex, fuv + vec2( TEX_STEP,  TEX_STEP)).a);
+  float d00 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP, -TEX_STEP)).a);
+  float d10 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0,       -TEX_STEP)).a);
+  float d20 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP, -TEX_STEP)).a);
+  float d01 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP,  0.0     )).a);
+  float d21 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP,  0.0     )).a);
+  float d02 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP,  TEX_STEP)).a);
+  float d12 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0,        TEX_STEP)).a);
+  float d22 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP,  TEX_STEP)).a);
   float gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
   float gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
   return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
@@ -1116,9 +1226,8 @@ void main() {
   }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
-  float blurStep = u_gooey * 8.0 / max(u_resolution.x, u_resolution.y);
   float fluidScale = max(u_resolution.x, u_resolution.y) * 1.5 / 128.0;
-  float blurFluid = blurStep / fluidScale / 128.0;
+  float blurFluid = u_gooey * 10.0 / (fluidScale * 128.0);
   bool useBlur = u_gooey > 0.01;
 
   // ── Layer 0 ──────────────────────────────────────────────────────
@@ -1390,7 +1499,7 @@ void main() {
           }
 
           // Auto-deploy insects periodically
-          const insectAutoTypes = ['water_strider', 'ant', 'butterfly', 'beetle', 'fly'] as const;
+          const insectAutoTypes = ['water_strider', 'ant', 'butterfly', 'beetle', 'fly', 'minnow', 'crab'] as const;
           const af0 = fluidsRef.current[0];
           if (af0 && af0.insects.length < 4 && Math.random() < rate * 0.004 + energy * 0.003) {
             const type = insectAutoTypes[Math.floor(Math.random() * insectAutoTypes.length)];
