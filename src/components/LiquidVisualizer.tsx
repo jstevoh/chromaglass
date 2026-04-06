@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo, forwardRef, useImperativeHandle } fr
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType } from '../types';
-import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey } from '../constants';
+import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -963,6 +963,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastClearTrigger = useRef(clearTrigger);
   const lastDrainTrigger = useRef(drainTrigger);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
+  const harmonyRef = useRef(pickHarmony());
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
 
@@ -1014,7 +1015,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           positions.forEach(([fx, fy], idx) => {
             const cx = Math.floor(fx * GRID_SIZE);
             const cy = Math.floor(fy * GRID_SIZE);
-            const color = PALETTE_RGB[Math.floor(idx * PALETTE_COUNT / positions.length) % PALETTE_COUNT];
+            const color = PALETTE_RGB[harmonyRef.current[idx % harmonyRef.current.length]];
             const blobR = 20;
             for (let dy = -blobR; dy <= blobR; dy++) {
               for (let dx = -blobR; dx <= blobR; dx++) {
@@ -1530,6 +1531,7 @@ void main() {
         if (drainTrigger > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTrigger;
           drainFrameRef.current = 1;
+          harmonyRef.current = pickHarmony(); // fresh palette after drain
         }
         if (drainFrameRef.current > 0) {
           const DRAIN_FRAMES = 55;
@@ -1626,12 +1628,15 @@ void main() {
               if (isBlow) {
                 af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
               } else {
-                const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
+                const color = harmonyColor(harmonyRef.current);
                 af.addDensity(rx, ry, 6.0 + energy * 35, color.r, color.g, color.b);
                 af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
               }
             }
           }
+
+          // Slowly rotate color harmony every ~45 seconds in auto mode
+          if (Math.random() < 0.0004) harmonyRef.current = pickHarmony();
 
           // Auto-deploy insects periodically
           const insectAutoTypes = ['water_strider', 'ant', 'butterfly', 'beetle', 'fly', 'minnow', 'crab'] as const;
@@ -1645,11 +1650,12 @@ void main() {
         // ── Seed trigger ───────────────────────────────────────
         if (seedCount > lastSeedCount.current) {
           lastSeedCount.current = seedCount;
+          harmonyRef.current = pickHarmony();
           for (const fluid of fluidsRef.current) {
             for (let i = 0; i < 8; i++) {
               const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
+              const color = harmonyColor(harmonyRef.current);
               fluid.addDensity(rx, ry, 10.0, color.r, color.g, color.b);
               fluid.addTemp(rx, ry, 2.0);
               fluid.addVelocity(rx, ry, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
@@ -1669,14 +1675,8 @@ void main() {
               { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
                 y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
             ];
-            const colorIndex = Math.floor((time * 0.25) % PALETTE_COUNT);
-            const nextColorIndex = (colorIndex + 1) % PALETTE_COUNT;
-            const blend = (time * 0.25) % 1;
-            const c0_amb = PALETTE_RGB[colorIndex];
-            const c1_amb = PALETTE_RGB[nextColorIndex];
-            const ar = c0_amb.r * (1 - blend) + c1_amb.r * blend;
-            const ag = c0_amb.g * (1 - blend) + c1_amb.g * blend;
-            const ab = c0_amb.b * (1 - blend) + c1_amb.b * blend;
+            const ambCol = harmonyCycle(harmonyRef.current, time * 0.25);
+            const ar = ambCol.r, ag = ambCol.g, ab = ambCol.b;
 
             for (const pt of injPts) {
               const px = Math.floor(pt.x), py = Math.floor(pt.y);
@@ -1695,13 +1695,8 @@ void main() {
 
             const impact = currentSettings.audioImpact ?? 0.45;
             if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
-              const timeOffset = time * 0.3 + colorMod * Math.PI;
-              const ci = Math.floor(timeOffset % PALETTE_COUNT);
-              const ni = (ci + 1) % PALETTE_COUNT;
-              const bl = timeOffset % 1;
-              const ar_a = PALETTE_RGB[ci].r * (1 - bl) + PALETTE_RGB[ni].r * bl;
-              const ag_a = PALETTE_RGB[ci].g * (1 - bl) + PALETTE_RGB[ni].g * bl;
-              const ab_a = PALETTE_RGB[ci].b * (1 - bl) + PALETTE_RGB[ni].b * bl;
+              const audioCol = harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI);
+              const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
               const activeFluid = fluidsRef.current[activeLayerRef.current];
               if (activeFluid) {
@@ -1797,7 +1792,7 @@ void main() {
 
           // Emergency seeding
           if (!hasContent && time % 5 < 0.02 && l === 0) {
-            const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
+            const color = harmonyColor(harmonyRef.current);
             fluid.addDensity(GRID_SIZE / 2, GRID_SIZE / 2, 5.0, color.r, color.g, color.b);
           }
 

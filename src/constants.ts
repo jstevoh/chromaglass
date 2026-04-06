@@ -27,6 +27,46 @@ export const DROPPER_COLORS = PALETTE.map(c => c.hex);
 // RGB-only list for the fluid simulation (avoids re-parsing hex every frame).
 export const PALETTE_RGB = PALETTE.map(({ r, g, b }) => ({ r, g, b }));
 
+// ── Color harmonies ──────────────────────────────────────────────────
+// Curated sets of 3-5 complementary colors from the palette.
+// Each set is chosen to mix well without going muddy (avoids browns/greys).
+// Index values refer to PALETTE / PALETTE_RGB array positions.
+export const COLOR_HARMONIES: number[][] = [
+  [0, 1, 2, 3],        // Warm sunset: Yellow, Orange, Hot Pink, Cherry Red
+  [7, 8, 9, 5],        // Cool ocean: Icy Blue, Blue Cheer, Cobalt, Emerald
+  [6, 10, 2, 8],       // Neon electric: Limpid Green, Purple, Hot Pink, Blue Cheer
+  [3, 1, 7, 8],        // Fire & ice: Cherry Red, Orange, Icy Blue, Blue Cheer
+  [10, 5, 11, 0],      // Royal garden: Purple, Emerald, Raspberry, Yellow
+  [0, 6, 2, 7],        // Tropical: Yellow, Limpid Green, Hot Pink, Icy Blue
+  [9, 10, 4, 5],       // Deep jewel: Cobalt, Purple, Crimson, Emerald
+  [7, 15, 5, 0],       // Pastel glow: Icy Blue, White, Emerald, Yellow
+  [2, 11, 10, 7],      // Magenta dream: Hot Pink, Raspberry, Purple, Icy Blue
+  [0, 1, 6, 15],       // Citrus pop: Yellow, Orange, Limpid Green, White
+  [8, 3, 0, 10],       // Contrast shock: Blue, Red, Yellow, Purple
+  [5, 2, 8, 0],        // Carnival: Emerald, Hot Pink, Blue, Yellow
+];
+
+/** Pick a random color harmony index set */
+export function pickHarmony(): number[] {
+  return COLOR_HARMONIES[Math.floor(Math.random() * COLOR_HARMONIES.length)];
+}
+
+/** Pick a random RGB from a given harmony */
+export function harmonyColor(harmony: number[]): { r: number; g: number; b: number } {
+  return PALETTE_RGB[harmony[Math.floor(Math.random() * harmony.length)]];
+}
+
+/** Cycle through a harmony over time (for smooth ambient/audio cycling) */
+export function harmonyCycle(harmony: number[], t: number): { r: number; g: number; b: number } {
+  const len = harmony.length;
+  const ci = Math.floor(t % len);
+  const ni = (ci + 1) % len;
+  const bl = t % 1;
+  const c0 = PALETTE_RGB[harmony[ci]];
+  const c1 = PALETTE_RGB[harmony[ni]];
+  return { r: c0.r * (1 - bl) + c1.r * bl, g: c0.g * (1 - bl) + c1.g * bl, b: c0.b * (1 - bl) + c1.b * bl };
+}
+
 // ── Audio helpers ──────────────────────────────────────────────────────
 
 export type AudioFeatureKey = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
