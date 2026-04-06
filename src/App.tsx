@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle, INSECT_TYPES } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -50,6 +50,28 @@ export default function App() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      // Draw image to an offscreen canvas to get pixel data
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      visualizerRef.current?.injectImage(imageData);
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+    // Reset so the same file can be re-selected
+    e.target.value = '';
+  }, []);
 
   // Track active preset whenever settings change.
   useEffect(() => {
@@ -143,6 +165,7 @@ export default function App() {
       buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
       damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
       automateRate: Math.random() * 0.2,
+      audioImpact: settings.audioImpact,
     });
     setActivePresetId(null);
     setSeedCount(prev => prev + 1);
@@ -241,6 +264,25 @@ export default function App() {
                     <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
                   </button>
                 </div>
+
+                <div className="h-px w-full bg-white/10"></div>
+
+                {/* Image Upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/12 hover:border-white/25 transition-all active:scale-95"
+                  title="Upload an image as colored dye — it will dissolve into the fluid"
+                >
+                  <ImagePlus size={12} />
+                  <span className="text-[8px] uppercase font-bold tracking-wider">Image Dye</span>
+                </button>
 
                 <div className="h-px w-full bg-white/10"></div>
 

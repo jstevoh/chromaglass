@@ -22,6 +22,7 @@ const PALETTE_COUNT = PALETTE_RGB.length;
 
 export interface LiquidVisualizerHandle {
   deployInsect: (type: string) => void;
+  injectImage: (imageData: ImageData) => void;
 }
 
 // ─── Insect system ────────────────────────────────────────────────────
@@ -128,6 +129,29 @@ class FluidSimulation {
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
     this.temp[index] += amount;
+  }
+
+  // Inject an image as colored dye — scales image to fit visible grid area
+  injectImage(imgData: ImageData) {
+    const w = imgData.width, h = imgData.height;
+    const d = imgData.data; // RGBA Uint8ClampedArray
+    // Map image into the visible grid region (roughly 22–106 in x, 38–90 in y)
+    const gx0 = 24, gx1 = 104, gy0 = 40, gy1 = 88;
+    const gw = gx1 - gx0, gh = gy1 - gy0;
+    for (let gy = gy0; gy < gy1; gy++) {
+      for (let gx = gx0; gx < gx1; gx++) {
+        // Sample the image pixel (bilinear centre of each grid cell)
+        const imgX = Math.floor(((gx - gx0) / gw) * w);
+        const imgY = Math.floor(((gy - gy0) / gh) * h);
+        const pi = (imgY * w + imgX) * 4;
+        const r = d[pi] / 255, g = d[pi + 1] / 255, b = d[pi + 2] / 255;
+        const a = d[pi + 3] / 255;
+        if (a < 0.05) continue; // skip transparent pixels
+        const brightness = r * 0.3 + g * 0.59 + b * 0.11;
+        const amount = (0.5 + brightness * 1.5) * a;
+        this.addDensity(gx, gy, amount, r, g, b);
+      }
+    }
   }
 
   applySquish(x: number, y: number, radius: number, amount: number) {
@@ -955,6 +979,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useImperativeHandle(ref, () => ({
     deployInsect: (type: string) => {
       fluidsRef.current[0]?.deployInsect(type);
+    },
+    injectImage: (imageData: ImageData) => {
+      const fluid = fluidsRef.current[activeLayerRef.current];
+      if (fluid) fluid.injectImage(imageData);
     },
   }));
 
