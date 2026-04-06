@@ -577,7 +577,7 @@ class FluidSimulation {
   }
 
   deployInsect(type: string) {
-    if (this.insects.length >= 10) return;
+    if (this.insects.length >= 20) return;
     // Find a position with some fluid; fall back to random
     let x = -1, y = -1;
     // Visible grid region: center ± ~42 cells in x, ± ~24 cells in y (for typical 16:9 screen)
@@ -652,7 +652,7 @@ class FluidSimulation {
           if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
             const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 0.18 * ins.strength * (ins.state === 'burst' ? 3.5 + bass * 3 : 1 + mid * 0.5);
+            const f = 0.72 * ins.strength * (ins.state === 'burst' ? 3.5 + bass * 3 : 1 + mid * 0.5);
             this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
           }
         }
@@ -675,7 +675,7 @@ class FluidSimulation {
             const lx = Math.floor(ins.x + px * side * 1.3 + Math.cos(ins.angle) * leg);
             const ly = Math.floor(ins.y + py * side * 1.3 + Math.sin(ins.angle) * leg);
             if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-              this.addVelocity(lx, ly, Math.cos(ins.angle) * (0.08 + bass * 0.12), Math.sin(ins.angle) * (0.08 + bass * 0.12));
+              this.addVelocity(lx, ly, Math.cos(ins.angle) * (0.32 + bass * 0.48), Math.sin(ins.angle) * (0.32 + bass * 0.48));
           }
         }
 
@@ -697,7 +697,7 @@ class FluidSimulation {
             const wx = Math.floor(ins.x + px * sx * w);
             const wy = Math.floor(ins.y + py * sx * w);
             if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = (0.35 + agitation * 0.25) * ins.strength * (1 - w / wingR);
+              const f = (1.4 + agitation * 1.0) * ins.strength * (1 - w / wingR);
               this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.4,
                                        py * sx * f - Math.sin(ins.angle) * f * 0.4);
             }
@@ -718,7 +718,7 @@ class FluidSimulation {
             ins.stateTimer = 0;
           }
           // Bow wave + side displacement — volume boosts plow force
-          const plowF = 0.35 + volume * 0.4;
+          const plowF = 1.4 + volume * 1.6;
           const bx = Math.floor(ins.x + Math.cos(ins.angle) * 2.2);
           const by = Math.floor(ins.y + Math.sin(ins.angle) * 2.2);
           if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
@@ -728,7 +728,7 @@ class FluidSimulation {
             const sx2 = Math.floor(ins.x + px * s * 2);
             const sy2 = Math.floor(ins.y + py * s * 2);
             if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-              this.addVelocity(sx2, sy2, px * s * (0.22 + volume * 0.25), py * s * (0.22 + volume * 0.25));
+              this.addVelocity(sx2, sy2, px * s * (0.88 + volume * 1.0), py * s * (0.88 + volume * 1.0));
           }
         }
 
@@ -745,8 +745,8 @@ class FluidSimulation {
         // Micro-swirl every 6 frames — energy boosts swirl
         if (ins.life % 6 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const swirlF = 0.14 + energy * 0.18;
-          this.addVelocity(ix, iy, ins.vx * (0.18 + energy * 0.2), ins.vy * (0.18 + energy * 0.2));
+          const swirlF = 0.56 + energy * 0.72;
+          this.addVelocity(ix, iy, ins.vx * (0.72 + energy * 0.8), ins.vy * (0.72 + energy * 0.8));
           this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
           this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
         }
@@ -768,14 +768,14 @@ class FluidSimulation {
           const tailX = Math.floor(ins.x - Math.cos(ins.angle) * 3);
           const tailY = Math.floor(ins.y - Math.sin(ins.angle) * 3);
           if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
-            const f = (0.22 + energy * 0.2) * ins.strength;
+            const f = (0.88 + energy * 0.8) * ins.strength;
             this.addVelocity(tailX, tailY, px * side * f, py * side * f);
           }
           // Bow pressure wave
           const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2);
           const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2);
           if (bowX > 0 && bowX < this.size - 1 && bowY > 0 && bowY < this.size - 1)
-            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.18 * ins.strength, Math.sin(ins.angle) * 0.18 * ins.strength);
+            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.72 * ins.strength, Math.sin(ins.angle) * 0.72 * ins.strength);
         }
 
       } else if (ins.type === 'crab') {
@@ -789,7 +789,7 @@ class FluidSimulation {
                 if (dist < 1 || dist > 4) continue;
                 const bx = Math.floor(ins.x) + pc, by = Math.floor(ins.y) + pr;
                 if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1) {
-                  const f = (0.4 + volume * 0.35) * ins.strength * (1 - dist / 4);
+                  const f = (1.6 + volume * 1.4) * ins.strength * (1 - dist / 4);
                   this.addVelocity(bx, by, (pc / dist) * f, (pr / dist) * f);
                 }
               }
@@ -819,10 +819,21 @@ class FluidSimulation {
               const lx = Math.floor(ins.x + px * legSide * 2 + Math.cos(ins.angle) * leg);
               const ly = Math.floor(ins.y + py * legSide * 2 + Math.sin(ins.angle) * leg);
               if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
-                this.addVelocity(lx, ly, px * legSide * (0.1 + volume * 0.08), py * legSide * (0.1 + volume * 0.08));
+                this.addVelocity(lx, ly, px * legSide * (0.4 + volume * 0.32), py * legSide * (0.4 + volume * 0.32));
             }
           }
         }
+      }
+
+      // Inject a small dye splash at the insect position each frame so you can see it
+      if (safe && ins.life % 3 === 0) {
+        const trailAmt = (ins.type === 'beetle' ? 0.08 : ins.type === 'crab' ? 0.07 : ins.type === 'minnow' ? 0.06 : 0.05) * ins.strength;
+        // Each insect type gets a distinctive hue rotation based on type and life phase
+        const hue = ins.life * 0.03;
+        const tr = 0.5 + 0.5 * Math.sin(hue);
+        const tg = 0.5 + 0.5 * Math.sin(hue + 2.094);
+        const tb = 0.5 + 0.5 * Math.sin(hue + 4.189);
+        this.addDensity(ix, iy, trailAmt, tr, tg, tb);
       }
 
       // Clamp speed per type — audio can push near the cap but not blow it up
@@ -874,6 +885,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   isAutomated = false, isActive = true,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
   const noise2D = useMemo(() => createNoise2D(), []);
   const lastSeedCount = useRef(seedCount);
@@ -1348,6 +1360,8 @@ void main() {
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      const overlay = overlayRef.current;
+      if (overlay) { overlay.width = window.innerWidth; overlay.height = window.innerHeight; }
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -1765,6 +1779,46 @@ void main() {
         }
       }
 
+      // ── Draw insect emoji overlay ──────────────────────────
+      const overlayCanvas = overlayRef.current;
+      if (overlayCanvas) {
+        const ctx2d = overlayCanvas.getContext('2d');
+        if (ctx2d) {
+          ctx2d.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          const W = overlayCanvas.width;
+          const H = overlayCanvas.height;
+          const scale2 = Math.max(W, H) * 1.5;
+          const rot0 = rotationAnglesRef.current[0] ?? 0;
+          const cosA = Math.cos(rot0);
+          const sinA = Math.sin(rot0);
+          const insects = fluidsRef.current[0]?.insects ?? [];
+          for (const ins of insects) {
+            // Map grid pos to screen pos (inverse of uvToFluid shader function)
+            const fRx = (ins.x / 128.0 - 0.5) * scale2;
+            const fRy = (ins.y / 128.0 - 0.5) * scale2;
+            const pUx = cosA * fRx + sinA * fRy;
+            const pUy = -sinA * fRx + cosA * fRy;
+            const sx = pUx + W / 2;
+            const sy = pUy + H / 2;
+            const insectType = INSECT_TYPES.find(t => t.id === ins.type);
+            const emoji = insectType?.emoji ?? '🐛';
+            const alpha = Math.min(1, ins.strength * 1.5);
+            ctx2d.save();
+            ctx2d.globalAlpha = alpha;
+            ctx2d.shadowColor = 'rgba(255,255,255,0.9)';
+            ctx2d.shadowBlur = 18;
+            ctx2d.font = '26px serif';
+            ctx2d.textAlign = 'center';
+            ctx2d.textBaseline = 'middle';
+            // Draw twice for brighter glow
+            ctx2d.fillText(emoji, sx, sy);
+            ctx2d.shadowBlur = 8;
+            ctx2d.fillText(emoji, sx, sy);
+            ctx2d.restore();
+          }
+        }
+      }
+
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -1799,6 +1853,11 @@ void main() {
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
         id="liquid-canvas"
+      />
+      <canvas
+        ref={overlayRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        id="insect-overlay"
       />
     </div>
   );
