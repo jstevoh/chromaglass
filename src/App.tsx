@@ -192,86 +192,85 @@ export default function App() {
 
                 <div className="h-px w-full bg-white/10"></div>
 
-                {/* Tool Toggle */}
+                {/* Tool Toggle + Liquid Selector */}
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Tool</span>
-                  <div className="flex flex-col bg-white/10 rounded-full p-1 relative w-full justify-between">
-                    <motion.div
-                      className="absolute top-1 left-1 right-1 h-[calc(50%-4px)] bg-white/20 rounded-full"
-                      animate={{ y: activeTool === 'dropper' ? 0 : '100%' }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+
+                  {/* Drop button — shows active liquid color */}
+                  <button
+                    onClick={() => setActiveTool('dropper')}
+                    className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl border transition-all ${
+                      activeTool === 'dropper'
+                        ? 'border-white/40 bg-white/15 text-white'
+                        : 'border-white/10 bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Droplet size={12} />
+                    <span className="text-[8px] uppercase font-bold tracking-wider flex-1 text-left">Drop</span>
+                    <span
+                      className="w-3 h-3 rounded-full border border-white/30 flex-shrink-0"
+                      style={{ backgroundColor: selectedLiquid.color }}
                     />
-                    <button
-                      onClick={() => setActiveTool('dropper')}
-                      className={`relative z-10 flex-1 flex justify-center items-center gap-1.5 py-2 transition-colors ${activeTool === 'dropper' ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                      title="Drop colored dye onto the glass"
-                    >
-                      <Droplet size={12} />
-                      <span className="text-[8px] uppercase font-bold tracking-wider">Drop</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTool('blow')}
-                      className={`relative z-10 flex-1 flex justify-center items-center gap-1.5 py-2 transition-colors ${activeTool === 'blow' ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                      title="Blow air through the fluid"
-                    >
-                      <Wind size={12} />
-                      <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
-                    </button>
-                  </div>
+                  </button>
+
+                  {/* Liquid types — visible when dropper is active */}
+                  <AnimatePresence>
+                    {activeTool === 'dropper' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-col gap-1 overflow-hidden w-full pl-2"
+                      >
+                        {liquidTypes.map((liq) => {
+                          const isSelected = liq.id === selectedLiquidId;
+                          return (
+                            <div key={liq.id}>
+                              <button
+                                onClick={() => setSelectedLiquidId(liq.id)}
+                                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border transition-all text-left ${
+                                  isSelected
+                                    ? 'border-white/40 bg-white/15 text-white'
+                                    : 'border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/20"
+                                  style={{ backgroundColor: liq.color }}
+                                />
+                                <span className="text-[9px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
+                                {isSelected && (
+                                  <label className="relative cursor-pointer flex-shrink-0" title="Change color">
+                                    <span className="text-[8px] text-white/40 hover:text-white/80 transition-colors">edit</span>
+                                    <input
+                                      type="color"
+                                      value={liq.color}
+                                      onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    />
+                                  </label>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Blow button */}
+                  <button
+                    onClick={() => setActiveTool('blow')}
+                    className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl border transition-all ${
+                      activeTool === 'blow'
+                        ? 'border-white/40 bg-white/15 text-white'
+                        : 'border-white/10 bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Wind size={12} />
+                    <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
+                  </button>
                 </div>
-
-                <div className="h-px w-full bg-white/10"></div>
-
-                {/* Liquid Type Selector */}
-                <AnimatePresence>
-                  {activeTool === 'dropper' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex flex-col gap-1 overflow-hidden w-full"
-                    >
-                      {liquidTypes.map((liq) => {
-                        const isSelected = liq.id === selectedLiquidId;
-                        return (
-                          <div key={liq.id} className="flex flex-col gap-1">
-                            <button
-                              onClick={() => setSelectedLiquidId(liq.id)}
-                              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border transition-all text-left ${
-                                isSelected
-                                  ? 'border-white/40 bg-white/15'
-                                  : 'border-white/10 bg-white/5 hover:bg-white/10'
-                              }`}
-                            >
-                              <span
-                                className="w-3 h-3 rounded-full flex-shrink-0 border border-white/20"
-                                style={{ backgroundColor: liq.color }}
-                              />
-                              <span className="text-[10px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
-                            </button>
-                            {isSelected && (
-                              <div className="flex items-center gap-2 px-2">
-                                <span className="text-[9px] text-white/40 flex-1 leading-tight">{liq.description}</span>
-                                <label className="relative cursor-pointer flex-shrink-0" title="Pick color">
-                                  <span
-                                    className="block w-5 h-5 rounded-full border-2 border-white/30 hover:border-white/60 transition-all"
-                                    style={{ backgroundColor: liq.color }}
-                                  />
-                                  <input
-                                    type="color"
-                                    value={liq.color}
-                                    onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
-                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                  />
-                                </label>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             </motion.div>
 
