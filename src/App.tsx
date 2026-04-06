@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
-import { LiquidVisualizer } from './components/LiquidVisualizer';
+import { LiquidVisualizer, LiquidVisualizerHandle, INSECT_TYPES } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,6 +49,7 @@ export default function App() {
   const [isAutomated, setIsAutomated] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const visualizerRef = useRef<LiquidVisualizerHandle>(null);
 
   // Track active preset whenever settings change.
   useEffect(() => {
@@ -156,6 +157,7 @@ export default function App() {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white">
       <LiquidVisualizer
+        ref={visualizerRef}
         audioData={audioData} settings={settings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
@@ -256,6 +258,24 @@ export default function App() {
                     <Wind size={11} />
                     <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
                   </button>
+                </div>
+
+                <div className="h-px w-full bg-white/10"></div>
+
+                {/* Insects */}
+                <div className="flex flex-col gap-1.5 w-full">
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Insects</span>
+                  {INSECT_TYPES.map((insect) => (
+                    <button
+                      key={insect.id}
+                      onClick={() => visualizerRef.current?.deployInsect(insect.id)}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/12 hover:border-white/25 transition-all text-left active:scale-95"
+                      title={insect.description}
+                    >
+                      <span className="text-base leading-none">{insect.emoji}</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider">{insect.name}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </motion.div>

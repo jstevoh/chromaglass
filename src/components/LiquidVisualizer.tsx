@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType } from '../types';
@@ -18,9 +18,32 @@ interface LiquidVisualizerProps {
 
 const GRID_SIZE = 128;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
-
-// Pre-compute the full-palette color count once.
 const PALETTE_COUNT = PALETTE_RGB.length;
+
+export interface LiquidVisualizerHandle {
+  deployInsect: (type: string) => void;
+}
+
+// ─── Insect system ────────────────────────────────────────────────────
+
+interface Insect {
+  type: string;
+  x: number; y: number;
+  vx: number; vy: number;
+  angle: number;
+  life: number; maxLife: number;
+  stateTimer: number;
+  state: string;
+  strength: number;
+}
+
+export const INSECT_TYPES = [
+  { id: 'water_strider', name: 'Water Strider', emoji: '🌊', description: 'Skims in quick bursts, leg dimples ripple outward' },
+  { id: 'ant',           name: 'Ant',           emoji: '🐜', description: 'Methodical march, tiny six-legged wake' },
+  { id: 'butterfly',     name: 'Butterfly',     emoji: '🦋', description: 'Panicked wing flaps, weakens and stills' },
+  { id: 'beetle',        name: 'Beetle',        emoji: '🪲', description: 'Slow heavy plow, strong bow wave' },
+  { id: 'fly',           name: 'Fly',           emoji: '🪰', description: 'Frantic zigzag, chaotic micro-swirls' },
+] as const;
 
 // ─── Fluid Simulation ────────────────────────────────────────────────
 
@@ -29,6 +52,8 @@ class FluidSimulation {
   dt: number;
   diff: number;
   visc: number;
+
+  insects: Insect[] = [];
 
   s: Float32Array;
   sR: Float32Array;
@@ -276,6 +301,8 @@ class FluidSimulation {
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
 
+    // 11. Insects
+    this.stepInsects();
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -547,6 +574,163 @@ class FluidSimulation {
     }
   }
 
+  deployInsect(type: string) {
+    if (this.insects.length >= 10) return;
+    // Find a position with some fluid; fall back to random
+    let x = -1, y = -1;
+    for (let t = 0; t < 30; t++) {
+      const tx = Math.floor(6 + Math.random() * (this.size - 12));
+      const ty = Math.floor(6 + Math.random() * (this.size - 12));
+      if (this.density[tx + ty * this.size] > 0.03) { x = tx; y = ty; break; }
+    }
+    if (x < 0) { x = Math.floor(this.size / 2); y = Math.floor(this.size / 2); }
+    const angle = Math.random() * Math.PI * 2;
+    const maxLife = type === 'ant' ? 1400 : type === 'butterfly' ? 900 : type === 'beetle' ? 1200 : 700;
+    const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : 'active';
+    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.2, vy: Math.sin(angle) * 0.2,
+      angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0 });
+  }
+
+  private stepInsects() {
+    for (let i = this.insects.length - 1; i >= 0; i--) {
+      const ins = this.insects[i];
+      ins.life++;
+      ins.stateTimer++;
+      if (ins.life >= ins.maxLife || ins.x < 2 || ins.x >= this.size - 2 || ins.y < 2 || ins.y >= this.size - 2) {
+        this.insects.splice(i, 1); continue;
+      }
+      // Weaken in last 30% of life
+      ins.strength = ins.life / ins.maxLife > 0.7 ? Math.max(0, 1 - (ins.life / ins.maxLife - 0.7) / 0.3) : 1.0;
+
+      const ix = Math.floor(ins.x), iy = Math.floor(ins.y);
+      const safe = ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1;
+
+      // Fluid carries insect gently
+      if (safe) {
+        const fi = ix + iy * this.size;
+        ins.vx += this.vx[fi] * 0.04;
+        ins.vy += this.vy[fi] * 0.04;
+      }
+
+      const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
+
+      if (ins.type === 'water_strider') {
+        const speed = ins.state === 'burst' ? 1.1 : 0.38;
+        ins.vx = ins.vx * 0.82 + Math.cos(ins.angle) * speed * 0.18;
+        ins.vy = ins.vy * 0.82 + Math.sin(ins.angle) * speed * 0.18;
+        if (ins.state === 'burst' && ins.stateTimer > 8) { ins.state = 'glide'; ins.stateTimer = 0; }
+        else if (ins.state !== 'burst' && ins.stateTimer > 35 + Math.random() * 25) {
+          ins.state = Math.random() < 0.3 ? 'burst' : 'glide';
+          ins.angle += (Math.random() - 0.5) * 0.9;
+          ins.stateTimer = 0;
+        }
+        // Four leg-contact dimples (2 per side)
+        const { px, py } = perp(ins.angle);
+        const fwd = { x: Math.cos(ins.angle), y: Math.sin(ins.angle) };
+        const legs = [
+          { lx: ins.x + px * 2.8 + fwd.x * 1.2, ly: ins.y + py * 2.8 + fwd.y * 1.2 },
+          { lx: ins.x + px * 2.8 - fwd.x * 1.2, ly: ins.y + py * 2.8 - fwd.y * 1.2 },
+          { lx: ins.x - px * 2.8 + fwd.x * 1.2, ly: ins.y - py * 2.8 + fwd.y * 1.2 },
+          { lx: ins.x - px * 2.8 - fwd.x * 1.2, ly: ins.y - py * 2.8 - fwd.y * 1.2 },
+        ];
+        for (const leg of legs) {
+          const lx = Math.floor(leg.lx), ly = Math.floor(leg.ly);
+          if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
+            const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1;
+            const f = 0.018 * ins.strength * (ins.state === 'burst' ? 2.2 : 1);
+            this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
+          }
+        }
+
+      } else if (ins.type === 'ant') {
+        ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * 0.17 * 0.22;
+        ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * 0.17 * 0.22;
+        if (ins.stateTimer > 55 + Math.random() * 55) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.9; ins.stateTimer = 0; }
+        // Six-legged alternating footfall every 4 frames
+        if (ins.life % 4 === 0 && safe) {
+          const { px, py } = perp(ins.angle);
+          const side = ins.life % 8 < 4 ? 1 : -1;
+          for (let leg = -1; leg <= 1; leg++) {
+            const lx = Math.floor(ins.x + px * side * 1.3 + Math.cos(ins.angle) * leg);
+            const ly = Math.floor(ins.y + py * side * 1.3 + Math.sin(ins.angle) * leg);
+            if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1)
+              this.addVelocity(lx, ly, Math.cos(ins.angle) * 0.007, Math.sin(ins.angle) * 0.007);
+          }
+        }
+
+      } else if (ins.type === 'butterfly') {
+        ins.angle += (Math.random() - 0.5) * 0.18;
+        const flapSpd = 0.18 * ins.strength;
+        ins.vx = ins.vx * 0.88 + (Math.random() - 0.5) * flapSpd;
+        ins.vy = ins.vy * 0.88 + (Math.random() - 0.5) * flapSpd;
+        // Alternating wing flaps every 10 frames
+        if (ins.stateTimer % 10 < 2 && ins.strength > 0.05) {
+          const leftWing = Math.floor(ins.stateTimer / 10) % 2 === 0;
+          const { px, py } = perp(ins.angle);
+          const sx = leftWing ? 1 : -1;
+          const wingR = Math.max(2, Math.floor(6 * ins.strength));
+          for (let w = 1; w <= wingR; w++) {
+            const wx = Math.floor(ins.x + px * sx * w);
+            const wy = Math.floor(ins.y + py * sx * w);
+            if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
+              const f = 0.055 * ins.strength * (1 - w / wingR);
+              this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.4,
+                                       py * sx * f - Math.sin(ins.angle) * f * 0.4);
+            }
+          }
+        }
+
+      } else if (ins.type === 'beetle') {
+        if (ins.state === 'stopped') {
+          if (ins.stateTimer > 50 + Math.random() * 50) { ins.state = 'walking'; ins.stateTimer = 0; }
+        } else {
+          ins.vx = ins.vx * 0.87 + Math.cos(ins.angle) * 0.11 * 0.13;
+          ins.vy = ins.vy * 0.87 + Math.sin(ins.angle) * 0.11 * 0.13;
+          if (ins.stateTimer > 90 + Math.random() * 80) {
+            ins.state = Math.random() < 0.35 ? 'stopped' : 'walking';
+            ins.angle += (Math.random() - 0.5) * 0.6;
+            ins.stateTimer = 0;
+          }
+          // Bow wave + side displacement
+          const bx = Math.floor(ins.x + Math.cos(ins.angle) * 2.2);
+          const by = Math.floor(ins.y + Math.sin(ins.angle) * 2.2);
+          if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
+            this.addVelocity(bx, by, Math.cos(ins.angle) * 0.045, Math.sin(ins.angle) * 0.045);
+          const { px, py } = perp(ins.angle);
+          for (const s of [-1, 1]) {
+            const sx2 = Math.floor(ins.x + px * s * 2);
+            const sy2 = Math.floor(ins.y + py * s * 2);
+            if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
+              this.addVelocity(sx2, sy2, px * s * 0.028, py * s * 0.028);
+          }
+        }
+
+      } else if (ins.type === 'fly') {
+        if (ins.stateTimer > 4 + Math.random() * 9) {
+          ins.angle += (Math.random() - 0.5) * Math.PI * 1.6;
+          ins.stateTimer = 0;
+        }
+        ins.vx = ins.vx * 0.68 + Math.cos(ins.angle) * 0.65 * 0.32;
+        ins.vy = ins.vy * 0.68 + Math.sin(ins.angle) * 0.65 * 0.32;
+        // Micro-swirl every 6 frames
+        if (ins.life % 6 === 0 && safe) {
+          const { px, py } = perp(ins.angle);
+          this.addVelocity(ix, iy, ins.vx * 0.022, ins.vy * 0.022);
+          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * 0.016,  py * 0.016);
+          this.addVelocity(Math.max(1,              ix - 1), iy, -px * 0.016, -py * 0.016);
+        }
+      }
+
+      // Clamp speed per type
+      const maxSpd = ins.type === 'fly' ? 1.2 : ins.type === 'water_strider' ? 0.85 : 0.35;
+      const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
+      if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
+      ins.x += ins.vx;
+      ins.y += ins.vy;
+    }
+  }
+
   // Inject curl-noise vorticity into dense fluid regions — driven by mid/treble
   injectVorticity(strength: number, time: number, noise2D: (x: number, y: number) => number) {
     const step = 3; // sample every 3 cells for performance
@@ -569,11 +753,11 @@ class FluidSimulation {
 
 // ─── React Component ─────────────────────────────────────────────────
 
-export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
+export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid,
   activeLayer = 0, clearTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true,
-}) => {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenCanvasesRef = useRef<HTMLCanvasElement[]>([]);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -599,6 +783,12 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
   const lastTimeRef = useRef(Date.now() * 0.001);
   const grainCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const tempLayerCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    deployInsect: (type: string) => {
+      fluidsRef.current[0]?.deployInsect(type);
+    },
+  }));
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -1170,4 +1360,4 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
       />
     </div>
   );
-};
+});
