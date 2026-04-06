@@ -1400,7 +1400,7 @@ void main() {
     // ── Mouse / touch handlers ─────────────────────────────────────
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
-      const cyp = clientY - rect.top - rect.height / 2;
+      const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
       const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
       const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
