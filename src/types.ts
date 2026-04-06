@@ -58,37 +58,37 @@ export interface VisualizerSettings {
 export const DEFAULT_SETTINGS: VisualizerSettings = {
   sensitivity: 0.4,
   bassBoost: 1.0,
-  globalSpeed: 0.005,       // very slow crawl
+  globalSpeed: 0.025,       // slow viscous crawl, visibly moving
   audioMappings: {
     velocity: 'bass',
     density: 'bass',
     color: 'treble',
     rotation: 'none',
   },
-  platePressure: 0.1,
-  glassSmear: 0.15,
-  rainDrip: 0.1,
+  platePressure: 0.4,       // glass plate squeeze — drives radial spreading
+  glassSmear: 0.3,          // gentle smear from plate contact
+  rainDrip: 0.0,
   viscosity: 'thick',
-  polarity: 0.3,
-  heatIntensity: 0.05,
-  boilingPoint: 0.95,       // almost never boils without audio
-  evaporationRate: 0.01,
-  airVelocity: 0.02,
-  vibrationFrequency: 0.1,
-  layerCount: 1,            // single layer — clean and focused
+  polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
+  heatIntensity: 0.15,
+  boilingPoint: 0.95,
+  evaporationRate: 0.003,   // very slow evaporation — colors persist
+  airVelocity: 0.0,
+  vibrationFrequency: 0.0,
+  layerCount: 1,
   blendMode: 'screen',
-  gooeyEffect: 0.3,
-  rotationSpeed: 0.003,
-  centerGravity: 0.05,
+  gooeyEffect: 0.45,        // organic blob merging
+  rotationSpeed: 0.0,       // no rotation — flat plate simulation
+  centerGravity: 0.0,
   ledPlatform: false,
   ledMode: 'rainbow',
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
-  diffusionRate: 0.00005,
-  buoyancy: 0.2,
-  advection: 0.2,
-  damping: 0.995,           // high damping — energy dissipates quickly
+  diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
+  buoyancy: 0.45,
+  advection: 0.45,
+  damping: 0.97,
   heatDecay: 0.98,
   automateRate: 0.02,
 };

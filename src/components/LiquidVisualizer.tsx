@@ -616,13 +616,28 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
       for (let i = currentCount; i < targetCount; i++) {
         const fluid = new FluidSimulation(GRID_SIZE, settings.diffusionRate, 0.0001, 0.01);
         if (i === 0) {
-          for (let j = 0; j < 3; j++) {
-            const rx = Math.floor(Math.random() * (GRID_SIZE - 40)) + 20;
-            const ry = Math.floor(Math.random() * (GRID_SIZE - 40)) + 20;
-            const color = PALETTE_RGB[Math.floor(Math.random() * PALETTE_COUNT)];
-            fluid.addDensity(rx, ry, 30.0, color.r, color.g, color.b);
-            fluid.addTemp(rx, ry, 5.0);
-          }
+          // Seed with large overlapping blobs that already fill the canvas —
+          // Hele-Shaw initial state: multiple immiscible fluids in contact.
+          const positions: [number, number][] = [
+            [0.22, 0.22], [0.78, 0.22], [0.50, 0.50],
+            [0.22, 0.78], [0.78, 0.78], [0.35, 0.50], [0.65, 0.50],
+          ];
+          positions.forEach(([fx, fy], idx) => {
+            const cx = Math.floor(fx * GRID_SIZE);
+            const cy = Math.floor(fy * GRID_SIZE);
+            const color = PALETTE_RGB[Math.floor(idx * PALETTE_COUNT / positions.length) % PALETTE_COUNT];
+            const blobR = 20;
+            for (let dy = -blobR; dy <= blobR; dy++) {
+              for (let dx = -blobR; dx <= blobR; dx++) {
+                const dist2 = dx * dx + dy * dy;
+                if (dist2 > blobR * blobR) continue;
+                const nx = cx + dx, ny = cy + dy;
+                if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                const w = (1 - Math.sqrt(dist2) / blobR) ** 2;
+                fluid.addDensity(nx, ny, 2.0 * w, color.r, color.g, color.b);
+              }
+            }
+          });
         }
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
@@ -775,11 +790,21 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
           const af = fluidsRef.current[activeLayerRef.current];
           if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
             if (activeToolRef.current === 'blow') {
-              af.blowAir(x, y, 12, 0.5);
+              af.blowAir(x, y, 10, 0.3);
             } else {
               const rgb = hexToRgb(selectedColorRef.current);
-              af.addDensity(x, y, 2.0, rgb.r, rgb.g, rgb.b);
-              af.addTemp(x, y, 0.5);
+              // Inject over a small radius for a natural drop shape
+              for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                  const dist = Math.sqrt(dx*dx + dy*dy);
+                  if (dist > 3) continue;
+                  const nx = x + dx, ny = y + dy;
+                  if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                  const w = (1 - dist / 3) ** 2;
+                  af.addDensity(nx, ny, 0.8 * w, rgb.r, rgb.g, rgb.b);
+                }
+              }
+              af.addTemp(x, y, 0.2);
             }
           }
         }
@@ -827,24 +852,31 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
           // ── Ambient seeding ────────────────────────────────
           const af = fluidsRef.current[activeLayerRef.current];
           if (af) {
-            const ambientX = Math.floor(GRID_SIZE / 2 + Math.cos(time * 0.5) * GRID_SIZE * 0.2);
-            const ambientY = Math.floor(GRID_SIZE / 2 + Math.sin(time * 0.7) * GRID_SIZE * 0.2);
-
-            const colorIndex = Math.floor((time * 0.5) % PALETTE_COUNT);
+            // Two slow Lissajous orbits inject different colors continuously.
+            const phase = time * 0.15;
+            const injPts = [
+              { x: GRID_SIZE / 2 + Math.cos(phase) * GRID_SIZE * 0.28,
+                y: GRID_SIZE / 2 + Math.sin(phase * 1.3) * GRID_SIZE * 0.28 },
+              { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
+                y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
+            ];
+            const colorIndex = Math.floor((time * 0.25) % PALETTE_COUNT);
             const nextColorIndex = (colorIndex + 1) % PALETTE_COUNT;
-            const blend = (time * 0.5) % 1;
+            const blend = (time * 0.25) % 1;
             const c0 = PALETTE_RGB[colorIndex];
             const c1 = PALETTE_RGB[nextColorIndex];
             const ar = c0.r * (1 - blend) + c1.r * blend;
             const ag = c0.g * (1 - blend) + c1.g * blend;
             const ab = c0.b * (1 - blend) + c1.b * blend;
 
-            af.addDensity(ambientX, ambientY, 0.018, ar, ag, ab);
-            af.addTemp(ambientX, ambientY, 0.008);
+            for (const pt of injPts) {
+              const px = Math.floor(pt.x), py = Math.floor(pt.y);
+              if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
+                af.addDensity(px, py, 0.035, ar, ag, ab);
+                af.addTemp(px, py, 0.01);
+              }
+            }
 
-            const driftX = noise2D(time * 0.1, 0) * 0.001;
-            const driftY = noise2D(0, time * 0.1) * 0.001;
-            af.addVelocity(ambientX, ambientY, driftX, driftY);
           }
 
           // ── Audio input to fluid — density/heat only, no velocity ──
