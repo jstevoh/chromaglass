@@ -11,6 +11,7 @@ interface LiquidVisualizerProps {
   selectedLiquid?: LiquidType;
   activeLayer?: number;
   clearTrigger?: number;
+  drainTrigger?: number;
   activeTool?: 'dropper' | 'blow';
   isAutomated?: boolean;
   isActive?: boolean;
@@ -952,7 +953,7 @@ interface GLResources {
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid,
-  activeLayer = 0, clearTrigger = 0, activeTool = 'dropper',
+  activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -960,6 +961,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const noise2D = useMemo(() => createNoise2D(), []);
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
+  const lastDrainTrigger = useRef(drainTrigger);
+  const drainFrameRef = useRef(0); // >0 means drain animation is running
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
 
@@ -1522,6 +1525,52 @@ void main() {
           simulationTimeRef.current += realDt * timeMultiplier;
         }
         const time = simulationTimeRef.current;
+
+        // ── Drain animation ────────────────────────────────────
+        if (drainTrigger > lastDrainTrigger.current) {
+          lastDrainTrigger.current = drainTrigger;
+          drainFrameRef.current = 1;
+        }
+        if (drainFrameRef.current > 0) {
+          const DRAIN_FRAMES = 55;
+          const frame = drainFrameRef.current;
+          const t = frame / DRAIN_FRAMES; // 0→1 over animation
+          // Ease-in power so the pull accelerates
+          const pull = Math.pow(t, 0.6) * 3.5;
+          const cx = GRID_SIZE / 2, cy = GRID_SIZE / 2;
+          for (const af of fluidsRef.current) {
+            for (let j = 1; j < GRID_SIZE - 1; j++) {
+              for (let i = 1; i < GRID_SIZE - 1; i++) {
+                const idx = i + j * GRID_SIZE;
+                if (af.density[idx] < 0.001) continue;
+                const dx = cx - i, dy = cy - j;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                // Inward pull (centripetal) + clockwise swirl (tangential)
+                const inward = pull * (1 + (1 - t) * 0.4);
+                const swirl  = pull * 0.9 * (1 - t * 0.3);
+                af.vx[idx] += (dx / dist) * inward + (-dy / dist) * swirl;
+                af.vy[idx] += (dy / dist) * inward + ( dx / dist) * swirl;
+                // Accelerate evaporation near end of animation
+                if (t > 0.55) {
+                  const evapRate = (t - 0.55) / 0.45 * 0.25;
+                  af.density[idx]  *= (1 - evapRate);
+                  af.densityR[idx] *= (1 - evapRate);
+                  af.densityG[idx] *= (1 - evapRate);
+                  af.densityB[idx] *= (1 - evapRate);
+                }
+              }
+            }
+          }
+          drainFrameRef.current++;
+          if (drainFrameRef.current > DRAIN_FRAMES) {
+            // Hard clear everything once animation completes
+            for (const af of fluidsRef.current) {
+              af.density.fill(0); af.densityR.fill(0); af.densityG.fill(0); af.densityB.fill(0);
+              af.temp.fill(0); af.vx.fill(0); af.vy.fill(0);
+            }
+            drainFrameRef.current = 0;
+          }
+        }
 
         // ── Clear trigger ──────────────────────────────────────
         if (clearTrigger > lastClearTrigger.current) {

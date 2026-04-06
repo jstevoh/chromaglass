@@ -36,6 +36,7 @@ export default function App() {
   const [settings, setSettings] = useState<VisualizerSettings>(() => ({ ...DEFAULT_SETTINGS }));
   const [seedCount, setSeedCount] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
+  const [drainTrigger, setDrainTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
@@ -183,7 +184,7 @@ export default function App() {
         ref={visualizerRef}
         audioData={audioData} settings={settings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
-        activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+        drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
       />
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
@@ -411,10 +412,11 @@ export default function App() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setClearTrigger(prev => prev + 1)}
+                    onClick={() => setDrainTrigger(prev => prev + 1)}
                     className="text-[8px] uppercase tracking-widest font-bold opacity-40 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                    title="Drain — swirls all dye down the drain"
                   >
-                    Clear
+                    Drain
                   </button>
                 </div>
 
