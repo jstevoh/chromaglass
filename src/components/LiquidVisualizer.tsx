@@ -35,6 +35,7 @@ interface Insect {
   stateTimer: number;
   state: string;
   strength: number;
+  size: number; // 0.4–2.2, normal distribution mean=1.0 — scales force radius and speed
 }
 
 export const INSECT_TYPES = [
@@ -589,10 +590,15 @@ class FluidSimulation {
     }
     if (x < 0) { x = Math.floor(vx0 + Math.random() * (vx1 - vx0)); y = Math.floor(vy0 + Math.random() * (vy1 - vy0)); }
     const angle = Math.random() * Math.PI * 2;
-    const maxLife = type === 'ant' ? 2800 : type === 'butterfly' ? 1800 : type === 'beetle' ? 3000 : type === 'minnow' ? 2200 : type === 'crab' ? 2600 : 1400;
+    // Normal distribution size via Box-Muller: mean=1.0, std=0.35, clamped [0.4, 2.2]
+    const u1 = Math.random(), u2 = Math.random();
+    const z = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+    const size = Math.max(0.4, Math.min(2.2, 1.0 + z * 0.35));
+    const baseLife = type === 'ant' ? 2800 : type === 'butterfly' ? 1800 : type === 'beetle' ? 3000 : type === 'minnow' ? 2200 : type === 'crab' ? 2600 : 1400;
+    const maxLife = Math.round(baseLife * size);
     const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : type === 'crab' ? 'walking' : 'active';
-    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.05, vy: Math.sin(angle) * 0.05,
-      angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0 });
+    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.03, vy: Math.sin(angle) * 0.03,
+      angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0, size });
   }
 
   private stepInsects(audioData: AudioData | null) {
@@ -626,66 +632,68 @@ class FluidSimulation {
       const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
 
       if (ins.type === 'water_strider') {
-        // Bass triggers a short skitter burst; otherwise glides smoothly at low speed
+        const sz = ins.size;
         if (bass > 0.65 && ins.state !== 'burst') { ins.state = 'burst'; ins.stateTimer = 0; }
         if (ins.state === 'burst') {
-          const speed = 0.38 * (1 + bass * 0.8);
-          ins.vx = ins.vx * 0.78 + Math.cos(ins.angle) * speed * 0.22;
-          ins.vy = ins.vy * 0.78 + Math.sin(ins.angle) * speed * 0.22;
-          if (ins.stateTimer > 14) { ins.state = 'glide'; ins.stateTimer = 0; }
+          const speed = 0.20 / Math.sqrt(sz) * (1 + bass * 0.7);
+          ins.vx = ins.vx * 0.80 + Math.cos(ins.angle) * speed * 0.20;
+          ins.vy = ins.vy * 0.80 + Math.sin(ins.angle) * speed * 0.20;
+          if (ins.stateTimer > 18) { ins.state = 'glide'; ins.stateTimer = 0; }
         } else {
-          // Slow steady glide with a gentle drift
-          const speed = 0.10 * (1 + mid * 0.4);
-          ins.vx = ins.vx * 0.92 + Math.cos(ins.angle) * speed * 0.08;
-          ins.vy = ins.vy * 0.92 + Math.sin(ins.angle) * speed * 0.08;
-          // Lazy direction shift every ~100 frames, very small angle change
-          if (ins.stateTimer > 80 + Math.random() * 80) {
-            ins.state = Math.random() < 0.15 ? 'burst' : 'glide';
-            ins.angle += (Math.random() - 0.5) * (0.5 + energy * 0.6);
+          // Slow glide with gentle lateral zigzag — surface-skimming S-curve
+          ins.angle += Math.sin(ins.life * 0.06) * 0.025 * (1 + mid * 0.5);
+          const speed = 0.05 / Math.sqrt(sz) * (1 + mid * 0.3);
+          ins.vx = ins.vx * 0.94 + Math.cos(ins.angle) * speed * 0.06;
+          ins.vy = ins.vy * 0.94 + Math.sin(ins.angle) * speed * 0.06;
+          if (ins.stateTimer > 100 + Math.random() * 120) {
+            ins.state = Math.random() < 0.12 ? 'burst' : 'glide';
+            ins.angle += (Math.random() - 0.5) * (0.6 + energy * 0.5);
             ins.stateTimer = 0;
           }
         }
-        // Four leg-contact dimples pushing outward from body — strong circular disturbance
+        // Four leg dimples — radius scales with size
         const { px, py } = perp(ins.angle);
         const fwd = { x: Math.cos(ins.angle), y: Math.sin(ins.angle) };
+        const legR = 2.8 * sz;
         const legs = [
-          { lx: ins.x + px * 2.8 + fwd.x * 1.2, ly: ins.y + py * 2.8 + fwd.y * 1.2 },
-          { lx: ins.x + px * 2.8 - fwd.x * 1.2, ly: ins.y + py * 2.8 - fwd.y * 1.2 },
-          { lx: ins.x - px * 2.8 + fwd.x * 1.2, ly: ins.y - py * 2.8 + fwd.y * 1.2 },
-          { lx: ins.x - px * 2.8 - fwd.x * 1.2, ly: ins.y - py * 2.8 - fwd.y * 1.2 },
+          { lx: ins.x + px * legR + fwd.x * 1.2 * sz, ly: ins.y + py * legR + fwd.y * 1.2 * sz },
+          { lx: ins.x + px * legR - fwd.x * 1.2 * sz, ly: ins.y + py * legR - fwd.y * 1.2 * sz },
+          { lx: ins.x - px * legR + fwd.x * 1.2 * sz, ly: ins.y - py * legR + fwd.y * 1.2 * sz },
+          { lx: ins.x - px * legR - fwd.x * 1.2 * sz, ly: ins.y - py * legR - fwd.y * 1.2 * sz },
         ];
         for (const leg of legs) {
           const lx = Math.floor(leg.lx), ly = Math.floor(leg.ly);
           if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
             const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 1.0 * ins.strength * (ins.state === 'burst' ? 4.5 + bass * 3 : 1.2 + mid * 0.8);
+            const f = 1.0 * sz * ins.strength * (ins.state === 'burst' ? 4.5 + bass * 3 : 1.2 + mid * 0.8);
             this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
           }
         }
 
       } else if (ins.type === 'ant') {
-        // Slow methodical march, sharp ~90° turns every ~150 frames, mid boosts pace
-        const pace = 0.08 * (1 + mid * 0.6);
-        ins.vx = ins.vx * 0.88 + Math.cos(ins.angle) * pace * 0.12;
-        ins.vy = ins.vy * 0.88 + Math.sin(ins.angle) * pace * 0.12;
-        // Deliberate near-right-angle turns, less frequent
-        if (ins.stateTimer > 120 + Math.random() * 80) {
-          // Ants turn roughly 90° left or right, occasionally reverse
-          const turns = [-Math.PI * 0.5, -Math.PI * 0.4, Math.PI * 0.4, Math.PI * 0.5];
-          ins.angle += turns[Math.floor(Math.random() * turns.length)] * (1 + energy * 0.3);
+        const sz = ins.size;
+        // Lateral body weave while marching — ants rarely go perfectly straight
+        ins.angle += Math.sin(ins.life * 0.12) * 0.018 + (Math.random() - 0.5) * 0.008;
+        const pace = 0.04 / Math.sqrt(sz) * (1 + mid * 0.5);
+        ins.vx = ins.vx * 0.91 + Math.cos(ins.angle) * pace * 0.09;
+        ins.vy = ins.vy * 0.91 + Math.sin(ins.angle) * pace * 0.09;
+        // Deliberate ~90° turns, occasionally a U-turn
+        if (ins.stateTimer > 150 + Math.random() * 120) {
+          const turns = [-Math.PI * 0.5, -Math.PI * 0.45, Math.PI * 0.45, Math.PI * 0.5, Math.PI * 0.95];
+          ins.angle += turns[Math.floor(Math.random() * turns.length)] * (1 + energy * 0.25);
           ins.stateTimer = 0;
         }
-        // Six-legged alternating footfall every 8 frames — wider area imprint
-        if (ins.life % 8 === 0 && safe) {
+        // Six-legged alternating footfall every 10 frames — radius scales with size
+        if (ins.life % 10 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const side = ins.life % 16 < 8 ? 1 : -1;
+          const side = ins.life % 20 < 10 ? 1 : -1;
           for (let leg = -1; leg <= 1; leg++) {
             for (let reach = 1; reach <= 2; reach++) {
-              const lx = Math.floor(ins.x + px * side * reach * 1.3 + Math.cos(ins.angle) * leg);
-              const ly = Math.floor(ins.y + py * side * reach * 1.3 + Math.sin(ins.angle) * leg);
+              const lx = Math.floor(ins.x + px * side * reach * 1.3 * sz + Math.cos(ins.angle) * leg * sz);
+              const ly = Math.floor(ins.y + py * side * reach * 1.3 * sz + Math.sin(ins.angle) * leg * sz);
               if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
-                const footF = (0.5 + bass * 0.7) * (1 / reach);
+                const footF = (0.5 + bass * 0.7) * sz * (1 / reach);
                 this.addVelocity(lx, ly, Math.cos(ins.angle) * footF, Math.sin(ins.angle) * footF);
               }
             }
@@ -693,25 +701,26 @@ class FluidSimulation {
         }
 
       } else if (ins.type === 'butterfly') {
-        // Gentle drift with slow wing-beat oscillation; treble accelerates the flutter
+        const sz = ins.size;
         const agitation = treble * 1.0 + energy * 0.4;
-        // Smooth heading drift — like a butterfly riding air currents
-        ins.angle += Math.sin(ins.life * 0.025) * 0.04 + (Math.random() - 0.5) * (0.05 + agitation * 0.08);
-        const driftSpd = 0.05 * (1 + agitation * 0.5) * ins.strength;
-        ins.vx = ins.vx * 0.93 + Math.cos(ins.angle) * driftSpd * 0.07;
-        ins.vy = ins.vy * 0.93 + Math.sin(ins.angle) * driftSpd * 0.07;
-        // Wing flap every ~18 frames — alternating left/right, big slow beats
-        const flapInterval = Math.max(10, Math.floor(18 - treble * 8));
-        if (ins.stateTimer % flapInterval < 3 && ins.strength > 0.05) {
+        // Compound winding path: slow sine oscillation + occasional random drift
+        ins.angle += Math.sin(ins.life * 0.018) * 0.05 + Math.cos(ins.life * 0.031) * 0.025
+                   + (Math.random() - 0.5) * (0.04 + agitation * 0.06);
+        const driftSpd = 0.025 / Math.sqrt(sz) * (1 + agitation * 0.4) * ins.strength;
+        ins.vx = ins.vx * 0.95 + Math.cos(ins.angle) * driftSpd * 0.05;
+        ins.vy = ins.vy * 0.95 + Math.sin(ins.angle) * driftSpd * 0.05;
+        // Wing flap — interval and wing span scale with size
+        const flapInterval = Math.max(12, Math.floor(22 - treble * 10));
+        if (ins.stateTimer % flapInterval < 4 && ins.strength > 0.05) {
           const leftWing = Math.floor(ins.stateTimer / flapInterval) % 2 === 0;
           const { px, py } = perp(ins.angle);
           const sx = leftWing ? 1 : -1;
-          const wingR = Math.max(4, Math.floor(9 * ins.strength));
+          const wingR = Math.max(3, Math.floor(9 * ins.strength * sz));
           for (let w = 1; w <= wingR; w++) {
             const wx = Math.floor(ins.x + px * sx * w);
             const wy = Math.floor(ins.y + py * sx * w);
             if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = (1.8 + agitation * 1.2) * ins.strength * (1 - w / wingR);
+              const f = (1.8 + agitation * 1.2) * sz * ins.strength * (1 - w / wingR);
               this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.3,
                                        py * sx * f - Math.sin(ins.angle) * f * 0.3);
             }
@@ -723,65 +732,69 @@ class FluidSimulation {
         if (ins.state === 'stopped') {
           if (bass > 0.55 || ins.stateTimer > 120 + Math.random() * 150) { ins.state = 'walking'; ins.stateTimer = 0; }
         } else {
-          const plowSpeed = 0.032 * (1 + volume * 0.5);
-          ins.vx = ins.vx * 0.94 + Math.cos(ins.angle) * plowSpeed * 0.06;
-          ins.vy = ins.vy * 0.94 + Math.sin(ins.angle) * plowSpeed * 0.06;
-          if (ins.stateTimer > 180 + Math.random() * 120) {
+          const sz = ins.size;
+          // Slow heavy plow with slight heading wobble — beetles weave slightly
+          ins.angle += Math.sin(ins.life * 0.08) * 0.012 + (Math.random() - 0.5) * 0.005;
+          const plowSpeed = 0.016 / Math.sqrt(sz) * (1 + volume * 0.4);
+          ins.vx = ins.vx * 0.96 + Math.cos(ins.angle) * plowSpeed * 0.04;
+          ins.vy = ins.vy * 0.96 + Math.sin(ins.angle) * plowSpeed * 0.04;
+          if (ins.stateTimer > 220 + Math.random() * 160) {
             ins.state = Math.random() < 0.4 ? 'stopped' : 'walking';
-            ins.angle += (Math.random() - 0.5) * (0.5 + bass * 0.7);
+            ins.angle += (Math.random() - 0.5) * (0.55 + bass * 0.6);
             ins.stateTimer = 0;
           }
-          // Large bow wave — beetle's heavy body creates a wide forward push
-          const plowF = 2.0 + volume * 2.0;
-          for (let reach = 1; reach <= 3; reach++) {
+          // Large multi-reach bow wave — scales with size
+          const plowF = (2.0 + volume * 2.0) * sz;
+          for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
             const bx = Math.floor(ins.x + Math.cos(ins.angle) * (reach + 1));
             const by = Math.floor(ins.y + Math.sin(ins.angle) * (reach + 1));
             if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
               this.addVelocity(bx, by, Math.cos(ins.angle) * plowF / reach, Math.sin(ins.angle) * plowF / reach);
           }
-          // Wide side displacement — pushing fluid out from flanks
+          // Wide flank displacement — scales with size
           const { px, py } = perp(ins.angle);
           for (const s of [-1, 1]) {
-            for (let reach = 1; reach <= 3; reach++) {
-              const sx2 = Math.floor(ins.x + px * s * reach * 1.5);
-              const sy2 = Math.floor(ins.y + py * s * reach * 1.5);
+            for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
+              const sx2 = Math.floor(ins.x + px * s * reach * 1.5 * sz);
+              const sy2 = Math.floor(ins.y + py * s * reach * 1.5 * sz);
               if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-                this.addVelocity(sx2, sy2, px * s * (1.2 + volume * 1.2) / reach, py * s * (1.2 + volume * 1.2) / reach);
+                this.addVelocity(sx2, sy2, px * s * (1.2 + volume * 1.2) * sz / reach, py * s * (1.2 + volume * 1.2) * sz / reach);
             }
           }
         }
 
       } else if (ins.type === 'fly') {
-        // Short rapid darts (15-25 frames) alternating with brief resting stops (10-20 frames)
+        const sz = ins.size;
         if (ins.state === 'active') {
-          const dashSpd = 0.22 * (1 + energy * 0.8 + treble * 0.5);
-          ins.vx = ins.vx * 0.80 + Math.cos(ins.angle) * dashSpd * 0.20;
-          ins.vy = ins.vy * 0.80 + Math.sin(ins.angle) * dashSpd * 0.20;
-          if (ins.stateTimer > 15 + Math.random() * 20) {
+          // Dart with slight angle jitter mid-flight — flies don't go perfectly straight
+          ins.angle += (Math.random() - 0.5) * 0.08;
+          const dashSpd = 0.12 / Math.sqrt(sz) * (1 + energy * 0.7 + treble * 0.4);
+          ins.vx = ins.vx * 0.83 + Math.cos(ins.angle) * dashSpd * 0.17;
+          ins.vy = ins.vy * 0.83 + Math.sin(ins.angle) * dashSpd * 0.17;
+          if (ins.stateTimer > 20 + Math.random() * 30) {
             ins.state = 'stopped'; ins.stateTimer = 0;
           }
         } else {
-          // Resting — nearly still, wings create a tiny circular disturbance
-          ins.vx *= 0.85;
-          ins.vy *= 0.85;
+          ins.vx *= 0.88;
+          ins.vy *= 0.88;
           if (safe && ins.life % 4 === 0) {
             const { px, py } = perp(ins.angle);
-            const buzzF = 0.35 + energy * 0.45;
-            this.addVelocity(ix, iy, 0, 0);
+            const buzzF = (0.35 + energy * 0.45) * sz;
             this.addVelocity(Math.min(this.size-2, ix+1), iy,  px * buzzF,  py * buzzF);
             this.addVelocity(Math.max(1,            ix-1), iy, -px * buzzF, -py * buzzF);
             this.addVelocity(ix, Math.min(this.size-2, iy+1),  py * buzzF, -px * buzzF);
             this.addVelocity(ix, Math.max(1,            iy-1), -py * buzzF,  px * buzzF);
           }
-          if (ins.stateTimer > 10 + Math.random() * 15) {
-            ins.angle += (Math.random() - 0.5) * Math.PI * (1.2 + treble * 1.0);
+          if (ins.stateTimer > 14 + Math.random() * 20) {
+            // Vary the turn amount — sometimes small corrections, sometimes big jumps
+            const turnMag = Math.random() < 0.3 ? Math.PI * (0.8 + Math.random() * 0.6) : (Math.random() - 0.5) * Math.PI * 0.8;
+            ins.angle += turnMag * (1 + treble * 0.6);
             ins.state = 'active'; ins.stateTimer = 0;
           }
         }
-        // Chaotic micro-vortex when moving
         if (ins.state === 'active' && ins.life % 5 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const swirlF = 0.7 + energy * 0.8;
+          const swirlF = (0.7 + energy * 0.8) * sz;
           this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
           this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
           this.addVelocity(ix, Math.min(this.size - 2, iy + 1),  py * swirlF, -px * swirlF);
@@ -789,32 +802,30 @@ class FluidSimulation {
         }
 
       } else if (ins.type === 'minnow') {
-        // Slow smooth sinusoidal swimming; lazy S-curve heading drift
-        const swimSpeed = 0.18 * (1 + treble * 0.5 + energy * 0.3);
-        // Gentle sinusoidal heading oscillation — the S-curve of a fish
-        ins.angle += Math.sin(ins.life * 0.04) * 0.04 + (Math.random() - 0.5) * 0.01;
-        ins.vx = ins.vx * 0.90 + Math.cos(ins.angle) * swimSpeed * 0.10;
-        ins.vy = ins.vy * 0.90 + Math.sin(ins.angle) * swimSpeed * 0.10;
-        // Bass causes a slow lazy turn
-        if (bass > 0.6 && ins.stateTimer > 40) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.7; ins.stateTimer = 0; }
-        // Body-wave wake every 4 frames — wider alternating side-wash
-        if (ins.life % 4 === 0 && safe) {
+        const sz = ins.size;
+        const swimSpeed = 0.09 / Math.sqrt(sz) * (1 + treble * 0.4 + energy * 0.25);
+        // Tight S-curve: two sine waves at different frequencies create complex path
+        ins.angle += Math.sin(ins.life * 0.05) * 0.06 + Math.sin(ins.life * 0.017) * 0.025
+                   + (Math.random() - 0.5) * 0.008;
+        ins.vx = ins.vx * 0.92 + Math.cos(ins.angle) * swimSpeed * 0.08;
+        ins.vy = ins.vy * 0.92 + Math.sin(ins.angle) * swimSpeed * 0.08;
+        if (bass > 0.6 && ins.stateTimer > 50) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.6; ins.stateTimer = 0; }
+        if (ins.life % 5 === 0 && safe) {
           const { px, py } = perp(ins.angle);
-          const side = ins.life % 8 < 4 ? 1 : -1;
-          // Tail fin: broad alternating wash
-          for (let t = 1; t <= 3; t++) {
+          const side = ins.life % 10 < 5 ? 1 : -1;
+          const maxTail = Math.round(3 * sz);
+          for (let t = 1; t <= maxTail; t++) {
             const tailX = Math.floor(ins.x - Math.cos(ins.angle) * (t + 1));
             const tailY = Math.floor(ins.y - Math.sin(ins.angle) * (t + 1));
             if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
-              const f = (1.2 + energy * 1.0) * ins.strength / t;
+              const f = (1.2 + energy * 1.0) * sz * ins.strength / t;
               this.addVelocity(tailX, tailY, px * side * f, py * side * f);
             }
           }
-          // Bow pressure wave
-          const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2);
-          const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2);
+          const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2 * sz);
+          const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2 * sz);
           if (bowX > 0 && bowX < this.size - 1 && bowY > 0 && bowY < this.size - 1)
-            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.9 * ins.strength, Math.sin(ins.angle) * 0.9 * ins.strength);
+            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.9 * sz * ins.strength, Math.sin(ins.angle) * 0.9 * sz * ins.strength);
         }
 
       } else if (ins.type === 'crab') {
@@ -822,13 +833,15 @@ class FluidSimulation {
         if (ins.state === 'pinching') {
           // Radial outward burst — large radius pinch claw attack
           if (ins.stateTimer < 5 && safe) {
-            for (let pr = -5; pr <= 5; pr++) {
-              for (let pc = -5; pc <= 5; pc++) {
+            const sz = ins.size;
+            const pR = Math.round(5 * sz);
+            for (let pr = -pR; pr <= pR; pr++) {
+              for (let pc = -pR; pc <= pR; pc++) {
                 const dist = Math.sqrt(pr * pr + pc * pc);
-                if (dist < 1 || dist > 5) continue;
+                if (dist < 1 || dist > pR) continue;
                 const bx = Math.floor(ins.x) + pc, by = Math.floor(ins.y) + pr;
                 if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1) {
-                  const f = (2.2 + volume * 1.8) * ins.strength * (1 - dist / 5);
+                  const f = (2.2 + volume * 1.8) * sz * ins.strength * (1 - dist / pR);
                   this.addVelocity(bx, by, (pc / dist) * f, (pr / dist) * f);
                 }
               }
@@ -836,30 +849,30 @@ class FluidSimulation {
           }
           if (ins.stateTimer > 60) { ins.state = 'walking'; ins.stateTimer = 0; }
         } else {
-          // Very slow sideways walk
+          const sz = ins.size;
           const { px, py } = perp(ins.angle);
-          const sideDir = ins.life % 600 < 300 ? 1 : -1; // alternate every 300 frames
-          const sideSpeed = 0.065 * (1 + mid * 0.4) * sideDir;
-          ins.vx = ins.vx * 0.92 + px * sideSpeed * 0.08;
-          ins.vy = ins.vy * 0.92 + py * sideSpeed * 0.08;
-          // Rare facing turn
-          if (ins.stateTimer > 200 + Math.random() * 150) {
+          // Slow lateral scuttle with a slight forward/back wobble added
+          ins.angle += Math.sin(ins.life * 0.04) * 0.01;
+          const sideDir = ins.life % 600 < 300 ? 1 : -1;
+          const sideSpeed = 0.035 / Math.sqrt(sz) * (1 + mid * 0.35) * sideDir;
+          ins.vx = ins.vx * 0.94 + px * sideSpeed * 0.06;
+          ins.vy = ins.vy * 0.94 + py * sideSpeed * 0.06;
+          if (ins.stateTimer > 250 + Math.random() * 200) {
             ins.angle += (Math.random() - 0.5) * Math.PI * 0.4;
             ins.stateTimer = 0;
           }
-          // Bass or random triggers pinch
-          if ((bass > 0.65 || Math.random() < 0.001) && ins.stateTimer > 60) {
+          if ((bass > 0.65 || Math.random() < 0.001) && ins.stateTimer > 80) {
             ins.state = 'pinching'; ins.stateTimer = 0;
           }
-          // 8-legged ripple every 10 frames — alternating deep leg drag
-          if (ins.life % 10 === 0 && safe) {
-            const legSide = ins.life % 20 < 10 ? 1 : -1;
-            for (let leg = -2; leg <= 2; leg++) {
-              for (let reach = 1; reach <= 3; reach++) {
-                const lx = Math.floor(ins.x + px * legSide * reach * 1.4 + Math.cos(ins.angle) * leg);
-                const ly = Math.floor(ins.y + py * legSide * reach * 1.4 + Math.sin(ins.angle) * leg);
+          if (ins.life % 12 === 0 && safe) {
+            const legSide = ins.life % 24 < 12 ? 1 : -1;
+            const maxLeg = Math.round(2 * sz);
+            for (let leg = -maxLeg; leg <= maxLeg; leg++) {
+              for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
+                const lx = Math.floor(ins.x + px * legSide * reach * 1.4 * sz + Math.cos(ins.angle) * leg);
+                const ly = Math.floor(ins.y + py * legSide * reach * 1.4 * sz + Math.sin(ins.angle) * leg);
                 if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
-                  const legF = (0.6 + volume * 0.5) / reach;
+                  const legF = (0.6 + volume * 0.5) * sz / reach;
                   this.addVelocity(lx, ly, px * legSide * legF, py * legSide * legF);
                 }
               }
@@ -869,8 +882,9 @@ class FluidSimulation {
       }
 
 
-      // Clamp speed per type — audio can push near the cap but not blow it up
-      const maxSpd = ins.type === 'fly' ? 0.35 : ins.type === 'water_strider' ? 0.45 : ins.type === 'minnow' ? 0.28 : ins.type === 'ant' ? 0.15 : ins.type === 'beetle' ? 0.07 : ins.type === 'crab' ? 0.12 : ins.type === 'butterfly' ? 0.12 : 0.2;
+      // Clamp speed — scale inversely with size so large insects move slower
+      const baseMaxSpd = ins.type === 'fly' ? 0.18 : ins.type === 'water_strider' ? 0.22 : ins.type === 'minnow' ? 0.14 : ins.type === 'ant' ? 0.08 : ins.type === 'beetle' ? 0.035 : ins.type === 'crab' ? 0.06 : ins.type === 'butterfly' ? 0.06 : 0.10;
+      const maxSpd = baseMaxSpd / Math.sqrt(ins.size);
       const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
       if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
       ins.x += ins.vx;
