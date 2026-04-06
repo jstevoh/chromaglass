@@ -64,7 +64,7 @@ export interface VisualizerSettings {
 export const DEFAULT_SETTINGS: VisualizerSettings = {
   sensitivity: 0.4,
   bassBoost: 1.0,
-  globalSpeed: 0.01,        // very slow crawl
+  globalSpeed: 0.005,       // very slow crawl
   audioMappings: {
     velocity: 'bass',
     density: 'bass',

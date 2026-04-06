@@ -211,18 +211,17 @@ class FluidSimulation {
   }
 
   step(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number) {
-    // ── Dynamic speed ────────────────────────────────────────
+    // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
-    if (audioData) dynamicSpeed += audioData.energy * 0.05;
     dynamicSpeed += settings.platePressure * 0.02;
-    dynamicSpeed += settings.airVelocity * 0.02;
-    dynamicSpeed += settings.automateRate * 0.02;
+    dynamicSpeed += settings.airVelocity * 0.01;
+    dynamicSpeed += settings.automateRate * 0.01;
 
     let speedMultiplier = settings.globalSpeed / 0.05;
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
-    this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.1);
+    this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.05);
 
     let visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
     let diff = settings.diffusionRate;
@@ -274,13 +273,7 @@ class FluidSimulation {
         this.injectVorticity(midNorm * settings.glassSmear * 0.8, time, noise2D);
       }
 
-      if (velocityMod > 0.7) {
-        const squishForce = velocityMod * 0.02 * settings.platePressure;
-        const cx = Math.floor(this.size / 2);
-        const cy = Math.floor(this.size / 2);
-        this.applySquish(cx, cy, Math.floor(10 + velocityMod * 20), squishForce);
-      }
-      heatIntensity += colorMod * 2.0;
+      heatIntensity += colorMod * 0.5;
       visc = visc * 0.9 + Math.max(0.1, visc - densityMod * 0.8) * 0.1;
       damping = Math.min(0.999, damping + rotationMod * 0.01);
     }
@@ -351,8 +344,8 @@ class FluidSimulation {
       this.vx[i] *= damping;
       this.vy[i] *= damping;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
-      if (speedSq > 1.0) {
-        const factor = 1.0 / Math.sqrt(speedSq);
+      if (speedSq > 0.25) {
+        const factor = 0.5 / Math.sqrt(speedSq);
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
@@ -630,14 +623,8 @@ class FluidSimulation {
     const shearX = noise2D(smearSpeed, 100) * strength * 150.0 * dt;
     const shearY = noise2D(100, smearSpeed) * strength * 150.0 * dt;
 
-    let joltX = 0, joltY = 0;
-    if (audioData && audioData.volume > 80) {
-      joltX = (Math.random() - 0.5) * strength * 200.0 * dt * (audioData.bass / 255);
-      joltY = (Math.random() - 0.5) * strength * 200.0 * dt * (audioData.bass / 255);
-    }
-
-    const totalShearX = shearX + joltX;
-    const totalShearY = shearY + joltY;
+    const totalShearX = shearX;
+    const totalShearY = shearY;
 
     for (let i = 0; i < GRID_AREA; i++) {
       if (this.density[i] > 0.01) {
@@ -972,12 +959,11 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
         const realDt = now - lastTimeRef.current;
         lastTimeRef.current = now;
 
-        // Dynamic speed calculation
+        // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
         let dynamicSpeed = 0.05;
-        if (currentAudioData) dynamicSpeed += currentAudioData.energy * 0.05;
         dynamicSpeed += currentSettings.platePressure * 0.02;
-        dynamicSpeed += currentSettings.airVelocity * 0.02;
-        dynamicSpeed += currentSettings.automateRate * 0.02;
+        dynamicSpeed += currentSettings.airVelocity * 0.01;
+        dynamicSpeed += currentSettings.automateRate * 0.01;
         let speedMultiplier = currentSettings.globalSpeed / 0.05;
         if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
         dynamicSpeed *= speedMultiplier;
@@ -1354,8 +1340,9 @@ export const LiquidVisualizer: React.FC<LiquidVisualizerProps> = ({
                 }
               }
 
-              const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod);
-              rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt * timeMultiplier * 60;
+              // Use realDt only — never timeMultiplier, which spikes with audio energy
+              const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod) * 0.3;
+              rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt;
             }
 
             tCtx.clearRect(0, 0, tCanvas.width, tCanvas.height);
