@@ -176,24 +176,6 @@ export default function App() {
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
-                {/* Auto Toggle */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Auto</span>
-                  <button
-                    onClick={() => setIsAutomated(!isAutomated)}
-                    className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
-                    title="Auto-generate dye drops and air bursts from audio"
-                  >
-                    <motion.div
-                      className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
-                      animate={{ x: isAutomated ? 20 : 0 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  </button>
-                </div>
-
-                <div className="h-px w-full bg-white/10"></div>
-
                 {/* Liquid Type Selector — always visible */}
                 <div className="flex flex-col gap-1.5 w-full">
                   <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Liquid</span>
@@ -301,6 +283,24 @@ export default function App() {
                 >
                   {isActive ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
                 </button>
+
+                <div className="w-full h-px bg-white/10" />
+
+                {/* Random Evolve */}
+                <div className="flex flex-col items-center gap-1.5 w-full">
+                  <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Random Evolve</span>
+                  <button
+                    onClick={() => setIsAutomated(!isAutomated)}
+                    className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
+                    title="Auto-generate dye drops and air bursts from audio"
+                  >
+                    <motion.div
+                      className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
+                      animate={{ x: isAutomated ? 20 : 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  </button>
+                </div>
 
                 <div className="w-full h-px bg-white/10" />
 
