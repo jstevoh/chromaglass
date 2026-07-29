@@ -4,6 +4,7 @@
 // listen gets instant structure-aware visuals.
 
 import { SongMap, SongSection } from './musicTypes';
+import { putFingerprint } from './musicDb';
 
 const ANALYSIS_SAMPLE_RATE = 22050;
 
@@ -87,6 +88,9 @@ interface WorkerResult {
   energyCurve: number[];
   frameRate: number;
   durationSec: number;
+  fpHashes?: Uint32Array;
+  fpFrames?: Uint32Array;
+  fpDurationSec?: number;
 }
 
 /** Run the offline analysis worker over a recorded listen. */
@@ -125,6 +129,20 @@ export async function generateSongMap(
   if (!result || !result.ok) {
     if (result?.error) console.warn('song map analysis failed:', result.error);
     return null;
+  }
+
+  // Store the local recognition fingerprint alongside the song map, so this
+  // track is identified instantly (and offline) on every future listen.
+  if (result.fpHashes && result.fpFrames && result.fpHashes.length > 100) {
+    await putFingerprint({
+      isrc,
+      title: meta?.title,
+      artist: meta?.artist,
+      hashes: result.fpHashes,
+      frames: result.fpFrames,
+      durationSec: result.fpDurationSec ?? result.durationSec,
+      createdAt: Date.now(),
+    });
   }
 
   return {

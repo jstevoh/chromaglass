@@ -75,7 +75,9 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
                   {section.label}
                 </span>
               )}
-              <span className="px-1.5 py-0.5 rounded bg-white/10">{track.source === 'manual' ? 'manual tag' : 'fingerprint'}</span>
+              <span className="px-1.5 py-0.5 rounded bg-white/10">
+                {track.source === 'manual' ? 'manual tag' : track.source === 'local' ? 'local match' : 'fingerprint'}
+              </span>
               {trackState?.presetId && (
                 <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 font-bold">{trackState.presetId.replace(/-/g, ' ')}</span>
               )}

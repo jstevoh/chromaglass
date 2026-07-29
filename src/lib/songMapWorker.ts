@@ -1,6 +1,10 @@
-// Web Worker: offline analysis of a recorded listen into a SongMap.
+// Web Worker: offline analysis of a recorded listen into a SongMap,
+// plus a local recognition fingerprint (see localFingerprint.ts).
 // Input:  { pcm: Float32Array, sampleRate: number }  (mono)
-// Output: { sections, pitchCurve, energyCurve, frameRate, durationSec }
+// Output: { sections, pitchCurve, energyCurve, frameRate, durationSec,
+//           fpHashes, fpFrames, fpDurationSec }
+
+import { extractPeakHashes } from './localFingerprint';
 //
 // Pipeline: framed FFT → energy / chroma / spectral-centroid features →
 // self-similarity novelty curve → section boundaries → repetition-based
@@ -246,6 +250,7 @@ self.onmessage = (e: MessageEvent) => {
   try {
     const feat = analyze(pcm, sampleRate);
     const sections = segment(feat);
+    const fp = extractPeakHashes(pcm, sampleRate);
     (self as any).postMessage({
       ok: true,
       sections,
@@ -253,6 +258,9 @@ self.onmessage = (e: MessageEvent) => {
       energyCurve: Array.from(feat.energy),
       frameRate: feat.frameRate,
       durationSec: feat.durationSec,
+      fpHashes: fp.hashes,
+      fpFrames: fp.frames,
+      fpDurationSec: fp.durationSec,
     });
   } catch (err) {
     (self as any).postMessage({ ok: false, error: String(err) });

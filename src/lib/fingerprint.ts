@@ -13,6 +13,46 @@ export function fingerprintingAvailable(): boolean {
   return typeof PROXY_URL === 'string' && PROXY_URL.length > 0;
 }
 
+/** Record a short mono snippet from the stream as raw PCM (native rate). */
+export async function capturePcm(stream: MediaStream, seconds = 4): Promise<{ pcm: Float32Array; sampleRate: number } | null> {
+  try {
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const nativeRate = ctx.sampleRate;
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    const chunks: Float32Array[] = [];
+    let collected = 0;
+    const target = Math.ceil(seconds * nativeRate);
+
+    const done = new Promise<void>(resolve => {
+      processor.onaudioprocess = e => {
+        if (collected >= target) return;
+        const data = e.inputBuffer.getChannelData(0);
+        chunks.push(new Float32Array(data));
+        collected += data.length;
+        if (collected >= target) resolve();
+      };
+    });
+
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    await Promise.race([done, new Promise<void>(r => setTimeout(r, (seconds + 3) * 1000))]);
+    processor.disconnect();
+    source.disconnect();
+    await ctx.close();
+
+    if (collected < nativeRate * 2) return null;
+    const merged = new Float32Array(collected);
+    let off = 0;
+    for (const c of chunks) { merged.set(c, off); off += c.length; }
+    return { pcm: merged, sampleRate: nativeRate };
+  } catch (e) {
+    console.warn('capturePcm failed', e);
+    return null;
+  }
+}
+
 /**
  * Record a short mono snippet from the stream and encode as WAV (16-bit PCM).
  * WAV keeps the proxy simple — both AudD and ACRCloud accept it directly.

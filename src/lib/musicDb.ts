@@ -3,11 +3,13 @@
 // so repeat listens need no server round-trip.
 
 import { SongMap, TrackEvolutionState } from './musicTypes';
+import { TrackFingerprint } from './localFingerprint';
 
 const DB_NAME = 'chromaglass-music';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SONG_MAPS = 'songMaps';
 const TRACKS = 'tracks';
+const FINGERPRINTS = 'fingerprints';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -19,6 +21,7 @@ function openDb(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(SONG_MAPS)) db.createObjectStore(SONG_MAPS, { keyPath: 'isrc' });
       if (!db.objectStoreNames.contains(TRACKS)) db.createObjectStore(TRACKS, { keyPath: 'isrc' });
+      if (!db.objectStoreNames.contains(FINGERPRINTS)) db.createObjectStore(FINGERPRINTS, { keyPath: 'isrc' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -58,4 +61,19 @@ export async function putTrackState(state: TrackEvolutionState): Promise<void> {
 export async function getAllTrackStates(): Promise<TrackEvolutionState[]> {
   try { return await txRequest<TrackEvolutionState[]>(TRACKS, 'readonly', s => s.getAll()); }
   catch (e) { console.warn('musicDb.getAllTrackStates failed', e); return []; }
+}
+
+export async function putFingerprint(fp: TrackFingerprint): Promise<void> {
+  try { await txRequest(FINGERPRINTS, 'readwrite', s => s.put(fp)); }
+  catch (e) { console.warn('musicDb.putFingerprint failed', e); }
+}
+
+export async function getAllFingerprints(): Promise<TrackFingerprint[]> {
+  try { return await txRequest<TrackFingerprint[]>(FINGERPRINTS, 'readonly', s => s.getAll()); }
+  catch (e) { console.warn('musicDb.getAllFingerprints failed', e); return []; }
+}
+
+export async function hasFingerprint(isrc: string): Promise<boolean> {
+  try { return (await txRequest<number>(FINGERPRINTS, 'readonly', s => s.count(isrc))) > 0; }
+  catch { return false; }
 }

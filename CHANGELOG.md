@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-28
+
+### Added
+- **Local song recognition** — each first listen's recording is reduced to a Shazam-style spectral-peak constellation fingerprint (stored in IndexedDB). Repeat listens are recognized locally in seconds — offline, free, with sample-accurate playback position — and the AudD API becomes a fallback for unknown tracks only. Manually tagged tracks also become auto-recognized after one listen.
+- Per-track auto-preset: identification picks a visualizer preset matched to the music's energy/bass/brightness, deterministic per ISRC and remembered across listens (toggleable)
+- Palette lock: pin any of 13 curated color harmonies from a new left-panel section, overriding drains/seeds/auto-rotation/music (persists across sessions)
+- Dye Color swatch grid for one-click recoloring of the manual tools
+- Beat-triggered color rings, audio-reactive turbulence, mid/treble vorticity, three multi-hue ambient injection orbits, treble dye sparks
+
+### Changed
+- Fluid sim grid 128 → 192 with sqrt-encoded density textures — smoother edges, no gradient banding; solver iterations tuned per use so net cost stays at or below the old build
+- Identification latency: first attempt fires as soon as sound is present, 5s snippets, 10s retries; between-song dips trigger instant re-identification
+- First-listen recordings are trimmed at the true track boundary before analysis
+
+### Fixed
+- Plate saturation washout: self-regulating dye budget (density-aware evaporation + per-cell thickness cap) keeps blobs, boundaries and empty glass in equilibrium
+- Silent fingerprint-capture failures from forced sample rates / suspended AudioContexts
+- Side control columns overlapping the top bar on short windows
+
 ## [1.1.0] - 2026-07-28
 
 ### Added — Liquid Light Show rendering

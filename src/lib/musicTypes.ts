@@ -10,7 +10,7 @@ export interface TrackIdentity {
   offsetSec?: number;
   /** performance.now()-style wall clock when offsetSec was sampled — used to extrapolate position. */
   identifiedAtMs?: number;
-  source: 'fingerprint' | 'manual';
+  source: 'fingerprint' | 'manual' | 'local';
 }
 
 export interface SongSection {
