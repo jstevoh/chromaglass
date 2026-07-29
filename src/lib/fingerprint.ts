@@ -19,13 +19,18 @@ export function fingerprintingAvailable(): boolean {
  */
 export async function captureSnippet(stream: MediaStream, seconds = 8): Promise<Blob | null> {
   try {
-    const ctx = new AudioContext({ sampleRate: 44100 });
+    // Use the device's native sample rate — forcing one can throw on
+    // mismatched-rate streams in some browsers.
+    const ctx = new AudioContext();
+    // Contexts created outside a user gesture may start suspended.
+    if (ctx.state === 'suspended') await ctx.resume();
+    const nativeRate = ctx.sampleRate;
     const source = ctx.createMediaStreamSource(stream);
     const processorSize = 4096;
     const processor = ctx.createScriptProcessor(processorSize, 1, 1);
     const chunks: Float32Array[] = [];
     let collected = 0;
-    const target = Math.ceil(seconds * ctx.sampleRate);
+    const target = Math.ceil(seconds * nativeRate);
 
     const done = new Promise<void>(resolve => {
       processor.onaudioprocess = e => {
@@ -45,13 +50,13 @@ export async function captureSnippet(stream: MediaStream, seconds = 8): Promise<
     source.disconnect();
     await ctx.close();
 
-    if (collected < ctx.sampleRate * 2) return null; // too little audio to be useful
+    if (collected < nativeRate * 2) return null; // too little audio to be useful
 
     // Downsample to 16 kHz mono to keep the upload small (~250 KB for 8 s)
     const merged = new Float32Array(collected);
     let off = 0;
     for (const c of chunks) { merged.set(c, off); off += c.length; }
-    const ratio = 44100 / 16000;
+    const ratio = nativeRate / 16000;
     const outLen = Math.floor(merged.length / ratio);
     const down = new Float32Array(outLen);
     for (let i = 0; i < outLen; i++) down[i] = merged[Math.floor(i * ratio)];
