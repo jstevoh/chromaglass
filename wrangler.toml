@@ -1,0 +1,6 @@
+# Cloudflare Worker config for the fingerprint proxy.
+# Deploy:  npx wrangler deploy
+# Secret:  npx wrangler secret put AUDD_API_TOKEN
+name = "chromaglass-fingerprint"
+main = "server/fingerprint-worker.js"
+compatibility_date = "2026-07-01"
