@@ -57,6 +57,9 @@ async function identifyAudd(file, env) {
   form.append('return', 'timecode');
   const res = await fetch('https://api.audd.io/', { method: 'POST', body: form });
   const data = await res.json();
+  if (data && data.status === 'error') {
+    throw new Error(`AudD: ${data.error && data.error.error_message ? data.error.error_message : JSON.stringify(data.error)}`);
+  }
   const r = data && data.result;
   if (!r) return { match: false };
   return {
