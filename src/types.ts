@@ -120,13 +120,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
-  automateRate: 0.02,
-  audioImpact: 0.45,
-  turbulenceScale: 0.35,    // visible multi-scale ripples and filaments
+  automateRate: 0.12,
+  audioImpact: 0.6,
+  turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
   blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
-  boundaryContrast: 0.35,   // subtle bright interface line between dye colors
-  saturationBoost: 1.35,    // counteracts muddy blending at boundaries
+  boundaryContrast: 0.45,   // bright interface line between dye colors
+  saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
 };

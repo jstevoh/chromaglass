@@ -33,7 +33,7 @@ export const PRESETS: Preset[] = [
       advection: 0.35,           // smooth transport, no turbulence
       damping: 0.988,            // very slow energy loss — movements persist gracefully
       heatDecay: 0.992,          // warmth lingers, keeps gentle convection going
-      automateRate: 0.06,        // infrequent auto-injection — space to breathe
+      automateRate: 0.15,        // regular auto-injection keeps the frame alive
       platePressure: 0.25,       // subtle radial spread from center
       glassSmear: 0.3,           // soft smearing, no harsh edges
       rainDrip: 0.15,            // occasional downward streaks for variety
@@ -46,12 +46,12 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.08,  // minimal vibration — serene
       sensitivity: 0.4,
       bassBoost: 1.0,
-      audioImpact: 0.35,         // gentle audio response — music breathes the fluid
-      turbulenceScale: 0.3,      // gentle multi-scale ripple — alive but meditative
+      audioImpact: 0.55,         // audible music visibly drives the fluid
+      turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
       blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
-      boundaryContrast: 0.4,     // visible bright line where dyes meet
-      saturationBoost: 1.35,
+      boundaryContrast: 0.5,     // bright line where dyes meet
+      saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
       postBlurRadius: 0.35,
       audioMappings: {

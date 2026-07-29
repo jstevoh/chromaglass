@@ -701,9 +701,24 @@ class FluidSimulation {
     this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
 
-    // 6.5. Multi-octave curl turbulence — detail at every scale
+    // 6.5. Multi-octave curl turbulence — detail at every scale.
+    // Audio energy breathes extra turbulence into the field so the liquid
+    // visibly churns with the music instead of drifting at constant pace.
     const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
-    this.applyCurlTurbulence(settings.turbulenceScale ?? 0, turbDetail, time, noise2D);
+    let turbScale = settings.turbulenceScale ?? 0;
+    if (audioData) {
+      const energy01 = Math.min(1, audioData.energy);
+      turbScale *= 1 + energy01 * (settings.audioImpact ?? 0.45) * 2.0;
+    }
+    this.applyCurlTurbulence(turbScale, turbDetail, time, noise2D);
+
+    // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
+    if (audioData) {
+      const mid01 = Math.min(1, audioData.mid / 70);
+      const treble01 = Math.min(1, audioData.treble / 70);
+      const spin = (mid01 * 0.6 + treble01 * 0.4) * (settings.audioImpact ?? 0.45);
+      if (spin > 0.08) this.injectVorticity(spin * 0.03, time, noise2D);
+    }
 
     // 7. Immiscibility & fingering — blobSurfaceTension trades cohesion for shear.
     // Low tension: weak cohesion + strong fingering → amoeba-like elongation and pinching.
@@ -1129,6 +1144,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
+  const lastBass01Ref = useRef(0); // for beat edge detection
 
   useImperativeHandle(ref, () => ({
     injectImage: (imageData: ImageData) => {
@@ -2017,24 +2033,26 @@ void main() {
           // ── Ambient seeding ────────────────────────────────
           const af = fluidsRef.current[activeLayerRef.current];
           if (af) {
-            // Two slow Lissajous orbits inject different colors continuously.
-            const phase = time * 0.15;
+            // Three Lissajous orbits, each carrying its own harmony color —
+            // keeps several distinct hues alive in the frame at all times.
+            const phase = time * 0.18;
             const injPts = [
               { x: GRID_SIZE / 2 + Math.cos(phase) * GRID_SIZE * 0.28,
                 y: GRID_SIZE / 2 + Math.sin(phase * 1.3) * GRID_SIZE * 0.28 },
               { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
                 y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
+              { x: GRID_SIZE / 2 + Math.cos(phase * 1.1 + 2.1) * GRID_SIZE * 0.22,
+                y: GRID_SIZE / 2 + Math.sin(phase * 0.6 + 4.2) * GRID_SIZE * 0.33 },
             ];
-            const ambCol = harmonyCycle(harmonyRef.current, time * 0.25);
-            const ar = ambCol.r, ag = ambCol.g, ab = ambCol.b;
 
-            for (const pt of injPts) {
+            injPts.forEach((pt, idx) => {
               const px = Math.floor(pt.x), py = Math.floor(pt.y);
               if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
-                af.addDensity(px, py, 0.035, ar, ag, ab);
-                af.addTemp(px, py, 0.01);
+                const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
+                af.addDensity(px, py, 0.07, c.r, c.g, c.b);
+                af.addTemp(px, py, 0.02);
               }
-            }
+            });
 
           }
 
@@ -2045,7 +2063,10 @@ void main() {
 
             const impact = currentSettings.audioImpact ?? 0.45;
             if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
-              const audioCol = harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI);
+              // Each audio feature carries a different color from the harmony,
+              // so bass, mids and swells paint distinguishable hues.
+              const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
+              const audioCol = colFor(0);
               const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
               const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -2091,36 +2112,60 @@ void main() {
                   }
                 }
 
-                // Mid: orbital injection
+                // Beat edge: a fresh-colored ring of dye blooms outward on each
+                // kick so bass hits are visible in COLOR, not just motion
+                if (bass01 > 0.45 && lastBass01Ref.current <= 0.45) {
+                  const ringCol = colFor(2.0);
+                  const ringR = (10 + bass01 * 14) * GRID_SCALE;
+                  const drops = 14;
+                  for (let d = 0; d < drops; d++) {
+                    const a = (d / drops) * Math.PI * 2 + time;
+                    const rx2 = Math.floor(centerX + Math.cos(a) * ringR);
+                    const ry2 = Math.floor(centerY + Math.sin(a) * ringR);
+                    if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
+                      activeFluid.addDensity(rx2, ry2, bass01 * 1.6 * impactMul, ringCol.r, ringCol.g, ringCol.b);
+                      activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
+                    }
+                  }
+                }
+                lastBass01Ref.current = bass01;
+
+                // Mid: orbital injection in its own hue
                 if (mid01 > 0.2) {
+                  const midCol = colFor(1.3);
                   const orbitR = GRID_SIZE * 0.3;
                   const mx = Math.floor(centerX + Math.cos(time * 0.6) * orbitR);
                   const my = Math.floor(centerY + Math.sin(time * 0.8) * orbitR);
                   if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
-                    activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.04 * autoAmp, ar_a, ag_a, ab_a, mid01);
+                    activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
                     activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                   }
                 }
 
-                // Treble: scattered heat sparks
+                // Treble: scattered sparks — heat plus tiny bright dye specks
+                // so high frequencies glitter instead of acting invisibly
                 if (treble01 > 0.2) {
+                  const sparkCol = colFor(3.1);
                   const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6) * impactMul);
                   for (let s = 0; s < sparks; s++) {
                     const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                     const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                     activeFluid.addTemp(sx, sy, treble01 * 0.45 * autoAmp);
+                    activeFluid.addDensity(sx, sy, treble01 * 0.5,
+                      sparkCol.r * 0.4 + 0.6, sparkCol.g * 0.4 + 0.6, sparkCol.b * 0.4 + 0.6);
                   }
                 }
 
-                // Energy: roaming swell
+                // Energy: roaming swell in a third hue
                 if (energy01 > 0.15) {
+                  const swellCol = colFor(2.6);
                   const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
                   const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
-                  activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.04 * autoAmp, ar_a, ag_a, ab_a, energy01);
+                  activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
                   if (isAutomatedRef.current) {
                     const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
                     const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
-                    activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.035, ar_a, ag_a, ab_a, energy01);
+                    activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.05, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
               }
