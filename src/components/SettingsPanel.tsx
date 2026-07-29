@@ -144,6 +144,69 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         ))}
       </section>
 
+      {/* Light Show Look Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Palette size={12} /> Light Show Look
+        </h3>
+        <Slider
+          label="Turbulence Scale"
+          value={settings.turbulenceScale}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turbulenceScale: v })}
+        />
+        <Slider
+          label="Turbulence Detail"
+          value={settings.turbulenceDetail}
+          min={1}
+          max={4}
+          step={1}
+          onChange={(v: number) => onUpdate({ turbulenceDetail: Math.round(v) })}
+        />
+        <Slider
+          label="Blob Surface Tension"
+          value={settings.blobSurfaceTension}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
+        />
+        <Slider
+          label="Boundary Glow"
+          value={settings.boundaryContrast}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ boundaryContrast: v })}
+        />
+        <Slider
+          label="Saturation"
+          value={settings.saturationBoost}
+          min={0.5}
+          max={2.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ saturationBoost: v })}
+        />
+        <Slider
+          label="Glossiness"
+          value={settings.glossiness}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ glossiness: v })}
+        />
+        <Slider
+          label="Post Blur"
+          value={settings.postBlurRadius}
+          min={0}
+          max={1.5}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ postBlurRadius: v })}
+        />
+      </section>
+
       {/* Squish Plate Section */}
       <section className="mb-8">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">

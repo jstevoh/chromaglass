@@ -1,11 +1,27 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
-import { LiquidVisualizer, LiquidVisualizerHandle, INSECT_TYPES } from './components/LiquidVisualizer';
+import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
+import { useCastSender } from './hooks/useCastSession';
+import { useMusicIntelligence } from './hooks/useMusicIntelligence';
+import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
+import { COLOR_HARMONIES } from './constants';
+import { TrackPanel } from './components/TrackPanel';
+import { LyricsOverlay } from './components/LyricsOverlay';
+
+const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
+
+function loadMusicSettings(): MusicSettings {
+  try {
+    const raw = localStorage.getItem(MUSIC_SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_MUSIC_SETTINGS, ...JSON.parse(raw) };
+  } catch { /* fall through */ }
+  return { ...DEFAULT_MUSIC_SETTINGS };
+}
 
 type AudioSource = 'none' | 'microphone' | 'system';
 
@@ -32,17 +48,23 @@ export default function App() {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<VisualizerSettings>(() => ({ ...DEFAULT_SETTINGS }));
+  const [activePresetId, setActivePresetId] = useState<string | null>('classic');
+  const [settings, setSettings] = useState<VisualizerSettings>(() => {
+    const classic = PRESETS.find(p => p.id === 'classic');
+    return classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
+  });
   const [seedCount, setSeedCount] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
+
+  // ── Cast ──
+  const { isCasting, startCast, stopCast } = useCastSender();
 
   const updateLiquidColor = useCallback((id: string, color: string) => {
     setLiquidTypes(prev => prev.map(t => t.id === id ? { ...t, color } : t));
@@ -131,6 +153,42 @@ export default function App() {
 
   const audioData = useAudioAnalyzer(isActive ? audioStream : null, isActive, settings.sensitivity, settings.bassBoost);
 
+  // ── Music intelligence ──────────────────────────────────────────
+  const [showTrackPanel, setShowTrackPanel] = useState(false);
+  const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
+  const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
+    setMusicSettings(prev => {
+      const next = { ...prev, ...partial };
+      try { localStorage.setItem(MUSIC_SETTINGS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
+
+  const musicIntel = useMusicIntelligence(audioStream, audioData, musicSettings, settings);
+
+  // Overlay music-driven parameters onto the user's settings for rendering only
+  // (the settings state itself is untouched, so preset detection keeps working).
+  const effectiveSettings = useMemo(
+    () => musicIntel.overrides ? { ...settings, ...musicIntel.overrides } : settings,
+    [settings, musicIntel.overrides],
+  );
+
+  // Pin the visualizer's palette to the track's harmony (with evolution drift)
+  useEffect(() => {
+    if (musicIntel.harmonyIndex != null) {
+      visualizerRef.current?.setHarmony(COLOR_HARMONIES[musicIntel.harmonyIndex]);
+    }
+  }, [musicIntel.harmonyIndex]);
+
+  // Fire lyric word-triggers into the fluid
+  useEffect(() => {
+    if (musicIntel.trigger) {
+      const energy = audioData ? Math.min(1, audioData.energy) : 0.6;
+      visualizerRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [musicIntel.trigger?.seq]);
+
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
@@ -138,6 +196,7 @@ export default function App() {
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...presetSettings }));
     setActivePresetId(presetId);
+    visualizerRef.current?.applyPreset(presetId);
   };
 
   const triggerLucky = () => {
@@ -167,8 +226,20 @@ export default function App() {
       damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
       automateRate: Math.random() * 0.2,
       audioImpact: settings.audioImpact,
+      turbulenceScale: Math.random() * 0.7,
+      turbulenceDetail: 1 + Math.floor(Math.random() * 4),
+      blobSurfaceTension: Math.random(),
+      boundaryContrast: Math.random() * 0.7,
+      saturationBoost: 1.0 + Math.random() * 0.8,
+      glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
+      postBlurRadius: Math.random() * 0.7,
     });
     setActivePresetId(null);
+    // Randomize inject style for the evolve
+    const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
+    const s1 = allStyles[Math.floor(Math.random() * allStyles.length)];
+    const s2 = allStyles[Math.floor(Math.random() * allStyles.length)];
+    visualizerRef.current?.setInjectStyle([s1, s2]);
     setSeedCount(prev => prev + 1);
   };
 
@@ -182,7 +253,7 @@ export default function App() {
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white">
       <LiquidVisualizer
         ref={visualizerRef}
-        audioData={audioData} settings={settings} seedCount={seedCount}
+        audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
       />
@@ -240,30 +311,32 @@ export default function App() {
 
                 <div className="h-px w-full bg-white/10"></div>
 
-                {/* Drop / Blow toggle */}
-                <div className="flex gap-1.5 w-full">
-                  <button
-                    onClick={() => setActiveTool('dropper')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                      activeTool === 'dropper'
-                        ? 'border-white/40 bg-white/15 text-white'
-                        : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
-                    }`}
-                  >
-                    <Droplet size={11} />
-                    <span className="text-[8px] uppercase font-bold tracking-wider">Drop</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTool('blow')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border transition-all ${
-                      activeTool === 'blow'
-                        ? 'border-white/40 bg-white/15 text-white'
-                        : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
-                    }`}
-                  >
-                    <Wind size={11} />
-                    <span className="text-[8px] uppercase font-bold tracking-wider">Blow</span>
-                  </button>
+                {/* Tools */}
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Tools</span>
+                  <div className="grid grid-cols-3 gap-1 w-full">
+                    {([
+                      { id: 'dropper' as const, icon: Droplet, label: 'Drop' },
+                      { id: 'spray' as const, icon: SprayCan, label: 'Spray' },
+                      { id: 'splatter' as const, icon: Paintbrush, label: 'Splat' },
+                      { id: 'pour' as const, icon: FlaskConical, label: 'Pour' },
+                      { id: 'streak' as const, icon: Slash, label: 'Streak' },
+                      { id: 'blow' as const, icon: Wind, label: 'Blow' },
+                    ]).map(({ id, icon: Icon, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setActiveTool(id)}
+                        className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg border transition-all ${
+                          activeTool === id
+                            ? 'border-white/40 bg-white/15 text-white'
+                            : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
+                        }`}
+                      >
+                        <Icon size={11} />
+                        <span className="text-[7px] uppercase font-bold tracking-wider">{label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="h-px w-full bg-white/10"></div>
@@ -285,23 +358,6 @@ export default function App() {
                   <span className="text-[8px] uppercase font-bold tracking-wider">Image Dye</span>
                 </button>
 
-                <div className="h-px w-full bg-white/10"></div>
-
-                {/* Insects */}
-                <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Insects</span>
-                  {INSECT_TYPES.map((insect) => (
-                    <button
-                      key={insect.id}
-                      onClick={() => visualizerRef.current?.deployInsect(insect.id)}
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/12 hover:border-white/25 transition-all text-left active:scale-95"
-                      title={insect.description}
-                    >
-                      <span className="text-base leading-none">{insect.emoji}</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{insect.name}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
             </motion.div>
 
@@ -480,6 +536,29 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* ── Track Panel ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTrackPanel && (
+          <TrackPanel
+            state={musicIntel.state}
+            musicSettings={musicSettings}
+            onUpdateMusicSettings={updateMusicSettings}
+            onManualTag={musicIntel.manualTag}
+            onReplayListen={musicIntel.replayListen}
+            onStopReplay={musicIntel.stopReplay}
+            onClose={() => setShowTrackPanel(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Lyrics Overlay ─────────────────────────────────────── */}
+      {musicSettings.enabled && musicSettings.lyricsOverlay && (
+        <LyricsOverlay
+          line={musicIntel.state.line}
+          sentiment={musicIntel.state.sectionSentimentValue}
+        />
+      )}
+
       {/* ── Top Bar ────────────────────────────────────────────── */}
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
@@ -497,6 +576,27 @@ export default function App() {
         </div>
 
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
+          <button
+            onClick={() => setShowTrackPanel(!showTrackPanel)}
+            className={`relative p-2 rounded-full transition-all ${
+              showTrackPanel ? 'bg-purple-500 text-white' : 'hover:bg-white/10 text-white/60'
+            }`}
+            title={musicIntel.state.track ? `${musicIntel.state.track.title} — ${musicIntel.state.track.artist}` : 'Track intelligence'}
+          >
+            <Music size={14} />
+            {musicIntel.state.track && !showTrackPanel && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
+            )}
+          </button>
+          <button
+            onClick={() => isCasting ? stopCast() : startCast()}
+            className={`p-2 rounded-full transition-all ${
+              isCasting ? 'bg-blue-500 text-white' : 'hover:bg-white/10 text-white/60'
+            }`}
+            title={isCasting ? "Stop casting" : "Cast to display"}
+          >
+            <Cast size={14} />
+          </button>
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`p-2 rounded-full transition-all text-[9px] font-bold ${

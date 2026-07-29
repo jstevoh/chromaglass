@@ -18,33 +18,95 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'The standard 1960s psychedelic liquid light show.',
+    description: 'Slow, luminous blobs drift and merge — a meditative 1960s liquid light show.',
     settings: {
-      globalSpeed: 0.05,
+      globalSpeed: 0.022,        // unhurried, dreamlike pace
       layerCount: 2,
-      blendMode: 'screen',
-      gooeyEffect: 0.4,
-      rotationSpeed: 0.02,
-      centerGravity: 0.2,
+      blendMode: 'screen',       // additive glow — colors brighten where they overlap
+      gooeyEffect: 0.65,         // organic, rounded blob edges
+      rotationSpeed: 0.008,      // barely perceptible rotation keeps it alive
+      centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
-      surfaceTension: 0.05,
-      diffusionRate: 0.0001,
-      buoyancy: 0.5,
-      advection: 0.5,
-      damping: 0.98,
-      heatDecay: 0.95,
-      automateRate: 0.1,
-      platePressure: 0.3,
-      glassSmear: 0.5,
-      rainDrip: 0.5,
-      viscosity: 'thick',
-      polarity: 0.9,
-      heatIntensity: 0.15,
-      boilingPoint: 0.75,
-      evaporationRate: 0.03,
-      airVelocity: 0.1,
-      vibrationFrequency: 0.5,
-      audioMappings: { ...DEFAULT_MAPPINGS },
+      surfaceTension: 0.14,      // blobs hold shape, merge slowly
+      diffusionRate: 0.00012,    // colors bleed softly at boundaries
+      buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
+      advection: 0.35,           // smooth transport, no turbulence
+      damping: 0.988,            // very slow energy loss — movements persist gracefully
+      heatDecay: 0.992,          // warmth lingers, keeps gentle convection going
+      automateRate: 0.06,        // infrequent auto-injection — space to breathe
+      platePressure: 0.25,       // subtle radial spread from center
+      glassSmear: 0.3,           // soft smearing, no harsh edges
+      rainDrip: 0.15,            // occasional downward streaks for variety
+      viscosity: 'thick',        // heavy, syrupy movement
+      polarity: 0.7,             // colors stay distinct but can gently intermingle
+      heatIntensity: 0.1,        // low heat — convection is a background breath
+      boilingPoint: 0.9,         // very hard to boil — keeps things calm
+      evaporationRate: 0.005,    // colors persist a long time
+      airVelocity: 0.04,         // near-still air — no turbulence
+      vibrationFrequency: 0.08,  // minimal vibration — serene
+      sensitivity: 0.4,
+      bassBoost: 1.0,
+      audioImpact: 0.35,         // gentle audio response — music breathes the fluid
+      turbulenceScale: 0.3,      // gentle multi-scale ripple — alive but meditative
+      turbulenceDetail: 3,
+      blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
+      boundaryContrast: 0.4,     // visible bright line where dyes meet
+      saturationBoost: 1.35,
+      glossiness: 0.0,           // flat backlit dye — the projector look
+      postBlurRadius: 0.35,
+      audioMappings: {
+        velocity: 'bass',        // low frequencies push the fluid gently
+        density: 'volume',       // louder = more color, but mapped gently
+        color: 'treble',         // high frequencies shift hue — sparkle
+        rotation: 'none',        // no audio-driven rotation — keep it calm
+      },
+    }
+  },
+  {
+    id: 'galaxy',
+    name: 'Galaxy',
+    description: 'Spiral arms of starlight swirl through the void — galaxies colliding in slow motion.',
+    settings: {
+      globalSpeed: 0.018,        // stately cosmic drift
+      layerCount: 2,
+      blendMode: 'lighter',      // additive light — stars brighten where they overlap
+      gooeyEffect: 0.15,         // low goo — sharper points of light, less blobby
+      rotationSpeed: 0.035,      // visible rotation creates spiral arms
+      centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
+      ledPlatform: false,        // pure black void
+      surfaceTension: 0.02,      // near-zero — fluid fragments into star clusters
+      diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
+      buoyancy: 0.25,            // minimal buoyancy — horizontal swirl dominates
+      advection: 0.75,           // strong transport — sweeping spiral arm motion
+      damping: 0.994,            // very high — movements persist, orbits sustain
+      heatDecay: 0.998,          // heat lingers forever — nebula glow persists
+      automateRate: 0.14,        // moderate injection — periodic star bursts
+      platePressure: 0.1,        // minimal plate spread — gravity dominates
+      glassSmear: 0.15,          // light smearing — comet-tail streaks
+      rainDrip: 0.0,             // no dripping — weightless space
+      viscosity: 'thin',         // thin — fluid fragments into filaments and streams
+      polarity: 0.25,            // low — colors intermingle freely like nebula gas
+      heatIntensity: 0.06,       // faint warmth — just enough for gentle convection
+      boilingPoint: 0.95,        // nearly impossible to boil — calm cosmos
+      evaporationRate: 0.002,    // stars persist for a very long time
+      airVelocity: 0.02,         // near-vacuum — no turbulence
+      vibrationFrequency: 0.0,   // no vibration — serene void
+      sensitivity: 0.5,
+      bassBoost: 1.2,
+      audioImpact: 0.4,
+      turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
+      turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
+      blobSurfaceTension: 0.1,   // near-zero cohesion — matter fragments freely
+      boundaryContrast: 0.25,
+      saturationBoost: 1.45,     // vivid nebula color
+      glossiness: 0.0,
+      postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
+      audioMappings: {
+        velocity: 'bass',        // bass drives galactic tides
+        density: 'energy',       // overall energy triggers star formation
+        color: 'treble',         // treble shifts nebula hue
+        rotation: 'energy',      // energy modulates orbital speed
+      },
     }
   },
   {
@@ -156,6 +218,13 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.1,
+      turbulenceScale: 0.15,     // lava moves as whole blobs, minimal ripple
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.85,  // high cohesion — rounded rising globs
+      boundaryContrast: 0.3,
+      saturationBoost: 1.3,
+      glossiness: 0.12,          // faint wax sheen — the one preset that earns it
+      postBlurRadius: 0.55,      // softer edges than the flat-dye presets
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -235,6 +304,13 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.04,
       airVelocity: 0.5,
       vibrationFrequency: 0.9,
+      turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
+      turbulenceDetail: 4,
+      blobSurfaceTension: 0.15,  // shapes constantly tear and reform
+      boundaryContrast: 0.6,     // hard psychedelic color interfaces
+      saturationBoost: 1.6,      // hyper-saturated
+      glossiness: 0.0,
+      postBlurRadius: 0.3,
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',

@@ -74,6 +74,15 @@ export interface VisualizerSettings {
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
   audioImpact: number;
+
+  // Light Show Look (rendering)
+  turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
+  turbulenceDetail: number;   // number of curl-noise octaves (1-4)
+  blobSurfaceTension: number; // lower = more elongation/shear, higher = more circular
+  boundaryContrast: number;   // bright edge-line strength where two dye colors meet
+  saturationBoost: number;    // final color grade saturation multiplier
+  glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
+  postBlurRadius: number;     // final gooey blur radius multiplier
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
@@ -113,4 +122,11 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   heatDecay: 0.98,
   automateRate: 0.02,
   audioImpact: 0.45,
+  turbulenceScale: 0.35,    // visible multi-scale ripples and filaments
+  turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
+  blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
+  boundaryContrast: 0.35,   // subtle bright interface line between dye colors
+  saturationBoost: 1.35,    // counteracts muddy blending at boundaries
+  glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
+  postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
 };

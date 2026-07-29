@@ -11,6 +11,23 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
+- **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
+- **Music intelligence** — Identifies the playing song (fingerprint proxy or manual tag), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
+- **Lyrics layer** — Time-synced lyrics from LRCLIB with themed word-triggers (fire, water, sky…), per-section sentiment arc, and an optional kinetic typography overlay
+- **Evolving per-track identity** — Each song's ISRC seeds a stable visual identity that grows more complex with every listen; replay any past listen's exact look from the history panel
+
+## Music Intelligence Setup (optional)
+
+Everything except automatic identification works out of the box. For automatic song ID:
+
+1. Deploy the fingerprint proxy (holds your API key server-side):
+   ```bash
+   wrangler deploy server/fingerprint-worker.js --name chromaglass-fingerprint
+   wrangler secret put AUDD_API_TOKEN   # token from https://audd.io (or set ACR_* for ACRCloud)
+   ```
+2. Set `VITE_FINGERPRINT_PROXY_URL` in `.env` to the worker URL.
+
+Without the proxy, use the **Tag Track** form in the Track panel — song maps, lyrics, and evolution all work from a manual tag.
 
 ## Quick Start
 
@@ -59,10 +76,23 @@ src/
   constants.ts             # Shared color palettes, audio utilities
   presets.ts               # 10 built-in visualizer presets
   hooks/
-    useAudioAnalyzer.ts    # Web Audio FFT hook (bass/mid/treble/energy/timbre/complexity)
+    useAudioAnalyzer.ts        # Web Audio FFT hook (bass/mid/treble/energy/timbre/complexity)
+    useMusicIntelligence.ts    # Orchestrates identification, song maps, lyrics, evolution
+  lib/
+    musicTypes.ts              # Music intelligence interfaces
+    musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
+    evolution.ts               # ISRC-seeded visual identity + per-listen evolution
+    fingerprint.ts             # Snippet capture + fingerprint proxy client
+    songMap.ts                 # Listen recorder, offline analysis orchestration
+    songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
+    lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
-    LiquidVisualizer.tsx   # Fluid simulation engine + canvas renderer
-    SettingsPanel.tsx       # Full settings UI panel
+    LiquidVisualizer.tsx       # Fluid simulation engine + WebGL2 renderer
+    SettingsPanel.tsx          # Full settings UI panel
+    TrackPanel.tsx             # Now playing, evolution, listen history/replay
+    LyricsOverlay.tsx          # Kinetic typography lyric overlay
+server/
+  fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
 ```
 
 ## License

@@ -12,7 +12,7 @@ interface LiquidVisualizerProps {
   activeLayer?: number;
   clearTrigger?: number;
   drainTrigger?: number;
-  activeTool?: 'dropper' | 'blow';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak';
   isAutomated?: boolean;
   isActive?: boolean;
 }
@@ -21,34 +21,36 @@ const GRID_SIZE = 128;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
+const PRESET_INJECT_STYLES: Record<string, string[]> = {
+  'classic':            ['drop'],
+  'galaxy':             ['spray', 'streak'],
+  'deep-ocean':         ['pour', 'drop'],
+  'cyberpunk':          ['streak', 'splatter'],
+  'lava-lamp':          ['pour'],
+  'ink-bleed':          ['splatter', 'pour'],
+  'acid-trip':          ['splatter', 'spray'],
+  'bass-drop':          ['splatter', 'drop'],
+  'timbre-shifter':     ['spray'],
+  'boiling-point':      ['spray', 'splatter'],
+  'microscopic-chaos':  ['drop'],
+  'aurora-borealis':    ['streak', 'spray'],
+  'solar-flare':        ['splatter', 'streak'],
+  'jellyfish-bloom':    ['pour', 'drop'],
+  'fractal-dream':      ['streak', 'spray'],
+  'velvet-underground': ['pour', 'drop'],
+  'neon-coral-reef':    ['streak', 'drop'],
+  'stardust-collapse':  ['spray', 'splatter'],
+};
+
 export interface LiquidVisualizerHandle {
-  deployInsect: (type: string) => void;
   injectImage: (imageData: ImageData) => void;
+  applyPreset: (presetId: string) => void;
+  setInjectStyle: (styles: string[]) => void;
+  /** Pin the color harmony to a specific palette-index set (music intelligence). */
+  setHarmony: (indices: number[]) => void;
+  /** Fire a themed dye burst for a lyric word-trigger. */
+  triggerTheme: (theme: string, energy?: number) => void;
 }
-
-// ─── Insect system ────────────────────────────────────────────────────
-
-interface Insect {
-  type: string;
-  x: number; y: number;
-  vx: number; vy: number;
-  angle: number;
-  life: number; maxLife: number;
-  stateTimer: number;
-  state: string;
-  strength: number;
-  size: number; // 0.4–2.2, normal distribution mean=1.0 — scales force radius and speed
-}
-
-export const INSECT_TYPES = [
-  { id: 'water_strider', name: 'Water Strider', emoji: '🌊', description: 'Skims in quick bursts, leg dimples ripple outward' },
-  { id: 'ant',           name: 'Ant',           emoji: '🐜', description: 'Methodical march, tiny six-legged wake' },
-  { id: 'butterfly',     name: 'Butterfly',     emoji: '🦋', description: 'Panicked wing flaps, weakens and stills' },
-  { id: 'beetle',        name: 'Beetle',        emoji: '🪲', description: 'Slow heavy plow, strong bow wave' },
-  { id: 'fly',           name: 'Fly',           emoji: '🪰', description: 'Frantic zigzag, chaotic micro-swirls' },
-  { id: 'minnow', name: 'Minnow', emoji: '🐟', description: 'Fast sinusoidal swimmer, curving wake' },
-  { id: 'crab',   name: 'Crab',   emoji: '🦀', description: 'Sideways scuttle, powerful pinch burst' },
-] as const;
 
 // ─── Fluid Simulation ────────────────────────────────────────────────
 
@@ -57,8 +59,6 @@ class FluidSimulation {
   dt: number;
   diff: number;
   visc: number;
-
-  insects: Insect[] = [];
 
   s: Float32Array;
   sR: Float32Array;
@@ -155,6 +155,352 @@ class FluidSimulation {
     }
   }
 
+  clearAll() {
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
+    this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
+    this.temp.fill(0); this.temp0.fill(0);
+    this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
+    this.pressure.fill(0); this.dhdt.fill(0); this.gap.fill(0.03);
+  }
+
+  private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {
+    const rCeil = Math.ceil(radius * 2);
+    for (let dy = -rCeil; dy <= rCeil; dy++) {
+      for (let dx = -rCeil; dx <= rCeil; dx++) {
+        const dist2 = dx * dx + dy * dy;
+        const nx = Math.floor(cx) + dx, ny = Math.floor(cy) + dy;
+        if (nx < 1 || nx >= this.size - 1 || ny < 1 || ny >= this.size - 1) continue;
+        const w = Math.exp(-dist2 / (2 * radius * radius));
+        if (w < 0.01) continue;
+        this.addDensity(nx, ny, amount * w, r, g, b);
+      }
+    }
+  }
+
+  seedPreset(presetId: string, noise2D: (x: number, y: number) => number): number[] {
+    const S = this.size;
+    const cx = S / 2, cy = S / 2;
+
+    const harmonies: Record<string, number[]> = {
+      'galaxy':             [9, 10, 7, 15],
+      'deep-ocean':         [7, 8, 9, 5],
+      'cyberpunk':          [6, 10, 2, 8],
+      'lava-lamp':          [0, 1, 2, 3],
+      'ink-bleed':          [14, 15, 14, 15],
+      'acid-trip':          [8, 3, 0, 10],
+      'bass-drop':          [8, 3, 0, 10],
+      'boiling-point':      [0, 1, 2, 3],
+      'microscopic-chaos':  [9, 10, 4, 5],
+      'aurora-borealis':    [5, 6, 10, 7],
+      'solar-flare':        [0, 1, 2, 3],
+      'jellyfish-bloom':    [2, 11, 10, 7],
+      'fractal-dream':      [6, 10, 2, 8],
+      'velvet-underground': [9, 10, 4, 11],
+      'neon-coral-reef':    [0, 6, 2, 7],
+      'stardust-collapse':  [7, 15, 5, 0],
+    };
+    const harmony = harmonies[presetId] || pickHarmony();
+    const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
+
+    switch (presetId) {
+      case 'galaxy': {
+        // Bright core
+        this.splatBlob(cx, cy, 5, 5.0, 0.85, 0.92, 1.0);
+        this.splatBlob(cx, cy, 11, 2.5, 0.5, 0.25, 0.85);
+        // Two logarithmic spiral arms
+        for (let arm = 0; arm < 2; arm++) {
+          const offset = arm * Math.PI;
+          const c = col(arm);
+          for (let t = 0.3; t < 5.5; t += 0.06) {
+            const r = 3 + t * 8;
+            const theta = t * 1.3 + offset;
+            const x = cx + r * Math.cos(theta), y = cy + r * Math.sin(theta);
+            const bright = Math.max(0.1, 1.0 - t / 6.5);
+            this.splatBlob(x, y, 1.8 + bright * 2.5, bright * 2.8, c.r, c.g, c.b);
+          }
+        }
+        // Scattered stars
+        for (let i = 0; i < 100; i++) {
+          const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 48;
+          const c = Math.random() < 0.35 ? { r: 1, g: 1, b: 1 } : col(Math.floor(Math.random() * 4));
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
+            0.6 + Math.random(), 0.4 + Math.random() * 1.2, c.r, c.g, c.b);
+        }
+        // Angular velocity for swirl
+        for (let j = 2; j < S - 2; j += 2) {
+          for (let i = 2; i < S - 2; i += 2) {
+            const dx = i - cx, dy = j - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 2 || dist > 55) continue;
+            const spd = 0.12 / (1 + dist * 0.025);
+            this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
+          }
+        }
+        break;
+      }
+
+      case 'classic': {
+        const positions: [number, number][] = [
+          [0.22, 0.22], [0.78, 0.22], [0.50, 0.50],
+          [0.22, 0.78], [0.78, 0.78], [0.35, 0.50], [0.65, 0.50],
+        ];
+        positions.forEach(([fx, fy], idx) => {
+          const c = col(idx);
+          this.splatBlob(fx * S, fy * S, 18, 2.5, c.r, c.g, c.b);
+        });
+        break;
+      }
+
+      case 'deep-ocean': {
+        for (let band = 0; band < 5; band++) {
+          const by = S * (0.18 + band * 0.16);
+          const c = col(band);
+          for (let i = 2; i < S - 2; i++) {
+            const wy = by + Math.sin(i * 0.06 + band * 1.5) * 8;
+            this.splatBlob(i, wy, 6, 1.2, c.r, c.g, c.b);
+          }
+        }
+        for (let j = 2; j < S - 2; j += 3)
+          for (let i = 2; i < S - 2; i += 3)
+            this.addVelocity(i, j, 0.04 + Math.sin(j * 0.05) * 0.02, 0);
+        break;
+      }
+
+      case 'cyberpunk': {
+        for (let s = 0; s < 5; s++) {
+          const c = col(s);
+          const sx = Math.random() * S * 0.3, sy = Math.random() * S;
+          const a = Math.PI * 0.2 + s * 0.15;
+          for (let t = 0; t < S * 1.2; t += 1.5) {
+            const x = sx + Math.cos(a) * t, y = sy + Math.sin(a) * t;
+            if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
+            this.splatBlob(x, y, 2.5, 2.0, c.r, c.g, c.b);
+          }
+        }
+        break;
+      }
+
+      case 'lava-lamp': {
+        const blobs: [number, number, number][] = [
+          [0.3, 0.75, 22], [0.7, 0.80, 18], [0.5, 0.60, 25], [0.4, 0.45, 15], [0.6, 0.35, 12],
+        ];
+        blobs.forEach(([fx, fy, rad], idx) => {
+          const c = col(idx);
+          this.splatBlob(fx * S, fy * S, rad, 3.0, c.r, c.g, c.b);
+          this.addTemp(Math.floor(fx * S), Math.floor(fy * S), 3.0);
+        });
+        for (let i = 5; i < S - 5; i += 3) this.addTemp(i, Math.floor(S * 0.85), 1.5);
+        break;
+      }
+
+      case 'ink-bleed': {
+        const ink = { r: 0.05, g: 0.05, b: 0.08 };
+        for (let drop = 0; drop < 6; drop++) {
+          const dx = 15 + Math.random() * (S - 30), dy = 15 + Math.random() * (S - 50);
+          this.splatBlob(dx, dy, 4 + Math.random() * 8, 3.5, ink.r, ink.g, ink.b);
+          for (let t = 0; t < 15 + Math.random() * 20; t++)
+            this.splatBlob(dx + (Math.random() - 0.5) * 2, dy + t, 1.5, 1.5 / (1 + t * 0.1), ink.r, ink.g, ink.b);
+        }
+        break;
+      }
+
+      case 'acid-trip': {
+        for (let ring = 0; ring < 5; ring++) {
+          const r = 8 + ring * 10;
+          const c = col(ring);
+          for (let a = 0; a < Math.PI * 2; a += 0.04) {
+            const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+            if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
+            this.splatBlob(x, y, 3, 1.8, c.r, c.g, c.b);
+          }
+        }
+        break;
+      }
+
+      case 'bass-drop': {
+        for (let i = 0; i < 4; i++) {
+          const c = col(i);
+          const off = (Math.random() - 0.5) * 12;
+          this.splatBlob(cx + off, cy + off, 20 - i * 3, 4.0 - i * 0.5, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'timbre-shifter': {
+        for (let j = 2; j < S - 2; j += 2)
+          for (let i = 2; i < S - 2; i += 2) {
+            const n = noise2D(i * 0.03, j * 0.03);
+            const c = col(Math.floor((n + 1) * 2));
+            this.addDensity(i, j, 0.8 + n * 0.4, c.r, c.g, c.b);
+          }
+        break;
+      }
+
+      case 'boiling-point': {
+        for (let i = 0; i < 40; i++) {
+          const x = 8 + Math.random() * (S - 16), y = 8 + Math.random() * (S - 16);
+          const c = col(i);
+          this.splatBlob(x, y, 3 + Math.random() * 5, 2.0, c.r, c.g, c.b);
+          this.addTemp(Math.floor(x), Math.floor(y), 3.0 + Math.random() * 4);
+        }
+        break;
+      }
+
+      case 'microscopic-chaos': {
+        for (let j = 0; j < 12; j++)
+          for (let i = 0; i < 12; i++) {
+            const c = col(i + j);
+            this.splatBlob(10 + i * 9 + (Math.random() - 0.5) * 4, 10 + j * 9 + (Math.random() - 0.5) * 4, 3.5, 2.5, c.r, c.g, c.b);
+          }
+        break;
+      }
+
+      case 'aurora-borealis': {
+        for (let band = 0; band < 4; band++) {
+          const by = S * (0.25 + band * 0.15);
+          const c = col(band);
+          for (let i = 2; i < S - 2; i++) {
+            const wave = Math.sin(i * 0.04 + band * 2.0) * 12 + Math.sin(i * 0.09) * 5;
+            const w = 3 + Math.sin(i * 0.07 + band) * 2;
+            this.splatBlob(i, by + wave, w, 1.5, c.r, c.g, c.b);
+          }
+        }
+        for (let j = 2; j < S - 2; j += 4)
+          for (let i = 2; i < S - 2; i += 4) this.addVelocity(i, j, 0.03, 0);
+        break;
+      }
+
+      case 'solar-flare': {
+        this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
+        this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
+        for (let f = 0; f < 8; f++) {
+          const a = f * Math.PI * 2 / 8 + (Math.random() - 0.5) * 0.4;
+          const c = col(f);
+          const len = 20 + Math.random() * 25;
+          for (let t = 5; t < len; t += 1.5) {
+            const wb = Math.sin(t * 0.3 + f) * 2;
+            const x = cx + Math.cos(a) * t + Math.cos(a + Math.PI / 2) * wb;
+            const y = cy + Math.sin(a) * t + Math.sin(a + Math.PI / 2) * wb;
+            if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
+            const br = 1.0 - t / len;
+            this.splatBlob(x, y, 2 + br * 2, br * 3.0, c.r, c.g, c.b);
+            this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.15, Math.sin(a) * 0.15);
+          }
+        }
+        this.addTemp(Math.floor(cx), Math.floor(cy), 5.0);
+        break;
+      }
+
+      case 'jellyfish-bloom': {
+        for (let jf = 0; jf < 4; jf++) {
+          const jx = S * (0.2 + jf * 0.2 + (Math.random() - 0.5) * 0.1);
+          const jy = S * (0.3 + (Math.random() - 0.5) * 0.3);
+          const c = col(jf);
+          const bellR = 8 + Math.random() * 6;
+          for (let a = -Math.PI; a < 0; a += 0.06)
+            for (let r = 0; r < bellR; r += 1.5) {
+              const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.7;
+              if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
+              this.splatBlob(x, y, 1.5, (1.0 - r / bellR) * 2.0, c.r, c.g, c.b);
+            }
+          for (let t = 0; t < 3; t++) {
+            let tx = jx + (t - 1) * bellR * 0.4;
+            for (let dy = 0; dy < 18 + Math.random() * 10; dy++) {
+              const wb = Math.sin(dy * 0.2 + t) * 2;
+              this.splatBlob(tx + wb, jy + dy, 1.0, 0.8 / (1 + dy * 0.05), c.r, c.g, c.b);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'fractal-dream': {
+        const rings: [number, number, number][] = [
+          [cx, cy, 30], [cx - 15, cy - 10, 18], [cx + 15, cy + 10, 20],
+          [cx + 8, cy - 15, 12], [cx - 12, cy + 12, 15],
+        ];
+        rings.forEach(([rx, ry, rr], idx) => {
+          const c = col(idx);
+          for (let a = 0; a < Math.PI * 2; a += 0.05)
+            this.splatBlob(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr, 2.5, 1.8, c.r, c.g, c.b);
+        });
+        break;
+      }
+
+      case 'velvet-underground': {
+        const pools: [number, number, number][] = [
+          [0.3, 0.35, 22], [0.65, 0.55, 25], [0.45, 0.70, 20], [0.7, 0.25, 18],
+        ];
+        pools.forEach(([fx, fy, rad], idx) => {
+          const c = col(idx);
+          this.splatBlob(fx * S, fy * S, rad, 4.0, c.r, c.g, c.b);
+        });
+        break;
+      }
+
+      case 'neon-coral-reef': {
+        for (let branch = 0; branch < 6; branch++) {
+          let bx = S * (0.15 + branch * 0.14), by = S * 0.85;
+          const c = col(branch);
+          for (let seg = 0; seg < 50; seg++) {
+            by -= 1.0 + Math.random() * 0.8;
+            bx += (Math.random() - 0.5) * 3;
+            if (bx < 2 || bx >= S - 2 || by < 2) break;
+            this.splatBlob(bx, by, 2 + Math.random() * 2, 2.0, c.r, c.g, c.b);
+            if (Math.random() < 0.15) {
+              let fx = bx, fy = by;
+              const dir = Math.random() < 0.5 ? -1 : 1;
+              for (let s2 = 0; s2 < 15; s2++) {
+                fy -= 0.8 + Math.random() * 0.5;
+                fx += dir * (0.8 + Math.random() * 0.5);
+                if (fx < 2 || fx >= S - 2 || fy < 2) break;
+                this.splatBlob(fx, fy, 1.5, 1.2, c.r, c.g, c.b);
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case 'stardust-collapse': {
+        this.splatBlob(cx, cy, 6, 4.0, 1.0, 1.0, 1.0);
+        const ringR = 30;
+        for (let i = 0; i < 60; i++) {
+          const a = (i / 60) * Math.PI * 2;
+          const r = ringR + (Math.random() - 0.5) * 8;
+          const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+          if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
+          const c = col(i);
+          this.splatBlob(x, y, 1.5 + Math.random() * 1.5, 1.5 + Math.random(), c.r, c.g, c.b);
+          const dx = cx - x, dy = cy - y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          this.addVelocity(Math.floor(x), Math.floor(y), dx / dist * 0.08, dy / dist * 0.08);
+        }
+        for (let i = 0; i < 40; i++) {
+          const a = Math.random() * Math.PI * 2, d = 5 + Math.random() * 45;
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + Math.random() * 0.8, 0.3 + Math.random() * 0.5, 1, 1, 1);
+        }
+        for (let j = 2; j < S - 2; j += 3)
+          for (let i = 2; i < S - 2; i += 3) {
+            const dx = i - cx, dy = j - cy, dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 2 || dist > 50) continue;
+            const spd = 0.06 / (1 + dist * 0.02);
+            this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
+          }
+        break;
+      }
+
+      default: {
+        for (let i = 0; i < 5; i++) {
+          const c = col(i);
+          this.splatBlob(10 + Math.random() * (S - 20), 10 + Math.random() * (S - 20), 15, 2.0, c.r, c.g, c.b);
+        }
+        break;
+      }
+    }
+
+    return harmony;
+  }
+
   applySquish(x: number, y: number, radius: number, amount: number) {
     const r2 = radius * radius;
     for (let i = -radius; i <= radius; i++) {
@@ -190,6 +536,80 @@ class FluidSimulation {
           this.densityG[idx] *= 0.8;
           this.densityB[idx] *= 0.8;
         }
+      }
+    }
+  }
+
+  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number) {
+    const S = this.size;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    switch (style) {
+      case 'spray': {
+        const sprayR = 8 + energy * 5;
+        const count = 8 + Math.floor(energy * 8);
+        for (let p = 0; p < count; p++) {
+          const a = Math.random() * Math.PI * 2, d = Math.random() * sprayR;
+          const px = Math.floor(x + Math.cos(a) * d), py = Math.floor(y + Math.sin(a) * d);
+          if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
+          this.addDensity(px, py, amount * (1 - d / sprayR) * 0.25, r, g, b);
+        }
+        break;
+      }
+      case 'splatter': {
+        const count = 3 + Math.floor(energy * 4);
+        for (let p = 0; p < count; p++) {
+          const a = Math.random() * Math.PI * 2;
+          const fling = 2 + Math.random() * (10 + energy * 8);
+          const px = Math.floor(x + Math.cos(a) * fling), py = Math.floor(y + Math.sin(a) * fling);
+          if (px < 2 || px >= S - 2 || py < 2 || py >= S - 2) continue;
+          const dropR = 1 + Math.floor(Math.random() * 2);
+          for (let ddy = -dropR; ddy <= dropR; ddy++)
+            for (let ddx = -dropR; ddx <= dropR; ddx++) {
+              const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+              if (dd > dropR) continue;
+              const nx = clamp(px + ddx, 1, S - 2), ny = clamp(py + ddy, 1, S - 2);
+              this.addDensity(nx, ny, amount * (1 - dd / dropR) * 0.6, r, g, b);
+            }
+          this.addVelocity(px, py, Math.cos(a) * (0.3 + energy * 0.5), Math.sin(a) * (0.3 + energy * 0.5));
+        }
+        break;
+      }
+      case 'pour': {
+        const pourR = 3 + Math.floor(energy * 2);
+        for (let ddy = -pourR; ddy <= pourR; ddy++)
+          for (let ddx = -pourR; ddx <= pourR; ddx++) {
+            const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (dd > pourR) continue;
+            const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
+            const w = Math.pow(1 - dd / pourR, 1.5);
+            this.addDensity(nx, ny, amount * 1.3 * w, r, g, b);
+            this.addVelocity(nx, ny, 0, 0.1 * w);
+          }
+        break;
+      }
+      case 'streak': {
+        const a = Math.random() * Math.PI * 2;
+        const len = 5 + Math.floor(energy * 10);
+        const dx = Math.cos(a), dy = Math.sin(a);
+        for (let t = -len; t <= len; t += 0.8) {
+          const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
+          if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
+          const w = 1.0 - Math.abs(t) / len;
+          this.addDensity(sx, sy, amount * 0.35 * w, r, g, b);
+          this.addVelocity(sx, sy, dx * 0.2 * w, dy * 0.2 * w);
+        }
+        break;
+      }
+      default: { // drop
+        const dropR = 3;
+        for (let ddy = -dropR; ddy <= dropR; ddy++)
+          for (let ddx = -dropR; ddx <= dropR; ddx++) {
+            const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (dd > dropR) continue;
+            const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
+            this.addDensity(nx, ny, amount * Math.pow(1 - dd / dropR, 2), r, g, b);
+          }
+        break;
       }
     }
   }
@@ -273,10 +693,17 @@ class FluidSimulation {
     this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
 
-    // 7. Immiscibility & fingering — reduced to prevent rapid boundary motion
-    const surfaceTension = (settings.polarity || 0) * 0.04;
+    // 6.5. Multi-octave curl turbulence — detail at every scale
+    const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
+    this.applyCurlTurbulence(settings.turbulenceScale ?? 0, turbDetail, time, noise2D);
+
+    // 7. Immiscibility & fingering — blobSurfaceTension trades cohesion for shear.
+    // Low tension: weak cohesion + strong fingering → amoeba-like elongation and pinching.
+    // High tension: strong cohesion + weak fingering → rounder, self-contained blobs.
+    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
+    const surfaceTension = (settings.polarity || 0) * 0.04 * (0.4 + tension * 1.2);
     this.applyImmiscibility(surfaceTension, time, noise2D);
-    const fingeringStrength = (settings.polarity || 0) * 0.15;
+    const fingeringStrength = (settings.polarity || 0) * 0.15 * (0.4 + (1 - tension) * 1.8);
     if (fingeringStrength > 0) this.applyFingering(fingeringStrength, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
@@ -329,8 +756,6 @@ class FluidSimulation {
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
 
-    // 11. Insects
-    this.stepInsects(audioData);
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -602,318 +1027,30 @@ class FluidSimulation {
     }
   }
 
-  deployInsect(type: string) {
-    if (this.insects.length >= 20) return;
-    // Find a position with some fluid; fall back to random
-    let x = -1, y = -1;
-    // Visible grid region: center ± ~42 cells in x, ± ~24 cells in y (for typical 16:9 screen)
-    const vx0 = 22, vx1 = 106, vy0 = 38, vy1 = 90;
-    for (let t = 0; t < 30; t++) {
-      const tx = Math.floor(vx0 + Math.random() * (vx1 - vx0));
-      const ty = Math.floor(vy0 + Math.random() * (vy1 - vy0));
-      if (this.density[tx + ty * this.size] > 0.03) { x = tx; y = ty; break; }
-    }
-    if (x < 0) { x = Math.floor(vx0 + Math.random() * (vx1 - vx0)); y = Math.floor(vy0 + Math.random() * (vy1 - vy0)); }
-    const angle = Math.random() * Math.PI * 2;
-    // Normal distribution size via Box-Muller: mean=1.0, std=0.35, clamped [0.4, 2.2]
-    const u1 = Math.random(), u2 = Math.random();
-    const z = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
-    const size = Math.max(0.4, Math.min(2.2, 1.0 + z * 0.35));
-    const baseLife = type === 'ant' ? 2800 : type === 'butterfly' ? 1800 : type === 'beetle' ? 3000 : type === 'minnow' ? 2200 : type === 'crab' ? 2600 : 1400;
-    const maxLife = Math.round(baseLife * size);
-    const initState = type === 'water_strider' ? 'glide' : type === 'beetle' ? 'walking' : type === 'crab' ? 'walking' : 'active';
-    this.insects.push({ type, x, y, vx: Math.cos(angle) * 0.03, vy: Math.sin(angle) * 0.03,
-      angle, life: 0, maxLife, stateTimer: 0, state: initState, strength: 1.0, size });
-  }
-
-  private stepInsects(audioData: AudioData | null) {
-    // Normalize audio bands to 0–1 range (raw values are 0–100 scale)
-    const bass    = audioData ? Math.min(1, audioData.bass    / 80) : 0;
-    const mid     = audioData ? Math.min(1, audioData.mid     / 80) : 0;
-    const treble  = audioData ? Math.min(1, audioData.treble  / 80) : 0;
-    const energy  = audioData ? Math.min(1, audioData.energy  / 80) : 0;
-    const volume  = audioData ? Math.min(1, audioData.volume  / 80) : 0;
-
-    for (let i = this.insects.length - 1; i >= 0; i--) {
-      const ins = this.insects[i];
-      ins.life++;
-      ins.stateTimer++;
-      if (ins.life >= ins.maxLife || ins.x < 2 || ins.x >= this.size - 2 || ins.y < 2 || ins.y >= this.size - 2) {
-        this.insects.splice(i, 1); continue;
-      }
-      // Weaken in last 30% of life
-      ins.strength = ins.life / ins.maxLife > 0.7 ? Math.max(0, 1 - (ins.life / ins.maxLife - 0.7) / 0.3) : 1.0;
-
-      const ix = Math.floor(ins.x), iy = Math.floor(ins.y);
-      const safe = ix > 0 && ix < this.size - 1 && iy > 0 && iy < this.size - 1;
-
-      // Fluid carries insect — stronger influence so insects are swept by currents they create
-      if (safe) {
-        const fi = ix + iy * this.size;
-        ins.vx += this.vx[fi] * 0.18;
-        ins.vy += this.vy[fi] * 0.18;
-      }
-
-      const perp = (a: number) => ({ px: -Math.sin(a), py: Math.cos(a) });
-
-      if (ins.type === 'water_strider') {
-        const sz = ins.size;
-        if (bass > 0.65 && ins.state !== 'burst') { ins.state = 'burst'; ins.stateTimer = 0; }
-        if (ins.state === 'burst') {
-          const speed = 0.20 / Math.sqrt(sz) * (1 + bass * 0.7);
-          ins.vx = ins.vx * 0.80 + Math.cos(ins.angle) * speed * 0.20;
-          ins.vy = ins.vy * 0.80 + Math.sin(ins.angle) * speed * 0.20;
-          if (ins.stateTimer > 18) { ins.state = 'glide'; ins.stateTimer = 0; }
-        } else {
-          // Slow glide with gentle lateral zigzag — surface-skimming S-curve
-          ins.angle += Math.sin(ins.life * 0.06) * 0.025 * (1 + mid * 0.5);
-          const speed = 0.05 / Math.sqrt(sz) * (1 + mid * 0.3);
-          ins.vx = ins.vx * 0.94 + Math.cos(ins.angle) * speed * 0.06;
-          ins.vy = ins.vy * 0.94 + Math.sin(ins.angle) * speed * 0.06;
-          if (ins.stateTimer > 100 + Math.random() * 120) {
-            ins.state = Math.random() < 0.12 ? 'burst' : 'glide';
-            ins.angle += (Math.random() - 0.5) * (0.6 + energy * 0.5);
-            ins.stateTimer = 0;
-          }
-        }
-        // Four leg dimples — radius scales with size
-        const { px, py } = perp(ins.angle);
-        const fwd = { x: Math.cos(ins.angle), y: Math.sin(ins.angle) };
-        const legR = 2.8 * sz;
-        const legs = [
-          { lx: ins.x + px * legR + fwd.x * 1.2 * sz, ly: ins.y + py * legR + fwd.y * 1.2 * sz },
-          { lx: ins.x + px * legR - fwd.x * 1.2 * sz, ly: ins.y + py * legR - fwd.y * 1.2 * sz },
-          { lx: ins.x - px * legR + fwd.x * 1.2 * sz, ly: ins.y - py * legR + fwd.y * 1.2 * sz },
-          { lx: ins.x - px * legR - fwd.x * 1.2 * sz, ly: ins.y - py * legR - fwd.y * 1.2 * sz },
-        ];
-        for (const leg of legs) {
-          const lx = Math.floor(leg.lx), ly = Math.floor(leg.ly);
-          if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
-            const dx = leg.lx - ins.x, dy = leg.ly - ins.y;
-            const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const f = 1.0 * sz * ins.strength * (ins.state === 'burst' ? 4.5 + bass * 3 : 1.2 + mid * 0.8);
-            this.addVelocity(lx, ly, (dx / d) * f, (dy / d) * f);
-          }
-        }
-
-      } else if (ins.type === 'ant') {
-        const sz = ins.size;
-        // Lateral body weave while marching — ants rarely go perfectly straight
-        ins.angle += Math.sin(ins.life * 0.12) * 0.018 + (Math.random() - 0.5) * 0.008;
-        const pace = 0.04 / Math.sqrt(sz) * (1 + mid * 0.5);
-        ins.vx = ins.vx * 0.91 + Math.cos(ins.angle) * pace * 0.09;
-        ins.vy = ins.vy * 0.91 + Math.sin(ins.angle) * pace * 0.09;
-        // Deliberate ~90° turns, occasionally a U-turn
-        if (ins.stateTimer > 150 + Math.random() * 120) {
-          const turns = [-Math.PI * 0.5, -Math.PI * 0.45, Math.PI * 0.45, Math.PI * 0.5, Math.PI * 0.95];
-          ins.angle += turns[Math.floor(Math.random() * turns.length)] * (1 + energy * 0.25);
-          ins.stateTimer = 0;
-        }
-        // Six-legged alternating footfall every 10 frames — radius scales with size
-        if (ins.life % 10 === 0 && safe) {
-          const { px, py } = perp(ins.angle);
-          const side = ins.life % 20 < 10 ? 1 : -1;
-          for (let leg = -1; leg <= 1; leg++) {
-            for (let reach = 1; reach <= 2; reach++) {
-              const lx = Math.floor(ins.x + px * side * reach * 1.3 * sz + Math.cos(ins.angle) * leg * sz);
-              const ly = Math.floor(ins.y + py * side * reach * 1.3 * sz + Math.sin(ins.angle) * leg * sz);
-              if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
-                const footF = (0.5 + bass * 0.7) * sz * (1 / reach);
-                this.addVelocity(lx, ly, Math.cos(ins.angle) * footF, Math.sin(ins.angle) * footF);
-              }
-            }
-          }
-        }
-
-      } else if (ins.type === 'butterfly') {
-        const sz = ins.size;
-        const agitation = treble * 1.0 + energy * 0.4;
-        // Compound winding path: slow sine oscillation + occasional random drift
-        ins.angle += Math.sin(ins.life * 0.018) * 0.05 + Math.cos(ins.life * 0.031) * 0.025
-                   + (Math.random() - 0.5) * (0.04 + agitation * 0.06);
-        const driftSpd = 0.025 / Math.sqrt(sz) * (1 + agitation * 0.4) * ins.strength;
-        ins.vx = ins.vx * 0.95 + Math.cos(ins.angle) * driftSpd * 0.05;
-        ins.vy = ins.vy * 0.95 + Math.sin(ins.angle) * driftSpd * 0.05;
-        // Wing flap — interval and wing span scale with size
-        const flapInterval = Math.max(12, Math.floor(22 - treble * 10));
-        if (ins.stateTimer % flapInterval < 4 && ins.strength > 0.05) {
-          const leftWing = Math.floor(ins.stateTimer / flapInterval) % 2 === 0;
-          const { px, py } = perp(ins.angle);
-          const sx = leftWing ? 1 : -1;
-          const wingR = Math.max(3, Math.floor(9 * ins.strength * sz));
-          for (let w = 1; w <= wingR; w++) {
-            const wx = Math.floor(ins.x + px * sx * w);
-            const wy = Math.floor(ins.y + py * sx * w);
-            if (wx > 0 && wx < this.size - 1 && wy > 0 && wy < this.size - 1) {
-              const f = (1.8 + agitation * 1.2) * sz * ins.strength * (1 - w / wingR);
-              this.addVelocity(wx, wy, px * sx * f - Math.cos(ins.angle) * f * 0.3,
-                                       py * sx * f - Math.sin(ins.angle) * f * 0.3);
-            }
-          }
-        }
-
-      } else if (ins.type === 'beetle') {
-        // Very slow heavy plow; long stops, bass kicks it into motion
-        if (ins.state === 'stopped') {
-          if (bass > 0.55 || ins.stateTimer > 120 + Math.random() * 150) { ins.state = 'walking'; ins.stateTimer = 0; }
-        } else {
-          const sz = ins.size;
-          // Slow heavy plow with slight heading wobble — beetles weave slightly
-          ins.angle += Math.sin(ins.life * 0.08) * 0.012 + (Math.random() - 0.5) * 0.005;
-          const plowSpeed = 0.016 / Math.sqrt(sz) * (1 + volume * 0.4);
-          ins.vx = ins.vx * 0.96 + Math.cos(ins.angle) * plowSpeed * 0.04;
-          ins.vy = ins.vy * 0.96 + Math.sin(ins.angle) * plowSpeed * 0.04;
-          if (ins.stateTimer > 220 + Math.random() * 160) {
-            ins.state = Math.random() < 0.4 ? 'stopped' : 'walking';
-            ins.angle += (Math.random() - 0.5) * (0.55 + bass * 0.6);
-            ins.stateTimer = 0;
-          }
-          // Large multi-reach bow wave — scales with size
-          const plowF = (2.0 + volume * 2.0) * sz;
-          for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
-            const bx = Math.floor(ins.x + Math.cos(ins.angle) * (reach + 1));
-            const by = Math.floor(ins.y + Math.sin(ins.angle) * (reach + 1));
-            if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1)
-              this.addVelocity(bx, by, Math.cos(ins.angle) * plowF / reach, Math.sin(ins.angle) * plowF / reach);
-          }
-          // Wide flank displacement — scales with size
-          const { px, py } = perp(ins.angle);
-          for (const s of [-1, 1]) {
-            for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
-              const sx2 = Math.floor(ins.x + px * s * reach * 1.5 * sz);
-              const sy2 = Math.floor(ins.y + py * s * reach * 1.5 * sz);
-              if (sx2 > 0 && sx2 < this.size - 1 && sy2 > 0 && sy2 < this.size - 1)
-                this.addVelocity(sx2, sy2, px * s * (1.2 + volume * 1.2) * sz / reach, py * s * (1.2 + volume * 1.2) * sz / reach);
-            }
-          }
-        }
-
-      } else if (ins.type === 'fly') {
-        const sz = ins.size;
-        if (ins.state === 'active') {
-          // Dart with slight angle jitter mid-flight — flies don't go perfectly straight
-          ins.angle += (Math.random() - 0.5) * 0.08;
-          const dashSpd = 0.12 / Math.sqrt(sz) * (1 + energy * 0.7 + treble * 0.4);
-          ins.vx = ins.vx * 0.83 + Math.cos(ins.angle) * dashSpd * 0.17;
-          ins.vy = ins.vy * 0.83 + Math.sin(ins.angle) * dashSpd * 0.17;
-          if (ins.stateTimer > 20 + Math.random() * 30) {
-            ins.state = 'stopped'; ins.stateTimer = 0;
-          }
-        } else {
-          ins.vx *= 0.88;
-          ins.vy *= 0.88;
-          if (safe && ins.life % 4 === 0) {
-            const { px, py } = perp(ins.angle);
-            const buzzF = (0.35 + energy * 0.45) * sz;
-            this.addVelocity(Math.min(this.size-2, ix+1), iy,  px * buzzF,  py * buzzF);
-            this.addVelocity(Math.max(1,            ix-1), iy, -px * buzzF, -py * buzzF);
-            this.addVelocity(ix, Math.min(this.size-2, iy+1),  py * buzzF, -px * buzzF);
-            this.addVelocity(ix, Math.max(1,            iy-1), -py * buzzF,  px * buzzF);
-          }
-          if (ins.stateTimer > 14 + Math.random() * 20) {
-            // Vary the turn amount — sometimes small corrections, sometimes big jumps
-            const turnMag = Math.random() < 0.3 ? Math.PI * (0.8 + Math.random() * 0.6) : (Math.random() - 0.5) * Math.PI * 0.8;
-            ins.angle += turnMag * (1 + treble * 0.6);
-            ins.state = 'active'; ins.stateTimer = 0;
-          }
-        }
-        if (ins.state === 'active' && ins.life % 5 === 0 && safe) {
-          const { px, py } = perp(ins.angle);
-          const swirlF = (0.7 + energy * 0.8) * sz;
-          this.addVelocity(Math.min(this.size - 2, ix + 1), iy,  px * swirlF,  py * swirlF);
-          this.addVelocity(Math.max(1,              ix - 1), iy, -px * swirlF, -py * swirlF);
-          this.addVelocity(ix, Math.min(this.size - 2, iy + 1),  py * swirlF, -px * swirlF);
-          this.addVelocity(ix, Math.max(1,              iy - 1), -py * swirlF,  px * swirlF);
-        }
-
-      } else if (ins.type === 'minnow') {
-        const sz = ins.size;
-        const swimSpeed = 0.09 / Math.sqrt(sz) * (1 + treble * 0.4 + energy * 0.25);
-        // Tight S-curve: two sine waves at different frequencies create complex path
-        ins.angle += Math.sin(ins.life * 0.05) * 0.06 + Math.sin(ins.life * 0.017) * 0.025
-                   + (Math.random() - 0.5) * 0.008;
-        ins.vx = ins.vx * 0.92 + Math.cos(ins.angle) * swimSpeed * 0.08;
-        ins.vy = ins.vy * 0.92 + Math.sin(ins.angle) * swimSpeed * 0.08;
-        if (bass > 0.6 && ins.stateTimer > 50) { ins.angle += (Math.random() - 0.5) * Math.PI * 0.6; ins.stateTimer = 0; }
-        if (ins.life % 5 === 0 && safe) {
-          const { px, py } = perp(ins.angle);
-          const side = ins.life % 10 < 5 ? 1 : -1;
-          const maxTail = Math.round(3 * sz);
-          for (let t = 1; t <= maxTail; t++) {
-            const tailX = Math.floor(ins.x - Math.cos(ins.angle) * (t + 1));
-            const tailY = Math.floor(ins.y - Math.sin(ins.angle) * (t + 1));
-            if (tailX > 0 && tailX < this.size - 1 && tailY > 0 && tailY < this.size - 1) {
-              const f = (1.2 + energy * 1.0) * sz * ins.strength / t;
-              this.addVelocity(tailX, tailY, px * side * f, py * side * f);
-            }
-          }
-          const bowX = Math.floor(ins.x + Math.cos(ins.angle) * 2 * sz);
-          const bowY = Math.floor(ins.y + Math.sin(ins.angle) * 2 * sz);
-          if (bowX > 0 && bowX < this.size - 1 && bowY > 0 && bowY < this.size - 1)
-            this.addVelocity(bowX, bowY, Math.cos(ins.angle) * 0.9 * sz * ins.strength, Math.sin(ins.angle) * 0.9 * sz * ins.strength);
-        }
-
-      } else if (ins.type === 'crab') {
-        // Very slow sideways scuttle; big radial pinch claws on bass
-        if (ins.state === 'pinching') {
-          // Radial outward burst — large radius pinch claw attack
-          if (ins.stateTimer < 5 && safe) {
-            const sz = ins.size;
-            const pR = Math.round(5 * sz);
-            for (let pr = -pR; pr <= pR; pr++) {
-              for (let pc = -pR; pc <= pR; pc++) {
-                const dist = Math.sqrt(pr * pr + pc * pc);
-                if (dist < 1 || dist > pR) continue;
-                const bx = Math.floor(ins.x) + pc, by = Math.floor(ins.y) + pr;
-                if (bx > 0 && bx < this.size - 1 && by > 0 && by < this.size - 1) {
-                  const f = (2.2 + volume * 1.8) * sz * ins.strength * (1 - dist / pR);
-                  this.addVelocity(bx, by, (pc / dist) * f, (pr / dist) * f);
-                }
-              }
-            }
-          }
-          if (ins.stateTimer > 60) { ins.state = 'walking'; ins.stateTimer = 0; }
-        } else {
-          const sz = ins.size;
-          const { px, py } = perp(ins.angle);
-          // Slow lateral scuttle with a slight forward/back wobble added
-          ins.angle += Math.sin(ins.life * 0.04) * 0.01;
-          const sideDir = ins.life % 600 < 300 ? 1 : -1;
-          const sideSpeed = 0.035 / Math.sqrt(sz) * (1 + mid * 0.35) * sideDir;
-          ins.vx = ins.vx * 0.94 + px * sideSpeed * 0.06;
-          ins.vy = ins.vy * 0.94 + py * sideSpeed * 0.06;
-          if (ins.stateTimer > 250 + Math.random() * 200) {
-            ins.angle += (Math.random() - 0.5) * Math.PI * 0.4;
-            ins.stateTimer = 0;
-          }
-          if ((bass > 0.65 || Math.random() < 0.001) && ins.stateTimer > 80) {
-            ins.state = 'pinching'; ins.stateTimer = 0;
-          }
-          if (ins.life % 12 === 0 && safe) {
-            const legSide = ins.life % 24 < 12 ? 1 : -1;
-            const maxLeg = Math.round(2 * sz);
-            for (let leg = -maxLeg; leg <= maxLeg; leg++) {
-              for (let reach = 1; reach <= Math.round(3 * sz); reach++) {
-                const lx = Math.floor(ins.x + px * legSide * reach * 1.4 * sz + Math.cos(ins.angle) * leg);
-                const ly = Math.floor(ins.y + py * legSide * reach * 1.4 * sz + Math.sin(ins.angle) * leg);
-                if (lx > 0 && lx < this.size - 1 && ly > 0 && ly < this.size - 1) {
-                  const legF = (0.6 + volume * 0.5) * sz / reach;
-                  this.addVelocity(lx, ly, px * legSide * legF, py * legSide * legF);
-                }
-              }
-            }
-          }
+  // Multi-octave curl noise — turbulence at several scales simultaneously.
+  // Octave 0 is a low-frequency swirl that moves whole blobs; higher octaves
+  // add ripples, filament trails and satellite droplets at lower amplitude.
+  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
+    if (scale <= 0.005) return;
+    const step = 2;
+    const eps = 0.75; // finite-difference offset in grid cells
+    for (let o = 0; o < octaves; o++) {
+      const freq = 0.012 * (1 << o);           // 0.012, 0.024, 0.048, 0.096
+      const amp = scale * 0.010 * Math.pow(0.55, o);
+      const tOff = time * (0.06 + o * 0.05) + o * 37.7;
+      for (let j = 1; j < this.size - 1; j += step) {
+        for (let i = 1; i < this.size - 1; i += step) {
+          const idx = i + j * this.size;
+          const d = this.density[idx];
+          if (d < 0.02) continue;
+          // Curl of scalar noise field: v = (dn/dy, -dn/dx) — divergence-free
+          const dn_dx = noise2D((i + eps) * freq, j * freq + tOff) - noise2D((i - eps) * freq, j * freq + tOff);
+          const dn_dy = noise2D(i * freq, (j + eps) * freq + tOff) - noise2D(i * freq, (j - eps) * freq + tOff);
+          const m = amp * Math.min(1.5, d);
+          this.vx[idx] +=  dn_dy * m;
+          this.vy[idx] += -dn_dx * m;
         }
       }
-
-
-      // Clamp speed — scale inversely with size so large insects move slower
-      const baseMaxSpd = ins.type === 'fly' ? 0.18 : ins.type === 'water_strider' ? 0.22 : ins.type === 'minnow' ? 0.14 : ins.type === 'ant' ? 0.08 : ins.type === 'beetle' ? 0.035 : ins.type === 'crab' ? 0.06 : ins.type === 'butterfly' ? 0.06 : 0.10;
-      const maxSpd = baseMaxSpd / Math.sqrt(ins.size);
-      const spd = Math.sqrt(ins.vx * ins.vx + ins.vy * ins.vy);
-      if (spd > maxSpd) { ins.vx = ins.vx / spd * maxSpd; ins.vy = ins.vy / spd * maxSpd; }
-      ins.x += ins.vx;
-      ins.y += ins.vy;
     }
   }
 
@@ -964,6 +1101,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastDrainTrigger = useRef(drainTrigger);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   const harmonyRef = useRef(pickHarmony());
+  const injectStyleRef = useRef<string[]>(['drop']);
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
 
@@ -977,16 +1115,95 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const isActiveRef = useRef(isActive);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
 
   useImperativeHandle(ref, () => ({
-    deployInsect: (type: string) => {
-      fluidsRef.current[0]?.deployInsect(type);
-    },
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
+    },
+    applyPreset: (presetId: string) => {
+      for (const fluid of fluidsRef.current) fluid.clearAll();
+      rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+      const fluid = fluidsRef.current[0];
+      if (fluid) {
+        harmonyRef.current = fluid.seedPreset(presetId, noise2D);
+      }
+      injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+      drainFrameRef.current = 0;
+    },
+    setInjectStyle: (styles: string[]) => {
+      injectStyleRef.current = styles;
+    },
+    setHarmony: (indices: number[]) => {
+      if (indices.length > 0 && indices.every(i => i >= 0 && i < PALETTE_COUNT)) {
+        harmonyRef.current = indices;
+      }
+    },
+    triggerTheme: (theme: string, energy = 0.6) => {
+      const af = fluidsRef.current[activeLayerRef.current];
+      if (!af || drainFrameRef.current > 0) return;
+      const S = GRID_SIZE;
+      const rx = () => Math.floor(S * 0.2 + Math.random() * S * 0.6);
+      const pick = (idxs: number[]) => PALETTE_RGB[idxs[Math.floor(Math.random() * idxs.length)]];
+      const amt = 4 + energy * 8;
+
+      switch (theme) {
+        case 'fire': { // warm palette, low placement, heat drives it upward
+          const c = pick([0, 1, 3]);
+          const x = rx(), y = Math.floor(S * 0.75);
+          af.autoInject('splatter', x, y, amt, c.r, c.g, c.b, energy);
+          af.addTemp(x, y, 3 + energy * 4);
+          break;
+        }
+        case 'water': { // cool palette pours downward from the top
+          const c = pick([7, 8, 9]);
+          const x = rx(), y = Math.floor(S * 0.2);
+          af.autoInject('pour', x, y, amt, c.r, c.g, c.b, energy);
+          for (let d = 0; d < 10; d++) af.addVelocity(x, Math.min(S - 2, y + d), 0, 0.08);
+          break;
+        }
+        case 'sky': { // icy blue + white mist high in the frame
+          const c = pick([7, 15]);
+          af.autoInject('spray', rx(), Math.floor(S * 0.25), amt, c.r, c.g, c.b, energy);
+          break;
+        }
+        case 'earth': { // heavy warm browns settle low
+          const c = pick([12, 13, 1]);
+          af.autoInject('pour', rx(), Math.floor(S * 0.8), amt, c.r, c.g, c.b, energy * 0.6);
+          break;
+        }
+        case 'love': { // pink bloom from the center
+          const c = pick([2, 11]);
+          af.autoInject('drop', Math.floor(S / 2), Math.floor(S / 2), amt * 1.2, c.r, c.g, c.b, energy);
+          af.addTemp(Math.floor(S / 2), Math.floor(S / 2), 1.5);
+          break;
+        }
+        case 'dark': { // ink splatter
+          const c = pick([14, 4]);
+          af.autoInject('splatter', rx(), rx(), amt, c.r * 0.4, c.g * 0.4, c.b * 0.4, energy);
+          break;
+        }
+        case 'light': { // white-gold radial burst
+          const c = pick([15, 0]);
+          const x = Math.floor(S / 2), y = Math.floor(S / 2);
+          af.autoInject('drop', x, y, amt, c.r, c.g, c.b, energy);
+          af.applyRadialImpulse(x, y, 20, 0.3 + energy * 0.4);
+          af.addTemp(x, y, 2 + energy * 2);
+          break;
+        }
+        case 'motion': { // fast streaks in the current harmony
+          const c = harmonyColor(harmonyRef.current);
+          af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3));
+          break;
+        }
+        default: {
+          const c = harmonyColor(harmonyRef.current);
+          af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
+        }
+      }
     },
   }));
 
@@ -1006,28 +1223,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       for (let i = currentCount; i < targetCount; i++) {
         const fluid = new FluidSimulation(GRID_SIZE, settings.diffusionRate, 0.0001, 0.01);
         if (i === 0) {
-          // Seed with large overlapping blobs that already fill the canvas —
-          // Hele-Shaw initial state: multiple immiscible fluids in contact.
-          const positions: [number, number][] = [
-            [0.22, 0.22], [0.78, 0.22], [0.50, 0.50],
-            [0.22, 0.78], [0.78, 0.78], [0.35, 0.50], [0.65, 0.50],
-          ];
-          positions.forEach(([fx, fy], idx) => {
-            const cx = Math.floor(fx * GRID_SIZE);
-            const cy = Math.floor(fy * GRID_SIZE);
-            const color = PALETTE_RGB[harmonyRef.current[idx % harmonyRef.current.length]];
-            const blobR = 20;
-            for (let dy = -blobR; dy <= blobR; dy++) {
-              for (let dx = -blobR; dx <= blobR; dx++) {
-                const dist2 = dx * dx + dy * dy;
-                if (dist2 > blobR * blobR) continue;
-                const nx = cx + dx, ny = cy + dy;
-                if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                const w = (1 - Math.sqrt(dist2) / blobR) ** 2;
-                fluid.addDensity(nx, ny, 2.0 * w, color.r, color.g, color.b);
-              }
-            }
-          });
+          // Seed initial preset pattern
+          harmonyRef.current = fluid.seedPreset('classic', noise2D);
         }
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
@@ -1060,7 +1257,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (!canvas) return;
 
     // ── WebGL2 initialization ──────────────────────────────────────────
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false }) as WebGL2RenderingContext | null;
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
     if (!gl) { console.error('WebGL2 not supported'); return; }
 
     const vertSrc = `#version 300 es
@@ -1090,6 +1287,10 @@ uniform int u_ledMode;
 uniform vec3 u_ledColor;
 uniform float u_ledAngle;
 uniform float u_time;
+uniform float u_glossiness;        // specular intensity, 0 = flat backlit dye
+uniform float u_saturation;        // final grade saturation multiplier
+uniform float u_boundaryContrast;  // bright interface line between dye colors
+uniform float u_postBlur;          // gooey blur radius multiplier
 
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
@@ -1225,8 +1426,11 @@ vec3 sobelNormal(sampler2D tex, vec2 fuv) {
   return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
 }
 
-// Blinn-Phong + Fresnel shading
+// Blinn-Phong + Fresnel shading, gated by u_glossiness.
+// At glossiness 0 the dye renders as flat, evenly-lit matte color —
+// the projected-light-show look — with no glass-sphere highlight dots.
 vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
+  if (u_glossiness < 0.005) return color;
   vec3 L = normalize(vec3(-0.577, -0.577, 0.577));
   vec3 V = vec3(0.0, 0.0, 1.0);
   vec3 H = normalize(L + V);
@@ -1238,13 +1442,34 @@ vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
   float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
   float specularTotal = specular + fresnel * 0.12;
 
+  vec3 lit;
   if (darkBlend) {
     float lf = 0.6 + 0.4 * diffuse;
-    return color * lf;
+    lit = color * lf;
   } else {
     float lf = 0.5 + 0.5 * diffuse;
-    return color * lf + specularTotal;
+    lit = color * lf + specularTotal;
   }
+  return mix(color, lit, u_glossiness);
+}
+
+// Bright thin interface line where two distinct dye colors meet —
+// fakes the oil-water boundary glow without a multi-fluid solve.
+float boundaryEdge(sampler2D tex, vec2 fuv) {
+  vec4 cC = decodeFluid(tex, fuv, 0.0, false);
+  if (cC.a < 0.03) return 0.0;
+  float e = TEX_STEP * 0.55;
+  vec4 cR = decodeFluid(tex, fuv + vec2( e, 0.0), 0.0, false);
+  vec4 cL = decodeFluid(tex, fuv + vec2(-e, 0.0), 0.0, false);
+  vec4 cT = decodeFluid(tex, fuv + vec2(0.0,  e), 0.0, false);
+  vec4 cB = decodeFluid(tex, fuv + vec2(0.0, -e), 0.0, false);
+  // Only count chroma difference where dye exists on both sides (interface,
+  // not the outer silhouette of a blob against empty glass).
+  float maskX = min(cR.a, cL.a);
+  float maskY = min(cT.a, cB.a);
+  float diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
+  float diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
+  return smoothstep(0.12, 0.75, diffX + diffY);
 }
 
 // Blend mode functions
@@ -1316,9 +1541,11 @@ void main() {
   }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
+  // u_postBlur scales the legacy gooey blur; defaults well below 1.0 so
+  // fine turbulent structure survives to the screen.
   float fluidScale = max(u_resolution.x, u_resolution.y) * 1.5 / 128.0;
-  float blurFluid = u_gooey * 10.0 / (fluidScale * 128.0);
-  bool useBlur = u_gooey > 0.01;
+  float blurFluid = u_gooey * u_postBlur * 10.0 / (fluidScale * 128.0);
+  bool useBlur = u_gooey * u_postBlur > 0.01;
 
   // ── Layer 0 ──────────────────────────────────────────────────────
   float c0 = cos(-u_rotation0), s0 = sin(-u_rotation0);
@@ -1336,6 +1563,12 @@ void main() {
   vec3 normal0 = sobelNormal(u_layer0, fuv0);
   fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend);
   if (darkBlend) fluid0.a *= 0.6;
+
+  // Bright interface line where dye colors meet
+  if (u_boundaryContrast > 0.005 && fluid0.a > 0.03) {
+    float edge0 = boundaryEdge(u_layer0, fuv0);
+    fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
+  }
 
   vec3 outColor = bgColor;
   outColor = mix(outColor, fluid0.rgb, fluid0.a);
@@ -1356,9 +1589,18 @@ void main() {
     fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend);
     if (darkBlend) fluid1.a *= 0.6;
 
+    if (u_boundaryContrast > 0.005 && fluid1.a > 0.03) {
+      float edge1 = boundaryEdge(u_layer1, fuv1);
+      fluid1.rgb += fluid1.rgb * edge1 * u_boundaryContrast * 1.6 + vec3(edge1 * u_boundaryContrast * 0.25);
+    }
+
     vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
     outColor = mix(outColor, blended, fluid1.a);
   }
+
+  // ── Saturation grade ──────────────────────────────────────────────
+  float luma = dot(outColor, vec3(0.299, 0.587, 0.114));
+  outColor = clamp(mix(vec3(luma), outColor, u_saturation), 0.0, 1.0);
 
   // ── Film grain ────────────────────────────────────────────────────
   float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.035;
@@ -1427,6 +1669,7 @@ void main() {
       'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1',
       'u_resolution','u_gooey','u_darkBlend','u_blendMode',
       'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
+      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -1457,6 +1700,7 @@ void main() {
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
+      lastMousePosRef.current = { ...mousePosRef.current };
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       if (!activeFluid) return;
@@ -1534,42 +1778,63 @@ void main() {
           harmonyRef.current = pickHarmony(); // fresh palette after drain
         }
         if (drainFrameRef.current > 0) {
-          const DRAIN_FRAMES = 55;
+          const DRAIN_FRAMES = 50;
           const frame = drainFrameRef.current;
-          const t = frame / DRAIN_FRAMES; // 0→1 over animation
-          // Ease-in power so the pull accelerates
-          const pull = Math.pow(t, 0.6) * 3.5;
-          const cx = GRID_SIZE / 2, cy = GRID_SIZE / 2;
+          const t = frame / DRAIN_FRAMES;
+          const pull = Math.pow(t, 0.4) * 4.0;
+          const dcx = GRID_SIZE / 2, dcy = GRID_SIZE / 2;
+
           for (const af of fluidsRef.current) {
+            // 1. Set drain velocity field (inward spiral)
             for (let j = 1; j < GRID_SIZE - 1; j++) {
               for (let i = 1; i < GRID_SIZE - 1; i++) {
                 const idx = i + j * GRID_SIZE;
-                if (af.density[idx] < 0.001) continue;
-                const dx = cx - i, dy = cy - j;
+                const dx = dcx - i, dy = dcy - j;
                 const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                // Inward pull (centripetal) + clockwise swirl (tangential)
-                const inward = pull * (1 + (1 - t) * 0.4);
-                const swirl  = pull * 0.9 * (1 - t * 0.3);
-                af.vx[idx] += (dx / dist) * inward + (-dy / dist) * swirl;
-                af.vy[idx] += (dy / dist) * inward + ( dx / dist) * swirl;
-                // Accelerate evaporation near end of animation
-                if (t > 0.55) {
-                  const evapRate = (t - 0.55) / 0.45 * 0.25;
-                  af.density[idx]  *= (1 - evapRate);
-                  af.densityR[idx] *= (1 - evapRate);
-                  af.densityG[idx] *= (1 - evapRate);
-                  af.densityB[idx] *= (1 - evapRate);
-                }
+                const inward = pull * (1 + dist / 50);
+                const swirl = pull * 0.7 * (1 - t * 0.5);
+                af.vx[idx] = (dx / dist) * inward + (-dy / dist) * swirl;
+                af.vy[idx] = (dy / dist) * inward + ( dx / dist) * swirl;
               }
             }
+
+            // 2. Semi-lagrangian advection (backtrace through drain velocity)
+            af.s.set(af.density);
+            af.sR.set(af.densityR);
+            af.sG.set(af.densityG);
+            af.sB.set(af.densityB);
+
+            for (let j = 1; j < GRID_SIZE - 1; j++) {
+              for (let i = 1; i < GRID_SIZE - 1; i++) {
+                const idx = i + j * GRID_SIZE;
+                const srcX = Math.max(1, Math.min(GRID_SIZE - 2, i - af.vx[idx] * 0.3));
+                const srcY = Math.max(1, Math.min(GRID_SIZE - 2, j - af.vy[idx] * 0.3));
+                const i0 = Math.floor(srcX), j0 = Math.floor(srcY);
+                const i1 = Math.min(GRID_SIZE - 2, i0 + 1), j1 = Math.min(GRID_SIZE - 2, j0 + 1);
+                const sx = srcX - i0, sy = srcY - j0;
+                const w00 = (1 - sx) * (1 - sy), w10 = sx * (1 - sy), w01 = (1 - sx) * sy, w11 = sx * sy;
+                const idx00 = i0 + j0 * GRID_SIZE, idx10 = i1 + j0 * GRID_SIZE;
+                const idx01 = i0 + j1 * GRID_SIZE, idx11 = i1 + j1 * GRID_SIZE;
+                af.density[idx]  = af.s[idx00]  * w00 + af.s[idx10]  * w10 + af.s[idx01]  * w01 + af.s[idx11]  * w11;
+                af.densityR[idx] = af.sR[idx00] * w00 + af.sR[idx10] * w10 + af.sR[idx01] * w01 + af.sR[idx11] * w11;
+                af.densityG[idx] = af.sG[idx00] * w00 + af.sG[idx10] * w10 + af.sG[idx01] * w01 + af.sG[idx11] * w11;
+                af.densityB[idx] = af.sB[idx00] * w00 + af.sB[idx10] * w10 + af.sB[idx01] * w01 + af.sB[idx11] * w11;
+              }
+            }
+
+            // 3. Evaporate
+            const evapRate = 0.03 + t * t * 0.35;
+            for (let idx = 0; idx < GRID_AREA; idx++) {
+              af.density[idx]  *= (1 - evapRate);
+              af.densityR[idx] *= (1 - evapRate);
+              af.densityG[idx] *= (1 - evapRate);
+              af.densityB[idx] *= (1 - evapRate);
+            }
           }
+
           drainFrameRef.current++;
           if (drainFrameRef.current > DRAIN_FRAMES) {
-            // Hard clear everything once animation completes
-            for (const af of fluidsRef.current) {
-              af.density.fill(0); af.densityR.fill(0); af.densityG.fill(0); af.densityB.fill(0);
-              af.temp.fill(0); af.vx.fill(0); af.vy.fill(0);
-            }
+            for (const af of fluidsRef.current) af.clearAll();
             drainFrameRef.current = 0;
           }
         }
@@ -1585,18 +1850,93 @@ void main() {
         }
 
         // ── Manual injection ───────────────────────────────────
-        if (isMouseDownRef.current) {
+        if (isMouseDownRef.current && drainFrameRef.current === 0) {
           const { x, y } = mousePosRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
           if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-            if (activeToolRef.current === 'blow') {
+            const tool = activeToolRef.current;
+            const liq = selectedLiquidRef.current;
+            const rgb = hexToRgb(liq?.color ?? '#ffffff');
+            const heat = liq?.heatAmount ?? 0.05;
+
+            if (tool === 'blow') {
               af.blowAir(x, y, 4, 0.06);
+
+            } else if (tool === 'spray') {
+              // Wide cone of fine mist — many small random particles in a radius
+              const sprayR = 10;
+              for (let p = 0; p < 12; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * sprayR;
+                const px = Math.floor(x + Math.cos(angle) * dist);
+                const py = Math.floor(y + Math.sin(angle) * dist);
+                if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
+                const w = (1 - dist / sprayR) * 0.4;
+                af.addDensity(px, py, w, rgb.r, rgb.g, rgb.b);
+                if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+              }
+
+            } else if (tool === 'splatter') {
+              // Fling droplets outward from cursor — random sizes, random directions
+              for (let p = 0; p < 5; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const flingDist = 3 + Math.random() * 15;
+                const px = Math.floor(x + Math.cos(angle) * flingDist);
+                const py = Math.floor(y + Math.sin(angle) * flingDist);
+                if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
+                const dropR = 1 + Math.floor(Math.random() * 3);
+                const amt = 1.0 + Math.random() * 1.5;
+                for (let ddy = -dropR; ddy <= dropR; ddy++) {
+                  for (let ddx = -dropR; ddx <= dropR; ddx++) {
+                    const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+                    if (dd > dropR) continue;
+                    const nx = px + ddx, ny = py + ddy;
+                    if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                    const w = (1 - dd / dropR);
+                    af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                  }
+                }
+                // Fling velocity outward
+                af.addVelocity(px, py, Math.cos(angle) * 0.5, Math.sin(angle) * 0.5);
+              }
+
+            } else if (tool === 'pour') {
+              // Heavy thick stream — wide, dense, with downward velocity
+              const pourR = 4;
+              const amt = 2.0;
+              for (let ddy = -pourR; ddy <= pourR; ddy++) {
+                for (let ddx = -pourR; ddx <= pourR; ddx++) {
+                  const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+                  if (dd > pourR) continue;
+                  const nx = x + ddx, ny = y + ddy;
+                  if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                  const w = (1 - dd / pourR) ** 1.5;
+                  af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                  af.addVelocity(nx, ny, 0, 0.12 * w); // downward gravity
+                  if (heat > 0) af.addTemp(nx, ny, heat * w);
+                }
+              }
+
+            } else if (tool === 'streak') {
+              // Thin high-velocity smear along mouse movement direction
+              const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
+              const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+              const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
+              const streakLen = Math.min(12, Math.max(3, mvLen * 2));
+              const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
+              for (let t = -streakLen; t <= streakLen; t += 0.8) {
+                const sx = Math.floor(x + nx_dir * t);
+                const sy = Math.floor(y + ny_dir * t);
+                if (sx < 1 || sx >= GRID_SIZE - 1 || sy < 1 || sy >= GRID_SIZE - 1) continue;
+                const w = 1.0 - Math.abs(t) / streakLen;
+                af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
+                af.addVelocity(sx, sy, nx_dir * 0.3 * w, ny_dir * 0.3 * w);
+              }
+
             } else {
-              const liq = selectedLiquidRef.current;
-              const rgb = hexToRgb(liq?.color ?? '#ffffff');
+              // dropper (default)
               const r = liq?.injectRadius ?? 3;
               const amt = liq?.injectAmount ?? 0.8;
-              const heat = liq?.heatAmount ?? 0.05;
               for (let dy = -r; dy <= r; dy++) {
                 for (let dx = -r; dx <= r; dx++) {
                   const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1613,7 +1953,7 @@ void main() {
         }
 
         // ── Automation logic ───────────────────────────────────
-        if (isAutomatedRef.current && isActiveRef.current) {
+        if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
           const rate = currentSettings.automateRate || 0.5;
           const energy = currentAudioData ? currentAudioData.energy : 0;
           const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
@@ -1629,7 +1969,9 @@ void main() {
                 af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
               } else {
                 const color = harmonyColor(harmonyRef.current);
-                af.addDensity(rx, ry, 6.0 + energy * 35, color.r, color.g, color.b);
+                const styles = injectStyleRef.current;
+                const style = styles[Math.floor(Math.random() * styles.length)];
+                af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
                 af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
               }
             }
@@ -1638,32 +1980,26 @@ void main() {
           // Slowly rotate color harmony every ~45 seconds in auto mode
           if (Math.random() < 0.0004) harmonyRef.current = pickHarmony();
 
-          // Auto-deploy insects periodically
-          const insectAutoTypes = ['water_strider', 'ant', 'butterfly', 'beetle', 'fly', 'minnow', 'crab'] as const;
-          const af0 = fluidsRef.current[0];
-          if (af0 && af0.insects.length < 4 && Math.random() < rate * 0.004 + energy * 0.003) {
-            const type = insectAutoTypes[Math.floor(Math.random() * insectAutoTypes.length)];
-            af0.deployInsect(type);
-          }
         }
 
         // ── Seed trigger ───────────────────────────────────────
-        if (seedCount > lastSeedCount.current) {
+        if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
           lastSeedCount.current = seedCount;
           harmonyRef.current = pickHarmony();
+          const styles = injectStyleRef.current;
           for (const fluid of fluidsRef.current) {
             for (let i = 0; i < 8; i++) {
               const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
               const color = harmonyColor(harmonyRef.current);
-              fluid.addDensity(rx, ry, 10.0, color.r, color.g, color.b);
+              const style = styles[Math.floor(Math.random() * styles.length)];
+              fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
               fluid.addTemp(rx, ry, 2.0);
-              fluid.addVelocity(rx, ry, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
             }
           }
         }
 
-        if (isActiveRef.current) {
+        if (isActiveRef.current && drainFrameRef.current === 0) {
           // ── Ambient seeding ────────────────────────────────
           const af = fluidsRef.current[activeLayerRef.current];
           if (af) {
@@ -1711,10 +2047,13 @@ void main() {
                 const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
                 const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
 
-                // Center pulse — scales with density mapping
                 const centerX = Math.floor(GRID_SIZE / 2);
                 const centerY = Math.floor(GRID_SIZE / 2);
-                activeFluid.addDensity(centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a);
+                const aStyles = injectStyleRef.current;
+                const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
+
+                // Center pulse — scales with density mapping
+                activeFluid.autoInject(aStyle(), centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a, densityMod);
                 activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
 
                 // Bass hit: radial velocity burst — scales with impact + auto mode
@@ -1732,20 +2071,19 @@ void main() {
                       }
                     }
                   }
-                  // In auto mode, also inject colored density in a ring on bass hits
                   if (isAutomatedRef.current && bass01 > 0.4) {
-                    activeFluid.addDensity(centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a);
+                    activeFluid.autoInject(aStyle(), centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a, bass01);
                     activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
                   }
                 }
 
-                // Mid: orbital injection points react to mid frequencies
+                // Mid: orbital injection
                 if (mid01 > 0.2) {
                   const orbitR = GRID_SIZE * 0.3;
                   const mx = Math.floor(centerX + Math.cos(time * 0.6) * orbitR);
                   const my = Math.floor(centerY + Math.sin(time * 0.8) * orbitR);
                   if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
-                    activeFluid.addDensity(mx, my, mid01 * 0.04 * autoAmp, ar_a, ag_a, ab_a);
+                    activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.04 * autoAmp, ar_a, ag_a, ab_a, mid01);
                     activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                   }
                 }
@@ -1760,16 +2098,15 @@ void main() {
                   }
                 }
 
-                // Energy: roaming swell of density
+                // Energy: roaming swell
                 if (energy01 > 0.15) {
                   const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
                   const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
-                  activeFluid.addDensity(ex, ey, energy01 * 0.04 * autoAmp, ar_a, ag_a, ab_a);
+                  activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.04 * autoAmp, ar_a, ag_a, ab_a, energy01);
                   if (isAutomatedRef.current) {
-                    // Second roaming point on opposite orbit in auto mode
                     const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
                     const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
-                    activeFluid.addDensity(ex2, ey2, energy01 * 0.035, ar_a, ag_a, ab_a);
+                    activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.035, ar_a, ag_a, ab_a, energy01);
                   }
                 }
               }
@@ -1783,7 +2120,7 @@ void main() {
 
         for (let l = 0; l < fluidsRef.current.length; l++) {
           const fluid = fluidsRef.current[l];
-          if (isActiveRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
+          if (isActiveRef.current && drainFrameRef.current === 0) fluid.step(currentSettings, currentAudioData, time, noise2D);
 
           // Check if there's content
           for (let i = 0; i < GRID_AREA; i++) {
@@ -1791,7 +2128,7 @@ void main() {
           }
 
           // Emergency seeding
-          if (!hasContent && time % 5 < 0.02 && l === 0) {
+          if (!hasContent && time % 5 < 0.02 && l === 0 && drainFrameRef.current === 0) {
             const color = harmonyColor(harmonyRef.current);
             fluid.addDensity(GRID_SIZE / 2, GRID_SIZE / 2, 5.0, color.r, color.g, color.b);
           }
@@ -1888,6 +2225,10 @@ void main() {
           const ledAngle = time * (currentSettings.ledSpeed ?? 1) * 0.5 / (2 * Math.PI);
           glCtx.uniform1f(uLocs['u_ledAngle'], ledAngle);
           glCtx.uniform1f(uLocs['u_time'], time);
+          glCtx.uniform1f(uLocs['u_glossiness'], currentSettings.glossiness ?? 0);
+          glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
+          glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
+          glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
 
           glCtx.viewport(0, 0, canvas.width, canvas.height);
           glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);

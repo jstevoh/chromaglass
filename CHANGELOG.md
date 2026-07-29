@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-28
+
+### Added — Liquid Light Show rendering
+- Multi-octave curl-noise turbulence in the velocity field — structure at every scale, from whole-blob motion down to ripples and filament trails (`turbulenceScale`, `turbulenceDetail`)
+- Blob surface tension parameter trading cohesion against shear — low values give amoeba-like elongation and pinching instead of static circles (`blobSurfaceTension`)
+- Bright interface line where two distinct dye colors meet, faking the oil-water boundary look without a multi-fluid solve (`boundaryContrast`)
+- Saturation multiplier in the final color grade to counteract muddy blending (`saturationBoost`)
+- New "Light Show Look" section in Settings exposing all rendering parameters
+
+### Changed — Liquid Light Show rendering
+- Specular/Fresnel lighting pass now gated behind a `glossiness` parameter defaulting to 0 — fluid renders as flat, evenly-lit matte dye (the projected light show look) instead of glossy 3D spheres; Lava Lamp keeps a faint sheen
+- Gooey post-blur is parametrized (`postBlurRadius`) and defaults far lower, so fine turbulent detail survives to the screen
+- Signature presets (Classic, Galaxy, Acid Trip, Lava Lamp) tuned for the new parameters
+
+### Added — Music Intelligence layer
+- Song identification via AudD/ACRCloud fingerprinting behind a Cloudflare Worker proxy (`server/fingerprint-worker.js`, key stays server-side); manual track tagging fallback when no proxy is configured
+- First-listen song map generation: the listen is recorded client-side and analyzed offline in a Web Worker (FFT → chroma/energy/centroid features → self-similarity novelty segmentation into intro/verse/chorus/bridge/outro, plus autocorrelation pitch curve and RMS energy curve), cached in IndexedDB by ISRC
+- Structure-synced visuals: known song structure drives turbulence, saturation and audio impact over the track timeline (choruses surge, intros/outros calm)
+- Synced lyrics via LRCLIB (free, no key) with LRC parsing, rough energy-based alignment fallback for unsynced lyrics, semantic word-triggers (fire/water/sky/earth/love/dark/light/motion themed dye bursts), lexicon-based sentiment arc per section, and an optional kinetic typography overlay
+- Deterministic per-track visual identity: ISRC hash seeds palette harmony, turbulence and density offsets so every song has a consistent look
+- Evolution across listens: complexity ramps, palette drifts and new trigger themes unlock as listen count grows; every listen's parameter snapshot is stored
+- Track Intelligence panel: now playing with section timeline, evolution progress, listen history with one-tap replay of any past listen's frozen visual parameters, library view and music settings (lyric triggers, sentiment arc, lyrics overlay, evolution speed)
+
 ## [1.0.0] - 2026-04-05
 
 ### Added
