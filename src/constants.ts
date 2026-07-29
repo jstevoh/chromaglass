@@ -44,6 +44,7 @@ export const COLOR_HARMONIES: number[][] = [
   [0, 1, 6, 15],       // Citrus pop: Yellow, Orange, Limpid Green, White
   [8, 3, 0, 10],       // Contrast shock: Blue, Red, Yellow, Purple
   [5, 2, 8, 0],        // Carnival: Emerald, Hot Pink, Blue, Yellow
+  [9, 10, 7, 15],      // Galaxy: Cobalt, Purple, Icy Blue, White
 ];
 
 /** Pick a random color harmony index set */

@@ -1,10 +1,16 @@
-import {StrictMode} from 'react';
+import {StrictMode, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
 import './index.css';
+
+const isCastMode = new URLSearchParams(window.location.search).has('cast');
+const Root = isCastMode
+  ? lazy(() => import('./components/CastDisplay'))
+  : lazy(() => import('./App'));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Suspense fallback={<div className="w-full h-screen bg-black" />}>
+      <Root />
+    </Suspense>
   </StrictMode>,
 );
