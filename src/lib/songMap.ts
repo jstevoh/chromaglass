@@ -54,8 +54,10 @@ export class ListenRecorder {
   }
 }
 
+interface DecodedAudio { pcm: Float32Array; sampleRate: number }
+
 /** Decode a recorded blob to mono PCM at the analysis sample rate. */
-async function decodeToMono(blob: Blob): Promise<{ pcm: Float32Array; sampleRate: number } | null> {
+async function decodeToMono(blob: Blob): Promise<DecodedAudio | null> {
   try {
     const arrayBuf = await blob.arrayBuffer();
     const probeCtx = new AudioContext();
@@ -92,9 +94,17 @@ export async function generateSongMap(
   isrc: string,
   recording: Blob,
   meta?: { title?: string; artist?: string },
+  maxDurationSec?: number,
 ): Promise<SongMap | null> {
   const decoded = await decodeToMono(recording);
   if (!decoded || decoded.pcm.length < ANALYSIS_SAMPLE_RATE * 20) return null; // need ≥20s
+
+  // Trim audio recorded past the track boundary (the recorder keeps rolling
+  // until the next identification confirms a track change).
+  if (maxDurationSec && maxDurationSec > 20) {
+    const maxSamples = Math.floor(maxDurationSec * decoded.sampleRate);
+    if (maxSamples < decoded.pcm.length) decoded.pcm = decoded.pcm.subarray(0, maxSamples);
+  }
 
   const result = await new Promise<WorkerResult | null>(resolve => {
     let worker: Worker;

@@ -17,7 +17,8 @@ interface LiquidVisualizerProps {
   isActive?: boolean;
 }
 
-const GRID_SIZE = 128;
+const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
+const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
@@ -136,8 +137,10 @@ class FluidSimulation {
   injectImage(imgData: ImageData) {
     const w = imgData.width, h = imgData.height;
     const d = imgData.data; // RGBA Uint8ClampedArray
-    // Map image into the visible grid region (roughly 22–106 in x, 38–90 in y)
-    const gx0 = 24, gx1 = 104, gy0 = 40, gy1 = 88;
+    // Map image into the central visible region of the grid
+    const S = this.size;
+    const gx0 = Math.round(S * 0.19), gx1 = Math.round(S * 0.81);
+    const gy0 = Math.round(S * 0.31), gy1 = Math.round(S * 0.69);
     const gw = gx1 - gx0, gh = gy1 - gy0;
     for (let gy = gy0; gy < gy1; gy++) {
       for (let gx = gx0; gx < gx1; gx++) {
@@ -164,6 +167,7 @@ class FluidSimulation {
   }
 
   private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {
+    radius *= GRID_SCALE; // caller radii are in 128-grid units
     const rCeil = Math.ceil(radius * 2);
     for (let dy = -rCeil; dy <= rCeil; dy++) {
       for (let dx = -rCeil; dx <= rCeil; dx++) {
@@ -180,6 +184,7 @@ class FluidSimulation {
   seedPreset(presetId: string, noise2D: (x: number, y: number) => number): number[] {
     const S = this.size;
     const cx = S / 2, cy = S / 2;
+    const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
     const harmonies: Record<string, number[]> = {
       'galaxy':             [9, 10, 7, 15],
@@ -212,7 +217,7 @@ class FluidSimulation {
           const offset = arm * Math.PI;
           const c = col(arm);
           for (let t = 0.3; t < 5.5; t += 0.06) {
-            const r = 3 + t * 8;
+            const r = (3 + t * 8) * k;
             const theta = t * 1.3 + offset;
             const x = cx + r * Math.cos(theta), y = cy + r * Math.sin(theta);
             const bright = Math.max(0.1, 1.0 - t / 6.5);
@@ -221,7 +226,7 @@ class FluidSimulation {
         }
         // Scattered stars
         for (let i = 0; i < 100; i++) {
-          const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 48;
+          const a = Math.random() * Math.PI * 2, d = (3 + Math.random() * 48) * k;
           const c = Math.random() < 0.35 ? { r: 1, g: 1, b: 1 } : col(Math.floor(Math.random() * 4));
           this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
             0.6 + Math.random(), 0.4 + Math.random() * 1.2, c.r, c.g, c.b);
@@ -231,8 +236,8 @@ class FluidSimulation {
           for (let i = 2; i < S - 2; i += 2) {
             const dx = i - cx, dy = j - cy;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 2 || dist > 55) continue;
-            const spd = 0.12 / (1 + dist * 0.025);
+            if (dist < 2 * k || dist > 55 * k) continue;
+            const spd = 0.12 / (1 + (dist / k) * 0.025);
             this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
           }
         }
@@ -306,7 +311,7 @@ class FluidSimulation {
 
       case 'acid-trip': {
         for (let ring = 0; ring < 5; ring++) {
-          const r = 8 + ring * 10;
+          const r = (8 + ring * 10) * k;
           const c = col(ring);
           for (let a = 0; a < Math.PI * 2; a += 0.04) {
             const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
@@ -350,7 +355,7 @@ class FluidSimulation {
         for (let j = 0; j < 12; j++)
           for (let i = 0; i < 12; i++) {
             const c = col(i + j);
-            this.splatBlob(10 + i * 9 + (Math.random() - 0.5) * 4, 10 + j * 9 + (Math.random() - 0.5) * 4, 3.5, 2.5, c.r, c.g, c.b);
+            this.splatBlob((10 + i * 9 + (Math.random() - 0.5) * 4) * k, (10 + j * 9 + (Math.random() - 0.5) * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
           }
         break;
       }
@@ -360,7 +365,7 @@ class FluidSimulation {
           const by = S * (0.25 + band * 0.15);
           const c = col(band);
           for (let i = 2; i < S - 2; i++) {
-            const wave = Math.sin(i * 0.04 + band * 2.0) * 12 + Math.sin(i * 0.09) * 5;
+            const wave = (Math.sin(i * 0.04 + band * 2.0) * 12 + Math.sin(i * 0.09) * 5) * k;
             const w = 3 + Math.sin(i * 0.07 + band) * 2;
             this.splatBlob(i, by + wave, w, 1.5, c.r, c.g, c.b);
           }
@@ -376,9 +381,9 @@ class FluidSimulation {
         for (let f = 0; f < 8; f++) {
           const a = f * Math.PI * 2 / 8 + (Math.random() - 0.5) * 0.4;
           const c = col(f);
-          const len = 20 + Math.random() * 25;
-          for (let t = 5; t < len; t += 1.5) {
-            const wb = Math.sin(t * 0.3 + f) * 2;
+          const len = (20 + Math.random() * 25) * k;
+          for (let t = 5 * k; t < len; t += 1.5) {
+            const wb = Math.sin(t * 0.3 + f) * 2 * k;
             const x = cx + Math.cos(a) * t + Math.cos(a + Math.PI / 2) * wb;
             const y = cy + Math.sin(a) * t + Math.sin(a + Math.PI / 2) * wb;
             if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
@@ -396,7 +401,7 @@ class FluidSimulation {
           const jx = S * (0.2 + jf * 0.2 + (Math.random() - 0.5) * 0.1);
           const jy = S * (0.3 + (Math.random() - 0.5) * 0.3);
           const c = col(jf);
-          const bellR = 8 + Math.random() * 6;
+          const bellR = (8 + Math.random() * 6) * k;
           for (let a = -Math.PI; a < 0; a += 0.06)
             for (let r = 0; r < bellR; r += 1.5) {
               const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.7;
@@ -405,8 +410,8 @@ class FluidSimulation {
             }
           for (let t = 0; t < 3; t++) {
             let tx = jx + (t - 1) * bellR * 0.4;
-            for (let dy = 0; dy < 18 + Math.random() * 10; dy++) {
-              const wb = Math.sin(dy * 0.2 + t) * 2;
+            for (let dy = 0; dy < (18 + Math.random() * 10) * k; dy++) {
+              const wb = Math.sin(dy * 0.2 + t) * 2 * k;
               this.splatBlob(tx + wb, jy + dy, 1.0, 0.8 / (1 + dy * 0.05), c.r, c.g, c.b);
             }
           }
@@ -416,8 +421,8 @@ class FluidSimulation {
 
       case 'fractal-dream': {
         const rings: [number, number, number][] = [
-          [cx, cy, 30], [cx - 15, cy - 10, 18], [cx + 15, cy + 10, 20],
-          [cx + 8, cy - 15, 12], [cx - 12, cy + 12, 15],
+          [cx, cy, 30 * k], [cx - 15 * k, cy - 10 * k, 18 * k], [cx + 15 * k, cy + 10 * k, 20 * k],
+          [cx + 8 * k, cy - 15 * k, 12 * k], [cx - 12 * k, cy + 12 * k, 15 * k],
         ];
         rings.forEach(([rx, ry, rr], idx) => {
           const c = col(idx);
@@ -464,10 +469,10 @@ class FluidSimulation {
 
       case 'stardust-collapse': {
         this.splatBlob(cx, cy, 6, 4.0, 1.0, 1.0, 1.0);
-        const ringR = 30;
+        const ringR = 30 * k;
         for (let i = 0; i < 60; i++) {
           const a = (i / 60) * Math.PI * 2;
-          const r = ringR + (Math.random() - 0.5) * 8;
+          const r = ringR + (Math.random() - 0.5) * 8 * k;
           const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
           if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
           const c = col(i);
@@ -476,14 +481,14 @@ class FluidSimulation {
           this.addVelocity(Math.floor(x), Math.floor(y), dx / dist * 0.08, dy / dist * 0.08);
         }
         for (let i = 0; i < 40; i++) {
-          const a = Math.random() * Math.PI * 2, d = 5 + Math.random() * 45;
+          const a = Math.random() * Math.PI * 2, d = (5 + Math.random() * 45) * k;
           this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + Math.random() * 0.8, 0.3 + Math.random() * 0.5, 1, 1, 1);
         }
         for (let j = 2; j < S - 2; j += 3)
           for (let i = 2; i < S - 2; i += 3) {
             const dx = i - cx, dy = j - cy, dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 2 || dist > 50) continue;
-            const spd = 0.06 / (1 + dist * 0.02);
+            if (dist < 2 * k || dist > 50 * k) continue;
+            const spd = 0.06 / (1 + (dist / k) * 0.02);
             this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
           }
         break;
@@ -502,6 +507,7 @@ class FluidSimulation {
   }
 
   applySquish(x: number, y: number, radius: number, amount: number) {
+    radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
     for (let i = -radius; i <= radius; i++) {
       for (let j = -radius; j <= radius; j++) {
@@ -519,6 +525,7 @@ class FluidSimulation {
   }
 
   blowAir(x: number, y: number, radius: number, strength: number) {
+    radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
     for (let i = -radius; i <= radius; i++) {
       for (let j = -radius; j <= radius; j++) {
@@ -542,10 +549,11 @@ class FluidSimulation {
 
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number) {
     const S = this.size;
+    const k = GRID_SCALE;
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     switch (style) {
       case 'spray': {
-        const sprayR = 8 + energy * 5;
+        const sprayR = (8 + energy * 5) * k;
         const count = 8 + Math.floor(energy * 8);
         for (let p = 0; p < count; p++) {
           const a = Math.random() * Math.PI * 2, d = Math.random() * sprayR;
@@ -559,10 +567,10 @@ class FluidSimulation {
         const count = 3 + Math.floor(energy * 4);
         for (let p = 0; p < count; p++) {
           const a = Math.random() * Math.PI * 2;
-          const fling = 2 + Math.random() * (10 + energy * 8);
+          const fling = (2 + Math.random() * (10 + energy * 8)) * k;
           const px = Math.floor(x + Math.cos(a) * fling), py = Math.floor(y + Math.sin(a) * fling);
           if (px < 2 || px >= S - 2 || py < 2 || py >= S - 2) continue;
-          const dropR = 1 + Math.floor(Math.random() * 2);
+          const dropR = Math.round((1 + Math.floor(Math.random() * 2)) * k);
           for (let ddy = -dropR; ddy <= dropR; ddy++)
             for (let ddx = -dropR; ddx <= dropR; ddx++) {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -575,7 +583,7 @@ class FluidSimulation {
         break;
       }
       case 'pour': {
-        const pourR = 3 + Math.floor(energy * 2);
+        const pourR = Math.round((3 + Math.floor(energy * 2)) * k);
         for (let ddy = -pourR; ddy <= pourR; ddy++)
           for (let ddx = -pourR; ddx <= pourR; ddx++) {
             const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -589,7 +597,7 @@ class FluidSimulation {
       }
       case 'streak': {
         const a = Math.random() * Math.PI * 2;
-        const len = 5 + Math.floor(energy * 10);
+        const len = (5 + Math.floor(energy * 10)) * k;
         const dx = Math.cos(a), dy = Math.sin(a);
         for (let t = -len; t <= len; t += 0.8) {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
@@ -601,7 +609,7 @@ class FluidSimulation {
         break;
       }
       default: { // drop
-        const dropR = 3;
+        const dropR = Math.round(3 * k);
         for (let ddy = -dropR; ddy <= dropR; ddy++)
           for (let ddx = -dropR; ddx <= dropR; ddx++) {
             const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -716,12 +724,13 @@ class FluidSimulation {
     if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
     if (settings.airVelocity > 0.1) this.applyAirflow(settings.airVelocity, dt, time, noise2D);
 
-    // 9. Diffuse & advect density + temp
-    this.diffuse(0, this.s,     this.density,  diff, dt);
-    this.diffuse(0, this.sR,    this.densityR, diff, dt);
-    this.diffuse(0, this.sG,    this.densityG, diff, dt);
-    this.diffuse(0, this.sB,    this.densityB, diff, dt);
-    this.diffuse(0, this.temp0, this.temp,     diff, dt);
+    // 9. Diffuse & advect density + temp — dye diffusion coefficients are
+    // tiny, so 4 iterations is fully converged for visual purposes
+    this.diffuse(0, this.s,     this.density,  diff, dt, 4);
+    this.diffuse(0, this.sR,    this.densityR, diff, dt, 4);
+    this.diffuse(0, this.sG,    this.densityG, diff, dt, 4);
+    this.diffuse(0, this.sB,    this.densityB, diff, dt, 4);
+    this.diffuse(0, this.temp0, this.temp,     diff, dt, 4);
     this.advect(0, this.density,  this.s,      this.vx, this.vy, dt * advection);
     this.advect(0, this.densityR, this.sR,     this.vx, this.vy, dt * advection);
     this.advect(0, this.densityG, this.sG,     this.vx, this.vy, dt * advection);
@@ -761,7 +770,7 @@ class FluidSimulation {
   // ── Private simulation methods ─────────────────────────────────────
 
   private solveSqueezePressure(viscosity: number) {
-    for (let k = 0; k < 20; k++) {
+    for (let k = 0; k < 10; k++) {
       for (let j = 1; j < this.size - 1; j++) {
         for (let i = 1; i < this.size - 1; i++) {
           const idx = i + j * this.size;
@@ -917,14 +926,16 @@ class FluidSimulation {
     }
   }
 
-  private diffuse(b: number, x: Float32Array, x0: Float32Array, diff: number, dt: number) {
+  private diffuse(b: number, x: Float32Array, x0: Float32Array, diff: number, dt: number, iterations = 10) {
     const a = dt * diff * (this.size - 2) * (this.size - 2);
-    this.linSolve(b, x, x0, a, 1 + 4 * a);
+    this.linSolve(b, x, x0, a, 1 + 4 * a, iterations);
   }
 
-  private linSolve(b: number, x: Float32Array, x0: Float32Array, a: number, c: number) {
+  // Iteration counts are tuned per use: pressure projection needs the most,
+  // dye diffusion converges almost immediately (tiny diffusion coefficients).
+  private linSolve(b: number, x: Float32Array, x0: Float32Array, a: number, c: number, iterations = 12) {
     const cRecip = 1.0 / c;
-    for (let k = 0; k < 20; k++) {
+    for (let k = 0; k < iterations; k++) {
       for (let j = 1; j < this.size - 1; j++) {
         for (let i = 1; i < this.size - 1; i++) {
           x[i + j * this.size] =
@@ -1035,7 +1046,7 @@ class FluidSimulation {
     const step = 2;
     const eps = 0.75; // finite-difference offset in grid cells
     for (let o = 0; o < octaves; o++) {
-      const freq = 0.012 * (1 << o);           // 0.012, 0.024, 0.048, 0.096
+      const freq = (0.012 / GRID_SCALE) * (1 << o); // feature size stays constant relative to the frame
       const amp = scale * 0.010 * Math.pow(0.55, o);
       const tOff = time * (0.06 + o * 0.05) + o * 37.7;
       for (let j = 1; j < this.size - 1; j += step) {
@@ -1190,7 +1201,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const c = pick([15, 0]);
           const x = Math.floor(S / 2), y = Math.floor(S / 2);
           af.autoInject('drop', x, y, amt, c.r, c.g, c.b, energy);
-          af.applyRadialImpulse(x, y, 20, 0.3 + energy * 0.4);
+          af.applyRadialImpulse(x, y, Math.round(20 * GRID_SCALE), 0.3 + energy * 0.4);
           af.addTemp(x, y, 2 + energy * 2);
           break;
         }
@@ -1291,10 +1302,10 @@ uniform float u_glossiness;        // specular intensity, 0 = flat backlit dye
 uniform float u_saturation;        // final grade saturation multiplier
 uniform float u_boundaryContrast;  // bright interface line between dye colors
 uniform float u_postBlur;          // gooey blur radius multiplier
+uniform float u_gridSize;          // fluid sim texture resolution
 
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
-const float TEX_STEP = 3.0 / 128.0;
 
 // Catmull-Rom bicubic weights
 vec4 cubic(float v) {
@@ -1309,7 +1320,7 @@ vec4 cubic(float v) {
 
 // Bicubic texture sampling — smooth C1 upscaling, eliminates grid aliasing
 vec4 textureBicubic(sampler2D tex, vec2 uv) {
-  const vec2 texSize = vec2(128.0);
+  vec2 texSize = vec2(u_gridSize);
   vec2 invTex = 1.0 / texSize;
   uv = uv * texSize - 0.5;
   vec2 fxy = fract(uv);
@@ -1346,8 +1357,10 @@ float hash(vec2 p) {
 // So: absorption = R/255 * 8, totalDensity = A/255 * 8
 // color_channel = exp(-absorption / totalDensity)
 
+// sqrt-encoded in the texture (see packing loop) — squaring on decode gives
+// far more precision at low densities, killing banding in smooth gradients
 float decodeDensity(float a) {
-  return a * DENSITY_SCALE;
+  return a * a * DENSITY_SCALE;
 }
 
 vec4 sampleLayer(sampler2D tex, vec2 uv) {
@@ -1413,14 +1426,15 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
 
 // Sobel normals in fluid UV space
 vec3 sobelNormal(sampler2D tex, vec2 fuv) {
-  float d00 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP, -TEX_STEP)).a);
-  float d10 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0,       -TEX_STEP)).a);
-  float d20 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP, -TEX_STEP)).a);
-  float d01 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP,  0.0     )).a);
-  float d21 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP,  0.0     )).a);
-  float d02 = decodeDensity(textureBicubic(tex, fuv + vec2(-TEX_STEP,  TEX_STEP)).a);
-  float d12 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0,        TEX_STEP)).a);
-  float d22 = decodeDensity(textureBicubic(tex, fuv + vec2( TEX_STEP,  TEX_STEP)).a);
+  float ts = 3.0 / u_gridSize;
+  float d00 = decodeDensity(textureBicubic(tex, fuv + vec2(-ts, -ts)).a);
+  float d10 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0, -ts)).a);
+  float d20 = decodeDensity(textureBicubic(tex, fuv + vec2( ts, -ts)).a);
+  float d01 = decodeDensity(textureBicubic(tex, fuv + vec2(-ts, 0.0)).a);
+  float d21 = decodeDensity(textureBicubic(tex, fuv + vec2( ts, 0.0)).a);
+  float d02 = decodeDensity(textureBicubic(tex, fuv + vec2(-ts,  ts)).a);
+  float d12 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0,  ts)).a);
+  float d22 = decodeDensity(textureBicubic(tex, fuv + vec2( ts,  ts)).a);
   float gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
   float gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
   return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
@@ -1458,7 +1472,7 @@ vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
 float boundaryEdge(sampler2D tex, vec2 fuv) {
   vec4 cC = decodeFluid(tex, fuv, 0.0, false);
   if (cC.a < 0.03) return 0.0;
-  float e = TEX_STEP * 0.55;
+  float e = (3.0 / u_gridSize) * 0.55;
   vec4 cR = decodeFluid(tex, fuv + vec2( e, 0.0), 0.0, false);
   vec4 cL = decodeFluid(tex, fuv + vec2(-e, 0.0), 0.0, false);
   vec4 cT = decodeFluid(tex, fuv + vec2(0.0,  e), 0.0, false);
@@ -1669,7 +1683,7 @@ void main() {
       'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1',
       'u_resolution','u_gooey','u_darkBlend','u_blendMode',
       'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
-      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur',
+      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -1864,7 +1878,7 @@ void main() {
 
             } else if (tool === 'spray') {
               // Wide cone of fine mist — many small random particles in a radius
-              const sprayR = 10;
+              const sprayR = 10 * GRID_SCALE;
               for (let p = 0; p < 12; p++) {
                 const angle = Math.random() * Math.PI * 2;
                 const dist = Math.random() * sprayR;
@@ -1880,11 +1894,11 @@ void main() {
               // Fling droplets outward from cursor — random sizes, random directions
               for (let p = 0; p < 5; p++) {
                 const angle = Math.random() * Math.PI * 2;
-                const flingDist = 3 + Math.random() * 15;
+                const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
                 const px = Math.floor(x + Math.cos(angle) * flingDist);
                 const py = Math.floor(y + Math.sin(angle) * flingDist);
                 if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
-                const dropR = 1 + Math.floor(Math.random() * 3);
+                const dropR = Math.round((1 + Math.floor(Math.random() * 3)) * GRID_SCALE);
                 const amt = 1.0 + Math.random() * 1.5;
                 for (let ddy = -dropR; ddy <= dropR; ddy++) {
                   for (let ddx = -dropR; ddx <= dropR; ddx++) {
@@ -1902,7 +1916,7 @@ void main() {
 
             } else if (tool === 'pour') {
               // Heavy thick stream — wide, dense, with downward velocity
-              const pourR = 4;
+              const pourR = Math.round(4 * GRID_SCALE);
               const amt = 2.0;
               for (let ddy = -pourR; ddy <= pourR; ddy++) {
                 for (let ddx = -pourR; ddx <= pourR; ddx++) {
@@ -1922,7 +1936,7 @@ void main() {
               const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
               const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
               const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
-              const streakLen = Math.min(12, Math.max(3, mvLen * 2));
+              const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
               const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
               for (let t = -streakLen; t <= streakLen; t += 0.8) {
                 const sx = Math.floor(x + nx_dir * t);
@@ -1935,7 +1949,7 @@ void main() {
 
             } else {
               // dropper (default)
-              const r = liq?.injectRadius ?? 3;
+              const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);
               const amt = liq?.injectAmount ?? 0.8;
               for (let dy = -r; dy <= r; dy++) {
                 for (let dx = -r; dx <= r; dx++) {
@@ -2058,7 +2072,7 @@ void main() {
 
                 // Bass hit: radial velocity burst — scales with impact + auto mode
                 if (bass01 > 0.25) {
-                  const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * Math.max(0.4, impactMul));
+                  const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
                   const bassStr = (bass01 - 0.25) * autoAmp;
                   for (let bj = -burstR; bj <= burstR; bj += 3) {
                     for (let bi = -burstR; bi <= burstR; bi += 3) {
@@ -2178,17 +2192,18 @@ void main() {
             tData.push(new Uint8Array(GRID_AREA * 4));
           }
 
-          // Pack fluid data into textures
+          // Pack fluid data into textures — sqrt-encoded for extra precision
+          // at low densities (the shader squares on decode). Kills banding.
           for (let l = 0; l < fluidsRef.current.length; l++) {
             const fluid = fluidsRef.current[l];
             const td = tData[l];
-            const scale = 255 / 8.0;
+            const inv8 = 1 / 8.0;
             for (let i = 0; i < GRID_AREA; i++) {
               const i4 = i * 4;
-              td[i4]     = Math.max(0, Math.min(255, fluid.densityR[i] * scale + 0.5));
-              td[i4 + 1] = Math.max(0, Math.min(255, fluid.densityG[i] * scale + 0.5));
-              td[i4 + 2] = Math.max(0, Math.min(255, fluid.densityB[i] * scale + 0.5));
-              td[i4 + 3] = Math.max(0, Math.min(255, fluid.density[i]  * scale + 0.5));
+              td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
+              td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
+              td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
+              td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
             }
             glCtx.activeTexture(glCtx.TEXTURE0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
@@ -2229,6 +2244,7 @@ void main() {
           glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
           glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
           glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
+          glCtx.uniform1f(uLocs['u_gridSize'], GRID_SIZE);
 
           glCtx.viewport(0, 0, canvas.width, canvas.height);
           glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);

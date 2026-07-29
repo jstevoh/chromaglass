@@ -76,6 +76,9 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
                 </span>
               )}
               <span className="px-1.5 py-0.5 rounded bg-white/10">{track.source === 'manual' ? 'manual tag' : 'fingerprint'}</span>
+              {trackState?.presetId && (
+                <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 font-bold">{trackState.presetId.replace(/-/g, ' ')}</span>
+              )}
             </div>
 
             {/* Section timeline */}
@@ -218,6 +221,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
       <section className="mb-8">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4">Music Intelligence</h3>
         <Toggle label="Enabled" value={musicSettings.enabled} onChange={v => onUpdateMusicSettings({ enabled: v })} />
+        <Toggle label="Auto Preset" value={musicSettings.autoPreset} onChange={v => onUpdateMusicSettings({ autoPreset: v })} />
         <Toggle label="Lyric Triggers" value={musicSettings.lyricTriggers} onChange={v => onUpdateMusicSettings({ lyricTriggers: v })} />
         <Toggle label="Sentiment Arc" value={musicSettings.sentimentArc} onChange={v => onUpdateMusicSettings({ sentimentArc: v })} />
         <Toggle label="Lyrics Overlay" value={musicSettings.lyricsOverlay} onChange={v => onUpdateMusicSettings({ lyricsOverlay: v })} />

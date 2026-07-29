@@ -189,6 +189,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.trigger?.seq]);
 
+  // Switch to the track's chosen preset when a song is identified
+  useEffect(() => {
+    if (musicIntel.presetPick && musicSettings.autoPreset) {
+      const preset = PRESETS.find(p => p.id === musicIntel.presetPick!.presetId);
+      if (preset) applyPreset(preset.id, preset.settings);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [musicIntel.presetPick?.seq]);
+
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
@@ -267,7 +276,7 @@ export default function App() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex flex-col items-start gap-4 transition-all duration-300 max-h-[calc(100vh-120px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex flex-col items-start gap-4 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
@@ -366,7 +375,7 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 transition-all duration-300 max-h-[calc(100vh-120px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 

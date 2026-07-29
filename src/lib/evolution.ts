@@ -56,6 +56,37 @@ export function trackSeed(isrc: string): TrackSeed {
   };
 }
 
+// ── Per-track preset selection ─────────────────────────────────────────
+// Buckets of visualizer presets by musical character. The pick is
+// deterministic per ISRC (a song keeps its preset across listens) but the
+// bucket comes from the live audio profile at identification time.
+const PRESET_BUCKETS = {
+  calm:   ['classic', 'deep-ocean', 'velvet-underground', 'lava-lamp', 'jellyfish-bloom'],
+  dreamy: ['galaxy', 'aurora-borealis', 'fractal-dream', 'timbre-shifter'],
+  bright: ['cyberpunk', 'neon-coral-reef', 'stardust-collapse', 'acid-trip'],
+  heavy:  ['bass-drop', 'solar-flare', 'boiling-point', 'microscopic-chaos'],
+};
+
+export interface AudioProfile {
+  energy: number;     // 0-1 overall intensity
+  bass: number;       // 0-1 low-end weight
+  brightness: number; // 0-1 spectral brightness
+}
+
+export function pickPresetForTrack(isrc: string, profile: AudioProfile | null): string {
+  const h = hashString(isrc + '::preset');
+  if (!profile) {
+    const all = [...PRESET_BUCKETS.calm, ...PRESET_BUCKETS.dreamy, ...PRESET_BUCKETS.bright, ...PRESET_BUCKETS.heavy];
+    return all[h % all.length];
+  }
+  let bucket: string[];
+  if (profile.energy < 0.28) bucket = profile.brightness > 0.5 ? PRESET_BUCKETS.dreamy : PRESET_BUCKETS.calm;
+  else if (profile.bass > 0.55 && profile.bass >= profile.brightness) bucket = PRESET_BUCKETS.heavy;
+  else if (profile.brightness > 0.45) bucket = PRESET_BUCKETS.bright;
+  else bucket = PRESET_BUCKETS.dreamy;
+  return bucket[h % bucket.length];
+}
+
 const UNLOCKABLE_THEMES: LyricTheme[] = ['fire', 'water', 'sky', 'earth', 'love', 'dark', 'light', 'motion'];
 const BASE_THEMES: LyricTheme[] = ['fire', 'water'];
 

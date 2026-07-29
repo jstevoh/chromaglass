@@ -51,6 +51,8 @@ export interface TrackEvolutionState {
   isrc: string;
   title?: string;
   artist?: string;
+  /** Visualizer preset chosen for this track on first identification. */
+  presetId?: string;
   listenCount: number;
   currentParams: {
     complexity: number;       // 0-1, ramps turbulenceDetail/scale over listens
@@ -72,6 +74,7 @@ export interface LyricTrigger {
 /** Settings for the music intelligence layer (persisted in localStorage, separate from visual presets). */
 export interface MusicSettings {
   enabled: boolean;
+  autoPreset: boolean;    // switch to a track-matched preset on identification
   lyricTriggers: boolean;
   sentimentArc: boolean;
   lyricsOverlay: boolean;
@@ -80,6 +83,7 @@ export interface MusicSettings {
 
 export const DEFAULT_MUSIC_SETTINGS: MusicSettings = {
   enabled: true,
+  autoPreset: true,
   lyricTriggers: true,
   sentimentArc: true,
   lyricsOverlay: false,

@@ -17,7 +17,7 @@ export function fingerprintingAvailable(): boolean {
  * Record a short mono snippet from the stream and encode as WAV (16-bit PCM).
  * WAV keeps the proxy simple — both AudD and ACRCloud accept it directly.
  */
-export async function captureSnippet(stream: MediaStream, seconds = 8): Promise<Blob | null> {
+export async function captureSnippet(stream: MediaStream, seconds = 5): Promise<Blob | null> {
   try {
     // Use the device's native sample rate — forcing one can throw on
     // mismatched-rate streams in some browsers.

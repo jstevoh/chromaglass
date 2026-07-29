@@ -21,12 +21,14 @@ import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/son
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
 import {
   trackSeed, newTrackState, evolveAfterListen, buildVisualParams,
-  paramsToSnapshot, MusicVisualParams,
+  paramsToSnapshot, pickPresetForTrack, MusicVisualParams,
 } from '../lib/evolution';
 import { getSongMap, putSongMap, getTrackState, putTrackState, getAllTrackStates } from '../lib/musicDb';
 
-const IDENTIFY_INTERVAL_MS = 45_000;
-const SILENCE_END_MS = 8_000;   // this long below the silence floor ⇒ listen ended
+const IDENTIFY_INTERVAL_MS = 35_000; // re-check cadence while a track is identified
+const IDENTIFY_RETRY_MS = 10_000;    // retry cadence while nothing is identified
+const SILENCE_END_MS = 5_000;   // this long below the silence floor ⇒ listen ended
+const GAP_MS = 1_600;           // a dip this long looks like a between-song gap
 const SILENCE_VOLUME = 2.5;
 const MIN_LISTEN_MS = 60_000;   // shorter listens don't count toward evolution
 
@@ -54,6 +56,8 @@ export interface MusicIntelResult {
   harmonyIndex: number | null;
   /** One-shot lyric trigger — seq increments each time a new trigger fires. */
   trigger: { seq: number; trigger: LyricTrigger } | null;
+  /** One-shot preset pick when a track is (first) identified — seq increments per pick. */
+  presetPick: { seq: number; presetId: string } | null;
   manualTag: (artist: string, title: string) => void;
   clearTrack: () => void;
   replayListen: (listenNumber: number) => void;
@@ -78,6 +82,7 @@ export function useMusicIntelligence(
   const [replayListenNumber, setReplayListenNumber] = useState<number | null>(null);
   const [allTracks, setAllTracks] = useState<TrackEvolutionState[]>([]);
   const [trigger, setTrigger] = useState<{ seq: number; trigger: LyricTrigger } | null>(null);
+  const [presetPick, setPresetPick] = useState<{ seq: number; presetId: string } | null>(null);
 
   const recorderRef = useRef(new ListenRecorder());
   const trackRef = useRef<TrackIdentity | null>(null);
@@ -88,9 +93,11 @@ export function useMusicIntelligence(
   const audioRef = useRef<AudioData | null>(null);
   const lastLoudMsRef = useRef(performance.now());
   const listenStartMsRef = useRef(0);
-  const lastIdentifyMsRef = useRef(0);
+  const lastIdentifyMsRef = useRef(-Infinity); // first attempt fires as soon as sound is present
   const lastPosRef = useRef(0);
   const triggerSeqRef = useRef(0);
+  const presetSeqRef = useRef(0);
+  const gapPendingRef = useRef(false); // saw a between-song dip; identify as soon as sound returns
   const firedTriggerIdxRef = useRef(new Set<number>());
   const paramsRef = useRef<MusicVisualParams | null>(null);
   const busyRef = useRef(false);
@@ -120,7 +127,22 @@ export function useMusicIntelligence(
     let state = await getTrackState(identity.isrc);
     if (!state) state = newTrackState(identity.isrc, identity.title, identity.artist);
     else if (!state.title && identity.title) state = { ...state, title: identity.title, artist: identity.artist };
+
+    // Pick (or recall) this track's visualizer preset — deterministic per
+    // ISRC, biased by the live audio profile at first identification.
+    if (!state.presetId) {
+      const a = audioRef.current;
+      const profile = a ? {
+        energy: Math.min(1, a.energy),
+        bass: Math.min(1, a.bass / 70),
+        brightness: Math.min(1, a.timbre / 70),
+      } : null;
+      state = { ...state, presetId: pickPresetForTrack(identity.isrc, profile) };
+      await putTrackState(state);
+    }
     setTrackState(state);
+    presetSeqRef.current++;
+    setPresetPick({ seq: presetSeqRef.current, presetId: state.presetId! });
 
     const cached = await getSongMap(identity.isrc);
     setSongMap(cached ?? null);
@@ -138,11 +160,15 @@ export function useMusicIntelligence(
   }, []);
 
   // ── Finalize the current listen (track changed or went silent) ─────
-  const finalizeListen = useCallback(async (reason: 'silence' | 'trackChange' | 'manual') => {
+  // trimToSec bounds the recording analysis at the actual track boundary —
+  // the recorder keeps rolling past the end of a song until silence or the
+  // next identification confirms the change.
+  const finalizeListen = useCallback(async (reason: 'silence' | 'trackChange' | 'manual', trimToSec?: number) => {
     const currentTrack = trackRef.current;
     const listenMs = performance.now() - listenStartMsRef.current;
     const recording = await recorderRef.current.stop();
     setRecordingActive(false);
+    gapPendingRef.current = false;
 
     if (!currentTrack) return;
 
@@ -151,7 +177,7 @@ export function useMusicIntelligence(
       setAnalyzing(true);
       const map = await generateSongMap(currentTrack.isrc, recording, {
         title: currentTrack.title, artist: currentTrack.artist,
-      });
+      }, trimToSec);
       setAnalyzing(false);
       if (map) {
         await putSongMap(map);
@@ -213,19 +239,34 @@ export function useMusicIntelligence(
         lastPosRef.current = pos;
       }
 
-      // End of listen on sustained silence
+      // End of listen on sustained silence — trim the recording back to when
+      // the sound actually stopped
       if (currentTrack && silentFor > SILENCE_END_MS && !busyRef.current) {
         busyRef.current = true;
-        await finalizeListen('silence');
+        const playedSec = Math.max(0, (lastLoudMsRef.current - listenStartMsRef.current) / 1000);
+        await finalizeListen('silence', playedSec);
         busyRef.current = false;
         return;
       }
 
-      // Periodic identification — also fires quickly after silence→energy transitions
-      const dueForIdentify = now - lastIdentifyMsRef.current > IDENTIFY_INTERVAL_MS ||
-        (!currentTrack && silentFor < 2000 && now - lastIdentifyMsRef.current > 15_000);
-      if (fingerprintingAvailable() && dueForIdentify && !busyRef.current &&
-          audio && audio.volume > SILENCE_VOLUME) {
+      // A short dip while a track is playing looks like a between-song gap:
+      // identify immediately when sound returns instead of waiting out the
+      // slow re-check interval, so track changes are caught within seconds.
+      if (currentTrack && silentFor > GAP_MS && silentFor < SILENCE_END_MS) {
+        gapPendingRef.current = true;
+      }
+      const soundPresent = !!audio && audio.volume > SILENCE_VOLUME;
+      if (gapPendingRef.current && soundPresent) {
+        gapPendingRef.current = false;
+        lastIdentifyMsRef.current = -Infinity; // force an identify this tick
+      }
+
+      // Identification cadence: as soon as sound is present when nothing is
+      // identified yet (then a fast retry loop), slow re-checks once a track
+      // is known — those only refine position and catch track changes.
+      const identifyGap = currentTrack ? IDENTIFY_INTERVAL_MS : IDENTIFY_RETRY_MS;
+      const dueForIdentify = now - lastIdentifyMsRef.current > identifyGap;
+      if (fingerprintingAvailable() && dueForIdentify && !busyRef.current && soundPresent) {
         busyRef.current = true;
         lastIdentifyMsRef.current = now;
         setIdentifying(true);
@@ -233,7 +274,11 @@ export function useMusicIntelligence(
           const identity = await identify(stream);
           if (identity) {
             if (identity.isrc !== trackRef.current?.isrc) {
-              await finalizeListen('trackChange');
+              // Trim the previous listen's recording at the point the new
+              // track actually started (its match offset tells us when).
+              const newTrackStartMs = (identity.identifiedAtMs ?? performance.now()) - (identity.offsetSec ?? 0) * 1000;
+              const prevListenSec = Math.max(0, (newTrackStartMs - listenStartMsRef.current) / 1000);
+              await finalizeListen('trackChange', prevListenSec);
               await adoptTrack(identity, stream);
             } else if (trackRef.current) {
               // Same track — refine the position clock with the fresh offset
@@ -317,7 +362,7 @@ export function useMusicIntelligence(
       sectionSentimentValue, identifying, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },
-    overrides, harmonyIndex, trigger,
+    overrides, harmonyIndex, trigger, presetPick,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
   };
 }
