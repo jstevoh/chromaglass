@@ -47,6 +47,13 @@ export const COLOR_HARMONIES: number[][] = [
   [9, 10, 7, 15],      // Galaxy: Cobalt, Purple, Icy Blue, White
 ];
 
+// Display names for COLOR_HARMONIES, index-aligned.
+export const COLOR_HARMONY_NAMES: string[] = [
+  'Warm Sunset', 'Cool Ocean', 'Neon Electric', 'Fire & Ice', 'Royal Garden',
+  'Tropical', 'Deep Jewel', 'Pastel Glow', 'Magenta Dream', 'Citrus Pop',
+  'Contrast Shock', 'Carnival', 'Galaxy',
+];
+
 /** Pick a random color harmony index set */
 export function pickHarmony(): number[] {
   return COLOR_HARMONIES[Math.floor(Math.random() * COLOR_HARMONIES.length)];

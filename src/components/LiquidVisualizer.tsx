@@ -49,6 +49,8 @@ export interface LiquidVisualizerHandle {
   setInjectStyle: (styles: string[]) => void;
   /** Pin the color harmony to a specific palette-index set (music intelligence). */
   setHarmony: (indices: number[]) => void;
+  /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
+  setHarmonyLock: (indices: number[] | null) => void;
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
 }
@@ -81,6 +83,7 @@ class FluidSimulation {
 
   temp: Float32Array;
   temp0: Float32Array;
+  meanDensity = 0; // rolling measure of how full the plate is
 
   constructor(size: number, diffusion: number, viscosity: number, dt: number) {
     this.size = size;
@@ -752,8 +755,16 @@ class FluidSimulation {
     this.advect(0, this.densityB, this.sB,     this.vx, this.vy, dt * advection);
     this.advect(0, this.temp,     this.temp0,  this.vx, this.vy, dt * advection);
 
-    // 10. Evaporation, damping, stability
-    const evapFactor = 1.0 - settings.evaporationRate * 0.02;
+    // 10. Evaporation, damping, stability.
+    // Self-regulating dye budget: as the plate fills toward saturation,
+    // evaporation ramps up hard so injection and removal find equilibrium
+    // with plenty of empty glass left — a saturated plate has no boundaries
+    // or gradients and reads as a static color wash.
+    const targetMean = 0.85;
+    const over = Math.max(0, this.meanDensity / targetMean - 1);
+    const regulatorEvap = Math.min(0.02, over * over * 0.012);
+    const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    let densSum = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       this.vx[i] *= damping;
       this.vy[i] *= damping;
@@ -767,6 +778,16 @@ class FluidSimulation {
       this.densityR[i] *= evapFactor;
       this.densityG[i] *= evapFactor;
       this.densityB[i] *= evapFactor;
+      // Per-cell soft cap — keeps color ratios but stops runaway thickness,
+      // so fresh dye can always shift a cell's hue
+      if (this.density[i] > 6) {
+        const capScale = 6 / this.density[i];
+        this.density[i] *= capScale;
+        this.densityR[i] *= capScale;
+        this.densityG[i] *= capScale;
+        this.densityB[i] *= capScale;
+      }
+      densSum += this.density[i];
       this.temp[i]     *= heatDecay;
       this.dhdt[i]     *= 0.5;
       this.gap[i]       = Math.min(0.03, this.gap[i] + 0.005);
@@ -779,7 +800,7 @@ class FluidSimulation {
       if (isNaN(this.vx[i]))      this.vx[i]       = 0;
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
-
+    this.meanDensity = densSum / GRID_AREA;
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -1127,6 +1148,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastDrainTrigger = useRef(drainTrigger);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   const harmonyRef = useRef(pickHarmony());
+  const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const injectStyleRef = useRef<string[]>(['drop']);
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
@@ -1156,7 +1178,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
       const fluid = fluidsRef.current[0];
       if (fluid) {
-        harmonyRef.current = fluid.seedPreset(presetId, noise2D);
+        const seeded = fluid.seedPreset(presetId, noise2D);
+        harmonyRef.current = harmonyLockRef.current ?? seeded;
       }
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
       drainFrameRef.current = 0;
@@ -1165,9 +1188,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       injectStyleRef.current = styles;
     },
     setHarmony: (indices: number[]) => {
+      // Music-driven harmony never overrides an explicit user palette lock
+      if (harmonyLockRef.current) return;
       if (indices.length > 0 && indices.every(i => i >= 0 && i < PALETTE_COUNT)) {
         harmonyRef.current = indices;
       }
+    },
+    setHarmonyLock: (indices: number[] | null) => {
+      harmonyLockRef.current = indices;
+      if (indices) harmonyRef.current = indices;
     },
     triggerTheme: (theme: string, energy = 0.6) => {
       const af = fluidsRef.current[activeLayerRef.current];
@@ -1805,7 +1834,7 @@ void main() {
         if (drainTrigger > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTrigger;
           drainFrameRef.current = 1;
-          harmonyRef.current = pickHarmony(); // fresh palette after drain
+          harmonyRef.current = harmonyLockRef.current ?? pickHarmony(); // fresh palette after drain
         }
         if (drainFrameRef.current > 0) {
           const DRAIN_FRAMES = 50;
@@ -2008,14 +2037,14 @@ void main() {
           }
 
           // Slowly rotate color harmony every ~45 seconds in auto mode
-          if (Math.random() < 0.0004) harmonyRef.current = pickHarmony();
+          if (!harmonyLockRef.current && Math.random() < 0.0004) harmonyRef.current = pickHarmony();
 
         }
 
         // ── Seed trigger ───────────────────────────────────────
         if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
           lastSeedCount.current = seedCount;
-          harmonyRef.current = pickHarmony();
+          harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
           const styles = injectStyleRef.current;
           for (const fluid of fluidsRef.current) {
             for (let i = 0; i < 8; i++) {
@@ -2049,7 +2078,7 @@ void main() {
               const px = Math.floor(pt.x), py = Math.floor(pt.y);
               if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
                 const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
-                af.addDensity(px, py, 0.07, c.r, c.g, c.b);
+                af.addDensity(px, py, 0.05, c.r, c.g, c.b);
                 af.addTemp(px, py, 0.02);
               }
             });
@@ -2123,7 +2152,7 @@ void main() {
                     const rx2 = Math.floor(centerX + Math.cos(a) * ringR);
                     const ry2 = Math.floor(centerY + Math.sin(a) * ringR);
                     if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                      activeFluid.addDensity(rx2, ry2, bass01 * 1.6 * impactMul, ringCol.r, ringCol.g, ringCol.b);
+                      activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
                       activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
                     }
                   }

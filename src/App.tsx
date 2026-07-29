@@ -9,7 +9,7 @@ import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
-import { COLOR_HARMONIES } from './constants';
+import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 
@@ -166,6 +166,26 @@ export default function App() {
 
   const musicIntel = useMusicIntelligence(audioStream, audioData, musicSettings, settings);
 
+  // ── User palette lock ───────────────────────────────────────────
+  const [paletteLock, setPaletteLock] = useState<number | null>(() => {
+    const raw = localStorage.getItem('chromaglass-palette-lock');
+    const n = raw == null ? NaN : parseInt(raw, 10);
+    return Number.isInteger(n) && n >= 0 && n < COLOR_HARMONIES.length ? n : null;
+  });
+  const selectPalette = useCallback((index: number | null) => {
+    setPaletteLock(index);
+    try {
+      if (index == null) localStorage.removeItem('chromaglass-palette-lock');
+      else localStorage.setItem('chromaglass-palette-lock', String(index));
+    } catch { /* private mode */ }
+    visualizerRef.current?.setHarmonyLock(index == null ? null : COLOR_HARMONIES[index]);
+  }, []);
+  useEffect(() => {
+    // Re-assert a persisted lock once the visualizer is mounted
+    if (paletteLock != null) visualizerRef.current?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Overlay music-driven parameters onto the user's settings for rendering only
   // (the settings state itself is untouched, so preset detection keeps working).
   const effectiveSettings = useMemo(
@@ -174,11 +194,12 @@ export default function App() {
   );
 
   // Pin the visualizer's palette to the track's harmony (with evolution drift)
+  // — unless the user has locked a palette themselves.
   useEffect(() => {
-    if (musicIntel.harmonyIndex != null) {
+    if (musicIntel.harmonyIndex != null && paletteLock == null) {
       visualizerRef.current?.setHarmony(COLOR_HARMONIES[musicIntel.harmonyIndex]);
     }
-  }, [musicIntel.harmonyIndex]);
+  }, [musicIntel.harmonyIndex, paletteLock]);
 
   // Fire lyric word-triggers into the fluid
   useEffect(() => {
@@ -316,6 +337,62 @@ export default function App() {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Quick color swatches — one click recolors the selected liquid */}
+                <div className="flex flex-col gap-1.5 w-full">
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
+                  <div className="grid grid-cols-8 gap-1">
+                    {DROPPER_COLORS.map(hex => {
+                      const isCurrent = selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
+                      return (
+                        <button
+                          key={hex}
+                          onClick={() => updateLiquidColor(selectedLiquidId, hex)}
+                          className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                            isCurrent ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/20'
+                          }`}
+                          style={{ backgroundColor: hex }}
+                          title={PALETTE.find(p => p.hex === hex)?.name ?? hex}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="h-px w-full bg-white/10"></div>
+
+                {/* Palette lock — pins the ambient/auto/music color harmony */}
+                <div className="flex flex-col gap-1.5 w-full">
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Palette</span>
+                  <div className="flex flex-col gap-1 max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+                    <button
+                      onClick={() => selectPalette(null)}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
+                        paletteLock == null ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[9px] font-bold uppercase tracking-wider flex-1">Auto</span>
+                      <span className="text-[8px] opacity-50">follows music</span>
+                    </button>
+                    {COLOR_HARMONIES.map((harmony, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectPalette(idx)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
+                          paletteLock === idx ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                        }`}
+                        title={COLOR_HARMONY_NAMES[idx]}
+                      >
+                        <span className="flex gap-0.5">
+                          {harmony.slice(0, 4).map((pi, i) => (
+                            <span key={i} className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: PALETTE[pi].hex }} />
+                          ))}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider truncate">{COLOR_HARMONY_NAMES[idx]}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="h-px w-full bg-white/10"></div>
