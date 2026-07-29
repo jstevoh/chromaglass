@@ -41,10 +41,23 @@ export interface SongMap {
   generatedAt: number;
 }
 
+/** One manual interaction, anchored to song time. Coordinates are normalized 0-1. */
+export interface GestureEvent {
+  t: number;      // seconds into the track
+  tool: string;   // dropper | spray | splatter | pour | streak | blow
+  x: number;
+  y: number;
+  dx?: number;    // normalized movement direction (streak)
+  dy?: number;
+  color?: string; // hex dye color (absent for blow)
+}
+
 export interface ListenRecord {
   date: string;          // ISO
   listenNumber: number;
   paramSnapshot: Record<string, number>;
+  /** Saved light-show performance — present only if the user chose to keep it. */
+  gestures?: GestureEvent[];
 }
 
 export interface TrackEvolutionState {

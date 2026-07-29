@@ -206,7 +206,14 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
                 }`}
               >
                 <div>
-                  <div className="text-[10px] font-bold">Listen #{listen.listenNumber}</div>
+                  <div className="text-[10px] font-bold flex items-center gap-1.5">
+                    Listen #{listen.listenNumber}
+                    {listen.gestures && listen.gestures.length > 0 && (
+                      <span className="px-1 py-0.5 rounded bg-purple-500/25 text-purple-200 text-[8px] font-bold" title={`${listen.gestures.length} recorded gestures replay with this listen`}>
+                        🎨 {listen.gestures.length}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[9px] opacity-50">{new Date(listen.date).toLocaleString()}</div>
                 </div>
                 <Play size={10} className="opacity-50" />
@@ -214,7 +221,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
             ))}
           </div>
           <p className="text-[9px] opacity-40 mt-2 leading-relaxed">
-            Replay renders the live audio with that listen's frozen visual parameters — same engine, historical look.
+            Replay renders the live audio with that listen's frozen visual parameters — and re-paints any saved 🎨 performance at the same moments in the song.
           </p>
         </section>
       )}

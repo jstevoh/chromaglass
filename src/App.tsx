@@ -219,6 +219,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.presetPick?.seq]);
 
+  // Re-fire replayed performance gestures into the fluid
+  useEffect(() => {
+    if (musicIntel.gestureFire) {
+      for (const g of musicIntel.gestureFire.gestures) {
+        visualizerRef.current?.applyGesture(g);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [musicIntel.gestureFire?.seq]);
+
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
@@ -286,6 +296,7 @@ export default function App() {
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+        onManualGesture={musicIntel.recordGesture}
       />
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
@@ -644,6 +655,38 @@ export default function App() {
           sentiment={musicIntel.state.sectionSentimentValue}
         />
       )}
+
+      {/* ── Save-performance prompt (post-song, otherwise discarded) ── */}
+      <AnimatePresence>
+        {musicIntel.pendingPerformance && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-purple-400/30 rounded-2xl px-5 py-3 shadow-2xl"
+          >
+            <div className="text-xs">
+              <div className="font-bold">Keep your light-show performance?</div>
+              <div className="opacity-60 text-[10px] mt-0.5">
+                {musicIntel.pendingPerformance.gestureCount} gestures painted during
+                {musicIntel.pendingPerformance.title ? ` “${musicIntel.pendingPerformance.title}”` : ' this listen'}
+              </div>
+            </div>
+            <button
+              onClick={musicIntel.savePendingPerformance}
+              className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-[10px] font-bold uppercase tracking-widest transition-colors"
+            >
+              Save
+            </button>
+            <button
+              onClick={musicIntel.discardPendingPerformance}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold uppercase tracking-widest text-white/60 transition-colors"
+            >
+              Discard
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">

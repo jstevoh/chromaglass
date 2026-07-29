@@ -15,6 +15,8 @@ interface LiquidVisualizerProps {
   activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak';
   isAutomated?: boolean;
   isActive?: boolean;
+  /** Called (throttled) while the user paints — feeds performance recording. */
+  onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
 }
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
@@ -53,6 +55,8 @@ export interface LiquidVisualizerHandle {
   setHarmonyLock: (indices: number[] | null) => void;
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
+  /** Re-fire a recorded manual gesture (performance replay). Normalized coords. */
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
 }
 
 // ─── Fluid Simulation ────────────────────────────────────────────────
@@ -1138,7 +1142,7 @@ interface GLResources {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true,
+  isAutomated = false, isActive = true, onManualGesture,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -1167,6 +1171,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
   const lastBass01Ref = useRef(0); // for beat edge detection
+  const onManualGestureRef = useRef(onManualGesture);
+  const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
 
   useImperativeHandle(ref, () => ({
     injectImage: (imageData: ImageData) => {
@@ -1261,6 +1267,44 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
       }
     },
+    applyGesture: (g) => {
+      const af = fluidsRef.current[activeLayerRef.current];
+      if (!af || drainFrameRef.current > 0) return;
+      const S = GRID_SIZE;
+      const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
+      const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
+      const rgb = hexToRgb(g.color ?? '#ffffff');
+
+      switch (g.tool) {
+        case 'blow':
+          af.blowAir(x, y, 4, 0.06);
+          break;
+        case 'streak': {
+          // Directional smear along the recorded movement
+          const dx = g.dx ?? 1, dy = g.dy ?? 0;
+          const len = 8 * GRID_SCALE;
+          for (let t = -len; t <= len; t += 0.8) {
+            const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
+            if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
+            const w = 1.0 - Math.abs(t) / len;
+            af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
+            af.addVelocity(sx, sy, dx * 0.3 * w, dy * 0.3 * w);
+          }
+          break;
+        }
+        case 'spray':
+          af.autoInject('spray', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
+          break;
+        case 'splatter':
+          af.autoInject('splatter', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+          break;
+        case 'pour':
+          af.autoInject('pour', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+          break;
+        default: // dropper
+          af.autoInject('drop', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+      }
+    },
   }));
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
@@ -1270,6 +1314,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+  useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
 
   useEffect(() => {
     const currentCount = fluidsRef.current.length;
@@ -1917,6 +1962,21 @@ void main() {
             const liq = selectedLiquidRef.current;
             const rgb = hexToRgb(liq?.color ?? '#ffffff');
             const heat = liq?.heatAmount ?? 0.05;
+
+            // Feed the performance recorder (~15 Hz while painting)
+            if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
+              const gmx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
+              const gmy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+              const gLen = Math.sqrt(gmx * gmx + gmy * gmy) || 1;
+              onManualGestureRef.current({
+                tool,
+                x: x / GRID_SIZE,
+                y: y / GRID_SIZE,
+                dx: gmx / gLen,
+                dy: gmy / gLen,
+                color: tool === 'blow' ? undefined : (liq?.color ?? '#ffffff'),
+              });
+            }
 
             if (tool === 'blow') {
               af.blowAir(x, y, 4, 0.06);
