@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Three macro presets — Macro Bead, Cell Bloom, Lacing Run — each with its own seed pattern of separated beads for the camera to choose between
 - Macro toggle in the main toolbar and a Macro Closeup section in Settings; Lucky rolls closeup framing one time in four
 
+### Added — Deployment
+- GitHub Actions workflow that typechecks, builds and publishes to Firebase Hosting on every push to `main` (needs a `FIREBASE_SERVICE_ACCOUNT` repository secret)
+- Favicon, Apple touch icon, share card and page metadata — the built site previously served a bare `index.html` with no icon and no description
+
 ### Added — Audio
 - **Automatic room calibration** — the analyser learns the room instead of asking the listener to find a sensitivity number: it tracks the noise floor and signal ceiling in dBFS, fits the AnalyserNode's own dB window to them (the defaults waste almost the whole 0-255 spectrum on a quiet room, which is the mechanical reason a distant mic drives the visuals so weakly), and normalises every band against its own learned range so bass, mids and treble each use their full travel wherever the app is running (`src/lib/audioCalibration.ts`, `autoCalibrate`)
 - Calibration readout and a Recalibrate button in Settings → Audio Input, showing the learned floor and peak

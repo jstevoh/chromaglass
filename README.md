@@ -100,6 +100,22 @@ server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
 ```
 
+## Deploying
+
+Pushes to `main` are typechecked, built and published to Firebase Hosting by
+`.github/workflows/deploy.yml`. Before the first run, add a repository secret
+named `FIREBASE_SERVICE_ACCOUNT` containing a service-account JSON key with the
+**Firebase Hosting Admin** role on the `chromaglass` project (Firebase console →
+Project settings → Service accounts → Generate new private key). Optionally add
+`VITE_FINGERPRINT_PROXY_URL` to enable automatic song identification.
+
+To deploy by hand instead:
+
+```bash
+npm run build
+npx firebase deploy --only hosting
+```
+
 ## License
 
 MIT

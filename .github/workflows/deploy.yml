@@ -1,0 +1,76 @@
+name: Deploy to Firebase Hosting
+
+# Every push to main is typechecked, built and published to the live channel.
+# Run it by hand from the Actions tab with "Run workflow" when you want to
+# redeploy without a code change.
+#
+# One-time setup — the workflow can't run until this secret exists:
+#
+#   1. Firebase console → Project settings → Service accounts → Generate new
+#      private key. (Or: gcloud iam service-accounts keys create key.json
+#      --iam-account=<sa>@chromaglass.iam.gserviceaccount.com)
+#   2. The account needs the "Firebase Hosting Admin" and "API Keys Viewer"
+#      roles on the chromaglass project.
+#   3. GitHub → Settings → Secrets and variables → Actions → New repository
+#      secret, named FIREBASE_SERVICE_ACCOUNT, with the whole JSON file as its
+#      value.
+#
+# Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
+# automatic song identification. Left unset, the build still succeeds and the
+# Track panel falls back to manual tagging.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys race each other onto the live channel.
+concurrency:
+  group: firebase-hosting-live
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+
+      # Until the secret is added, build and typecheck still run and the job
+      # stays green — a red X on main for setup that hasn't happened yet is
+      # noise, not a signal.
+      - name: Check for deploy credentials
+        id: creds
+        run: echo "present=${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Firebase Hosting
+        if: steps.creds.outputs.present == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: chromaglass
+          channelId: live
+
+      - name: Deploy skipped
+        if: steps.creds.outputs.present != 'true'
+        run: |
+          echo "::warning title=Not deployed::FIREBASE_SERVICE_ACCOUNT is not set, so the build was not published. See the setup notes at the top of .github/workflows/deploy.yml."
