@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Three macro presets — Macro Bead, Cell Bloom, Lacing Run — each with its own seed pattern of separated beads for the camera to choose between
 - Macro toggle in the main toolbar and a Macro Closeup section in Settings; Lucky rolls closeup framing one time in four
 
+### Added — Audio
+- **Automatic room calibration** — the analyser learns the room instead of asking the listener to find a sensitivity number: it tracks the noise floor and signal ceiling in dBFS, fits the AnalyserNode's own dB window to them (the defaults waste almost the whole 0-255 spectrum on a quiet room, which is the mechanical reason a distant mic drives the visuals so weakly), and normalises every band against its own learned range so bass, mids and treble each use their full travel wherever the app is running (`src/lib/audioCalibration.ts`, `autoCalibrate`)
+- Calibration readout and a Recalibrate button in Settings → Audio Input, showing the learned floor and peak
+- **Raw microphone capture** — echo cancellation, noise suppression and auto gain are now switched off. They are tuned for speech on a call and are hostile to music: suppression ducks a steady groove as background noise, AGC flattens the dynamics, and echo cancellation can null out the speakers in the room
+- A smoothed signal gate so the silences between beats don't strobe the visuals, and a noise-floor rule that lifts only from levels near the floor — a floor that chased the running level would climb to meet sustained music and squeeze the range shut a minute into every song
+
+### Added — Depth
+- **Surface relief** — the frame is lit from a real height field assembled at three scales: the bead's own dome, the meniscus of every cell (analytic, from each cell's radial slope) and the grooves the lacing cuts. Wet specular highlights, a refracting rim and occlusion in the recesses (`macroRelief`)
+- Two-tap contact shadow — one tight to the bead, one wider and softer behind it, which is what lifts the paint off the ground instead of leaving it pasted flat on
+
+### Changed — Audio
+- The sensitivity slider is now a trim either side of the calibrated level rather than the control that has to be right; its default maps to unity gain
+- Moving a slider no longer tears down and rebuilds the AudioContext, so trims don't glitch the audio or discard the room calibration mid-song
+
+### Changed — Rendering
+- **Dark ink reads as dark ink.** Opacity now accounts for how much of the spectrum the dye absorbs, so black hides the lit ground behind it instead of sitting over it at the same opacity as a yellow and greying out; cell cores darken the whole way rather than being scaled down by the patch mask; film grain is scaled by brightness, since a fixed offset on near-black pixels is a grey haze
+- **The solver runs on wall-clock time**, not one step per rendered frame. The light show used to run in slow motion on a weak GPU and at double speed on a 120 Hz display; steps are now driven by elapsed time and capped, so a slow frame catches up rather than falling behind
+- Each cell is evaluated against every neighbour's profile rather than being assigned to its nearest centre, so crowded cells keep complete circular rings instead of being clipped into polygons
+- The silhouette warp no longer deforms the cells themselves — bent circles read as lumps rather than as bubbles
+
 ### Changed — Macro Closeup
 - Macro frames expose against the plate's own density histogram each frame: dye below the level where the top ~14% of the plate begins renders as bare ground, and the range above it is stretched to full opacity, so a closeup always has a subject, a silhouette and visible surface under the paint
 - The dye budget drops from a near-full plate to a sparse one while the closeup camera is running — a saturated plate magnified is just one flat colour

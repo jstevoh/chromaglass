@@ -25,6 +25,13 @@ const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 12
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
+// The solver advances at a fixed rate in wall-clock time rather than once per
+// rendered frame, so the light show runs at the same speed on a 30 fps laptop,
+// a 60 fps desktop and a 120 Hz display. A slow frame catches up by taking
+// several steps, capped so a stall can't spiral into a burst of work.
+const SIM_STEP = 1 / 60;
+const SIM_MAX_CATCHUP = 4;
+
 // Density histogram used to expose the macro closeup (see "Macro film exposure").
 const FILM_BINS = 64;
 const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
@@ -1248,6 +1255,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
+  const simAccumRef = useRef(0);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -1484,6 +1492,7 @@ uniform float u_macroCellScale;    // cell size
 uniform float u_macroLacing;       // dark lacing filaments along dye boundaries
 uniform float u_macroDepth;        // dome shading, contact shadow, depth of field
 uniform float u_macroEdge;         // fractal silhouette warp
+uniform float u_macroRelief;       // surface relief: per-pixel normals, specular, occlusion
 uniform float u_flowRate;          // fluid-UV per second, for advecting procedural detail
 uniform float u_filmLevel;         // density below which magnified dye reads as bare ground
 uniform float u_filmGain;          // maps the density above that level onto full opacity
@@ -1606,15 +1615,22 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   float g = exp(-decodeDensity(raw.g) * norm);
   float b = exp(-decodeDensity(raw.b) * norm);
 
+  // Ink that absorbs every wavelength hides what is behind it far sooner than
+  // a transparent dye of the same thickness does. Without this the blacks sit
+  // over the lit ground at the same opacity as the yellows and grey out.
+  float darkness = 1.0 - max(r, max(g, b));
+
   // Beer-Lambert volumetric opacity using blurred density for gooey edges.
   // Magnified, only dye thick enough to be a bead should register: below
   // u_filmLevel (tracked per frame from the plate's own density histogram) the
   // wash reads as bare ground, which is what gives a closeup its silhouettes.
-  float thickness = u_macro > 0.5
+  float thickness = (u_macro > 0.5
     ? max(0.0, totalDensity - u_filmLevel) * u_filmGain
-    : totalDensity * 2.8;
+    : totalDensity * 2.8) * (1.0 + darkness * 1.7);
   float alpha = 1.0 - exp(-thickness);
-  alpha = min(0.95, alpha);
+  // Magnified, a bead of ink is opaque; at plate scale the backlight is meant
+  // to come through everything, so the old ceiling stays there.
+  alpha = min(u_macro > 0.5 ? 0.995 : 0.95, alpha);
 
   return vec4(r, g, b, alpha);
 }
@@ -1713,57 +1729,94 @@ float fbm3(vec2 p) {
   return sum * 1.14;   // ~0..1
 }
 
-// One octave of packed bubbles.
-//   .x = signed distance to the nearest bubble edge (negative inside)
-//   .y = per-bubble random, 0..1
-vec2 bubbles(vec2 p, float seed) {
-  vec2 ip = floor(p), fp = fract(p);
-  // Voronoi by nearest *centre*, not by nearest edge: picking the nearest edge
-  // unions overlapping circles into blobs, while real cells crowd each other
-  // and each keeps its own ring, which is what belonging to one centre gives.
-  float bestDist = 1e9, bestR = 0.0, bestId = 0.0;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 g = vec2(float(i), float(j));
-      vec2 h = hash22(ip + g + seed);
-      vec2 c = g + 0.5 + (h - 0.5) * 0.55;
-      float dist = length(fp - c);
-      if (dist < bestDist) { bestDist = dist; bestR = 0.15 + h.x * 0.20; bestId = h.y; }
-    }
-  }
-  return vec2(bestDist - bestR, bestId);
+// Surface height across one cell, as a function of the signed distance to its
+// edge: the film is thin over the sunken core and piles into a meniscus ridge
+// at the rim. Differentiating this along the radial direction gives an exact
+// normal — screen-space derivatives of the same field come out blocky, because
+// they are evaluated per 2x2 quad over hard-edged masks.
+float cellHeight(float d, float rimWidth) {
+  float sunk = 1.0 - smoothstep(-rimWidth * 1.6, rimWidth * 0.1, d);
+  float ridge = exp(-pow((d - rimWidth * 0.25) / (rimWidth * 1.2), 2.0));
+  return ridge * 0.55 - sunk * 0.85;
 }
 
+struct Cell {
+  float core;   // interior mask
+  float rim;    // bright ring, negative just outside (the dark outline)
+  float id;     // per-bubble random
+  vec2 slope;   // 2D gradient of the cell's surface height
+};
+
 // One generation of cells: born, carried along by the dye, dissolved again.
+//
+// Every cell in the 3x3 neighbourhood is evaluated against its own profile and
+// the strongest wins per feature, so each one keeps a complete circular ring
+// even where its neighbours crowd it. (Assigning each pixel to its nearest
+// centre instead — a plain Voronoi — clips those rings along the cell
+// boundaries and turns round cells into polygons.)
+//
 // Cross-fading two offsets of the *same* pattern would average two distance
 // fields into mush, so instead each generation is its own pattern under a
 // sin^2 envelope; two generations half a cycle apart sum to exactly 1, giving
 // continuous cover with no ghosting and no reset pop.
-//   .x = core mask, .y = rim mask (negative just outside — the dark outline
-//        every real cell carries), .z = per-bubble random
-// rimWidth is a fraction of the cell spacing, so rings stay legible at any
-// magnification instead of collapsing to a hairline.
-vec3 cellGeneration(vec2 p, vec2 flow, float seed, float period, float phase, float rimWidth) {
+Cell cellField(vec2 p0, vec2 flow, float seed, float period, float phase, float rimWidth) {
   float a = fract(u_time / period + phase);
-  vec2 b = bubbles(p - flow * (a * period), seed);
   float env = sin(3.14159265 * a);
   env *= env;
-  float core = (1.0 - smoothstep(-rimWidth * 0.8, -rimWidth * 0.15, b.x)) * env;
-  float bright = 1.0 - smoothstep(rimWidth * 0.35, rimWidth * 1.15, abs(b.x));
-  float outline = 1.0 - smoothstep(rimWidth * 0.5, rimWidth * 1.3, abs(b.x - rimWidth * 2.0));
-  return vec3(core, (bright - outline * 0.7) * env, b.y);
+
+  vec2 p = p0 - flow * (a * period);
+  vec2 ip = floor(p), fp = fract(p);
+
+  float core = 0.0, bright = 0.0, outline = 0.0, id = 0.0;
+  float bestW = -1.0, bestD = 1.0;
+  vec2 bestDir = vec2(1.0, 0.0);
+
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 h = hash22(ip + g + seed);
+      vec2 c = g + 0.5 + (h - 0.5) * 0.62;
+      float r = 0.16 + h.x * 0.22;
+      vec2 delta = fp - c;
+      float dist = length(delta);
+      float d = dist - r;
+      if (d > rimWidth * 3.5) continue;                  // nowhere near this cell
+
+      float cr = 1.0 - smoothstep(-rimWidth * 0.8, -rimWidth * 0.15, d);
+      float br = 1.0 - smoothstep(rimWidth * 0.35, rimWidth * 1.15, abs(d));
+      float ol = 1.0 - smoothstep(rimWidth * 0.5, rimWidth * 1.3, abs(d - rimWidth * 2.0));
+
+      core = max(core, cr);
+      bright = max(bright, br);
+      outline = max(outline, ol);
+
+      float w = max(cr, br);
+      if (w > bestW) { bestW = w; bestD = d; bestDir = delta / max(dist, 1e-4); id = h.y; }
+    }
+  }
+
+  // Slope only for the cell that owns this pixel — two profile evaluations
+  // per generation instead of eighteen.
+  float e = rimWidth * 0.35;
+  float dh = (cellHeight(bestD + e, rimWidth) - cellHeight(bestD - e, rimWidth)) / (2.0 * e);
+
+  // A bright ring covers the dark outline of whatever it overlaps.
+  float rim = bright - outline * 0.7 * (1.0 - bright);
+  return Cell(core * env, rim * env, id, bestDir * dh * env);
 }
 
 // Crinkle the sampled position so bicubic-smooth silhouettes gain sub-cell
 // structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
-vec2 macroWarp(vec2 fuv) {
-  if (u_macroEdge < 0.005) return fuv;
+vec2 macroWarpOffset(vec2 fuv) {
+  if (u_macroEdge < 0.005) return vec2(0.0);
   float f = u_gridSize * 0.85;
   vec2 t = vec2(u_time * 0.012, u_time * -0.009);
   vec2 w = vec2(fbm3(fuv * f + t), fbm3(fuv * f + vec2(37.2, 11.7) + t)) - 0.5;
   w += (vec2(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
-  return fuv + w * (u_macroEdge * 1.1 / u_gridSize);
+  return w * (u_macroEdge * 1.1 / u_gridSize);
 }
+
+vec2 macroWarp(vec2 fuv) { return fuv + macroWarpOffset(fuv); }
 
 // Decode an already-fetched texel — the defocused path doesn't need bicubic
 // filtering or a gooey blur, so it costs 5 plain fetches instead of 5 decodes.
@@ -1772,8 +1825,10 @@ vec4 decodeFluidRaw(vec4 raw) {
   if (totalDensity < 0.001 / DENSITY_SCALE) return vec4(0.0);
   float norm = 1.0 / totalDensity;
   vec3 c = exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm);
-  float thickness = u_macro > 0.5 ? max(0.0, totalDensity - u_filmLevel) * u_filmGain : totalDensity * 2.8;
-  return vec4(c, min(0.95, 1.0 - exp(-thickness)));
+  float darkness = 1.0 - max(c.r, max(c.g, c.b));
+  float thickness = (u_macro > 0.5 ? max(0.0, totalDensity - u_filmLevel) * u_filmGain : totalDensity * 2.8)
+                  * (1.0 + darkness * 1.7);
+  return vec4(c, min(u_macro > 0.5 ? 0.995 : 0.95, 1.0 - exp(-thickness)));
 }
 
 // 5-tap defocus. The blur radius is constant in screen space, so the
@@ -1787,66 +1842,115 @@ vec4 decodeFluidDof(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur, floa
   return decodeFluidRaw(raw);
 }
 
-// Paint cells + lacing + dome shading for one layer's decoded dye.
+// Paint cells, lacing and relief lighting for one layer's decoded dye.
 //   grad  — silhouette/interface gradient strength, 0..1
 //   dof   — defocus at this pixel, 0..1 (detail dissolves out of focus)
-vec3 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 normal, float grad, float dof) {
+// Returns shaded colour in .rgb and a corrected opacity in .a.
+//
+// Control flow here is uniform (branches test uniforms only, masks do the
+// per-pixel work) because the relief pass takes screen-space derivatives of
+// the height field, which are undefined inside divergent branches.
+vec4 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 gridNormal, float grad, float dof) {
+  // The silhouette warp is meant to crinkle blob outlines, not to deform the
+  // cells themselves — bent circles read as lumps rather than as bubbles.
+  vec2 cuv = fuv - macroWarpOffset(fuv) * 0.75;
   float focus = 1.0 - dof * 0.85;
+  float paint = smoothstep(0.02, 0.20, alpha);
 
   // ── Packed cells ────────────────────────────────────────────────
-  float cellAmt = u_macroCells * focus;
-  if (cellAmt > 0.005 && alpha > 0.02) {
+  float core = 0.0, rim = 0.0, fineCore = 0.0, fineRim = 0.0, id = 0.0, k = 0.0;
+  vec2 cellSlope = vec2(0.0);
+  if (u_macroCells > 0.005) {
     float freq = u_gridSize / max(0.15, u_macroCellScale * 8.0);
-    vec2 p = fuv * freq;
+    vec2 p = cuv * freq;
     vec2 f = flow * freq;
 
     // Cells cluster in patches, the way pouring medium breaks out unevenly.
-    float clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.24, 0.62, fbm3(fuv * 13.0 + u_time * 0.015));
-    float k = cellAmt * clumping;
+    // Larger, higher-contrast patches: a real pour breaks out in cell-covered
+    // areas next to smooth ones, rather than pebbling the whole frame evenly.
+    float clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.26, 0.60, fbm3(cuv * 8.0 + u_time * 0.015));
+    k = u_macroCells * focus * clumping;
 
-    if (k > 0.002) {
-      // Coarse cells: two generations, half a cycle apart
-      vec3 g0 = cellGeneration(p, f, 0.0, 3.2, 0.0, 0.13);
-      vec3 g1 = cellGeneration(p, f, 17.0, 3.2, 0.5, 0.13);
-      float core = g0.x + g1.x;
-      float rim = g0.y + g1.y;
-      float id = g0.z * g0.x + g1.z * g1.x;
+    // Coarse cells: two generations, half a cycle apart
+    Cell g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13);
+    Cell g1 = cellField(p, f, 17.0, 3.2, 0.5, 0.13);
+    // Union, not sum: adding two generations' masks welds their circles into
+    // compound blobs, while taking the stronger of the two keeps every cell
+    // round as it fades in over the one it replaces.
+    core = max(g0.core, g1.core);
+    rim = max(g0.rim, g1.rim);
+    id = g0.core > g1.core ? g0.id : g1.id;
 
-      // Fine cells crowd into the gaps between the big ones, as they do in a
-      // real pour, and read as the grain of the film rather than as bubbles.
-      vec3 h0 = cellGeneration(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
-      vec3 h1 = cellGeneration(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
-      float gap = clamp(1.0 - core * 1.6, 0.0, 1.0);
-      float fineCore = (h0.x + h1.x) * gap;
-      float fineRim = (h0.y + h1.y) * gap;
+    // Fine cells crowd into the gaps between the big ones, as they do in a
+    // real pour, and read as the grain of the film rather than as bubbles.
+    Cell h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
+    Cell h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
+    float gap = clamp(1.0 - core * 1.6, 0.0, 1.0);
+    fineCore = max(h0.core, h1.core) * gap;
+    fineRim = max(h0.rim, h1.rim) * gap;
+    cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap;
 
-      vec3 dark = col * 0.05;
-      vec3 ring = mix(col, vec3(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
+    vec3 dark = col * 0.03;
+    vec3 ring = mix(col, vec3(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
 
-      col = mix(col, dark, clamp((core + fineCore * 0.55) * k, 0.0, 1.0));
-      col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
-    }
+    // Cell cores are holes in the film, not a tint over it: darken them the
+    // whole way rather than scaling the darkening down with the patch mask.
+    col = mix(col, dark, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
+    col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
   }
 
-  // ── Lacing — thin dark filaments streaming along the flow at dye edges ──
-  if (u_macroLacing > 0.005 && alpha > 0.03) {
+  // ── Lacing — thin dark filaments streaming along the flow ───────
+  float lace = 0.0;
+  if (u_macroLacing > 0.005) {
     vec2 dir = length(flow) > 1e-5 ? normalize(flow) : vec2(1.0, 0.0);
     vec2 nrm = vec2(-dir.y, dir.x);
-    vec2 q = vec2(dot(fuv, dir) * u_gridSize * 0.35, dot(fuv, nrm) * u_gridSize * 3.2);
-    float lace = fbm3(q + u_time * 0.03) - 0.5;
-    float line = 1.0 - smoothstep(0.0, 0.055, abs(lace));
+    vec2 q = vec2(dot(cuv, dir) * u_gridSize * 0.35, dot(cuv, nrm) * u_gridSize * 3.2);
+    float n = fbm3(q + u_time * 0.03) - 0.5;
+    float line = 1.0 - smoothstep(0.0, 0.055, abs(n));
     float edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
-    col = mix(col, col * 0.06, line * edgeMask * u_macroLacing * focus);
+    lace = line * edgeMask * u_macroLacing * focus;
+    col = mix(col, col * 0.04, lace);
   }
 
-  // ── Dome shading — the film reads as a bead with thickness ──────
+  // ── Relief ──────────────────────────────────────────────────────
+  // The surface normal is assembled from three scales: the bead's own dome
+  // (from the solver-grid normal), the meniscus of every cell (analytic, from
+  // each cell's radial slope) and grooves where the lacing cuts in. Lit, this
+  // is what makes the frame read as a wet surface with depth instead of as
+  // flat colour.
+  if (u_macroRelief > 0.005) {
+    float r3 = u_macroRelief;
+    vec2 tilt = cellSlope * k * 1.6 + vec2(0.0, lace * 0.6);
+    // The grid normal is a gentle slope over many sim cells; scaled up it
+    // becomes the dome of the bead, which is what carries the large-scale
+    // sense of volume under the cell detail.
+    vec3 n = normalize(vec3(gridNormal.xy * 3.2 - tilt * r3, 1.0));
+
+    vec3 L = normalize(vec3(-0.45, -0.55, 0.70));
+    vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
+    float diff = max(0.0, dot(n, L));
+    float spec = pow(max(0.0, dot(n, H)), 46.0);
+    float fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    // Recessed cores and grooves sit in their own shadow.
+    float ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
+
+    // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
+    // without darkening it overall.
+    col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
+    col += vec3(1.0, 0.97, 0.90) * spec * r3 * paint * 0.7;    // wet highlight on the domes
+    col += col * fres * r3 * paint * 0.35;                     // bright refracting edge
+  }
+
+  // ── Dome shading — thickness across the bead as a whole ─────────
   if (u_macroDepth > 0.005) {
     float belly = smoothstep(0.05, 0.45, alpha);
-    float lam = max(0.0, dot(normal, normalize(vec3(-0.5, -0.5, 0.72))));
-    col *= mix(1.0, (0.52 + 0.68 * belly) * (0.72 + 0.5 * lam), u_macroDepth * 0.85);
+    col *= mix(1.0, 0.74 + 0.42 * belly, u_macroDepth * 0.8);
   }
 
-  return col;
+  // Ink pooled in a cell core is opaque — let it read as true black rather
+  // than as the lit ground showing through.
+  float aOut = clamp(alpha + clamp(core * k, 0.0, 1.0) * 0.5 * paint, 0.0, 1.0);
+  return vec4(col, aOut);
 }
 
 // Blend mode functions
@@ -1964,7 +2068,7 @@ void main() {
 
   if (macro) {
     float grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    fluid0.rgb = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    fluid0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
@@ -1973,9 +2077,13 @@ void main() {
   if (macro && u_macroDepth > 0.005) {
     float fiber = fbm3(uv * vec2(aspect, 1.0) * 230.0);
     bgColor = bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * u_macroDepth;
-    vec2 fuvS = uvToFluid(uv + vec2(0.014, -0.014), c0, s0);
-    float sh = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, fuvS).a) * 2.2);
-    bgColor *= mix(1.0, 0.32, clamp(sh, 0.0, 1.0) * u_macroDepth);
+    // Two offsets — a contact shadow tight to the bead and a softer, wider
+    // one behind it. The gap between them is what lifts the paint off the
+    // ground instead of leaving it pasted flat onto it.
+    float shA = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.008, -0.008), c0, s0)).a) * 2.6);
+    float shB = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.022, -0.022), c0, s0)).a) * 1.6);
+    float shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
+    bgColor *= mix(1.0, 0.18, shadow * u_macroDepth);
   }
 
   vec3 outColor = bgColor;
@@ -2007,7 +2115,7 @@ void main() {
 
     if (macro) {
       float grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1.rgb = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
+      fluid1 = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
     }
 
     vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
@@ -2019,7 +2127,11 @@ void main() {
   outColor = clamp(mix(vec3(luma), outColor, u_saturation), 0.0, 1.0);
 
   // ── Film grain ────────────────────────────────────────────────────
-  float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.035;
+  // Grain scaled by brightness — a fixed offset on near-black pixels is a grey
+  // haze, which is exactly what washes the ink out.
+  float grainLuma = dot(outColor, vec3(0.299, 0.587, 0.114));
+  float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.035
+              * (0.25 + 0.75 * smoothstep(0.0, 0.25, grainLuma));
   outColor = clamp(outColor + grain, 0.0, 1.0);
 
   fragColor = vec4(outColor, 1.0);
@@ -2103,7 +2215,7 @@ void main() {
       'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
       'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
       'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
-      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_flowRate',
+      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
       'u_filmLevel','u_filmGain',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
@@ -2213,6 +2325,11 @@ void main() {
         }
         const time = simulationTimeRef.current;
 
+        // How many solver steps this frame owes, from wall-clock time.
+        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * SIM_MAX_CATCHUP);
+        const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
+        simAccumRef.current -= simSteps * SIM_STEP;
+
         // ── Drain animation ────────────────────────────────────
         if (drainTrigger > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTrigger;
@@ -2275,7 +2392,7 @@ void main() {
             }
           }
 
-          drainFrameRef.current++;
+          drainFrameRef.current += Math.max(1, simSteps);
           if (drainFrameRef.current > DRAIN_FRAMES) {
             for (const af of fluidsRef.current) af.clearAll();
             drainFrameRef.current = 0;
@@ -2292,323 +2409,333 @@ void main() {
           }
         }
 
-        // ── Manual injection ───────────────────────────────────
-        if (isMouseDownRef.current && drainFrameRef.current === 0) {
-          const { x, y } = mousePosRef.current;
-          const af = fluidsRef.current[activeLayerRef.current];
-          if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-            const tool = activeToolRef.current;
-            const liq = selectedLiquidRef.current;
-            const rgb = hexToRgb(liq?.color ?? '#ffffff');
-            const heat = liq?.heatAmount ?? 0.05;
+        // ── Fixed-timestep phase ───────────────────────────────
+        // Injection and the solver share one loop so dye-per-second, air
+        // bursts and beat rings stay constant whatever the frame rate is.
+        for (let simStep = 0; simStep < simSteps; simStep++) {
+          // ── Manual injection ───────────────────────────────────
+          if (isMouseDownRef.current && drainFrameRef.current === 0) {
+            const { x, y } = mousePosRef.current;
+            const af = fluidsRef.current[activeLayerRef.current];
+            if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+              const tool = activeToolRef.current;
+              const liq = selectedLiquidRef.current;
+              const rgb = hexToRgb(liq?.color ?? '#ffffff');
+              const heat = liq?.heatAmount ?? 0.05;
 
-            // Feed the performance recorder (~15 Hz while painting)
-            if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
-              const gmx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
-              const gmy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
-              const gLen = Math.sqrt(gmx * gmx + gmy * gmy) || 1;
-              onManualGestureRef.current({
-                tool,
-                x: x / GRID_SIZE,
-                y: y / GRID_SIZE,
-                dx: gmx / gLen,
-                dy: gmy / gLen,
-                color: tool === 'blow' ? undefined : (liq?.color ?? '#ffffff'),
-              });
-            }
-
-            if (tool === 'blow') {
-              af.blowAir(x, y, 4, 0.06);
-
-            } else if (tool === 'spray') {
-              // Wide cone of fine mist — many small random particles in a radius
-              const sprayR = 10 * GRID_SCALE;
-              for (let p = 0; p < 12; p++) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * sprayR;
-                const px = Math.floor(x + Math.cos(angle) * dist);
-                const py = Math.floor(y + Math.sin(angle) * dist);
-                if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                const w = (1 - dist / sprayR) * 0.4;
-                af.addDensity(px, py, w, rgb.r, rgb.g, rgb.b);
-                if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+              // Feed the performance recorder (~15 Hz while painting)
+              if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
+                const gmx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
+                const gmy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+                const gLen = Math.sqrt(gmx * gmx + gmy * gmy) || 1;
+                onManualGestureRef.current({
+                  tool,
+                  x: x / GRID_SIZE,
+                  y: y / GRID_SIZE,
+                  dx: gmx / gLen,
+                  dy: gmy / gLen,
+                  color: tool === 'blow' ? undefined : (liq?.color ?? '#ffffff'),
+                });
               }
 
-            } else if (tool === 'splatter') {
-              // Fling droplets outward from cursor — random sizes, random directions
-              for (let p = 0; p < 5; p++) {
-                const angle = Math.random() * Math.PI * 2;
-                const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
-                const px = Math.floor(x + Math.cos(angle) * flingDist);
-                const py = Math.floor(y + Math.sin(angle) * flingDist);
-                if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
-                const dropR = Math.round((1 + Math.floor(Math.random() * 3)) * GRID_SCALE);
-                const amt = 1.0 + Math.random() * 1.5;
-                for (let ddy = -dropR; ddy <= dropR; ddy++) {
-                  for (let ddx = -dropR; ddx <= dropR; ddx++) {
+              if (tool === 'blow') {
+                af.blowAir(x, y, 4, 0.06);
+
+              } else if (tool === 'spray') {
+                // Wide cone of fine mist — many small random particles in a radius
+                const sprayR = 10 * GRID_SCALE;
+                for (let p = 0; p < 12; p++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const dist = Math.random() * sprayR;
+                  const px = Math.floor(x + Math.cos(angle) * dist);
+                  const py = Math.floor(y + Math.sin(angle) * dist);
+                  if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
+                  const w = (1 - dist / sprayR) * 0.4;
+                  af.addDensity(px, py, w, rgb.r, rgb.g, rgb.b);
+                  if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+                }
+
+              } else if (tool === 'splatter') {
+                // Fling droplets outward from cursor — random sizes, random directions
+                for (let p = 0; p < 5; p++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
+                  const px = Math.floor(x + Math.cos(angle) * flingDist);
+                  const py = Math.floor(y + Math.sin(angle) * flingDist);
+                  if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
+                  const dropR = Math.round((1 + Math.floor(Math.random() * 3)) * GRID_SCALE);
+                  const amt = 1.0 + Math.random() * 1.5;
+                  for (let ddy = -dropR; ddy <= dropR; ddy++) {
+                    for (let ddx = -dropR; ddx <= dropR; ddx++) {
+                      const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+                      if (dd > dropR) continue;
+                      const nx = px + ddx, ny = py + ddy;
+                      if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                      const w = (1 - dd / dropR);
+                      af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                    }
+                  }
+                  // Fling velocity outward
+                  af.addVelocity(px, py, Math.cos(angle) * 0.5, Math.sin(angle) * 0.5);
+                }
+
+              } else if (tool === 'pour') {
+                // Heavy thick stream — wide, dense, with downward velocity
+                const pourR = Math.round(4 * GRID_SCALE);
+                const amt = 2.0;
+                for (let ddy = -pourR; ddy <= pourR; ddy++) {
+                  for (let ddx = -pourR; ddx <= pourR; ddx++) {
                     const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-                    if (dd > dropR) continue;
-                    const nx = px + ddx, ny = py + ddy;
+                    if (dd > pourR) continue;
+                    const nx = x + ddx, ny = y + ddy;
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                    const w = (1 - dd / dropR);
+                    const w = (1 - dd / pourR) ** 1.5;
                     af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                    af.addVelocity(nx, ny, 0, 0.12 * w); // downward gravity
+                    if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
-                // Fling velocity outward
-                af.addVelocity(px, py, Math.cos(angle) * 0.5, Math.sin(angle) * 0.5);
-              }
 
-            } else if (tool === 'pour') {
-              // Heavy thick stream — wide, dense, with downward velocity
-              const pourR = Math.round(4 * GRID_SCALE);
-              const amt = 2.0;
-              for (let ddy = -pourR; ddy <= pourR; ddy++) {
-                for (let ddx = -pourR; ddx <= pourR; ddx++) {
-                  const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-                  if (dd > pourR) continue;
-                  const nx = x + ddx, ny = y + ddy;
-                  if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                  const w = (1 - dd / pourR) ** 1.5;
-                  af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                  af.addVelocity(nx, ny, 0, 0.12 * w); // downward gravity
-                  if (heat > 0) af.addTemp(nx, ny, heat * w);
+              } else if (tool === 'streak') {
+                // Thin high-velocity smear along mouse movement direction
+                const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
+                const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+                const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
+                const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
+                const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
+                for (let t = -streakLen; t <= streakLen; t += 0.8) {
+                  const sx = Math.floor(x + nx_dir * t);
+                  const sy = Math.floor(y + ny_dir * t);
+                  if (sx < 1 || sx >= GRID_SIZE - 1 || sy < 1 || sy >= GRID_SIZE - 1) continue;
+                  const w = 1.0 - Math.abs(t) / streakLen;
+                  af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
+                  af.addVelocity(sx, sy, nx_dir * 0.3 * w, ny_dir * 0.3 * w);
                 }
-              }
 
-            } else if (tool === 'streak') {
-              // Thin high-velocity smear along mouse movement direction
-              const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
-              const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
-              const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
-              const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
-              const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
-              for (let t = -streakLen; t <= streakLen; t += 0.8) {
-                const sx = Math.floor(x + nx_dir * t);
-                const sy = Math.floor(y + ny_dir * t);
-                if (sx < 1 || sx >= GRID_SIZE - 1 || sy < 1 || sy >= GRID_SIZE - 1) continue;
-                const w = 1.0 - Math.abs(t) / streakLen;
-                af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
-                af.addVelocity(sx, sy, nx_dir * 0.3 * w, ny_dir * 0.3 * w);
-              }
-
-            } else {
-              // dropper (default)
-              const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);
-              const amt = liq?.injectAmount ?? 0.8;
-              for (let dy = -r; dy <= r; dy++) {
-                for (let dx = -r; dx <= r; dx++) {
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist > r) continue;
-                  const nx = x + dx, ny = y + dy;
-                  if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                  const w = (1 - dist / r) ** 2;
-                  af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                  if (heat > 0) af.addTemp(nx, ny, heat * w);
-                }
-              }
-            }
-          }
-        }
-
-        // ── Automation logic ───────────────────────────────────
-        if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
-          const rate = currentSettings.automateRate || 0.5;
-          const energy = currentAudioData ? currentAudioData.energy : 0;
-          const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
-          const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
-
-          if (Math.random() < rate * 0.3 + energy * 0.8) {
-            const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
-            if (af) {
-              const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
-              if (isBlow) {
-                af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
               } else {
+                // dropper (default)
+                const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);
+                const amt = liq?.injectAmount ?? 0.8;
+                for (let dy = -r; dy <= r; dy++) {
+                  for (let dx = -r; dx <= r; dx++) {
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > r) continue;
+                    const nx = x + dx, ny = y + dy;
+                    if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
+                    const w = (1 - dist / r) ** 2;
+                    af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                    if (heat > 0) af.addTemp(nx, ny, heat * w);
+                  }
+                }
+              }
+            }
+          }
+
+          // ── Automation logic ───────────────────────────────────
+          if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
+            const rate = currentSettings.automateRate || 0.5;
+            const energy = currentAudioData ? currentAudioData.energy : 0;
+            const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
+            const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
+
+            if (Math.random() < rate * 0.3 + energy * 0.8) {
+              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+              if (af) {
+                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
+                if (isBlow) {
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
+                } else {
+                  const color = harmonyColor(harmonyRef.current);
+                  const styles = injectStyleRef.current;
+                  const style = styles[Math.floor(Math.random() * styles.length)];
+                  af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
+                  af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
+                }
+              }
+            }
+
+            // Slowly rotate color harmony every ~45 seconds in auto mode
+            if (!harmonyLockRef.current && Math.random() < 0.0004) harmonyRef.current = pickHarmony();
+
+          }
+
+          // ── Seed trigger ───────────────────────────────────────
+          if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
+            lastSeedCount.current = seedCount;
+            macroCamRef.current.reset();
+            harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
+            const styles = injectStyleRef.current;
+            for (const fluid of fluidsRef.current) {
+              for (let i = 0; i < 8; i++) {
+                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                 const color = harmonyColor(harmonyRef.current);
-                const styles = injectStyleRef.current;
                 const style = styles[Math.floor(Math.random() * styles.length)];
-                af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
-                af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
+                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
+                fluid.addTemp(rx, ry, 2.0);
               }
             }
           }
 
-          // Slowly rotate color harmony every ~45 seconds in auto mode
-          if (!harmonyLockRef.current && Math.random() < 0.0004) harmonyRef.current = pickHarmony();
+          if (isActiveRef.current && drainFrameRef.current === 0) {
+            // ── Ambient seeding ────────────────────────────────
+            const af = fluidsRef.current[activeLayerRef.current];
+            if (af) {
+              // Three Lissajous orbits, each carrying its own harmony color —
+              // keeps several distinct hues alive in the frame at all times.
+              const phase = time * 0.18;
+              const injPts = [
+                { x: GRID_SIZE / 2 + Math.cos(phase) * GRID_SIZE * 0.28,
+                  y: GRID_SIZE / 2 + Math.sin(phase * 1.3) * GRID_SIZE * 0.28 },
+                { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
+                  y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
+                { x: GRID_SIZE / 2 + Math.cos(phase * 1.1 + 2.1) * GRID_SIZE * 0.22,
+                  y: GRID_SIZE / 2 + Math.sin(phase * 0.6 + 4.2) * GRID_SIZE * 0.33 },
+              ];
 
-        }
+              injPts.forEach((pt, idx) => {
+                const px = Math.floor(pt.x), py = Math.floor(pt.y);
+                if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
+                  const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
+                  af.addDensity(px, py, 0.05, c.r, c.g, c.b);
+                  af.addTemp(px, py, 0.02);
+                }
+              });
 
-        // ── Seed trigger ───────────────────────────────────────
-        if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
-          lastSeedCount.current = seedCount;
-          macroCamRef.current.reset();
-          harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
-          const styles = injectStyleRef.current;
-          for (const fluid of fluidsRef.current) {
-            for (let i = 0; i < 8; i++) {
-              const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-              const color = harmonyColor(harmonyRef.current);
-              const style = styles[Math.floor(Math.random() * styles.length)];
-              fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
-              fluid.addTemp(rx, ry, 2.0);
             }
-          }
-        }
 
-        if (isActiveRef.current && drainFrameRef.current === 0) {
-          // ── Ambient seeding ────────────────────────────────
-          const af = fluidsRef.current[activeLayerRef.current];
-          if (af) {
-            // Three Lissajous orbits, each carrying its own harmony color —
-            // keeps several distinct hues alive in the frame at all times.
-            const phase = time * 0.18;
-            const injPts = [
-              { x: GRID_SIZE / 2 + Math.cos(phase) * GRID_SIZE * 0.28,
-                y: GRID_SIZE / 2 + Math.sin(phase * 1.3) * GRID_SIZE * 0.28 },
-              { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
-                y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
-              { x: GRID_SIZE / 2 + Math.cos(phase * 1.1 + 2.1) * GRID_SIZE * 0.22,
-                y: GRID_SIZE / 2 + Math.sin(phase * 0.6 + 4.2) * GRID_SIZE * 0.33 },
-            ];
+            // ── Audio input to fluid ──────────────────────────────
+            if (currentAudioData && currentSettings.audioMappings) {
+              const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
+              const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
-            injPts.forEach((pt, idx) => {
-              const px = Math.floor(pt.x), py = Math.floor(pt.y);
-              if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
-                const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
-                af.addDensity(px, py, 0.05, c.r, c.g, c.b);
-                af.addTemp(px, py, 0.02);
-              }
-            });
+              const impact = currentSettings.audioImpact ?? 0.45;
+              if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
+                // Each audio feature carries a different color from the harmony,
+                // so bass, mids and swells paint distinguishable hues.
+                const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
+                const audioCol = colFor(0);
+                const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
-          }
+                const activeFluid = fluidsRef.current[activeLayerRef.current];
+                if (activeFluid) {
+                  const bass01   = Math.min(1, currentAudioData.bass   / 70);
+                  const treble01 = Math.min(1, currentAudioData.treble / 70);
+                  const energy01 = Math.min(1, currentAudioData.energy / 70);
+                  const mid01    = Math.min(1, currentAudioData.mid    / 70);
 
-          // ── Audio input to fluid ──────────────────────────────
-          if (currentAudioData && currentSettings.audioMappings) {
-            const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
-            const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
+                  // audioImpact (0–1) controls visual punch; auto mode adds extra multiplier
+                  // At impact=0.45 (default) + no auto → ~1.0x baseline
+                  // At impact=1.0 + auto → ~4.9x baseline
+                  const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
+                  const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
 
-            const impact = currentSettings.audioImpact ?? 0.45;
-            if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
-              // Each audio feature carries a different color from the harmony,
-              // so bass, mids and swells paint distinguishable hues.
-              const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
-              const audioCol = colFor(0);
-              const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
+                  const centerX = Math.floor(GRID_SIZE / 2);
+                  const centerY = Math.floor(GRID_SIZE / 2);
+                  const aStyles = injectStyleRef.current;
+                  const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
 
-              const activeFluid = fluidsRef.current[activeLayerRef.current];
-              if (activeFluid) {
-                const bass01   = Math.min(1, currentAudioData.bass   / 70);
-                const treble01 = Math.min(1, currentAudioData.treble / 70);
-                const energy01 = Math.min(1, currentAudioData.energy / 70);
-                const mid01    = Math.min(1, currentAudioData.mid    / 70);
+                  // Center pulse — scales with density mapping
+                  activeFluid.autoInject(aStyle(), centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a, densityMod);
+                  activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
 
-                // audioImpact (0–1) controls visual punch; auto mode adds extra multiplier
-                // At impact=0.45 (default) + no auto → ~1.0x baseline
-                // At impact=1.0 + auto → ~4.9x baseline
-                const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
-                const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
+                  // Bass hit: radial velocity burst — scales with impact + auto mode
+                  if (bass01 > 0.25) {
+                    const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
+                    const bassStr = (bass01 - 0.25) * autoAmp;
+                    for (let bj = -burstR; bj <= burstR; bj += 3) {
+                      for (let bi = -burstR; bi <= burstR; bi += 3) {
+                        const dist = Math.sqrt(bi * bi + bj * bj);
+                        if (dist < 2 || dist > burstR) continue;
+                        const bx = centerX + bi, by = centerY + bj;
+                        if (bx > 0 && bx < GRID_SIZE - 1 && by > 0 && by < GRID_SIZE - 1) {
+                          const f = bassStr * 0.65 * (1 - dist / burstR);
+                          activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
+                        }
+                      }
+                    }
+                    if (isAutomatedRef.current && bass01 > 0.4) {
+                      activeFluid.autoInject(aStyle(), centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a, bass01);
+                      activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
+                    }
+                  }
 
-                const centerX = Math.floor(GRID_SIZE / 2);
-                const centerY = Math.floor(GRID_SIZE / 2);
-                const aStyles = injectStyleRef.current;
-                const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
-
-                // Center pulse — scales with density mapping
-                activeFluid.autoInject(aStyle(), centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a, densityMod);
-                activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
-
-                // Bass hit: radial velocity burst — scales with impact + auto mode
-                if (bass01 > 0.25) {
-                  const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
-                  const bassStr = (bass01 - 0.25) * autoAmp;
-                  for (let bj = -burstR; bj <= burstR; bj += 3) {
-                    for (let bi = -burstR; bi <= burstR; bi += 3) {
-                      const dist = Math.sqrt(bi * bi + bj * bj);
-                      if (dist < 2 || dist > burstR) continue;
-                      const bx = centerX + bi, by = centerY + bj;
-                      if (bx > 0 && bx < GRID_SIZE - 1 && by > 0 && by < GRID_SIZE - 1) {
-                        const f = bassStr * 0.65 * (1 - dist / burstR);
-                        activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
+                  // Beat edge: a fresh-colored ring of dye blooms outward on each
+                  // kick so bass hits are visible in COLOR, not just motion
+                  if (bass01 > 0.45 && lastBass01Ref.current <= 0.45) {
+                    const ringCol = colFor(2.0);
+                    const ringR = (10 + bass01 * 14) * GRID_SCALE;
+                    const drops = 14;
+                    for (let d = 0; d < drops; d++) {
+                      const a = (d / drops) * Math.PI * 2 + time;
+                      const rx2 = Math.floor(centerX + Math.cos(a) * ringR);
+                      const ry2 = Math.floor(centerY + Math.sin(a) * ringR);
+                      if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
+                        activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
+                        activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
                       }
                     }
                   }
-                  if (isAutomatedRef.current && bass01 > 0.4) {
-                    activeFluid.autoInject(aStyle(), centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a, bass01);
-                    activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
-                  }
-                }
+                  lastBass01Ref.current = bass01;
 
-                // Beat edge: a fresh-colored ring of dye blooms outward on each
-                // kick so bass hits are visible in COLOR, not just motion
-                if (bass01 > 0.45 && lastBass01Ref.current <= 0.45) {
-                  const ringCol = colFor(2.0);
-                  const ringR = (10 + bass01 * 14) * GRID_SCALE;
-                  const drops = 14;
-                  for (let d = 0; d < drops; d++) {
-                    const a = (d / drops) * Math.PI * 2 + time;
-                    const rx2 = Math.floor(centerX + Math.cos(a) * ringR);
-                    const ry2 = Math.floor(centerY + Math.sin(a) * ringR);
-                    if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                      activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
-                      activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
+                  // Mid: orbital injection in its own hue
+                  if (mid01 > 0.2) {
+                    const midCol = colFor(1.3);
+                    const orbitR = GRID_SIZE * 0.3;
+                    const mx = Math.floor(centerX + Math.cos(time * 0.6) * orbitR);
+                    const my = Math.floor(centerY + Math.sin(time * 0.8) * orbitR);
+                    if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
+                      activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
+                      activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                     }
                   }
-                }
-                lastBass01Ref.current = bass01;
 
-                // Mid: orbital injection in its own hue
-                if (mid01 > 0.2) {
-                  const midCol = colFor(1.3);
-                  const orbitR = GRID_SIZE * 0.3;
-                  const mx = Math.floor(centerX + Math.cos(time * 0.6) * orbitR);
-                  const my = Math.floor(centerY + Math.sin(time * 0.8) * orbitR);
-                  if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
-                    activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
-                    activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
+                  // Treble: scattered sparks — heat plus tiny bright dye specks
+                  // so high frequencies glitter instead of acting invisibly
+                  if (treble01 > 0.2) {
+                    const sparkCol = colFor(3.1);
+                    const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6) * impactMul);
+                    for (let s = 0; s < sparks; s++) {
+                      const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                      const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                      activeFluid.addTemp(sx, sy, treble01 * 0.45 * autoAmp);
+                      activeFluid.addDensity(sx, sy, treble01 * 0.5,
+                        sparkCol.r * 0.4 + 0.6, sparkCol.g * 0.4 + 0.6, sparkCol.b * 0.4 + 0.6);
+                    }
                   }
-                }
 
-                // Treble: scattered sparks — heat plus tiny bright dye specks
-                // so high frequencies glitter instead of acting invisibly
-                if (treble01 > 0.2) {
-                  const sparkCol = colFor(3.1);
-                  const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 12 : 6) * impactMul);
-                  for (let s = 0; s < sparks; s++) {
-                    const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                    const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                    activeFluid.addTemp(sx, sy, treble01 * 0.45 * autoAmp);
-                    activeFluid.addDensity(sx, sy, treble01 * 0.5,
-                      sparkCol.r * 0.4 + 0.6, sparkCol.g * 0.4 + 0.6, sparkCol.b * 0.4 + 0.6);
-                  }
-                }
-
-                // Energy: roaming swell in a third hue
-                if (energy01 > 0.15) {
-                  const swellCol = colFor(2.6);
-                  const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
-                  const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
-                  activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
-                  if (isAutomatedRef.current) {
-                    const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
-                    const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
-                    activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.05, swellCol.r, swellCol.g, swellCol.b, energy01);
+                  // Energy: roaming swell in a third hue
+                  if (energy01 > 0.15) {
+                    const swellCol = colFor(2.6);
+                    const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
+                    const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
+                    activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
+                    if (isAutomatedRef.current) {
+                      const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
+                      const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
+                      activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.05, swellCol.r, swellCol.g, swellCol.b, energy01);
+                    }
                   }
                 }
               }
             }
           }
+
+
+          // ── Advance the solver ───────────────────────────────
+          if (isActiveRef.current && drainFrameRef.current === 0) {
+            for (const fluid of fluidsRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
+          }
         }
 
-        // ── Step simulations & update rotation ────────────────
+        // ── Housekeeping & rotation (once per rendered frame) ──
         let hasContent = false;
         const isDarkBlend = currentSettings.blendMode === 'multiply';
 
         for (let l = 0; l < fluidsRef.current.length; l++) {
           const fluid = fluidsRef.current[l];
-          if (isActiveRef.current && drainFrameRef.current === 0) fluid.step(currentSettings, currentAudioData, time, noise2D);
 
           // Check if there's content
           for (let i = 0; i < GRID_AREA; i++) {
@@ -2836,6 +2963,7 @@ void main() {
           glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
           glCtx.uniform1f(uLocs['u_macroDepth'], currentSettings.macroDepth ?? 0.5);
           glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
+          glCtx.uniform1f(uLocs['u_macroRelief'], currentSettings.macroRelief ?? 0.7);
           glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
           glCtx.uniform1f(uLocs['u_filmLevel'], filmLevelRef.current);
           glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, filmGainRef.current)));

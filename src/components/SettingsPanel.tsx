@@ -3,16 +3,20 @@ import { motion } from 'motion/react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode } from '../types';
 import { PRESETS } from '../presets';
+import type { RoomCalibration } from '../lib/audioCalibration';
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
   onApplyPreset: (presetId: string, settings: Partial<VisualizerSettings>) => void;
   activePresetId: string | null;
+  /** Live room-calibration readout, null when auto-calibration is off. */
+  calibration?: RoomCalibration | null;
+  onRecalibrate?: () => void;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, onClose }) => {
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
 
   const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
@@ -113,6 +117,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.001}
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
         />
+
+        {/* Room calibration */}
+        <div className="flex items-center justify-between mb-3 mt-5">
+          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Auto Calibrate</span>
+          <button
+            onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
+            className={`w-10 h-5 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
+            title="Learn this room's noise floor and dynamics, and drive the visuals from where the music sits between them"
+          >
+            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {settings.autoCalibrate !== false && (
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
+            {calibration ? (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase tracking-widest opacity-60">
+                    {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
+                  </span>
+                  <span className="text-[10px] font-mono opacity-50">
+                    {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
+                  </span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
+                    style={{ width: `${Math.round(calibration.progress * 100)}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <span className="text-[10px] uppercase tracking-widest opacity-40">Waiting for audio</span>
+            )}
+            <button
+              onClick={() => onRecalibrate?.()}
+              className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
+            >
+              Recalibrate room
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Audio Mappings Section */}
@@ -287,6 +333,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
+            />
+            <Slider
+              label="Relief / 3D"
+              value={settings.macroRelief}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroRelief: v })}
             />
           </>
         )}

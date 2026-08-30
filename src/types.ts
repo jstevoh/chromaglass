@@ -31,6 +31,8 @@ export interface VisualizerSettings {
   // Sound Settings
   sensitivity: number;
   bassBoost: number;
+  /** Learn the room's noise floor and dynamics, and normalise every band against them. */
+  autoCalibrate: boolean;
   globalSpeed: number;
   audioMappings: AudioMappings;
   
@@ -94,11 +96,13 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
   sensitivity: 0.4,
   bassBoost: 1.0,
+  autoCalibrate: true,      // on by default — a fixed level can't serve every room
   globalSpeed: 0.025,       // slow viscous crawl, visibly moving
   audioMappings: {
     velocity: 'bass',
@@ -149,4 +153,5 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroLacing: 0.55,
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
+  macroRelief: 0.7,
 };

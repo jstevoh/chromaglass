@@ -6,6 +6,7 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 
 - **Real-time fluid simulation** — Navier-Stokes solver with squeeze-film flow, buoyancy, immiscibility, and fingering instabilities
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
+- **Automatic room calibration** — learns the room's noise floor and dynamics, fits the analyser's dB window to it and normalises every band against its own range, so the same visuals read well in a quiet living room or a loud bar
 - **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Monochrome Ink, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
@@ -85,6 +86,7 @@ src/
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts
+    audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
     fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking

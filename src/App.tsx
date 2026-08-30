@@ -120,7 +120,26 @@ export default function App() {
       if (source === 'system') {
         stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
       } else {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Ask for the raw microphone. The browser's defaults — echo
+        // cancellation, noise suppression and auto gain — are tuned for speech
+        // on a call and are actively hostile to music: suppression treats a
+        // steady groove as background noise and ducks it, AGC pumps the
+        // dynamics flat, and echo cancellation can null out the very speakers
+        // in the room. That is what "the mic isn't sensitive enough" usually
+        // is. Fall back to plain audio if a device rejects the constraints.
+        const raw: MediaStreamConstraints = {
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+          },
+        };
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(raw);
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
       }
       setAudioStream(stream);
       stream.getTracks().forEach(track => {
@@ -151,7 +170,12 @@ export default function App() {
     }
   }, [settings.layerCount, activeLayer]);
 
-  const audioData = useAudioAnalyzer(isActive ? audioStream : null, isActive, settings.sensitivity, settings.bassBoost);
+  const [calibrateNonce, setCalibrateNonce] = useState(0);
+  const audioData = useAudioAnalyzer(
+    isActive ? audioStream : null, isActive,
+    settings.sensitivity, settings.bassBoost,
+    settings.autoCalibrate !== false, calibrateNonce,
+  );
 
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
@@ -250,6 +274,7 @@ export default function App() {
     setSettings({
       sensitivity: Math.random() * 0.8 + 0.2,
       bassBoost: Math.random() * 1.5 + 0.5,
+      autoCalibrate: settings.autoCalibrate,
       globalSpeed: Math.random() * 0.08 + 0.02,
       audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
       platePressure: Math.random(), glassSmear: Math.random(), rainDrip: Math.random(),
@@ -285,6 +310,7 @@ export default function App() {
       macroLacing: Math.random(),
       macroDepth: 0.25 + Math.random() * 0.6,
       macroEdgeDetail: 0.3 + Math.random() * 0.7,
+      macroRelief: 0.4 + Math.random() * 0.6,
     });
     setActivePresetId(null);
     // Randomize inject style for the evolve
@@ -652,6 +678,8 @@ export default function App() {
             onUpdate={updateSettings}
             onApplyPreset={applyPreset}
             activePresetId={activePresetId}
+            calibration={audioData?.calibration ?? null}
+            onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             onClose={() => setShowSettings(false)}
           />
         )}

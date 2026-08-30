@@ -767,6 +767,7 @@ export const PRESETS: Preset[] = [
       macroLacing: 0.7,
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
+      macroRelief: 0.8,       // domed beads with wet highlights
       globalSpeed: 0.28,         // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
@@ -824,6 +825,7 @@ export const PRESETS: Preset[] = [
       macroLacing: 0.35,
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
+      macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.18,
       layerCount: 1,
       blendMode: 'screen',
@@ -881,6 +883,7 @@ export const PRESETS: Preset[] = [
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
       macroEdgeDetail: 0.9,      // maximum silhouette crinkle
+      macroRelief: 0.65,
       globalSpeed: 0.45,         // quick — this one rushes
       layerCount: 1,
       blendMode: 'screen',
