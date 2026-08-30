@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -234,7 +234,9 @@ export default function App() {
   };
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
-    setSettings(prev => ({ ...prev, ...presetSettings }));
+    // Presets that don't mention the macro camera get the plate-wide framing —
+    // otherwise a macro preset would leave the next one zoomed in.
+    setSettings(prev => ({ ...prev, macroMode: false, ...presetSettings }));
     setActivePresetId(presetId);
     visualizerRef.current?.applyPreset(presetId);
   };
@@ -273,6 +275,16 @@ export default function App() {
       saturationBoost: 1.0 + Math.random() * 0.8,
       glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
       postBlurRadius: Math.random() * 0.7,
+      // One roll in four goes closeup — a magnified chase is its own happy accident
+      macroMode: Math.random() < 0.25,
+      macroZoom: 4 + Math.random() * 8,
+      macroChase: 0.35 + Math.random() * 0.65,
+      macroHold: 2.5 + Math.random() * 7,
+      macroCells: Math.random(),
+      macroCellScale: 0.25 + Math.random() * 0.7,
+      macroLacing: Math.random(),
+      macroDepth: 0.25 + Math.random() * 0.6,
+      macroEdgeDetail: 0.3 + Math.random() * 0.7,
     });
     setActivePresetId(null);
     // Randomize inject style for the evolve
@@ -520,6 +532,18 @@ export default function App() {
                 </div>
 
                 <div className="w-full h-px bg-white/10" />
+
+                {/* Macro closeup */}
+                <button
+                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    settings.macroMode ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
+                >
+                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
+                </button>
 
                 {/* Settings */}
                 <button

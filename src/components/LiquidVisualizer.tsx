@@ -3,6 +3,7 @@ import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
+import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -24,6 +25,10 @@ const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 12
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
+// Density histogram used to expose the macro closeup (see "Macro film exposure").
+const FILM_BINS = 64;
+const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
+
 const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'classic':            ['drop'],
   'galaxy':             ['spray', 'streak'],
@@ -43,6 +48,9 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'velvet-underground': ['pour', 'drop'],
   'neon-coral-reef':    ['streak', 'drop'],
   'stardust-collapse':  ['spray', 'splatter'],
+  'macro-bead':         ['drop', 'splatter'],
+  'cell-bloom':         ['drop'],
+  'lace-run':           ['pour', 'streak'],
 };
 
 export interface LiquidVisualizerHandle {
@@ -210,6 +218,12 @@ class FluidSimulation {
       'velvet-underground': [9, 10, 4, 11],
       'neon-coral-reef':    [0, 6, 2, 7],
       'stardust-collapse':  [7, 15, 5, 0],
+      // Warm, fully-saturated sets only: white and graphite wash out fast under
+      // subtractive mixing, and at this magnification the highlights and the
+      // blacks come from the cell rings and lacing, not from the dye.
+      'macro-bead':         [0, 1, 3, 2],
+      'cell-bloom':         [0, 1, 2, 3],
+      'lace-run':           [0, 1, 4, 3],
     };
     const harmony = harmonies[presetId] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
@@ -501,6 +515,58 @@ class FluidSimulation {
         break;
       }
 
+      // ── Macro closeup seeds ──────────────────────────────────────
+      // These three exist for the macro camera: it needs *separated* beads to
+      // pick from, not one continuous wash covering the plate.
+      case 'macro-bead': {
+        for (let i = 0; i < 26; i++) {
+          const x = 14 + Math.random() * (S - 28), y = 14 + Math.random() * (S - 28);
+          const c = col(i);
+          const r = (2 + Math.random() * 5) * k;
+          this.splatBlob(x, y, r, 2.2 + Math.random() * 2.0, c.r, c.g, c.b);
+          // A dark shoulder on one side — cells and lacing key off this contrast
+          this.splatBlob(x + r * 0.9, y + r * 0.7, r * 0.5, 0.9, 0.06, 0.05, 0.05);
+          const a = Math.random() * Math.PI * 2;
+          this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.05, Math.sin(a) * 0.05);
+        }
+        break;
+      }
+
+      case 'cell-bloom': {
+        const centers: [number, number][] = [[0.34, 0.40], [0.63, 0.58], [0.50, 0.24], [0.28, 0.70]];
+        centers.forEach(([fx, fy], ci) => {
+          const bx = fx * S, by = fy * S;
+          const c = col(ci);
+          this.splatBlob(bx, by, 15 * k, 3.2, c.r, c.g, c.b);
+          // Nuclei clustered inside each pool — the densest cell patches
+          for (let n = 0; n < 18; n++) {
+            const a = Math.random() * Math.PI * 2, d = Math.random() * 13 * k;
+            const cc = col(ci + 1 + (n % 2));
+            this.splatBlob(bx + Math.cos(a) * d, by + Math.sin(a) * d,
+              (1.5 + Math.random() * 2.5) * k, 1.8, cc.r, cc.g, cc.b);
+          }
+        });
+        break;
+      }
+
+      case 'lace-run': {
+        // A tongue of light dye running across the plate — its leading edge is
+        // where the lacing filaments form.
+        const head = col(0), trail = col(1);
+        for (let t = 0; t < 90; t++) {
+          const x = S * 0.2 + t * (S * 0.6 / 90);
+          const y = S * 0.5 + Math.sin(t * 0.07) * 10 * k;
+          this.splatBlob(x, y, (6 + Math.sin(t * 0.15) * 3) * k, 2.4, head.r, head.g, head.b);
+          this.addVelocity(Math.floor(x), Math.floor(y), 0.07, 0.0);
+        }
+        for (let i = 0; i < 34; i++) {
+          const x = S * 0.18 + Math.random() * S * 0.7;
+          const y = S * 0.5 + (Math.random() - 0.5) * S * 0.35;
+          this.splatBlob(x, y, (1 + Math.random() * 3) * k, 1.6, trail.r, trail.g, trail.b);
+        }
+        break;
+      }
+
       default: {
         for (let i = 0; i < 5; i++) {
           const c = col(i);
@@ -764,7 +830,10 @@ class FluidSimulation {
     // evaporation ramps up hard so injection and removal find equilibrium
     // with plenty of empty glass left — a saturated plate has no boundaries
     // or gradients and reads as a static color wash.
-    const targetMean = 0.85;
+    // A macro frame needs empty ground around its subject: at 4-6x a plate held
+    // near saturation just fills the frame with one flat colour, so the dye
+    // budget drops hard whenever the closeup camera is running.
+    const targetMean = settings.macroMode ? 0.28 : 0.85;
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     const regulatorEvap = Math.min(0.02, over * over * 0.012);
     const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
@@ -1134,6 +1203,9 @@ interface GLResources {
   posBuffer: WebGLBuffer;
   textures: WebGLTexture[];
   texData: Uint8Array[];
+  /** Velocity fields for layers 0/1 — macro detail is advected by these. */
+  velTextures: WebGLTexture[];
+  velData: Uint8Array[];
   uLocs: Record<string, WebGLUniformLocation | null>;
 }
 
@@ -1173,6 +1245,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastBass01Ref = useRef(0); // for beat edge detection
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
+  const macroCamRef = useRef(new MacroCamera());
+  const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
+  const filmHistRef = useRef(new Uint32Array(FILM_BINS));
+  const lastMacroOnRef = useRef(false);
+  const filmLevelRef = useRef(0.3);
+  const filmGainRef = useRef(4.5);
 
   useImperativeHandle(ref, () => ({
     injectImage: (imageData: ImageData) => {
@@ -1189,6 +1267,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
       drainFrameRef.current = 0;
+      macroCamRef.current.reset();
     },
     setInjectStyle: (styles: string[]) => {
       injectStyleRef.current = styles;
@@ -1394,6 +1473,21 @@ uniform float u_boundaryContrast;  // bright interface line between dye colors
 uniform float u_postBlur;          // gooey blur radius multiplier
 uniform float u_gridSize;          // fluid sim texture resolution
 
+// ── Macro closeup camera ──
+uniform sampler2D u_vel0;          // layer 0 velocity field (rg, signed, normalized)
+uniform sampler2D u_vel1;
+uniform vec2  u_camCenter;         // fluid-UV the frame is centred on (0.5,0.5 = plate centre)
+uniform float u_camZoom;           // 1 = whole plate, 12 = extreme magnification
+uniform float u_macro;             // 0 = off, 1 = macro detail pass enabled
+uniform float u_macroCells;        // paint-cell / bubble structure amount
+uniform float u_macroCellScale;    // cell size
+uniform float u_macroLacing;       // dark lacing filaments along dye boundaries
+uniform float u_macroDepth;        // dome shading, contact shadow, depth of field
+uniform float u_macroEdge;         // fractal silhouette warp
+uniform float u_flowRate;          // fluid-UV per second, for advecting procedural detail
+uniform float u_filmLevel;         // density below which magnified dye reads as bare ground
+uniform float u_filmGain;          // maps the density above that level onto full opacity
+
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
 
@@ -1457,12 +1551,18 @@ vec4 sampleLayer(sampler2D tex, vec2 uv) {
   return textureBicubic(tex, uv);
 }
 
-// UV transform: screen UV -> fluid simulation UV
+// UV transform: screen UV -> fluid simulation UV.
+// u_camZoom magnifies about u_camCenter, which the macro camera parks on a bead.
 vec2 uvToFluid(vec2 uv, float c, float s) {
   vec2 p = (uv - 0.5) * u_resolution;
   p = vec2(c * p.x - s * p.y, s * p.x + c * p.y);
   float scale = max(u_resolution.x, u_resolution.y) * 1.5 / 128.0;
-  return p / (scale * 128.0) + 0.5;
+  return p / (scale * 128.0 * u_camZoom) + u_camCenter;
+}
+
+// Local dye velocity in fluid-UV per second — macro detail rides the paint.
+vec2 fluidFlow(sampler2D vtex, vec2 fuv) {
+  return (texture(vtex, fuv).rg * 2.0 - 1.0) * u_flowRate;
 }
 
 // Approximate Gaussian blur on density alpha in fluid UV space
@@ -1506,8 +1606,13 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   float g = exp(-decodeDensity(raw.g) * norm);
   float b = exp(-decodeDensity(raw.b) * norm);
 
-  // Beer-Lambert volumetric opacity using blurred density for gooey edges
-  float thickness = totalDensity * 2.8;
+  // Beer-Lambert volumetric opacity using blurred density for gooey edges.
+  // Magnified, only dye thick enough to be a bead should register: below
+  // u_filmLevel (tracked per frame from the plate's own density histogram) the
+  // wash reads as bare ground, which is what gives a closeup its silhouettes.
+  float thickness = u_macro > 0.5
+    ? max(0.0, totalDensity - u_filmLevel) * u_filmGain
+    : totalDensity * 2.8;
   float alpha = 1.0 - exp(-thickness);
   alpha = min(0.95, alpha);
 
@@ -1576,6 +1681,174 @@ float boundaryEdge(sampler2D tex, vec2 fuv) {
   return smoothstep(0.12, 0.75, diffX + diffY);
 }
 
+// ─── Macro closeup detail ──────────────────────────────────────────
+// At 6-12x magnification the 192-cell solver only supplies the large-scale
+// shape of the dye; everything finer is synthesised here, in fluid space, so
+// it magnifies with the camera the way real structure would: packed paint
+// cells (dark cores in bright rings), lacing filaments dragged along the flow,
+// a crinkled silhouette, dome shading and a shallow depth of field.
+
+vec2 hash22(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+             mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm3(vec2 p) {
+  float a = 0.5, sum = 0.0;
+  for (int i = 0; i < 3; i++) { sum += a * vnoise(p); p *= 2.07; a *= 0.5; }
+  return sum * 1.14;   // ~0..1
+}
+
+// One octave of packed bubbles.
+//   .x = signed distance to the nearest bubble edge (negative inside)
+//   .y = per-bubble random, 0..1
+vec2 bubbles(vec2 p, float seed) {
+  vec2 ip = floor(p), fp = fract(p);
+  // Voronoi by nearest *centre*, not by nearest edge: picking the nearest edge
+  // unions overlapping circles into blobs, while real cells crowd each other
+  // and each keeps its own ring, which is what belonging to one centre gives.
+  float bestDist = 1e9, bestR = 0.0, bestId = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 h = hash22(ip + g + seed);
+      vec2 c = g + 0.5 + (h - 0.5) * 0.55;
+      float dist = length(fp - c);
+      if (dist < bestDist) { bestDist = dist; bestR = 0.15 + h.x * 0.20; bestId = h.y; }
+    }
+  }
+  return vec2(bestDist - bestR, bestId);
+}
+
+// One generation of cells: born, carried along by the dye, dissolved again.
+// Cross-fading two offsets of the *same* pattern would average two distance
+// fields into mush, so instead each generation is its own pattern under a
+// sin^2 envelope; two generations half a cycle apart sum to exactly 1, giving
+// continuous cover with no ghosting and no reset pop.
+//   .x = core mask, .y = rim mask (negative just outside — the dark outline
+//        every real cell carries), .z = per-bubble random
+// rimWidth is a fraction of the cell spacing, so rings stay legible at any
+// magnification instead of collapsing to a hairline.
+vec3 cellGeneration(vec2 p, vec2 flow, float seed, float period, float phase, float rimWidth) {
+  float a = fract(u_time / period + phase);
+  vec2 b = bubbles(p - flow * (a * period), seed);
+  float env = sin(3.14159265 * a);
+  env *= env;
+  float core = (1.0 - smoothstep(-rimWidth * 0.8, -rimWidth * 0.15, b.x)) * env;
+  float bright = 1.0 - smoothstep(rimWidth * 0.35, rimWidth * 1.15, abs(b.x));
+  float outline = 1.0 - smoothstep(rimWidth * 0.5, rimWidth * 1.3, abs(b.x - rimWidth * 2.0));
+  return vec3(core, (bright - outline * 0.7) * env, b.y);
+}
+
+// Crinkle the sampled position so bicubic-smooth silhouettes gain sub-cell
+// structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
+vec2 macroWarp(vec2 fuv) {
+  if (u_macroEdge < 0.005) return fuv;
+  float f = u_gridSize * 0.85;
+  vec2 t = vec2(u_time * 0.012, u_time * -0.009);
+  vec2 w = vec2(fbm3(fuv * f + t), fbm3(fuv * f + vec2(37.2, 11.7) + t)) - 0.5;
+  w += (vec2(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
+  return fuv + w * (u_macroEdge * 1.1 / u_gridSize);
+}
+
+// Decode an already-fetched texel — the defocused path doesn't need bicubic
+// filtering or a gooey blur, so it costs 5 plain fetches instead of 5 decodes.
+vec4 decodeFluidRaw(vec4 raw) {
+  float totalDensity = decodeDensity(raw.a);
+  if (totalDensity < 0.001 / DENSITY_SCALE) return vec4(0.0);
+  float norm = 1.0 / totalDensity;
+  vec3 c = exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm);
+  float thickness = u_macro > 0.5 ? max(0.0, totalDensity - u_filmLevel) * u_filmGain : totalDensity * 2.8;
+  return vec4(c, min(0.95, 1.0 - exp(-thickness)));
+}
+
+// 5-tap defocus. The blur radius is constant in screen space, so the
+// out-of-focus surround holds still as the camera zooms.
+vec4 decodeFluidDof(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur, float dof) {
+  if (dof < 0.02) return decodeFluid(tex, fuv, blurFluid, useBlur);
+  float r = dof * 0.022 / (1.5 * u_camZoom);
+  vec4 raw = (texture(tex, fuv)
+            + texture(tex, fuv + vec2(r, 0.0)) + texture(tex, fuv - vec2(r, 0.0))
+            + texture(tex, fuv + vec2(0.0, r)) + texture(tex, fuv - vec2(0.0, r))) * 0.2;
+  return decodeFluidRaw(raw);
+}
+
+// Paint cells + lacing + dome shading for one layer's decoded dye.
+//   grad  — silhouette/interface gradient strength, 0..1
+//   dof   — defocus at this pixel, 0..1 (detail dissolves out of focus)
+vec3 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 normal, float grad, float dof) {
+  float focus = 1.0 - dof * 0.85;
+
+  // ── Packed cells ────────────────────────────────────────────────
+  float cellAmt = u_macroCells * focus;
+  if (cellAmt > 0.005 && alpha > 0.02) {
+    float freq = u_gridSize / max(0.15, u_macroCellScale * 8.0);
+    vec2 p = fuv * freq;
+    vec2 f = flow * freq;
+
+    // Cells cluster in patches, the way pouring medium breaks out unevenly.
+    float clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.24, 0.62, fbm3(fuv * 13.0 + u_time * 0.015));
+    float k = cellAmt * clumping;
+
+    if (k > 0.002) {
+      // Coarse cells: two generations, half a cycle apart
+      vec3 g0 = cellGeneration(p, f, 0.0, 3.2, 0.0, 0.13);
+      vec3 g1 = cellGeneration(p, f, 17.0, 3.2, 0.5, 0.13);
+      float core = g0.x + g1.x;
+      float rim = g0.y + g1.y;
+      float id = g0.z * g0.x + g1.z * g1.x;
+
+      // Fine cells crowd into the gaps between the big ones, as they do in a
+      // real pour, and read as the grain of the film rather than as bubbles.
+      vec3 h0 = cellGeneration(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
+      vec3 h1 = cellGeneration(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
+      float gap = clamp(1.0 - core * 1.6, 0.0, 1.0);
+      float fineCore = (h0.x + h1.x) * gap;
+      float fineRim = (h0.y + h1.y) * gap;
+
+      vec3 dark = col * 0.05;
+      vec3 ring = mix(col, vec3(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
+
+      col = mix(col, dark, clamp((core + fineCore * 0.55) * k, 0.0, 1.0));
+      col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
+    }
+  }
+
+  // ── Lacing — thin dark filaments streaming along the flow at dye edges ──
+  if (u_macroLacing > 0.005 && alpha > 0.03) {
+    vec2 dir = length(flow) > 1e-5 ? normalize(flow) : vec2(1.0, 0.0);
+    vec2 nrm = vec2(-dir.y, dir.x);
+    vec2 q = vec2(dot(fuv, dir) * u_gridSize * 0.35, dot(fuv, nrm) * u_gridSize * 3.2);
+    float lace = fbm3(q + u_time * 0.03) - 0.5;
+    float line = 1.0 - smoothstep(0.0, 0.055, abs(lace));
+    float edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
+    col = mix(col, col * 0.06, line * edgeMask * u_macroLacing * focus);
+  }
+
+  // ── Dome shading — the film reads as a bead with thickness ──────
+  if (u_macroDepth > 0.005) {
+    float belly = smoothstep(0.05, 0.45, alpha);
+    float lam = max(0.0, dot(normal, normalize(vec3(-0.5, -0.5, 0.72))));
+    col *= mix(1.0, (0.52 + 0.68 * belly) * (0.72 + 0.5 * lam), u_macroDepth * 0.85);
+  }
+
+  return col;
+}
+
 // Blend mode functions
 vec3 blendScreen(vec3 a, vec3 b)      { return 1.0 - (1.0 - a) * (1.0 - b); }
 vec3 blendLighter(vec3 a, vec3 b)     { return max(a, b); }
@@ -1631,6 +1904,17 @@ void main() {
   vec2 uv = v_uv;
   bool darkBlend = u_darkBlend != 0;
 
+  // ── Macro closeup setup ───────────────────────────────────────────
+  // Defocus grows away from the frame centre — the shallow depth of field a
+  // real macro lens has wide open, and what sells the magnification.
+  bool macro = u_macro > 0.5;
+  float aspect = u_resolution.x / max(1.0, u_resolution.y);
+  float dof = 0.0;
+  if (macro) {
+    float rad = length((uv - 0.5) * vec2(aspect, 1.0));
+    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * u_macroDepth;
+  }
+
   // ── LED Platform background ────────────────────────────────────────
   vec3 bgColor = darkBlend ? vec3(1.0) : vec3(0.0);
   if (u_ledPlatform != 0) {
@@ -1654,7 +1938,9 @@ void main() {
   // ── Layer 0 ──────────────────────────────────────────────────────
   float c0 = cos(-u_rotation0), s0 = sin(-u_rotation0);
   vec2 fuv0 = uvToFluid(uv, c0, s0);
-  vec4 fluid0 = decodeFluid(u_layer0, fuv0, blurFluid, useBlur);
+  vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) : vec2(0.0);
+  if (macro) fuv0 = macroWarp(fuv0);
+  vec4 fluid0 = decodeFluidDof(u_layer0, fuv0, blurFluid, useBlur, dof);
 
   // Gooey contrast on alpha
   if (useBlur && fluid0.a > 0.0) {
@@ -1663,15 +1949,33 @@ void main() {
     fluid0.a = clamp((fluid0.a - mid) * contrast + mid, 0.0, 1.0);
   }
 
-  // Lighting
-  vec3 normal0 = sobelNormal(u_layer0, fuv0);
+  // Lighting — a heavily defocused pixel has no edge detail worth resolving,
+  // so skip the 8-tap normal and the interface pass out there.
+  bool sharp0 = dof < 0.55;
+  vec3 normal0 = sharp0 ? sobelNormal(u_layer0, fuv0) : vec3(0.0, 0.0, 1.0);
   fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend);
   if (darkBlend) fluid0.a *= 0.6;
 
   // Bright interface line where dye colors meet
-  if (u_boundaryContrast > 0.005 && fluid0.a > 0.03) {
+  if (u_boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
     float edge0 = boundaryEdge(u_layer0, fuv0);
     fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
+  }
+
+  if (macro) {
+    float grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
+    fluid0.rgb = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+  }
+
+  // ── Substrate grain + contact shadow ──────────────────────────────
+  // Magnified, the ground under the dye should read as a surface, and the dye
+  // should sit *on* it rather than float in front of it.
+  if (macro && u_macroDepth > 0.005) {
+    float fiber = fbm3(uv * vec2(aspect, 1.0) * 230.0);
+    bgColor = bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * u_macroDepth;
+    vec2 fuvS = uvToFluid(uv + vec2(0.014, -0.014), c0, s0);
+    float sh = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, fuvS).a) * 2.2);
+    bgColor *= mix(1.0, 0.32, clamp(sh, 0.0, 1.0) * u_macroDepth);
   }
 
   vec3 outColor = bgColor;
@@ -1681,7 +1985,9 @@ void main() {
   if (u_layerCount > 1) {
     float c1 = cos(-u_rotation1), s1 = sin(-u_rotation1);
     vec2 fuv1 = uvToFluid(uv, c1, s1);
-    vec4 fluid1 = decodeFluid(u_layer1, fuv1, blurFluid, useBlur);
+    vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) : vec2(0.0);
+    if (macro) fuv1 = macroWarp(fuv1);
+    vec4 fluid1 = decodeFluidDof(u_layer1, fuv1, blurFluid, useBlur, dof);
 
     if (useBlur && fluid1.a > 0.0) {
       float contrast = 1.2 + u_gooey * 4.0;
@@ -1689,13 +1995,19 @@ void main() {
       fluid1.a = clamp((fluid1.a - mid) * contrast + mid, 0.0, 1.0);
     }
 
-    vec3 normal1 = sobelNormal(u_layer1, fuv1);
+    bool sharp1 = dof < 0.55;
+    vec3 normal1 = sharp1 ? sobelNormal(u_layer1, fuv1) : vec3(0.0, 0.0, 1.0);
     fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend);
     if (darkBlend) fluid1.a *= 0.6;
 
-    if (u_boundaryContrast > 0.005 && fluid1.a > 0.03) {
+    if (u_boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
       float edge1 = boundaryEdge(u_layer1, fuv1);
       fluid1.rgb += fluid1.rgb * edge1 * u_boundaryContrast * 1.6 + vec3(edge1 * u_boundaryContrast * 0.25);
+    }
+
+    if (macro) {
+      float grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
+      fluid1.rgb = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
     }
 
     vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
@@ -1768,19 +2080,38 @@ void main() {
       texData.push(new Uint8Array(GRID_AREA * 4));
     }
 
+    // Velocity fields for the two composited layers — bound to units 6/7 and
+    // only refreshed while the macro camera is running.
+    const velTextures: WebGLTexture[] = [];
+    const velData: Uint8Array[] = [];
+    for (let i = 0; i < 2; i++) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      velTextures.push(tex);
+      velData.push(new Uint8Array(GRID_AREA * 4).fill(128)); // 128 = zero velocity
+    }
+
     // Collect uniform locations
     const uniformNames = [
       'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1',
       'u_resolution','u_gooey','u_darkBlend','u_blendMode',
       'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
       'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
+      'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
+      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_flowRate',
+      'u_filmLevel','u_filmGain',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
       uLocs[name] = gl.getUniformLocation(program, name);
     }
 
-    webGLRef.current = { gl, program, vao, posBuffer, textures, texData, uLocs };
+    webGLRef.current = { gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs };
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -1798,7 +2129,14 @@ void main() {
       const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
       const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
       const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
-      return { x: Math.floor(rx / scale + GRID_SIZE / 2), y: Math.floor(ry / scale + GRID_SIZE / 2) };
+      // Mirror the shader's camera transform so the brush lands under the
+      // cursor at any magnification.
+      const shot = macroShotRef.current;
+      const z = Math.max(0.0001, shot.zoom);
+      return {
+        x: Math.floor(rx / (scale * z) + shot.cx * GRID_SIZE),
+        y: Math.floor(ry / (scale * z) + shot.cy * GRID_SIZE),
+      };
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -1811,7 +2149,7 @@ void main() {
       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
+        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
         const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
         const my = (e.movementX * Math.sin(-angle) + e.movementY * Math.cos(-angle)) / scale * 5;
         activeFluid.addVelocity(x, y, mx, my);
@@ -1879,6 +2217,7 @@ void main() {
         if (drainTrigger > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTrigger;
           drainFrameRef.current = 1;
+          macroCamRef.current.reset();
           harmonyRef.current = harmonyLockRef.current ?? pickHarmony(); // fresh palette after drain
         }
         if (drainFrameRef.current > 0) {
@@ -2104,6 +2443,7 @@ void main() {
         // ── Seed trigger ───────────────────────────────────────
         if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
           lastSeedCount.current = seedCount;
+          macroCamRef.current.reset();
           harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
           const styles = injectStyleRef.current;
           for (const fluid of fluidsRef.current) {
@@ -2309,6 +2649,77 @@ void main() {
           }
         }
 
+        // ── Macro camera ──────────────────────────────────────
+        // Locks the frame onto one bead of dye. Off, this stays at the plate-wide
+        // framing (centre 0.5,0.5 at zoom 1) and costs nothing.
+        const macroOn = currentSettings.macroMode === true;
+        if (macroOn !== lastMacroOnRef.current) {
+          lastMacroOnRef.current = macroOn;
+          if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on switch-on
+        }
+        if (macroOn && fluidsRef.current.length > 0) {
+          if (isActiveRef.current && drainFrameRef.current === 0) {
+            const subject = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
+            const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
+            macroShotRef.current = macroCamRef.current.update(
+              { density: subject.density, vx: subject.vx, vy: subject.vy, size: GRID_SIZE },
+              realDt,
+              {
+                zoom: Math.max(1, currentSettings.macroZoom ?? 6),
+                chase: currentSettings.macroChase ?? 0.6,
+                hold: Math.max(0.5, currentSettings.macroHold ?? 5),
+                floor: filmLevelRef.current,
+                energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
+                spanX: canvas.width / maxDim,
+                spanY: canvas.height / maxDim,
+              },
+            );
+          }
+        } else {
+          macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
+        }
+        const shot = macroShotRef.current;
+
+        // ── Macro film exposure ───────────────────────────────────
+        // The solver spreads dye into a wash whose absolute density depends on
+        // the preset, the audio and how long it has been running. A closeup
+        // needs a *subject*, so read the plate's own density histogram each
+        // frame and expose for it: everything under the level where the top
+        // fifth of the plate begins renders as bare ground, and the range
+        // above it is stretched to full opacity. Slewed, so exposure drifts
+        // rather than pumping.
+        if (macroOn && fluidsRef.current.length > 0) {
+          const f0 = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
+          const bins = filmHistRef.current;
+          bins.fill(0);
+          let samples = 0;
+          for (let j = 1; j < GRID_SIZE - 1; j += 3) {
+            for (let i = 1; i < GRID_SIZE - 1; i += 3) {
+              const d = f0.density[i + j * GRID_SIZE];
+              const b = d <= 0 ? 0 : Math.min(FILM_BINS - 1, (d * FILM_BIN_SCALE) | 0);
+              bins[b]++;
+              samples++;
+            }
+          }
+          // Walk down from the densest bin to the paint/ground split and to a
+          // near-peak level, and derive the exposure from the two.
+          const paintCount = samples * 0.14;
+          const peakCount = samples * 0.03;
+          let acc = 0, levelBin = 0, peakBin = FILM_BINS - 1;
+          for (let b = FILM_BINS - 1; b >= 0; b--) {
+            acc += bins[b];
+            if (acc >= peakCount && peakBin === FILM_BINS - 1) peakBin = b;
+            if (acc >= paintCount) { levelBin = b; break; }
+          }
+          const level = levelBin / FILM_BIN_SCALE;
+          // Floor the spread: a nearly flat histogram would otherwise produce a
+          // huge gain and a hard-edged, binary-looking frame.
+          const peak = Math.max(level + 0.35, peakBin / FILM_BIN_SCALE);
+          const slew = 1 - Math.exp(-2.5 * Math.min(0.25, realDt));
+          filmLevelRef.current += (level - filmLevelRef.current) * slew;
+          filmGainRef.current += (3.2 / (peak - level) - filmGainRef.current) * slew;
+        }
+
         // ── WebGL GPU render ──────────────────────────────────
         if (glr) {
           const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
@@ -2342,6 +2753,40 @@ void main() {
             glCtx.activeTexture(glCtx.TEXTURE0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
             glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
+          }
+
+          // Pack velocity for the macro detail pass. Encoded against the frame's
+          // own peak speed, so slow and fast passages both resolve; u_flowRate
+          // converts back to fluid-UV per second in the shader.
+          let flowRate = 0;
+          if (macroOn) {
+            const { velTextures: velTexs, velData: vData } = glr;
+            let velRange = 1e-3;
+            const probe = fluidsRef.current[0];
+            for (let j = 2; j < GRID_SIZE - 2; j += 4) {
+              for (let i = 2; i < GRID_SIZE - 2; i += 4) {
+                const idx = i + j * GRID_SIZE;
+                const ax = Math.abs(probe.vx[idx]), ay = Math.abs(probe.vy[idx]);
+                if (ax > velRange) velRange = ax;
+                if (ay > velRange) velRange = ay;
+              }
+            }
+            const encode = 127.5 / velRange;
+            for (let l = 0; l < Math.min(2, fluidsRef.current.length); l++) {
+              const fluid = fluidsRef.current[l];
+              const vd = vData[l];
+              for (let i = 0; i < GRID_AREA; i++) {
+                const i4 = i * 4;
+                vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
+                vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
+              }
+              glCtx.activeTexture(glCtx.TEXTURE6 + l);
+              glCtx.bindTexture(glCtx.TEXTURE_2D, velTexs[l]);
+              glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
+            }
+            // cells advected per second = v * (dt * (N-2)) / N / realDt
+            const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
+            flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
           }
 
           // Set uniforms and draw
@@ -2380,6 +2825,21 @@ void main() {
           glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
           glCtx.uniform1f(uLocs['u_gridSize'], GRID_SIZE);
 
+          // Macro closeup
+          glCtx.uniform1i(uLocs['u_vel0'], 6);
+          glCtx.uniform1i(uLocs['u_vel1'], 7);
+          glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
+          glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
+          glCtx.uniform1f(uLocs['u_macro'], macroOn ? 1 : 0);
+          glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
+          glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
+          glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
+          glCtx.uniform1f(uLocs['u_macroDepth'], currentSettings.macroDepth ?? 0.5);
+          glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
+          glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
+          glCtx.uniform1f(uLocs['u_filmLevel'], filmLevelRef.current);
+          glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, filmGainRef.current)));
+
           glCtx.viewport(0, 0, canvas.width, canvas.height);
           glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
           glCtx.bindVertexArray(null);
@@ -2404,8 +2864,9 @@ void main() {
       // Clean up WebGL resources
       const glr = webGLRef.current;
       if (glr) {
-        const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs } = glr;
+        const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs, velTextures: velTexs } = glr;
         for (const tex of texs) glCtx.deleteTexture(tex);
+        for (const tex of velTexs) glCtx.deleteTexture(tex);
         glCtx.deleteBuffer(pb);
         glCtx.deleteVertexArray(vaoObj);
         glCtx.deleteProgram(prog);

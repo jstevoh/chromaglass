@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — Macro Closeup
+- **Bead camera** — a tracking macro camera that magnifies the plate and rides a single bead of dye: it locks onto the most compact, isolated bead it can find, follows it with a velocity lead so a fast bead never trails off-frame, and when the bead dissolves or its shot runs out it whips to a new one with a dolly-out that hides the cut (`macroMode`, `macroZoom`, `macroChase`, `macroHold`; `src/lib/macroCamera.ts`)
+- **Synthesised micro-detail** — at 4-6x the 192-cell solver only supplies the large shape, so the renderer adds fluid-space structure that magnifies with the camera: packed paint cells (dark cores in bright, dark-outlined rings) carried along by the dye, dendritic lacing stretched along the flow, a fractal silhouette warp, dome shading, contact shadow and substrate grain (`macroCells`, `macroCellScale`, `macroLacing`, `macroDepth`, `macroEdgeDetail`)
+- **Shallow depth of field** — defocus grows away from the frame centre, the way a macro lens behaves wide open
+- Three macro presets — Macro Bead, Cell Bloom, Lacing Run — each with its own seed pattern of separated beads for the camera to choose between
+- Macro toggle in the main toolbar and a Macro Closeup section in Settings; Lucky rolls closeup framing one time in four
+
+### Changed — Macro Closeup
+- Macro frames expose against the plate's own density histogram each frame: dye below the level where the top ~14% of the plate begins renders as bare ground, and the range above it is stretched to full opacity, so a closeup always has a subject, a silhouette and visible surface under the paint
+- The dye budget drops from a near-full plate to a sparse one while the closeup camera is running — a saturated plate magnified is just one flat colour
+- Defocused pixels skip the 8-tap normal and the interface pass, which more than pays for the macro detail: the closeup renders faster than the plate-wide view
+
 ## [1.2.0] - 2026-07-28
 
 ### Added

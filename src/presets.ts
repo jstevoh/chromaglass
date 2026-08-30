@@ -747,4 +747,181 @@ export const PRESETS: Preset[] = [
       },
     }
   },
+
+  // ── Macro closeup presets ────────────────────────────────────────
+  // These drive the tracking macro camera (macroMode). The frame rides one
+  // bead of dye at high magnification, so the settings that matter most are
+  // the ones that keep dye *separated* into distinct beads — high polarity,
+  // low diffusion, low gooey blur — and fast enough to be worth chasing.
+  {
+    id: 'macro-bead',
+    name: 'Macro Bead',
+    description: 'The camera chases one travelling bead at 8x — cells, lacing and razor edges fill the frame.',
+    settings: {
+      macroMode: true,
+      macroZoom: 4.5,            // ~28 sim cells across — bead plus its surroundings
+      macroChase: 0.7,           // quick follow with a hard whip on each cut
+      macroHold: 4.5,
+      macroCells: 0.85,
+      macroCellScale: 0.45,
+      macroLacing: 0.7,
+      macroDepth: 0.6,
+      macroEdgeDetail: 0.75,
+      globalSpeed: 0.28,         // beads visibly travel — the whole point
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.12,         // almost no metaball blur — keeps beads crisp
+      postBlurRadius: 0.1,
+      rotationSpeed: 0.0,
+      centerGravity: 0.0,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#3B0806',       // deep red ground, like paint on stained board
+      ledSpeed: 0.0,
+      surfaceTension: 0.22,      // beads hold their round shape
+      diffusionRate: 0.00003,    // colors stay separate instead of muddying
+      buoyancy: 0.35,
+      advection: 0.6,
+      damping: 0.985,
+      heatDecay: 0.985,
+      automateRate: 0.16,
+      platePressure: 0.3,
+      glassSmear: 0.2,
+      rainDrip: 0.05,
+      viscosity: 'thick',
+      polarity: 0.9,             // strong immiscibility — hard color boundaries
+      heatIntensity: 0.12,
+      boilingPoint: 0.9,
+      evaporationRate: 0.03,     // ground clears between beads instead of washing over
+      airVelocity: 0.08,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.5,
+      turbulenceScale: 0.45,
+      turbulenceDetail: 3,
+      blobSurfaceTension: 0.55,
+      boundaryContrast: 0.7,
+      saturationBoost: 1.5,
+      glossiness: 0.12,          // a hint of wet sheen at this distance
+      audioMappings: {
+        velocity: 'bass',
+        density: 'volume',
+        color: 'treble',
+        rotation: 'none',
+      },
+    }
+  },
+  {
+    id: 'cell-bloom',
+    name: 'Cell Bloom',
+    description: 'Packed rings of paint cells — dark cores in bright halos — breathing across a magnified pool.',
+    settings: {
+      macroMode: true,
+      macroZoom: 3.5,
+      macroChase: 0.45,          // slower drift — this one lingers on a pool
+      macroHold: 7.0,
+      macroCells: 1.0,           // maximum cell structure
+      macroCellScale: 0.32,      // small, densely packed cells
+      macroLacing: 0.35,
+      macroDepth: 0.7,
+      macroEdgeDetail: 0.5,
+      globalSpeed: 0.18,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.2,
+      postBlurRadius: 0.12,
+      rotationSpeed: 0.004,
+      centerGravity: 0.05,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#4A0D08',
+      ledSpeed: 0.0,
+      surfaceTension: 0.18,
+      diffusionRate: 0.00005,
+      buoyancy: 0.5,
+      advection: 0.45,
+      damping: 0.99,
+      heatDecay: 0.99,
+      automateRate: 0.1,
+      platePressure: 0.45,
+      glassSmear: 0.25,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      heatIntensity: 0.2,
+      boilingPoint: 0.85,
+      evaporationRate: 0.02,
+      airVelocity: 0.05,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.55,
+      turbulenceScale: 0.35,
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.6,
+      boundaryContrast: 0.6,
+      saturationBoost: 1.55,
+      glossiness: 0.18,
+      audioMappings: {
+        velocity: 'mid',
+        density: 'bass',
+        color: 'treble',
+        rotation: 'none',
+      },
+    }
+  },
+  {
+    id: 'lace-run',
+    name: 'Lacing Run',
+    description: 'A fast tongue of dye spreading over dark ground, dragging black dendritic lacing behind it.',
+    settings: {
+      macroMode: true,
+      macroZoom: 4.0,
+      macroChase: 0.9,           // whip-fast — the frame really moves
+      macroHold: 3.0,            // short takes, frequent cuts
+      macroCells: 0.8,
+      macroCellScale: 0.55,
+      macroLacing: 1.0,          // lacing is the subject here
+      macroDepth: 0.6,
+      macroEdgeDetail: 0.9,      // maximum silhouette crinkle
+      globalSpeed: 0.45,         // quick — this one rushes
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.08,
+      postBlurRadius: 0.08,
+      rotationSpeed: 0.0,
+      centerGravity: 0.0,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#2E0705',
+      ledSpeed: 0.0,
+      surfaceTension: 0.08,      // low — the edge fingers and splits
+      diffusionRate: 0.00004,
+      buoyancy: 0.3,
+      advection: 0.85,
+      damping: 0.975,
+      heatDecay: 0.97,
+      automateRate: 0.2,
+      platePressure: 0.45,       // squeeze drives the front without flattening it
+      glassSmear: 0.4,
+      rainDrip: 0.2,
+      viscosity: 'thin',
+      polarity: 0.95,
+      heatIntensity: 0.1,
+      boilingPoint: 0.9,
+      evaporationRate: 0.035,
+      airVelocity: 0.2,
+      vibrationFrequency: 0.1,
+      audioImpact: 0.65,
+      turbulenceScale: 0.7,
+      turbulenceDetail: 4,
+      blobSurfaceTension: 0.15,
+      boundaryContrast: 0.8,
+      saturationBoost: 1.4,
+      glossiness: 0.08,
+      audioMappings: {
+        velocity: 'bass',
+        density: 'energy',
+        color: 'treble',
+        rotation: 'none',
+      },
+    }
+  },
 ];

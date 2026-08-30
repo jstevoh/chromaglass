@@ -83,6 +83,17 @@ export interface VisualizerSettings {
   saturationBoost: number;    // final color grade saturation multiplier
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
+
+  // Macro Closeup — magnified camera that chases a single bead of liquid
+  macroMode: boolean;         // enable the tracking macro camera + micro-detail pass
+  macroZoom: number;          // 1 = full plate, 16 = extreme magnification
+  macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
+  macroHold: number;          // seconds spent on one bead before cutting to the next
+  macroCells: number;         // paint-cell / bubble structure amount
+  macroCellScale: number;     // cell size (small = many tiny cells)
+  macroLacing: number;        // dark lacing filaments along dye boundaries
+  macroDepth: number;         // dome shading, contact shadow and shallow depth of field
+  macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
@@ -129,4 +140,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
+  macroMode: false,         // off by default — the plate-wide light show is the base look
+  macroZoom: 4.0,           // ~32 sim cells across the frame — one bead and its ground
+  macroChase: 0.6,          // quick follow with a short whip on each new bead
+  macroHold: 5.0,
+  macroCells: 0.75,
+  macroCellScale: 0.5,
+  macroLacing: 0.55,
+  macroDepth: 0.5,
+  macroEdgeDetail: 0.6,
 };

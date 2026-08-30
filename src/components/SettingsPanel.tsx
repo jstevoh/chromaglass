@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode } from '../types';
 import { PRESETS } from '../presets';
 
@@ -205,6 +205,91 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ postBlurRadius: v })}
         />
+      </section>
+
+      {/* Macro Closeup Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Microscope size={12} /> Macro Closeup
+        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Bead Camera</span>
+          <button
+            onClick={() => onUpdate({ macroMode: !settings.macroMode })}
+            className={`w-10 h-5 rounded-full relative transition-colors ${settings.macroMode ? 'bg-white' : 'bg-white/20'}`}
+            title="Magnify the plate and chase a single bead of liquid"
+          >
+            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.macroMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {settings.macroMode && (
+          <>
+            <Slider
+              label="Zoom"
+              value={settings.macroZoom}
+              min={1}
+              max={16}
+              step={0.5}
+              onChange={(v: number) => onUpdate({ macroZoom: v })}
+            />
+            <Slider
+              label="Chase Speed"
+              value={settings.macroChase}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroChase: v })}
+            />
+            <Slider
+              label="Shot Length"
+              value={settings.macroHold}
+              min={1}
+              max={15}
+              step={0.5}
+              onChange={(v: number) => onUpdate({ macroHold: v })}
+            />
+            <Slider
+              label="Paint Cells"
+              value={settings.macroCells}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroCells: v })}
+            />
+            <Slider
+              label="Cell Size"
+              value={settings.macroCellScale}
+              min={0.15}
+              max={1.5}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroCellScale: v })}
+            />
+            <Slider
+              label="Lacing"
+              value={settings.macroLacing}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroLacing: v })}
+            />
+            <Slider
+              label="Depth / Focus"
+              value={settings.macroDepth}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroDepth: v })}
+            />
+            <Slider
+              label="Edge Detail"
+              value={settings.macroEdgeDetail}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
+            />
+          </>
+        )}
       </section>
 
       {/* Squish Plate Section */}
