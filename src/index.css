@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+/* ── Phone remote sliders ──────────────────────────────────────────
+   A 40px-tall touch target with a 10px visible track and a thumb big
+   enough to find without looking — these get used one-handed, in the
+   dark, while something else is happening. The fill percentage comes
+   in as --fill so the track shows position at a glance. */
+.remote-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.remote-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #fff 0%,
+    #fff var(--fill, 0%),
+    rgb(255 255 255 / 0.12) var(--fill, 0%),
+    rgb(255 255 255 / 0.12) 100%
+  );
+}
+.remote-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -9px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.55);
+}
+.remote-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.12);
+}
+.remote-slider::-moz-range-progress {
+  height: 10px;
+  border-radius: 9999px;
+  background: #fff;
+}
+.remote-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9999px;
+  background: #fff;
+}

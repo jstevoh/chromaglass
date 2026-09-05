@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
+import { useRemoteLink } from './hooks/useRemoteLink';
+import type { RemoteState } from './lib/remoteProtocol';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
@@ -320,6 +322,48 @@ export default function App() {
     visualizerRef.current?.setInjectStyle([s1, s2]);
     setSeedCount(prev => prev + 1);
   };
+
+  // ── Phone remote ────────────────────────────────────────────────
+  // The laptop is authoritative: it publishes a snapshot of the show whenever
+  // anything changes, and applies commands the phone sends back. When no relay
+  // is running (the Firebase-hosted build, or plain `vite dev`), the link stays
+  // dormant and nothing here changes behaviour.
+  const remoteState = useMemo<RemoteState>(() => ({
+    settings,
+    activePresetId,
+    isActive,
+    isAutomated,
+    trackName: musicIntel.state.track?.title ?? null,
+  }), [settings, activePresetId, isActive, isAutomated, musicIntel.state.track?.title]);
+
+  useRemoteLink({
+    role: 'display',
+    state: remoteState,
+    onMessage: (message) => {
+      switch (message.type) {
+        case 'patch':
+          updateSettings(message.settings);
+          break;
+        case 'preset': {
+          const preset = PRESETS.find(p => p.id === message.presetId);
+          if (preset) applyPreset(preset.id, preset.settings);
+          break;
+        }
+        case 'action':
+          switch (message.action) {
+            case 'play':          setIsActive(true); break;
+            case 'pause':         setIsActive(false); break;
+            case 'seed':          setSeedCount(prev => prev + 1); break;
+            case 'clear':         setClearTrigger(prev => prev + 1); break;
+            case 'drain':         setDrainTrigger(prev => prev + 1); break;
+            case 'lucky':         triggerLucky(); break;
+            case 'automate-on':   setIsAutomated(true); break;
+            case 'automate-off':  setIsAutomated(false); break;
+          }
+          break;
+      }
+    },
+  });
 
   // Derive preset name for display
   const activePresetName = useMemo(() => {

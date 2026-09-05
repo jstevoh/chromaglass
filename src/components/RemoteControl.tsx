@@ -1,0 +1,259 @@
+import type { ComponentType } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Wifi, WifiOff } from 'lucide-react';
+import { PRESETS } from '../presets';
+import { useRemoteLink } from '../hooks/useRemoteLink';
+import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
+import type { VisualizerSettings } from '../types';
+
+/**
+ * The phone. A control surface for a show running on the laptop — deliberately
+ * not a second copy of the settings panel.
+ *
+ * What's here is what you reach for mid-show in a dark room: presets, the two
+ * dials that change the mood most (drive and speed), the macro camera, and the
+ * one-shot gestures. Everything else stays on the laptop, where there's a
+ * pointer and enough screen to see what you're doing.
+ */
+export default function RemoteControl() {
+  const [state, setState] = useState<RemoteState | null>(null);
+  /**
+   * While a finger is on a slider, the phone trusts its own value: state
+   * snapshots keep arriving from the laptop, and letting them win would make
+   * the thumb jump backwards mid-drag.
+   */
+  const draggingRef = useRef<Set<keyof VisualizerSettings>>(new Set());
+  const [localValues, setLocalValues] = useState<Partial<VisualizerSettings>>({});
+
+  const { status, send } = useRemoteLink({
+    role: 'controller',
+    onMessage: (message) => {
+      if (message.type !== 'state') return;
+      setState(message.state);
+      setLocalValues((prev) => {
+        // Drop local overrides for anything not currently being dragged.
+        const next: Partial<VisualizerSettings> = {};
+        for (const key of draggingRef.current) {
+          if (key in prev) (next as Record<string, unknown>)[key] = prev[key];
+        }
+        return next;
+      });
+    },
+  });
+
+  const settings = state?.settings;
+  const value = useCallback(
+    <K extends keyof VisualizerSettings>(key: K): VisualizerSettings[K] | undefined =>
+      (localValues[key] ?? settings?.[key]) as VisualizerSettings[K] | undefined,
+    [localValues, settings],
+  );
+
+  const patch = useCallback(
+    (partial: Partial<VisualizerSettings>) => send({ type: 'patch', settings: partial }),
+    [send],
+  );
+  const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
+
+  const presetGroups = useMemo(() => {
+    const macro = PRESETS.filter((p) => p.settings.macroMode);
+    const rest = PRESETS.filter((p) => !p.settings.macroMode);
+    return [
+      { label: 'Closeup', presets: macro },
+      { label: 'Light show', presets: rest },
+    ];
+  }, []);
+
+  const connected = status === 'connected' && state !== null;
+
+  const Slider = ({
+    label,
+    field,
+    min,
+    max,
+    step,
+    format,
+  }: {
+    label: string;
+    field: keyof VisualizerSettings;
+    min: number;
+    max: number;
+    step: number;
+    format?: (v: number) => string;
+  }) => {
+    const current = (value(field) as number | undefined) ?? min;
+    return (
+      <div className="mb-5">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
+          <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={current}
+          disabled={!connected}
+          onPointerDown={() => draggingRef.current.add(field)}
+          onPointerUp={() => draggingRef.current.delete(field)}
+          onPointerCancel={() => draggingRef.current.delete(field)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            setLocalValues((prev) => ({ ...prev, [field]: v }));
+            patch({ [field]: v } as Partial<VisualizerSettings>);
+          }}
+          className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30"
+          style={{ ['--fill' as string]: `${((current - min) / (max - min)) * 100}%` }}
+        />
+      </div>
+    );
+  };
+
+  const ActionButton = ({
+    label,
+    icon: Icon,
+    onPress,
+    tone = 'default',
+  }: {
+    label: string;
+    icon: ComponentType<{ size?: number }>;
+    onPress: () => void;
+    tone?: 'default' | 'warn';
+  }) => (
+    <button
+      onClick={onPress}
+      disabled={!connected}
+      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
+        tone === 'warn'
+          ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
+          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    </button>
+  );
+
+  return (
+    <div
+      className="min-h-screen bg-[#0a0a0a] text-white"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+      }}
+    >
+      {/* Status */}
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 px-5 py-4 backdrop-blur">
+        <div>
+          <h1 className="text-lg font-bold italic tracking-tighter">
+            Chroma<span className="not-italic">Glass</span>
+          </h1>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Remote</p>
+        </div>
+        <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
+          {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
+          {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
+        </div>
+      </header>
+
+      {!connected && (
+        <p className="px-5 py-3 text-xs leading-relaxed text-white/45">
+          Waiting for the laptop. Make sure the show is open there and both devices are on the
+          same network.
+        </p>
+      )}
+
+      <main className="px-5 pt-5">
+        {/* Transport */}
+        <div className="mb-6 flex gap-3">
+          <button
+            onClick={() => action(state?.isActive ? 'pause' : 'play')}
+            disabled={!connected}
+            className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl py-5 text-sm font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 ${
+              state?.isActive ? 'bg-white text-black' : 'border border-white/15 bg-white/5 text-white/80'
+            }`}
+          >
+            {state?.isActive ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
+            {state?.isActive ? 'Playing' : 'Paused'}
+          </button>
+          <button
+            onClick={() => action(state?.isAutomated ? 'automate-off' : 'automate-on')}
+            disabled={!connected}
+            className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-30 ${
+              state?.isAutomated
+                ? 'border-purple-400/40 bg-purple-500/20 text-purple-100'
+                : 'border-white/10 bg-white/5 text-white/70'
+            }`}
+          >
+            <Waves size={18} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
+          </button>
+        </div>
+
+        {/* The two dials that change the mood most */}
+        <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} />
+        <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} />
+
+        {/* Macro camera */}
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <button
+            onClick={() => patch({ macroMode: !settings?.macroMode })}
+            disabled={!connected}
+            className="flex w-full items-center justify-between disabled:opacity-30"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+              <Microscope size={15} /> Macro Closeup
+            </span>
+            <span className={`h-6 w-11 rounded-full transition-colors ${settings?.macroMode ? 'bg-white' : 'bg-white/20'}`}>
+              <span className={`mt-0.5 block h-5 w-5 rounded-full bg-black transition-transform ${settings?.macroMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </span>
+          </button>
+          {settings?.macroMode && (
+            <div className="mt-4">
+              <Slider label="Zoom" field="macroZoom" min={1} max={12} step={0.5} format={(v) => `${v.toFixed(1)}x`} />
+              <Slider label="Shot Length" field="macroHold" min={1} max={15} step={0.5} format={(v) => `${v.toFixed(1)}s`} />
+            </div>
+          )}
+        </div>
+
+        {/* One-shot gestures */}
+        <div className="mb-7 flex gap-3">
+          <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} />
+          <ActionButton label="Random" icon={Sparkles} onPress={() => action('lucky')} />
+          <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} />
+          <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" />
+        </div>
+
+        {/* Presets */}
+        {presetGroups.map(({ label, presets }) => (
+          <section key={label} className="mb-7">
+            <h2 className="mb-3 text-[10px] uppercase tracking-[0.3em] text-white/30">{label}</h2>
+            <div className="grid grid-cols-2 gap-2.5">
+              {presets.map((preset) => {
+                const isActive = state?.activePresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => send({ type: 'preset', presetId: preset.id })}
+                    disabled={!connected}
+                    className={`rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                      isActive ? 'border-white/50 bg-white/15' : 'border-white/10 bg-white/5'
+                    }`}
+                  >
+                    <span className={`block text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white/75'}`}>
+                      {preset.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </main>
+    </div>
+  );
+}

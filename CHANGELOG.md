@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflow that typechecks, builds and publishes to Firebase Hosting on every push to `main` (needs a `FIREBASE_SERVICE_ACCOUNT` repository secret)
 - Favicon, Apple touch icon, share card and page metadata — the built site previously served a bare `index.html` with no icon and no description
 
+### Added — Phone Remote
+- **Laptop drives, phone controls.** `npm run remote` serves the built app on the LAN and relays control messages, so the laptop runs the show (mic, GPU, full UI) while a phone at `?remote=1` becomes a control surface: presets, sound drive, speed, the macro camera and the one-shot gestures (`server/remote-server.js`, `src/components/RemoteControl.tsx`, `src/hooks/useRemoteLink.ts`)
+- The laptop is authoritative and publishes a state snapshot on every change, so a phone joining or reloading mid-show sees what is actually running rather than what it last remembered; the link reconnects on its own with backoff, and stays dormant when no relay is present so the hosted build is unaffected
+- Deliberately a LAN WebSocket rather than a cloud round-trip: a slider should move the visuals in milliseconds, and the show should survive the internet going down
+
 ### Added — Audio
 - **Automatic room calibration** — the analyser learns the room instead of asking the listener to find a sensitivity number: it tracks the noise floor and signal ceiling in dBFS, fits the AnalyserNode's own dB window to them (the defaults waste almost the whole 0-255 spectrum on a quiet room, which is the mechanical reason a distant mic drives the visuals so weakly), and normalises every band against its own learned range so bass, mids and treble each use their full travel wherever the app is running (`src/lib/audioCalibration.ts`, `autoCalibrate`)
 - Calibration readout and a Recalibrate button in Settings → Audio Input, showing the learned floor and peak

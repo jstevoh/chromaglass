@@ -44,6 +44,31 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and allow microphone access when prompted.
 
+## Phone Remote
+
+The laptop runs the show — microphone, GPU, full UI — and your phone becomes a
+control surface for it over the local network.
+
+```bash
+npm run build
+npm run remote
+```
+
+The server prints two URLs: open the first on the laptop, the second
+(`?remote=1`) on the phone. Both devices need to be on the same network.
+
+The phone gets presets, sound drive, speed, the macro camera and the one-shot
+gestures (seed, random, drain, clear) — the things you reach for mid-show. The
+laptop stays authoritative and publishes a state snapshot on every change, so a
+phone that joins or reloads mid-show immediately shows what's actually running.
+
+This runs over plain http on your LAN, which is deliberate: a slider should move
+the visuals in a couple of milliseconds rather than a couple of hundred through
+a datacentre, and the show keeps working when the internet doesn't. The tradeoff
+is that a page loaded from the hosted `https://` site can't open a `ws://` socket
+to your laptop (mixed content), so remote control means running the show from
+`npm run remote`.
+
 ## Controls
 
 | Control | Description |
@@ -57,6 +82,7 @@ Open [http://localhost:3000](http://localhost:3000) and allow microphone access 
 | Clear | Wipe the active layer |
 | Auto toggle | Enable automated dye/air injection |
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
+| Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
 | Eye toggle | Minimize/maximize the UI |
 | Settings gear | Open the full settings panel |
 
@@ -87,6 +113,9 @@ src/
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts
     audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
+    remoteProtocol.ts          # Phone-remote message types and socket URL
+  hooks/
+    useRemoteLink.ts           # WebSocket link, either end, with reconnect
     fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
@@ -96,8 +125,11 @@ src/
     SettingsPanel.tsx          # Full settings UI panel
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
+  components/
+    RemoteControl.tsx          # The phone control surface
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
+  remote-server.js             # LAN static server + control relay (npm run remote)
 ```
 
 ## Deploying
