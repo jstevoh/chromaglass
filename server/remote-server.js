@@ -28,6 +28,7 @@ const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(HERE, '..', 'dist');
 const PORT = Number(process.env.PORT ?? 3000);
 const WS_PATH = '/remote-ws';
+const INFO_PATH = '/remote-info.json';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -51,6 +52,13 @@ if (!existsSync(DIST)) {
 // ── Static files, with SPA fallback ────────────────────────────────────
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
+  // The display asks for this before opening a socket, so a page served from
+  // anywhere else knows not to try. Static hosts answer with index.html.
+  if (url.pathname === INFO_PATH) {
+    res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH }));
+    return;
+  }
   // normalize() collapses any ../ before it can escape dist
   const requested = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
   let filePath = join(DIST, requested);

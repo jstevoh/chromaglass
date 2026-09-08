@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope } from 'lucide-react';
-import { VisualizerSettings, BlendMode, LedMode } from '../types';
+import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
 
@@ -13,10 +13,12 @@ interface SettingsPanelProps {
   /** Live room-calibration readout, null when auto-calibration is off. */
   calibration?: RoomCalibration | null;
   onRecalibrate?: () => void;
+  /** Which solver is running and at what grid, e.g. "GPU · 512²". */
+  engineStatus?: string | null;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, onClose }) => {
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
 
   const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
@@ -251,6 +253,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ postBlurRadius: v })}
         />
+      </section>
+
+      {/* Simulation Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Zap size={12} /> Simulation
+        </h3>
+        <div className="flex flex-col gap-2 mb-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Fluid Grid</span>
+            {engineStatus && <span className="text-[10px] font-mono opacity-50">{engineStatus}</span>}
+          </div>
+          <select
+            value={String(settings.simResolution ?? 'auto')}
+            onChange={(e) => {
+              const v = e.target.value;
+              onUpdate({ simResolution: (v === 'auto' || v === 'cpu' ? v : Number(v)) as SimResolution });
+            }}
+            className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
+            title="Grid the fluid is solved on. Finer grids resolve thinner filaments and real cell structure; the CPU solver is the fallback for machines without float render targets."
+          >
+            <option value="auto">Auto</option>
+            <option value="256">GPU · 256² (light)</option>
+            <option value="384">GPU · 384²</option>
+            <option value="512">GPU · 512²</option>
+            <option value="768">GPU · 768² (heavy)</option>
+            <option value="cpu">CPU · 192²</option>
+          </select>
+          <p className="text-[10px] leading-relaxed opacity-40">
+            Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them. Drop a step if the frame rate suffers.
+          </p>
+        </div>
       </section>
 
       {/* Macro Closeup Section */}

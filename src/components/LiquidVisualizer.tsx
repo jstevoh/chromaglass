@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
-import { VisualizerSettings, LiquidType } from '../types';
+import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
+import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -18,12 +19,29 @@ interface LiquidVisualizerProps {
   isActive?: boolean;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
+  /** Reports which solver is running and at what resolution, e.g. "GPU · 512²". */
+  onEngineStatus?: (status: string) => void;
 }
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
+
+// Which grid the solver should run on. 'auto' picks by machine class; the GPU
+// path is capped by the context's texture limit; 'cpu' is the 192² fallback.
+const resolveSimResolution = (setting: SimResolution | undefined, maxTexture: number): number => {
+  if (setting === 'cpu') return 0;
+  let res: number;
+  if (setting === undefined || setting === 'auto') {
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const cores = navigator.hardwareConcurrency ?? 4;
+    res = mobile ? 256 : cores >= 8 ? 512 : 384;
+  } else {
+    res = setting;
+  }
+  return Math.max(64, Math.min(Math.round(res), maxTexture));
+};
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
 // rendered frame, so the light show runs at the same speed on a 30 fps laptop,
@@ -104,6 +122,26 @@ class FluidSimulation {
   temp0: Float32Array;
   meanDensity = 0; // rolling measure of how full the plate is
 
+  // ── GPU solver attachment ──
+  // When `gpu` is set, the arrays above hold *deltas* — what the CPU-side
+  // writers added since the last step — and `gap` holds gap deltas. They are
+  // flushed into the high-res field each step and zeroed. Readers use the
+  // read* accessors, which serve a 192² downsample of the GPU field.
+  gpu: GpuFluid | null = null;
+  private dirty = false;
+  private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
+  private dyeAdd: Float32Array;     // interleaved upload buffers
+  private velAdd: Float32Array;
+  private rbDensity: Float32Array;  // downsampled readback
+  private rbVx: Float32Array;
+  private rbVy: Float32Array;
+  private mcA: Float32Array;        // MacCormack intermediates (CPU path)
+  private mcB: Float32Array;
+
+  get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
+  get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
+  get readVy(): Float32Array { return this.gpu ? this.rbVy : this.vy; }
+
   constructor(size: number, diffusion: number, viscosity: number, dt: number) {
     this.size = size;
     this.dt = dt;
@@ -130,10 +168,105 @@ class FluidSimulation {
 
     this.temp = new Float32Array(GRID_AREA);
     this.temp0 = new Float32Array(GRID_AREA);
+
+    this.mul = new Float32Array(GRID_AREA).fill(1);
+    this.dyeAdd = new Float32Array(GRID_AREA * 4);
+    this.velAdd = new Float32Array(GRID_AREA * 4);
+    this.rbDensity = new Float32Array(GRID_AREA);
+    this.rbVx = new Float32Array(GRID_AREA);
+    this.rbVy = new Float32Array(GRID_AREA);
+    this.mcA = new Float32Array(GRID_AREA);
+    this.mcB = new Float32Array(GRID_AREA);
+  }
+
+  // ── GPU solver lifecycle ───────────────────────────────────────────
+
+  /** Move the simulation onto the GPU. Whatever the CPU arrays hold becomes the opening state. */
+  attachGpu(gpu: GpuFluid) {
+    if (this.gpu) {                       // resolution change: carry the field across
+      this.pullStateFromGpu();
+      this.gpu.dispose();
+    }
+    this.gpu = gpu;
+    gpu.clear();
+    // Absolute state → opening delta. The gap is absolute at rest (0.03).
+    for (let i = 0; i < GRID_AREA; i++) this.gap[i] -= 0.03;
+    this.dhdt.fill(0);
+    this.mul.fill(1);
+    this.dirty = true;
+    // Readers see the CPU state until the first readback lands
+    this.rbDensity.set(this.density);
+    this.rbVx.set(this.vx);
+    this.rbVy.set(this.vy);
+  }
+
+  /** Bring the field back to the CPU arrays and release the GPU solver. */
+  detachGpu() {
+    if (!this.gpu) return;
+    this.pullStateFromGpu();
+    this.gpu.dispose();
+    this.gpu = null;
+  }
+
+  /** Release the GPU solver without a readback — the context is going away. */
+  dropGpu() {
+    this.gpu?.dispose();
+    this.gpu = null;
+  }
+
+  /** Once per rendered frame: refresh the readback the CPU-side readers use. */
+  syncFromGpu() {
+    if (!this.gpu) return;
+    const { dye, vel } = this.gpu.readback();
+    let sum = 0;
+    for (let i = 0; i < GRID_AREA; i++) {
+      const d = dye[i * 4 + 3];
+      this.rbDensity[i] = d;
+      this.rbVx[i] = vel[i * 4];
+      this.rbVy[i] = vel[i * 4 + 1];
+      sum += d;
+    }
+    this.meanDensity = sum / GRID_AREA;
+  }
+
+  private pullStateFromGpu() {
+    const gpu = this.gpu!;
+    if (this.dirty) this.flushDeltas(this.dt || 0.01);
+    const { dye, vel } = gpu.readback();
+    for (let i = 0; i < GRID_AREA; i++) {
+      this.densityR[i] = dye[i * 4];
+      this.densityG[i] = dye[i * 4 + 1];
+      this.densityB[i] = dye[i * 4 + 2];
+      this.density[i] = dye[i * 4 + 3];
+      this.vx[i] = vel[i * 4];
+      this.vy[i] = vel[i * 4 + 1];
+      this.temp[i] = vel[i * 4 + 2];
+    }
+    this.gap.fill(0.03);
+    this.dhdt.fill(0);
+    this.pressure.fill(0);
+    this.mul.fill(1);
+    this.dirty = false;
+  }
+
+  private flushDeltas(dt: number) {
+    const gpu = this.gpu!;
+    const da = this.dyeAdd, va = this.velAdd;
+    for (let i = 0; i < GRID_AREA; i++) {
+      const i4 = i * 4;
+      da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
+      va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
+    }
+    gpu.applyDeltas(da, va, this.mul, dt);
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
+    this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
+    this.mul.fill(1);
+    this.dirty = false;
   }
 
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
     const index = x + y * this.size;
+    this.dirty = true;
     this.density[index] += amount;
     // Store log-space absorptions for Scott Burns geometric mean mixing.
     // At render time: channel = exp(-densityChannel / density)
@@ -146,12 +279,14 @@ class FluidSimulation {
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
     const index = x + y * this.size;
+    this.dirty = true;
     this.vx[index] += amountX;
     this.vy[index] += amountY;
   }
 
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
+    this.dirty = true;
     this.temp[index] += amount;
   }
 
@@ -185,7 +320,12 @@ class FluidSimulation {
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
-    this.pressure.fill(0); this.dhdt.fill(0); this.gap.fill(0.03);
+    this.pressure.fill(0); this.dhdt.fill(0);
+    this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
+    this.mul.fill(1);
+    this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
+    this.dirty = false;
+    this.gpu?.clear();
   }
 
   private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {
@@ -596,6 +736,11 @@ class FluidSimulation {
         const ny = y + j;
         if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
           const idx = nx + ny * this.size;
+          this.dirty = true;
+          if (this.gpu) {
+            this.gap[idx] -= amount;    // a delta; the shader clamps and derives dh/dt
+            continue;
+          }
           const prevGap = this.gap[idx];
           this.gap[idx] = Math.max(0.005, this.gap[idx] - amount);
           this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
@@ -616,12 +761,17 @@ class FluidSimulation {
         if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
           const idx = nx + ny * this.size;
           const dist = Math.sqrt(distSq);
+          this.dirty = true;
           this.vx[idx] += (i / dist) * strength;
           this.vy[idx] += (j / dist) * strength;
-          this.density[idx] *= 0.8;
-          this.densityR[idx] *= 0.8;
-          this.densityG[idx] *= 0.8;
-          this.densityB[idx] *= 0.8;
+          if (this.gpu) {
+            this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
+          } else {
+            this.density[idx] *= 0.8;
+            this.densityR[idx] *= 0.8;
+            this.densityG[idx] *= 0.8;
+            this.densityB[idx] *= 0.8;
+          }
         }
       }
     }
@@ -732,132 +882,93 @@ class FluidSimulation {
 
     this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.05);
 
-    let visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
-    let diff = settings.diffusionRate;
-    const dt = this.dt;
-    let buoyancy = settings.buoyancy;
-    let advection = settings.advection;
-    let damping = settings.damping || 0.99;
-    let heatDecay = settings.heatDecay || 0.98;
-    let heatIntensity = settings.heatIntensity || 0.15;
+    const p = this.deriveStep(settings, audioData, time, noise2D);
 
-    // ── Audio → Physics bridge ───────────────────────────────
-    // Audio adds ONLY heat (which creates buoyancy-driven motion via physics).
-    // No direct velocity injection — the fluid dynamics create all movement.
-    if (audioData && settings.audioMappings) {
-      const colorMod = getAudioValue(audioData, settings.audioMappings.color as AudioFeatureKey);
-      heatIntensity += colorMod * 0.02;
+    if (this.gpu) {
+      const applied = this.dirty;
+      if (applied) this.flushDeltas(p.dt);
+      this.gpu.step(p, applied);
+      return;
     }
 
+    const dt = p.dt;
+
     // 1. Squeeze-Film Flow
-    this.solveSqueezePressure(visc);
-    this.updateSqueezeVelocity(visc);
+    this.solveSqueezePressure(p.visc);
+    this.updateSqueezeVelocity(p.visc);
 
     // 2. Buoyancy & center gravity
     const cx = this.size / 2;
     const cy = this.size / 2;
-    const gravityStrength = (settings.centerGravity || 0) * 0.05;
-
     for (let i = 0; i < GRID_AREA; i++) {
-      this.vy[i] -= this.temp[i] * buoyancy * dt;
-      if (gravityStrength > 0) {
+      this.vy[i] -= this.temp[i] * p.buoyancy * dt;
+      if (p.gravity > 0) {
         const x = i % this.size;
         const y = (i - x) / this.size;
         const dx = cx - x;
         const dy = cy - y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > 0) {
-          this.vx[i] += (dx / dist) * gravityStrength * dt;
-          this.vy[i] += (dy / dist) * gravityStrength * dt;
+          this.vx[i] += (dx / dist) * p.gravity * dt;
+          this.vy[i] += (dy / dist) * p.gravity * dt;
         }
       }
     }
 
     // 3-6. Velocity: diffuse → project → advect → project
-    this.diffuse(1, this.vx0, this.vx, settings.diffusionRate, dt);
-    this.diffuse(2, this.vy0, this.vy, settings.diffusionRate, dt);
+    this.diffuse(1, this.vx0, this.vx, p.nu, dt);
+    this.diffuse(2, this.vy0, this.vy, p.nu, dt);
     this.project(this.vx0, this.vy0, this.vx, this.vy);
-    this.advect(1, this.vx, this.vx0, this.vx0, this.vy0, dt * advection);
-    this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * advection);
+    this.advectMacCormack(1, this.vx, this.vx0, this.vx0, this.vy0, dt * p.advection);
+    this.advectMacCormack(2, this.vy, this.vy0, this.vx0, this.vy0, dt * p.advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
 
-    // 6.5. Multi-octave curl turbulence — detail at every scale.
-    // Audio energy breathes extra turbulence into the field so the liquid
-    // visibly churns with the music instead of drifting at constant pace.
-    const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
-    let turbScale = settings.turbulenceScale ?? 0;
-    if (audioData) {
-      const energy01 = Math.min(1, audioData.energy);
-      turbScale *= 1 + energy01 * (settings.audioImpact ?? 0.45) * 2.0;
-    }
-    this.applyCurlTurbulence(turbScale, turbDetail, time, noise2D);
+    // 6.5. Multi-octave curl turbulence — detail at every scale
+    this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
 
     // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
-    if (audioData) {
-      const mid01 = Math.min(1, audioData.mid / 70);
-      const treble01 = Math.min(1, audioData.treble / 70);
-      const spin = (mid01 * 0.6 + treble01 * 0.4) * (settings.audioImpact ?? 0.45);
-      if (spin > 0.08) this.injectVorticity(spin * 0.03, time, noise2D);
-    }
+    if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
-    // 7. Immiscibility & fingering — blobSurfaceTension trades cohesion for shear.
-    // Low tension: weak cohesion + strong fingering → amoeba-like elongation and pinching.
-    // High tension: strong cohesion + weak fingering → rounder, self-contained blobs.
-    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
-    const surfaceTension = (settings.polarity || 0) * 0.04 * (0.4 + tension * 1.2);
-    this.applyImmiscibility(surfaceTension, time, noise2D);
-    const fingeringStrength = (settings.polarity || 0) * 0.15 * (0.4 + (1 - tension) * 1.8);
-    if (fingeringStrength > 0) this.applyFingering(fingeringStrength, time, noise2D);
+    // 7. Immiscibility & fingering
+    this.applyImmiscibility(p.surfaceTension, time, noise2D);
+    if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
-    if (audioData && settings.vibrationFrequency > 0.3) {
-      this.applyVibration(audioData.energy * settings.vibrationFrequency * 0.002, settings.vibrationFrequency * 3, time);
-    }
+    if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
-    if (settings.rainDrip > 0.1) this.applyDripping(settings.rainDrip, dt, time, noise2D);
+    if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
     if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
-    if (settings.airVelocity > 0.1) this.applyAirflow(settings.airVelocity, dt, time, noise2D);
+    if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
-    // 9. Diffuse & advect density + temp — dye diffusion coefficients are
-    // tiny, so 4 iterations is fully converged for visual purposes
-    this.diffuse(0, this.s,     this.density,  diff, dt, 4);
-    this.diffuse(0, this.sR,    this.densityR, diff, dt, 4);
-    this.diffuse(0, this.sG,    this.densityG, diff, dt, 4);
-    this.diffuse(0, this.sB,    this.densityB, diff, dt, 4);
-    this.diffuse(0, this.temp0, this.temp,     diff, dt, 4);
-    this.advect(0, this.density,  this.s,      this.vx, this.vy, dt * advection);
-    this.advect(0, this.densityR, this.sR,     this.vx, this.vy, dt * advection);
-    this.advect(0, this.densityG, this.sG,     this.vx, this.vy, dt * advection);
-    this.advect(0, this.densityB, this.sB,     this.vx, this.vy, dt * advection);
-    this.advect(0, this.temp,     this.temp0,  this.vx, this.vy, dt * advection);
+    // 9. Diffuse & advect density + temp. MacCormack keeps the filaments that
+    // plain semi-Lagrangian transport would smear away within a few steps.
+    this.diffuse(0, this.s,     this.density,  p.diff, dt, 4);
+    this.diffuse(0, this.sR,    this.densityR, p.diff, dt, 4);
+    this.diffuse(0, this.sG,    this.densityG, p.diff, dt, 4);
+    this.diffuse(0, this.sB,    this.densityB, p.diff, dt, 4);
+    this.diffuse(0, this.temp0, this.temp,     p.diff, dt, 4);
+    this.advectMacCormack(0, this.density,  this.s,     this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityR, this.sR,    this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityG, this.sG,    this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityB, this.sB,    this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.temp,     this.temp0, this.vx, this.vy, dt * p.advection);
 
-    // 10. Evaporation, damping, stability.
-    // Self-regulating dye budget: as the plate fills toward saturation,
-    // evaporation ramps up hard so injection and removal find equilibrium
-    // with plenty of empty glass left — a saturated plate has no boundaries
-    // or gradients and reads as a static color wash.
-    // A macro frame needs empty ground around its subject: at 4-6x a plate held
-    // near saturation just fills the frame with one flat colour, so the dye
-    // budget drops hard whenever the closeup camera is running.
-    const targetMean = settings.macroMode ? 0.28 : 0.85;
-    const over = Math.max(0, this.meanDensity / targetMean - 1);
-    const regulatorEvap = Math.min(0.02, over * over * 0.012);
-    const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    // 10. Evaporation, damping, stability
     let densSum = 0;
     for (let i = 0; i < GRID_AREA; i++) {
-      this.vx[i] *= damping;
-      this.vy[i] *= damping;
+      this.vx[i] *= p.damping;
+      this.vy[i] *= p.damping;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
       if (speedSq > 0.000004) {
         const factor = 0.002 / Math.sqrt(speedSq);
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
-      this.density[i]  *= evapFactor;
-      this.densityR[i] *= evapFactor;
-      this.densityG[i] *= evapFactor;
-      this.densityB[i] *= evapFactor;
+      this.density[i]  *= p.evapFactor;
+      this.densityR[i] *= p.evapFactor;
+      this.densityG[i] *= p.evapFactor;
+      this.densityB[i] *= p.evapFactor;
       // Per-cell soft cap — keeps color ratios but stops runaway thickness,
       // so fresh dye can always shift a cell's hue
       if (this.density[i] > 6) {
@@ -868,7 +979,7 @@ class FluidSimulation {
         this.densityB[i] *= capScale;
       }
       densSum += this.density[i];
-      this.temp[i]     *= heatDecay;
+      this.temp[i]     *= p.heatDecay;
       this.dhdt[i]     *= 0.5;
       this.gap[i]       = Math.min(0.03, this.gap[i] + 0.005);
 
@@ -881,6 +992,83 @@ class FluidSimulation {
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
     this.meanDensity = densSum / GRID_AREA;
+  }
+
+  /**
+   * Everything one step needs, derived once from settings and audio so the CPU
+   * and GPU solvers run from the same numbers.
+   */
+  private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+    const dt = this.dt;
+    const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
+
+    // Momentum diffuses at a viscosity derived from the plate's thickness
+    // setting — not at the dye's diffusivity, which is a different quantity.
+    // Scaled so the defaults reproduce the near-zero momentum diffusion the
+    // presets were tuned against: in a thin film the viscous drag is carried by
+    // the squeeze-film wall shear, which is modelled separately.
+    const nu = visc * 0.0001;
+
+    const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
+    let turbScale = settings.turbulenceScale ?? 0;
+    let spin = 0;
+    let vibIntensity = 0, vibFrequency = 0;
+    if (audioData) {
+      const impact = settings.audioImpact ?? 0.45;
+      // Audio energy breathes extra turbulence into the field so the liquid
+      // visibly churns with the music instead of drifting at constant pace.
+      turbScale *= 1 + Math.min(1, audioData.energy) * impact * 2.0;
+      const mid01 = Math.min(1, audioData.mid / 70);
+      const treble01 = Math.min(1, audioData.treble / 70);
+      const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
+      if (s > 0.08) spin = s * 0.03;
+      if (settings.vibrationFrequency > 0.3) {
+        vibIntensity = audioData.energy * settings.vibrationFrequency * 0.002;
+        vibFrequency = settings.vibrationFrequency * 3;
+      }
+    }
+
+    // blobSurfaceTension trades cohesion for shear: low tension gives weak
+    // cohesion and strong fingering (amoeba-like elongation and pinching),
+    // high tension the reverse (rounder, self-contained blobs).
+    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
+    const polarity = settings.polarity || 0;
+    const surfaceTension = polarity * 0.04 * (0.4 + tension * 1.2);
+    const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
+
+    let smearX = 0, smearY = 0;
+    if (settings.glassSmear > 0.2) {
+      const t = time * 0.3;
+      smearX = noise2D(t, 100) * settings.glassSmear * 12.0 * dt;
+      smearY = noise2D(100, t) * settings.glassSmear * 12.0 * dt;
+    }
+
+    // Self-regulating dye budget: as the plate fills toward saturation,
+    // evaporation ramps up hard so injection and removal find equilibrium
+    // with plenty of empty glass left — a saturated plate has no boundaries
+    // or gradients and reads as a static colour wash. A macro frame needs
+    // empty ground around its subject, so the budget drops hard while the
+    // closeup camera is running.
+    const targetMean = settings.macroMode ? 0.28 : 0.85;
+    const over = Math.max(0, this.meanDensity / targetMean - 1);
+    const regulatorEvap = Math.min(0.02, over * over * 0.012);
+    const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+
+    return {
+      dt, visc, nu,
+      diff: settings.diffusionRate,
+      buoyancy: settings.buoyancy,
+      gravity: (settings.centerGravity || 0) * 0.05,
+      advection: settings.advection,
+      damping: settings.damping || 0.99,
+      heatDecay: settings.heatDecay || 0.98,
+      turbScale, turbDetail, spin, surfaceTension, fingering,
+      vibIntensity, vibFrequency,
+      drip: settings.rainDrip > 0.1 ? settings.rainDrip : 0,
+      smearX, smearY,
+      air: settings.airVelocity > 0.1 ? settings.airVelocity : 0,
+      evapFactor, time,
+    };
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -1120,6 +1308,38 @@ class FluidSimulation {
     this.setBoundary(b, d);
   }
 
+  /**
+   * MacCormack advection: advect forward, advect the result back, correct by
+   * half the round-trip error, and clamp to the range of the four cells the
+   * forward step interpolated between so the correction can't overshoot.
+   * Semi-Lagrangian transport alone is dissipative enough to smear a thin
+   * filament away within a few steps; this is what lets them survive.
+   */
+  private advectMacCormack(b: number, d: Float32Array, d0: Float32Array, velocX: Float32Array, velocY: Float32Array, dt: number) {
+    this.advect(b, this.mcA, d0, velocX, velocY, dt);         // φ̂ₙ₊₁ = A(φₙ)
+    this.advect(b, this.mcB, this.mcA, velocX, velocY, -dt);  // φ̂ₙ = A⁻¹(φ̂ₙ₊₁)
+
+    const N = this.size;
+    const dtx = dt * (N - 2);
+    const Nfloat = N - 2;
+    for (let j = 1; j < N - 1; j++) {
+      for (let i = 1; i < N - 1; i++) {
+        const idx = i + j * N;
+        let x = i - dtx * velocX[idx];
+        let y = j - dtx * velocY[idx];
+        if (x < 0.5) x = 0.5; else if (x > Nfloat + 0.5) x = Nfloat + 0.5;
+        if (y < 0.5) y = 0.5; else if (y > Nfloat + 0.5) y = Nfloat + 0.5;
+        const i0 = Math.floor(x), j0 = Math.floor(y);
+        const i1 = i0 + 1, j1 = j0 + 1;
+        const a = d0[i0 + j0 * N], b2 = d0[i1 + j0 * N], c = d0[i0 + j1 * N], e = d0[i1 + j1 * N];
+        const mn = Math.min(a, b2, c, e), mx = Math.max(a, b2, c, e);
+        const v = this.mcA[idx] + 0.5 * (d0[idx] - this.mcB[idx]);
+        d[idx] = v < mn ? mn : v > mx ? mx : v;
+      }
+    }
+    this.setBoundary(b, d);
+  }
+
   private setBoundary(b: number, x: Float32Array) {
     for (let i = 1; i < this.size - 1; i++) {
       x[i]                            = b === 2 ? -x[i + this.size]            : x[i + this.size];
@@ -1139,6 +1359,7 @@ class FluidSimulation {
 
   // Radial outward velocity impulse — simulates bass-frequency plate strike
   applyRadialImpulse(cx: number, cy: number, radius: number, strength: number) {
+    this.dirty = true;
     const r2 = radius * radius;
     for (let j = cy - radius; j <= cy + radius; j++) {
       for (let i = cx - radius; i <= cx + radius; i++) {
@@ -1214,6 +1435,11 @@ interface GLResources {
   velTextures: WebGLTexture[];
   velData: Uint8Array[];
   uLocs: Record<string, WebGLUniformLocation | null>;
+  /** Framebuffers the GPU solver renders its packed output into, keyed by texture. */
+  packFbos: Map<WebGLTexture, WebGLFramebuffer>;
+  /** Allocated edge length of each RGBA8 texture, so a resolution change reallocates it. */
+  texSizes: Map<WebGLTexture, number>;
+  maxTexture: number;
 }
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -1221,7 +1447,7 @@ interface GLResources {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true, onManualGesture,
+  isAutomated = false, isActive = true, onManualGesture, onEngineStatus,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -1256,6 +1482,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
   const simAccumRef = useRef(0);
+  const onEngineStatusRef = useRef(onEngineStatus);
+  const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
+  const engineStatusRef = useRef('');
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -1402,6 +1631,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
+  useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
     const currentCount = fluidsRef.current.length;
@@ -1435,6 +1665,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
       }
     } else if (currentCount > targetCount) {
+      for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
     }
@@ -1479,7 +1710,8 @@ uniform float u_glossiness;        // specular intensity, 0 = flat backlit dye
 uniform float u_saturation;        // final grade saturation multiplier
 uniform float u_boundaryContrast;  // bright interface line between dye colors
 uniform float u_postBlur;          // gooey blur radius multiplier
-uniform float u_gridSize;          // fluid sim texture resolution
+uniform float u_gridSize;          // fluid sim texture resolution (what we sample)
+uniform float u_logicalGrid;       // the 192-cell grid the look was tuned on
 
 // ── Macro closeup camera ──
 uniform sampler2D u_vel0;          // layer 0 velocity field (rg, signed, normalized)
@@ -1637,7 +1869,7 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
 
 // Sobel normals in fluid UV space
 vec3 sobelNormal(sampler2D tex, vec2 fuv) {
-  float ts = 3.0 / u_gridSize;
+  float ts = 3.0 / u_logicalGrid;
   float d00 = decodeDensity(textureBicubic(tex, fuv + vec2(-ts, -ts)).a);
   float d10 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0, -ts)).a);
   float d20 = decodeDensity(textureBicubic(tex, fuv + vec2( ts, -ts)).a);
@@ -1683,7 +1915,7 @@ vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
 float boundaryEdge(sampler2D tex, vec2 fuv) {
   vec4 cC = decodeFluid(tex, fuv, 0.0, false);
   if (cC.a < 0.03) return 0.0;
-  float e = (3.0 / u_gridSize) * 0.55;
+  float e = (3.0 / u_logicalGrid) * 0.55;
   vec4 cR = decodeFluid(tex, fuv + vec2( e, 0.0), 0.0, false);
   vec4 cL = decodeFluid(tex, fuv + vec2(-e, 0.0), 0.0, false);
   vec4 cT = decodeFluid(tex, fuv + vec2(0.0,  e), 0.0, false);
@@ -1809,11 +2041,11 @@ Cell cellField(vec2 p0, vec2 flow, float seed, float period, float phase, float 
 // structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
 vec2 macroWarpOffset(vec2 fuv) {
   if (u_macroEdge < 0.005) return vec2(0.0);
-  float f = u_gridSize * 0.85;
+  float f = u_logicalGrid * 0.85;
   vec2 t = vec2(u_time * 0.012, u_time * -0.009);
   vec2 w = vec2(fbm3(fuv * f + t), fbm3(fuv * f + vec2(37.2, 11.7) + t)) - 0.5;
   w += (vec2(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
-  return w * (u_macroEdge * 1.1 / u_gridSize);
+  return w * (u_macroEdge * 1.1 / u_logicalGrid);
 }
 
 vec2 macroWarp(vec2 fuv) { return fuv + macroWarpOffset(fuv); }
@@ -1861,7 +2093,7 @@ vec4 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 gridNormal, fl
   float core = 0.0, rim = 0.0, fineCore = 0.0, fineRim = 0.0, id = 0.0, k = 0.0;
   vec2 cellSlope = vec2(0.0);
   if (u_macroCells > 0.005) {
-    float freq = u_gridSize / max(0.15, u_macroCellScale * 8.0);
+    float freq = u_logicalGrid / max(0.15, u_macroCellScale * 8.0);
     vec2 p = cuv * freq;
     vec2 f = flow * freq;
 
@@ -1904,7 +2136,7 @@ vec4 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 gridNormal, fl
   if (u_macroLacing > 0.005) {
     vec2 dir = length(flow) > 1e-5 ? normalize(flow) : vec2(1.0, 0.0);
     vec2 nrm = vec2(-dir.y, dir.x);
-    vec2 q = vec2(dot(cuv, dir) * u_gridSize * 0.35, dot(cuv, nrm) * u_gridSize * 3.2);
+    vec2 q = vec2(dot(cuv, dir) * u_logicalGrid * 0.35, dot(cuv, nrm) * u_logicalGrid * 3.2);
     float n = fbm3(q + u_time * 0.03) - 0.5;
     float line = 1.0 - smoothstep(0.0, 0.055, abs(n));
     float edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
@@ -2216,14 +2448,18 @@ void main() {
       'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
       'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
       'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
-      'u_filmLevel','u_filmGain',
+      'u_filmLevel','u_filmGain','u_logicalGrid',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
       uLocs[name] = gl.getUniformLocation(program, name);
     }
 
-    webGLRef.current = { gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs };
+    webGLRef.current = {
+      gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
+      packFbos: new Map(), texSizes: new Map(),
+      maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+    };
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -2345,6 +2581,8 @@ void main() {
           const dcx = GRID_SIZE / 2, dcy = GRID_SIZE / 2;
 
           for (const af of fluidsRef.current) {
+            if (af.gpu) { af.gpu.drainStep(t); continue; }
+
             // 1. Set drain velocity field (inward spiral)
             for (let j = 1; j < GRID_SIZE - 1; j++) {
               for (let i = 1; i < GRID_SIZE - 1; i++) {
@@ -2403,9 +2641,37 @@ void main() {
         if (clearTrigger > lastClearTrigger.current) {
           lastClearTrigger.current = clearTrigger;
           const af = fluidsRef.current[activeLayerRef.current];
-          if (af) {
-            af.density.fill(0); af.densityR.fill(0); af.densityG.fill(0); af.densityB.fill(0);
-            af.temp.fill(0); af.vx.fill(0); af.vy.fill(0);
+          if (af) af.clearAll();
+        }
+
+        // ── Solver engine ──────────────────────────────────────
+        // The GPU solver runs the same scheme at 2-4x the grid; the CPU solver
+        // stays as the fallback for contexts without float render targets.
+        const wantRes = glr ? resolveSimResolution(currentSettings.simResolution, glr.maxTexture) : 0;
+        for (const fluid of fluidsRef.current) {
+          if (wantRes > 0 && glr && gpuSupportedRef.current !== false) {
+            if (!fluid.gpu || fluid.gpu.N !== wantRes) {
+              try {
+                if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
+                if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
+              } catch (err) {
+                console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
+                gpuSupportedRef.current = false;
+                fluid.dropGpu();
+              }
+            }
+          } else if (fluid.gpu) {
+            fluid.detachGpu();
+          }
+        }
+        {
+          const lead = fluidsRef.current[0];
+          const engine = lead?.gpu
+            ? `GPU · ${lead.gpu.N}²`
+            : `CPU · ${GRID_SIZE}²${wantRes > 0 && gpuSupportedRef.current === false ? ' · GPU unavailable' : ''}`;
+          if (engine !== engineStatusRef.current) {
+            engineStatusRef.current = engine;
+            onEngineStatusRef.current?.(engine);
           }
         }
 
@@ -2730,6 +2996,9 @@ void main() {
           }
         }
 
+        // GPU fields come back to the CPU once per frame for the readers below
+        for (const fluid of fluidsRef.current) fluid.syncFromGpu();
+
         // ── Housekeeping & rotation (once per rendered frame) ──
         let hasContent = false;
         const isDarkBlend = currentSettings.blendMode === 'multiply';
@@ -2739,7 +3008,7 @@ void main() {
 
           // Check if there's content
           for (let i = 0; i < GRID_AREA; i++) {
-            if (fluid.density[i] > 0.001) { hasContent = true; break; }
+            if (fluid.readDensity[i] > 0.001) { hasContent = true; break; }
           }
 
           // Emergency seeding
@@ -2789,7 +3058,7 @@ void main() {
             const subject = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
             const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
             macroShotRef.current = macroCamRef.current.update(
-              { density: subject.density, vx: subject.vx, vy: subject.vy, size: GRID_SIZE },
+              { density: subject.readDensity, vx: subject.readVx, vy: subject.readVy, size: GRID_SIZE },
               realDt,
               {
                 zoom: Math.max(1, currentSettings.macroZoom ?? 6),
@@ -2822,7 +3091,7 @@ void main() {
           let samples = 0;
           for (let j = 1; j < GRID_SIZE - 1; j += 3) {
             for (let i = 1; i < GRID_SIZE - 1; i += 3) {
-              const d = f0.density[i + j * GRID_SIZE];
+              const d = f0.readDensity[i + j * GRID_SIZE];
               const b = d <= 0 ? 0 : Math.min(FILM_BINS - 1, (d * FILM_BIN_SCALE) | 0);
               bins[b]++;
               samples++;
@@ -2864,56 +3133,101 @@ void main() {
             tData.push(new Uint8Array(GRID_AREA * 4));
           }
 
-          // Pack fluid data into textures — sqrt-encoded for extra precision
-          // at low densities (the shader squares on decode). Kills banding.
-          for (let l = 0; l < fluidsRef.current.length; l++) {
-            const fluid = fluidsRef.current[l];
-            const td = tData[l];
-            const inv8 = 1 / 8.0;
-            for (let i = 0; i < GRID_AREA; i++) {
-              const i4 = i * 4;
-              td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
-              td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
-              td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
-              td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
-            }
-            glCtx.activeTexture(glCtx.TEXTURE0 + l);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
-          }
-
-          // Pack velocity for the macro detail pass. Encoded against the frame's
-          // own peak speed, so slow and fast passages both resolve; u_flowRate
-          // converts back to fluid-UV per second in the shader.
+          // ── Velocity range for the macro detail pass ──────────
+          // Encoded against the frame's own peak speed so slow and fast
+          // passages both resolve; u_flowRate converts back to fluid-UV per
+          // second in the shader.
           let flowRate = 0;
+          let velRange = 1e-3;
           if (macroOn) {
-            const { velTextures: velTexs, velData: vData } = glr;
-            let velRange = 1e-3;
             const probe = fluidsRef.current[0];
+            const pvx = probe.readVx, pvy = probe.readVy;
             for (let j = 2; j < GRID_SIZE - 2; j += 4) {
               for (let i = 2; i < GRID_SIZE - 2; i += 4) {
                 const idx = i + j * GRID_SIZE;
-                const ax = Math.abs(probe.vx[idx]), ay = Math.abs(probe.vy[idx]);
+                const ax = Math.abs(pvx[idx]), ay = Math.abs(pvy[idx]);
                 if (ax > velRange) velRange = ax;
                 if (ay > velRange) velRange = ay;
               }
             }
-            const encode = 127.5 / velRange;
-            for (let l = 0; l < Math.min(2, fluidsRef.current.length); l++) {
-              const fluid = fluidsRef.current[l];
-              const vd = vData[l];
-              for (let i = 0; i < GRID_AREA; i++) {
-                const i4 = i * 4;
-                vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
-                vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
-              }
-              glCtx.activeTexture(glCtx.TEXTURE6 + l);
-              glCtx.bindTexture(glCtx.TEXTURE_2D, velTexs[l]);
-              glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
-            }
             // cells advected per second = v * (dt * (N-2)) / N / realDt
             const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
             flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
+          }
+
+          // An RGBA8 texture at the given edge, with a framebuffer so the GPU
+          // solver can render into it. Reallocates when the resolution changes.
+          const ensureRenderTarget = (tex: WebGLTexture, size: number): WebGLFramebuffer => {
+            if (glr.texSizes.get(tex) !== size) {
+              glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+              glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, size, size, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
+              glr.texSizes.set(tex, size);
+            }
+            let fbo = glr.packFbos.get(tex);
+            if (!fbo) {
+              fbo = glCtx.createFramebuffer()!;
+              glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, fbo);
+              glCtx.framebufferTexture2D(glCtx.FRAMEBUFFER, glCtx.COLOR_ATTACHMENT0, glCtx.TEXTURE_2D, tex, 0);
+              glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+              glr.packFbos.set(tex, fbo);
+            }
+            return fbo;
+          };
+
+          // ── Pack each layer into the renderer's textures ───────
+          const inv8 = 1 / 8.0;
+          const encode = 127.5 / velRange;
+          for (let l = 0; l < fluidsRef.current.length; l++) {
+            const fluid = fluidsRef.current[l];
+            const wantVel = macroOn && l < 2;
+
+            if (fluid.gpu) {
+              // The field never leaves the GPU: sqrt-encode straight into the
+              // layer texture, and the velocity texture when macro needs it.
+              const layerFbo = ensureRenderTarget(texs[l], fluid.gpu.N);
+              const velFbo = wantVel ? ensureRenderTarget(glr.velTextures[l], fluid.gpu.N) : null;
+              fluid.gpu.packInto(layerFbo, velFbo, velRange);
+            } else {
+              // CPU path: sqrt-encoded for extra precision at low densities
+              // (the shader squares on decode). Kills banding.
+              const td = tData[l];
+              for (let i = 0; i < GRID_AREA; i++) {
+                const i4 = i * 4;
+                td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
+                td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
+                td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
+                td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
+              }
+              glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+              glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
+              glr.texSizes.set(texs[l], GRID_SIZE);
+
+              if (wantVel) {
+                const vd = glr.velData[l];
+                for (let i = 0; i < GRID_AREA; i++) {
+                  const i4 = i * 4;
+                  vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
+                  vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
+                }
+                glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
+                glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
+                glr.texSizes.set(glr.velTextures[l], GRID_SIZE);
+              }
+            }
+
+          }
+
+          // Bind the renderer's samplers only once every layer is packed: the
+          // GPU solver's pack pass uses unit 0 for its own source texture, so
+          // packing layer 1 would otherwise unbind layer 0 from the unit the
+          // renderer reads it from.
+          for (let l = 0; l < fluidsRef.current.length; l++) {
+            glCtx.activeTexture(glCtx.TEXTURE0 + l);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+            if (macroOn && l < 2) {
+              glCtx.activeTexture(glCtx.TEXTURE6 + l);
+              glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
+            }
           }
 
           // Set uniforms and draw
@@ -2950,7 +3264,10 @@ void main() {
           glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
           glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
           glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
-          glCtx.uniform1f(uLocs['u_gridSize'], GRID_SIZE);
+          // Sampling math follows the texture actually bound; the tuned look
+          // (normals, edge lines, macro cells) stays on the logical 192 grid.
+          glCtx.uniform1f(uLocs['u_gridSize'], fluidsRef.current[0]?.gpu?.N ?? GRID_SIZE);
+          glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
 
           // Macro closeup
           glCtx.uniform1i(uLocs['u_vel0'], 6);
@@ -2979,6 +3296,16 @@ void main() {
 
     render();
 
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+        engine: engineStatusRef.current,
+        fluids: fluidsRef.current,
+        gl: webGLRef.current,
+        shot: macroShotRef.current,
+        gridSize: GRID_SIZE,
+      });
+    }
+
     return () => {
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);
@@ -2993,6 +3320,8 @@ void main() {
       const glr = webGLRef.current;
       if (glr) {
         const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs, velTextures: velTexs } = glr;
+        for (const fluid of fluidsRef.current) fluid.detachGpu();
+        for (const fbo of glr.packFbos.values()) glCtx.deleteFramebuffer(fbo);
         for (const tex of texs) glCtx.deleteTexture(tex);
         for (const tex of velTexs) glCtx.deleteTexture(tex);
         glCtx.deleteBuffer(pb);

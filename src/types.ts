@@ -18,6 +18,11 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Very heavy, barely moves once placed', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0  },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
+/**
+ * Fluid solver grid. 'cpu' is the 192² JavaScript solver; the numbers run the
+ * same scheme on the GPU at that edge length. 'auto' picks by machine class.
+ */
+export type SimResolution = 'auto' | 'cpu' | number;
 export type AudioFeature = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
 
 export interface AudioMappings {
@@ -97,6 +102,9 @@ export interface VisualizerSettings {
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
   macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
+
+  // Solver
+  simResolution: SimResolution;
 }
 
 export const DEFAULT_SETTINGS: VisualizerSettings = {
@@ -154,4 +162,5 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,
+  simResolution: 'auto',    // GPU at 384-512² where float render targets exist, else the CPU solver
 };

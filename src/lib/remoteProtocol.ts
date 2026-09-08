@@ -17,6 +17,8 @@ import type { VisualizerSettings } from '../types';
 
 /** WebSocket path the relay listens on. */
 export const REMOTE_WS_PATH = '/remote-ws';
+/** Served only by the show server; the display probes it before opening a socket. */
+export const REMOTE_INFO_PATH = '/remote-info.json';
 
 /** Query parameter that turns the app into the phone control surface. */
 export const REMOTE_QUERY_PARAM = 'remote';
@@ -58,4 +60,21 @@ export type RemoteMessage =
 export function remoteSocketUrl(): string {
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${window.location.host}${REMOTE_WS_PATH}`;
+}
+
+/**
+ * Is there a relay behind this origin at all? A failed WebSocket handshake is
+ * logged by the browser as an error no script can silence, so the display asks
+ * this first. A static host answers with the SPA fallback (index.html, 200),
+ * which fails the JSON check; only the show server returns the marker.
+ */
+export async function probeRelay(): Promise<boolean> {
+  try {
+    const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return false;
+    const body = (await res.json()) as { chromaglass?: unknown };
+    return body?.chromaglass === 'relay';
+  } catch {
+    return false;
+  }
 }

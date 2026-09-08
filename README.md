@@ -4,7 +4,8 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 
 ## Features
 
-- **Real-time fluid simulation** — Navier-Stokes solver with squeeze-film flow, buoyancy, immiscibility, and fingering instabilities
+- **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
+- **GPU solver** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid where the hardware allows it, and falls back to the 192² CPU solver everywhere else (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Automatic room calibration** — learns the room's noise floor and dynamics, fits the analyser's dB window to it and normalises every band against its own range, so the same visuals read well in a quiet living room or a loud bar
 - **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Monochrome Ink, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
@@ -69,6 +70,26 @@ is that a page loaded from the hosted `https://` site can't open a `ws://` socke
 to your laptop (mixed content), so remote control means running the show from
 `npm run remote`.
 
+## Simulation Engine
+
+The solver is Jos Stam's stable-fluids scheme — diffuse, project, advect,
+project — with the extras a liquid light show needs: a Hele-Shaw squeeze-film
+term for the plate pressure, immiscibility and fingering forces, curl-noise
+turbulence and a self-regulating dye budget. Two things are worth knowing:
+
+- **Where it runs.** On `auto` (the default) the solve moves onto the GPU as a
+  chain of WebGL2 fragment passes at the largest grid the hardware can hold at
+  frame rate (256², 384², 512² or 768²), and falls back to the 192² CPU solver
+  when the GPU can't render to float textures. Settings → Simulation → Fluid
+  Grid pins a size or forces the CPU path, and shows which engine is live.
+- **Advection.** Both paths use MacCormack advection (a forward and a backward
+  semi-Lagrangian pass, corrected and clamped), which is what lets a thin
+  filament of dye survive more than a few steps instead of blurring away.
+
+For testing, `?sim=cpu`, `?sim=auto` or `?sim=<size>` on the URL override the
+setting for that page load, and `?debug` exposes `window.chromaglassDebug()`
+with the live solver state.
+
 ## Controls
 
 | Control | Description |
@@ -94,7 +115,7 @@ to your laptop (mixed content), so remote control means running the show from
 - **Framer Motion** (via `motion/react`) for UI animations
 - **simplex-noise** for coherent noise fields
 - **Web Audio API** for real-time FFT analysis (1024-point)
-- **Canvas 2D** for fluid rendering with 3D lighting
+- **WebGL2** for both the fluid solve (float ping-pong textures, Jacobi pressure iterations) and the lit, relief-shaded render
 
 ## Project Structure
 
@@ -107,21 +128,21 @@ src/
   hooks/
     useAudioAnalyzer.ts        # Web Audio FFT hook (bass/mid/treble/energy/timbre/complexity)
     useMusicIntelligence.ts    # Orchestrates identification, song maps, lyrics, evolution
+    useRemoteLink.ts           # WebSocket link, either end, with reconnect
   lib/
     musicTypes.ts              # Music intelligence interfaces
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
+    gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts
     audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
     remoteProtocol.ts          # Phone-remote message types and socket URL
-  hooks/
-    useRemoteLink.ts           # WebSocket link, either end, with reconnect
     fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
     lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
-    LiquidVisualizer.tsx       # Fluid simulation engine + WebGL2 renderer
+    LiquidVisualizer.tsx       # CPU fluid solver, GPU solver driver + WebGL2 renderer
     SettingsPanel.tsx          # Full settings UI panel
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay

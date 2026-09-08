@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Solver
+- **GPU fluid solver.** The whole step — squeeze-film pressure, forces, viscous diffusion, pressure projection, advection, decay — now runs as WebGL2 fragment passes over float ping-pong textures, at 256², 384², 512² or 768² depending on the hardware, instead of the 192² JavaScript loop. Injection stays in logical 192² coordinates and is uploaded as a delta texture, and a box-filtered readback feeds the pieces that still need the field on the CPU (bead tracking, the dye regulator), so nothing outside the solver had to change (`src/lib/gpuFluid.ts`)
+- Settings → Simulation → **Fluid Grid**: `auto` picks the largest grid the GPU can hold, or pin a size, or force the CPU solver. A readout shows which engine is live. Machines without float render targets fall back to the CPU path on their own (`simResolution`)
+- `?sim=cpu|auto|<size>` and `?debug` URL overrides for testing
+
+### Changed — Solver
+- **MacCormack advection** on both paths, for velocity and dye: a forward and a backward semi-Lagrangian pass, corrected by half the round-trip error and clamped to the neighbourhood the forward pass sampled. First-order semi-Lagrangian transport smeared a thin filament away within a few steps; the same filaments now hold their edges
+- Momentum diffuses at a viscosity derived from the plate's thin/thick setting rather than at the dye's diffusion rate, which is a different physical quantity — the two had been sharing one number
+
 ### Added — Macro Closeup
 - **Bead camera** — a tracking macro camera that magnifies the plate and rides a single bead of dye: it locks onto the most compact, isolated bead it can find, follows it with a velocity lead so a fast bead never trails off-frame, and when the bead dissolves or its shot runs out it whips to a new one with a dolly-out that hides the cut (`macroMode`, `macroZoom`, `macroChase`, `macroHold`; `src/lib/macroCamera.ts`)
 - **Synthesised micro-detail** — at 4-6x the 192-cell solver only supplies the large shape, so the renderer adds fluid-space structure that magnifies with the camera: packed paint cells (dark cores in bright, dark-outlined rings) carried along by the dye, dendritic lacing stretched along the flow, a fractal silhouette warp, dome shading, contact shadow and substrate grain (`macroCells`, `macroCellScale`, `macroLacing`, `macroDepth`, `macroEdgeDetail`)
@@ -22,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Laptop drives, phone controls.** `npm run remote` serves the built app on the LAN and relays control messages, so the laptop runs the show (mic, GPU, full UI) while a phone at `?remote=1` becomes a control surface: presets, sound drive, speed, the macro camera and the one-shot gestures (`server/remote-server.js`, `src/components/RemoteControl.tsx`, `src/hooks/useRemoteLink.ts`)
 - The laptop is authoritative and publishes a state snapshot on every change, so a phone joining or reloading mid-show sees what is actually running rather than what it last remembered; the link reconnects on its own with backoff, and stays dormant when no relay is present so the hosted build is unaffected
 - Deliberately a LAN WebSocket rather than a cloud round-trip: a slider should move the visuals in milliseconds, and the show should survive the internet going down
+- The laptop probes for the show server (`/remote-info.json`) before opening a socket, so a hosted or previewed build no longer logs a refused WebSocket handshake on every load; it looks again every 30 s in case the relay is started later
 
 ### Added — Audio
 - **Automatic room calibration** — the analyser learns the room instead of asking the listener to find a sensitivity number: it tracks the noise floor and signal ceiling in dBFS, fits the AnalyserNode's own dB window to them (the defaults waste almost the whole 0-255 spectrum on a quiet room, which is the mechanical reason a distant mic drives the visuals so weakly), and normalises every band against its own learned range so bass, mids and treble each use their full travel wherever the app is running (`src/lib/audioCalibration.ts`, `autoCalibrate`)

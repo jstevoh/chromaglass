@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  probeRelay,
   remoteSocketUrl,
   type RemoteMessage,
   type RemoteState,
@@ -26,6 +27,8 @@ interface UseRemoteLinkOptions {
 /** Reconnect backoff, milliseconds. */
 const RETRY_MIN = 500;
 const RETRY_MAX = 8000;
+/** How often a display with no relay in sight looks again for one. */
+const PROBE_INTERVAL = 30000;
 
 /**
  * One end of the phone-remote link.
@@ -63,6 +66,26 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
     closedRef.current = false;
 
     const connect = () => {
+      if (closedRef.current) return;
+      // The display is on every page load, relay or not — a Firebase-hosted
+      // page has nothing to talk to. Probe before opening a socket, since a
+      // refused handshake is a console error nothing can suppress. A phone
+      // was pointed here deliberately, so it connects straight away.
+      if (role === 'display') {
+        void probeRelay().then((present) => {
+          if (closedRef.current) return;
+          if (present) openSocket();
+          else {
+            setStatus('offline');
+            timerRef.current = setTimeout(connect, PROBE_INTERVAL);
+          }
+        });
+        return;
+      }
+      openSocket();
+    };
+
+    const openSocket = () => {
       if (closedRef.current) return;
       let socket: WebSocket;
       try {

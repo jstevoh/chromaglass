@@ -53,7 +53,13 @@ export default function App() {
   const [activePresetId, setActivePresetId] = useState<string | null>('classic');
   const [settings, setSettings] = useState<VisualizerSettings>(() => {
     const classic = PRESETS.find(p => p.id === 'classic');
-    return classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
+    const base = classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
+    // Diagnostic override for this page load only: ?sim=cpu | auto | <edge>.
+    // Lets a device be pinned to a solver grid without touching its settings.
+    const sim = new URLSearchParams(window.location.search).get('sim');
+    if (sim === 'cpu' || sim === 'auto') base.simResolution = sim;
+    else if (sim && Number.isFinite(Number(sim))) base.simResolution = Number(sim);
+    return base;
   });
   const [seedCount, setSeedCount] = useState(0);
   const [clearTrigger, setClearTrigger] = useState(0);
@@ -173,6 +179,7 @@ export default function App() {
   }, [settings.layerCount, activeLayer]);
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
+  const [engineStatus, setEngineStatus] = useState<string | null>(null);
   const audioData = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
@@ -313,6 +320,7 @@ export default function App() {
       macroDepth: 0.25 + Math.random() * 0.6,
       macroEdgeDetail: 0.3 + Math.random() * 0.7,
       macroRelief: 0.4 + Math.random() * 0.6,
+      simResolution: settings.simResolution,
     });
     setActivePresetId(null);
     // Randomize inject style for the evolve
@@ -379,6 +387,7 @@ export default function App() {
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         onManualGesture={musicIntel.recordGesture}
+        onEngineStatus={setEngineStatus}
       />
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
@@ -724,6 +733,7 @@ export default function App() {
             activePresetId={activePresetId}
             calibration={audioData?.calibration ?? null}
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
+            engineStatus={engineStatus}
             onClose={() => setShowSettings(false)}
           />
         )}
