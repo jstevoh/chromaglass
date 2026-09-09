@@ -104,9 +104,10 @@ GPU class from the renderer string. When the hosted page has had to step
 down, it shows a card with the three commands to run the show locally.
 
 For testing, `?sim=cpu|auto|<size>`, `?tier=hosted|local|native` and
-`?gpu=software|weak|mid|strong` override detection for that page load, and
-`?debug` exposes `window.chromaglassDebug()` with the live solver state and
-governor.
+`?gpu=software|weak|mid|strong` override detection for that page load,
+`?warp=N` lifts the solver's catch-up cap (steps per frame) so a slow renderer
+still keeps up with wall-clock time, and `?debug` exposes
+`window.chromaglassDebug()` with the live solver state and governor.
 
 ## Controls
 

@@ -44,7 +44,15 @@ const resolveSimResolution = (setting: SimResolution | undefined, governor: Qual
 // a 60 fps desktop and a 120 Hz display. A slow frame catches up by taking
 // several steps, capped so a stall can't spiral into a burst of work.
 const SIM_STEP = 1 / 60;
-const SIM_MAX_CATCHUP = 4;
+// `?warp=N` (diagnostic) lifts the catch-up cap so a slow renderer can still
+// take many solver steps per frame: the sim never runs ahead of wall-clock,
+// it just stops falling behind. Used to capture developed frames on machines
+// that render at a few fps.
+const SIM_MAX_CATCHUP = (() => {
+  if (typeof window === 'undefined') return 4;
+  const warp = Number(new URLSearchParams(window.location.search).get('warp'));
+  return Number.isFinite(warp) && warp >= 1 ? Math.min(240, Math.round(warp)) : 4;
+})();
 
 // Density histogram used to expose the macro closeup (see "Macro film exposure").
 const FILM_BINS = 64;
