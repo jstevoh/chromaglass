@@ -5,6 +5,8 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
+import { classifyGpu, detectTier, qualityLadder, type EngineStatus } from '../lib/platform';
+import { QualityGovernor } from '../lib/governor';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -19,8 +21,8 @@ interface LiquidVisualizerProps {
   isActive?: boolean;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
-  /** Reports which solver is running and at what resolution, e.g. "GPU · 512²". */
-  onEngineStatus?: (status: string) => void;
+  /** Reports which solver is running, at what resolution, and how the governor is doing. */
+  onEngineStatus?: (status: EngineStatus) => void;
 }
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
@@ -28,19 +30,13 @@ const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 12
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
-// Which grid the solver should run on. 'auto' picks by machine class; the GPU
-// path is capped by the context's texture limit; 'cpu' is the 192² fallback.
-const resolveSimResolution = (setting: SimResolution | undefined, maxTexture: number): number => {
-  if (setting === 'cpu') return 0;
-  let res: number;
-  if (setting === undefined || setting === 'auto') {
-    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    const cores = navigator.hardwareConcurrency ?? 4;
-    res = mobile ? 256 : cores >= 8 ? 512 : 384;
-  } else {
-    res = setting;
-  }
-  return Math.max(64, Math.min(Math.round(res), maxTexture));
+// Which grid the solver should run on. A pinned size is honoured up to the
+// context's texture limit; 'auto' hands the choice to the frame-time governor;
+// 'cpu' is the 192² fallback.
+const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
+  const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
+  if (want === 'cpu') return 0;
+  return Math.max(64, Math.min(Math.round(want), maxTexture));
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
@@ -1484,7 +1480,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simAccumRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
-  const engineStatusRef = useRef('');
+  const engineStatusRef = useRef<EngineStatus | null>(null);
+  const engineStatusAtRef = useRef(0);
+  const governorRef = useRef<QualityGovernor | null>(null);
+  const dprRef = useRef(1);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -1678,6 +1677,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // ── WebGL2 initialization ──────────────────────────────────────────
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
     if (!gl) { console.error('WebGL2 not supported'); return; }
+
+    // Platform: where this build is running and on what, for the governor's
+    // starting guess. The renderer string is the only cheap read of the GPU.
+    const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const rendererString = String(
+      (dbgInfo && gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '',
+    );
+    const tier = detectTier();
+    const gpuClass = classifyGpu(rendererString);
+    const ladder = qualityLadder(tier, gpuClass);
+    governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
 
     const vertSrc = `#version 300 es
 in vec2 a_pos;
@@ -2462,8 +2472,11 @@ void main() {
     };
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      // Device pixels per CSS pixel is a quality rung, so a Retina laptop
+      // running locally renders sharp and a struggling one drops to 1x.
+      const dpr = dprRef.current;
+      canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+      canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -2537,6 +2550,8 @@ void main() {
     let animationFrameId: number;
 
     const render = () => {
+      const workStart = performance.now();
+      let frameS = 0;
       const currentAudioData = audioDataRef.current;
       const currentSettings = settingsRef.current;
       const glr = webGLRef.current;
@@ -2545,6 +2560,7 @@ void main() {
         const now = Date.now() * 0.001;
         const realDt = now - lastTimeRef.current;
         lastTimeRef.current = now;
+        frameS = realDt;
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
         let dynamicSpeed = 0.05;
@@ -2647,7 +2663,14 @@ void main() {
         // ── Solver engine ──────────────────────────────────────
         // The GPU solver runs the same scheme at 2-4x the grid; the CPU solver
         // stays as the fallback for contexts without float render targets.
-        const wantRes = glr ? resolveSimResolution(currentSettings.simResolution, glr.maxTexture) : 0;
+        const governor = governorRef.current!;
+        const governed = currentSettings.simResolution === undefined || currentSettings.simResolution === 'auto';
+        const wantDpr = governed ? governor.rung.dpr : 1;
+        if (wantDpr !== dprRef.current) {
+          dprRef.current = wantDpr;
+          resize();
+        }
+        const wantRes = glr ? resolveSimResolution(currentSettings.simResolution, governor, glr.maxTexture) : 0;
         for (const fluid of fluidsRef.current) {
           if (wantRes > 0 && glr && gpuSupportedRef.current !== false) {
             if (!fluid.gpu || fluid.gpu.N !== wantRes) {
@@ -2666,12 +2689,26 @@ void main() {
         }
         {
           const lead = fluidsRef.current[0];
-          const engine = lead?.gpu
-            ? `GPU · ${lead.gpu.N}²`
-            : `CPU · ${GRID_SIZE}²${wantRes > 0 && gpuSupportedRef.current === false ? ' · GPU unavailable' : ''}`;
-          if (engine !== engineStatusRef.current) {
-            engineStatusRef.current = engine;
-            onEngineStatusRef.current?.(engine);
+          const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
+          const status: EngineStatus = {
+            label: lead?.gpu
+              ? `GPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x`
+              : `CPU · ${GRID_SIZE}²${gpuUnavailable ? ' · GPU unavailable' : ''}`,
+            engine: lead?.gpu ? 'gpu' : 'cpu',
+            grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
+            dpr: dprRef.current,
+            tier, gpu: gpuClass,
+            governed,
+            steppedDown: governed && governor.steppedDown,
+            gpuUnavailable,
+            frameMs: governor.frameMs,
+          };
+          const prev = engineStatusRef.current;
+          // The label changes rarely; the frame time ticks over once a second.
+          if (!prev || prev.label !== status.label || prev.steppedDown !== status.steppedDown || now - engineStatusAtRef.current > 1) {
+            engineStatusRef.current = status;
+            engineStatusAtRef.current = now;
+            onEngineStatusRef.current?.(status);
           }
         }
 
@@ -3291,6 +3328,13 @@ void main() {
         }
       }
 
+      // Governor: judge this frame. A rung change takes effect through the
+      // engine block on the next frame, which reallocates the solver and
+      // resizes the canvas as needed.
+      if (frameS > 0 && governorRef.current) {
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001);
+      }
+
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -3298,7 +3342,9 @@ void main() {
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
-        engine: engineStatusRef.current,
+        engine: engineStatusRef.current?.label ?? '',
+        status: engineStatusRef.current,
+        governor: governorRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
         shot: macroShotRef.current,

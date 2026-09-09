@@ -4,6 +4,7 @@ import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
+import type { EngineStatus } from '../lib/platform';
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
@@ -14,7 +15,7 @@ interface SettingsPanelProps {
   calibration?: RoomCalibration | null;
   onRecalibrate?: () => void;
   /** Which solver is running and at what grid, e.g. "GPU · 512²". */
-  engineStatus?: string | null;
+  engineStatus?: EngineStatus | null;
   onClose: () => void;
 }
 
@@ -263,7 +264,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <div className="flex flex-col gap-2 mb-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">Fluid Grid</span>
-            {engineStatus && <span className="text-[10px] font-mono opacity-50">{engineStatus}</span>}
+            {engineStatus && (
+              <span className="text-[10px] font-mono opacity-50">
+                {engineStatus.label} · {engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–'} fps
+              </span>
+            )}
           </div>
           <select
             value={String(settings.simResolution ?? 'auto')}
@@ -282,7 +287,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="cpu">CPU · 192²</option>
           </select>
           <p className="text-[10px] leading-relaxed opacity-40">
-            Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them. Drop a step if the frame rate suffers.
+            Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
+            Auto measures the frame rate and picks the largest grid this machine holds at 60 fps
+            {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
+            {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </p>
         </div>
       </section>

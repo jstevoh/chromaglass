@@ -5,7 +5,7 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 ## Features
 
 - **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
-- **GPU solver** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid where the hardware allows it, and falls back to the 192² CPU solver everywhere else (Settings → Simulation → Fluid Grid)
+- **GPU solver with a frame-time governor** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid; a governor measures the real frame rate and picks the largest grid and pixel density the machine holds at 60 fps, and falls back to the 192² CPU solver where float render targets are missing (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Automatic room calibration** — learns the room's noise floor and dynamics, fits the analyser's dB window to it and normalises every band against its own range, so the same visuals read well in a quiet living room or a loud bar
 - **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Monochrome Ink, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
@@ -78,17 +78,35 @@ term for the plate pressure, immiscibility and fingering forces, curl-noise
 turbulence and a self-regulating dye budget. Two things are worth knowing:
 
 - **Where it runs.** On `auto` (the default) the solve moves onto the GPU as a
-  chain of WebGL2 fragment passes at the largest grid the hardware can hold at
-  frame rate (256², 384², 512² or 768²), and falls back to the 192² CPU solver
-  when the GPU can't render to float textures. Settings → Simulation → Fluid
-  Grid pins a size or forces the CPU path, and shows which engine is live.
+  chain of WebGL2 fragment passes, and a frame-time governor picks the grid:
+  it starts from a guess for the hardware, steps down within a couple of
+  seconds if frames are being dropped, and climbs one rung at a time when
+  there is sustained room. Machines whose GPU can't render to float textures
+  use the 192² CPU solver. Settings → Simulation → Fluid Grid pins a size or
+  forces the CPU path, and shows which engine is live and the frame rate.
 - **Advection.** Both paths use MacCormack advection (a forward and a backward
   semi-Lagrangian pass, corrected and clamped), which is what lets a thin
   filament of dye survive more than a few steps instead of blurring away.
 
-For testing, `?sim=cpu`, `?sim=auto` or `?sim=<size>` on the URL override the
-setting for that page load, and `?debug` exposes `window.chromaglassDebug()`
-with the live solver state.
+### One build, three tiers
+
+The same build serves three situations, and only the assumed headroom differs:
+
+| Tier | How it runs | Ladder |
+|---|---|---|
+| **Hosted** | chromaglass.web.app | up to 384² at 1.5x pixels — never stutters on a first visit |
+| **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
+| **Native** | a desktop shell around `dist/` (not built yet) | as local |
+
+The tier is detected from where the page was loaded (`localhost`, a private
+LAN address or `.local` is local; an Electron/Tauri shell is native), and the
+GPU class from the renderer string. When the hosted page has had to step
+down, it shows a card with the three commands to run the show locally.
+
+For testing, `?sim=cpu|auto|<size>`, `?tier=hosted|local|native` and
+`?gpu=software|weak|mid|strong` override detection for that page load, and
+`?debug` exposes `window.chromaglassDebug()` with the live solver state and
+governor.
 
 ## Controls
 
@@ -134,6 +152,8 @@ src/
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
+    governor.ts                # Frame-time governor: walks the quality ladder
+    platform.ts                # Tier (hosted/local/native), GPU class, quality ladders
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts
     audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
     remoteProtocol.ts          # Phone-remote message types and socket URL
@@ -148,6 +168,7 @@ src/
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
   components/
     RemoteControl.tsx          # The phone control surface
+    RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay (npm run remote)

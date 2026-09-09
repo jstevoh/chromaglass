@@ -9,6 +9,8 @@ import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import type { RemoteState } from './lib/remoteProtocol';
+import type { EngineStatus } from './lib/platform';
+import { RunLocallyCard } from './components/RunLocallyCard';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
@@ -179,7 +181,7 @@ export default function App() {
   }, [settings.layerCount, activeLayer]);
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
-  const [engineStatus, setEngineStatus] = useState<string | null>(null);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const audioData = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
@@ -387,7 +389,15 @@ export default function App() {
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         onManualGesture={musicIntel.recordGesture}
-        onEngineStatus={setEngineStatus}
+        onEngineStatus={(next) =>
+          // Ticks once a second; only re-render the shell when something visible changed.
+          setEngineStatus((prev) =>
+            prev && prev.label === next.label && prev.steppedDown === next.steppedDown &&
+            prev.gpuUnavailable === next.gpuUnavailable &&
+            Math.round(1000 / prev.frameMs) === Math.round(1000 / next.frameMs)
+              ? prev : next,
+          )
+        }
       />
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
@@ -711,6 +721,11 @@ export default function App() {
             </motion.div>
           </>
         )}
+      </AnimatePresence>
+
+      {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
+      <AnimatePresence>
+        {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
 
       {/* ── Minimize/Maximize Toggle ───────────────────────────── */}
