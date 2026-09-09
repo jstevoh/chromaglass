@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Clean screen: nothing over the liquid, not even the pointer. */
+.overlays-hidden canvas {
+  cursor: none;
+}
+
 /* ── Phone remote sliders ──────────────────────────────────────────
    A 40px-tall touch target with a 10px visible track and a thumb big
    enough to find without looking — these get used one-handed, in the

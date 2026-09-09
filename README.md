@@ -123,6 +123,7 @@ governor.
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
 | Eye toggle | Minimize/maximize the UI |
+| Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Settings gear | Open the full settings panel |
 
 ## Tech Stack

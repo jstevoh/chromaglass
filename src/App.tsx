@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -81,6 +81,64 @@ export default function App() {
   }, []);
   const [isAutomated, setIsAutomated] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  /**
+   * Clean screen: nothing on top of the liquid at all — no logo, no chips, no
+   * cursor. For a projected show. Esc (or holding a finger on a touch screen)
+   * brings everything back; a hint says so for a few seconds after hiding.
+   */
+  const [overlaysVisible, setOverlaysVisible] = useState(true);
+  const [showCleanHint, setShowCleanHint] = useState(false);
+  const hideOverlays = useCallback(() => {
+    setOverlaysVisible(false);
+    setShowCleanHint(true);
+  }, []);
+  useEffect(() => {
+    if (!showCleanHint) return;
+    const t = setTimeout(() => setShowCleanHint(false), 4000);
+    return () => clearTimeout(t);
+  }, [showCleanHint]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (!overlaysVisible) {
+        setOverlaysVisible(true);
+        return;
+      }
+      // With the overlays up, Esc closes whatever panel is open.
+      setShowSettings(false);
+      setShowHelp(false);
+      setShowTrackPanel(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [overlaysVisible]);
+  useEffect(() => {
+    // Touch screens have no Esc: a still finger held for a moment brings the
+    // overlays back. Painting is a moving finger, so the two don't collide.
+    if (overlaysVisible) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let origin: { x: number; y: number } | null = null;
+    const cancel = () => { if (timer) clearTimeout(timer); timer = null; origin = null; };
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      origin = { x: e.clientX, y: e.clientY };
+      timer = setTimeout(() => setOverlaysVisible(true), 700);
+    };
+    const move = (e: PointerEvent) => {
+      if (origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 12) cancel();
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', cancel, true);
+    window.addEventListener('pointercancel', cancel, true);
+    return () => {
+      cancel();
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', cancel, true);
+      window.removeEventListener('pointercancel', cancel, true);
+    };
+  }, [overlaysVisible]);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -343,8 +401,9 @@ export default function App() {
     activePresetId,
     isActive,
     isAutomated,
+    overlaysVisible,
     trackName: musicIntel.state.track?.title ?? null,
-  }), [settings, activePresetId, isActive, isAutomated, musicIntel.state.track?.title]);
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title]);
 
   useRemoteLink({
     role: 'display',
@@ -369,6 +428,8 @@ export default function App() {
             case 'lucky':         triggerLucky(); break;
             case 'automate-on':   setIsAutomated(true); break;
             case 'automate-off':  setIsAutomated(false); break;
+            case 'overlays-off':  hideOverlays(); break;
+            case 'overlays-on':   setOverlaysVisible(true); break;
           }
           break;
       }
@@ -382,7 +443,7 @@ export default function App() {
   }, [activePresetId]);
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white">
+    <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
         ref={visualizerRef}
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
@@ -399,6 +460,23 @@ export default function App() {
           )
         }
       />
+
+      {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
+      <AnimatePresence>
+        {!overlaysVisible && showCleanHint && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 1.2 } }}
+            className="pointer-events-none absolute bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/50 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 backdrop-blur-xl"
+          >
+            Esc — or hold a finger down — brings the controls back
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Everything below is an overlay on the liquid; clean screen removes it all. */}
+      <div hidden={!overlaysVisible} className="contents">
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
       <AnimatePresence>
@@ -728,15 +806,25 @@ export default function App() {
         {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
 
-      {/* ── Minimize/Maximize Toggle ───────────────────────────── */}
-      <button
-        onClick={() => setIsMinimized(!isMinimized)}
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[9px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
-        title={isMinimized ? "Show Controls" : "Hide Controls"}
-      >
-        {isMinimized ? <Eye size={14} /> : <EyeOff size={14} />}
-        {isMinimized ? 'Show UI' : 'Hide UI'}
-      </button>
+      {/* ── Minimize / clean-screen chips ──────────────────────── */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+        <button
+          onClick={() => setIsMinimized(!isMinimized)}
+          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[9px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
+          title={isMinimized ? "Show Controls" : "Hide Controls"}
+        >
+          {isMinimized ? <Eye size={14} /> : <EyeOff size={14} />}
+          {isMinimized ? 'Show UI' : 'Hide UI'}
+        </button>
+        <button
+          onClick={hideOverlays}
+          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[9px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
+          title="Clean screen: hide every overlay and the cursor. Esc brings them back."
+        >
+          <MonitorOff size={14} />
+          Clean Screen
+        </button>
+      </div>
 
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
@@ -921,6 +1009,8 @@ export default function App() {
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vh] bg-blue-500/5 blur-[120px] rounded-full" />
         <div className="absolute top-1/4 left-1/4 w-[40vw] h-[40vh] bg-purple-500/5 blur-[100px] rounded-full" />
+      </div>
+
       </div>
     </div>
   );

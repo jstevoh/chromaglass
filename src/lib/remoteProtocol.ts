@@ -32,7 +32,10 @@ export type RemoteAction =
   | 'drain'
   | 'lucky'
   | 'automate-on'
-  | 'automate-off';
+  | 'automate-off'
+  /** Hide every overlay on the display (a clean projected frame) / bring them back. */
+  | 'overlays-off'
+  | 'overlays-on';
 
 /** What the phone shows: mirrored from the display, never guessed. */
 export interface RemoteState {
@@ -40,6 +43,8 @@ export interface RemoteState {
   activePresetId: string | null;
   isActive: boolean;
   isAutomated: boolean;
+  /** False while the display is showing nothing but the liquid. */
+  overlaysVisible: boolean;
   /** Now-playing title, when music intelligence has identified something. */
   trackName?: string | null;
 }

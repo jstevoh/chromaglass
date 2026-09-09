@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Added — Clean screen
+- **Clean Screen** chip next to Hide UI: removes every overlay — logo, chips, meters, lyrics, the cursor — leaving only the liquid, for a projected show. **Esc** brings everything back (with the overlays up, Esc closes whichever panel is open); on a touch screen a finger held still for a moment does the same. A hint saying so shows for four seconds after hiding
+- The phone remote has a matching button, so the laptop's screen can be cleaned from across the room (`overlays-off` / `overlays-on` actions, `overlaysVisible` in the state snapshot)
+
 ### Changed — Solver
 - **MacCormack advection** on both paths, for velocity and dye: a forward and a backward semi-Lagrangian pass, corrected by half the round-trip error and clamped to the neighbourhood the forward pass sampled. First-order semi-Lagrangian transport smeared a thin filament away within a few steps; the same filaments now hold their edges
 - Momentum diffuses at a viscosity derived from the plate's thin/thick setting rather than at the dye's diffusion rate, which is a different physical quantity — the two had been sharing one number

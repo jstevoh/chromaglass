@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Wifi, WifiOff } from 'lucide-react';
+import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
@@ -219,6 +219,20 @@ export default function RemoteControl() {
             </div>
           )}
         </div>
+
+        {/* Clean screen on the laptop: the phone is the natural place to do this from */}
+        <button
+          onClick={() => action(state?.overlaysVisible === false ? 'overlays-on' : 'overlays-off')}
+          disabled={!connected}
+          className={`mb-6 flex w-full items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
+            state?.overlaysVisible === false
+              ? 'border-white/40 bg-white/15 text-white'
+              : 'border-white/10 bg-white/5 text-white/70'
+          }`}
+        >
+          {state?.overlaysVisible === false ? <Monitor size={16} /> : <MonitorOff size={16} />}
+          {state?.overlaysVisible === false ? 'Show laptop controls' : 'Clean screen on laptop'}
+        </button>
 
         {/* One-shot gestures */}
         <div className="mb-7 flex gap-3">
