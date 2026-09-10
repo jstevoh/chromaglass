@@ -88,6 +88,7 @@ export interface VisualizerSettings {
   blobSurfaceTension: number; // lower = more elongation/shear, higher = more circular
   boundaryContrast: number;   // bright edge-line strength where two dye colors meet
   saturationBoost: number;    // final color grade saturation multiplier
+  dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
@@ -154,6 +155,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
+  dyeBudget: 0.85,
   edgeRelief: 0.4,
   bubbles: 0.5,
   plateRock: 0.45,

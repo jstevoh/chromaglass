@@ -26,7 +26,8 @@ Six changes from a comparison of the app's frames with the liquid light show can
 - **Rock the plate.** A hand on the clock face: each kick tips the whole plate one way and a damped spring rocks it back, with a slow sway between beats, so the field sloshes instead of only churning. Applied as a uniform acceleration on both solver paths (`plateRock`)
 - **Less haze.** Film grain fades out almost entirely below the shadows so dark frames stay black; treble sparks are fewer and larger — a handful of real droplets instead of a cloud of one-cell specks that blurred into fog
 - **Two scales in one frame.** The second layer is viewed magnified about the centre with its own slow drift, like a second projector at a different throw; the brush maps through the same view (`layerScaleVariety`). Off in the macro presets, whose camera frames one plate
-- Four new sliders under Light Show Look: Edge Relief, Bubbles, Plate Rock, Layer Scale Variety; Lucky rolls them
+- **Dye budget per preset.** The regulator's target fullness is now a setting (`dyeBudget`), so a preset can run mostly clear glass with dye structures on it — Monochrome Ink runs at a quarter of the default and reads as ink on white instead of a grey wash
+- Five new sliders under Light Show Look: Dye Budget, Edge Relief, Bubbles, Plate Rock, Layer Scale Variety; Lucky rolls them
 
 ### Added — Clean screen
 - **Clean Screen** chip next to Hide UI: removes every overlay — logo, chips, meters, lyrics, the cursor — leaving only the liquid, for a projected show. **Esc** brings everything back (with the overlays up, Esc closes whichever panel is open); on a touch screen a finger held still for a moment does the same. A hint saying so shows for four seconds after hiding

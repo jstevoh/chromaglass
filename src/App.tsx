@@ -367,6 +367,7 @@ export default function App() {
       blobSurfaceTension: Math.random(),
       boundaryContrast: Math.random() * 0.7,
       saturationBoost: 1.0 + Math.random() * 0.8,
+      dyeBudget: 0.4 + Math.random() * 0.6,
       edgeRelief: Math.random() * 0.8,
       bubbles: Math.random() < 0.2 ? 0 : 0.2 + Math.random() * 0.8,
       plateRock: Math.random() * 0.9,

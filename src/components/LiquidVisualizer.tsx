@@ -1077,7 +1077,7 @@ class FluidSimulation {
     // or gradients and reads as a static colour wash. A macro frame needs
     // empty ground around its subject, so the budget drops hard while the
     // closeup camera is running.
-    const targetMean = settings.macroMode ? 0.28 : 0.85;
+    const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     const regulatorEvap = Math.min(0.02, over * over * 0.012);
     const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;

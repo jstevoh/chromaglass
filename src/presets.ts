@@ -250,6 +250,7 @@ export const PRESETS: Preset[] = [
       ledSpeed: 0.0,
       surfaceTension: 0.0,
       diffusionRate: 0.0005,   // ink holds its edge instead of greying the plate
+      dyeBudget: 0.22,         // mostly clear glass: ink on white, not a grey wash
       buoyancy: 0.4,
       advection: 0.4,
       damping: 0.96,

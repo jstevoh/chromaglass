@@ -223,6 +223,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
         />
         <Slider
+          label="Dye Budget"
+          value={settings.dyeBudget ?? 0.85}
+          min={0.1}
+          max={1.2}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ dyeBudget: v })}
+        />
+        <Slider
           label="Edge Relief"
           value={settings.edgeRelief ?? 0.4}
           min={0}
