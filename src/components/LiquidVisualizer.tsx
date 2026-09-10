@@ -2591,11 +2591,16 @@ void main() {
       float lens = inside * (1.0 - 1.0 / max(edge, 1.0));
       vec2 hd = bestD - vec2(-0.36, 0.34);
       float hl = exp(-dot(hd, hd) * 18.0) * inside;
+      // The membrane is the dye seen edge-on, not a black line: darken toward
+      // the colour already there, less over dark ground (a rim on black
+      // reads as a drawn circle), and keep the highlight modest.
+      float ground = dot(outColor, vec3(0.299, 0.587, 0.114));
+      float rimK = mix(0.25, 0.55, smoothstep(0.08, 0.5, ground));
       vec3 c = outColor;
-      c = mix(c, c * 1.10 + 0.04, lens * 0.7);
-      c *= 1.0 - membrane * 0.72;
-      c += vec3(1.0, 0.98, 0.94) * innerLine * 0.18;
-      c += vec3(1.0, 0.97, 0.9) * hl * 0.9;
+      c = mix(c, c * 1.06 + 0.02, lens * 0.6);
+      c = mix(c, c * c * 1.2, membrane * rimK);
+      c += outColor * innerLine * 0.35 + vec3(0.06) * innerLine;
+      c += vec3(1.0, 0.97, 0.9) * hl * (0.35 + 0.35 * ground);
       outColor = mix(outColor, c, opac * u_bubbleStrength);
     }
   }

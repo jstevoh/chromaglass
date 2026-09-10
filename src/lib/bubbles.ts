@@ -63,7 +63,7 @@ export class BubbleField {
     return {
       x, y, r, age: 0, life,
       sx: 0, sy: 0,
-      wob, wph: Math.random() * Math.PI * 2, wvel: 5 + Math.random() * 4,
+      wob, wph: Math.random() * Math.PI * 2, wvel: 1.2 + Math.random() * 1.2,
       kx: 0, ky: 0,
     };
   }
@@ -83,7 +83,7 @@ export class BubbleField {
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
       const d = Math.random() * spread;
-      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.65 + Math.random() * 0.7), 7 + Math.random() * 12, 0.2 + Math.random() * 0.15));
+      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.65 + Math.random() * 0.7), 9 + Math.random() * 14, 0.1 + Math.random() * 0.08));
     }
   }
 
@@ -101,8 +101,8 @@ export class BubbleField {
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
       // Ride the dye, climb the tilt, carry any kick, and wander a little.
-      const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + (Math.random() - 0.5) * (1.2 + agitation * 4);
-      const dy = vy * CELLS_PER_UNIT * 1.4 - tiltY * 900 + b.ky + (Math.random() - 0.5) * (1.2 + agitation * 4);
+      const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + (Math.random() - 0.5) * (0.5 + agitation * 1.5);
+      const dy = vy * CELLS_PER_UNIT * 1.4 - tiltY * 900 + b.ky + (Math.random() - 0.5) * (0.5 + agitation * 1.5);
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.5);
@@ -112,13 +112,13 @@ export class BubbleField {
       // Shape: stretch along the direction it is being dragged, relaxing
       // when the drag stops; the wobble runs down unless something feeds it.
       const speed = Math.hypot(dx, dy);
-      const want = Math.min(0.55, speed * 0.35);
+      const want = Math.min(0.45, speed * 0.22);
       const ax = speed > 1e-3 ? dx / speed : 0, ay = speed > 1e-3 ? dy / speed : 0;
-      const k = 1 - Math.exp(-dt * 3);
+      const k = 1 - Math.exp(-dt * 1.2);   // a bubble takes a second to take a new shape
       b.sx += (ax * want - b.sx) * k;
       b.sy += (ay * want - b.sy) * k;
-      const wobTarget = Math.min(0.35, speed * 0.01 + agitation * 0.12);
-      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.9 : 3)));
+      const wobTarget = Math.min(0.18, speed * 0.004 + agitation * 0.05);
+      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.6 : 1.5)));
       b.wph += b.wvel * dt;
     }
 
@@ -137,9 +137,9 @@ export class BubbleField {
           a.r = Math.min(N * 0.05, Math.sqrt(wa + wc));
           a.age = Math.min(a.age, c.age);
           const dist = Math.sqrt(dist2) || 1;
-          a.sx = (ddx / dist) * 0.35;
-          a.sy = (ddy / dist) * 0.35;
-          a.wob = Math.max(a.wob, 0.32);
+          a.sx = (ddx / dist) * 0.25;
+          a.sy = (ddy / dist) * 0.25;
+          a.wob = Math.max(a.wob, 0.16);
           this.events.push({ kind: 'merge', x: a.x, y: a.y, r: a.r });
           bs.splice(j, 1);
         }
@@ -150,12 +150,12 @@ export class BubbleField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       const s = Math.hypot(b.sx, b.sy);
-      if (b.age > 1.5 && b.r > 2.4 && s > 0.42 && bs.length < MAX_BUBBLES && Math.random() < dt * 1.2) {
+      if (b.age > 3 && b.r > 3 && s > 0.4 && bs.length < MAX_BUBBLES && Math.random() < dt * 0.4) {
         const ux = b.sx / s, uy = b.sy / s;
         const r2 = b.r / Math.SQRT2;
         const gap = r2 * 1.3;
         const child = (dir: number) => {
-          const nb = this.make(b.x + ux * gap * dir, b.y + uy * gap * dir, r2 * (0.85 + Math.random() * 0.3), b.life, 0.3);
+          const nb = this.make(b.x + ux * gap * dir, b.y + uy * gap * dir, r2 * (0.85 + Math.random() * 0.3), b.life, 0.15);
           nb.kx = ux * 14 * dir; nb.ky = uy * 14 * dir;
           return nb;
         };
@@ -169,7 +169,7 @@ export class BubbleField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       const atEdge = b.x < b.r + 1 || b.y < b.r + 1 || b.x > N - b.r - 1 || b.y > N - b.r - 1;
-      const shaken = b.age > 3 && Math.random() < dt * agitation * 0.15;
+      const shaken = b.age > 5 && Math.random() < dt * agitation * 0.06;
       if (b.age > b.life * lifeScale || atEdge || shaken) {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
@@ -177,7 +177,7 @@ export class BubbleField {
           const n = 2 + Math.floor(Math.random() * 2);
           for (let k = 0; k < n; k++) {
             const a = Math.random() * Math.PI * 2;
-            const nb = this.make(b.x + Math.cos(a) * b.r * 0.9, b.y + Math.sin(a) * b.r * 0.9, b.r * (0.25 + Math.random() * 0.2), 2 + Math.random() * 2.5, 0.3);
+            const nb = this.make(b.x + Math.cos(a) * b.r * 0.9, b.y + Math.sin(a) * b.r * 0.9, b.r * (0.25 + Math.random() * 0.2), 2 + Math.random() * 2.5, 0.12);
             nb.kx = Math.cos(a) * 18; nb.ky = Math.sin(a) * 18;
             bs.push(nb);
           }
