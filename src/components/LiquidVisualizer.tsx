@@ -750,6 +750,11 @@ class FluidSimulation {
         break;
       }
 
+      // Boyle's bench and Wilfred's lumia start from clean glass: the pattern
+      // and the light are the subject, not a seed of blobs.
+      case 'sensual-laboratory':
+      case 'lumia':
+        break;
       default: {
         for (let i = 0; i < 5; i++) {
           const c = col(i);
@@ -2976,7 +2981,7 @@ void main() {
             chem.step(Math.max(1, Math.min(10, Math.round(simSteps * 2.5))), 0.042, 0.062);
             const v = chem.activator;
             const c = harmonyCycle(harmonyRef.current, time * 0.08);
-            const amount = chemAmt * 0.0035 * Math.max(1, simSteps);
+            const amount = chemAmt * 0.02 * Math.max(1, simSteps);
             for (let y = 1; y < GRID_SIZE - 1; y++) {
               for (let x = 1; x < GRID_SIZE - 1; x++) {
                 const a = v[x + y * GRID_SIZE];
