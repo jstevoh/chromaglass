@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Added — The other projectors
+Six expansions from the same comparison — the machines a light show crew stacked on one screen besides the clock face:
+- **Lumia.** Thomas Wilfred's aurora as a layer under the dye: a slow folded height field read as sheets of light, two harmony colours drifting through each other on a scale of minutes, no beat and no dye (`lumia`; preset **Lumia**)
+- **Chemistry.** Mark Boyle's Sensual Laboratory put reactions on the platen instead of oil in a dish. A Gray–Scott reaction–diffusion field grows cells and coral in place and deposits dye where it is active; the flow carries the dye off while the pattern keeps growing underneath. Seeded by kicks (`chemistry`, `src/lib/chemistry.ts`; preset **Sensual Laboratory**)
+- **Film loops and a gel wheel.** A film projector that plays a video file through the dye — keyed on its own brightness, refracted by the dye's surface, tinted where the dye is — and a four-segment colour gel turning over the lamp at a chosen rpm, its colours from the working harmony (`filmMix`, `filmKey`, `gelWheel`, `gelSpeed`; Settings → Projectors → Load loop)
+- **A real plate in the mix.** The same film path takes the camera: point a phone or webcam at a real dish of oil on a lamp and it is composited through the solver's lighting (Settings → Projectors → Camera)
+- **Two projectionists.** The phone remote gains a pad: dragging blows air along the finger's path, a tap drops dye, each phone chooses which plate it works, and the phone's tilt streams into the plate as an external tilt that fades out if the link drops (`blow` / `drop` / `tilt` messages; `applyGesture` takes a layer; `setExternalTilt`)
+- **Sealed wheel.** A halogen grade — warm tint and a soft vignette — and a preset, **Oil Wheel**, that runs thick dye on convection at half a revolution a minute, yellows, greens and blues, no hands on it (`lampWarmth`)
+- **Exposure** plate-wide: the macro camera's histogram floor is now a setting, so a thin film between ink structures renders as bare glass — Monochrome Ink and Sensual Laboratory run on it (`exposure`)
+- A Projectors section in Settings with all of the above; Lucky rolls the projectors one at a time
+
 ### Changed — The look, against the tradition
 Six changes from a comparison of the app's frames with the liquid light show canon (SF light painting, the Joshua Light Show, Mad Alchemy, Optikinetics wheels, macro liquid-light photography):
 - **Palette contracts.** A projected clock face carries two or three dyes; the richness of a show comes from stacking plates, not rainbow dye. Every preset now names the palette indices it may use, and seeding, automation, beat injection and the slow harmony rotation all draw from inside that set (a song's identity harmony is intersected with it). Monochrome Ink stays black and white instead of being overpainted; Galaxy, Cyberpunk Neon and Fractal Dream stop drifting into full-spectrum haze. A user's palette lock still wins outright

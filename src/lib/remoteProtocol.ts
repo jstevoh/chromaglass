@@ -59,7 +59,15 @@ export type RemoteMessage =
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
   | { type: 'preset'; presetId: string }
-  | { type: 'action'; action: RemoteAction };
+  | { type: 'action'; action: RemoteAction }
+  /**
+   * The phone as a projectionist: a finger on its pad blows air or drops dye
+   * at that point of the plate (normalised, y up), on the layer it holds;
+   * its tilt rocks the plate.
+   */
+  | { type: 'blow'; x: number; y: number; layer: number }
+  | { type: 'drop'; x: number; y: number; layer: number }
+  | { type: 'tilt'; x: number; y: number };
 
 /** Build the ws:// URL for the relay from the page's own origin. */
 export function remoteSocketUrl(): string {

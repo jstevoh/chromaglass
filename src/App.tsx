@@ -240,6 +240,24 @@ export default function App() {
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera'>('none');
+  const loadFilm = async (file: File) => {
+    await visualizerRef.current?.loadFilmFile(file);
+    setFilmSource('file');
+  };
+  const startFilmCamera = async () => {
+    try {
+      await visualizerRef.current?.startFilmCamera();
+      setFilmSource('camera');
+    } catch (err) {
+      console.warn('ChromaGlass: camera unavailable for the film projector.', err);
+      setFilmSource('none');
+    }
+  };
+  const clearFilm = () => {
+    visualizerRef.current?.clearFilm();
+    setFilmSource('none');
+  };
   const audioData = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
@@ -372,6 +390,15 @@ export default function App() {
       bubbles: Math.random() < 0.2 ? 0 : 0.2 + Math.random() * 0.8,
       plateRock: Math.random() * 0.9,
       layerScaleVariety: Math.random(),
+      // The other projectors come out one roll in five, one at a time
+      lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
+      chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,
+      gelWheel: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
+      gelSpeed: 0.2 + Math.random() * 1.5,
+      lampWarmth: Math.random() < 0.3 ? Math.random() * 0.8 : 0,
+      exposure: Math.random() < 0.25 ? Math.random() * 0.8 : 0,
+      filmMix: settings.filmMix,
+      filmKey: settings.filmKey,
       glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
       postBlurRadius: Math.random() * 0.7,
       // One roll in four goes closeup — a magnified chase is its own happy accident
@@ -436,6 +463,15 @@ export default function App() {
             case 'overlays-off':  hideOverlays(); break;
             case 'overlays-on':   setOverlaysVisible(true); break;
           }
+          break;
+        case 'blow':
+          visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer });
+          break;
+        case 'drop':
+          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer });
+          break;
+        case 'tilt':
+          visualizerRef.current?.setExternalTilt(message.x, message.y);
           break;
       }
     },
@@ -842,6 +878,10 @@ export default function App() {
             calibration={audioData?.calibration ?? null}
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             engineStatus={engineStatus}
+            filmSource={filmSource}
+            onFilmFile={loadFilm}
+            onFilmCamera={startFilmCamera}
+            onFilmClear={clearFilm}
             onClose={() => setShowSettings(false)}
           />
         )}

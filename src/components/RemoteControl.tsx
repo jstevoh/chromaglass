@@ -1,6 +1,6 @@
-import type { ComponentType } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff } from 'lucide-react';
+import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
@@ -64,6 +64,52 @@ export default function RemoteControl() {
   }, []);
 
   const connected = status === 'connected' && state !== null;
+
+  // ── The projectionist's pad ──────────────────────────────────────
+  // A finger on the pad is a finger on the plate: dragging blows air along
+  // its path, a tap drops dye. Each phone holds one layer, so two phones are
+  // two projectionists on two plates.
+  const [padLayer, setPadLayer] = useState(0);
+  const [padTool, setPadTool] = useState<'blow' | 'drop'>('blow');
+  const padRef = useRef<HTMLDivElement>(null);
+  const padLastSend = useRef(0);
+  const padDown = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const padPoint = (e: ReactPointerEvent) => {
+    const r = padRef.current!.getBoundingClientRect();
+    // Normalised, y up — the plate's own coordinates.
+    return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
+  };
+  const padSend = (kind: 'blow' | 'drop', p: { x: number; y: number }) => send({ type: kind, x: p.x, y: p.y, layer: padLayer });
+
+  // ── Tilt ─────────────────────────────────────────────────────────
+  // The phone's orientation rocks the laptop's plate. iOS asks permission
+  // from a gesture; everywhere else the sensor just streams.
+  const [tiltOn, setTiltOn] = useState(false);
+  const tiltLast = useRef(0);
+  useEffect(() => {
+    if (!tiltOn) return;
+    const onOrient = (e: DeviceOrientationEvent) => {
+      const now = performance.now();
+      if (now - tiltLast.current < 66) return;   // ~15 Hz is plenty for a plate
+      tiltLast.current = now;
+      const gamma = e.gamma ?? 0;   // left-right, degrees
+      const beta = e.beta ?? 0;     // front-back
+      send({ type: 'tilt', x: Math.max(-1, Math.min(1, gamma / 30)), y: Math.max(-1, Math.min(1, (beta - 40) / 30)) });
+    };
+    window.addEventListener('deviceorientation', onOrient);
+    return () => {
+      window.removeEventListener('deviceorientation', onOrient);
+      send({ type: 'tilt', x: 0, y: 0 });
+    };
+  }, [tiltOn, send]);
+  const toggleTilt = async () => {
+    if (tiltOn) { setTiltOn(false); return; }
+    const req = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission;
+    if (typeof req === 'function') {
+      try { if ((await req()) !== 'granted') return; } catch { return; }
+    }
+    setTiltOn(true);
+  };
 
   const Slider = ({
     label,
@@ -233,6 +279,77 @@ export default function RemoteControl() {
           {state?.overlaysVisible === false ? <Monitor size={16} /> : <MonitorOff size={16} />}
           {state?.overlaysVisible === false ? 'Show laptop controls' : 'Clean screen on laptop'}
         </button>
+
+        {/* The projectionist's pad */}
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+              <Hand size={15} /> Projectionist
+            </span>
+            <div className="flex gap-1.5">
+              {(['blow', 'drop'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setPadTool(t)}
+                  disabled={!connected}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? 'border-white/50 bg-white/15 text-white' : 'border-white/10 text-white/50'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div
+            ref={padRef}
+            className={`relative aspect-video w-full touch-none select-none rounded-xl border border-dashed ${connected ? 'border-white/25 bg-black/40' : 'border-white/10 bg-black/20'}`}
+            onPointerDown={(e) => {
+              if (!connected) return;
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              const p = padPoint(e);
+              padDown.current = { ...p, moved: false };
+              if (padTool === 'drop') padSend('drop', p);
+              else { padSend('blow', p); padLastSend.current = performance.now(); }
+            }}
+            onPointerMove={(e) => {
+              if (!connected || !padDown.current) return;
+              const p = padPoint(e);
+              padDown.current.moved = true;
+              const now = performance.now();
+              if (now - padLastSend.current < 33) return;   // 30 Hz along the drag
+              padLastSend.current = now;
+              padSend(padTool, p);
+            }}
+            onPointerUp={() => { padDown.current = null; }}
+            onPointerCancel={() => { padDown.current = null; }}
+          >
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.25em] text-white/25">
+              {padTool === 'blow' ? 'drag to blow air across the plate' : 'tap or drag to drop dye'}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex gap-1.5">
+              {Array.from({ length: Math.max(1, Math.min(5, settings?.layerCount ?? 1)) }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPadLayer(i)}
+                  disabled={!connected}
+                  className={`h-8 w-8 rounded-full border text-[11px] font-bold disabled:opacity-30 ${padLayer === i ? 'border-white/50 bg-white/15 text-white' : 'border-white/10 text-white/50'}`}
+                  title={`This phone works plate ${i + 1}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={toggleTilt}
+              disabled={!connected}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? 'border-white/50 bg-white/15 text-white' : 'border-white/10 text-white/60'}`}
+              title="Tilting the phone tilts the plate"
+            >
+              <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
+            </button>
+          </div>
+        </div>
 
         {/* One-shot gestures */}
         <div className="mb-7 flex gap-3">

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -16,10 +16,16 @@ interface SettingsPanelProps {
   onRecalibrate?: () => void;
   /** Which solver is running and at what grid, e.g. "GPU · 512²". */
   engineStatus?: EngineStatus | null;
+  /** The film projector: what's playing, and how to change it. */
+  filmSource?: 'none' | 'file' | 'camera';
+  onFilmFile?: (file: File) => void;
+  onFilmCamera?: () => void;
+  onFilmClear?: () => void;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, onClose }) => {
+  const filmInputRef = useRef<HTMLInputElement>(null);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
 
   const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
@@ -293,6 +299,119 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.5}
           step={0.05}
           onChange={(v: number) => onUpdate({ postBlurRadius: v })}
+        />
+      </section>
+
+      {/* Projectors Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Projector size={12} /> Projectors
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.
+        </p>
+        <Slider
+          label="Lumia"
+          value={settings.lumia ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lumia: v })}
+        />
+        <Slider
+          label="Chemistry"
+          value={settings.chemistry ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ chemistry: v })}
+        />
+        <Slider
+          label="Gel Wheel"
+          value={settings.gelWheel ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ gelWheel: v })}
+        />
+        <Slider
+          label="Gel Speed (rpm)"
+          value={settings.gelSpeed ?? 0.5}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ gelSpeed: v })}
+        />
+        <Slider
+          label="Lamp Warmth"
+          value={settings.lampWarmth ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampWarmth: v })}
+        />
+        <Slider
+          label="Exposure"
+          value={settings.exposure ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ exposure: v })}
+        />
+        <div className="mt-2 mb-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Film Projector</span>
+            <span className="text-[10px] font-mono opacity-50">
+              {filmSource === 'file' ? 'loop playing' : filmSource === 'camera' ? 'camera live' : 'off'}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              ref={filmInputRef}
+              id="film-loop-file"
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => filmInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
+              title="Play a video file through the dye, looping"
+            >
+              <Film size={13} /> Load loop
+            </button>
+            <button
+              onClick={() => onFilmCamera?.()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
+              title="Point a camera at a real dish of oil and composite it through the solver"
+            >
+              <Camera size={13} /> Camera
+            </button>
+            <button
+              onClick={() => onFilmClear?.()}
+              disabled={filmSource === 'none'}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:opacity-30"
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        <Slider
+          label="Film Mix"
+          value={settings.filmMix ?? 0.7}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmMix: v })}
+        />
+        <Slider
+          label="Film Key"
+          value={settings.filmKey ?? 0.18}
+          min={0}
+          max={0.9}
+          step={0.02}
+          onChange={(v: number) => onUpdate({ filmKey: v })}
         />
       </section>
 

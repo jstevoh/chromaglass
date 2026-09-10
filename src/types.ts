@@ -92,6 +92,14 @@ export interface VisualizerSettings {
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye, no beat, no dye
+  chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
+  gelWheel: number;           // a rotating four-segment colour gel over the lamp
+  gelSpeed: number;           // gel wheel turns per minute
+  filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
+  filmKey: number;            // luminance below which the film is transparent (a black key)
+  exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
+  lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
@@ -160,6 +168,14 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   bubbles: 0.5,
   plateRock: 0.45,
   layerScaleVariety: 0.5,
+  lumia: 0,
+  chemistry: 0,
+  gelWheel: 0,
+  gelSpeed: 0.5,
+  filmMix: 0.7,
+  filmKey: 0.18,
+  lampWarmth: 0,
+  exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look

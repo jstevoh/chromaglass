@@ -15,6 +15,8 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
+- **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
+- **Two projectionists** — the phone remote has a pad: a finger on it blows air or drops dye at that point of the laptop's plate, each phone works one layer, and tilting the phone rocks the plate
 - **Palette contracts** — each preset names the two to four dyes it may use, and everything that adds colour (seeding, automation, beat hits, the slow harmony rotation, a song's identity) stays inside them, the way a projected plate carries a few dyes rather than a rainbow
 - **Music intelligence** — Identifies the playing song (fingerprint proxy or manual tag), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
 - **Lyrics layer** — Time-synced lyrics from LRCLIB with themed word-triggers (fire, water, sky…), per-section sentiment arc, and an optional kinetic typography overlay
@@ -124,6 +126,8 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Auto toggle | Enable automated dye/air injection |
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
+| Projectionist pad | On the phone: drag to blow air, tap to drop dye, pick which plate the phone works, and stream the phone's tilt into the plate |
+| Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Settings gear | Open the full settings panel |
@@ -156,6 +160,7 @@ src/
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
+    chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye
     governor.ts                # Frame-time governor: walks the quality ladder
     platform.ts                # Tier (hosted/local/native), GPU class, quality ladders
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts

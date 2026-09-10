@@ -8,6 +8,7 @@ import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
 import { classifyGpu, detectTier, qualityLadder, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
+import { ChemistryField } from '../lib/chemistry';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -93,8 +94,14 @@ export interface LiquidVisualizerHandle {
   setHarmonyLock: (indices: number[] | null) => void;
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
-  /** Re-fire a recorded manual gesture (performance replay). Normalized coords. */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
+  /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number }) => void;
+  /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
+  setExternalTilt: (x: number, y: number) => void;
+  /** Film projector: a video file or the camera, shown through the dye. */
+  loadFilmFile: (file: File) => Promise<void>;
+  startFilmCamera: () => Promise<void>;
+  clearFilm: () => void;
 }
 
 // ─── Palette contracts ───────────────────────────────────────────────
@@ -122,6 +129,9 @@ const PRESET_CONTRACTS: Record<string, number[]> = {
   'velvet-underground': [9, 10, 4],
   'neon-coral-reef':    [0, 6, 2],
   'stardust-collapse':  [7, 15, 5],
+  'lumia':              [10, 7, 1],
+  'sensual-laboratory': [14, 12],
+  'oil-wheel':          [0, 6, 8],
   // Warm, fully-saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye.
@@ -1469,6 +1479,8 @@ interface GLResources {
   /** Allocated edge length of each RGBA8 texture, so a resolution change reallocates it. */
   texSizes: Map<WebGLTexture, number>;
   maxTexture: number;
+  /** The film projector's frame — a video file or the camera — uploaded each frame it plays. */
+  filmTexture: WebGLTexture;
 }
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -1493,6 +1505,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
+  const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
+  const chemRef = useRef(new ChemistryField(GRID_SIZE));
+  const gelAngleRef = useRef(0);
+  const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
+  const filmVideo = () => {
+    const f = filmRef.current;
+    if (!f.video) {
+      const v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+      f.video = v;
+    }
+    return f.video;
+  };
+  const stopFilm = () => {
+    const f = filmRef.current;
+    if (f.stream) { f.stream.getTracks().forEach(t => t.stop()); f.stream = null; }
+    if (f.url) { URL.revokeObjectURL(f.url); f.url = null; }
+    if (f.video) { f.video.pause(); f.video.removeAttribute('src'); f.video.srcObject = null; }
+    f.kind = 'none';
+  };
   const injectStyleRef = useRef<string[]>(['drop']);
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
@@ -1535,6 +1567,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     applyPreset: (presetId: string) => {
       for (const fluid of fluidsRef.current) fluid.clearAll();
       bubblesRef.current.clear();
+      chemRef.current.reset();
       rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
       presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
       const fluid = fluidsRef.current[0];
@@ -1560,6 +1593,32 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         harmonyRef.current = inside.length >= 2 ? inside : harmonyWithin(contract);
       }
     },
+    setExternalTilt: (x: number, y: number) => {
+      const t = externalTiltRef.current;
+      t.x = Math.max(-1, Math.min(1, x));
+      t.y = Math.max(-1, Math.min(1, y));
+      t.at = performance.now() * 0.001;
+    },
+    loadFilmFile: async (file: File) => {
+      stopFilm();
+      const f = filmRef.current;
+      const v = filmVideo();
+      f.url = URL.createObjectURL(file);
+      v.src = f.url;
+      f.kind = 'file';
+      try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
+    },
+    startFilmCamera: async () => {
+      stopFilm();
+      const f = filmRef.current;
+      const v = filmVideo();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+      f.stream = stream;
+      v.srcObject = stream;
+      f.kind = 'camera';
+      try { await v.play(); } catch { /* as above */ }
+    },
+    clearFilm: () => stopFilm(),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
       if (indices) harmonyRef.current = indices;
@@ -1628,16 +1687,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     applyGesture: (g) => {
-      const af = fluidsRef.current[activeLayerRef.current];
+      const layer = g.layer ?? activeLayerRef.current;
+      const af = fluidsRef.current[layer];
       if (!af || drainFrameRef.current > 0) return;
       const S = GRID_SIZE;
       const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
       const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
-      const rgb = hexToRgb(g.color ?? '#ffffff');
+      const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
 
       switch (g.tool) {
         case 'blow':
           af.blowAir(x, y, 4, 0.06);
+          if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15) {
+            bubblesRef.current.spawn(x, y, 2.0 * GRID_SCALE, 1, 3 * GRID_SCALE);
+          }
+          break;
+        case 'drop':
+          af.autoInject('drop', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
+          af.addTemp(x, y, 0.6);
           break;
         case 'streak': {
           // Directional smear along the recorded movement
@@ -1771,6 +1838,19 @@ uniform vec2  u_layerDrift1;
 uniform vec4  u_bubbles[24];       // x, y, r (fluid uv) and opacity
 uniform int   u_bubbleCount;
 uniform float u_bubbleStrength;
+uniform float u_lumia;             // Wilfred's aurora under the plate
+uniform vec3  u_lumiaA;
+uniform vec3  u_lumiaB;
+uniform float u_gelWheel;          // rotating four-segment gel over the lamp
+uniform float u_gelAngle;
+uniform vec3  u_gel0; uniform vec3 u_gel1; uniform vec3 u_gel2; uniform vec3 u_gel3;
+uniform sampler2D u_film;          // the film projector: a loop or the camera
+uniform int   u_filmOn;
+uniform float u_filmMix;
+uniform float u_filmKey;
+uniform vec2  u_filmScale;
+uniform float u_lampWarmth;        // halogen grade
+uniform float u_exposure;          // plate-wide film exposure
 uniform float u_postBlur;          // gooey blur radius multiplier
 uniform float u_gridSize;          // fluid sim texture resolution (what we sample)
 uniform float u_logicalGrid;       // the 192-cell grid the look was tuned on
@@ -1918,9 +1998,12 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   // Magnified, only dye thick enough to be a bead should register: below
   // u_filmLevel (tracked per frame from the plate's own density histogram) the
   // wash reads as bare ground, which is what gives a closeup its silhouettes.
+  // Plate-wide, u_exposure blends toward the same floor-and-gain so a thin
+  // film between ink structures reads as bare glass rather than a grey wash.
+  float exposed = max(0.0, totalDensity - u_filmLevel) * u_filmGain;
   float thickness = (u_macro > 0.5
-    ? max(0.0, totalDensity - u_filmLevel) * u_filmGain
-    : totalDensity * 2.8) * (1.0 + darkness * 1.7);
+    ? exposed
+    : mix(totalDensity * 2.8, exposed, u_exposure)) * (1.0 + darkness * 1.7);
   float alpha = 1.0 - exp(-thickness);
   // Magnified, a bead of ink is opaque; at plate scale the backlight is meant
   // to come through everything, so the old ceiling stays there.
@@ -2339,6 +2422,34 @@ void main() {
     bgColor = lc * bevel;
   }
 
+  // ── Gel wheel ────────────────────────────────────────────────────
+  // Four gels turning over the lamp: each quadrant of the ground takes a
+  // colour, with a soft join where one gel gives way to the next.
+  if (u_gelWheel > 0.001) {
+    vec2 gc = (uv - 0.5) * vec2(aspect, 1.0);
+    float ga = fract(atan(gc.y, gc.x) / (2.0 * PI) + u_gelAngle);
+    float seg = ga * 4.0;
+    int gi = int(floor(seg));
+    float gf = fract(seg);
+    vec3 g0 = gi == 0 ? u_gel0 : gi == 1 ? u_gel1 : gi == 2 ? u_gel2 : u_gel3;
+    vec3 g1 = gi == 0 ? u_gel1 : gi == 1 ? u_gel2 : gi == 2 ? u_gel3 : u_gel0;
+    vec3 gel = mix(g0, g1, smoothstep(0.86, 1.0, gf));
+    bgColor = mix(bgColor, max(bgColor, vec3(0.10)) * gel * 1.5, u_gelWheel);
+  }
+
+  // ── Lumia ────────────────────────────────────────────────────────
+  // Wilfred's aurora: a slow, folded height field read as sheets of light,
+  // two colours drifting through each other on a scale of minutes.
+  if (u_lumia > 0.001) {
+    vec2 lp = uv * vec2(aspect, 1.0) * 1.35;
+    float lt = u_time * 0.035;
+    float h = fbm3(lp + vec2(lt * 0.7, -lt * 0.4)) * 0.6 + fbm3(lp * 2.1 - vec2(lt * 0.3, lt * 0.5)) * 0.4;
+    float sheet = pow(abs(sin(h * 9.42 + lt)), 3.0);
+    float veil = 0.25 + 0.75 * fbm3(lp * 0.6 + vec2(lt * 0.2, lt * 0.15));
+    vec3 lcol = mix(u_lumiaA, u_lumiaB, smoothstep(0.25, 0.75, fbm3(lp * 0.7 + lt)));
+    bgColor += lcol * (0.12 + 0.9 * sheet) * veil * u_lumia;
+  }
+
   // ── Gooey blur parameters ─────────────────────────────────────────
   // u_postBlur scales the legacy gooey blur; defaults well below 1.0 so
   // fine turbulent structure survives to the screen.
@@ -2459,6 +2570,26 @@ void main() {
     }
   }
 
+  // ── Film projector ───────────────────────────────────────────────
+  // A loop or the camera projected through the dye: keyed on its own
+  // brightness, refracted by the dye's surface and tinted where the dye is.
+  if (u_filmOn != 0 && u_filmMix > 0.001) {
+    vec2 fuvF = (uv - 0.5) * u_filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
+    vec3 film = texture(u_film, vec2(fuvF.x, 1.0 - fuvF.y)).rgb;
+    float fl = dot(film, vec3(0.299, 0.587, 0.114));
+    float key = smoothstep(u_filmKey, u_filmKey + 0.18, fl);
+    vec3 tinted = film * mix(vec3(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
+    outColor = mix(outColor, outColor * 0.35 + tinted * 0.95, key * u_filmMix);
+  }
+
+  // ── Lamp warmth ──────────────────────────────────────────────────
+  // A halogen lamp through a sealed wheel: warm, and darker toward the rim.
+  if (u_lampWarmth > 0.001) {
+    vec2 vc = (uv - 0.5) * vec2(aspect, 1.0);
+    float vig = 1.0 - smoothstep(0.45, 1.05, length(vc) * 1.25) * 0.45;
+    outColor = mix(outColor, outColor * vec3(1.06, 0.9, 0.7) * vig, u_lampWarmth);
+  }
+
   // ── Saturation grade ──────────────────────────────────────────────
   float luma = dot(outColor, vec3(0.299, 0.587, 0.114));
   outColor = clamp(mix(vec3(luma), outColor, u_saturation), 0.0, 1.0);
@@ -2557,16 +2688,27 @@ void main() {
       'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
       'u_filmLevel','u_filmGain','u_logicalGrid',
       'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleCount','u_bubbleStrength',
+      'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
+      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
       uLocs[name] = gl.getUniformLocation(program, name);
     }
 
+    const filmTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, filmTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
     webGLRef.current = {
       gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
       packFbos: new Map(), texSizes: new Map(),
       maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+      filmTexture,
     };
 
     const resize = () => {
@@ -2814,6 +2956,33 @@ void main() {
             engineStatusRef.current = status;
             engineStatusAtRef.current = now;
             onEngineStatusRef.current?.(status);
+          }
+        }
+
+        // ── Chemistry ─────────────────────────────────────────
+        // Boyle's bench: a reaction-diffusion field grows coral and cells in
+        // place and deposits dye where it is active; the flow then carries the
+        // dye off while the pattern keeps growing underneath.
+        {
+          const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
+          const lead = fluidsRef.current[0];
+          if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
+            const chem = chemRef.current;
+            const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
+            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004 * (isAutomatedRef.current ? 2 : 1)) {
+              chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
+            }
+            // The dividing regime grows at a pace a show can watch; coral is slower than a set.
+            chem.step(Math.max(1, Math.min(10, Math.round(simSteps * 2.5))), 0.042, 0.062);
+            const v = chem.activator;
+            const c = harmonyCycle(harmonyRef.current, time * 0.08);
+            const amount = chemAmt * 0.0035 * Math.max(1, simSteps);
+            for (let y = 1; y < GRID_SIZE - 1; y++) {
+              for (let x = 1; x < GRID_SIZE - 1; x++) {
+                const a = v[x + y * GRID_SIZE];
+                if (a > 0.22) lead.addDensity(x, y, amount * (a - 0.22), c.r, c.g, c.b);
+              }
+            }
           }
         }
 
@@ -3168,8 +3337,13 @@ void main() {
             rock.x += rock.vx * SIM_STEP; rock.y += rock.vy * SIM_STEP;
             const swayX = noise2D(time * 0.11, 3.7) * 0.35 * R;
             const swayY = noise2D(7.1, time * 0.09) * 0.35 * R;
-            const tiltX = (rock.x + swayX) * 0.004 * R;
-            const tiltY = (rock.y + swayY) * 0.004 * R;
+            // A phone held by the projectionist: its tilt is the plate's, fading
+            // out a couple of seconds after the last reading if the link drops.
+            const ext = externalTiltRef.current;
+            const extAge = performance.now() * 0.001 - ext.at;
+            const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
+            const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
+            const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
             for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; }
 
             // ── Bubbles ─────────────────────────────────────────
@@ -3262,7 +3436,7 @@ void main() {
           lastMacroOnRef.current = macroOn;
           if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on switch-on
         }
-        if (macroOn && fluidsRef.current.length > 0) {
+        if ((macroOn || (currentSettings.exposure ?? 0) > 0.001) && fluidsRef.current.length > 0) {
           if (isActiveRef.current && drainFrameRef.current === 0) {
             const subject = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
             const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
@@ -3439,6 +3613,24 @@ void main() {
             }
           }
 
+          // The film projector's frame, if one is playing.
+          let filmOn = 0;
+          let filmScaleX = 1, filmScaleY = 1;
+          {
+            const f = filmRef.current;
+            const v = f.video;
+            if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
+              glCtx.activeTexture(glCtx.TEXTURE8);
+              glCtx.bindTexture(glCtx.TEXTURE_2D, glr.filmTexture);
+              glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+              glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, v);
+              filmOn = 1;
+              // Cover-fit: crop whichever axis the frame has too much of.
+              const va = v.videoWidth / v.videoHeight, ca = canvas.width / canvas.height;
+              if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+            }
+          }
+
           // Set uniforms and draw
           glCtx.useProgram(prog);
           glCtx.bindVertexArray(vaoObj);
@@ -3473,6 +3665,31 @@ void main() {
           glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
           glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
+          glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+          glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
+          {
+            // Lumia and gel colours come from the working harmony, so they
+            // stay inside the preset's dyes.
+            const h = harmonyRef.current;
+            const hc = (i: number) => PALETTE_RGB[h[i % h.length]];
+            const a = hc(0), b = hc(1), c2 = hc(2), d = hc(3);
+            glCtx.uniform1f(uLocs['u_lumia'], Math.max(0, Math.min(1, currentSettings.lumia ?? 0)));
+            glCtx.uniform3f(uLocs['u_lumiaA'], a.r, a.g, a.b);
+            glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
+            const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
+            gelAngleRef.current = (gelAngleRef.current + realDt * (currentSettings.gelSpeed ?? 0.5) / 60) % 1;
+            glCtx.uniform1f(uLocs['u_gelWheel'], gel);
+            glCtx.uniform1f(uLocs['u_gelAngle'], gelAngleRef.current);
+            glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
+            glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
+            glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
+            glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
+            glCtx.uniform1i(uLocs['u_film'], 8);
+            glCtx.uniform1i(uLocs['u_filmOn'], filmOn);
+            glCtx.uniform1f(uLocs['u_filmMix'], Math.max(0, Math.min(1, currentSettings.filmMix ?? 0.7)));
+            glCtx.uniform1f(uLocs['u_filmKey'], Math.max(0, Math.min(0.9, currentSettings.filmKey ?? 0.18)));
+            glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
+          }
           {
             // Second-layer throw: zoom grows with the setting, drift is a slow
             // Lissajous so the two scales slide past each other.
@@ -3534,6 +3751,10 @@ void main() {
         engine: engineStatusRef.current?.label ?? '',
         status: engineStatusRef.current,
         governor: governorRef.current,
+        externalTilt: externalTiltRef.current,
+        bubbles: bubblesRef.current,
+        chemistry: chemRef.current,
+        film: filmRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
         shot: macroShotRef.current,
@@ -3542,6 +3763,7 @@ void main() {
     }
 
     return () => {
+      stopFilm();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);
