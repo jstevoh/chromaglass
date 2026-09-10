@@ -101,6 +101,16 @@ export interface VisualizerSettings {
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
+  hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
+  beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
+  backgroundLoop: number;     // the layers behind the lead run slower and calmer, a background loop the live plate plays over
+  kaleidoscope: number;       // mirror the plate into 2, 4 or 6 folds (0 = off), the four-fold dish of the reference stills
+  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, a thin bright ring at it
+  lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
+  lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
+  lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
+  secondLamp: number;         // a second, cooler lamp from the other side of the plate, so two lights play across every bubble and edge
+  iridescence: number;        // thin-film colour running round bubble rims
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -169,6 +179,16 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   bubbles: 0.5,
   plateRock: 0.45,
   layerScaleVariety: 0.5,
+  hueJourney: 3,
+  beatSqueeze: 0.5,
+  backgroundLoop: 0.5,
+  kaleidoscope: 0,
+  dishVignette: 0,
+  lightPlay: 0.6,
+  lampMotion: 0.5,
+  lampHotspot: 0.35,
+  secondLamp: 0,
+  iridescence: 0.25,
   lumia: 0,
   chemistry: 0,
   gelWheel: 0,

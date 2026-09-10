@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -11,6 +11,8 @@ import { useRemoteLink } from './hooks/useRemoteLink';
 import type { RemoteState } from './lib/remoteProtocol';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
+import { SequencerPanel } from './components/SequencerPanel';
+import { useShowSequencer } from './hooks/useShowSequencer';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
@@ -61,6 +63,16 @@ export default function App() {
     const sim = new URLSearchParams(window.location.search).get('sim');
     if (sim === 'cpu' || sim === 'auto') base.simResolution = sim;
     else if (sim && Number.isFinite(Number(sim))) base.simResolution = Number(sim);
+    // ?set=key=value;key=value pins any setting for this load (testing a look).
+    const set = new URLSearchParams(window.location.search).get('set');
+    if (set) {
+      for (const kv of set.split(';')) {
+        const [k, v] = kv.split('=');
+        if (!k || v === undefined || !(k in base)) continue;
+        const cur = (base as unknown as Record<string, unknown>)[k];
+        (base as unknown as Record<string, unknown>)[k] = typeof cur === 'number' ? Number(v) : typeof cur === 'boolean' ? v === 'true' : v;
+      }
+    }
     return base;
   });
   const [seedCount, setSeedCount] = useState(0);
@@ -267,6 +279,7 @@ export default function App() {
 
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
+  const [showSequencer, setShowSequencer] = useState(false);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
     setMusicSettings(prev => {
@@ -353,6 +366,27 @@ export default function App() {
     visualizerRef.current?.applyPreset(presetId);
   };
 
+  /** The sequencer's stage change: the preset's dyes and style, the plate kept. */
+  const adoptPreset = useCallback((presetId: string) => {
+    setActivePresetId(presetId);
+    visualizerRef.current?.adoptPreset(presetId);
+  }, []);
+
+  // ── Show sequencer ────────────────────────────────────────────────
+  // The settings it reads come from a ref so the 250 ms tick never sees a
+  // stale closure; the patches it writes go through updateSettings like any
+  // slider, so the phone and the panel show the glide as it happens.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const sequencer = useShowSequencer({
+    getSettings: () => settingsRef.current,
+    applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
+    adoptPreset,
+    setPaletteWindow: (size, lead) => visualizerRef.current?.setPaletteWindow(size, lead),
+    sectionLabel: musicIntel.state.section?.label ?? null,
+    isActive,
+  });
+
   const triggerLucky = () => {
     const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
     const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];
@@ -392,6 +426,16 @@ export default function App() {
       plateRock: Math.random() * 0.9,
       layerScaleVariety: Math.random(),
       macroSync: Math.random(),
+      hueJourney: Math.random() < 0.7 ? 1 + Math.round(Math.random() * 8) * 0.5 : 0,
+      beatSqueeze: Math.random(),
+      backgroundLoop: Math.random(),
+      kaleidoscope: Math.random() < 0.2 ? [2, 4, 6][Math.floor(Math.random() * 3)] : 0,
+      dishVignette: Math.random() < 0.3 ? 0.4 + Math.random() * 0.6 : 0,
+      lightPlay: 0.3 + Math.random() * 0.7,
+      lampMotion: Math.random(),
+      lampHotspot: Math.random() * 0.7,
+      secondLamp: Math.random() < 0.35 ? 0.4 + Math.random() * 0.6 : 0,
+      iridescence: Math.random() * 0.6,
       // The other projectors come out one roll in five, one at a time
       lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
       chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,
@@ -437,7 +481,15 @@ export default function App() {
     isAutomated,
     overlaysVisible,
     trackName: musicIntel.state.track?.title ?? null,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title]);
+    sequencer: {
+      name: sequencer.status.name,
+      running: sequencer.status.running,
+      stageIndex: sequencer.status.stageIndex,
+      stageName: sequencer.status.stageName,
+      progress: Math.round(sequencer.status.progress * 100) / 100,
+      stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
+    },
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -479,6 +531,10 @@ export default function App() {
             case 'automate-off':  setIsAutomated(false); break;
             case 'overlays-off':  hideOverlays(); break;
             case 'overlays-on':   setOverlaysVisible(true); break;
+            case 'seq-play':      sequencer.play(); break;
+            case 'seq-pause':     sequencer.pause(); break;
+            case 'seq-next':      sequencer.next(); break;
+            case 'seq-prev':      sequencer.prev(); break;
           }
           break;
         case 'blow':
@@ -782,6 +838,19 @@ export default function App() {
                   <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
                 </button>
 
+                {/* Show sequencer */}
+                <button
+                  onClick={() => { setShowSequencer(!showSequencer); setShowTrackPanel(false); }}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    showSequencer || sequencer.status.running ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title="Show sequencer — script how the show evolves over a song or a set"
+                  data-testid="sequencer-button"
+                >
+                  <Clapperboard size={16} className={showSequencer || sequencer.status.running ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Sequence</span>
+                </button>
+
                 {/* Randomize */}
                 <button
                   onClick={triggerLucky}
@@ -905,6 +974,28 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* ── Show Sequencer ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSequencer && (
+          <SequencerPanel
+            sequences={sequencer.sequences}
+            selectedId={sequencer.selectedId}
+            onSelect={sequencer.setSelectedId}
+            status={sequencer.status}
+            onPlay={sequencer.play}
+            onPause={sequencer.pause}
+            onStop={sequencer.stop}
+            onNext={sequencer.next}
+            onPrev={sequencer.prev}
+            onGoTo={sequencer.goTo}
+            onSave={sequencer.upsertSequence}
+            onRemove={sequencer.removeSequence}
+            hasSections={musicIntel.state.section !== null}
+            onClose={() => setShowSequencer(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ── Track Panel ────────────────────────────────────────── */}
       <AnimatePresence>
         {showTrackPanel && (
@@ -978,7 +1069,7 @@ export default function App() {
 
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
           <button
-            onClick={() => setShowTrackPanel(!showTrackPanel)}
+            onClick={() => { setShowTrackPanel(!showTrackPanel); setShowSequencer(false); }}
             className={`relative p-2 rounded-full transition-all ${
               showTrackPanel ? 'bg-purple-500 text-white' : 'hover:bg-white/10 text-white/60'
             }`}

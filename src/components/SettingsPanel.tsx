@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -309,6 +309,115 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.5}
           step={0.05}
           onChange={(v: number) => onUpdate({ postBlurRadius: v })}
+        />
+      </section>
+
+      {/* Show Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Clapperboard size={12} /> Show
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the mirror rig and round dish of the projected clock face. The Show Sequencer scripts these over a song.
+        </p>
+        <Slider
+          label="Hue Journey (min/step)"
+          value={settings.hueJourney ?? 0}
+          min={0}
+          max={10}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ hueJourney: v })}
+        />
+        <Slider
+          label="Beat Squeeze"
+          value={settings.beatSqueeze ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ beatSqueeze: v })}
+        />
+        <Slider
+          label="Background Loop"
+          value={settings.backgroundLoop ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ backgroundLoop: v })}
+        />
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="text-xs font-bold uppercase tracking-widest opacity-70">Kaleidoscope</div>
+          <div className="grid grid-cols-4 gap-1">
+            {[0, 2, 4, 6].map((k) => (
+              <button
+                key={k}
+                onClick={() => onUpdate({ kaleidoscope: k })}
+                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
+              >
+                {k === 0 ? 'Off' : `${k}×`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Round Dish"
+          value={settings.dishVignette ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ dishVignette: v })}
+        />
+      </section>
+
+      {/* Lamp Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Lightbulb size={12} /> Lamp
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
+        </p>
+        <Slider
+          label="Light Play"
+          value={settings.lightPlay ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lightPlay: v })}
+        />
+        <Slider
+          label="Lamp Motion"
+          value={settings.lampMotion ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampMotion: v })}
+        />
+        <Slider
+          label="Hot-Spot"
+          value={settings.lampHotspot ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampHotspot: v })}
+        />
+        <Slider
+          label="Second Lamp"
+          value={settings.secondLamp ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ secondLamp: v })}
+        />
+        <Slider
+          label="Iridescence"
+          value={settings.iridescence ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ iridescence: v })}
         />
       </section>
 

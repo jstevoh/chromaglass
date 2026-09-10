@@ -8,7 +8,10 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **GPU solver with a frame-time governor** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid; a governor measures the real frame rate and picks the largest grid and pixel density the machine holds at 60 fps, and falls back to the 192² CPU solver where float render targets are missing (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Automatic room calibration** — learns the room's noise floor and dynamics, fits the analyser's dB window to it and normalises every band against its own range, so the same visuals read well in a quiet living room or a loud bar
-- **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, Lumia, Sensual Laboratory, Oil Wheel, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
+- **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, Lumia, Sensual Laboratory, Oil Wheel, Poster 1969, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
+- **Show Sequencer** — a script for how the show evolves over a song or a set instead of dice: stages that adopt a preset, glide chosen settings over a transition, open the palette from one dye to the full set, and hand over on a clock or when the song changes section. Three built-in sequences (Slow Build, Verse / Chorus, Set Journey), an editor for your own, and a transport on the phone
+- **One lamp for everything** — a projector lamp under the plate that every material is lit from: bubbles shaded as lenses (dark rim toward the lamp, a caustic arc on the far side, the lamp's reflection on the lamp side, the plate magnified inside), dye rims bright toward the lamp and shadowed away from it, a hot-spot that falls away toward the rim, the lamp wandering and following the plate's rock, an optional second cooler lamp from the other side, and thin-film iridescence round bubble rims (Settings → Lamp)
+- **The show over minutes** — a hue journey that walks the preset's dyes one at a time (a set drifts its colours, never jumps), a rhythm plate pressed on every kick, a slower background loop on the plates behind the live one, a kaleidoscope mirror rig (2, 4 or 6 folds) and the round edge of a projected dish (Settings → Show)
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
 - **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, with synthesised paint cells, lacing filaments and shallow depth of field for extreme detail at high magnification
@@ -125,9 +128,12 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Clear | Wipe the active layer |
 | Auto toggle | Enable automated dye/air injection |
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
+| Sequence | Open the Show Sequencer: pick a sequence, play, pause, skip stages, or edit and save your own |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
 | Projectionist pad | On the phone: drag to blow air, tap to drop dye, pick which plate the phone works, and stream the phone's tilt into the plate |
 | Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
+| Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
+| Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Settings gear | Open the full settings panel |

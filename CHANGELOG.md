@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — The lamp
+- **One light for every material.** Until now each pass assumed its own fixed sun: dye gloss lit from one corner, the meniscus from another, the macro relief from a third, and every bubble's highlight stamped at the same offset. Now a projector lamp sits under the plate at a point (`u_lamp`), so the light reaches each place from its own direction, and everything that shades asks it: a bubble to the left of the lamp is lit from its right, one on the far side from below
+- **Bubbles as lenses** (`lightPlay`, default 0.6). From the reference photographs: the rim toward the lamp darkens as the light is bent away, the far rim carries the bright caustic arc, the lamp's reflection sits on the lamp side of the dome, the interior shows the plate behind magnified toward the centre, and a little of the plate on the far side sits in the bubble's shadow — so a field of bubbles reads as one light falling across them
+- **Dye rims under the lamp**: the meniscus glows in the dye's own colour on the side facing the lamp and sits in its own shadow on the far side; straight under the lamp both sides match
+- **The hot-spot** (`lampHotspot`, default 0.35): brightest over the lamp, falling away toward the rim, with a slight warmth at the centre
+- **Lamp motion** (`lampMotion`, default 0.5): the lamp wanders slowly under the plate and moves with the plate's rock, so a tilted plate is lit from a new side and the light keeps moving across everything
+- **Second lamp** (`secondLamp`, default 0): a cooler lamp from the other side of the plate — two lights across every bubble and edge, a cool arc and reflection against the warm one, and a cool pool on the ground
+- **Iridescence** (`iridescence`, default 0.25): thin-film colour running round bubble rims, stronger over bright ground
+- Settings → Lamp; Lucky rolls them; Oil Wheel and Poster 1969 carry their own; `?set=key=value;…` pins any setting for one page load
+
+### Added — The show over time
+- **Show Sequencer** (`src/lib/sequencer.ts`, `src/hooks/useShowSequencer.ts`, `src/components/SequencerPanel.tsx`). Until now the show only evolved by dice: a random re-pick of the harmony, automation rolling drops. A sequence is a list of stages; each adopts a preset (its dyes and injection style, the plate kept rather than cleared), glides any of sixteen settings toward a target over a transition, sets how many of the preset's dyes are in play and which leads, and can force the macro camera on or off. A stage hands over after a time, when the song changes section (from Track intelligence's song map, with a minimum dwell), or holds until Next. Built-ins: *Slow Build* (one dye on bare glass, the others arriving over four minutes, then the wheel turning), *Verse / Chorus* (quiet verse, pressed and rocked chorus, bridge in close-up; advances on section changes), *Set Journey* (classic wheel → oil wheel → mirrored dish → chemistry bench → 1969 poster → lumia). Copy a built-in or start fresh, edit stages, reorder, save (localStorage). A **Sequence** button in the toolbar, and a transport (play/pause, previous, next, progress bar) on the phone remote
+- **Hue journey** (`hueJourney`, minutes per step, default 3). The 45-second random re-pick is replaced by a deterministic walk through the preset's contract: a window one dye short of the set slides by one dye each step, so one colour drains while the next arrives and the plate never jumps. At 0 the old behaviour returns
+- **Beat squeeze** (`beatSqueeze`, default 0.5). The rhythm plate: on every kick a domed press goes into the lead plate near its middle, the dye spreading out in a ring and relaxing back
+- **Background loop** (`backgroundLoop`, default 0.5). The plates behind the lead run slower and calmer, so a two-layer show reads as a live plate worked over a slow loop, the way the recordings stack a slide-loop behind the hands-on plate
+- **Kaleidoscope** (`kaleidoscope`: off, 2, 4, 6) — the plate mirrored into wedges around the centre, seams meeting edge to edge, the rig turning slowly; and **Round dish** (`dishVignette`) — black beyond the rim with a thin bright ring at the glass edge, the projected clock face seen whole. Both in Settings → Show
+- **Poster, 1969** preset: two opaque dyes on one plate, flat and hard-edged, no gloss or meniscus, screen-print saturation
+- Lucky rolls the new fields; `window.chromaglassDebug()` now reports the harmony, contract, palette window and journey
+
 ### Added — Solver
 - **GPU fluid solver.** The whole step — squeeze-film pressure, forces, viscous diffusion, pressure projection, advection, decay — now runs as WebGL2 fragment passes over float ping-pong textures, at 256², 384², 512² or 768² depending on the hardware, instead of the 192² JavaScript loop. Injection stays in logical 192² coordinates and is uploaded as a delta texture, and a box-filtered readback feeds the pieces that still need the field on the CPU (bead tracking, the dye regulator), so nothing outside the solver had to change (`src/lib/gpuFluid.ts`)
 - Settings → Simulation → **Fluid Grid**: `auto` picks the largest grid the GPU can hold, or pin a size, or force the CPU solver. A readout shows which engine is live. Machines without float render targets fall back to the CPU path on their own (`simResolution`)
@@ -17,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Run-it-locally card** on the hosted build, shown once the governor has stepped down or the GPU solver is unavailable: what happened, and the three commands that run the same build on the viewer's own machine (`src/components/RunLocallyCard.tsx`)
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
+
+### Changed — Bubbles, second pass, from the references
+- A second reference study (48 photographs, 24 video timelines) showed the same bubble everywhere: small, round, gathered in packed fields inside the oil, a bright lens over the lamp with a thin edge in the dye's own colour — large deforming bubbles are the exception. So: up to forty, spawned small and in threes into the densest dye; shape only for the big ones, and slowly; they drift together and rest edge to edge before merging; the membrane is the dye seen edge-on with a lifted centre, never a drawn ring
 
 ### Changed — Bubbles that behave
 - Bubbles are drawn as one implicit (metaball) surface instead of stamped circles, so two pulling together neck into each other and merge, and the membrane is a thin dark line with a bright refracted edge inside it rather than a band a quarter of the radius wide
