@@ -234,48 +234,6 @@ export const PRESETS: Preset[] = [
     }
   },
   {
-    id: 'ink-bleed',
-    name: 'Monochrome Ink',
-    description: 'Sharp, high-contrast ink bleeding over a stark white backlight.',
-    settings: {
-      globalSpeed: 0.05,
-      layerCount: 2,
-      blendMode: 'multiply',
-      gooeyEffect: 0.0,
-      rotationSpeed: 0.0,
-      centerGravity: 0.3,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledColor: '#ffffff',
-      ledSpeed: 0.0,
-      surfaceTension: 0.0,
-      diffusionRate: 0.0005,   // ink holds its edge instead of greying the plate
-      dyeBudget: 0.22,         // mostly clear glass: ink on white, not a grey wash
-      exposure: 0.85,          // ink on white: the thin film between structures reads as bare glass
-      buoyancy: 0.4,
-      advection: 0.4,
-      damping: 0.96,
-      heatDecay: 0.94,
-      automateRate: 0.15,
-      platePressure: 0.4,
-      glassSmear: 0.1,
-      rainDrip: 0.9,
-      viscosity: 'thin',
-      polarity: 0.55,
-      heatIntensity: 0.1,
-      boilingPoint: 0.8,
-      evaporationRate: 0.08,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      audioMappings: {
-        velocity: 'complexity',
-        density: 'energy',
-        color: 'none',
-        rotation: 'timbre',
-      },
-    }
-  },
-  {
     id: 'acid-trip',
     name: 'Acid Trip',
     description: 'Chaotic, rapidly rotating colors with strange blending physics.',

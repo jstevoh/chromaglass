@@ -8,7 +8,7 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **GPU solver with a frame-time governor** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid; a governor measures the real frame rate and picks the largest grid and pixel density the machine holds at 60 fps, and falls back to the 192² CPU solver where float render targets are missing (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Automatic room calibration** — learns the room's noise floor and dynamics, fits the analyser's dB window to it and normalises every band against its own range, so the same visuals read well in a quiet living room or a loud bar
-- **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Monochrome Ink, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
+- **Built-in presets** — Classic Light Show, Deep Ocean, Cyberpunk Neon, Lava Lamp, Acid Trip, Bass Drop, Timbre Shifter, Boiling Point, Microscopic Chaos, Lumia, Sensual Laboratory, Oil Wheel, and three macro closeups: Macro Bead, Cell Bloom, Lacing Run
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
 - **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, with synthesised paint cells, lacing filaments and shallow depth of field for extreme detail at high magnification

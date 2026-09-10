@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Removed
+- The Monochrome Ink preset — a grey plate however it was tuned
+
 ### Added — The other projectors
 Six expansions from the same comparison — the machines a light show crew stacked on one screen besides the clock face:
 - **Lumia.** Thomas Wilfred's aurora as a layer under the dye: a slow folded height field read as sheets of light, two harmony colours drifting through each other on a scale of minutes, no beat and no dye (`lumia`; preset **Lumia**)
@@ -26,18 +29,18 @@ Six expansions from the same comparison — the machines a light show crew stack
 - **A real plate in the mix.** The same film path takes the camera: point a phone or webcam at a real dish of oil on a lamp and it is composited through the solver's lighting (Settings → Projectors → Camera)
 - **Two projectionists.** The phone remote gains a pad: dragging blows air along the finger's path, a tap drops dye, each phone chooses which plate it works, and the phone's tilt streams into the plate as an external tilt that fades out if the link drops (`blow` / `drop` / `tilt` messages; `applyGesture` takes a layer; `setExternalTilt`)
 - **Sealed wheel.** A halogen grade — warm tint and a soft vignette — and a preset, **Oil Wheel**, that runs thick dye on convection at half a revolution a minute, yellows, greens and blues, no hands on it (`lampWarmth`)
-- **Exposure** plate-wide: the macro camera's histogram floor is now a setting, so a thin film between ink structures renders as bare glass — Monochrome Ink and Sensual Laboratory run on it (`exposure`)
+- **Exposure** plate-wide: the macro camera's histogram floor is now a setting, so a thin film between dye structures renders as bare glass — Sensual Laboratory runs on it (`exposure`)
 - A Projectors section in Settings with all of the above; Lucky rolls the projectors one at a time
 
 ### Changed — The look, against the tradition
 Six changes from a comparison of the app's frames with the liquid light show canon (SF light painting, the Joshua Light Show, Mad Alchemy, Optikinetics wheels, macro liquid-light photography):
-- **Palette contracts.** A projected clock face carries two or three dyes; the richness of a show comes from stacking plates, not rainbow dye. Every preset now names the palette indices it may use, and seeding, automation, beat injection and the slow harmony rotation all draw from inside that set (a song's identity harmony is intersected with it). Monochrome Ink stays black and white instead of being overpainted; Galaxy, Cyberpunk Neon and Fractal Dream stop drifting into full-spectrum haze. A user's palette lock still wins outright
+- **Palette contracts.** A projected clock face carries two or three dyes; the richness of a show comes from stacking plates, not rainbow dye. Every preset now names the palette indices it may use, and seeding, automation, beat injection and the slow harmony rotation all draw from inside that set (a song's identity harmony is intersected with it). Galaxy, Cyberpunk Neon and Fractal Dream stop drifting into full-spectrum haze. A user's palette lock still wins outright
 - **Meniscus at every edge, at any zoom.** The dark rim and refracted highlight a bead has between two plates were only rendered in the macro closeup; a lighter version now runs plate-wide from the sobel normal (`edgeRelief`)
 - **Bubbles.** Trapped air is the most recognisable analog element after the blob. A small particle field rides the velocity field, climbs against the plate's tilt, merges on contact and pops at the edge or the end of its life; the renderer draws each as a lens — lighter interior, dark rim, one highlight. Born from the Blow tool, automation's air bursts and bass hits (`bubbles`, `src/lib/bubbles.ts`)
 - **Rock the plate.** A hand on the clock face: each kick tips the whole plate one way and a damped spring rocks it back, with a slow sway between beats, so the field sloshes instead of only churning. Applied as a uniform acceleration on both solver paths (`plateRock`)
 - **Less haze.** Film grain fades out almost entirely below the shadows so dark frames stay black; treble sparks are fewer and larger — a handful of real droplets instead of a cloud of one-cell specks that blurred into fog
 - **Two scales in one frame.** The second layer is viewed magnified about the centre with its own slow drift, like a second projector at a different throw; the brush maps through the same view (`layerScaleVariety`). Off in the macro presets, whose camera frames one plate
-- **Dye budget per preset.** The regulator's target fullness is now a setting (`dyeBudget`), so a preset can run mostly clear glass with dye structures on it — Monochrome Ink runs at a quarter of the default and reads as ink on white instead of a grey wash
+- **Dye budget per preset.** The regulator's target fullness is now a setting (`dyeBudget`), so a preset can run mostly clear glass with dye structures on it
 - Five new sliders under Light Show Look: Dye Budget, Edge Relief, Bubbles, Plate Rock, Layer Scale Variety; Lucky rolls them
 
 ### Added — Clean screen

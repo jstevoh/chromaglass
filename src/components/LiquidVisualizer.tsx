@@ -66,7 +66,6 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'deep-ocean':         ['pour', 'drop'],
   'cyberpunk':          ['streak', 'splatter'],
   'lava-lamp':          ['pour'],
-  'ink-bleed':          ['splatter', 'pour'],
   'acid-trip':          ['splatter', 'spray'],
   'bass-drop':          ['splatter', 'drop'],
   'timbre-shifter':     ['spray'],
@@ -116,7 +115,6 @@ const PRESET_CONTRACTS: Record<string, number[]> = {
   'deep-ocean':         [7, 9, 5],
   'cyberpunk':          [6, 10, 2],
   'lava-lamp':          [0, 1, 3],
-  'ink-bleed':          [14],          // graphite only: white dye on a white ground is just haze
   'acid-trip':          [8, 3, 0, 10],
   'bass-drop':          [8, 3, 0],
   'timbre-shifter':     [2, 8, 0],
@@ -499,17 +497,6 @@ class FluidSimulation {
           this.addTemp(Math.floor(fx * S), Math.floor(fy * S), 3.0);
         });
         for (let i = 5; i < S - 5; i += 3) this.addTemp(i, Math.floor(S * 0.85), 1.5);
-        break;
-      }
-
-      case 'ink-bleed': {
-        const ink = { r: 0.05, g: 0.05, b: 0.08 };
-        for (let drop = 0; drop < 6; drop++) {
-          const dx = 15 + Math.random() * (S - 30), dy = 15 + Math.random() * (S - 50);
-          this.splatBlob(dx, dy, 4 + Math.random() * 8, 3.5, ink.r, ink.g, ink.b);
-          for (let t = 0; t < 15 + Math.random() * 20; t++)
-            this.splatBlob(dx + (Math.random() - 0.5) * 2, dy + t, 1.5, 1.5 / (1 + t * 0.1), ink.r, ink.g, ink.b);
-        }
         break;
       }
 
