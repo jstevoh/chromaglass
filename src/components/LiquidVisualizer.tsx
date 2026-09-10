@@ -1836,6 +1836,7 @@ uniform float u_edgeRelief;        // meniscus at every blob edge, at any zoom
 uniform float u_layerZoom1;        // second layer viewed magnified about the centre
 uniform vec2  u_layerDrift1;
 uniform vec4  u_bubbles[24];       // x, y, r (fluid uv) and opacity
+uniform vec4  u_bubbleShape[24];   // stretch axis × magnitude, wobble amplitude, wobble phase
 uniform int   u_bubbleCount;
 uniform float u_bubbleStrength;
 uniform float u_lumia;             // Wilfred's aurora under the plate
@@ -2547,26 +2548,55 @@ void main() {
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
-  // Each is a lens over the finished dye: a lighter interior, a dark rim
-  // where the meniscus turns away from the light, and one highlight.
+  // One implicit surface for all of them: each bubble contributes a field
+  // that falls off with distance in its own stretched, wobbling frame, and
+  // the membrane is drawn where the sum crosses one. Two bubbles pulling
+  // together therefore neck into each other rather than overlap as circles;
+  // the membrane is a thin dark line with a bright refracted edge inside it.
   if (u_bubbleCount > 0 && u_bubbleStrength > 0.001) {
+    float field = 0.0;
+    float opac = 0.0;
+    float best = 0.0;
+    vec2 bestD = vec2(0.0);
     for (int i = 0; i < 24; i++) {
       if (i >= u_bubbleCount) break;
       vec4 bb = u_bubbles[i];
+      vec4 sh = u_bubbleShape[i];
       float rad = max(bb.z, 1e-4);
       vec2 d = (fuvBase - bb.xy) / rad;
-      float q = length(d);
-      if (q > 1.15) continue;
-      float rim = smoothstep(0.7, 0.97, q) * (1.0 - smoothstep(0.97, 1.12, q));
-      float inside = 1.0 - smoothstep(0.72, 1.0, q);
-      vec2 hd = d - vec2(-0.38, 0.36);
-      float hl = exp(-dot(hd, hd) * 16.0) * inside;
-      float lens = (1.0 - q * q) * inside;
+      if (dot(d, d) > 4.0) continue;
+      // Stretch: an ellipse along the drag axis, area-preserving.
+      float s = length(sh.xy);
+      if (s > 1e-4) {
+        vec2 ax = sh.xy / s;
+        vec2 loc = vec2(dot(d, ax), dot(d, vec2(-ax.y, ax.x)));
+        d = vec2(loc.x / (1.0 + s), loc.y * (1.0 + s));
+      }
+      // Wobble: second and third shape modes running around the rim.
+      float phi = atan(d.y, d.x);
+      float rEff = 1.0 + sh.z * (cos(2.0 * phi + sh.w) + 0.55 * cos(3.0 * phi - 1.7 * sh.w));
+      float q2 = dot(d, d) / max(rEff * rEff, 0.04);
+      float f = 1.0 / max(q2, 1e-4);
+      f = f * f;                               // steeper falloff: necks form only when close
+      field += f * bb.w;
+      opac = max(opac, bb.w * smoothstep(0.25, 1.0, f));
+      if (f > best) { best = f; bestD = d; }
+    }
+    if (field > 0.2) {
+      // field == 1 on the membrane, larger inside.
+      float edge = field;
+      float membrane = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.32, edge));
+      float innerLine = smoothstep(1.32, 1.6, edge) * (1.0 - smoothstep(1.6, 2.2, edge));
+      float inside = smoothstep(1.0, 1.35, edge);
+      float lens = inside * (1.0 - 1.0 / max(edge, 1.0));
+      vec2 hd = bestD - vec2(-0.36, 0.34);
+      float hl = exp(-dot(hd, hd) * 18.0) * inside;
       vec3 c = outColor;
-      c = mix(c, c * 1.14 + 0.05, lens * 0.65);
-      c *= 1.0 - rim * 0.78;
-      c += vec3(1.0, 0.97, 0.9) * hl * 0.95;
-      outColor = mix(outColor, c, bb.w * u_bubbleStrength);
+      c = mix(c, c * 1.10 + 0.04, lens * 0.7);
+      c *= 1.0 - membrane * 0.72;
+      c += vec3(1.0, 0.98, 0.94) * innerLine * 0.18;
+      c += vec3(1.0, 0.97, 0.9) * hl * 0.9;
+      outColor = mix(outColor, c, opac * u_bubbleStrength);
     }
   }
 
@@ -2687,7 +2717,7 @@ void main() {
       'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
       'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
       'u_filmLevel','u_filmGain','u_logicalGrid',
-      'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleCount','u_bubbleStrength',
+      'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
     ];
@@ -3367,12 +3397,20 @@ void main() {
               }
               const lead = fluidsRef.current[0];
               const vx = lead?.readVx, vy = lead?.readVy;
+              const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               bubbles.step(SIM_STEP, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
                 return [vx[ix + iy * GRID_SIZE], vy[ix + iy * GRID_SIZE]];
-              }, tiltX, tiltY, 0.5 + bubbleAmt);
+              }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
+              // A pop is a puff of air into the dye where the bubble was.
+              for (const ev of bubbles.events) {
+                if (ev.kind === 'pop' && lead) {
+                  const px = Math.round(ev.x), py = Math.round(ev.y);
+                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035);
+                }
+              }
             }
             rock.lastBass = bass01;
           }
@@ -3716,6 +3754,7 @@ void main() {
             const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
             const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
             glCtx.uniform4fv(uLocs['u_bubbles'], bubblesRef.current.packed);
+            glCtx.uniform4fv(uLocs['u_bubbleShape'], bubblesRef.current.packedShape);
             glCtx.uniform1i(uLocs['u_bubbleCount'], Math.min(MAX_BUBBLES, count));
             glCtx.uniform1f(uLocs['u_bubbleStrength'], Math.min(1, bubbleAmt * 1.6));
           }

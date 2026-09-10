@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Changed — Bubbles that behave
+- Bubbles are drawn as one implicit (metaball) surface instead of stamped circles, so two pulling together neck into each other and merge, and the membrane is a thin dark line with a bright refracted edge inside it rather than a band a quarter of the radius wide
+- Each bubble now has a shape: it stretches along whatever is dragging it, wobbles in second- and third-order modes after a knock (a merge, a split, fresh air), and relaxes when the plate goes quiet
+- New behaviour: a bubble stretched hard enough by shear tears in two; one popping (end of life, the plate's edge, or shaken loose by the treble) leaves a short-lived spray of smaller bubbles and puffs air into the dye where it was; the treble agitates the whole population
+
 ### Added — Macro camera on the beat
 - **Music sync** for the closeup camera (`macroSync`, Settings → Macro Closeup and the phone): a kick brings the cut forward once the shot has had a fair run, so the edit lands on the music instead of a private timer; each kick punches in with the bass and eases back; loud passages spend the hold faster and tighten the chase; the treble adds a few cells of handheld tremor. At 0 the camera keeps its own time as before
 
