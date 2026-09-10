@@ -15,6 +15,73 @@ import type { VisualizerSettings } from '../types';
  * one-shot gestures. Everything else stays on the laptop, where there's a
  * pointer and enough screen to see what you're doing.
  */
+
+/**
+ * Defined at module level on purpose: a component created inside the render
+ * body gets a new identity on every state message from the laptop, which
+ * remounts the slider under the thumb that is dragging it.
+ */
+function Slider({ label, field, min, max, step, format, value, connected, onDrag, onChange }: {
+  label: string;
+  field: keyof VisualizerSettings;
+  min: number;
+  max: number;
+  step: number;
+  format?: (v: number) => string;
+  value: number | undefined;
+  connected: boolean;
+  onDrag: (field: keyof VisualizerSettings, dragging: boolean) => void;
+  onChange: (field: keyof VisualizerSettings, v: number) => void;
+}) {
+  const current = value ?? min;
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
+        <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
+      </div>
+      <input
+        id={`remote-${String(field)}`}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={current}
+        disabled={!connected}
+        onPointerDown={() => onDrag(field, true)}
+        onPointerUp={() => onDrag(field, false)}
+        onPointerCancel={() => onDrag(field, false)}
+        onChange={(e) => onChange(field, parseFloat(e.target.value))}
+        className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30"
+        style={{ ['--fill' as string]: `${((current - min) / (max - min)) * 100}%` }}
+      />
+    </div>
+  );
+}
+
+function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' }: {
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+  onPress: () => void;
+  connected: boolean;
+  tone?: 'default' | 'warn';
+}) {
+  return (
+    <button
+      onClick={onPress}
+      disabled={!connected}
+      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
+        tone === 'warn'
+          ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
+          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    </button>
+  );
+}
+
 export default function RemoteControl() {
   const [state, setState] = useState<RemoteState | null>(null);
   /**
@@ -52,6 +119,29 @@ export default function RemoteControl() {
     (partial: Partial<VisualizerSettings>) => send({ type: 'patch', settings: partial }),
     [send],
   );
+  // A dragged slider fires many times a frame; the laptop needs about twenty
+  // a second, and always the last one.
+  const throttleRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; pending: Partial<VisualizerSettings> }>({ timer: null, pending: {} });
+  const patchThrottled = useCallback((partial: Partial<VisualizerSettings>) => {
+    const t = throttleRef.current;
+    t.pending = { ...t.pending, ...partial };
+    if (t.timer) return;
+    t.timer = setTimeout(() => {
+      t.timer = null;
+      const p = t.pending;
+      t.pending = {};
+      patch(p);
+    }, 50);
+  }, [patch]);
+  const onSliderDrag = useCallback((field: keyof VisualizerSettings, dragging: boolean) => {
+    if (dragging) draggingRef.current.add(field);
+    else draggingRef.current.delete(field);
+  }, []);
+  const onSliderChange = useCallback((field: keyof VisualizerSettings, v: number) => {
+    setLocalValues((prev) => ({ ...prev, [field]: v }));
+    patchThrottled({ [field]: v } as Partial<VisualizerSettings>);
+  }, [patchThrottled]);
+
   const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
 
   const presetGroups = useMemo(() => {
@@ -64,6 +154,7 @@ export default function RemoteControl() {
   }, []);
 
   const connected = status === 'connected' && state !== null;
+  const sliderProps = { onDrag: onSliderDrag, onChange: onSliderChange };
 
   // ── The projectionist's pad ──────────────────────────────────────
   // A finger on the pad is a finger on the plate: dragging blows air along
@@ -110,75 +201,6 @@ export default function RemoteControl() {
     }
     setTiltOn(true);
   };
-
-  const Slider = ({
-    label,
-    field,
-    min,
-    max,
-    step,
-    format,
-  }: {
-    label: string;
-    field: keyof VisualizerSettings;
-    min: number;
-    max: number;
-    step: number;
-    format?: (v: number) => string;
-  }) => {
-    const current = (value(field) as number | undefined) ?? min;
-    return (
-      <div className="mb-5">
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
-          <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={current}
-          disabled={!connected}
-          onPointerDown={() => draggingRef.current.add(field)}
-          onPointerUp={() => draggingRef.current.delete(field)}
-          onPointerCancel={() => draggingRef.current.delete(field)}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            setLocalValues((prev) => ({ ...prev, [field]: v }));
-            patch({ [field]: v } as Partial<VisualizerSettings>);
-          }}
-          className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30"
-          style={{ ['--fill' as string]: `${((current - min) / (max - min)) * 100}%` }}
-        />
-      </div>
-    );
-  };
-
-  const ActionButton = ({
-    label,
-    icon: Icon,
-    onPress,
-    tone = 'default',
-  }: {
-    label: string;
-    icon: ComponentType<{ size?: number }>;
-    onPress: () => void;
-    tone?: 'default' | 'warn';
-  }) => (
-    <button
-      onClick={onPress}
-      disabled={!connected}
-      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
-        tone === 'warn'
-          ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
-          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
-      }`}
-    >
-      <Icon size={20} />
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-    </button>
-  );
 
   return (
     <div
@@ -241,8 +263,8 @@ export default function RemoteControl() {
         </div>
 
         {/* The two dials that change the mood most */}
-        <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} />
-        <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} />
+        <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
+        <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
 
         {/* Macro camera */}
         <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -260,8 +282,8 @@ export default function RemoteControl() {
           </button>
           {settings?.macroMode && (
             <div className="mt-4">
-              <Slider label="Zoom" field="macroZoom" min={1} max={12} step={0.5} format={(v) => `${v.toFixed(1)}x`} />
-              <Slider label="Shot Length" field="macroHold" min={1} max={15} step={0.5} format={(v) => `${v.toFixed(1)}s`} />
+              <Slider label="Zoom" field="macroZoom" min={1} max={12} step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Shot Length" field="macroHold" min={1} max={15} step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
             </div>
           )}
         </div>
@@ -353,10 +375,10 @@ export default function RemoteControl() {
 
         {/* One-shot gestures */}
         <div className="mb-7 flex gap-3">
-          <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} />
-          <ActionButton label="Random" icon={Sparkles} onPress={() => action('lucky')} />
-          <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} />
-          <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" />
+          <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} connected={connected} />
+          <ActionButton label="Random" icon={Sparkles} onPress={() => action('lucky')} connected={connected} />
+          <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} connected={connected} />
+          <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" connected={connected} />
         </div>
 
         {/* Presets */}

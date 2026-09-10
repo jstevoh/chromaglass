@@ -240,6 +240,7 @@ export default function App() {
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const engineStatusRef = useRef<EngineStatus | null>(null);
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera'>('none');
   const loadFilm = async (file: File) => {
     await visualizerRef.current?.loadFilmFile(file);
@@ -437,13 +438,28 @@ export default function App() {
     trackName: musicIntel.state.track?.title ?? null,
   }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title]);
 
+  // Patches from a phone arrive at the rate of a thumb on a slider; apply
+  // them in batches so the show isn't re-rendered thirty times a second.
+  const pendingPatchRef = useRef<Partial<VisualizerSettings> | null>(null);
+  const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queuePatch = (partial: Partial<VisualizerSettings>) => {
+    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...partial };
+    if (patchTimerRef.current) return;
+    patchTimerRef.current = setTimeout(() => {
+      patchTimerRef.current = null;
+      const p = pendingPatchRef.current;
+      pendingPatchRef.current = null;
+      if (p) updateSettings(p);
+    }, 50);
+  };
+
   useRemoteLink({
     role: 'display',
     state: remoteState,
     onMessage: (message) => {
       switch (message.type) {
         case 'patch':
-          updateSettings(message.settings);
+          queuePatch(message.settings);
           break;
         case 'preset': {
           const preset = PRESETS.find(p => p.id === message.presetId);
@@ -491,15 +507,15 @@ export default function App() {
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         onManualGesture={musicIntel.recordGesture}
-        onEngineStatus={(next) =>
-          // Ticks once a second; only re-render the shell when something visible changed.
+        onEngineStatus={(next) => {
+          // The live reading goes in a ref (the settings panel polls it while
+          // open); the shell only re-renders when the engine itself changed.
+          engineStatusRef.current = next;
           setEngineStatus((prev) =>
             prev && prev.label === next.label && prev.steppedDown === next.steppedDown &&
-            prev.gpuUnavailable === next.gpuUnavailable &&
-            Math.round(1000 / prev.frameMs) === Math.round(1000 / next.frameMs)
-              ? prev : next,
-          )
-        }
+            prev.gpuUnavailable === next.gpuUnavailable ? prev : next,
+          );
+        }}
       />
 
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
@@ -878,6 +894,7 @@ export default function App() {
             calibration={audioData?.calibration ?? null}
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             engineStatus={engineStatus}
+            getLiveEngineStatus={() => engineStatusRef.current}
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}

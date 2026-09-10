@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Fixed — Lag and jitter
+- **The GPU path no longer stalls every frame.** The bead tracker and dye regulator read the field back from the GPU each frame with a blocking `readPixels`, which forces the GPU to finish before the CPU can continue and serialises the two — the stutter was the pipeline draining sixty times a second. The read now goes through pixel-pack buffers with fences, collected a frame later
+- **Catch-up no longer compounds a hitch.** When a solver step already costs most of a frame, owing four of them after a slow frame only produced a run of slow frames; the cap now adapts to the measured step cost, so the show runs a little slow instead of stuttering
+- **Cheaper CPU step.** MacCormack advection stays on the dye, where it keeps filaments, and velocity and heat take first-order transport — about a third of the step on a field nobody sees directly
+- **The phone remote responds again.** Its slider and button components were defined inside the render body, so every state message from the laptop gave them a new identity and remounted the control under the thumb dragging it; they are module-level now. Slider patches are throttled to ~20 a second, the laptop applies them in 50 ms batches, and its state snapshots back to phones are coalesced
+- The shell no longer re-renders once a second for the frame-rate readout; the settings panel polls the live reading itself while open
+
 ### Removed
 - The Monochrome Ink preset — a grey plate however it was tuned
 
