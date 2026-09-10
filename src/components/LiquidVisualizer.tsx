@@ -3,6 +3,7 @@ import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
+import { CameraPass } from '../lib/cameraPass';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
 import { classifyGpu, detectTier, qualityLadder, type EngineStatus } from '../lib/platform';
@@ -79,6 +80,9 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'neon-coral-reef':    ['streak', 'drop'],
   'stardust-collapse':  ['spray', 'splatter'],
   'poster-1969':        ['pour', 'drop'],
+  'oil-on-water':       ['drop'],
+  'colorful-cosmos':    ['pour'],
+  'sunny-side-up':      ['pour', 'drop'],
   'macro-bead':         ['drop', 'splatter'],
   'cell-bloom':         ['drop'],
   'lace-run':           ['pour', 'streak'],
@@ -136,6 +140,9 @@ const PRESET_CONTRACTS: Record<string, number[]> = {
   'sensual-laboratory': [14, 12],
   'oil-wheel':          [0, 6, 8],
   'poster-1969':        [2, 6],
+  'oil-on-water':       [0, 1],
+  'colorful-cosmos':    [9, 2, 0],
+  'sunny-side-up':      [7, 10, 2],
   // Warm, fully-saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye.
@@ -1546,6 +1553,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
+  /** The camera pass, built the first time a frame asks for it. */
+  const cameraRef = useRef<CameraPass | null>(null);
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
@@ -1879,7 +1888,8 @@ void main() {
     const fragSrc = `#version 300 es
 precision highp float;
 in vec2 v_uv;
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec4 auxOut;   // for the camera: normal.xy (biased), dye height, bubble mask
 
 uniform sampler2D u_layer0;
 uniform sampler2D u_layer1;
@@ -1909,6 +1919,12 @@ uniform vec4  u_lamp;              // the projector lamp under the plate: x, y (
 uniform vec4  u_lamp2;             // a second lamp from another side, cooler: x, y, height, strength (0 = off)
 uniform float u_lightPlay;         // how much the lamp's direction shows on bubbles and dye edges
 uniform float u_iridescence;       // thin-film colour running round bubble rims
+uniform float u_photo;             // photograph mode: a lit paper backdrop, dye as transmission, domes with a softbox in them
+uniform vec3  u_paperA;            // the backdrop's two colours
+uniform vec3  u_paperB;
+uniform float u_droplets;          // satellite micro-droplets on the glass
+uniform float u_thinFilm;          // interference colour where the dye runs thinnest
+uniform int   u_cameraOn;          // the camera pass will add its own grain
 uniform float u_lumia;             // Wilfred's aurora under the plate
 uniform vec3  u_lumiaA;
 uniform vec3  u_lumiaB;
@@ -2170,7 +2186,9 @@ float boundaryEdge(sampler2D tex, vec2 fuv) {
 vec3 meniscus(vec3 color, vec3 n, float a, vec2 fuv) {
   float rim = clamp((1.0 - n.z) * 6.0, 0.0, 1.0) * smoothstep(0.02, 0.2, a);
   vec3 L = lampDir(fuv, u_lamp);
-  float spec = pow(max(dot(n, L), 0.0), 10.0);
+  // In the photograph the softbox in the dome is the reflection; the
+  // meniscus keeps only a pin of it, or every small drop turns into a speck.
+  float spec = pow(max(dot(n, L), 0.0), mix(10.0, 24.0, u_photo)) * mix(1.0, 0.3, u_photo);
   // Which way this edge faces, against where the lamp is: the rim toward
   // the lamp glows in the dye's own colour, the rim away from it sits in
   // its own shadow. Straight under the lamp the two sides are the same.
@@ -2220,6 +2238,36 @@ float fbm3(vec2 p) {
   for (int i = 0; i < 3; i++) { sum += a * vnoise(p); p *= 2.07; a *= 0.5; }
   return sum * 1.14;   // ~0..1
 }
+
+// Satellite droplets: the hundreds of tiny beads that sit on the glass around
+// every drop in a macro photograph. Each cell of a jittered grid holds one
+// small lens, shaded like the big bubbles — dim toward the lamp, bright away
+// from it, a point of the lamp on its dome.
+vec3 microDrops(vec3 c, vec2 p, vec2 lampSide, float ground, float keep) {
+  vec2 i = floor(p), f = fract(p);
+  vec3 outc = c;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 h = hash22(i + g);
+      if (h.x > keep) continue;
+      vec2 centre = g + 0.2 + h * 0.6;
+      float rad = 0.10 + hash12(i + g + 7.7) * 0.2;
+      vec2 d = (f - centre) / rad;
+      float q = dot(d, d);
+      if (q > 1.0) continue;
+      float rim = smoothstep(0.5, 1.0, q);
+      float toward = dot(d / max(sqrt(q), 1e-3), lampSide);
+      vec3 dc = c * (1.06 + 0.18 * max(0.0, -toward) * (1.0 - rim));
+      dc = mix(dc, c * c * 1.15, rim * (0.5 + 0.35 * max(0.0, toward)));
+      vec2 hd = d - lampSide * 0.4;
+      dc += vec3(1.0, 0.98, 0.95) * exp(-dot(hd, hd) * 14.0) * (0.25 + 0.4 * ground);
+      outc = mix(outc, dc, smoothstep(1.0, 0.85, q));
+    }
+  }
+  return outc;
+}
+
 
 // Surface height across one cell, as a function of the signed distance to its
 // edge: the film is thin over the sunken core and piles into a meniscus ridge
@@ -2529,6 +2577,17 @@ void main() {
 
   // ── LED Platform background ────────────────────────────────────────
   vec3 bgColor = darkBlend ? vec3(1.0) : vec3(0.0);
+  // The photographs are all taken over a lit backdrop — coloured paper under
+  // a dish of water — never over black. Two colours across the frame, a
+  // little cloud in the join, and the tooth of the paper.
+  if (u_photo > 0.5) {
+    vec2 pp = uv * vec2(aspect, 1.0);
+    float g = smoothstep(-0.15, 1.15, uv.x * 0.55 + uv.y * 0.65 + (fbm3(pp * 2.2 + 3.1) - 0.5) * 0.5 - 0.1);
+    bgColor = mix(u_paperA, u_paperB, g) * (0.82 + 0.08 * fbm3(pp * 60.0));   // headroom left for the bloom
+  }
+  vec2 auxN = vec2(0.0);
+  float auxH = 0.0;
+  float auxB = 0.0;
   if (u_ledPlatform != 0) {
     vec2 centered = (uv - 0.5) * u_resolution;
     float t = fract(atan(centered.y, centered.x) / (2.0 * PI) + 0.5 + u_ledAngle);
@@ -2625,7 +2684,45 @@ void main() {
   }
 
   vec3 outColor = bgColor;
-  outColor = mix(outColor, fluid0.rgb, fluid0.a);
+  if (u_photo > 0.5) {
+    // Dye as transmission: the paper seen through it, tinted, and the drop
+    // itself a dome — a dark meniscus deeper on the side away from the lamp,
+    // a thicker middle that absorbs more, the softbox reflected as a bright
+    // crescent on the lamp side, and a rim that catches the sky.
+    float a = fluid0.a;
+    // Transmission proper: the paper times the dye's transmittance. A thin
+    // wash therefore vanishes into the paper instead of reading as a pale
+    // speck; only a real drop shows, and a little lift keeps it from mud.
+    // Dyes in transmission mix subtractively — two of them together go
+    // darker, not paler — so the thick middle of a mixed drop deepens.
+    vec3 tr = pow(fluid0.rgb, vec3(1.0 + 0.9 * a));
+    float trl = dot(tr, vec3(0.299, 0.587, 0.114));
+    tr = clamp(mix(vec3(trl), tr, 1.3), 0.0, 1.0);
+    vec3 lit = tr * mix(outColor, vec3(1.0), 0.22 * smoothstep(0.1, 0.6, a)) * (1.0 + 0.2 * a);
+    outColor = mix(outColor, lit, a);
+    vec3 n = normal0;
+    vec3 S = lampDir(fuv0, u_lamp);
+    vec2 R = 2.0 * n.z * n.xy;
+    float sb = smoothstep(0.42, 0.12, abs(R.x - S.x * 0.6)) * smoothstep(0.26, 0.06, abs(R.y - S.y * 0.6));
+    float fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    float rimDark = clamp((1.0 - n.z) * 5.0, 0.0, 1.0);
+    float facing = clamp(dot(n.xy, S.xy) * 3.0, -1.0, 1.0);
+    outColor *= 1.0 - rimDark * a * (0.35 + 0.3 * max(0.0, -facing));
+    outColor *= 1.0 - a * a * 0.22;
+    outColor += vec3(1.0, 0.98, 0.95) * sb * a * (0.35 + 0.6 * fres);
+    outColor += vec3(0.95, 0.97, 1.0) * fres * a * 0.18;
+  } else {
+    outColor = mix(outColor, fluid0.rgb, fluid0.a);
+  }
+  auxN = -normal0.xy * fluid0.a;
+  auxH = fluid0.a;
+  // Where the dye runs thinnest it is a film, and a film has colours of its
+  // own: interference bands that follow the thickness.
+  if (u_thinFilm > 0.001 && fluid0.a > 0.004 && fluid0.a < 0.4) {
+    float thin = smoothstep(0.4, 0.04, fluid0.a) * smoothstep(0.004, 0.03, fluid0.a);
+    vec3 film = thinFilm(fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4 + u_time * 0.02);
+    outColor = mix(outColor, outColor * (0.5 + 1.3 * film) + film * 0.08, thin * u_thinFilm * 0.85);
+  }
 
   // ── Layer 1 (if present) ──────────────────────────────────────────
   if (u_layerCount > 1) {
@@ -2660,8 +2757,18 @@ void main() {
       fluid1 = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
     }
 
-    vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
-    outColor = mix(outColor, blended, fluid1.a);
+    if (u_photo > 0.5) {
+      vec3 lit1 = pow(fluid1.rgb, vec3(1.0 + 0.9 * fluid1.a)) * mix(outColor, vec3(1.0), 0.22 * smoothstep(0.1, 0.6, fluid1.a)) * (1.0 + 0.2 * fluid1.a);
+      outColor = mix(outColor, lit1, fluid1.a);
+      float rim1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
+      outColor *= 1.0 - rim1 * fluid1.a * 0.4;
+      outColor += vec3(0.95, 0.97, 1.0) * pow(1.0 - clamp(normal1.z, 0.0, 1.0), 3.0) * fluid1.a * 0.15;
+    } else {
+      vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
+      outColor = mix(outColor, blended, fluid1.a);
+    }
+    auxN = mix(auxN, -normal1.xy, fluid1.a * 0.5);
+    auxH = max(auxH, fluid1.a);
   }
 
   // ── The lamp's hot-spot ──────────────────────────────────────────
@@ -2678,6 +2785,18 @@ void main() {
       float glow2 = exp(-d2 * d2 * 3.5);
       outColor *= mix(vec3(1.0), mix(vec3(1.0), vec3(0.9, 0.97, 1.12) * 1.25, glow2), u_lamp2.w * u_lamp.w);
     }
+  }
+
+  // ── Satellite droplets ───────────────────────────────────────────
+  // Two sizes of them, more where the dye is, a few on the bare glass.
+  if (u_droplets > 0.001 && !macro) {
+    vec3 Ld = lampDir(fuvBase, u_lamp);
+    vec2 sideD = Ld.xy / max(length(Ld.xy), 0.06);
+    float groundD = dot(outColor, vec3(0.299, 0.587, 0.114));
+    float keep = u_droplets * (0.18 + 0.32 * fluid0.a);
+    vec3 dropped = microDrops(outColor, fuvBase * u_logicalGrid * 0.55 + 17.0, sideD, groundD, keep);
+    dropped = microDrops(dropped, fuvBase * u_logicalGrid * 1.1 + 5.0, sideD, groundD, keep * 0.6);
+    outColor = mix(outColor, dropped, min(1.0, u_droplets * 1.5));
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
@@ -2770,6 +2889,8 @@ void main() {
         c += vec3(0.75, 0.86, 1.0) * exp(-dot(hd2, hd2) * 22.0) * inside * 0.35 * u_lamp2.w;
       }
       outColor = mix(outColor, c, opac * u_bubbleStrength);
+      auxN = mix(auxN, -bestD * 0.8, opac * inside);
+      auxB = max(auxB, opac * inside);
     }
   }
 
@@ -2818,9 +2939,10 @@ void main() {
   // below the shadows, so a dim plate reads as depth rather than fog.
   float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.03
               * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
-  outColor = clamp(outColor + grain, 0.0, 1.0);
+  if (u_cameraOn == 0) outColor = clamp(outColor + grain, 0.0, 1.0);
 
   fragColor = vec4(outColor, 1.0);
+  auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }`;
 
     const compileShader = (type: number, src: string): WebGLShader | null => {
@@ -2907,6 +3029,7 @@ void main() {
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
       'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
+      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -3967,6 +4090,16 @@ void main() {
             glCtx.uniform1f(uLocs['u_iridescence'], Math.max(0, Math.min(1, currentSettings.iridescence ?? 0)));
           }
           {
+            const photo = currentSettings.renderStyle === 'photo';
+            glCtx.uniform1f(uLocs['u_photo'], photo ? 1 : 0);
+            const pa = hexToRgb(currentSettings.paperA ?? '#1e5fb8');
+            const pb = hexToRgb(currentSettings.paperB ?? '#f4c04a');
+            glCtx.uniform3f(uLocs['u_paperA'], pa.r, pa.g, pa.b);
+            glCtx.uniform3f(uLocs['u_paperB'], pb.r, pb.g, pb.b);
+            glCtx.uniform1f(uLocs['u_droplets'], Math.max(0, Math.min(1, currentSettings.microDroplets ?? 0)));
+            glCtx.uniform1f(uLocs['u_thinFilm'], Math.max(0, Math.min(1, currentSettings.thinFilm ?? 0)));
+          }
+          {
             // Lumia and gel colours come from the working harmony, so they
             // stay inside the preset's dyes.
             const h = harmonyRef.current;
@@ -4028,9 +4161,36 @@ void main() {
           glCtx.uniform1f(uLocs['u_filmLevel'], filmLevelRef.current);
           glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, filmGainRef.current)));
 
-          glCtx.viewport(0, 0, canvas.width, canvas.height);
+          // ── Two passes when the camera is on ───────────────────
+          // The plate is drawn to a texture and the camera looks at it:
+          // refraction, depth of field, bloom and the sensor's roll-off
+          // all need the finished picture to sample from.
+          const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
+          if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
+          const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
+          glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
+          if (cam) {
+            cam.bindTarget(canvas.width, canvas.height);
+          } else {
+            glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+            glCtx.viewport(0, 0, canvas.width, canvas.height);
+          }
           glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
           glCtx.bindVertexArray(null);
+          if (cam) {
+            cam.draw(canvas.width, canvas.height, {
+              time,
+              amount: camAmt,
+              refraction: Math.max(0, Math.min(1, currentSettings.refraction ?? 0)),
+              chromatic: Math.max(0, Math.min(1, currentSettings.chromaticAberration ?? 0)),
+              focus: Math.max(0, Math.min(1, currentSettings.focus ?? 0.5)),
+              aperture: Math.max(0, Math.min(1, currentSettings.aperture ?? 0)),
+              bloom: Math.max(0, Math.min(1, currentSettings.bloom ?? 0)),
+              filmic: 1,
+              vignette: 0.6,
+              grain: 0.6,
+            });
+          }
         }
       }
 
@@ -4090,6 +4250,8 @@ void main() {
         glCtx.deleteBuffer(pb);
         glCtx.deleteVertexArray(vaoObj);
         glCtx.deleteProgram(prog);
+        cameraRef.current?.dispose();
+        cameraRef.current = null;
         webGLRef.current = null;
       }
     };

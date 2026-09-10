@@ -153,6 +153,7 @@ export function builtInSequences(): ShowSequence[] {
         s('Mirrored dish', 150, { presetId: 'classic', transition: 12, settings: { kaleidoscope: 4, dishVignette: 0.7, turbulenceScale: 0.4 } }),
         s('Chemistry bench', 150, { presetId: 'sensual-laboratory', transition: 15 }),
         s('Poster, 1969', 150, { presetId: 'poster-1969', transition: 10 }),
+        s('Oil on water, photographed', 150, { presetId: 'oil-on-water', transition: 12 }),
         s('Lumia interlude', 120, { presetId: 'lumia', transition: 20 }),
       ],
     },
