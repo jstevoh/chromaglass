@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Changed — The look, against the tradition
+Six changes from a comparison of the app's frames with the liquid light show canon (SF light painting, the Joshua Light Show, Mad Alchemy, Optikinetics wheels, macro liquid-light photography):
+- **Palette contracts.** A projected clock face carries two or three dyes; the richness of a show comes from stacking plates, not rainbow dye. Every preset now names the palette indices it may use, and seeding, automation, beat injection and the slow harmony rotation all draw from inside that set (a song's identity harmony is intersected with it). Monochrome Ink stays black and white instead of being overpainted; Galaxy, Cyberpunk Neon and Fractal Dream stop drifting into full-spectrum haze. A user's palette lock still wins outright
+- **Meniscus at every edge, at any zoom.** The dark rim and refracted highlight a bead has between two plates were only rendered in the macro closeup; a lighter version now runs plate-wide from the sobel normal (`edgeRelief`)
+- **Bubbles.** Trapped air is the most recognisable analog element after the blob. A small particle field rides the velocity field, climbs against the plate's tilt, merges on contact and pops at the edge or the end of its life; the renderer draws each as a lens — lighter interior, dark rim, one highlight. Born from the Blow tool, automation's air bursts and bass hits (`bubbles`, `src/lib/bubbles.ts`)
+- **Rock the plate.** A hand on the clock face: each kick tips the whole plate one way and a damped spring rocks it back, with a slow sway between beats, so the field sloshes instead of only churning. Applied as a uniform acceleration on both solver paths (`plateRock`)
+- **Less haze.** Film grain fades out almost entirely below the shadows so dark frames stay black; treble sparks are fewer and larger — a handful of real droplets instead of a cloud of one-cell specks that blurred into fog
+- **Two scales in one frame.** The second layer is viewed magnified about the centre with its own slow drift, like a second projector at a different throw; the brush maps through the same view (`layerScaleVariety`). Off in the macro presets, whose camera frames one plate
+- Four new sliders under Light Show Look: Edge Relief, Bubbles, Plate Rock, Layer Scale Variety; Lucky rolls them
+
 ### Added — Clean screen
 - **Clean Screen** chip next to Hide UI: removes every overlay — logo, chips, meters, lyrics, the cursor — leaving only the liquid, for a projected show. **Esc** brings everything back (with the overlays up, Esc closes whichever panel is open); on a touch screen a finger held still for a moment does the same. A hint saying so shows for four seconds after hiding
 - The phone remote has a matching button, so the laptop's screen can be cleaned from across the room (`overlays-off` / `overlays-on` actions, `overlaysVisible` in the state snapshot)

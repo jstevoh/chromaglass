@@ -307,6 +307,8 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
       blobSurfaceTension: 0.15,  // shapes constantly tear and reform
+      edgeRelief: 0.65,
+      bubbles: 0.35,
       boundaryContrast: 0.6,     // hard psychedelic color interfaces
       saturationBoost: 1.6,      // hyper-saturated
       glossiness: 0.0,
@@ -800,6 +802,8 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.45,
       turbulenceDetail: 3,
       blobSurfaceTension: 0.55,
+      bubbles: 0.25,
+      layerScaleVariety: 0,
       boundaryContrast: 0.7,
       saturationBoost: 1.5,
       glossiness: 0.12,          // a hint of wet sheen at this distance
@@ -858,6 +862,8 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.35,
       turbulenceDetail: 2,
       blobSurfaceTension: 0.6,
+      bubbles: 0.2,
+      layerScaleVariety: 0,
       boundaryContrast: 0.6,
       saturationBoost: 1.55,
       glossiness: 0.18,
@@ -916,6 +922,8 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.7,
       turbulenceDetail: 4,
       blobSurfaceTension: 0.15,
+      bubbles: 0.3,
+      layerScaleVariety: 0,
       boundaryContrast: 0.8,
       saturationBoost: 1.4,
       glossiness: 0.08,

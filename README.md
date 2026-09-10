@@ -14,7 +14,8 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, with synthesised paint cells, lacing filaments and shallow depth of field for extreme detail at high magnification
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
-- **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
+- **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
+- **Palette contracts** — each preset names the two to four dyes it may use, and everything that adds colour (seeding, automation, beat hits, the slow harmony rotation, a song's identity) stays inside them, the way a projected plate carries a few dyes rather than a rainbow
 - **Music intelligence** — Identifies the playing song (fingerprint proxy or manual tag), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
 - **Lyrics layer** — Time-synced lyrics from LRCLIB with themed word-triggers (fire, water, sky…), per-section sentiment arc, and an optional kinetic typography overlay
 - **Evolving per-track identity** — Each song's ISRC seeds a stable visual identity that grows more complex with every listen; replay any past listen's exact look from the history panel
@@ -154,6 +155,7 @@ src/
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
+    bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     governor.ts                # Frame-time governor: walks the quality ladder
     platform.ts                # Tier (hosted/local/native), GPU class, quality ladders
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts

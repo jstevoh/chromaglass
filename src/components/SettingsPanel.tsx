@@ -223,6 +223,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
         />
         <Slider
+          label="Edge Relief"
+          value={settings.edgeRelief ?? 0.4}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ edgeRelief: v })}
+        />
+        <Slider
+          label="Bubbles"
+          value={settings.bubbles ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bubbles: v })}
+        />
+        <Slider
+          label="Plate Rock"
+          value={settings.plateRock ?? 0.45}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateRock: v })}
+        />
+        <Slider
+          label="Layer Scale Variety"
+          value={settings.layerScaleVariety ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ layerScaleVariety: v })}
+        />
+        <Slider
           label="Boundary Glow"
           value={settings.boundaryContrast}
           min={0}

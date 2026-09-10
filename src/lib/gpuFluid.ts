@@ -36,6 +36,8 @@ export interface GpuStepParams {
   diff: number;         // dye / heat diffusivity
   buoyancy: number;
   gravity: number;      // centre-gravity strength (already × 0.05)
+  tiltX: number;        // plate tilt, applied as a uniform acceleration
+  tiltY: number;
   advection: number;
   damping: number;
   heatDecay: number;
@@ -219,10 +221,11 @@ void main() {
 
   // Buoyancy and centre gravity — before the velocity solve, as on the CPU
   forcesA: `${PRELUDE}
-uniform sampler2D u_vel; uniform float u_dt; uniform float u_buoyancy; uniform float u_gravity;
+uniform sampler2D u_vel; uniform float u_dt; uniform float u_buoyancy; uniform float u_gravity; uniform vec2 u_tilt;
 void main() {
   vec4 v = texture(u_vel, v_uv);
   v.y -= v.z * u_buoyancy * u_dt;
+  v.xy += u_tilt * u_dt;
   if (u_gravity > 0.0) {
     vec2 d = vec2(0.5) - v_uv;
     float len = length(d);
@@ -642,6 +645,7 @@ export class GpuFluid {
       gl.uniform1f(u.get('u_dt')!, p.dt);
       gl.uniform1f(u.get('u_buoyancy')!, p.buoyancy);
       gl.uniform1f(u.get('u_gravity')!, p.gravity);
+      gl.uniform2f(u.get('u_tilt')!, p.tiltX, p.tiltY);
     });
     this.vel.swap();
 

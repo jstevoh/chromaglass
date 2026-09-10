@@ -88,6 +88,10 @@ export interface VisualizerSettings {
   blobSurfaceTension: number; // lower = more elongation/shear, higher = more circular
   boundaryContrast: number;   // bright edge-line strength where two dye colors meet
   saturationBoost: number;    // final color grade saturation multiplier
+  edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
+  plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -150,6 +154,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
+  edgeRelief: 0.4,
+  bubbles: 0.5,
+  plateRock: 0.45,
+  layerScaleVariety: 0.5,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look
