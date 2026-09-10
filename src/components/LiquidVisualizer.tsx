@@ -78,6 +78,7 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'velvet-underground': ['pour', 'drop'],
   'neon-coral-reef':    ['streak', 'drop'],
   'stardust-collapse':  ['spray', 'splatter'],
+  'poster-1969':        ['pour', 'drop'],
   'macro-bead':         ['drop', 'splatter'],
   'cell-bloom':         ['drop'],
   'lace-run':           ['pour', 'streak'],
@@ -86,6 +87,10 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
 export interface LiquidVisualizerHandle {
   injectImage: (imageData: ImageData) => void;
   applyPreset: (presetId: string) => void;
+  /** Take on a preset's dyes and injection style without clearing the plate — the sequencer's way of changing stage. */
+  adoptPreset: (presetId: string) => void;
+  /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
+  setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
   /** Pin the color harmony to a specific palette-index set (music intelligence). */
   setHarmony: (indices: number[]) => void;
@@ -130,6 +135,7 @@ const PRESET_CONTRACTS: Record<string, number[]> = {
   'lumia':              [10, 7, 1],
   'sensual-laboratory': [14, 12],
   'oil-wheel':          [0, 6, 8],
+  'poster-1969':        [2, 6],
   // Warm, fully-saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye.
@@ -144,6 +150,22 @@ const harmonyWithin = (contract: number[]): number[] => {
   const pool = [...contract];
   const out: number[] = [];
   while (out.length < 3) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+};
+
+/**
+ * A window onto the contract: `size` dyes starting at `lead`, wrapping. This
+ * is how a show walks its hues — the window slides one dye at a time, so the
+ * plate keeps most of its colours while one drains and a new one arrives —
+ * and how a monochrome opening is done: a window of one.
+ */
+const windowOf = (contract: number[], size: number | null, lead: number): number[] => {
+  const n = contract.length;
+  if (n === 0) return contract;
+  const w = Math.max(1, Math.min(n, size ?? (n <= 3 ? n : 3)));
+  const out: number[] = [];
+  const start = ((Math.round(lead) % n) + n) % n;
+  for (let i = 0; i < w; i++) out.push(contract[(start + i) % n]);
   return out;
 };
 
@@ -179,6 +201,8 @@ class FluidSimulation {
   /** Plate tilt this step — a uniform acceleration, set by the show each step. */
   tiltX = 0;
   tiltY = 0;
+  /** Which plate this is: 0 is the live plate, the rest run behind it as a background loop. */
+  layerIndex = 0;
 
   // ── GPU solver attachment ──
   // When `gpu` is set, the arrays above hold *deltas* — what the CPU-side
@@ -910,6 +934,10 @@ class FluidSimulation {
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
+    // Plates behind the lead are the background loop: the same show, slower
+    // and calmer, that the live plate is worked over.
+    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
+
     this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.05);
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
@@ -1046,6 +1074,7 @@ class FluidSimulation {
 
     const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
     let turbScale = settings.turbulenceScale ?? 0;
+    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
     let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
     if (audioData) {
@@ -1497,6 +1526,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const harmonyRef = useRef(pickHarmony());
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
+  /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
+  const paletteWindowRef = useRef<{ size: number | null; lead: number }>({ size: null, lead: 0 });
+  const journeyRef = useRef({ lead: 0, lastAt: -1 });
+  /**
+   * The working harmony for the current contract: the sequencer's window if
+   * it set one, else the hue journey's window (one dye short of the contract,
+   * so the walk is visible), else the whole set.
+   */
+  const harmonyFromContract = (contract: number[], journeyOn: boolean): number[] => {
+    const pw = paletteWindowRef.current;
+    const lead = pw.lead + journeyRef.current.lead;
+    if (pw.size !== null) return windowOf(contract, pw.size, lead);
+    if (journeyOn && contract.length >= 3) return windowOf(contract, Math.max(2, contract.length - 1), lead);
+    return contract.length <= 3 ? windowOf(contract, null, lead) : harmonyWithin(contract);
+  };
   const bubblesRef = useRef(new BubbleField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
@@ -1570,14 +1614,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       chemRef.current.reset();
       rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
       presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
+      journeyRef.current = { lead: 0, lastAt: -1 };
       const fluid = fluidsRef.current[0];
       if (fluid) {
         const seeded = fluid.seedPreset(presetId, noise2D);
-        harmonyRef.current = harmonyLockRef.current ?? seeded;
+        const contract = presetContractRef.current;
+        harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
       }
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
       drainFrameRef.current = 0;
       macroCamRef.current.reset();
+    },
+    adoptPreset: (presetId: string) => {
+      // The sequencer changing stage: the plate keeps what is on it, and the
+      // new dyes and injection style take over from here.
+      presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
+      journeyRef.current = { lead: 0, lastAt: -1 };
+      injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+      if (!harmonyLockRef.current) {
+        const contract = presetContractRef.current;
+        harmonyRef.current = contract ? harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0) : pickHarmony();
+      }
+    },
+    setPaletteWindow: (size: number | null, lead: number) => {
+      paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
+      if (harmonyLockRef.current) return;
+      const contract = presetContractRef.current;
+      if (contract) harmonyRef.current = harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0);
     },
     setInjectStyle: (styles: string[]) => {
       injectStyleRef.current = styles;
@@ -1751,6 +1814,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (currentCount < targetCount) {
       for (let i = currentCount; i < targetCount; i++) {
         const fluid = new FluidSimulation(GRID_SIZE, settings.diffusionRate, 0.0001, 0.01);
+        fluid.layerIndex = i;
         if (i === 0) {
           // Seed initial preset pattern
           harmonyRef.current = fluid.seedPreset('classic', noise2D);
@@ -1851,6 +1915,8 @@ uniform float u_filmMix;
 uniform float u_filmKey;
 uniform vec2  u_filmScale;
 uniform float u_lampWarmth;        // halogen grade
+uniform float u_kaleido;           // mirror folds (0 = off, else 2/4/6)
+uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_postBlur;          // gooey blur radius multiplier
 uniform float u_gridSize;          // fluid sim texture resolution (what we sample)
@@ -2404,6 +2470,22 @@ void main() {
   // real macro lens has wide open, and what sells the magnification.
   bool macro = u_macro > 0.5;
   float aspect = u_resolution.x / max(1.0, u_resolution.y);
+  vec2 uvScreen = uv;   // the unfolded frame, for the dish
+  // ── Kaleidoscope ─────────────────────────────────────────────────
+  // The plate mirrored into wedges — the four-fold dish of the stills, a
+  // mirror rig in front of the lens. Fold the angle around the centre so
+  // every wedge shows the same piece of plate, seams meeting edge to edge.
+  if (u_kaleido >= 2.0) {
+    vec2 c = (uv - 0.5) * vec2(aspect, 1.0);
+    float ang = atan(c.y, c.x);
+    float rad = length(c);
+    float wedge = 6.28318530718 / u_kaleido;
+    float a = mod(ang, wedge);
+    if (a > wedge * 0.5) a = wedge - a;              // mirror inside the wedge
+    a += u_time * 0.02;                              // the rig turns, slowly
+    c = vec2(cos(a), sin(a)) * rad * 0.72;           // pull in so the plate's middle fills the wedge
+    uv = clamp(c / vec2(aspect, 1.0) + 0.5, 0.001, 0.999);
+  }
   float dof = 0.0;
   if (macro) {
     float rad = length((uv - 0.5) * vec2(aspect, 1.0));
@@ -2623,6 +2705,19 @@ void main() {
     outColor = mix(outColor, outColor * vec3(1.06, 0.9, 0.7) * vig, u_lampWarmth);
   }
 
+  // ── The dish ─────────────────────────────────────────────────────
+  // A round clock face projected whole: black beyond the rim, and the rim
+  // itself a thin bright line where the glass edge catches the lamp.
+  if (u_dish > 0.001) {
+    vec2 dc = (uvScreen - 0.5) * vec2(aspect, 1.0);
+    float dr = length(dc) / 0.5;
+    float rimR = mix(1.9, 0.98, u_dish);
+    float inside = 1.0 - smoothstep(rimR - 0.015, rimR + 0.01, dr);
+    float rim = smoothstep(rimR - 0.035, rimR - 0.01, dr) * (1.0 - smoothstep(rimR - 0.005, rimR + 0.012, dr));
+    float shade = 1.0 - smoothstep(rimR * 0.55, rimR, dr) * 0.35 * u_dish;
+    outColor = outColor * inside * shade + vec3(0.9, 0.85, 0.7) * rim * 0.35 * u_dish;
+  }
+
   // ── Saturation grade ──────────────────────────────────────────────
   float luma = dot(outColor, vec3(0.299, 0.587, 0.114));
   outColor = clamp(mix(vec3(luma), outColor, u_saturation), 0.0, 1.0);
@@ -2723,6 +2818,7 @@ void main() {
       'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
+      'u_kaleido','u_dish',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -2870,7 +2966,7 @@ void main() {
           drainFrameRef.current = 1;
           macroCamRef.current.reset();
           bubblesRef.current.clear();
-          harmonyRef.current = harmonyLockRef.current ?? (presetContractRef.current ? harmonyWithin(presetContractRef.current) : pickHarmony()); // fresh palette after drain
+          harmonyRef.current = harmonyLockRef.current ?? (presetContractRef.current ? harmonyFromContract(presetContractRef.current, (currentSettings.hueJourney ?? 0) > 0) : pickHarmony()); // fresh palette after drain
         }
         if (drainFrameRef.current > 0) {
           const DRAIN_FRAMES = 50;
@@ -3177,9 +3273,23 @@ void main() {
               }
             }
 
-            // Slowly rotate color harmony every ~45 seconds in auto mode
-            if (!harmonyLockRef.current && Math.random() < 0.0004) {
-              harmonyRef.current = presetContractRef.current ? harmonyWithin(presetContractRef.current) : pickHarmony();
+            // The hue journey: a set drifts its colours over minutes, one dye
+            // draining as the next arrives, never a jump. With the journey off
+            // the old behaviour stays — a random re-pick every ~45 s.
+            const journeyMin = currentSettings.hueJourney ?? 0;
+            if (!harmonyLockRef.current) {
+              if (journeyMin > 0) {
+                const j = journeyRef.current;
+                if (j.lastAt < 0) j.lastAt = time;
+                if (time - j.lastAt >= journeyMin * 60) {
+                  j.lastAt = time;
+                  j.lead += 1;
+                  const contract = presetContractRef.current;
+                  harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
+                }
+              } else if (Math.random() < 0.0004) {
+                harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
+              }
             }
 
           }
@@ -3366,6 +3476,22 @@ void main() {
               rock.vx += Math.cos(rock.phase) * bass01 * 7 * R;
               rock.vy += Math.sin(rock.phase) * bass01 * 7 * R;
               rock.phase += 2.4;   // successive kicks go different ways
+            }
+            // The rhythm plate: on a kick the projectionist presses the top
+            // glass and the dye spreads out in a ring, then relaxes back.
+            const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
+            if (squeezeAmt > 0 && bass01 > 0.45 && rock.lastBass <= 0.45 && isActiveRef.current && drainFrameRef.current === 0) {
+              const leadPlate = fluidsRef.current[0];
+              if (leadPlate) {
+                const cx = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
+                const cy = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
+                // Three nested discs make a rough dome, so the dye spreads
+                // from the middle instead of only at one hard ring.
+                const a = 0.0012 * squeezeAmt * bass01;
+                leadPlate.applySquish(cx, cy, 40, a);
+                leadPlate.applySquish(cx, cy, 27, a);
+                leadPlate.applySquish(cx, cy, 15, a);
+              }
             }
             const w = 2 * Math.PI * 0.9, z = 0.22;
             const ax = -w * w * rock.x - 2 * z * w * rock.vx;
@@ -3732,6 +3858,11 @@ void main() {
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
           {
+            const k = Math.round(currentSettings.kaleidoscope ?? 0);
+            glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
+          }
+          glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
+          {
             // Lumia and gel colours come from the working harmony, so they
             // stay inside the preset's dyes.
             const h = harmonyRef.current;
@@ -3824,6 +3955,11 @@ void main() {
         gl: webGLRef.current,
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
+        harmony: harmonyRef.current,
+        contract: presetContractRef.current,
+        paletteWindow: paletteWindowRef.current,
+        journey: journeyRef.current,
+        settings: settingsRef.current,
       });
     }
 

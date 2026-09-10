@@ -35,7 +35,23 @@ export type RemoteAction =
   | 'automate-off'
   /** Hide every overlay on the display (a clean projected frame) / bring them back. */
   | 'overlays-off'
-  | 'overlays-on';
+  | 'overlays-on'
+  /** The show sequencer's transport. */
+  | 'seq-play'
+  | 'seq-pause'
+  | 'seq-next'
+  | 'seq-prev';
+
+/** The sequencer as the phone sees it. */
+export interface RemoteSequencer {
+  name: string | null;
+  running: boolean;
+  stageIndex: number;
+  stageName: string | null;
+  /** 0..1 through the current stage. */
+  progress: number;
+  stages: { name: string; seconds: number }[];
+}
 
 /** What the phone shows: mirrored from the display, never guessed. */
 export interface RemoteState {
@@ -47,6 +63,8 @@ export interface RemoteState {
   overlaysVisible: boolean;
   /** Now-playing title, when music intelligence has identified something. */
   trackName?: string | null;
+  /** The show sequencer's transport state, when the display has one. */
+  sequencer?: RemoteSequencer;
 }
 
 export type RemoteMessage =

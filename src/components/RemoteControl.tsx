@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass } from 'lucide-react';
+import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
@@ -373,6 +373,50 @@ export default function RemoteControl() {
             </button>
           </div>
         </div>
+
+        {/* The show sequencer's transport: what you reach for when the song changes */}
+        {state?.sequencer && (
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-sequencer">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+                <Clapperboard size={15} /> Sequencer
+              </span>
+              <span className="text-[10px] text-white/40 truncate max-w-[50%]">
+                {state.sequencer.name ?? 'Stopped'}
+              </span>
+            </div>
+            {state.sequencer.name && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="truncate">{state.sequencer.stageIndex + 1}. {state.sequencer.stageName}</span>
+                  <span className="text-white/40">{state.sequencer.stageIndex + 1}/{state.sequencer.stages.length}</span>
+                </div>
+                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full bg-white/70 transition-[width]" style={{ width: `${Math.round(state.sequencer.progress * 100)}%` }} />
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
+                <SkipBack size={16} className="mx-auto" />
+              </button>
+              <button
+                onClick={() => action(state.sequencer.running ? 'seq-pause' : 'seq-play')}
+                disabled={!connected}
+                className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[11px] font-bold uppercase tracking-[0.2em] disabled:opacity-30 active:scale-95 ${
+                  state.sequencer.running ? 'border-white/40 bg-white text-black' : 'border-white/10 bg-white/5 text-white/80'
+                }`}
+                data-testid="remote-seq-toggle"
+              >
+                {state.sequencer.running ? <Pause size={16} /> : <Play size={16} />}
+                {state.sequencer.running ? 'Pause' : state.sequencer.name ? 'Resume' : 'Play'}
+              </button>
+              <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
+                <SkipForward size={16} className="mx-auto" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* One-shot gestures */}
         <div className="mb-7 flex gap-3">
