@@ -275,7 +275,9 @@ class FluidSimulation {
   /** Once per rendered frame: refresh the readback the CPU-side readers use. */
   syncFromGpu() {
     if (!this.gpu) return;
-    const { dye, vel } = this.gpu.readback();
+    // One frame of latency instead of a pipeline stall every frame.
+    if (!this.gpu.readbackAsync()) return;
+    const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       const d = dye[i * 4 + 3];
@@ -949,8 +951,11 @@ class FluidSimulation {
     this.diffuse(1, this.vx0, this.vx, p.nu, dt);
     this.diffuse(2, this.vy0, this.vy, p.nu, dt);
     this.project(this.vx0, this.vy0, this.vx, this.vy);
-    this.advectMacCormack(1, this.vx, this.vx0, this.vx0, this.vy0, dt * p.advection);
-    this.advectMacCormack(2, this.vy, this.vy0, this.vx0, this.vy0, dt * p.advection);
+    // Velocity takes the cheaper first-order transport: MacCormack pays for
+    // itself on the dye, where it keeps filaments, and costs a third of the
+    // step on a field nobody sees directly.
+    this.advect(1, this.vx, this.vx0, this.vx0, this.vy0, dt * p.advection);
+    this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * p.advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
 
     // 6.5. Multi-octave curl turbulence — detail at every scale
@@ -982,7 +987,7 @@ class FluidSimulation {
     this.advectMacCormack(0, this.densityR, this.sR,    this.vx, this.vy, dt * p.advection);
     this.advectMacCormack(0, this.densityG, this.sG,    this.vx, this.vy, dt * p.advection);
     this.advectMacCormack(0, this.densityB, this.sB,    this.vx, this.vy, dt * p.advection);
-    this.advectMacCormack(0, this.temp,     this.temp0, this.vx, this.vy, dt * p.advection);
+    this.advect(0, this.temp,     this.temp0, this.vx, this.vy, dt * p.advection);
 
     // 10. Evaporation, damping, stability
     let densSum = 0;
@@ -1541,6 +1546,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
   const simAccumRef = useRef(0);
+  /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
+  const simMsRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
   const engineStatusRef = useRef<EngineStatus | null>(null);
@@ -2814,8 +2821,12 @@ void main() {
         }
         const time = simulationTimeRef.current;
 
-        // How many solver steps this frame owes, from wall-clock time.
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * SIM_MAX_CATCHUP);
+        // How many solver steps this frame owes, from wall-clock time. When a
+        // step is already most of a frame, catching up would only turn one
+        // slow frame into a run of them — better to let the show run a little
+        // slow than to stutter.
+        const catchUp = simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP;
+        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
         simAccumRef.current -= simSteps * SIM_STEP;
 
@@ -3367,7 +3378,10 @@ void main() {
 
           // ── Advance the solver ───────────────────────────────
           if (isActiveRef.current && drainFrameRef.current === 0) {
+            const t0 = performance.now();
             for (const fluid of fluidsRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
+            const ms = performance.now() - t0;
+            simMsRef.current += (ms - simMsRef.current) * 0.3;
           }
         }
 

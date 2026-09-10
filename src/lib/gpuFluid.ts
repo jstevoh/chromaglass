@@ -495,6 +495,14 @@ export class GpuFluid {
   private deltaMul!: WebGLTexture;
   private rbDye: Float32Array;
   private rbVel: Float32Array;
+  /**
+   * Two slots of pixel-pack buffers with a fence each. A frame kicks off a
+   * read into one slot and collects the other once its fence has signalled,
+   * so the CPU never waits on the GPU — the field it sees is one frame old,
+   * which the bead camera and the dye regulator cannot tell.
+   */
+  private pbo: { dye: WebGLBuffer; vel: WebGLBuffer; fence: WebGLSync | null }[] = [];
+  private pboSlot = 0;
   private disposed = false;
 
   /**
@@ -529,6 +537,16 @@ export class GpuFluid {
     this.L = logicalSize;
     this.rbDye = new Float32Array(logicalSize * logicalSize * 4);
     this.rbVel = new Float32Array(logicalSize * logicalSize * 4);
+    for (let i = 0; i < 2; i++) {
+      const make = () => {
+        const b = gl.createBuffer()!;
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, b);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, logicalSize * logicalSize * 16, gl.STREAM_READ);
+        return b;
+      };
+      this.pbo.push({ dye: make(), vel: make(), fence: null });
+    }
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
 
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
@@ -727,6 +745,57 @@ export class GpuFluid {
    * Downsample the field to the logical grid and read it back. Both arrays are
    * L² × 4, row-major: dye = (R, G, B absorption, density), vel = (vx, vy, temp, 0).
    */
+  /**
+   * Start a read of this step's field and collect the previous one if the
+   * GPU has finished with it. Returns true when `rbDye`/`rbVel` were updated.
+   */
+  readbackAsync(): boolean {
+    const gl = this.gl;
+    const slot = this.pbo[this.pboSlot];
+    const other = this.pbo[this.pboSlot ^ 1];
+    // Kick off this frame's read into the current slot: two downsample passes,
+    // each read straight into its pack buffer without waiting.
+    this.run('downsample', this.readbackTarget, (u) => {
+      this.bind(u, 'u_src', this.dye.read.tex, 0);
+    }, this.L);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.dye);
+    gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
+    this.run('downsample', this.readbackTarget, (u) => {
+      this.bind(u, 'u_src', this.vel.read.tex, 0);
+    }, this.L);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.vel);
+    gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (slot.fence) gl.deleteSync(slot.fence);
+    slot.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+
+    // Collect the other slot if its work is done; otherwise leave it for next frame.
+    let fresh = false;
+    if (other.fence) {
+      const status = gl.clientWaitSync(other.fence, 0, 0);
+      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, other.dye);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbDye);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, other.vel);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbVel);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        gl.deleteSync(other.fence);
+        other.fence = null;
+        fresh = true;
+        this.pboSlot ^= 1;
+      }
+    } else {
+      this.pboSlot ^= 1;
+    }
+    return fresh;
+  }
+
+  get rbDyeView(): Float32Array { return this.rbDye; }
+  get rbVelView(): Float32Array { return this.rbVel; }
+
+  /** Synchronous read — waits for the GPU. Kept for probes; the show uses readbackAsync. */
   readback(): { dye: Float32Array; vel: Float32Array } {
     const gl = this.gl;
     this.run('downsample', this.readbackTarget, (u) => {
@@ -767,6 +836,8 @@ export class GpuFluid {
     for (const pp of [this.dye, this.vel, this.squeeze, this.press, this.spress]) {
       for (const t of [pp.read, pp.write]) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
     }
+    for (const s of this.pbo) { gl.deleteBuffer(s.dye); gl.deleteBuffer(s.vel); if (s.fence) gl.deleteSync(s.fence); }
+    this.pbo = [];
     for (const t of [this.div, this.scratchA, this.scratchB, this.readbackTarget]) {
       gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex);
     }

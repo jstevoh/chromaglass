@@ -150,10 +150,17 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
     };
   }, [enabled, role]);
 
-  // Display: push a fresh snapshot whenever the show changes.
+  // Display: push a fresh snapshot whenever the show changes — coalesced, so
+  // a slider being dragged on a phone doesn't come back as a snapshot per
+  // tick. The last state always goes out.
+  const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (role !== 'display' || !state) return;
-    send({ type: 'state', state });
+    if (snapshotTimer.current) return;   // one is already scheduled; it reads stateRef when it fires
+    snapshotTimer.current = setTimeout(() => {
+      snapshotTimer.current = null;
+      if (stateRef.current) send({ type: 'state', state: stateRef.current });
+    }, 80);
   }, [role, state, send]);
 
   return { status, send };

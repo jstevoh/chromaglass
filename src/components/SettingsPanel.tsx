@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
@@ -16,6 +16,8 @@ interface SettingsPanelProps {
   onRecalibrate?: () => void;
   /** Which solver is running and at what grid, e.g. "GPU · 512²". */
   engineStatus?: EngineStatus | null;
+  /** The live reading (frame time), polled while the panel is open. */
+  getLiveEngineStatus?: () => EngineStatus | null;
   /** The film projector: what's playing, and how to change it. */
   filmSource?: 'none' | 'file' | 'camera';
   onFilmFile?: (file: File) => void;
@@ -24,8 +26,16 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  const [liveFps, setLiveFps] = useState<number | null>(null);
+  useEffect(() => {
+    if (!getLiveEngineStatus) return;
+    const tick = () => { const s = getLiveEngineStatus(); setLiveFps(s && s.frameMs > 0 ? Math.round(1000 / s.frameMs) : null); };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [getLiveEngineStatus]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
 
   const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
@@ -425,7 +435,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">Fluid Grid</span>
             {engineStatus && (
               <span className="text-[10px] font-mono opacity-50">
-                {engineStatus.label} · {engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–'} fps
+                {engineStatus.label} · {liveFps ?? (engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–')} fps
               </span>
             )}
           </div>
