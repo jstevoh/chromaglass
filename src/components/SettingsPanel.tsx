@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -368,6 +368,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ dishVignette: v })}
+        />
+      </section>
+
+      {/* Lamp Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Lightbulb size={12} /> Lamp
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
+        </p>
+        <Slider
+          label="Light Play"
+          value={settings.lightPlay ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lightPlay: v })}
+        />
+        <Slider
+          label="Lamp Motion"
+          value={settings.lampMotion ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampMotion: v })}
+        />
+        <Slider
+          label="Hot-Spot"
+          value={settings.lampHotspot ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampHotspot: v })}
+        />
+        <Slider
+          label="Second Lamp"
+          value={settings.secondLamp ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ secondLamp: v })}
+        />
+        <Slider
+          label="Iridescence"
+          value={settings.iridescence ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ iridescence: v })}
         />
       </section>
 

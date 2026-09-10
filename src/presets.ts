@@ -855,6 +855,9 @@ export const PRESETS: Preset[] = [
       plateRock: 0,
       layerScaleVariety: 0.35,
       lampWarmth: 0.75,
+      lampHotspot: 0.6,
+      lampMotion: 0.2,
+      lightPlay: 0.7,
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -905,6 +908,10 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.7,
       layerScaleVariety: 0.0,
       hueJourney: 0,
+      lightPlay: 0.15,
+      lampHotspot: 0.1,
+      iridescence: 0,
+      secondLamp: 0,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },

@@ -63,6 +63,16 @@ export default function App() {
     const sim = new URLSearchParams(window.location.search).get('sim');
     if (sim === 'cpu' || sim === 'auto') base.simResolution = sim;
     else if (sim && Number.isFinite(Number(sim))) base.simResolution = Number(sim);
+    // ?set=key=value;key=value pins any setting for this load (testing a look).
+    const set = new URLSearchParams(window.location.search).get('set');
+    if (set) {
+      for (const kv of set.split(';')) {
+        const [k, v] = kv.split('=');
+        if (!k || v === undefined || !(k in base)) continue;
+        const cur = (base as unknown as Record<string, unknown>)[k];
+        (base as unknown as Record<string, unknown>)[k] = typeof cur === 'number' ? Number(v) : typeof cur === 'boolean' ? v === 'true' : v;
+      }
+    }
     return base;
   });
   const [seedCount, setSeedCount] = useState(0);
@@ -421,6 +431,11 @@ export default function App() {
       backgroundLoop: Math.random(),
       kaleidoscope: Math.random() < 0.2 ? [2, 4, 6][Math.floor(Math.random() * 3)] : 0,
       dishVignette: Math.random() < 0.3 ? 0.4 + Math.random() * 0.6 : 0,
+      lightPlay: 0.3 + Math.random() * 0.7,
+      lampMotion: Math.random(),
+      lampHotspot: Math.random() * 0.7,
+      secondLamp: Math.random() < 0.35 ? 0.4 + Math.random() * 0.6 : 0,
+      iridescence: Math.random() * 0.6,
       // The other projectors come out one roll in five, one at a time
       lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
       chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,

@@ -1544,6 +1544,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const bubblesRef = useRef(new BubbleField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
+  /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
+  const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
@@ -1903,6 +1905,10 @@ uniform vec4  u_bubbles[40];       // x, y, r (fluid uv) and opacity
 uniform vec4  u_bubbleShape[40];   // stretch axis × magnitude, wobble amplitude, wobble phase
 uniform int   u_bubbleCount;
 uniform float u_bubbleStrength;
+uniform vec4  u_lamp;              // the projector lamp under the plate: x, y (fluid uv), height, hot-spot strength
+uniform vec4  u_lamp2;             // a second lamp from another side, cooler: x, y, height, strength (0 = off)
+uniform float u_lightPlay;         // how much the lamp's direction shows on bubbles and dye edges
+uniform float u_iridescence;       // thin-film colour running round bubble rims
 uniform float u_lumia;             // Wilfred's aurora under the plate
 uniform vec3  u_lumiaA;
 uniform vec3  u_lumiaB;
@@ -2095,12 +2101,28 @@ vec3 sobelNormal(sampler2D tex, vec2 fuv) {
   return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
 }
 
+// ─── The lamp ───────────────────────────────────────────────────────
+// One light for every material. A projector lamp sits under the plate at a
+// point, so the light reaches each place on the plate from its own
+// direction: a bubble to the left of the lamp is lit from its right, one on
+// the far side from below. Everything that shades — dye edges, bubbles, the
+// macro relief — asks this for its light instead of assuming a fixed sun.
+vec3 lampDir(vec2 fuv, vec4 lamp) {
+  return normalize(vec3(lamp.xy - fuv, max(0.15, lamp.z)));
+}
+
+// The colours of a thin film at thickness t (in cycles): the rim of a bubble,
+// the thinnest sheet of oil.
+vec3 thinFilm(float t) {
+  return 0.5 + 0.5 * cos(6.28318530718 * (t + vec3(0.0, 0.33, 0.67)));
+}
+
 // Blinn-Phong + Fresnel shading, gated by u_glossiness.
 // At glossiness 0 the dye renders as flat, evenly-lit matte color —
 // the projected-light-show look — with no glass-sphere highlight dots.
-vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend) {
+vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend, vec2 fuv) {
   if (u_glossiness < 0.005) return color;
-  vec3 L = normalize(vec3(-0.577, -0.577, 0.577));
+  vec3 L = lampDir(fuv, u_lamp);
   vec3 V = vec3(0.0, 0.0, 1.0);
   vec3 H = normalize(L + V);
   float diffuse = max(0.0, dot(normal, L));
@@ -2145,12 +2167,25 @@ float boundaryEdge(sampler2D tex, vec2 fuv) {
 // curves away from the glass and a bright refracted highlight just inside
 // it. The macro pass builds this from a full height field; plate-wide, the
 // sobel normal is enough to carry the same read.
-vec3 meniscus(vec3 color, vec3 n, float a) {
+vec3 meniscus(vec3 color, vec3 n, float a, vec2 fuv) {
   float rim = clamp((1.0 - n.z) * 6.0, 0.0, 1.0) * smoothstep(0.02, 0.2, a);
-  vec3 L = normalize(vec3(-0.45, 0.6, 0.65));
+  vec3 L = lampDir(fuv, u_lamp);
   float spec = pow(max(dot(n, L), 0.0), 10.0);
-  vec3 c = color * (1.0 - rim * 0.55);
+  // Which way this edge faces, against where the lamp is: the rim toward
+  // the lamp glows in the dye's own colour, the rim away from it sits in
+  // its own shadow. Straight under the lamp the two sides are the same.
+  vec2 nd = n.xy / max(length(n.xy), 1e-4);
+  float facing = clamp(dot(nd, L.xy) * 3.0, -1.0, 1.0);
+  float play = u_lightPlay;
+  vec3 c = color * (1.0 - rim * (0.55 + 0.3 * max(0.0, -facing) * play));
+  c += color * rim * max(0.0, facing) * 0.7 * play;
   c += vec3(1.0, 0.98, 0.92) * spec * rim * 1.1;
+  if (u_lamp2.w > 0.001) {
+    vec3 L2 = lampDir(fuv, u_lamp2);
+    float facing2 = clamp(dot(nd, L2.xy) * 3.0, -1.0, 1.0);
+    float spec2 = pow(max(dot(n, L2), 0.0), 10.0);
+    c += (vec3(0.72, 0.84, 1.0) * spec2 * rim * 1.0 + mix(color, vec3(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * u_lamp2.w;
+  }
   return mix(color, c, u_edgeRelief);
 }
 
@@ -2383,7 +2418,7 @@ vec4 macroDetail(vec3 col, float alpha, vec2 fuv, vec2 flow, vec3 gridNormal, fl
     // sense of volume under the cell detail.
     vec3 n = normalize(vec3(gridNormal.xy * 3.2 - tilt * r3, 1.0));
 
-    vec3 L = normalize(vec3(-0.45, -0.55, 0.70));
+    vec3 L = lampDir(fuv, u_lamp);
     vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
     float diff = max(0.0, dot(n, L));
     float spec = pow(max(0.0, dot(n, H)), 46.0);
@@ -2559,7 +2594,7 @@ void main() {
   // so skip the 8-tap normal and the interface pass out there.
   bool sharp0 = dof < 0.55;
   vec3 normal0 = sharp0 ? sobelNormal(u_layer0, fuv0) : vec3(0.0, 0.0, 1.0);
-  fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend);
+  fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend, fuv0);
   if (darkBlend) fluid0.a *= 0.6;
 
   // Bright interface line where dye colors meet
@@ -2567,7 +2602,7 @@ void main() {
     float edge0 = boundaryEdge(u_layer0, fuv0);
     fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
   }
-  if (!macro && u_edgeRelief > 0.005 && sharp0) fluid0.rgb = meniscus(fluid0.rgb, normal0, fluid0.a);
+  if (!macro && u_edgeRelief > 0.005 && sharp0) fluid0.rgb = meniscus(fluid0.rgb, normal0, fluid0.a, fuv0);
 
   if (macro) {
     float grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
@@ -2611,14 +2646,14 @@ void main() {
 
     bool sharp1 = dof < 0.55;
     vec3 normal1 = sharp1 ? sobelNormal(u_layer1, fuv1) : vec3(0.0, 0.0, 1.0);
-    fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend);
+    fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend, fuv1);
     if (darkBlend) fluid1.a *= 0.6;
 
     if (u_boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
       float edge1 = boundaryEdge(u_layer1, fuv1);
       fluid1.rgb += fluid1.rgb * edge1 * u_boundaryContrast * 1.6 + vec3(edge1 * u_boundaryContrast * 0.25);
     }
-    if (!macro && u_edgeRelief > 0.005 && sharp1) fluid1.rgb = meniscus(fluid1.rgb, normal1, fluid1.a);
+    if (!macro && u_edgeRelief > 0.005 && sharp1) fluid1.rgb = meniscus(fluid1.rgb, normal1, fluid1.a, fuv1);
 
     if (macro) {
       float grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
@@ -2627,6 +2662,22 @@ void main() {
 
     vec3 blended = applyBlend(outColor, fluid1.rgb, u_blendMode);
     outColor = mix(outColor, blended, fluid1.a);
+  }
+
+  // ── The lamp's hot-spot ──────────────────────────────────────────
+  // A projector is not an even backlight: the plate is brightest over the
+  // lamp and falls away toward the rim, and where the lamp sits wanders as
+  // the plate rocks. A second lamp puts a cooler pool on the other side.
+  if (u_lamp.w > 0.001) {
+    float dl = length(fuvBase - u_lamp.xy);
+    float glow = exp(-dl * dl * 3.5);
+    vec3 pool = mix(vec3(1.0), vec3(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow);
+    outColor *= mix(vec3(1.0), pool, u_lamp.w);
+    if (u_lamp2.w > 0.001) {
+      float d2 = length(fuvBase - u_lamp2.xy);
+      float glow2 = exp(-d2 * d2 * 3.5);
+      outColor *= mix(vec3(1.0), mix(vec3(1.0), vec3(0.9, 0.97, 1.12) * 1.25, glow2), u_lamp2.w * u_lamp.w);
+    }
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
@@ -2639,6 +2690,7 @@ void main() {
     float field = 0.0;
     float opac = 0.0;
     float best = 0.0;
+    float bestRad = 0.01;
     vec2 bestD = vec2(0.0);
     for (int i = 0; i < 40; i++) {
       if (i >= u_bubbleCount) break;
@@ -2662,25 +2714,61 @@ void main() {
       f = f * f;                               // steeper falloff: necks form only when close
       field += f * bb.w;
       opac = max(opac, bb.w * smoothstep(0.25, 1.0, f));
-      if (f > best) { best = f; bestD = d; }
+      if (f > best) { best = f; bestD = d; bestRad = rad; }
     }
     if (field > 0.2) {
       // field == 1 on the membrane, larger inside.
       // In every reference the bubble is a lens over the lamp: a bright
       // centre, a thin darker edge that is the dye seen edge-on, and a
-      // small highlight. Nothing is drawn as a black line.
+      // small highlight. Nothing is drawn as a black line. And the lens is
+      // lit from wherever the lamp is: the rim toward the lamp darkens as
+      // the light is bent away, the far rim carries the bright caustic arc,
+      // the highlight sits on the lamp side of the dome, and the interior
+      // shows the plate behind it magnified — so a field of bubbles reads
+      // as one light falling across them, not forty stamps.
       float edge = field;
       float membrane = smoothstep(0.86, 1.0, edge) * (1.0 - smoothstep(1.0, 1.22, edge));
       float inside = smoothstep(1.0, 1.3, edge);
       float centre = smoothstep(1.3, 3.0, edge);
-      vec2 hd = bestD - vec2(-0.3, 0.3);
-      float hl = exp(-dot(hd, hd) * 22.0) * inside;
+      float play = u_lightPlay;
+      vec3 Lb = lampDir(fuvBase, u_lamp);
+      vec2 lampSide = Lb.xy / max(length(Lb.xy), 0.06);   // unit toward the lamp; shrinks to nothing straight under it
+      vec2 nd = normalize(bestD + vec2(1e-5));
+      float toward = dot(nd, lampSide);
       float ground = dot(outColor, vec3(0.299, 0.587, 0.114));
       float rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
       vec3 c = outColor;
+      // The lens: the plate behind, pulled in toward the bubble's centre.
+      vec2 lensUv = fuvBase - bestD * bestRad * (0.15 + 0.35 * play);
+      vec4 lensF = decodeFluid(u_layer0, lensUv, 0.0, false);
+      vec3 lensCol = mix(bgColor, lensF.rgb, lensF.a);
+      c = mix(c, lensCol, inside * 0.45 * play);
       c = mix(c, c * 1.18 + 0.06, inside * 0.55 + centre * 0.3);     // the lamp through the lens
-      c = mix(c, c * c * 1.1, membrane * rimK);                        // the edge, in the dye's own colour
+      // Shaded as a lens: dimmer toward the lamp, brighter away from it.
+      c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
+      float arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));
+      c += (c * 0.9 + 0.16) * arcBand * max(0.0, -toward) * 0.9 * play;          // the caustic arc
+      // A little of the plate around the far side sits in the bubble's shadow.
+      float halo = smoothstep(0.3, 0.7, edge) * (1.0 - smoothstep(0.7, 0.92, edge));
+      c *= 1.0 - halo * max(0.0, -toward) * 0.22 * play;
+      c = mix(c, c * c * 1.1, membrane * (rimK + 0.35 * max(0.0, toward) * play));  // the edge, darkest toward the lamp
+      // Thin-film colour running round the rim, brighter over bright ground.
+      if (u_iridescence > 0.001) {
+        vec3 film = thinFilm(edge * 2.2 + atan(bestD.y, bestD.x) * 0.5 + u_time * 0.05);
+        c = mix(c, c * (0.55 + 1.2 * film), membrane * u_iridescence * (0.35 + 0.65 * ground));
+      }
+      // The lamp's own reflection: a small spot on the lamp side of the dome.
+      vec2 hd = bestD - lampSide * 0.36;
+      float hl = exp(-dot(hd, hd) * 22.0) * inside;
       c += vec3(1.0, 0.98, 0.92) * hl * (0.25 + 0.3 * ground);
+      if (u_lamp2.w > 0.001) {
+        vec3 L2 = lampDir(fuvBase, u_lamp2);
+        vec2 side2 = L2.xy / max(length(L2.xy), 0.06);
+        float toward2 = dot(nd, side2);
+        c += vec3(0.6, 0.78, 1.0) * (0.15 + ground * 0.5) * arcBand * max(0.0, -toward2) * play * u_lamp2.w;
+        vec2 hd2 = bestD - side2 * 0.36;
+        c += vec3(0.75, 0.86, 1.0) * exp(-dot(hd2, hd2) * 22.0) * inside * 0.35 * u_lamp2.w;
+      }
       outColor = mix(outColor, c, opac * u_bubbleStrength);
     }
   }
@@ -2818,7 +2906,7 @@ void main() {
       'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
-      'u_kaleido','u_dish',
+      'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -3863,6 +3951,22 @@ void main() {
           }
           glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
           {
+            // The lamp wanders slowly under the plate, and the plate's own
+            // rock moves it too — a tilted plate is lit from a new side.
+            const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
+            const rock = rockRef.current;
+            const lamp = lampRef.current;
+            const rockK = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
+            lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rock.x * 0.05 * rockK;
+            lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rock.y * 0.05 * rockK;
+            lamp.x2 = 0.5 - (lamp.x - 0.5) * 0.7 + noise2D(time * 0.019, 27.1) * 0.3 * motion;
+            lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
+            glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
+            glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
+            glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
+            glCtx.uniform1f(uLocs['u_iridescence'], Math.max(0, Math.min(1, currentSettings.iridescence ?? 0)));
+          }
+          {
             // Lumia and gel colours come from the working harmony, so they
             // stay inside the preset's dyes.
             const h = harmonyRef.current;
@@ -3959,6 +4063,7 @@ void main() {
         contract: presetContractRef.current,
         paletteWindow: paletteWindowRef.current,
         journey: journeyRef.current,
+        lamp: lampRef.current,
         settings: settingsRef.current,
       });
     }
