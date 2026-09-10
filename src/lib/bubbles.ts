@@ -31,7 +31,7 @@ export interface Bubble {
   ky: number;
 }
 
-export const MAX_BUBBLES = 24;
+export const MAX_BUBBLES = 40;
 
 /** Solver velocity units → cells per second: one step moves v·dt·(N−2) cells at 60 steps/s. */
 const CELLS_PER_UNIT = 0.05 * 190 * 60;
@@ -111,35 +111,58 @@ export class BubbleField {
 
       // Shape: stretch along the direction it is being dragged, relaxing
       // when the drag stops; the wobble runs down unless something feeds it.
+      // Surface tension wins at small sizes: a small bubble stays round. Only
+      // a large one stretches under drag, and it takes a couple of seconds.
       const speed = Math.hypot(dx, dy);
-      const want = Math.min(0.45, speed * 0.22);
+      const bigness = Math.max(0, Math.min(1, (b.r - 3) / 4));
+      const want = Math.min(0.4, speed * 0.2) * bigness;
       const ax = speed > 1e-3 ? dx / speed : 0, ay = speed > 1e-3 ? dy / speed : 0;
-      const k = 1 - Math.exp(-dt * 1.2);   // a bubble takes a second to take a new shape
+      const k = 1 - Math.exp(-dt * 0.7);
       b.sx += (ax * want - b.sx) * k;
       b.sy += (ay * want - b.sy) * k;
-      const wobTarget = Math.min(0.18, speed * 0.004 + agitation * 0.05);
-      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.6 : 1.5)));
+      const wobTarget = Math.min(0.1, speed * 0.002 + agitation * 0.02) * bigness;
+      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.5 : 1.0)));
       b.wph += b.wvel * dt;
     }
 
-    // Merge on contact: the larger absorbs the smaller, area-conserving,
-    // and the survivor is left necked along the join and wobbling.
+    // Cluster: bubbles nearby drift gently toward one another and then rest
+    // against each other — the packed fields in every reference frame — and
+    // only merge once they have sat pressed together for a while.
+    for (let i = 0; i < bs.length; i++) {
+      for (let j = i + 1; j < bs.length; j++) {
+        const a = bs[i], c = bs[j];
+        const ddx = c.x - a.x, ddy = c.y - a.y;
+        const dist = Math.hypot(ddx, ddy) || 1e-3;
+        const touch = a.r + c.r;
+        if (dist < touch * 3 && dist > touch * 0.95) {
+          const pull = 2.5 * dt * (1 - dist / (touch * 3));
+          a.x += (ddx / dist) * pull; a.y += (ddy / dist) * pull;
+          c.x -= (ddx / dist) * pull; c.y -= (ddy / dist) * pull;
+        } else if (dist < touch * 0.95) {
+          // Overlapping: push apart to rest edge to edge.
+          const push = (touch * 0.95 - dist) * 0.5;
+          a.x -= (ddx / dist) * push; a.y -= (ddy / dist) * push;
+          c.x += (ddx / dist) * push; c.y += (ddy / dist) * push;
+        }
+      }
+    }
+    // Merge: two that have been pressed together long enough become one,
+    // area-conserving; the survivor is left slightly necked along the join.
     for (let i = 0; i < bs.length; i++) {
       for (let j = bs.length - 1; j > i; j--) {
         const a = bs[i], c = bs[j];
         const ddx = a.x - c.x, ddy = a.y - c.y;
         const dist2 = ddx * ddx + ddy * ddy;
-        // Fresh spray gets a moment to fly apart before it can merge back.
-        if (a.age > 0.4 && c.age > 0.4 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.5) {
+        if (a.age > 2 && c.age > 2 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.92 && Math.random() < dt * 0.12) {
           const wa = a.r * a.r, wc = c.r * c.r;
           a.x = (a.x * wa + c.x * wc) / (wa + wc);
           a.y = (a.y * wa + c.y * wc) / (wa + wc);
           a.r = Math.min(N * 0.05, Math.sqrt(wa + wc));
           a.age = Math.min(a.age, c.age);
           const dist = Math.sqrt(dist2) || 1;
-          a.sx = (ddx / dist) * 0.25;
-          a.sy = (ddy / dist) * 0.25;
-          a.wob = Math.max(a.wob, 0.16);
+          a.sx = (ddx / dist) * 0.18;
+          a.sy = (ddy / dist) * 0.18;
+          a.wob = Math.max(a.wob, 0.08);
           this.events.push({ kind: 'merge', x: a.x, y: a.y, r: a.r });
           bs.splice(j, 1);
         }
@@ -150,7 +173,7 @@ export class BubbleField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       const s = Math.hypot(b.sx, b.sy);
-      if (b.age > 3 && b.r > 3 && s > 0.4 && bs.length < MAX_BUBBLES && Math.random() < dt * 0.4) {
+      if (b.age > 4 && b.r > 5 && s > 0.36 && bs.length < MAX_BUBBLES && Math.random() < dt * 0.3) {
         const ux = b.sx / s, uy = b.sy / s;
         const r2 = b.r / Math.SQRT2;
         const gap = r2 * 1.3;

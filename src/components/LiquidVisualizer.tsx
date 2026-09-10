@@ -1699,7 +1699,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         case 'blow':
           af.blowAir(x, y, 4, 0.06);
           if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15) {
-            bubblesRef.current.spawn(x, y, 2.0 * GRID_SCALE, 1, 3 * GRID_SCALE);
+            bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
           }
           break;
         case 'drop':
@@ -1835,8 +1835,8 @@ uniform float u_boundaryContrast;  // bright interface line between dye colors
 uniform float u_edgeRelief;        // meniscus at every blob edge, at any zoom
 uniform float u_layerZoom1;        // second layer viewed magnified about the centre
 uniform vec2  u_layerDrift1;
-uniform vec4  u_bubbles[24];       // x, y, r (fluid uv) and opacity
-uniform vec4  u_bubbleShape[24];   // stretch axis × magnitude, wobble amplitude, wobble phase
+uniform vec4  u_bubbles[40];       // x, y, r (fluid uv) and opacity
+uniform vec4  u_bubbleShape[40];   // stretch axis × magnitude, wobble amplitude, wobble phase
 uniform int   u_bubbleCount;
 uniform float u_bubbleStrength;
 uniform float u_lumia;             // Wilfred's aurora under the plate
@@ -2558,7 +2558,7 @@ void main() {
     float opac = 0.0;
     float best = 0.0;
     vec2 bestD = vec2(0.0);
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 40; i++) {
       if (i >= u_bubbleCount) break;
       vec4 bb = u_bubbles[i];
       vec4 sh = u_bubbleShape[i];
@@ -2584,23 +2584,21 @@ void main() {
     }
     if (field > 0.2) {
       // field == 1 on the membrane, larger inside.
+      // In every reference the bubble is a lens over the lamp: a bright
+      // centre, a thin darker edge that is the dye seen edge-on, and a
+      // small highlight. Nothing is drawn as a black line.
       float edge = field;
-      float membrane = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.32, edge));
-      float innerLine = smoothstep(1.32, 1.6, edge) * (1.0 - smoothstep(1.6, 2.2, edge));
-      float inside = smoothstep(1.0, 1.35, edge);
-      float lens = inside * (1.0 - 1.0 / max(edge, 1.0));
-      vec2 hd = bestD - vec2(-0.36, 0.34);
-      float hl = exp(-dot(hd, hd) * 18.0) * inside;
-      // The membrane is the dye seen edge-on, not a black line: darken toward
-      // the colour already there, less over dark ground (a rim on black
-      // reads as a drawn circle), and keep the highlight modest.
+      float membrane = smoothstep(0.86, 1.0, edge) * (1.0 - smoothstep(1.0, 1.22, edge));
+      float inside = smoothstep(1.0, 1.3, edge);
+      float centre = smoothstep(1.3, 3.0, edge);
+      vec2 hd = bestD - vec2(-0.3, 0.3);
+      float hl = exp(-dot(hd, hd) * 22.0) * inside;
       float ground = dot(outColor, vec3(0.299, 0.587, 0.114));
-      float rimK = mix(0.25, 0.55, smoothstep(0.08, 0.5, ground));
+      float rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
       vec3 c = outColor;
-      c = mix(c, c * 1.06 + 0.02, lens * 0.6);
-      c = mix(c, c * c * 1.2, membrane * rimK);
-      c += outColor * innerLine * 0.35 + vec3(0.06) * innerLine;
-      c += vec3(1.0, 0.97, 0.9) * hl * (0.35 + 0.35 * ground);
+      c = mix(c, c * 1.18 + 0.06, inside * 0.55 + centre * 0.3);     // the lamp through the lens
+      c = mix(c, c * c * 1.1, membrane * rimK);                        // the edge, in the dye's own colour
+      c += vec3(1.0, 0.98, 0.92) * hl * (0.25 + 0.3 * ground);
       outColor = mix(outColor, c, opac * u_bubbleStrength);
     }
   }
@@ -3057,7 +3055,7 @@ void main() {
               if (tool === 'blow') {
                 af.blowAir(x, y, 4, 0.06);
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                  bubblesRef.current.spawn(x, y, 2.0 * GRID_SCALE, 1, 3 * GRID_SCALE);
+                  bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                 }
 
               } else if (tool === 'spray') {
@@ -3166,8 +3164,8 @@ void main() {
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.25 + (currentSettings.bubbles ?? 0) * 0.4
-                      && bubblesRef.current.bubbles.length < 3 + Math.round(9 * (currentSettings.bubbles ?? 0))) {
-                    bubblesRef.current.spawn(rx, ry, (1.8 + energy * 2) * GRID_SCALE, 1, 3 * GRID_SCALE);
+                      && bubblesRef.current.bubbles.length < 6 + Math.round(24 * (currentSettings.bubbles ?? 0))) {
+                    bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
                   }
                 } else {
                   const color = harmonyColor(harmonyRef.current);
@@ -3394,11 +3392,21 @@ void main() {
               // A few bubbles at a time, not a foam: one on a kick (usually),
               // the odd extra under sustained bass, and none once the plate
               // already carries as many as the setting allows.
-              const room = bubbles.bubbles.length < 3 + Math.round(9 * bubbleAmt);
+              // Air lives in the oil: a kick releases a few small bubbles into
+              // the densest dye near the ring, where they gather into the packed
+              // fields the references show, rather than one lens on bare glass.
+              const room = bubbles.bubbles.length < 6 + Math.round(24 * bubbleAmt);
               const onset = bass01 > 0.45 && rock.lastBass <= 0.45;
-              if (currentAudioData && room && ((onset && Math.random() < 0.7 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.004 * bubbleAmt))) {
-                const a = Math.random() * Math.PI * 2, rr = (10 + bass01 * 14) * GRID_SCALE;
-                bubbles.spawn(GRID_SIZE / 2 + Math.cos(a) * rr, GRID_SIZE / 2 + Math.sin(a) * rr, (1.5 + bass01 * 2) * GRID_SCALE, 1, 2 * GRID_SCALE);
+              if (currentAudioData && room && ((onset && Math.random() < 0.8 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.006 * bubbleAmt))) {
+                const dens = fluidsRef.current[0]?.readDensity;
+                let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
+                for (let t = 0; t < 6; t++) {
+                  const a = Math.random() * Math.PI * 2, rr = (6 + Math.random() * 40) * GRID_SCALE;
+                  const px = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr), py = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
+                  const d = dens ? dens[Math.max(0, Math.min(GRID_SIZE - 1, px)) + Math.max(0, Math.min(GRID_SIZE - 1, py)) * GRID_SIZE] : 0;
+                  if (d > best) { best = d; bx = px; by = py; }
+                }
+                bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 3 * GRID_SCALE);
               }
               const lead = fluidsRef.current[0];
               const vx = lead?.readVx, vy = lead?.readVy;
