@@ -391,6 +391,7 @@ export default function App() {
       bubbles: Math.random() < 0.2 ? 0 : 0.2 + Math.random() * 0.8,
       plateRock: Math.random() * 0.9,
       layerScaleVariety: Math.random(),
+      macroSync: Math.random(),
       // The other projectors come out one roll in five, one at a time
       lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
       chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,

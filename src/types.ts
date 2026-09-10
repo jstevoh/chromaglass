@@ -109,6 +109,7 @@ export interface VisualizerSettings {
   macroZoom: number;          // 1 = full plate, 16 = extreme magnification
   macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
   macroHold: number;          // seconds spent on one bead before cutting to the next
+  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
@@ -182,6 +183,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroZoom: 4.0,           // ~32 sim cells across the frame — one bead and its ground
   macroChase: 0.6,          // quick follow with a short whip on each new bead
   macroHold: 5.0,
+  macroSync: 0.6,
   macroCells: 0.75,
   macroCellScale: 0.5,
   macroLacing: 0.55,
