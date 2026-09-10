@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Changed — Bubbles, second pass, from the references
+- A second reference study (48 photographs, 24 video timelines) showed the same bubble everywhere: small, round, gathered in packed fields inside the oil, a bright lens over the lamp with a thin edge in the dye's own colour — large deforming bubbles are the exception. So: up to forty, spawned small and in threes into the densest dye; shape only for the big ones, and slowly; they drift together and rest edge to edge before merging; the membrane is the dye seen edge-on with a lifted centre, never a drawn ring
+
 ### Changed — Bubbles that behave
 - Bubbles are drawn as one implicit (metaball) surface instead of stamped circles, so two pulling together neck into each other and merge, and the membrane is a thin dark line with a bright refracted edge inside it rather than a band a quarter of the radius wide
 - Each bubble now has a shape: it stretches along whatever is dragging it, wobbles in second- and third-order modes after a knock (a merge, a split, fresh air), and relaxes when the plate goes quiet
