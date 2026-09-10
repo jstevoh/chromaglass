@@ -3436,7 +3436,7 @@ void main() {
           lastMacroOnRef.current = macroOn;
           if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on switch-on
         }
-        if ((macroOn || (currentSettings.exposure ?? 0) > 0.001) && fluidsRef.current.length > 0) {
+        if (macroOn && fluidsRef.current.length > 0) {
           if (isActiveRef.current && drainFrameRef.current === 0) {
             const subject = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
             const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
@@ -3467,7 +3467,7 @@ void main() {
         // fifth of the plate begins renders as bare ground, and the range
         // above it is stretched to full opacity. Slewed, so exposure drifts
         // rather than pumping.
-        if (macroOn && fluidsRef.current.length > 0) {
+        if ((macroOn || (currentSettings.exposure ?? 0) > 0.001) && fluidsRef.current.length > 0) {
           const f0 = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
           const bins = filmHistRef.current;
           bins.fill(0);
