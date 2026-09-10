@@ -109,7 +109,7 @@ const PRESET_CONTRACTS: Record<string, number[]> = {
   'deep-ocean':         [7, 9, 5],
   'cyberpunk':          [6, 10, 2],
   'lava-lamp':          [0, 1, 3],
-  'ink-bleed':          [14, 15],
+  'ink-bleed':          [14],          // graphite only: white dye on a white ground is just haze
   'acid-trip':          [8, 3, 0, 10],
   'bass-drop':          [8, 3, 0],
   'timbre-shifter':     [2, 8, 0],

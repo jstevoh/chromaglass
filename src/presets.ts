@@ -249,7 +249,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#ffffff',
       ledSpeed: 0.0,
       surfaceTension: 0.0,
-      diffusionRate: 0.002,
+      diffusionRate: 0.0005,   // ink holds its edge instead of greying the plate
       buoyancy: 0.4,
       advection: 0.4,
       damping: 0.96,
@@ -259,7 +259,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.9,
       viscosity: 'thin',
-      polarity: 0.1,
+      polarity: 0.55,
       heatIntensity: 0.1,
       boilingPoint: 0.8,
       evaporationRate: 0.08,
