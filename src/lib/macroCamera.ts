@@ -34,8 +34,19 @@ export interface MacroCameraOptions {
   chase: number;
   /** Seconds to stay on one bead before cutting to another. */
   hold: number;
-  /** Audio energy 0..1 — adds a small zoom punch. */
+  /** Audio energy 0..1 — a slow push-in and faster cutting in loud passages. */
   energy?: number;
+  /**
+   * Music sync 0..1. At 0 the camera keeps its own time; at 1 it cuts on
+   * kicks, punches in with the bass, chases harder when the track is loud
+   * and picks up a handheld tremor from the treble.
+   */
+  sync?: number;
+  /** Bass level 0..1 this frame, and whether a kick landed on it. */
+  bass?: number;
+  beat?: boolean;
+  /** Treble level 0..1 — the tremor. */
+  treble?: number;
   /**
    * Density that counts as bare ground. The renderer exposes the closeup
    * against this same level, so tracking it keeps the camera on what the
@@ -79,6 +90,12 @@ export class MacroCamera {
   private beadMass = 0;
   private holdLeft = 0;
   private whipLeft = 0;
+  /** Seconds since the last cut, so a kick can't cut twice in a bar. */
+  private sinceCut = 0;
+  /** A kick's push-in, decaying. */
+  private punchLeft = 0;
+  private tremorX = 0;
+  private tremorY = 0;
   private clock = 0;
   /** Density counted as bare ground, mirrored from the renderer's exposure. */
   private floor = 0;
@@ -87,6 +104,10 @@ export class MacroCamera {
 
   /** Force a cut to a new bead on the next update (preset change, drain, seed). */
   reset() {
+    this.sinceCut = 0;
+    this.punchLeft = 0;
+    this.tremorX = 0;
+    this.tremorY = 0;
     this.initialized = false;
     this.holdLeft = 0;
     this.whipLeft = 0;
@@ -107,10 +128,18 @@ export class MacroCamera {
       this.whipLeft = 0;
     }
 
+    const sync = clamp(opts.sync ?? 0, 0, 1);
+    const energy = clamp(opts.energy ?? 0, 0, 1);
+    const bass = clamp(opts.bass ?? 0, 0, 1);
+    const treble = clamp(opts.treble ?? 0, 0, 1);
+
     // ── Stay on the bead ────────────────────────────────────────────
     const tracked = this.recenter(field);
-    this.holdLeft -= step;
+    // Loud passages spend the hold faster, so a chorus cuts quicker than a verse.
+    this.holdLeft -= step * (1 + sync * energy * 1.2);
+    this.sinceCut += step;
     this.whipLeft = Math.max(0, this.whipLeft - step);
+    this.punchLeft = Math.max(0, this.punchLeft - step / 0.35);
 
     const margin = size * EDGE_MARGIN;
     const lostIt = tracked.mass < this.beadMass * 0.18 || tracked.mass < 0.5;
@@ -118,9 +147,17 @@ export class MacroCamera {
       this.beadX < margin || this.beadX > size - margin ||
       this.beadY < margin || this.beadY > size - margin;
 
-    if (lostIt || ranAground || this.holdLeft <= 0) {
+    // A kick can bring the cut forward once the shot has had a fair run —
+    // most of the way through its hold at low sync, a quarter of it at full —
+    // so the edit lands on the music instead of a private timer.
+    const minRun = Math.max(0.5, opts.hold * (0.9 - 0.65 * sync));
+    const beatCut = !!opts.beat && sync > 0.05 && this.sinceCut >= minRun && bass > 0.55;
+    if (opts.beat) this.punchLeft = Math.max(this.punchLeft, bass * sync);
+
+    if (lostIt || ranAground || this.holdLeft <= 0 || beatCut) {
       const from = { x: this.beadX, y: this.beadY };
       this.acquire(field, from, opts.hold);
+      this.sinceCut = 0;
       const jumped = Math.hypot(this.beadX - from.x, this.beadY - from.y);
       // Only call it a cut if the camera actually has somewhere to travel.
       if (jumped > size * 0.06) this.whipLeft = WHIP_TIME;
@@ -134,23 +171,37 @@ export class MacroCamera {
 
     // ── Follow ─────────────────────────────────────────────────────
     const whip = this.whipLeft / WHIP_TIME;
-    const rate = (2.5 + opts.chase * 12) * (1 + whip * 1.8);
+    // The chase tightens when the track is loud.
+    const rate = (2.5 + opts.chase * 12) * (1 + whip * 1.8) * (1 + sync * energy * 0.8);
     const k = 1 - Math.exp(-rate * step);
     this.camX += (targetX - this.camX) * k;
     this.camY += (targetY - this.camY) * k;
 
-    // ── Zoom: slow breathe, a dolly-out through each whip, audio punch ──
+    // ── Handheld tremor from the treble ────────────────────────────
+    // A few cells of drift at three unrelated rates, scaled by the highs, so
+    // hi-hats read as a hand that is never quite still.
+    const tremorAmp = size * 0.004 * sync * treble;
+    const tx = (Math.sin(this.clock * 9.3) + Math.sin(this.clock * 23.1 + 1.3) * 0.5) * tremorAmp;
+    const ty = (Math.sin(this.clock * 11.7 + 0.7) + Math.sin(this.clock * 19.4 + 2.1) * 0.5) * tremorAmp;
+    this.tremorX += (tx - this.tremorX) * (1 - Math.exp(-20 * step));
+    this.tremorY += (ty - this.tremorY) * (1 - Math.exp(-20 * step));
+
+    // ── Zoom: slow breathe, a dolly-out through each whip, the music's push ──
     const breathe = 1 + Math.sin(this.clock * 0.37) * 0.08 + Math.sin(this.clock * 0.11 + 1.7) * 0.05;
     const dolly = 1 - Math.sin(whip * Math.PI) * 0.32;
-    const punch = 1 + (opts.energy ?? 0) * 0.07;
-    const wantZoom = Math.max(1, opts.zoom * breathe * dolly * punch);
-    this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-8 * step));
+    // A slow push with the energy, and a kick's push-in that eases back.
+    const push = 1 + energy * (0.07 + sync * 0.08);
+    const punch = 1 + this.punchLeft * this.punchLeft * 0.2;
+    const wantZoom = Math.max(1, opts.zoom * breathe * dolly * push * punch);
+    // The punch is fast in, the rest eases.
+    const zoomRate = wantZoom > this.smoothZoom ? 8 + sync * 22 : 8;
+    this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-zoomRate * step));
 
     // ── Keep the frame on the plate ────────────────────────────────
     const halfX = clamp(opts.spanX / this.smoothZoom, 0, 1) * 0.5;
     const halfY = clamp(opts.spanY / this.smoothZoom, 0, 1) * 0.5;
-    const cx = this.frameClamp(this.camX / size, halfX);
-    const cy = this.frameClamp(this.camY / size, halfY);
+    const cx = this.frameClamp((this.camX + this.tremorX) / size, halfX);
+    const cy = this.frameClamp((this.camY + this.tremorY) / size, halfY);
 
     return { cx, cy, zoom: this.smoothZoom, whip };
   }

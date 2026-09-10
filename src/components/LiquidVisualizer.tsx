@@ -1540,6 +1540,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
   const lastBass01Ref = useRef(0); // for beat edge detection
+  const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
   const macroCamRef = useRef(new MacroCamera());
@@ -3446,6 +3447,7 @@ void main() {
           if (isActiveRef.current && drainFrameRef.current === 0) {
             const subject = fluidsRef.current[activeLayerRef.current] ?? fluidsRef.current[0];
             const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
+            const camBass = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             macroShotRef.current = macroCamRef.current.update(
               { density: subject.readDensity, vx: subject.readVx, vy: subject.readVy, size: GRID_SIZE },
               realDt,
@@ -3455,10 +3457,15 @@ void main() {
                 hold: Math.max(0.5, currentSettings.macroHold ?? 5),
                 floor: filmLevelRef.current,
                 energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
+                sync: currentSettings.macroSync ?? 0,
+                bass: camBass,
+                beat: camBass > 0.45 && camBassRef.current <= 0.45,
+                treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,
                 spanX: canvas.width / maxDim,
                 spanY: canvas.height / maxDim,
               },
             );
+            camBassRef.current = camBass;
           }
         } else {
           macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };

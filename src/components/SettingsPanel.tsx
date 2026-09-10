@@ -506,6 +506,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onChange={(v: number) => onUpdate({ macroHold: v })}
             />
             <Slider
+              label="Music Sync"
+              value={settings.macroSync ?? 0.6}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroSync: v })}
+            />
+            <Slider
               label="Paint Cells"
               value={settings.macroCells}
               min={0}

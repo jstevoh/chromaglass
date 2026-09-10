@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Simulation shows the live engine, pixel density and frame rate, and whether Auto has had to step down on this machine
 - `?tier=` and `?gpu=` URL overrides for testing a tier on the wrong machine
 
+### Added — Macro camera on the beat
+- **Music sync** for the closeup camera (`macroSync`, Settings → Macro Closeup and the phone): a kick brings the cut forward once the shot has had a fair run, so the edit lands on the music instead of a private timer; each kick punches in with the bass and eases back; loud passages spend the hold faster and tighten the chase; the treble adds a few cells of handheld tremor. At 0 the camera keeps its own time as before
+
 ### Fixed — Lag and jitter
 - **The GPU path no longer stalls every frame.** The bead tracker and dye regulator read the field back from the GPU each frame with a blocking `readPixels`, which forces the GPU to finish before the CPU can continue and serialises the two — the stutter was the pipeline draining sixty times a second. The read now goes through pixel-pack buffers with fences, collected a frame later
 - **Catch-up no longer compounds a hitch.** When a solver step already costs most of a frame, owing four of them after a slow frame only produced a run of slow frames; the cap now adapts to the measured step cost, so the show runs a little slow instead of stuttering
