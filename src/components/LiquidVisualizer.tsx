@@ -4,6 +4,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
+import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
 import { classifyGpu, detectTier, qualityLadder, type EngineStatus } from '../lib/platform';
@@ -1595,6 +1596,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
   const lastBass01Ref = useRef(0); // for beat edge detection
+  /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
+  const beatClockRef = useRef(new BeatClock());
+  const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -3149,6 +3153,15 @@ void main() {
         const realDt = now - lastTimeRef.current;
         lastTimeRef.current = now;
         frameS = realDt;
+        // One verdict per frame on whether this is a kick: from the beat
+        // clock when it is locked (ahead of the microphone), else from the
+        // onset as heard. Every reaction below reads this instead of its own
+        // threshold crossing, so they all land together.
+        {
+          const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
+          const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
+          kickRef.current = beatClockRef.current.update(performance.now(), bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+        }
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
         let dynamicSpeed = 0.05;
@@ -3619,7 +3632,7 @@ void main() {
 
                   // Beat edge: a fresh-colored ring of dye blooms outward on each
                   // kick so bass hits are visible in COLOR, not just motion
-                  if (bass01 > 0.45 && lastBass01Ref.current <= 0.45) {
+                  if (kickRef.current.kick && simStep === 0) {
                     const ringCol = colFor(2.0);
                     const ringR = (10 + bass01 * 14) * GRID_SCALE;
                     const drops = 14;
@@ -3694,7 +3707,8 @@ void main() {
             const rock = rockRef.current;
             const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if (R > 0 && bass01 > 0.45 && rock.lastBass <= 0.45) {
+            const kickStep = kickRef.current.kick && simStep === 0;
+            if (R > 0 && kickStep) {
               rock.vx += Math.cos(rock.phase) * bass01 * 7 * R;
               rock.vy += Math.sin(rock.phase) * bass01 * 7 * R;
               rock.phase += 2.4;   // successive kicks go different ways
@@ -3702,7 +3716,7 @@ void main() {
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
-            if (squeezeAmt > 0 && bass01 > 0.45 && rock.lastBass <= 0.45 && isActiveRef.current && drainFrameRef.current === 0) {
+            if (squeezeAmt > 0 && kickStep && isActiveRef.current && drainFrameRef.current === 0) {
               const leadPlate = fluidsRef.current[0];
               if (leadPlate) {
                 const cx = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
@@ -3744,7 +3758,7 @@ void main() {
               // the densest dye near the ring, where they gather into the packed
               // fields the references show, rather than one lens on bare glass.
               const room = bubbles.bubbles.length < 6 + Math.round(24 * bubbleAmt);
-              const onset = bass01 > 0.45 && rock.lastBass <= 0.45;
+              const onset = kickStep;
               if (currentAudioData && room && ((onset && Math.random() < 0.8 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.006 * bubbleAmt))) {
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
@@ -3869,7 +3883,7 @@ void main() {
                 energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
                 sync: currentSettings.macroSync ?? 0,
                 bass: camBass,
-                beat: camBass > 0.45 && camBassRef.current <= 0.45,
+                beat: kickRef.current.kick,
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,
                 spanX: canvas.width / maxDim,
                 spanY: canvas.height / maxDim,

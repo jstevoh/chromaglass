@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Beats ahead of the microphone
+- A microphone hears late — capture buffer, analyser window and smoothing, band smoothing, the wait for the onset threshold — so a kick on the plate landed after the kick in the room. `src/lib/beatClock.ts` is a phase-locked clock: it collects onsets, finds a period once the last few intervals agree (folded into 60–200 bpm), then nudges the period and snaps the phase on every on-beat onset, gaining confidence with each hit and losing it on syncopations, misses and silence. Once confident it fires each beat `beatLead` ms (default 80) before the onset would be heard and absorbs the heard onset of the same beat so nothing fires twice; when it loses the beat it hands back to detection
+- Every kick reaction — the plate rock, the beat squeeze, the beat ring of dye, bubble release, the macro camera's cut — now reads one verdict per frame instead of its own threshold crossing, so they land together. `beatPrediction` (default 0.7) is how much the show trusts the clock; 0 is detection only. Settings → Sound
+
 ### Changed — Bubbles in the dye, not over it
 - Bubbles rode the velocity field but the dye slid underneath them as if they were painted on a sheet above the plate. Now each bubble's footprint carries a standing squeeze in the solver, so the dye keeps pumping out to the bubble's rim and flows round it (`applySquish` per bubble per step, on the lead plate)
 - Whatever lands on the plate lands on the bubbles: dye from the dropper, spray, pour, streak or splatter bursts the bubble under it into two or three satellites and shoves the bubbles along the spreading front; a blow of air shoves harder and bursts nothing. The same for the phone's pad, replayed performances and automation drops (`BubbleField.disturb`)

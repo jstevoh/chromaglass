@@ -40,6 +40,10 @@ export interface VisualizerSettings {
   autoCalibrate: boolean;
   /** When a new song starts (a gap between tracks, or a different track identified): keep the look, switch to another preset, or roll a random one. */
   onNewSong: 'off' | 'preset' | 'random';
+  /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
+  beatPrediction: number;
+  /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
+  beatLead: number;
   globalSpeed: number;
   audioMappings: AudioMappings;
   
@@ -151,6 +155,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   bassBoost: 1.0,
   autoCalibrate: true,      // on by default — a fixed level can't serve every room
   onNewSong: 'preset',      // a new song gets a new look
+  beatPrediction: 0.7,
+  beatLead: 80,
   globalSpeed: 0.025,       // slow viscous crawl, visibly moving
   audioMappings: {
     velocity: 'bass',
