@@ -3,6 +3,7 @@ import { LiquidVisualizer, type LiquidVisualizerHandle } from './LiquidVisualize
 import { DEFAULT_SETTINGS } from '../types';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProtocol';
+import { useRemoteLink } from '../hooks/useRemoteLink';
 
 /**
  * The cast receiver: the show on the second screen.
@@ -48,6 +49,14 @@ export default function CastDisplay() {
     }
     visualizerRef.current?.setHarmonyLock(state.harmonyLock);
   }, [state]);
+
+  // A network display: served by the show server on the LAN, fed through
+  // its relay. The link probes first, so a receiver opened from a static
+  // host stays quiet.
+  useRemoteLink({
+    role: 'mirror',
+    onMessage: (m) => { if (m.type === 'cast') handle(m.message); },
+  });
 
   useEffect(() => {
     const hello = JSON.stringify({ type: 'hello' } satisfies CastMessage);

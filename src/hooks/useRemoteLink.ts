@@ -9,7 +9,7 @@ import {
 export type RemoteStatus = 'connecting' | 'connected' | 'offline';
 
 interface UseRemoteLinkOptions {
-  role: 'display' | 'controller';
+  role: 'display' | 'controller' | 'mirror';
   /** Called for every message addressed to this role. */
   onMessage?: (message: RemoteMessage) => void;
   /**
@@ -71,7 +71,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       // page has nothing to talk to. Probe before opening a socket, since a
       // refused handshake is a console error nothing can suppress. A phone
       // was pointed here deliberately, so it connects straight away.
-      if (role === 'display') {
+      if (role !== 'controller') {
         void probeRelay().then((present) => {
           if (closedRef.current) return;
           if (present) openSocket();

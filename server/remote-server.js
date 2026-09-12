@@ -49,6 +49,12 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 
+const lanAddresses = () =>
+  Object.values(networkInterfaces())
+    .flat()
+    .filter((n) => n && n.family === 'IPv4' && !n.internal)
+    .map((n) => n.address);
+
 // ── Static files, with SPA fallback ────────────────────────────────────
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
@@ -56,7 +62,8 @@ const server = createServer((req, res) => {
   // anywhere else knows not to try. Static hosts answer with index.html.
   if (url.pathname === INFO_PATH) {
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH }));
+    // The LAN addresses let the show print the URL a network display opens.
+    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, hosts: lanAddresses() }));
     return;
   }
   // normalize() collapses any ../ before it can escape dist
@@ -107,32 +114,43 @@ wss.on('connection', (socket) => {
     }
 
     if (message.type === 'hello') {
-      roles.set(socket, message.role === 'display' ? 'display' : 'controller');
-      const count = [...wss.clients].filter(c => roles.get(c) === message.role).length;
-      console.log(`  ${message.role} connected (${count} now)`);
-      // A joining phone needs the current state before it can show anything.
-      if (message.role === 'controller') {
-        broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : 'controller';
+      roles.set(socket, role);
+      const count = [...wss.clients].filter(c => roles.get(c) === role).length;
+      console.log(`  ${role} connected (${count} now)`);
+      // A joining phone needs the current state before it can show anything;
+      // a joining network display needs the show itself.
+      if (role === 'controller') broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+      if (role === 'mirror') {
+        broadcastTo('display', JSON.stringify({ type: 'request-cast' }));
+        broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
       return;
     }
 
+    const from = roles.get(socket);
+    // The show itself — settings and audio bands, thirty times a second —
+    // goes only to the network displays; phones never see it.
+    if (from === 'display' && message.type === 'cast') {
+      broadcastTo('mirror', raw, socket);
+      return;
+    }
+    if (from === 'mirror') return;   // a display only listens
     // Displays talk to phones; phones talk to displays.
-    broadcastTo(roles.get(socket) === 'display' ? 'controller' : 'display', raw, socket);
+    broadcastTo(from === 'display' ? 'controller' : 'display', raw, socket);
   });
 
   socket.on('close', () => {
     const role = roles.get(socket);
     if (role && role !== 'unknown') console.log(`  ${role} disconnected`);
+    if (role === 'mirror') {
+      const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
+      broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
+    }
   });
 });
 
 // ── Startup banner ─────────────────────────────────────────────────────
-const lanAddresses = () =>
-  Object.values(networkInterfaces())
-    .flat()
-    .filter((n) => n && n.family === 'IPv4' && !n.internal)
-    .map((n) => n.address);
 
 server.listen(PORT, '0.0.0.0', () => {
   const hosts = lanAddresses();
@@ -143,6 +161,7 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     for (const host of hosts) {
       console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1`);
+      console.log(`  Network display:    http://${host}:${PORT}/?cast=true`);
     }
   }
   console.log('\n  Both devices must be on the same network.\n');

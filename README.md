@@ -65,6 +65,8 @@ npm run build
 npm run remote
 ```
 
+The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
+
 The server prints two URLs: open the first on the laptop, the second
 (`?remote=1`) on the phone. Both devices need to be on the same network.
 
@@ -142,7 +144,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup |
-| Cast | A menu: **Second display** opens the show in its own window, placed on a second screen when one is plugged in (click it once for fullscreen); **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
+| Cast | A menu: **Second display** opens the show in its own window, placed on a second screen when one is plugged in (click it once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
 
 ## Tech Stack
