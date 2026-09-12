@@ -14,6 +14,7 @@
  */
 
 import type { VisualizerSettings } from '../types';
+import type { CastMessage } from './castProtocol';
 
 /** WebSocket path the relay listens on. */
 export const REMOTE_WS_PATH = '/remote-ws';
@@ -68,8 +69,14 @@ export interface RemoteState {
 }
 
 export type RemoteMessage =
-  /** Sent on connect so the relay knows which way to route. */
-  | { type: 'hello'; role: 'display' | 'controller' }
+  /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' }
+  /** Relay → display, when a network display joins and needs the whole show. */
+  | { type: 'request-cast' }
+  /** Relay → display: how many network displays are connected. */
+  | { type: 'mirrors'; count: number }
+  /** Display → network displays: the show itself, the same messages a cast receiver gets. */
+  | { type: 'cast'; message: CastMessage }
   /** Relay → display, when a controller joins and needs a snapshot. */
   | { type: 'request-state' }
   /** Display → controllers. */
@@ -100,12 +107,24 @@ export function remoteSocketUrl(): string {
  * which fails the JSON check; only the show server returns the marker.
  */
 export async function probeRelay(): Promise<boolean> {
+  return (await relayInfo()) !== null;
+}
+
+export interface RelayInfo {
+  port: number;
+  /** The show server's LAN addresses, for the URL a network display opens. */
+  hosts: string[];
+}
+
+/** The relay's own description of itself, or null when there is none behind this origin. */
+export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
-    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return false;
-    const body = (await res.json()) as { chromaglass?: unknown };
-    return body?.chromaglass === 'relay';
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[] };
+    if (body?.chromaglass !== 'relay') return null;
+    return { port: body.port ?? (Number(window.location.port) || 3000), hosts: Array.isArray(body.hosts) ? body.hosts : [] };
   } catch {
-    return false;
+    return null;
   }
 }

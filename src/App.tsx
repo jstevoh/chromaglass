@@ -8,8 +8,9 @@ import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES 
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
-import type { RemoteState } from './lib/remoteProtocol';
-import type { CastState } from './lib/castProtocol';
+import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
+import type { CastState, CastMessage } from './lib/castProtocol';
+import type { RemoteMessage } from './lib/remoteProtocol';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
@@ -290,6 +291,10 @@ export default function App() {
   const [showSequencer, setShowSequencer] = useState(false);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
   const [castMenu, setCastMenu] = useState(false);
+  /** Network displays connected through the relay, and where they can reach it. */
+  const [mirrorCount, setMirrorCount] = useState(0);
+  const [relay, setRelay] = useState<RelayInfo | null>(null);
+  useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
   const presetAnchorRef = useRef<{ top: number; left: number } | null>(null);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
@@ -522,9 +527,13 @@ export default function App() {
     presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
   }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock]);
-  const sendCastState = useCallback(() => castSend({ type: 'state', state: castState }), [castSend, castState]);
+  const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
+  const sendCastState = useCallback(() => {
+    castSend({ type: 'state', state: castState });
+    if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+  }, [castSend, castState, mirrorCount]);
   castReadyRef.current = sendCastState;
-  useEffect(() => { if (isCasting) sendCastState(); }, [isCasting, sendCastState]);
+  useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState, audio: audioData, songChange });
@@ -533,18 +542,20 @@ export default function App() {
   // The audio bands, thirty times a second — the raw spectrum stays here.
   const lastCastAudioRef = useRef(0);
   useEffect(() => {
-    if (!isCasting) return;
+    if (!isCasting && mirrorCount === 0) return;
     const now = performance.now();
     if (now - lastCastAudioRef.current < 33) return;
     lastCastAudioRef.current = now;
-    castSend({
+    const message: CastMessage = {
       type: 'audio',
       audio: audioData ? {
         volume: audioData.volume, bass: audioData.bass, mid: audioData.mid, treble: audioData.treble,
         energy: audioData.energy, spectralCentroid: audioData.spectralCentroid, timbre: audioData.timbre, complexity: audioData.complexity,
       } : null,
-    });
-  }, [audioData, isCasting, castSend]);
+    };
+    if (isCasting) castSend(message);
+    if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message });
+  }, [audioData, isCasting, mirrorCount, castSend]);
 
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
@@ -583,11 +594,17 @@ export default function App() {
     }, 50);
   };
 
-  useRemoteLink({
+  const remoteLink = useRemoteLink({
     role: 'display',
     state: remoteState,
     onMessage: (message) => {
       switch (message.type) {
+        case 'mirrors':
+          setMirrorCount(message.count);
+          break;
+        case 'request-cast':
+          relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+          break;
         case 'patch':
           queuePatch(message.settings);
           break;
@@ -626,6 +643,8 @@ export default function App() {
       }
     },
   });
+
+  relaySendRef.current = remoteLink.send;
 
   // Derive preset name for display
   const activePresetName = useMemo(() => {
@@ -1221,6 +1240,19 @@ export default function App() {
                   <div className="text-xs font-semibold">Second display</div>
                   <div className="text-[10px] opacity-50 leading-snug mt-0.5">Opens the show in its own window, placed on a second screen if one is plugged in. Click it once for fullscreen.</div>
                 </button>
+                <div className="px-3 py-2 rounded-lg" data-testid="cast-network">
+                  <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
+                  {relay ? (
+                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">
+                      Open this on any browser on the same Wi-Fi — a projector, a TV, a tablet — and it shows the show:
+                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
+                        <div key={h} className="font-mono text-white/80 select-all mt-0.5">http://{h}:{relay.port}/?cast=true</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">Needs the show server: run <span className="font-mono">npm run remote</span> and open the show from there, then this lists the address.</div>
+                  )}
+                </div>
                 <button
                   role="menuitem"
                   onClick={() => { setCastMenu(false); startCast('device'); }}
