@@ -15,6 +15,7 @@ import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
 import { PresetMenu } from './components/PresetMenu';
 import { useShowSequencer } from './hooks/useShowSequencer';
+import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
@@ -490,6 +491,23 @@ export default function App() {
     setSeedCount(prev => prev + 1);
   };
 
+  // ── A new song, a new look ──────────────────────────────────────
+  // Heard as a gap between tracks, or named by track identification. The
+  // sequencer owns the evolution while it runs, so it is left alone then.
+  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive);
+  const lastSongChangeSeq = useRef(0);
+  useEffect(() => {
+    if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
+    lastSongChangeSeq.current = songChange.seq;
+    const mode = settings.onNewSong ?? 'off';
+    if (mode === 'off' || sequencer.status.running) return;
+    if (mode === 'random') { triggerLucky(); return; }
+    const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    if (next) applyPreset(next.id, next.settings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songChange?.seq]);
+
   // ── Cast: keep the receiver in step ─────────────────────────────
   const castState = useMemo<CastState>(() => ({
     settings: effectiveSettings,
@@ -508,9 +526,9 @@ export default function App() {
   useEffect(() => { if (isCasting) sendCastState(); }, [isCasting, sendCastState]);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState });
+      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState, audio: audioData, songChange });
     }
-  }, [isCasting, castState]);
+  }, [isCasting, castState, audioData, songChange]);
   // The audio bands, thirty times a second — the raw spectrum stays here.
   const lastCastAudioRef = useRef(0);
   useEffect(() => {

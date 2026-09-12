@@ -38,6 +38,8 @@ export interface VisualizerSettings {
   bassBoost: number;
   /** Learn the room's noise floor and dynamics, and normalise every band against them. */
   autoCalibrate: boolean;
+  /** When a new song starts (a gap between tracks, or a different track identified): keep the look, switch to another preset, or roll a random one. */
+  onNewSong: 'off' | 'preset' | 'random';
   globalSpeed: number;
   audioMappings: AudioMappings;
   
@@ -148,6 +150,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   sensitivity: 0.4,
   bassBoost: 1.0,
   autoCalibrate: true,      // on by default — a fixed level can't serve every room
+  onNewSong: 'preset',      // a new song gets a new look
   globalSpeed: 0.025,       // slow viscous crawl, visibly moving
   audioMappings: {
     velocity: 'bass',

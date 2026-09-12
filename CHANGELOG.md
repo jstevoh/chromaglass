@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — A new song, a new look
+- `onNewSong` (Settings → Sound → On a New Song: Keep / New preset / Random, default New preset). A new song is detected two ways: a boundary heard in the audio — music that has run at least twenty seconds, then quiet for at least two and a half, then sound again (`src/lib/songBoundary.ts`; a rest inside a song is too short, a crossfaded set never goes quiet) — or track identification naming a different song than before. Either picks another non-closeup preset or rolls a random look; a gap and an identification close together count once; the sequencer keeps control while it is running
+
 ### Fixed — Casting
 - Casting to a Chromecast or a second display showed "Source window closed" and nothing else. The receiver page mirrored the show window's canvas through `window.opener`, which only exists when the receiver is a popup; a page presented through the Presentation API runs in its own context with no opener. The receiver now runs its own copy of the visualizer and is fed by the show window — a snapshot of the settings when it connects and on every change, the audio bands thirty times a second, and the seed, clear and drain triggers — over the PresentationConnection, or over a BroadcastChannel when it was opened as a popup (`src/lib/castProtocol.ts`, `src/hooks/useCastSession.ts`, `src/components/CastDisplay.tsx`). Choosing a preset re-seeds the receiver's plate too, and the user's palette lock carries across
 - The receiver says when the show window has gone quiet instead of freezing on the last frame
