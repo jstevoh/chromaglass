@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  probeRelay,
+  relayInfo,
   remoteSocketUrl,
+  showKeyFromUrl,
   type RemoteMessage,
   type RemoteState,
 } from '../lib/remoteProtocol';
 
-export type RemoteStatus = 'connecting' | 'connected' | 'offline';
+/** 'denied' means the relay is there but this page's show key is wrong or missing. */
+export type RemoteStatus = 'connecting' | 'connected' | 'offline' | 'denied';
 
 interface UseRemoteLinkOptions {
   role: 'display' | 'controller' | 'mirror';
@@ -43,6 +45,9 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
   const retryRef = useRef(RETRY_MIN);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closedRef = useRef(false);
+  // The show key: from the URL a phone or display was given, or — on the
+  // machine the server runs on — from the relay itself.
+  const keyRef = useRef<string | null>(showKeyFromUrl());
 
   // Handlers and state are read through refs so a re-render never tears the
   // socket down and reconnects.
@@ -72,10 +77,12 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       // refused handshake is a console error nothing can suppress. A phone
       // was pointed here deliberately, so it connects straight away.
       if (role !== 'controller') {
-        void probeRelay().then((present) => {
+        void relayInfo().then((info) => {
           if (closedRef.current) return;
-          if (present) openSocket();
-          else {
+          if (info) {
+            if (info.key) keyRef.current = info.key;
+            openSocket();
+          } else {
             setStatus('offline');
             timerRef.current = setTimeout(connect, PROBE_INTERVAL);
           }
@@ -99,7 +106,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       socket.onopen = () => {
         retryRef.current = RETRY_MIN;
         setStatus('connected');
-        socket.send(JSON.stringify({ type: 'hello', role } satisfies RemoteMessage));
+        socket.send(JSON.stringify({ type: 'hello', role, key: keyRef.current ?? undefined } satisfies RemoteMessage));
         if (role === 'display' && stateRef.current) {
           socket.send(JSON.stringify({ type: 'state', state: stateRef.current } satisfies RemoteMessage));
         }
@@ -112,6 +119,12 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
         } catch {
           return;   // a malformed frame is not worth tearing the link down for
         }
+        if (message.type === 'denied') {
+          // Wrong key: no point retrying with the same one.
+          closedRef.current = true;
+          setStatus('denied');
+          return;
+        }
         if (message.type === 'request-state' && role === 'display' && stateRef.current) {
           socket.send(JSON.stringify({ type: 'state', state: stateRef.current } satisfies RemoteMessage));
           return;
@@ -121,6 +134,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
 
       socket.onclose = () => {
         socketRef.current = null;
+        if (closedRef.current) return;   // refused, or torn down on purpose: keep that status
         setStatus('connecting');
         scheduleRetry();
       };

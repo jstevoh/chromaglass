@@ -25,7 +25,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "remote": "node server/remote-server.js"
+    "remote": "node server/remote-server.js",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

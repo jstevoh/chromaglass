@@ -224,6 +224,7 @@ export default function RemoteControl() {
         </div>
         <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
+          {status === 'denied' && <span className="ml-2 text-red-300">Wrong show key — open the address the show server printed, key included</span>}
           {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
         </div>
       </header>

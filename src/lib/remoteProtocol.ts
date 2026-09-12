@@ -70,7 +70,9 @@ export interface RemoteState {
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
+  /** Relay → a client that presented the wrong show key, before it is closed. */
+  | { type: 'denied'; reason: 'key' }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -114,6 +116,17 @@ export interface RelayInfo {
   port: number;
   /** The show server's LAN addresses, for the URL a network display opens. */
   hosts: string[];
+  /** The show key, given only to the machine the server runs on; phones and displays carry it in their URL. */
+  key: string | null;
+}
+
+/** The show key from this page's own URL (`?key=1234`), if it came with one. */
+export function showKeyFromUrl(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get('key');
+  } catch {
+    return null;
+  }
 }
 
 /** The relay's own description of itself, or null when there is none behind this origin. */
@@ -121,9 +134,9 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[] };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null };
     if (body?.chromaglass !== 'relay') return null;
-    return { port: body.port ?? (Number(window.location.port) || 3000), hosts: Array.isArray(body.hosts) ? body.hosts : [] };
+    return { port: body.port ?? (Number(window.location.port) || 3000), hosts: Array.isArray(body.hosts) ? body.hosts : [], key: body.key ?? null };
   } catch {
     return null;
   }
