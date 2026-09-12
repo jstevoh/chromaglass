@@ -1228,7 +1228,7 @@ export default function App() {
                   data-testid="cast-device"
                 >
                   <div className="text-xs font-semibold">Chromecast</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Chrome's device picker. If it lists nothing, no cast device was found on this network.</div>
+                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Chrome's device picker. Nest displays take the show directly. A Google TV that does not appear or connect here: open Second display, then Chrome's menu → Cast → the TV → Cast tab, on that window.</div>
                 </button>
               </div>
             )}
