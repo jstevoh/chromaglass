@@ -111,6 +111,19 @@ export interface VisualizerSettings {
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
   secondLamp: number;         // a second, cooler lamp from the other side of the plate, so two lights play across every bubble and edge
   iridescence: number;        // thin-film colour running round bubble rims
+
+  // Photograph — the macro shot of oil on water rather than the projected show
+  renderStyle: 'show' | 'photo'; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
+  paperA: string;             // the backdrop's two colours
+  paperB: string;
+  camera: number;             // the camera pass as a whole (0 = off): refraction, depth of field, bloom, chromatic aberration, the sensor's roll-off
+  focus: number;              // the focal plane as a height: 0 the glass, 1 the tops of the thickest domes
+  aperture: number;           // how fast things go soft away from the focal plane
+  bloom: number;              // glow around the highlights
+  chromaticAberration: number;// colour fringing at refracting edges and the frame's corners
+  refraction: number;         // how much the dye and the bubbles bend what is under them
+  microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
+  thinFilm: number;           // interference colour where the dye runs thinnest
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -189,6 +202,17 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampHotspot: 0.35,
   secondLamp: 0,
   iridescence: 0.25,
+  renderStyle: 'show',
+  paperA: '#1e5fb8',
+  paperB: '#f4c04a',
+  camera: 0,
+  focus: 0.55,
+  aperture: 0.5,
+  bloom: 0.4,
+  chromaticAberration: 0.3,
+  refraction: 0.6,
+  microDroplets: 0,
+  thinFilm: 0,
   lumia: 0,
   chemistry: 0,
   gelWheel: 0,

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -369,6 +369,57 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ dishVignette: v })}
         />
+      </section>
+
+      {/* Camera Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Aperture size={12} /> Camera
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
+        </p>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="text-xs font-bold uppercase tracking-widest opacity-70">Render Style</div>
+          <div className="grid grid-cols-2 gap-1">
+            {(['show', 'photo'] as const).map((style) => (
+              <button
+                key={style}
+                onClick={() => onUpdate({ renderStyle: style })}
+                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                  (settings.renderStyle ?? 'show') === style ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={style === 'show' ? 'The projected light show: dye as light on black' : 'The photograph: dye over lit paper'}
+                data-testid={`render-${style}`}
+              >
+                {style === 'show' ? 'Light show' : 'Photograph'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {(settings.renderStyle ?? 'show') === 'photo' && (
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {(['paperA', 'paperB'] as const).map((key) => (
+              <label key={key} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">{key === 'paperA' ? 'Paper A' : 'Paper B'}</span>
+                <input
+                  type="color"
+                  value={settings[key] ?? '#000000'}
+                  onChange={(e) => onUpdate({ [key]: e.target.value } as Partial<VisualizerSettings>)}
+                  className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+        <Slider label="Camera" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })} />
+        <Slider label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })} />
+        <Slider label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })} />
+        <Slider label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })} />
+        <Slider label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })} />
+        <Slider label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })} />
+        <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })} />
+        <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })} />
       </section>
 
       {/* Lamp Section */}

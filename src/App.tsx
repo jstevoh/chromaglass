@@ -361,7 +361,7 @@ export default function App() {
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     // Presets that don't mention the macro camera get the plate-wide framing —
     // otherwise a macro preset would leave the next one zoomed in.
-    setSettings(prev => ({ ...prev, macroMode: false, ...presetSettings }));
+    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', ...presetSettings }));
     setActivePresetId(presetId);
     visualizerRef.current?.applyPreset(presetId);
   };
@@ -436,6 +436,17 @@ export default function App() {
       lampHotspot: Math.random() * 0.7,
       secondLamp: Math.random() < 0.35 ? 0.4 + Math.random() * 0.6 : 0,
       iridescence: Math.random() * 0.6,
+      renderStyle: Math.random() < 0.25 ? 'photo' : 'show',
+      paperA: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
+      paperB: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
+      camera: Math.random() < 0.4 ? 0.5 + Math.random() * 0.5 : 0,
+      focus: Math.random(),
+      aperture: Math.random() * 0.8,
+      bloom: Math.random() * 0.7,
+      chromaticAberration: Math.random() * 0.6,
+      refraction: 0.3 + Math.random() * 0.7,
+      microDroplets: Math.random() < 0.4 ? Math.random() : 0,
+      thinFilm: Math.random() < 0.4 ? Math.random() : 0,
       // The other projectors come out one roll in five, one at a time
       lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
       chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,
