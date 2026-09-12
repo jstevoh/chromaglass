@@ -88,6 +88,47 @@ export class BubbleField {
   }
 
   /**
+   * Something landed on the plate at (x, y): dye from a dropper, or a blow
+   * of air. A bubble under a drop of dye is burst by it — the film cannot
+   * hold against the weight — and bubbles around the point are shoved away
+   * along the spreading front. Air shoves harder and bursts nothing (fresh
+   * air arrives as new bubbles elsewhere).
+   */
+  disturb(x: number, y: number, r: number, kind: 'dye' | 'air', strength = 1): void {
+    const bs = this.bubbles;
+    // The front spreads well past the drop itself.
+    const reach = kind === 'air' ? r * 3 + 4 : r * 3 + 6;
+    const shove = (kind === 'air' ? 40 : 22) * strength;
+    for (let i = bs.length - 1; i >= 0; i--) {
+      const b = bs[i];
+      const dx = b.x - x, dy = b.y - y;
+      const dist = Math.hypot(dx, dy) || 1e-3;
+      if (kind === 'dye' && dist < r + b.r * 0.6 && b.age > 0.3) {
+        this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
+        bs.splice(i, 1);
+        if (b.r > 2 && bs.length < MAX_BUBBLES - 2) {
+          const n = 2 + Math.floor(Math.random() * 2);
+          for (let k = 0; k < n; k++) {
+            const a = Math.random() * Math.PI * 2;
+            const nb = this.make(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, b.r * (0.25 + Math.random() * 0.2), 2 + Math.random() * 2.5, 0.12);
+            nb.kx = Math.cos(a) * 20; nb.ky = Math.sin(a) * 20;
+            bs.push(nb);
+          }
+        }
+        continue;
+      }
+      if (dist < reach) {
+        const k = shove * (1 - dist / reach);
+        const ux = dx / dist, uy = dy / dist;
+        // A shove sets the kick rather than adding to it, so a finger held
+        // still does not wind a bubble up to escape velocity.
+        if (Math.hypot(b.kx, b.ky) < k) { b.kx = ux * k; b.ky = uy * k; }
+        b.wob = Math.max(b.wob, 0.06 * (1 - dist / reach));
+      }
+    }
+  }
+
+  /**
    * Advance by `dt` seconds. `velocity` samples the solver field in its own
    * units; `tiltX/Y` is the plate tilt (air climbs against it); `lifeScale`
    * stretches or shortens how long bubbles last; `agitation` (0..1, from the

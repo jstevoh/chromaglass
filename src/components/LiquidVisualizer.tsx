@@ -1764,6 +1764,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const layer = g.layer ?? activeLayerRef.current;
       const af = fluidsRef.current[layer];
       if (!af || drainFrameRef.current > 0) return;
+      if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
+        bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (g.tool === 'blow' ? 5 : 3) * GRID_SCALE, g.tool === 'blow' ? 'air' : 'dye');
+      }
       const S = GRID_SIZE;
       const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
       const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
@@ -3343,6 +3346,11 @@ void main() {
               const liq = selectedLiquidRef.current;
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
               const heat = liq?.heatAmount ?? 0.05;
+              // Whatever lands on the lead plate lands on its bubbles too:
+              // dye bursts the one under it and shoves the rest, air shoves.
+              if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
+                bubblesRef.current.disturb(x, y, (tool === 'blow' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' ? 'air' : 'dye');
+              }
 
               // Feed the performance recorder (~15 Hz while painting)
               if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
@@ -3468,6 +3476,9 @@ void main() {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                 const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                 const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
+                if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
+                  bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
+                }
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.25 + (currentSettings.bubbles ?? 0) * 0.4
@@ -3754,6 +3765,17 @@ void main() {
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
                 return [vx[ix + iy * GRID_SIZE], vy[ix + iy * GRID_SIZE]];
               }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
+              // A bubble is air between the plates: the dye cannot sit under
+              // it. A standing squeeze on each footprint keeps pumping the
+              // dye out to the rim, so the field flows round the bubbles
+              // instead of sliding underneath them as if they were painted on.
+              if (lead) {
+                for (const b of bubbles.bubbles) {
+                  if (b.r < 1.2) continue;
+                  const bx = Math.round(b.x), by = Math.round(b.y);
+                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
+                }
+              }
               // A pop is a puff of air into the dye where the bubble was.
               for (const ev of bubbles.events) {
                 if (ev.kind === 'pop' && lead) {

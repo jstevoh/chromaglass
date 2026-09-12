@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Bubbles in the dye, not over it
+- Bubbles rode the velocity field but the dye slid underneath them as if they were painted on a sheet above the plate. Now each bubble's footprint carries a standing squeeze in the solver, so the dye keeps pumping out to the bubble's rim and flows round it (`applySquish` per bubble per step, on the lead plate)
+- Whatever lands on the plate lands on the bubbles: dye from the dropper, spray, pour, streak or splatter bursts the bubble under it into two or three satellites and shoves the bubbles along the spreading front; a blow of air shoves harder and bursts nothing. The same for the phone's pad, replayed performances and automation drops (`BubbleField.disturb`)
+
 ### Added — A new song, a new look
 - `onNewSong` (Settings → Sound → On a New Song: Keep / New preset / Random, default New preset). A new song is detected two ways: a boundary heard in the audio — music that has run at least twenty seconds, then quiet for at least two and a half, then sound again (`src/lib/songBoundary.ts`; a rest inside a song is too short, a crossfaded set never goes quiet) — or track identification naming a different song than before. Either picks another non-closeup preset or rolls a random look; a gap and an identification close together count once; the sequencer keeps control while it is running
 
