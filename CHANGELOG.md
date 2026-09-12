@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Casting
+- Casting to a Chromecast or a second display showed "Source window closed" and nothing else. The receiver page mirrored the show window's canvas through `window.opener`, which only exists when the receiver is a popup; a page presented through the Presentation API runs in its own context with no opener. The receiver now runs its own copy of the visualizer and is fed by the show window — a snapshot of the settings when it connects and on every change, the audio bands thirty times a second, and the seed, clear and drain triggers — over the PresentationConnection, or over a BroadcastChannel when it was opened as a popup (`src/lib/castProtocol.ts`, `src/hooks/useCastSession.ts`, `src/components/CastDisplay.tsx`). Choosing a preset re-seeds the receiver's plate too, and the user's palette lock carries across
+- The receiver says when the show window has gone quiet instead of freezing on the last frame
+
+### Added — Presets at the top
+- The preset's name under the ChromaGlass title is now a menu, and a **Presets** button sits at the top of the toolbar: every preset one click away, grouped Light show / Photograph / Closeup, the current one marked, closing on a pick, a click outside or Escape (`src/components/PresetMenu.tsx`)
+
 ### Added — The photograph
 - **Two-pass renderer** (`src/lib/cameraPass.ts`). The plate pass can now draw to a texture, with a second attachment carrying per pixel the surface normal, the dye's height and whether a bubble sits there, and a camera pass looks at that picture the way a lens and a sensor would: refraction of the finished plate through drops and bubbles, a focal plane with depth of field (twelve-tap disc), bloom around the highlights, chromatic aberration at refracting edges and the frame's corners, an ACES roll-off, vignette and grain. Off by default (`camera` 0), so the projected show is drawn straight to the screen as before; the pass builds itself the first frame it is asked for
 - **Photograph render style** (`renderStyle: 'photo'`): a lit paper backdrop in two colours (`paperA`/`paperB`) with a soft join and the tooth of the paper; dye composited as transmission over it, mixing subtractively so a thin wash vanishes into the paper and a mixed drop deepens; each drop a dome from its normal — a dark meniscus deeper away from the lamp, a thicker middle that absorbs more, the softbox reflected as a bright crescent on the lamp side, a rim that catches the sky

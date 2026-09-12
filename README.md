@@ -138,6 +138,8 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Camera | Settings → Camera: light show or photograph, paper colours, camera, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
+| Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup |
+| Cast | Present the show on a Chromecast or a second display through Chrome's device picker (or a popup window where there is no picker); the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
 
 ## Tech Stack

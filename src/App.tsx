@@ -2,16 +2,18 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import type { RemoteState } from './lib/remoteProtocol';
+import type { CastState } from './lib/castProtocol';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
+import { PresetMenu } from './components/PresetMenu';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
@@ -86,7 +88,12 @@ export default function App() {
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
 
   // ── Cast ──
-  const { isCasting, startCast, stopCast } = useCastSender();
+  // The receiver runs its own visualizer; it is fed a snapshot of the show
+  // when it connects and every change after. The callback lives in a ref
+  // because the state it snapshots is declared further down.
+  const castReadyRef = useRef<() => void>(() => {});
+  const { isCasting, startCast, stopCast, send: castSend } = useCastSender(() => castReadyRef.current());
+  const [presetSeq, setPresetSeq] = useState(0);
 
   const updateLiquidColor = useCallback((id: string, color: string) => {
     setLiquidTypes(prev => prev.map(t => t.id === id ? { ...t, color } : t));
@@ -280,6 +287,8 @@ export default function App() {
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
+  const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
+  const presetAnchorRef = useRef<{ top: number; left: number } | null>(null);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
     setMusicSettings(prev => {
@@ -363,6 +372,7 @@ export default function App() {
     // otherwise a macro preset would leave the next one zoomed in.
     setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', ...presetSettings }));
     setActivePresetId(presetId);
+    setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);
   };
 
@@ -479,6 +489,43 @@ export default function App() {
     visualizerRef.current?.setInjectStyle([s1, s2]);
     setSeedCount(prev => prev + 1);
   };
+
+  // ── Cast: keep the receiver in step ─────────────────────────────
+  const castState = useMemo<CastState>(() => ({
+    settings: effectiveSettings,
+    isActive,
+    isAutomated,
+    activeLayer,
+    seedCount,
+    clearTrigger,
+    drainTrigger,
+    presetId: activePresetId,
+    presetSeq,
+    harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
+  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock]);
+  const sendCastState = useCallback(() => castSend({ type: 'state', state: castState }), [castSend, castState]);
+  castReadyRef.current = sendCastState;
+  useEffect(() => { if (isCasting) sendCastState(); }, [isCasting, sendCastState]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState });
+    }
+  }, [isCasting, castState]);
+  // The audio bands, thirty times a second — the raw spectrum stays here.
+  const lastCastAudioRef = useRef(0);
+  useEffect(() => {
+    if (!isCasting) return;
+    const now = performance.now();
+    if (now - lastCastAudioRef.current < 33) return;
+    lastCastAudioRef.current = now;
+    castSend({
+      type: 'audio',
+      audio: audioData ? {
+        volume: audioData.volume, bass: audioData.bass, mid: audioData.mid, treble: audioData.treble,
+        energy: audioData.energy, spectralCentroid: audioData.spectralCentroid, timbre: audioData.timbre, complexity: audioData.complexity,
+      } : null,
+    });
+  }, [audioData, isCasting, castSend]);
 
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
@@ -825,6 +872,30 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
+                {/* Presets */}
+                <div className="relative w-full">
+                  <button
+                    onClick={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      presetAnchorRef.current = { top: r.top, left: r.left };
+                      setPresetMenu(presetMenu === 'toolbar' ? 'none' : 'toolbar');
+                    }}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                      presetMenu === 'toolbar' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    }`}
+                    title="Presets — every look, one click away"
+                    aria-haspopup="menu"
+                    aria-expanded={presetMenu === 'toolbar'}
+                    data-testid="preset-toolbar-button"
+                  >
+                    <LayoutGrid size={16} className={presetMenu === 'toolbar' ? '' : 'opacity-60 group-hover:opacity-100'} />
+                    <span className="text-[7px] font-bold uppercase tracking-widest">Presets</span>
+                  </button>
+                  {presetMenu === 'toolbar' && (
+                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} align="side" anchor={presetAnchorRef.current} />
+                  )}
+                </div>
+
                 {/* Macro closeup */}
                 <button
                   onClick={() => updateSettings({ macroMode: !settings.macroMode })}
@@ -1064,18 +1135,29 @@ export default function App() {
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
-        <div className="flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
+        <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
           <h1 className="text-2xl font-light tracking-tighter italic font-serif">
             Chroma<span className="font-bold not-italic">Glass</span>
           </h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[9px] uppercase tracking-widest opacity-40">
+          {/* The preset's name is the menu: one click from the top of the screen. */}
+          <button
+            onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
+            className="flex items-center gap-2 mt-0.5 group"
+            title="Choose a preset"
+            aria-haspopup="menu"
+            aria-expanded={presetMenu === 'title'}
+            data-testid="preset-title-button"
+          >
+            <p className="text-[9px] uppercase tracking-widest opacity-40 group-hover:opacity-80 transition-opacity">
               {activePresetName ? activePresetName : 'Custom'}
             </p>
-            {activePresetName && (
-              <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold">Preset</span>
-            )}
-          </div>
+            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold flex items-center gap-1 group-hover:bg-white/20 transition-colors">
+              Preset <ChevronDown size={9} />
+            </span>
+          </button>
+          {presetMenu === 'title' && (
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} align="left" />
+          )}
         </div>
 
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
