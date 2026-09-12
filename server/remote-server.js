@@ -27,6 +27,14 @@ import { WebSocketServer } from 'ws';
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(HERE, '..', 'dist');
 const PORT = Number(process.env.PORT ?? 3000);
+// The show key: a phone or a network display must present it to join. Four
+// digits by default, or SHOW_KEY in the environment for one that lasts. It
+// matters once the server is reachable beyond the room — through a tunnel,
+// across buildings — where anyone with the address could otherwise drive
+// the show.
+const SHOW_KEY = String(process.env.SHOW_KEY ?? String(Math.floor(1000 + Math.random() * 9000)));
+/** A request that came through a tunnel or a proxy carries forwarding headers; the key is not for those. */
+const isLocalRequest = (req) => !req.headers['x-forwarded-for'] && !req.headers['cf-connecting-ip'];
 const WS_PATH = '/remote-ws';
 const INFO_PATH = '/remote-info.json';
 
@@ -63,7 +71,7 @@ const server = createServer((req, res) => {
   if (url.pathname === INFO_PATH) {
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
     // The LAN addresses let the show print the URL a network display opens.
-    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, hosts: lanAddresses() }));
+    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, hosts: lanAddresses(), key: isLocalRequest(req) ? SHOW_KEY : null }));
     return;
   }
   // normalize() collapses any ../ before it can escape dist
@@ -114,6 +122,12 @@ wss.on('connection', (socket) => {
     }
 
     if (message.type === 'hello') {
+      if (String(message.key ?? '') !== SHOW_KEY) {
+        console.log(`  ${message.role ?? 'unknown'} refused: wrong show key`);
+        socket.send(JSON.stringify({ type: 'denied', reason: 'key' }));
+        socket.close();
+        return;
+      }
       const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : 'controller';
       roles.set(socket, role);
       const count = [...wss.clients].filter(c => roles.get(c) === role).length;
@@ -155,14 +169,17 @@ wss.on('connection', (socket) => {
 server.listen(PORT, '0.0.0.0', () => {
   const hosts = lanAddresses();
   console.log('\n  ChromaGlass show server\n');
+  console.log(`  Show key:           ${SHOW_KEY}`);
   console.log(`  Laptop (the show):  http://localhost:${PORT}/`);
   if (hosts.length === 0) {
     console.log('  No LAN address found — is this machine on a network?');
   } else {
     for (const host of hosts) {
-      console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1`);
-      console.log(`  Network display:    http://${host}:${PORT}/?cast=true`);
+      console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1&key=${SHOW_KEY}`);
+      console.log(`  Network display:    http://${host}:${PORT}/?cast=true&key=${SHOW_KEY}`);
     }
   }
-  console.log('\n  Both devices must be on the same network.\n');
+  console.log('\n  Same Wi-Fi: use the addresses above. Across buildings, other access points');
+  console.log('  or the internet: run "npm run tunnel" in another window and use the https');
+  console.log(`  address it prints, with ?cast=true&key=${SHOW_KEY} or ?remote=1&key=${SHOW_KEY}.\n`);
 });

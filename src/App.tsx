@@ -1244,10 +1244,17 @@ export default function App() {
                   <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
                   {relay ? (
                     <div className="text-[10px] opacity-50 leading-snug mt-0.5">
-                      Open this on any browser on the same Wi-Fi — a projector, a TV, a tablet — and it shows the show:
+                      Open this on any browser — a projector, a TV, a tablet — and it shows the show. Same Wi-Fi:
                       {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-white/80 select-all mt-0.5">http://{h}:{relay.port}/?cast=true</div>
+                        <div key={h} className="font-mono text-white/80 select-all mt-0.5">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       ))}
+                      {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
+                        <>
+                          <div className="mt-1">Through the tunnel, from anywhere:</div>
+                          <div className="font-mono text-white/80 select-all mt-0.5">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
+                        </>
+                      )}
+                      <div className="mt-1">Across buildings or other access points: run <span className="font-mono">npm run tunnel</span> and use the https address it prints, with the same <span className="font-mono">?cast=true&amp;key=…</span>.</div>
                     </div>
                   ) : (
                     <div className="text-[10px] opacity-50 leading-snug mt-0.5">Needs the show server: run <span className="font-mono">npm run remote</span> and open the show from there, then this lists the address.</div>

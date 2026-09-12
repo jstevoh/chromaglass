@@ -65,7 +65,22 @@ npm run build
 npm run remote
 ```
 
-The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
+The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
+
+### The show key
+
+Every start prints a four-digit **show key**, and phones and network displays must carry it in their address (`&key=1234`) to join; the printed addresses include it. Set `SHOW_KEY=1234 npm run remote` for one that stays the same. The key is what makes it safe to expose the server beyond the room.
+
+### Across buildings, other access points, or the internet
+
+A home with several access points often puts devices on segments that cannot see each other, and a projector in another building may not be on the laptop's network at all. Rather than fight the network, open a tunnel: the projector reaches the laptop's show server through the internet, with the key keeping strangers out.
+
+```bash
+brew install cloudflared
+npm run tunnel
+```
+
+The tunnel prints an `https://….trycloudflare.com` address. On the projector open `https://<that address>/?cast=true&key=<show key>`, and on a phone `…/?remote=1&key=<show key>`. Keep `npm run remote` running in its own window; the tunnel only forwards to it. The tunnel adds tens of milliseconds, which the show absorbs, and it closes when its window does.
 
 The server prints two URLs: open the first on the laptop, the second
 (`?remote=1`) on the phone. Both devices need to be on the same network.
