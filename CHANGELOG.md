@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Beats ahead of the microphone
+- A microphone hears late — capture buffer, analyser window and smoothing, band smoothing, the wait for the onset threshold — so a kick on the plate landed after the kick in the room. `src/lib/beatClock.ts` is a phase-locked clock: it collects onsets, finds a period once the last few intervals agree (folded into 60–200 bpm), then nudges the period and snaps the phase on every on-beat onset, gaining confidence with each hit and losing it on syncopations, misses and silence. Once confident it fires each beat `beatLead` ms (default 80) before the onset would be heard and absorbs the heard onset of the same beat so nothing fires twice; when it loses the beat it hands back to detection
+- Every kick reaction — the plate rock, the beat squeeze, the beat ring of dye, bubble release, the macro camera's cut — now reads one verdict per frame instead of its own threshold crossing, so they land together. `beatPrediction` (default 0.7) is how much the show trusts the clock; 0 is detection only. Settings → Sound
+
+### Changed — Bubbles in the dye, not over it
+- Bubbles rode the velocity field but the dye slid underneath them as if they were painted on a sheet above the plate. Now each bubble's footprint carries a standing squeeze in the solver, so the dye keeps pumping out to the bubble's rim and flows round it (`applySquish` per bubble per step, on the lead plate)
+- Whatever lands on the plate lands on the bubbles: dye from the dropper, spray, pour, streak or splatter bursts the bubble under it into two or three satellites and shoves the bubbles along the spreading front; a blow of air shoves harder and bursts nothing. The same for the phone's pad, replayed performances and automation drops (`BubbleField.disturb`)
+
+### Added — A new song, a new look
+- `onNewSong` (Settings → Sound → On a New Song: Keep / New preset / Random, default New preset). A new song is detected two ways: a boundary heard in the audio — music that has run at least twenty seconds, then quiet for at least two and a half, then sound again (`src/lib/songBoundary.ts`; a rest inside a song is too short, a crossfaded set never goes quiet) — or track identification naming a different song than before. Either picks another non-closeup preset or rolls a random look; a gap and an identification close together count once; the sequencer keeps control while it is running
+
+### Fixed — Casting
+- Casting to a Chromecast or a second display showed "Source window closed" and nothing else. The receiver page mirrored the show window's canvas through `window.opener`, which only exists when the receiver is a popup; a page presented through the Presentation API runs in its own context with no opener. The receiver now runs its own copy of the visualizer and is fed by the show window — a snapshot of the settings when it connects and on every change, the audio bands thirty times a second, and the seed, clear and drain triggers — over the PresentationConnection, or over a BroadcastChannel when it was opened as a popup (`src/lib/castProtocol.ts`, `src/hooks/useCastSession.ts`, `src/components/CastDisplay.tsx`). Choosing a preset re-seeds the receiver's plate too, and the user's palette lock carries across
+- The receiver says when the show window has gone quiet instead of freezing on the last frame
+
+### Added — Presets at the top
+- The preset's name under the ChromaGlass title is now a menu, and a **Presets** button sits at the top of the toolbar: every preset one click away, grouped Light show / Photograph / Closeup, the current one marked, closing on a pick, a click outside or Escape (`src/components/PresetMenu.tsx`)
+
 ### Added — The photograph
 - **Two-pass renderer** (`src/lib/cameraPass.ts`). The plate pass can now draw to a texture, with a second attachment carrying per pixel the surface normal, the dye's height and whether a bubble sits there, and a camera pass looks at that picture the way a lens and a sensor would: refraction of the finished plate through drops and bubbles, a focal plane with depth of field (twelve-tap disc), bloom around the highlights, chromatic aberration at refracting edges and the frame's corners, an ACES roll-off, vignette and grain. Off by default (`camera` 0), so the projected show is drawn straight to the screen as before; the pass builds itself the first frame it is asked for
 - **Photograph render style** (`renderStyle: 'photo'`): a lit paper backdrop in two colours (`paperA`/`paperB`) with a soft join and the tooth of the paper; dye composited as transmission over it, mixing subtractively so a thin wash vanishes into the paper and a mixed drop deepens; each drop a dome from its normal — a dark meniscus deeper away from the lamp, a thicker middle that absorbs more, the softbox reflected as a bright crescent on the lamp side, a rim that catches the sky

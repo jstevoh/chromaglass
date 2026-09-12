@@ -148,6 +148,49 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
         </div>
+        {/* The beat, ahead of the microphone */}
+        <Slider
+          label="Beat Prediction"
+          value={settings.beatPrediction ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ beatPrediction: v })}
+        />
+        <Slider
+          label="Beat Lead (ms)"
+          value={settings.beatLead ?? 0}
+          min={0}
+          max={250}
+          step={5}
+          onChange={(v: number) => onUpdate({ beatLead: v })}
+        />
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+          A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
+        </p>
+
+        {/* A new song, a new look */}
+        <div className="flex flex-col gap-2 mb-4 mt-2">
+          <div className="text-xs font-bold uppercase tracking-widest opacity-70">On a New Song</div>
+          <div className="grid grid-cols-3 gap-1">
+            {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => onUpdate({ onNewSong: mode })}
+                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                  (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
+                data-testid={`new-song-${mode}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] leading-relaxed opacity-40">
+            A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
+          </p>
+        </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
             {calibration ? (

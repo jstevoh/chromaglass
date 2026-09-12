@@ -1,67 +1,97 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { LiquidVisualizer, type LiquidVisualizerHandle } from './LiquidVisualizer';
+import { DEFAULT_SETTINGS } from '../types';
+import type { AudioData } from '../hooks/useAudioAnalyzer';
+import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProtocol';
 
 /**
- * Cast display — a direct pixel-mirror of the main window's canvas.
- * Reads the source canvas from window.opener via drawImage (same-origin, GPU-to-GPU).
- * Scales to fill the cast display's viewport at native resolution.
+ * The cast receiver: the show on the second screen.
+ *
+ * Runs the visualizer itself and takes everything it needs from the sender —
+ * settings, the audio bands, seeds and clears — over whichever link brought
+ * it here: a PresentationConnection when Chrome presented this page to a
+ * Chromecast or a second display, or a BroadcastChannel when it was opened
+ * as a popup. It never looks at `window.opener`: a presented page has none.
  */
 export default function CastDisplay() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [disconnected, setDisconnected] = useState(false);
+  const visualizerRef = useRef<LiquidVisualizerHandle>(null);
+  const [state, setState] = useState<CastState | null>(null);
+  const [audio, setAudio] = useState<AudioData | null>(null);
+  const [linked, setLinked] = useState(false);
+  const lastPresetSeq = useRef(0);
+  const lastMessageAt = useRef(0);
+  const [stale, setStale] = useState(false);
+
+  const handle = useCallback((msg: CastMessage) => {
+    lastMessageAt.current = performance.now();
+    if (msg.type === 'state') {
+      setLinked(true);
+      setState(msg.state);
+    } else if (msg.type === 'audio') {
+      if (!msg.audio) { setAudio(null); return; }
+      setAudio({
+        ...msg.audio,
+        frequencyData: EMPTY,
+        timeDomainData: EMPTY,
+        calibration: null,
+      });
+    }
+  }, []);
+
+  // The sender re-seeds the plate when a preset is chosen; do the same here,
+  // and pin the palette the way the sender has it.
+  useEffect(() => {
+    if (!state) return;
+    if (state.presetSeq > lastPresetSeq.current && state.presetId) {
+      lastPresetSeq.current = state.presetSeq;
+      visualizerRef.current?.applyPreset(state.presetId);
+    }
+    visualizerRef.current?.setHarmonyLock(state.harmonyLock);
+  }, [state]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const hello = JSON.stringify({ type: 'hello' } satisfies CastMessage);
+    const cleanups: (() => void)[] = [];
 
-    let animId: number;
-    let lastW = 0, lastH = 0;
+    // Presented by Chrome: connections arrive through the receiver object.
+    const receiver = (navigator as unknown as { presentation?: { receiver?: PresentationReceiverLike } }).presentation?.receiver;
+    if (receiver) {
+      const attach = (conn: PresentationConnectionLike) => {
+        conn.onmessage = (e) => {
+          try { handle(JSON.parse(e.data) as CastMessage); } catch { /* not ours */ }
+        };
+        const sayHello = () => { try { conn.send(hello); } catch { /* not yet open */ } };
+        if (conn.state === 'connected') sayHello();
+        conn.onconnect = sayHello;
+      };
+      receiver.connectionList.then((list) => {
+        list.connections.forEach(attach);
+        list.onconnectionavailable = (e) => attach(e.connection);
+      }).catch(() => { /* no presentation here */ });
+    }
 
-    const render = () => {
-      // Find source canvas in the opener window
-      let source: HTMLCanvasElement | null = null;
-      try {
-        source = (window.opener as Window)?.document?.querySelector('canvas') ?? null;
-      } catch {
-        // Cross-origin or opener closed
-      }
+    // Opened as a popup: the sender is on the same origin, one channel away.
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(CAST_CHANNEL);
+      bc.onmessage = (e: MessageEvent<CastMessage>) => handle(e.data);
+      bc.postMessage({ type: 'hello' } satisfies CastMessage);
+      cleanups.push(() => bc.close());
+    }
 
-      if (!source || !window.opener || (window.opener as Window).closed) {
-        setDisconnected(true);
-        animId = requestAnimationFrame(render);
-        return;
-      }
+    // If the sender goes quiet the plate keeps running on its last settings;
+    // say so rather than pretending the link is live.
+    const timer = setInterval(() => setStale(linkedRef.current && performance.now() - lastMessageAt.current > 4000), 1000);
+    cleanups.push(() => clearInterval(timer));
+    return () => cleanups.forEach((c) => c());
+  }, [handle]);
+  const linkedRef = useRef(false);
+  linkedRef.current = linked;
 
-      setDisconnected(false);
-
-      // Resize canvas to fill viewport at device pixel ratio
-      const dpr = window.devicePixelRatio || 1;
-      const w = Math.round(window.innerWidth * dpr);
-      const h = Math.round(window.innerHeight * dpr);
-      if (w !== lastW || h !== lastH) {
-        canvas.width = w;
-        canvas.height = h;
-        lastW = w;
-        lastH = h;
-      }
-
-      // Draw source canvas scaled to fill this display
-      ctx.drawImage(source, 0, 0, w, h);
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
-  // Auto-enter fullscreen on click
   const handleFullscreen = useCallback(() => {
-    document.documentElement.requestFullscreen?.();
+    document.documentElement.requestFullscreen?.().catch(() => { /* not allowed here */ });
   }, []);
 
-  // Hide cursor after inactivity
+  // Hide the cursor after a few seconds still.
   const [showCursor, setShowCursor] = useState(true);
   const cursorTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
@@ -78,22 +108,38 @@ export default function CastDisplay() {
     };
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => ({ linked, stale, state, audio });
+    }
+  }, [linked, stale, state, audio]);
+
+  const settings = state?.settings ?? DEFAULT_SETTINGS;
+
   return (
     <div
-      className="w-full h-screen bg-black overflow-hidden"
+      className="relative w-full h-screen bg-black overflow-hidden text-white overlays-hidden"
       style={{ cursor: showCursor ? 'default' : 'none' }}
       onClick={handleFullscreen}
+      data-testid="cast-display"
     >
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
+      <LiquidVisualizer
+        ref={visualizerRef}
+        audioData={audio}
+        settings={settings}
+        seedCount={state?.seedCount ?? 0}
+        clearTrigger={state?.clearTrigger ?? 0}
+        drainTrigger={state?.drainTrigger ?? 0}
+        activeLayer={state?.activeLayer ?? 0}
+        isAutomated={state?.isAutomated ?? false}
+        isActive={state?.isActive ?? true}
       />
 
-      {disconnected && (
+      {(!linked || stale) && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-          <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 text-center">
-            <p className="text-white/60 text-sm">Source window closed</p>
-            <p className="text-white/30 text-xs mt-1">Reopen ChromaGlass to resume</p>
+          <div className="bg-black/70 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 text-center">
+            <p className="text-white/80 text-sm font-medium">ChromaGlass Cast Display</p>
+            <p className="text-white/40 text-xs mt-1">{linked ? 'The show window has gone quiet' : 'Waiting for the show…'}</p>
           </div>
         </div>
       )}
@@ -103,25 +149,33 @@ export default function CastDisplay() {
   );
 }
 
+const EMPTY = new Uint8Array(0);
+
 function CastHint() {
   const [visible, setVisible] = useState(true);
-
   useEffect(() => {
     const timer = setTimeout(() => setVisible(false), 4000);
     return () => clearTimeout(timer);
   }, []);
-
   if (!visible) return null;
-
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
-      style={{ opacity: visible ? 1 : 0, transition: 'opacity 1s' }}
-    >
-      <div className="bg-black/70 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 text-center">
-        <p className="text-white/80 text-sm font-medium">ChromaGlass Cast Display</p>
-        <p className="text-white/40 text-xs mt-1">Click anywhere for fullscreen</p>
+    <div className="fixed bottom-6 inset-x-0 flex justify-center z-50 pointer-events-none" style={{ transition: 'opacity 1s' }}>
+      <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2">
+        <p className="text-white/50 text-xs">Click anywhere for fullscreen</p>
       </div>
     </div>
   );
+}
+
+interface PresentationConnectionLike {
+  state: 'connecting' | 'connected' | 'closed' | 'terminated';
+  send(data: string): void;
+  onmessage: ((e: MessageEvent<string>) => void) | null;
+  onconnect: (() => void) | null;
+}
+interface PresentationReceiverLike {
+  connectionList: Promise<{
+    connections: PresentationConnectionLike[];
+    onconnectionavailable: ((e: { connection: PresentationConnectionLike }) => void) | null;
+  }>;
 }
