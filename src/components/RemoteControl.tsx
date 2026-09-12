@@ -266,6 +266,7 @@ export default function RemoteControl() {
         {/* The two dials that change the mood most */}
         <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
         <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
+        <Slider label="Evolve Speed" field="automateRate" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
 
         {/* Macro camera */}
         <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">

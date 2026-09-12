@@ -153,7 +153,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Blow tool | Click/tap to blow air bubbles |
 | Layer buttons | Switch active fluid layer |
 | Clear | Wipe the active layer |
-| Auto toggle | Enable automated dye/air injection |
+| Random Evolve | Automated dye drops and air blows driven by the music; the **Evolve Speed** slider under it sets how often, from a drop every second or so to a frenzy |
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
 | Sequence | Open the Show Sequencer: pick a sequence, play, pause, skip stages, or edit and save your own |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |

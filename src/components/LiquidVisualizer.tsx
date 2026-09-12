@@ -3513,12 +3513,16 @@ void main() {
 
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
-            const rate = currentSettings.automateRate || 0.5;
-            const energy = currentAudioData ? currentAudioData.energy : 0;
+            const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
+            const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
             const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
             const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
-            if (Math.random() < rate * 0.3 + energy * 0.8) {
+            // The rate scales everything: at the default it is a drop or a
+            // blow every second or so, quickening with the music; at full it
+            // is the old frenzy. (Before, the music term stood on its own and
+            // the slider hardly mattered.)
+            if (Math.random() < rate * (0.08 + energy * 0.5)) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
