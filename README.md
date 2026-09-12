@@ -55,6 +55,12 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and allow microphone access when prompted.
 
+## A projector on HDMI
+
+The best picture is the cable. Plug the projector in as a second display, then **Cast → Second display**. The show window opens on the projector's screen, moves itself there, and mirrors the laptop's canvas: the laptop renders once, at the projector's pixel size, and shows itself a scaled copy letterboxed behind the controls. Click the projector window once for fullscreen. Nothing is encoded or sent; the projector shows the same frame the laptop drew, so brush strokes, presets, the sequencer and the phone remote all land on the wall as they happen. Keep the laptop window visible (not minimised), since the browser stops drawing a hidden window.
+
+In System Settings → Displays, give the projector its native resolution and keep it as a separate display rather than mirroring, so the controls stay off the wall.
+
 ## Phone Remote
 
 The laptop runs the show — microphone, GPU, full UI — and your phone becomes a
@@ -159,7 +165,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup |
-| Cast | A menu: **Second display** opens the show in its own window, placed on a second screen when one is plugged in (click it once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
+| Cast | A menu: **Second display** (a projector on HDMI) opens a window on the second screen that mirrors this very canvas pixel for pixel — one render, at the projector's own resolution, every stroke on the laptop on the wall the same frame, the laptop keeping all the controls and a scaled copy (click the window once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
 
 ## Tech Stack

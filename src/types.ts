@@ -234,9 +234,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look
   macroZoom: 4.0,           // ~32 sim cells across the frame — one bead and its ground
-  macroChase: 0.6,          // quick follow with a short whip on each new bead
+  macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
-  macroSync: 0.6,
+  macroSync: 0.5,
   macroCells: 0.75,
   macroCellScale: 0.5,
   macroLacing: 0.55,

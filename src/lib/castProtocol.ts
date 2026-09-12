@@ -46,6 +46,12 @@ export interface CastState {
 export type CastMessage =
   /** Receiver → sender, on load: send me everything. */
   | { type: 'hello' }
+  /**
+   * Receiver → sender: this window mirrors the sender's own canvas (a second
+   * display on the same machine), so the sender should render at this size —
+   * the projector's pixels — and need not send the show at all.
+   */
+  | { type: 'stage'; width: number; height: number }
   /** Sender → receiver. */
   | { type: 'state'; state: CastState }
   | { type: 'audio'; audio: CastAudio | null };

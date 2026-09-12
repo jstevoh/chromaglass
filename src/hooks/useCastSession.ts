@@ -12,7 +12,7 @@ import { CAST_CHANNEL, type CastMessage } from '../lib/castProtocol';
  * reaches whatever receiver is live, and `onReceiverReady` fires when one
  * connects so the app can push a full snapshot.
  */
-export function useCastSender(onReceiverReady: () => void) {
+export function useCastSender(onReceiverReady: () => void, onStage?: (size: { width: number; height: number } | null) => void) {
   const [isCasting, setIsCasting] = useState(false);
   const windowRef = useRef<Window | null>(null);
   const connectionRef = useRef<PresentationConnectionLike | null>(null);
@@ -20,6 +20,8 @@ export function useCastSender(onReceiverReady: () => void) {
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const readyRef = useRef(onReceiverReady);
   readyRef.current = onReceiverReady;
+  const stageRef = useRef(onStage);
+  stageRef.current = onStage;
 
   const cleanup = useCallback(() => {
     if (checkIntervalRef.current) {
@@ -30,6 +32,7 @@ export function useCastSender(onReceiverReady: () => void) {
     connectionRef.current = null;
     channelRef.current?.close();
     channelRef.current = null;
+    stageRef.current?.(null);
     setIsCasting(false);
   }, []);
 
@@ -38,6 +41,7 @@ export function useCastSender(onReceiverReady: () => void) {
     const bc = new BroadcastChannel(CAST_CHANNEL);
     bc.onmessage = (e: MessageEvent<CastMessage>) => {
       if (e.data?.type === 'hello') readyRef.current();
+      if (e.data?.type === 'stage') stageRef.current?.({ width: e.data.width, height: e.data.height });
     };
     channelRef.current = bc;
   }, []);

@@ -75,7 +75,7 @@ const TRACK_RADIUS = 7;
 /** Radius (cells) used to measure how isolated a candidate bead is. */
 const CONTRAST_RADIUS = 6;
 /** Seconds a whip takes to settle. */
-const WHIP_TIME = 0.45;
+const WHIP_TIME = 0.7;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -101,6 +101,7 @@ export class MacroCamera {
   private floor = 0;
   private smoothZoom = 0;
   private initialized = false;
+  private lastStep = 1 / 60;
 
   /** Force a cut to a new bead on the next update (preset change, drain, seed). */
   reset() {
@@ -116,6 +117,7 @@ export class MacroCamera {
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
     const { size } = field;
     const step = clamp(dt, 0, 0.25);
+    this.lastStep = Math.max(1 / 240, step);
     this.clock += step;
     this.floor = Math.max(0, opts.floor ?? 0);
 
@@ -135,11 +137,11 @@ export class MacroCamera {
 
     // ── Stay on the bead ────────────────────────────────────────────
     const tracked = this.recenter(field);
-    // Loud passages spend the hold faster, so a chorus cuts quicker than a verse.
-    this.holdLeft -= step * (1 + sync * energy * 1.2);
+    // Loud passages spend the hold a little faster, so a chorus cuts sooner than a verse.
+    this.holdLeft -= step * (1 + sync * energy * 0.4);
     this.sinceCut += step;
     this.whipLeft = Math.max(0, this.whipLeft - step);
-    this.punchLeft = Math.max(0, this.punchLeft - step / 0.35);
+    this.punchLeft = Math.max(0, this.punchLeft - step / 0.6);
 
     const margin = size * EDGE_MARGIN;
     const lostIt = tracked.mass < this.beadMass * 0.18 || tracked.mass < 0.5;
@@ -148,11 +150,13 @@ export class MacroCamera {
       this.beadY < margin || this.beadY > size - margin;
 
     // A kick can bring the cut forward once the shot has had a fair run —
-    // most of the way through its hold at low sync, a quarter of it at full —
-    // so the edit lands on the music instead of a private timer.
-    const minRun = Math.max(0.5, opts.hold * (0.9 - 0.65 * sync));
-    const beatCut = !!opts.beat && sync > 0.05 && this.sinceCut >= minRun && bass > 0.55;
-    if (opts.beat) this.punchLeft = Math.max(this.punchLeft, bass * sync);
+    // most of the way through its hold at low sync, half of it at full — so
+    // the edit lands on the music instead of a private timer. Never sooner
+    // than two seconds: a cut a beat is a strobe, not an edit.
+    const minRun = Math.max(2, opts.hold * (0.95 - 0.5 * sync));
+    const beatCut = !!opts.beat && sync > 0.05 && this.sinceCut >= minRun && bass > 0.6;
+    // Only a strong kick punches in, and gently.
+    if (opts.beat && bass > 0.6) this.punchLeft = Math.max(this.punchLeft, (bass - 0.6) * 2.5 * sync);
 
     if (lostIt || ranAground || this.holdLeft <= 0 || beatCut) {
       const from = { x: this.beadX, y: this.beadY };
@@ -171,8 +175,9 @@ export class MacroCamera {
 
     // ── Follow ─────────────────────────────────────────────────────
     const whip = this.whipLeft / WHIP_TIME;
-    // The chase tightens when the track is loud.
-    const rate = (2.5 + opts.chase * 12) * (1 + whip * 1.8) * (1 + sync * energy * 0.8);
+    // The chase tightens when the track is loud. Slow by default: a macro
+    // rig on a bead is a heavy thing on a slider, not a hand-held phone.
+    const rate = (1.0 + opts.chase * 5) * (1 + whip * 1.8) * (1 + sync * energy * 0.4);
     const k = 1 - Math.exp(-rate * step);
     this.camX += (targetX - this.camX) * k;
     this.camY += (targetY - this.camY) * k;
@@ -180,21 +185,21 @@ export class MacroCamera {
     // ── Handheld tremor from the treble ────────────────────────────
     // A few cells of drift at three unrelated rates, scaled by the highs, so
     // hi-hats read as a hand that is never quite still.
-    const tremorAmp = size * 0.004 * sync * treble;
-    const tx = (Math.sin(this.clock * 9.3) + Math.sin(this.clock * 23.1 + 1.3) * 0.5) * tremorAmp;
-    const ty = (Math.sin(this.clock * 11.7 + 0.7) + Math.sin(this.clock * 19.4 + 2.1) * 0.5) * tremorAmp;
-    this.tremorX += (tx - this.tremorX) * (1 - Math.exp(-20 * step));
-    this.tremorY += (ty - this.tremorY) * (1 - Math.exp(-20 * step));
+    const tremorAmp = size * 0.0012 * sync * treble;
+    const tx = (Math.sin(this.clock * 3.1) + Math.sin(this.clock * 7.3 + 1.3) * 0.5) * tremorAmp;
+    const ty = (Math.sin(this.clock * 3.9 + 0.7) + Math.sin(this.clock * 6.4 + 2.1) * 0.5) * tremorAmp;
+    this.tremorX += (tx - this.tremorX) * (1 - Math.exp(-8 * step));
+    this.tremorY += (ty - this.tremorY) * (1 - Math.exp(-8 * step));
 
     // ── Zoom: slow breathe, a dolly-out through each whip, the music's push ──
     const breathe = 1 + Math.sin(this.clock * 0.37) * 0.08 + Math.sin(this.clock * 0.11 + 1.7) * 0.05;
-    const dolly = 1 - Math.sin(whip * Math.PI) * 0.32;
-    // A slow push with the energy, and a kick's push-in that eases back.
-    const push = 1 + energy * (0.07 + sync * 0.08);
-    const punch = 1 + this.punchLeft * this.punchLeft * 0.2;
+    const dolly = 1 - Math.sin(whip * Math.PI) * 0.22;
+    // A slow push with the energy, and a strong kick's push-in that eases back.
+    const push = 1 + energy * (0.05 + sync * 0.05);
+    const punch = 1 + this.punchLeft * this.punchLeft * 0.06;
     const wantZoom = Math.max(1, opts.zoom * breathe * dolly * push * punch);
-    // The punch is fast in, the rest eases.
-    const zoomRate = wantZoom > this.smoothZoom ? 8 + sync * 22 : 8;
+    // The punch is quicker in than out; everything eases.
+    const zoomRate = wantZoom > this.smoothZoom ? 4 + sync * 4 : 3;
     this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-zoomRate * step));
 
     // ── Keep the frame on the plate ────────────────────────────────
@@ -229,9 +234,11 @@ export class MacroCamera {
       }
     }
     if (sum > 0) {
-      // Blend rather than snap — a hard centroid jitters on turbulent dye.
-      this.beadX += (sx / sum - this.beadX) * 0.5;
-      this.beadY += (sy / sum - this.beadY) * 0.5;
+      // Blend rather than snap — a hard centroid jitters on turbulent dye —
+      // and blend by time, not by frame, so 120 Hz is no twitchier than 30.
+      const k = 1 - Math.exp(-this.lastStep * 6);
+      this.beadX += (sx / sum - this.beadX) * k;
+      this.beadY += (sy / sum - this.beadY) * k;
     }
     return { mass: sum };
   }
