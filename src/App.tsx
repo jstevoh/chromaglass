@@ -289,6 +289,7 @@ export default function App() {
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
+  const [castMenu, setCastMenu] = useState(false);
   const presetAnchorRef = useRef<{ top: number; left: number } | null>(null);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
@@ -1191,15 +1192,47 @@ export default function App() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
             )}
           </button>
-          <button
-            onClick={() => isCasting ? stopCast() : startCast()}
-            className={`p-2 rounded-full transition-all ${
-              isCasting ? 'bg-blue-500 text-white' : 'hover:bg-white/10 text-white/60'
-            }`}
-            title={isCasting ? "Stop casting" : "Cast to display"}
-          >
-            <Cast size={14} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}
+              className={`p-2 rounded-full transition-all ${
+                isCasting ? 'bg-blue-500 text-white' : castMenu ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/60'
+              }`}
+              title={isCasting ? "Stop casting" : "Cast to display"}
+              aria-haspopup="menu"
+              aria-expanded={castMenu}
+              data-testid="cast-button"
+            >
+              <Cast size={14} />
+            </button>
+            {castMenu && !isCasting && (
+              <div
+                className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-white/10 bg-[#0b0b10]/95 backdrop-blur-xl p-2 shadow-2xl z-[60] pointer-events-auto"
+                style={{ animation: 'chromaglass-menu-in 0.15s ease-out' }}
+                role="menu"
+                data-testid="cast-menu"
+              >
+                <button
+                  role="menuitem"
+                  onClick={() => { setCastMenu(false); startCast('window'); }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
+                  data-testid="cast-window"
+                >
+                  <div className="text-xs font-semibold">Second display</div>
+                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Opens the show in its own window, placed on a second screen if one is plugged in. Click it once for fullscreen.</div>
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => { setCastMenu(false); startCast('device'); }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
+                  data-testid="cast-device"
+                >
+                  <div className="text-xs font-semibold">Chromecast</div>
+                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Chrome's device picker. If it lists nothing, no cast device was found on this network.</div>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`p-2 rounded-full transition-all text-[9px] font-bold ${
