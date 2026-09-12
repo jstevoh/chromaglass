@@ -142,7 +142,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup |
-| Cast | A menu: **Second display** opens the show in its own window, placed on a second screen when one is plugged in (click it once for fullscreen); **Chromecast** uses Chrome's device picker. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
+| Cast | A menu: **Second display** opens the show in its own window, placed on a second screen when one is plugged in (click it once for fullscreen); **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
 
 ## Tech Stack
