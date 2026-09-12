@@ -930,7 +930,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Sparkles size={12} /> Automation
         </h3>
         <Slider
-          label="Automation Rate"
+          label="Evolve Speed"
           value={settings.automateRate}
           min={0}
           max={1.0}

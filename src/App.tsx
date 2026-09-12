@@ -910,6 +910,25 @@ export default function App() {
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     />
                   </button>
+                  {/* How fast it evolves: a drop or a blow every second or so at the left, a frenzy at the right */}
+                  <div className={`flex flex-col gap-1 w-full mt-1 transition-opacity ${isAutomated ? '' : 'opacity-40'}`}>
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Evolve Speed</span>
+                      <span className="text-[8px] font-bold text-white/50">{Math.round((settings.automateRate ?? 0) * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settings.automateRate ?? 0}
+                      onChange={e => updateSettings({ automateRate: parseFloat(e.target.value) })}
+                      className="w-full h-1 appearance-none rounded-full cursor-pointer accent-purple-400"
+                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${(settings.automateRate ?? 0) * 100}%, rgba(255,255,255,0.1) ${(settings.automateRate ?? 0) * 100}%)` }}
+                      title="How quickly Random Evolve adds drops and blows"
+                      data-testid="evolve-speed"
+                    />
+                  </div>
                 </div>
 
                 <div className="w-full h-px bg-white/10" />
