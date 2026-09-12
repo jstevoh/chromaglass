@@ -1118,7 +1118,7 @@ export const PRESETS: Preset[] = [
     settings: {
       macroMode: true,
       macroZoom: 4.5,            // ~28 sim cells across — bead plus its surroundings
-      macroChase: 0.7,           // quick follow with a hard whip on each cut
+      macroChase: 0.55,          // a quick follow with a whip on each cut
       macroHold: 4.5,
       macroCells: 0.85,
       macroCellScale: 0.45,
@@ -1238,8 +1238,8 @@ export const PRESETS: Preset[] = [
     settings: {
       macroMode: true,
       macroZoom: 4.0,
-      macroChase: 0.9,           // whip-fast — the frame really moves
-      macroHold: 3.0,            // short takes, frequent cuts
+      macroChase: 0.7,           // the liveliest of the three
+      macroHold: 4.0,            // short takes
       macroCells: 0.8,
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here

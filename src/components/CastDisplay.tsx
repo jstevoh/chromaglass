@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { LiquidVisualizer, type LiquidVisualizerHandle } from './LiquidVisualizer';
 import { DEFAULT_SETTINGS } from '../types';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
@@ -15,6 +15,109 @@ import { useRemoteLink } from '../hooks/useRemoteLink';
  * as a popup. It never looks at `window.opener`: a presented page has none.
  */
 export default function CastDisplay() {
+  // Opened by the show window itself, on this machine: mirror its canvas pixel
+  // for pixel. That is the HDMI projector — one render, at the projector's
+  // own resolution, nothing sent anywhere, and every stroke on the laptop is
+  // on the wall the same frame. A page presented by Chrome or opened over the
+  // network has no opener and runs the show itself instead.
+  const source = useMemo(() => {
+    try {
+      const o = window.opener as Window | null;
+      return (o && !o.closed && o.document?.querySelector<HTMLCanvasElement>('#liquid-canvas')) || null;
+    } catch {
+      return null;   // cross-origin, or no opener
+    }
+  }, []);
+  if (source) return <StageMirror source={source} />;
+  return <CastReceiver />;
+}
+
+/** The projector window: the show window's canvas, and nothing else. */
+function StageMirror({ source }: { source: HTMLCanvasElement }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [gone, setGone] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CAST_CHANNEL) : null;
+    let lastW = 0, lastH = 0;
+    // Tell the show window how many pixels this screen has, so it renders
+    // that many; again whenever the window moves, resizes or goes fullscreen.
+    const announce = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.round(window.innerWidth * dpr));
+      const h = Math.max(1, Math.round(window.innerHeight * dpr));
+      if (w !== lastW || h !== lastH) {
+        canvas.width = w; canvas.height = h;
+        lastW = w; lastH = h;
+        bc?.postMessage({ type: 'stage', width: w, height: h } satisfies CastMessage);
+      }
+    };
+    announce();
+    window.addEventListener('resize', announce);
+    document.addEventListener('fullscreenchange', announce);
+    let anim = 0;
+    const draw = () => {
+      anim = requestAnimationFrame(draw);
+      const opener = window.opener as Window | null;
+      if (!opener || opener.closed) { setGone(true); return; }
+      const sw = source.width, sh = source.height;
+      if (sw === 0 || sh === 0) return;
+      // Letterbox in case the show window has not caught up with our size yet.
+      const s = Math.min(lastW / sw, lastH / sh);
+      const dw = Math.round(sw * s), dh = Math.round(sh * s);
+      const dx = (lastW - dw) >> 1, dy = (lastH - dh) >> 1;
+      if (dw !== lastW || dh !== lastH) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, lastW, lastH); }
+      ctx.drawImage(source, 0, 0, sw, sh, dx, dy, dw, dh);
+    };
+    draw();
+    return () => {
+      cancelAnimationFrame(anim);
+      window.removeEventListener('resize', announce);
+      document.removeEventListener('fullscreenchange', announce);
+      bc?.close();
+    };
+  }, [source]);
+
+  useEffect(() => {
+    let timer = setTimeout(() => setShowCursor(false), 2500);
+    const move = () => { setShowCursor(true); clearTimeout(timer); timer = setTimeout(() => setShowCursor(false), 2500); };
+    window.addEventListener('mousemove', move);
+    return () => { window.removeEventListener('mousemove', move); clearTimeout(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => ({ mode: 'mirror', linked: !gone, stage: { width: canvasRef.current?.width, height: canvasRef.current?.height }, source: { width: source.width, height: source.height } });
+    }
+  }, [gone, source]);
+
+  return (
+    <div
+      className="w-full h-screen bg-black overflow-hidden"
+      style={{ cursor: showCursor ? 'default' : 'none' }}
+      onClick={() => document.documentElement.requestFullscreen?.().catch(() => { /* not allowed here */ })}
+      data-testid="cast-display"
+    >
+      <canvas ref={canvasRef} className="w-full h-full" id="stage-canvas" />
+      {gone && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 text-center">
+            <p className="text-white/60 text-sm">The show window was closed</p>
+          </div>
+        </div>
+      )}
+      <CastHint />
+    </div>
+  );
+}
+
+/** A receiver with no show window to mirror: runs the show itself, fed by messages. */
+function CastReceiver() {
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   const [state, setState] = useState<CastState | null>(null);
   const [audio, setAudio] = useState<AudioData | null>(null);

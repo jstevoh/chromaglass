@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
@@ -7,7 +7,7 @@ import { CameraPass } from '../lib/cameraPass';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
-import { classifyGpu, detectTier, qualityLadder, type EngineStatus } from '../lib/platform';
+import { classifyGpu, detectTier, devicePixels, qualityLadder, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { ChemistryField } from '../lib/chemistry';
@@ -111,6 +111,11 @@ export interface LiquidVisualizerHandle {
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
   clearFilm: () => void;
+  /**
+   * A second display mirrors this canvas pixel for pixel: render at its size
+   * (the projector's pixels) and letterbox it here. Null returns to the window.
+   */
+  setStage: (size: { width: number; height: number } | null) => void;
 }
 
 // ─── Palette contracts ───────────────────────────────────────────────
@@ -1614,6 +1619,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const engineStatusAtRef = useRef(0);
   const governorRef = useRef<QualityGovernor | null>(null);
   const dprRef = useRef(1);
+  /** The mirrored display's pixel size, when one is attached. */
+  const stageRef = useRef<{ width: number; height: number } | null>(null);
+  const resizeRef = useRef<() => void>(() => {});
+  const [staged, setStaged] = useState(false);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -1676,6 +1685,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       t.x = Math.max(-1, Math.min(1, x));
       t.y = Math.max(-1, Math.min(1, y));
       t.at = performance.now() * 0.001;
+    },
+    setStage: (size) => {
+      stageRef.current = size && size.width > 0 && size.height > 0 ? { width: Math.round(size.width), height: Math.round(size.height) } : null;
+      setStaged(stageRef.current !== null);
+      resizeRef.current();
     },
     loadFilmFile: async (file: File) => {
       stopFilm();
@@ -3062,14 +3076,35 @@ void main() {
       // Device pixels per CSS pixel is a quality rung, so a Retina laptop
       // running locally renders sharp and a struggling one drops to 1x.
       const dpr = dprRef.current;
-      canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
-      canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+      const stage = stageRef.current;
+      if (stage) {
+        // A projector is mirroring this canvas: render at its pixels, with
+        // the governor's rung as a fraction of them, so the mirror shows the
+        // real picture and this window only a scaled copy.
+        const frac = Math.min(1, dpr / devicePixels());
+        const cap = webGLRef.current?.maxTexture ?? 8192;
+        canvas.width = Math.max(1, Math.min(cap, Math.round(stage.width * frac)));
+        canvas.height = Math.max(1, Math.min(cap, Math.round(stage.height * frac)));
+      } else {
+        canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+        canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+      }
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
+    resizeRef.current = resize;
     window.addEventListener('resize', resize);
     resize();
 
     // ── Mouse / touch handlers ─────────────────────────────────────
+    // Where the picture actually sits in the element: the whole box, unless a
+    // stage is attached and the canvas is letterboxed inside it.
+    const drawnRect = (): DOMRect => {
+      const box = canvas.getBoundingClientRect();
+      if (!stageRef.current || canvas.width === 0 || canvas.height === 0) return box;
+      const s = Math.min(box.width / canvas.width, box.height / canvas.height);
+      const w = canvas.width * s, h = canvas.height * s;
+      return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
+    };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
@@ -3093,7 +3128,7 @@ void main() {
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = drawnRect();
       const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
       lastMousePosRef.current = { ...mousePosRef.current };
       mousePosRef.current = { x, y };
@@ -3115,14 +3150,14 @@ void main() {
     const handleTouchStart = (e: TouchEvent) => {
       isMouseDownRef.current = true;
       if (e.touches[0]) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = drawnRect();
         mousePosRef.current = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       }
     };
     const handleTouchEnd = () => { isMouseDownRef.current = false; };
     const handleTouchMove = (e: TouchEvent) => {
       if (!e.touches[0]) return;
-      const rect = canvas.getBoundingClientRect();
+      const rect = drawnRect();
       const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -4298,6 +4333,7 @@ void main() {
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
+        style={staged ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
     </div>

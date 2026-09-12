@@ -94,7 +94,11 @@ export default function App() {
   // when it connects and every change after. The callback lives in a ref
   // because the state it snapshots is declared further down.
   const castReadyRef = useRef<() => void>(() => {});
-  const { isCasting, startCast, stopCast, send: castSend } = useCastSender(() => castReadyRef.current());
+  const stageRef = useRef<{ width: number; height: number } | null>(null);
+  const { isCasting, startCast, stopCast, send: castSend } = useCastSender(
+    () => castReadyRef.current(),
+    (size) => { stageRef.current = size; visualizerRef.current?.setStage(size); },
+  );
   const [presetSeq, setPresetSeq] = useState(0);
 
   const updateLiquidColor = useCallback((id: string, color: string) => {
@@ -553,7 +557,7 @@ export default function App() {
         energy: audioData.energy, spectralCentroid: audioData.spectralCentroid, timbre: audioData.timbre, complexity: audioData.complexity,
       } : null,
     };
-    if (isCasting) castSend(message);
+    if (isCasting && !stageRef.current) castSend(message);   // a mirror of this canvas needs no feed
     if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message });
   }, [audioData, isCasting, mirrorCount, castSend]);
 
@@ -1238,7 +1242,7 @@ export default function App() {
                   data-testid="cast-window"
                 >
                   <div className="text-xs font-semibold">Second display</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Opens the show in its own window, placed on a second screen if one is plugged in. Click it once for fullscreen.</div>
+                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">A projector on HDMI: opens a window on the second screen showing this very canvas, rendered at the projector's own pixels. Click it once for fullscreen. This window keeps the controls and a scaled copy.</div>
                 </button>
                 <div className="px-3 py-2 rounded-lg" data-testid="cast-network">
                   <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
