@@ -52,11 +52,16 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
    * full size — the projector plugged into the laptop, which is what most
    * shows are. Otherwise a large popup on this screen.
    */
-  const openWindow = useCallback(async (castUrl: string) => {
+  const openWindow = useCallback(async (castUrl: string, screen?: ScreenLike | null) => {
     // The window must open in the click itself: anything after an await has
     // lost the user gesture and is blocked as a popup. So open first, then
-    // find the other screen and move the window there.
-    const castWindow = window.open(castUrl, 'chromaglass-cast', 'popup,width=1920,height=1080');
+    // find the other screen and move the window there. When the projector
+    // is already known, the window opens straight on it, and fullscreen
+    // where the browser allows a popup to (Chrome, with the permission).
+    const features = screen
+      ? `popup,fullscreen,left=${Math.round(screen.availLeft)},top=${Math.round(screen.availTop)},width=${Math.round(screen.availWidth)},height=${Math.round(screen.availHeight)}`
+      : 'popup,width=1920,height=1080';
+    const castWindow = window.open(castUrl, 'chromaglass-cast', features);
     if (!castWindow) return false;
     windowRef.current = castWindow;
     openChannel();
@@ -73,9 +78,10 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
         const notHere = (sc: ScreenLike) => sc.left !== cur.left || sc.top !== cur.top;
         const other = details.screens.find((sc) => (sc as ScreenLike & { isInternal?: boolean }).isInternal === false && notHere(sc))
           ?? details.screens.find(notHere);
-        if (other && !castWindow.closed) {
-          castWindow.moveTo(other.availLeft, other.availTop);
-          castWindow.resizeTo(other.availWidth, other.availHeight);
+        const target = screen ?? other;
+        if (target && !castWindow.closed) {
+          castWindow.moveTo(target.availLeft, target.availTop);
+          castWindow.resizeTo(target.availWidth, target.availHeight);
         }
       }
     } catch {
@@ -84,11 +90,11 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
     return true;
   }, [cleanup, openChannel]);
 
-  const startCast = useCallback(async (mode: 'window' | 'device' = 'device') => {
+  const startCast = useCallback(async (mode: 'window' | 'device' = 'device', screen?: ScreenLike | null) => {
     const debug = new URLSearchParams(window.location.search).has('debug') ? '&debug' : '';
     const castUrl = `${window.location.origin}${window.location.pathname}?cast=true${debug}`;
 
-    if (mode === 'window') { await openWindow(castUrl); return; }
+    if (mode === 'window') { await openWindow(castUrl, screen); return; }
 
     // Presentation API: Chrome's device picker, with Chromecasts in it. The
     // receiver page is presented there and driven over the connection.
@@ -143,10 +149,12 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
 interface PresentationRequestLike {
   start(): Promise<PresentationConnectionLike>;
 }
-interface ScreenLike {
+export interface ScreenLike {
   left: number; top: number;
   availLeft: number; availTop: number; availWidth: number; availHeight: number;
   isPrimary?: boolean;
+  isInternal?: boolean;
+  label?: string;
 }
 interface PresentationConnectionLike {
   state: 'connecting' | 'connected' | 'closed' | 'terminated';
