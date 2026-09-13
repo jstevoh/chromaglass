@@ -17,6 +17,7 @@
  */
 
 import type { VisualizerSettings } from '../types';
+import type { SongRef } from './songRef';
 
 /** How a stage hands over to the next one. */
 export type StageAdvance = 'time' | 'section' | 'hold';
@@ -49,6 +50,8 @@ export interface ShowSequence {
   loop: boolean;
   stages: ShowStage[];
   builtIn?: boolean;
+  /** The song this was made for: it starts when that song is identified, at the right point, and stops when it ends. */
+  song?: SongRef;
 }
 
 let idCounter = 0;

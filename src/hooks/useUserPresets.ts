@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { VisualizerSettings } from '../types';
 import type { Preset } from '../presets';
+import type { SongRef } from '../lib/songRef';
 import {
   UserPreset, downloadText, loadUserPresets, makeUserPreset, parsePresetFile, presetFileName,
   saveUserPresets, serializePreset,
@@ -28,8 +29,8 @@ export function useUserPresets() {
   }, []);
 
   /** Snapshot the current look as a new preset, keep it, and hand the file over. */
-  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null): UserPreset => {
-    const p = makeUserPreset(name, description, settings, contract, injectStyles);
+  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, song: SongRef | null = null): UserPreset => {
+    const p = makeUserPreset(name, description, settings, contract, injectStyles, song);
     upsert(p);
     downloadText(presetFileName(p), serializePreset(p));
     return p;

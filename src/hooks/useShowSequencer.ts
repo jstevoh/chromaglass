@@ -152,6 +152,35 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     publish();
   }, [enterStage, findSequence, publish, selectedId]);
 
+  /**
+   * Start a sequence part-way through — the song it was made for was
+   * identified `offsetSec` in — so its stages line up with the music rather
+   * than starting from the top. Stages are laid end to end by their seconds.
+   */
+  const startAt = useCallback((sequenceId: string, offsetSec: number) => {
+    const seq = findSequence(sequenceId);
+    if (!seq || seq.stages.length === 0) return;
+    setSelectedId(sequenceId);
+    const total = seq.stages.reduce((t, st) => t + Math.max(1, st.seconds), 0);
+    let off = Math.max(0, offsetSec);
+    if (seq.loop && total > 0) off = off % total;
+    let index = 0;
+    for (; index < seq.stages.length - 1; index++) {
+      const len = Math.max(1, seq.stages[index].seconds);
+      if (off < len) break;
+      off -= len;
+    }
+    enterStage(seq, index);
+    const run = runRef.current;
+    if (run) {
+      run.enteredAt -= Math.min(off, Math.max(1, seq.stages[index].seconds));
+      run.pausedAt = null;
+      // Arriving mid-stage, the settings should already be there.
+      if (run.transition > 0 && off > run.transition) { argsRef.current.applySettings(run.target); run.glideDone = true; }
+    }
+    publish();
+  }, [enterStage, findSequence, publish]);
+
   const pause = useCallback(() => {
     const run = runRef.current;
     if (run && run.pausedAt === null) run.pausedAt = now();
@@ -224,7 +253,7 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     selectedId,
     setSelectedId,
     status,
-    play, pause, stop, next, prev, goTo,
+    play, pause, stop, next, prev, goTo, startAt,
     upsertSequence, removeSequence,
   };
 }

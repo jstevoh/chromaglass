@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import type { UserPreset } from '../lib/userPresets';
+import { songLabel, type SongRef } from '../lib/songRef';
 
 /**
  * The presets, one click from the top of the screen. Grouped the way the
@@ -26,7 +27,9 @@ interface PresetMenuProps {
   /** The user's own presets, and what to do with them. */
   userPresets?: UserPreset[];
   onApplyUserPreset?: (p: UserPreset) => void;
-  onSaveCurrent?: (name: string, description: string) => void;
+  onSaveCurrent?: (name: string, description: string, forSong?: boolean) => void;
+  /** The song playing now, if one is identified: a saved preset can be made for it. */
+  currentSong?: SongRef | null;
   onLoadFile?: (file: File) => Promise<void>;
   onExportUserPreset?: (p: UserPreset) => void;
   onDeleteUserPreset?: (id: string) => void;
@@ -40,8 +43,9 @@ const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
 
 export const PresetMenu: React.FC<PresetMenuProps> = ({
   activePresetId, onApplyPreset, onClose, align = 'left', anchor = null,
-  userPresets = [], onApplyUserPreset, onSaveCurrent, onLoadFile, onExportUserPreset, onDeleteUserPreset,
+  userPresets = [], onApplyUserPreset, onSaveCurrent, onLoadFile, onExportUserPreset, onDeleteUserPreset, currentSong = null,
 }) => {
+  const [forSong, setForSong] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -88,7 +92,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
           {saving ? (
             <form
               className="flex flex-col gap-1.5"
-              onSubmit={(e) => { e.preventDefault(); if (saveName.trim()) { onSaveCurrent(saveName, ''); setSaving(false); setSaveName(''); } }}
+              onSubmit={(e) => { e.preventDefault(); if (saveName.trim()) { onSaveCurrent(saveName, '', forSong && !!currentSong); setSaving(false); setSaveName(''); } }}
             >
               <input
                 autoFocus
@@ -98,6 +102,12 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40"
                 data-testid="preset-save-name"
               />
+              {currentSong && (
+                <label className="flex items-start gap-2 text-[10px] opacity-70 cursor-pointer">
+                  <input type="checkbox" checked={forSong} onChange={(e) => setForSong(e.target.checked)} className="accent-white mt-0.5" data-testid="preset-save-for-song" />
+                  <span>Made for <span className="text-white/90">{songLabel(currentSong)}</span> — applied whenever that song is identified</span>
+                </label>
+              )}
               <div className="flex gap-1.5">
                 <button type="submit" className="flex-1 py-1.5 rounded-lg bg-white text-black text-[10px] font-bold uppercase tracking-widest" data-testid="preset-save-confirm">Save as file</button>
                 <button type="button" onClick={() => setSaving(false)} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest">Cancel</button>
@@ -142,10 +152,13 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     role="menuitem"
                     onClick={() => { onApplyUserPreset?.(p); onClose(); }}
                     className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left ${active ? 'text-white' : 'text-white/75'}`}
-                    title={p.description ?? 'A saved preset'}
+                    title={p.song ? `Made for ${songLabel(p.song)}` : (p.description ?? 'A saved preset')}
                     data-testid={`preset-menu-${p.id}`}
                   >
-                    <span className="text-xs font-semibold truncate">{p.name}</span>
+                    <span className="min-w-0">
+                      <span className="text-xs font-semibold truncate block">{p.name}</span>
+                      {p.song && <span className="text-[9px] opacity-50 truncate block">♪ {songLabel(p.song)}</span>}
+                    </span>
                     {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
                   </button>
                   <button onClick={() => onExportUserPreset?.(p)} className="p-1.5 rounded hover:bg-white/10 text-white/50" title="Save this preset as a file"><Download size={11} /></button>
