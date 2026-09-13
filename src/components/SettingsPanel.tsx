@@ -28,10 +28,17 @@ interface SettingsPanelProps {
   onApplyUserPreset?: (id: string) => void;
   onSavePreset?: (name: string) => void;
   onLoadPresetFile?: (file: File) => Promise<void>;
+  /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
+  audioInputs?: { id: string; label: string }[];
+  audioInputId?: string;
+  onAudioInput?: (id: string) => void;
+  /** The house lights. */
+  blackout?: boolean;
+  onBlackout?: () => void;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const presetFileRef = useRef<HTMLInputElement>(null);
   const [presetFileError, setPresetFileError] = useState<string | null>(null);
@@ -204,6 +211,45 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.001}
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
         />
+
+        {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
+        {onAudioInput && (
+          <div className="flex flex-col gap-1.5 mb-4 mt-2">
+            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Input</span>
+            <select
+              value={audioInputId}
+              onChange={(e) => onAudioInput(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+              data-testid="audio-input"
+            >
+              <option value="">Default microphone</option>
+              {audioInputs.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+            <p className="text-[10px] leading-relaxed opacity-40">
+              On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
+            </p>
+          </div>
+        )}
+
+        {/* The house lights */}
+        <Slider
+          label="Dimmer"
+          value={settings.dimmer ?? 1}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ dimmer: v })}
+        />
+        {onBlackout && (
+          <button
+            onClick={onBlackout}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            title="Fade the plate to black and back (B on the keyboard)"
+            data-testid="blackout-button"
+          >
+            {blackout ? 'Lights up' : 'Blackout'}
+          </button>
+        )}
 
         {/* Room calibration */}
         <div className="flex items-center justify-between mb-3 mt-5">

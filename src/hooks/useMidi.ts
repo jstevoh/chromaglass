@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  apcMiniMk2Map, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
+  apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
   MIDI_FILE_EXT, MIDI_FORMAT,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiSource, type MidiTarget,
@@ -37,7 +37,7 @@ export interface MidiFeedback {
   presetColor: (presetId: string) => { r: number; g: number; b: number } | null;
   /** Palette colour (0..1 RGB) by index, for the dye pads. */
   paletteColor: (index: number) => { r: number; g: number; b: number } | null;
-  toggles: { play: boolean; automate: boolean; macro: boolean; overlays: boolean; sequencer: boolean };
+  toggles: { play: boolean; automate: boolean; macro: boolean; overlays: boolean; sequencer: boolean; blackout: boolean; record: boolean };
 }
 
 export interface MidiDevice { id: string; name: string; }
@@ -259,8 +259,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const setBindingMode = useCallback((id: string, mode: 'absolute' | 'relative') => setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, mode } : b) })), [setMap]);
   const clearMap = useCallback(() => setMap(prev => ({ ...prev, bindings: [] })), [setMap]);
   const rename = useCallback((name: string) => setMap(prev => ({ ...prev, name })), [setMap]);
-  const loadFactory = useCallback((which: 'apc-mini-mk2' | 'nanokontrol2') => {
-    setMap(which === 'apc-mini-mk2' ? apcMiniMk2Map(presetIds) : nanoKontrol2Map());
+  const loadFactory = useCallback((which: 'apc-mini-mk2' | 'nanokontrol2' | 'apc40-mk2' | 'launchpad' | 'launch-control-xl') => {
+    setMap(
+      which === 'apc-mini-mk2' ? apcMiniMk2Map(presetIds)
+      : which === 'apc40-mk2' ? apc40Mk2Map(presetIds)
+      : which === 'launchpad' ? launchpadMap(presetIds)
+      : which === 'launch-control-xl' ? launchControlXlMap()
+      : nanoKontrol2Map(),
+    );
     takeover.reset(); lastApplied.clear();
   }, [presetIds, setMap, takeover, lastApplied]);
   const exportMap = useCallback(() => {
@@ -299,6 +305,8 @@ function toggleState(a: MidiAction, t: MidiFeedback['toggles']): boolean | null 
     case 'macro-toggle': return t.macro;
     case 'overlays-toggle': return !t.overlays;
     case 'seq-play-pause': return t.sequencer;
+    case 'blackout-toggle': return t.blackout;
+    case 'record-toggle': return t.record;
     default: return null;
   }
 }

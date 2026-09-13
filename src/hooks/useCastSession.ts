@@ -69,7 +69,10 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
       if (w.getScreenDetails) {
         const details = await w.getScreenDetails();
         const cur = details.currentScreen;
-        const other = details.screens.find((sc) => sc.left !== cur.left || sc.top !== cur.top);
+        // The projector is the screen that is not built in; failing that, any other screen.
+        const notHere = (sc: ScreenLike) => sc.left !== cur.left || sc.top !== cur.top;
+        const other = details.screens.find((sc) => (sc as ScreenLike & { isInternal?: boolean }).isInternal === false && notHere(sc))
+          ?? details.screens.find(notHere);
         if (other && !castWindow.closed) {
           castWindow.moveTo(other.availLeft, other.availTop);
           castWindow.resizeTo(other.availWidth, other.availHeight);

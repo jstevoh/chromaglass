@@ -45,7 +45,11 @@ export type RemoteAction =
   | 'seq-stop'
   /** Step through the display's preset list. */
   | 'preset-next'
-  | 'preset-prev';
+  | 'preset-prev'
+  /** The house lights: fade to black and back. */
+  | 'blackout-toggle'
+  /** Record the show to a video file / stop. */
+  | 'record-toggle';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -74,6 +78,10 @@ export interface RemoteState {
   presets?: { id: string; name: string; macro: boolean; user: boolean }[];
   /** Whether the display has a MIDI controller live, for the tablet's status line. */
   midi?: string | null;
+  /** The plate is faded to black. */
+  blackout?: boolean;
+  /** A recording is running, and for how many seconds. */
+  recording?: number | null;
 }
 
 export type RemoteMessage =
@@ -103,6 +111,8 @@ export type RemoteMessage =
    */
   | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
   | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string }
+  /** A hand pressing the top glass: the film thins under it and the dye spreads out in a ring. */
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
   | { type: 'dye'; color: string };

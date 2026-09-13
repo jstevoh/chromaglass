@@ -1826,7 +1826,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const af = fluidsRef.current[layer];
       if (!af || drainFrameRef.current > 0) return;
       if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
-        bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (g.tool === 'blow' ? 5 : 3) * GRID_SCALE, g.tool === 'blow' ? 'air' : 'dye');
+        const airy = g.tool === 'blow' || g.tool === 'press';
+        bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * GRID_SCALE, airy ? 'air' : 'dye');
       }
       const S = GRID_SIZE;
       const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
@@ -1858,6 +1859,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
             af.addVelocity(sx, sy, dx * 0.3 * w, dy * 0.3 * w);
           }
+          break;
+        }
+        case 'press': {
+          // Pressed harder, the film thins over a wider palm.
+          const a = 0.002 + 0.004 * amt;
+          af.applySquish(x, y, 20 + 12 * amt, a);
+          af.applySquish(x, y, 12 + 6 * amt, a);
+          af.applySquish(x, y, 6, a);
           break;
         }
         case 'spray':
@@ -2007,6 +2016,7 @@ uniform float u_lampWarmth;        // halogen grade
 uniform float u_kaleido;           // mirror folds (0 = off, else 2/4/6)
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
+uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
 uniform float u_postBlur;          // gooey blur radius multiplier
 uniform float u_gridSize;          // fluid sim texture resolution (what we sample)
 uniform float u_logicalGrid;       // the 192-cell grid the look was tuned on
@@ -3007,6 +3017,9 @@ void main() {
   float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.03
               * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
   if (u_cameraOn == 0) outColor = clamp(outColor + grain, 0.0, 1.0);
+  // The dimmer sits last, the way the lamp's own dimmer does: everything
+  // upstream, the camera pass included, sees a darker plate.
+  outColor *= u_dimmer;
 
   fragColor = vec4(outColor, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
@@ -3094,7 +3107,7 @@ void main() {
       'u_filmLevel','u_filmGain','u_logicalGrid',
       'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
-      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure',
+      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
       'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
       'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
     ];
@@ -3444,7 +3457,7 @@ void main() {
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                bubblesRef.current.disturb(x, y, (tool === 'blow' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' ? 'air' : 'dye');
+                bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
               }
 
               // Feed the performance recorder (~15 Hz while painting)
@@ -3458,11 +3471,17 @@ void main() {
                   y: y / GRID_SIZE,
                   dx: gmx / gLen,
                   dy: gmy / gLen,
-                  color: tool === 'blow' ? undefined : (liq?.color ?? '#ffffff'),
+                  color: tool === 'blow' || tool === 'press' ? undefined : (liq?.color ?? '#ffffff'),
                 });
               }
 
-              if (tool === 'blow') {
+              if (tool === 'press') {
+                // A hand on the top glass: the film thins under the palm and
+                // the dye spreads out in a ring, the rhythm plate worked by hand.
+                af.applySquish(x, y, 30, 0.004);
+                af.applySquish(x, y, 18, 0.004);
+                af.applySquish(x, y, 8, 0.004);
+              } else if (tool === 'blow') {
                 af.blowAir(x, y, 4, 0.06);
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                   bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
@@ -4189,6 +4208,7 @@ void main() {
           glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+          glCtx.uniform1f(uLocs['u_dimmer'], Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)));
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
