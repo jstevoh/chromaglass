@@ -890,6 +890,13 @@ class FluidSimulation {
             // rim, so the centre is not hollowed at once): the fingers stay
             // visible even once the gap has bottomed out and the flow stops.
             const dist = Math.sqrt(d2);
+            // Under the palm the glass clears: the dye is pushed out to the
+            // fingers' tips and the centre reads as near-black glass.
+            if (dist < radius * 0.3) {
+              const core = 1 - Math.min(0.05, amount * 1.4) * fingering * (1 - dist / (radius * 0.3));
+              if (this.gpu) this.mul[idx] *= core;
+              else { this.density[idx] *= core; this.densityR[idx] *= core; this.densityG[idx] *= core; this.densityB[idx] *= core; }
+            }
             if (ang > 0 && dist < radius * prop.len) {
               const push = amount * 8 * ang * fingering * prop.k;
               this.vx[idx] += (i / dist) * push;
