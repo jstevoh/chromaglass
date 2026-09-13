@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle, PRESET_CONTRACTS } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2 } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -17,6 +17,7 @@ import { SequencerPanel } from './components/SequencerPanel';
 import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
+import { useRecorder } from './hooks/useRecorder';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -41,7 +42,9 @@ function loadMusicSettings(): MusicSettings {
   return { ...DEFAULT_MUSIC_SETTINGS };
 }
 
-type AudioSource = 'none' | 'microphone' | 'system';
+type AudioSource = 'none' | 'microphone' | 'system' | 'file';
+
+const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 
 // Detect which preset (if any) matches the current settings.
 function detectActivePreset(settings: VisualizerSettings): string | null {
@@ -63,6 +66,32 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
+  // ── The input the show listens to ──
+  // A USB interface fed from the desk beats the laptop's own microphone in
+  // any room with a crowd in it. The choice is remembered; the list of
+  // inputs needs microphone permission before the browser names them.
+  const [audioInputId, setAudioInputId] = useState<string>(() => { try { return localStorage.getItem(AUDIO_INPUT_KEY) ?? ''; } catch { return ''; } });
+  const [audioInputs, setAudioInputs] = useState<{ id: string; label: string }[]>([]);
+  const refreshAudioInputs = useCallback(async () => {
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputs(devs.filter(d => d.kind === 'audioinput').map((d, i) => ({ id: d.deviceId, label: d.label || `Input ${i + 1}` })));
+    } catch { /* no device access */ }
+  }, []);
+  useEffect(() => {
+    void refreshAudioInputs();
+    navigator.mediaDevices?.addEventListener?.('devicechange', refreshAudioInputs);
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refreshAudioInputs);
+  }, [refreshAudioInputs]);
+  // ── A music file, played here ──
+  // The straightest signal there is: no room, no microphone, no loopback
+  // driver. The element plays to the speakers and its stream feeds the show.
+  const [musicFile, setMusicFile] = useState<{ name: string; url: string } | null>(null);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
+  const musicElRef = useRef<HTMLAudioElement>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+  const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -93,7 +122,7 @@ export default function App() {
   const [activeLayer, setActiveLayer] = useState(0);
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
 
@@ -222,7 +251,12 @@ export default function App() {
     }
 
     setAudioSource(source);
+    if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
+    if (source === 'file') {
+      // The stream comes from the element once it is ready; see playMusicFile.
+      return;
+    }
 
     try {
       let stream: MediaStream;
@@ -242,13 +276,15 @@ export default function App() {
             noiseSuppression: false,
             autoGainControl: false,
             channelCount: 1,
+            ...(audioInputId ? { deviceId: { exact: audioInputId } } : {}),
           },
         };
         try {
           stream = await navigator.mediaDevices.getUserMedia(raw);
         } catch {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream = await navigator.mediaDevices.getUserMedia(audioInputId ? { audio: { deviceId: { exact: audioInputId } } } : { audio: true });
         }
+        void refreshAudioInputs();   // with permission, the inputs have names now
       }
       setAudioStream(stream);
       stream.getTracks().forEach(track => {
@@ -265,7 +301,59 @@ export default function App() {
       }
       setAudioSource('none');
     }
-  }, [audioStream]);
+  }, [audioStream, audioInputId, refreshAudioInputs]);
+  const chooseAudioInput = useCallback((id: string) => {
+    setAudioInputId(id);
+    try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
+    // Reopen the microphone on the new input if it is the live source.
+    if (audioSource === 'microphone') setTimeout(() => { void handleSourceChange('microphone'); }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioSource]);
+
+  /** A music file: the element plays it aloud and its stream is what the show hears. */
+  const playMusicFile = useCallback((file: File) => {
+    const el = musicElRef.current;
+    if (!el) return;
+    if (musicFile) URL.revokeObjectURL(musicFile.url);
+    const url = URL.createObjectURL(file);
+    setMusicFile({ name: file.name.replace(/\.[^.]+$/, ''), url });
+    setMusicTime({ t: 0, d: 0 });
+    if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
+    el.src = url;
+    el.onloadedmetadata = () => setMusicTime({ t: 0, d: el.duration || 0 });
+    el.oncanplay = () => {
+      el.oncanplay = null;
+      let stream: MediaStream | null = null;
+      // Chrome: the element's own stream. Elsewhere: route it through an
+      // AudioContext to a stream destination, and to the speakers as well.
+      const cap = (el as HTMLMediaElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
+      try { stream = cap.captureStream?.() ?? cap.mozCaptureStream?.() ?? null; } catch { stream = null; }
+      if (!stream) {
+        try {
+          if (!musicCtxRef.current) {
+            const ctx = new AudioContext();
+            const src = ctx.createMediaElementSource(el);
+            const dest = ctx.createMediaStreamDestination();
+            src.connect(dest);
+            src.connect(ctx.destination);
+            musicCtxRef.current = { ctx, src, dest };
+          }
+          stream = musicCtxRef.current.dest.stream;
+        } catch { stream = null; }
+      }
+      setAudioSource('file');
+      setAudioStream(stream);
+      void el.play().catch(() => { /* needs a gesture; the play button is there */ });
+    };
+    el.load();
+  }, [audioStream, musicFile]);
+  const closeMusicFile = useCallback(() => {
+    const el = musicElRef.current;
+    if (el) { el.pause(); el.removeAttribute('src'); el.load(); }
+    if (musicFile) URL.revokeObjectURL(musicFile.url);
+    setMusicFile(null);
+    if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
+  }, [musicFile, audioSource]);
 
   useEffect(() => {
     if (audioSource === 'microphone' && !audioStream) {
@@ -664,6 +752,48 @@ export default function App() {
     if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message });
   }, [audioData, isCasting, mirrorCount, castSend]);
 
+  // ── The house lights ──
+  // Blackout fades the dimmer to nothing over a second and back to where it
+  // was: the band stops, the wall goes dark, the band starts, the wall comes
+  // back. The dimmer itself is a setting, so a fader can ride it by hand.
+  const [blackout, setBlackout] = useState(false);
+  const dimmerBeforeRef = useRef(1);
+  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // On a timer, not requestAnimationFrame: the laptop's window is often
+  // behind the projector's, and a hidden tab stops animating while the
+  // fader on the desk expects the wall to go dark anyway.
+  const fadeDimmer = useCallback((to: number, ms = 1100) => {
+    if (fadeRef.current) clearInterval(fadeRef.current);
+    const from = settingsRef.current.dimmer ?? 1;
+    const began = performance.now();
+    fadeRef.current = setInterval(() => {
+      const k = Math.min(1, (performance.now() - began) / ms);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
+      if (k >= 1 && fadeRef.current) { clearInterval(fadeRef.current); fadeRef.current = null; }
+    }, 16);
+  }, []);
+  const toggleBlackout = useCallback(() => {
+    setBlackout(prev => {
+      if (!prev) { dimmerBeforeRef.current = Math.max(0.05, settingsRef.current.dimmer ?? 1); fadeDimmer(0); }
+      else fadeDimmer(dimmerBeforeRef.current);
+      return !prev;
+    });
+  }, [fadeDimmer]);
+  // ── Recording ──
+  const recorder = useRecorder();
+  const toggleRecording = useCallback(() => {
+    recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
+  }, [recorder, audioStream]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'b' || e.key === 'B') toggleBlackout();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggleBlackout]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -699,6 +829,8 @@ export default function App() {
       case 'seq-stop':        sequencer.stop(); break;
       case 'preset-next':     stepPreset(1); break;
       case 'preset-prev':     stepPreset(-1); break;
+      case 'blackout-toggle': toggleBlackout(); break;
+      case 'record-toggle':   toggleRecording(); break;
     }
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. */
@@ -730,7 +862,9 @@ export default function App() {
       stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
     },
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets]);
+    blackout,
+    recording: recorder.recording ? recorder.seconds : null,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -787,6 +921,8 @@ export default function App() {
             case 'seq-stop':      sequencer.stop(); break;
             case 'preset-next':   stepPreset(1); break;
             case 'preset-prev':   stepPreset(-1); break;
+            case 'blackout-toggle': toggleBlackout(); break;
+            case 'record-toggle': toggleRecording(); break;
           }
           break;
         case 'blow':
@@ -794,6 +930,9 @@ export default function App() {
           break;
         case 'drop':
           visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, color: message.color ?? selectedLiquid?.color });
+          break;
+        case 'press':
+          visualizerRef.current?.applyGesture({ tool: 'press', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
           break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
@@ -823,7 +962,7 @@ export default function App() {
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
       paletteColor: (i) => PALETTE_RGB[i] ?? null,
-      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running },
+      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording },
     },
     allPresetIds,
   );
@@ -838,6 +977,29 @@ export default function App() {
       (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad });
     }
   }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad]);
+  // ── A projector, noticed ──
+  // With the window-management permission already granted, the app can see
+  // a second screen on load and offer to put the show on it in one click
+  // (the click is needed: a window opened without one is a blocked popup).
+  const [projectorFound, setProjectorFound] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const perms = (navigator as unknown as { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } }).permissions;
+        const w = window as unknown as { getScreenDetails?: () => Promise<{ screens: { isInternal?: boolean; label?: string; left: number; top: number }[]; currentScreen: { left: number; top: number } }> };
+        if (!perms || !w.getScreenDetails) return;
+        let state = 'prompt';
+        try { state = (await perms.query({ name: 'window-management' })).state; } catch { try { state = (await perms.query({ name: 'window-placement' })).state; } catch { return; } }
+        if (state !== 'granted') return;
+        const d = await w.getScreenDetails();
+        const other = d.screens.find(sc => sc.isInternal === false && (sc.left !== d.currentScreen.left || sc.top !== d.currentScreen.top))
+          ?? d.screens.find(sc => sc.left !== d.currentScreen.left || sc.top !== d.currentScreen.top);
+        if (alive && other) setProjectorFound(other.label || 'second screen');
+      } catch { /* no permission yet: the Cast menu asks for it */ }
+    })();
+    return () => { alive = false; };
+  }, []);
   const gamepadCursorStyle = useMemo(() => {
     if (!gamepad.cursor.visible) return null;
     const r = visualizerRef.current?.drawnRect?.();
@@ -877,6 +1039,40 @@ export default function App() {
           style={{ left: gamepadCursorStyle.left, top: gamepadCursorStyle.top, width: gamepad.cursor.pressing ? 44 : 28, height: gamepad.cursor.pressing ? 44 : 28, backgroundColor: gamepad.cursor.pressing ? `${selectedLiquid?.color ?? '#fff'}55` : 'transparent' }}
           data-testid="gamepad-cursor"
         />
+      )}
+
+      {/* The music file's player: always audible, never in the way */}
+      <audio ref={musicElRef} className="hidden" preload="auto"
+        onPlay={() => setMusicPlaying(true)} onPause={() => setMusicPlaying(false)}
+        onTimeUpdate={(e) => { const el = e.currentTarget; setMusicTime({ t: el.currentTime, d: el.duration || 0 }); }}
+        onEnded={() => setMusicPlaying(false)} />
+      {musicFile && overlaysVisible && (
+        <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-xl shadow-2xl" data-testid="music-player">
+          <button onClick={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
+            {musicPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
+          </button>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate" title={musicFile.name}>{musicFile.name}</span>
+          <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.t / 60)}:{String(Math.floor(musicTime.t % 60)).padStart(2, '0')}</span>
+          <input type="range" min={0} max={Math.max(1, musicTime.d)} step={0.1} value={Math.min(musicTime.t, musicTime.d || 0)}
+            onChange={(e) => { const el = musicElRef.current; if (el) el.currentTime = parseFloat(e.target.value); }}
+            className="w-40 h-1 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
+          <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.d / 60)}:{String(Math.floor(musicTime.d % 60)).padStart(2, '0')}</span>
+          <button onClick={closeMusicFile} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
+        </div>
+      )}
+      {projectorFound && !isCasting && overlaysVisible && (
+        <button
+          onClick={() => { void startCast('window'); setProjectorFound(null); }}
+          className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl hover:bg-white/10"
+          title="Open the show full size on the second screen"
+          data-testid="projector-hint"
+        >
+          <Projector size={13} /> {projectorFound} connected · send the show there
+          <span className="ml-1 text-white/30" onClick={(e) => { e.stopPropagation(); setProjectorFound(null); }} aria-label="Dismiss"><X size={11} /></span>
+        </button>
+      )}
+      {blackout && overlaysVisible && (
+        <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
 
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
@@ -1017,6 +1213,7 @@ export default function App() {
                       { id: 'pour' as const, icon: FlaskConical, label: 'Pour' },
                       { id: 'streak' as const, icon: Slash, label: 'Streak' },
                       { id: 'blow' as const, icon: Wind, label: 'Blow' },
+                      { id: 'press' as const, icon: Hand, label: 'Press' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}
@@ -1281,6 +1478,21 @@ export default function App() {
                     <Monitor size={14} />
                     <span>System</span>
                   </button>
+                  <button
+                    onClick={() => musicInputRef.current?.click()}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                      audioSource === 'file'
+                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title="Play a music file here and drive the show from it — no microphone, no loopback"
+                    data-testid="music-file-button"
+                  >
+                    <FileAudio size={14} />
+                    <span>File</span>
+                  </button>
+                  <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
+                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
                 </div>
 
               </div>
@@ -1326,6 +1538,11 @@ export default function App() {
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             engineStatus={engineStatus}
             getLiveEngineStatus={() => engineStatusRef.current}
+            audioInputs={audioInputs}
+            audioInputId={audioInputId}
+            onAudioInput={chooseAudioInput}
+            blackout={blackout}
+            onBlackout={toggleBlackout}
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
@@ -1468,6 +1685,17 @@ export default function App() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
             )}
           </button>
+          {recorder.supported && (
+            <button
+              onClick={toggleRecording}
+              className={`p-2 rounded-full transition-all flex items-center gap-1 ${recorder.recording ? 'bg-red-600 text-white' : 'hover:bg-white/10 text-white/60'}`}
+              title={recorder.recording ? 'Stop recording and save the video' : 'Record the show to a video file'}
+              data-testid="record-button"
+            >
+              {recorder.recording ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
+              {recorder.recording && <span className="text-[9px] font-mono" data-testid="record-time">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, '0')}</span>}
+            </button>
+          )}
           <div className="relative">
             <button
               onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}

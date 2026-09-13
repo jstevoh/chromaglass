@@ -109,6 +109,9 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
         <div className="flex flex-wrap gap-1.5 mb-2">
           <button onClick={() => midi.loadFactory('apc-mini-mk2')} className={chip(false)} data-testid="midi-factory-apc">APC mini mk2</button>
           <button onClick={() => midi.loadFactory('nanokontrol2')} className={chip(false)} data-testid="midi-factory-nano">nanoKONTROL2</button>
+          <button onClick={() => midi.loadFactory('apc40-mk2')} className={chip(false)} data-testid="midi-factory-apc40">APC40 mkII</button>
+          <button onClick={() => midi.loadFactory('launchpad')} className={chip(false)} data-testid="midi-factory-launchpad">Launchpad</button>
+          <button onClick={() => midi.loadFactory('launch-control-xl')} className={chip(false)} data-testid="midi-factory-lcxl">Launch Control XL</button>
           <button onClick={midi.clearMap} className={chip(false)} title="Remove every binding"><Trash2 size={11} className="inline -mt-0.5" /> Clear</button>
         </div>
         <div className="flex gap-1.5">

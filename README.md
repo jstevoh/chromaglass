@@ -76,17 +76,58 @@ npm run remote
 
 The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
 
+## On stage
+
+Playing the visuals for a band is a different job from running them in a living room: the audio-reactive code does the micro-syncing (the kick lands on the plate), and the projectionist does the macro-syncing (the mood, the transitions, the energy). What the app gives that projectionist:
+
+- **A clean feed, not a microphone.** Ask the sound desk for an aux send or matrix out into a USB audio interface (a Scarlett 2i2 is plenty) and pick it under Settings → Sound → **Input**. Ask for a mix heavy on kick, snare and bass. The choice is remembered.
+- **A music file, played here.** The **File** button under the Mic and System buttons plays an MP3, WAV, FLAC or OGG through the speakers and drives the show from it: the straightest signal there is, for rehearsing a set to the studio recordings.
+- **The dimmer and blackout.** `dimmer` is the house lights for the plate; ride it from a fader (it is the master fader on the APC40 mkII and Launch Control XL factory maps). **B** on the keyboard, the Blackout button on the phone and in Settings → Sound, or the *Blackout* action from any controller fades the plate to black in a second and back again when the band comes in.
+- **Pressing the plate.** The **Press** tool, the pad's *press* mode on a tablet, the left trigger on a game controller, or `/chromaglass/press` over OSC: a hand on the top glass. The film thins under it and the dye spreads out in a ring, the way the Joshua Light Show worked its rhythm plate; **Beat Squeeze** (Settings → Show) does the same on every kick.
+- **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
+- **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
+- **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
+- **Masks.** Front-projecting onto the band means light on faces. A browser cannot output Syphon or NDI directly; to mask, capture the projector window with OBS (Window Capture → NDI or Syphon plugin) into Resolume, HeavyM or MadMapper, or rear-project onto a gauze and avoid the problem.
+- **Fewer things to go wrong.** Install the app (below), turn off sleep and updates on the laptop, run the show from `npm run remote`, and put the phone or the controller in charge so nobody has to reach for the trackpad in the dark.
+
+### Which controller
+
+The APC mini mk2 is the cheap, right answer: an 8×8 RGB grid for presets and dyes, nine faders, and USB power. Better, if the budget stretches: the **APC40 mkII** adds a master fader (the dimmer), sixteen knobs and a crossfader, and is what most VJs carry; the **Launch Control XL** is the fader-and-knob desk with no pads; a **Launchpad Mini mk3 / Launchpad X** is the pad grid with no faders, so pair it with a nanoKONTROL2. Factory maps for all of them are in the MIDI panel. Endless encoders (a MIDI Fighter Twister, a Faderfox) work through learn with *Endless encoder* ticked.
+
+## Installing the app
+
+ChromaGlass is a Progressive Web App. In Chrome or Edge, open the site (or the show server's address) and use the install icon at the right of the address bar: it gets its own dock or taskbar icon and opens in a window with no tabs or address bar. The installed app is the same code, updated on the next open.
+
+With the window-management permission granted (the Cast menu's **Second display** asks for it once), the app notices a projector on load and offers to send the show there in one click; the projector is the screen that is not built in.
+
+## OSC
+
+The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_PORT=0` to turn it off), from the local network only, so Resolume, TouchDesigner, Max, Ableton (Connection Kit) and phone OSC apps can drive the show:
+
+```
+/chromaglass/setting/<key> <number>    any numeric setting, e.g. /chromaglass/setting/audioImpact 0.8
+/chromaglass/action/<name>             seed clear drain lucky play pause automate-on automate-off
+                                       overlays-on overlays-off seq-play seq-pause seq-next seq-prev seq-stop
+                                       preset-next preset-prev blackout-toggle record-toggle
+/chromaglass/preset <id>               cue a preset (galaxy, oil-on-water, or a user-… id)
+/chromaglass/blow x y [amount] [dx dy] air at a point (0..1, y up)
+/chromaglass/drop x y [amount]         dye at a point
+/chromaglass/press x y [amount]        press the glass at a point
+/chromaglass/tilt x y                  rock the plate (-1..1)
+/chromaglass/dye #rrggbb               the dropper's colour
+```
+
 ## MIDI and game controllers
 
 The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox have no Web MIDI) turns a controller on the desk into the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer.
 
-- **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera) and the Korg nanoKONTROL2 (faders and knobs as above, S buttons one-shots, M buttons toggles, transport keys the sequencer). A Launchpad, MIDImix, Launch Control XL or Faderfox is a few minutes of learn away.
+- **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, transport play / blackout / record), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
 - **MIDI learn**: pick what a control should do in the panel (any of thirty settings, every action, every preset, every dye), then touch the control. Tick *Endless encoder* first for a knob with no stop (relative "two's-complement" nudges); the binding list flips any CC between `abs` and `enc` later.
 - **Soft takeover**: a fader that disagrees with the app is ignored until it passes through the app's value, so a slider dragged on the phone does not jump back the moment a fader twitches. Turn it off for a controller with motorised faders.
 - **LED feedback**: preset pads light in the preset's lead dye (dim until it is the active one), dye pads in their colour, toggle buttons on or off, on the APC mini mk2 / Launchpad velocity palette; CC-driven LEDs get 127/0. *LEDs: Auto* picks the output that shares a name with the input.
 - **Maps are files**: **Save file** writes a `.chromaglass-midi.json` next to your presets and sequences; **Load file** reads one in. The map also lives in the browser, and MIDI comes back on by itself on the next visit.
 
-A **game controller** needs no setup: plug it in (or pair it) and press a button. The left stick moves a cursor over the plate, the right stick blows air from the cursor in the direction it is pushed, the right trigger drops dye (as much as it is pulled), the left trigger blows a puff, the shoulders cycle the dye colour, the d-pad steps presets (left/right) and plates (up/down), A seeds, B drains, X rolls a random look, Y cleans the screen, Start is play/pause, Back is Random Evolve, R3 is Macro, L3 recentres the cursor. The Gamepad API carries no gyro, so rocking the plate stays with the phone's tilt.
+A **game controller** needs no setup: plug it in (or pair it) and press a button. The left stick moves a cursor over the plate, the right stick blows air from the cursor in the direction it is pushed, the right trigger drops dye (as much as it is pulled), the left trigger presses the glass, the shoulders cycle the dye colour, the d-pad steps presets (left/right) and plates (up/down), A seeds, B drains, X rolls a random look, Y cleans the screen, Start is play/pause, Back is Random Evolve, R3 is Macro, L3 recentres the cursor. The Gamepad API carries no gyro, so rocking the plate stays with the phone's tilt.
 
 ### The show key
 
@@ -166,6 +207,10 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Lucky | Randomize all settings |
 | Dropper tool | Click/tap to add colored dye |
 | Blow tool | Click/tap to blow air bubbles |
+| Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring |
+| Mic / System / File | Where the show listens: the microphone (or the input chosen in Settings → Sound), system audio, or a music file played here with its own small player |
+| Dimmer / Blackout | Settings → Sound: the house lights for the plate; **B** fades to black and back, as does the Blackout button on the phone or from a controller |
+| Record | The red button by Cast: the show to a `.webm` file, music included |
 | Layer buttons | Switch active fluid layer |
 | Clear | Wipe the active layer |
 | Random Evolve | Automated dye drops and air blows driven by the music; the **Evolve Speed** slider under it sets how often, from a drop every second or so to a frenzy |
@@ -209,7 +254,8 @@ src/
     useMusicIntelligence.ts    # Orchestrates identification, song maps, lyrics, evolution
     useRemoteLink.ts           # WebSocket link, either end, with reconnect
     useMidi.ts                 # Web MIDI: devices, bindings, learn, soft takeover, LED feedback
-    useGamepad.ts              # Gamepad API: cursor, blow, drop, buttons
+    useGamepad.ts              # Gamepad API: cursor, blow, drop, press, buttons
+    useRecorder.ts             # MediaRecorder: the canvas and the music to a video file
   lib/
     musicTypes.ts              # Music intelligence interfaces
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
@@ -238,7 +284,10 @@ src/
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
-  remote-server.js             # LAN static server + control relay (npm run remote)
+  remote-server.js             # LAN static server + control relay + OSC in (npm run remote)
+public/
+  manifest.webmanifest         # PWA manifest: installable, standalone window
+  sw.js                        # Service worker: light cache, never the relay
 ```
 
 ## Updating everything at once

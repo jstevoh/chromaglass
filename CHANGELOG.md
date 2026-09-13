@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — The stage kit
+- **Press**: a tool, a tablet pad mode, a game-controller trigger and an OSC address for a hand on the top glass. The film thins under it (three nested squeezes of the Hele-Shaw gap) and the dye spreads out in a ring, the Joshua Light Show's rhythm plate worked by hand; pen pressure and trigger travel set how hard
+- **Dimmer** (`dimmer`, default 1) as the last stage of the plate shader, so the camera pass sees a darker plate and bloom fades with it; **Blackout** (`B`, the phone, Settings → Sound, a MIDI or OSC action) fades it to black over a second and back to where it was, on a timer so it works while the laptop's window is behind the projector's
+- **Input picker** (Settings → Sound): the audio interface fed from the desk instead of the built-in microphone; remembered, reopened when changed
+- **Music file** (the File button): an MP3/WAV/FLAC/OGG played through the speakers and heard by the show via the element's own stream (an AudioContext route where `captureStream` is missing), with a small player: play/pause, seek, close
+- **Record** (the red button by Cast, or the *Record* action): `canvas.captureStream` + the music into MediaRecorder, VP9/VP8 WebM or MP4 as the browser has it, saved as a download on stop (`src/hooks/useRecorder.ts`)
+- **Factory MIDI maps** for the APC40 mkII, Launchpad Mini mk3 / X (programmer mode) and Launch Control XL, alongside the APC mini mk2 and nanoKONTROL2; the dimmer is learnable and the new actions (blackout, record) are on every map
+- **OSC in** on the show server (UDP 9000, LAN only, `OSC_PORT`): a small OSC 1.0 reader (bundles, i/f/d/h/s/b/T/F) mapping `/chromaglass/setting/<key>`, `/action/<name>`, `/preset`, `/blow`, `/drop`, `/press`, `/tilt`, `/dye` onto the relay's own messages, so Resolume, TouchDesigner, Max and Ableton drive the show like a phone does
+- **Installable**: a web manifest (standalone window, icons, shortcuts for the remote and a network display) and a light service worker (hashed assets cached, the page network-first, the relay and remote-info never touched), registered on built sites only. Chrome and Edge offer "Install app"
+- **A projector, noticed**: with the window-management permission already granted, a second external screen on load shows a one-click "send the show there" chip; the Second display cast now prefers the screen that is not built in
+- The remote gets a Dimmer slider and Blackout / Record buttons; the display's state carries `blackout` and `recording`
+
+### Fixed — The show server, after review
+- A socket that never said hello with the show key was still relayed to the display (the key was decorative); relay-only message types (`denied`, `request-state`, `mirrors`, `request-cast`, `hello`) sent by a client were forwarded too, and a forged `denied` made the display stop reconnecting. Both dropped now
+- A text frame `null` (JSON.parse succeeds, `.type` throws), a malformed percent-encoded path (`decodeURIComponent` throws) and a WebSocket protocol error with no `error` listener each took the whole server down
+- Ping/pong every thirty seconds terminates a network display that has dropped off Wi-Fi without a FIN, and show frames are skipped for a socket whose send buffer is over a megabyte, instead of queueing thirty a second forever
+- `firebase.json` listed the catch-all `no-store` header after `/assets/**`, so the hashed bundles were served uncacheable; the order is fixed and assets are immutable again
+
+
 ### Added — MIDI controllers, game controllers, and the iPad as a plate
 - **MIDI** (`src/lib/midi.ts`, `src/hooks/useMidi.ts`, `MidiPanel.tsx`, the MIDI toolbar button): a controller's faders ride settings, its pads cue presets and dye colours, its buttons fire the one-shots and drive the sequencer. Factory maps for the Akai APC mini mk2 and Korg nanoKONTROL2; **MIDI learn** for any other (pick a target — thirty settings, every action, every preset, every dye — then touch the control); endless encoders as relative nudges; **soft takeover** so a fader that disagrees with the app waits until it passes through the value; **LED feedback** lights preset pads in the preset's lead dye (dim until active), dye pads in their colour, toggles on or off, using the Launchpad / APC velocity palette and 127/0 for CC LEDs. Maps live in the browser and as `.chromaglass-midi.json` files (Save file / Load file), and MIDI comes back on by itself next visit
 - **Game controller** (`src/hooks/useGamepad.ts`): left stick moves a cursor ring over the plate, right stick blows air from it in the direction pushed, right trigger drops dye as much as it is pulled, left trigger puffs, shoulders cycle the dye, d-pad steps presets and plates, face buttons seed / drain / random / clean screen, Start play/pause, Back Random Evolve, R3 Macro, L3 recentres. Polled on a timer so it keeps working while the laptop's window is behind the projector's

@@ -22,7 +22,11 @@ export type MidiAction =
   | 'seed' | 'clear' | 'drain' | 'lucky'
   | 'play-toggle' | 'automate-toggle' | 'overlays-toggle' | 'macro-toggle'
   | 'seq-play-pause' | 'seq-next' | 'seq-prev' | 'seq-stop'
-  | 'preset-next' | 'preset-prev';
+  | 'preset-next' | 'preset-prev'
+  /** The house lights: fade the plate to black and back. */
+  | 'blackout-toggle'
+  /** Record the show to a video file / stop recording. */
+  | 'record-toggle';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -70,10 +74,12 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
+  'blackout-toggle': 'Blackout', 'record-toggle': 'Record',
 };
 
 /** The settings worth a fader, with their travel. */
 export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number }[] = [
+  { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
   { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0.005, max: 0.3 },
@@ -299,4 +305,82 @@ export function nanoKontrol2Map(): MidiMap {
   b.push(bind(cc(58), { kind: 'action', action: 'preset-prev' }));
   b.push(bind(cc(59), { kind: 'action', action: 'preset-next' }));
   return { format: MIDI_FORMAT, version: 1, name: 'nanoKONTROL2', device: 'nanoKONTROL2', bindings: b };
+}
+
+/**
+ * Akai APC40 mkII: the classic VJ desk. Eight track faders (CC 7 on channels
+ * 1–8) ride the show, the master fader (CC 14) is the dimmer, the eight
+ * device knobs (CC 16–23) are the lamp and camera, the eight track knobs
+ * (CC 48–55) the plate, the 8×5 clip grid (notes 0–39, bottom-left first)
+ * cues presets from the top row down, the scene launch column (notes 82–86)
+ * runs the sequencer, and the transport keys are play / blackout / record.
+ */
+export function apc40Mk2Map(presetIds: string[]): MidiMap {
+  const b: MidiBinding[] = [];
+  presetIds.slice(0, 40).forEach((id, i) => {
+    const row = 4 - Math.floor(i / 8), col = i % 8;
+    b.push(bind(note(row * 8 + col), { kind: 'preset', presetId: id }));
+  });
+  const faders: (keyof VisualizerSettings)[] = ['audioImpact', 'automateRate', 'globalSpeed', 'dyeBudget', 'turbulenceScale', 'plateRock', 'bubbles', 'saturationBoost'];
+  faders.forEach((k, ch) => b.push(bind(cc(7, ch), setting(k))));
+  b.push(bind(cc(14), setting('dimmer')));
+  const device: (keyof VisualizerSettings)[] = ['lightPlay', 'lampMotion', 'lampHotspot', 'secondLamp', 'camera', 'focus', 'aperture', 'bloom'];
+  device.forEach((k, i) => b.push(bind(cc(16 + i), setting(k))));
+  const track: (keyof VisualizerSettings)[] = ['beatSqueeze', 'edgeRelief', 'iridescence', 'hueJourney', 'backgroundLoop', 'dishVignette', 'macroZoom', 'macroSync'];
+  track.forEach((k, i) => b.push(bind(cc(48 + i), setting(k))));
+  const scenes: MidiAction[] = ['seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop', 'lucky'];
+  scenes.forEach((a, i) => b.push(bind(note(82 + i), { kind: 'action', action: a })));
+  // Clip stop buttons (note 52 on channels 1–8): the one-shots and toggles.
+  const stops: MidiAction[] = ['seed', 'drain', 'clear', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'preset-prev', 'preset-next'];
+  stops.forEach((a, ch) => b.push(bind(note(52, ch), { kind: 'action', action: a })));
+  b.push(bind(note(91), { kind: 'action', action: 'play-toggle' }));     // play
+  b.push(bind(note(92), { kind: 'action', action: 'blackout-toggle' })); // stop
+  b.push(bind(note(93), { kind: 'action', action: 'record-toggle' }));   // record
+  // Track select (note 51 on channels 1–8): the first eight dyes.
+  for (let ch = 0; ch < 8; ch++) b.push(bind(note(51, ch), { kind: 'dye', paletteIndex: ch }));
+  return { format: MIDI_FORMAT, version: 1, name: 'APC40 mkII', device: 'APC40 mkII', bindings: b };
+}
+
+/**
+ * Novation Launchpad Mini mk3 / Launchpad X in programmer mode: pads are
+ * notes 11–88 (row × 10 + column, row 1 at the bottom), the top row of
+ * buttons CC 91–98, the right column CC 89 down to 19. The top six rows are
+ * presets, the bottom two dyes, the top buttons the one-shots and the
+ * sequencer, the side column the toggles. Colours light by velocity.
+ */
+export function launchpadMap(presetIds: string[]): MidiMap {
+  const b: MidiBinding[] = [];
+  presetIds.slice(0, 48).forEach((id, i) => {
+    const row = 8 - Math.floor(i / 8), col = 1 + (i % 8);
+    b.push(bind(note(row * 10 + col), { kind: 'preset', presetId: id }));
+  });
+  for (let i = 0; i < 8; i++) b.push(bind(note(20 + 1 + i), { kind: 'dye', paletteIndex: i }));
+  for (let i = 0; i < 8; i++) b.push(bind(note(10 + 1 + i), { kind: 'dye', paletteIndex: 8 + i }));
+  const top: MidiAction[] = ['seed', 'drain', 'clear', 'lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
+  top.forEach((a, i) => b.push(bind(cc(91 + i), { kind: 'action', action: a })));
+  const side: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
+  side.forEach((a, i) => b.push(bind(cc(89 - 10 * i), { kind: 'action', action: a })));
+  return { format: MIDI_FORMAT, version: 1, name: 'Launchpad', device: 'Launchpad Mini mk3 / X (programmer mode)', bindings: b };
+}
+
+/**
+ * Novation Launch Control XL (factory template 1): three rows of knobs
+ * (CC 13–20, 29–36, 49–56), eight faders (CC 77–84), and two rows of
+ * buttons (notes 41–44 + 57–60, 73–76 + 89–92).
+ */
+export function launchControlXlMap(): MidiMap {
+  const b: MidiBinding[] = [];
+  const faders: (keyof VisualizerSettings)[] = ['dimmer', 'audioImpact', 'automateRate', 'globalSpeed', 'dyeBudget', 'turbulenceScale', 'plateRock', 'bubbles'];
+  faders.forEach((k, i) => b.push(bind(cc(77 + i), setting(k))));
+  const row1: (keyof VisualizerSettings)[] = ['lightPlay', 'lampMotion', 'lampHotspot', 'secondLamp', 'iridescence', 'saturationBoost', 'edgeRelief', 'beatSqueeze'];
+  row1.forEach((k, i) => b.push(bind(cc(13 + i), setting(k))));
+  const row2: (keyof VisualizerSettings)[] = ['camera', 'focus', 'aperture', 'bloom', 'hueJourney', 'backgroundLoop', 'dishVignette', 'beatLead'];
+  row2.forEach((k, i) => b.push(bind(cc(29 + i), setting(k))));
+  const row3: (keyof VisualizerSettings)[] = ['macroZoom', 'macroSync', 'macroChase', 'lumia', 'chemistry', 'gelWheel', 'turbulenceScale', 'dyeBudget'];
+  row3.forEach((k, i) => b.push(bind(cc(49 + i), setting(k))));
+  const focus: MidiAction[] = ['seed', 'drain', 'clear', 'lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
+  [41, 42, 43, 44, 57, 58, 59, 60].forEach((n, i) => b.push(bind(note(n), { kind: 'action', action: focus[i] })));
+  const control: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
+  [73, 74, 75, 76, 89, 90, 91, 92].forEach((n, i) => b.push(bind(note(n), { kind: 'action', action: control[i] })));
+  return { format: MIDI_FORMAT, version: 1, name: 'Launch Control XL', device: 'Launch Control XL', bindings: b };
 }

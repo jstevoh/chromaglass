@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { useRemoteLink } from '../hooks/useRemoteLink';
@@ -193,7 +193,7 @@ export default function RemoteControl() {
   // presses (more dye) and leans (which way the air goes). Each device holds
   // one layer, so two tablets are two projectionists on two plates.
   const [padLayer, setPadLayer] = useState(0);
-  const [padTool, setPadTool] = useState<'blow' | 'drop'>('blow');
+  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press'>('blow');
   const [padColor, setPadColor] = useState<string | null>(null);
   const [padFull, setPadFull] = useState(false);
   const [penSeen, setPenSeen] = useState(false);
@@ -206,9 +206,10 @@ export default function RemoteControl() {
     // Normalised, y up — the plate's own coordinates.
     return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
   };
-  const padSend = (kind: 'blow' | 'drop', e: ReactPointerEvent, p: { x: number; y: number }) => {
+  const padSend = (kind: 'blow' | 'drop' | 'press', e: ReactPointerEvent, p: { x: number; y: number }) => {
     const amount = pressureOf(e);
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
+    else if (kind === 'press') send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
     else { const t = tiltOf(e); send({ type: 'blow', x: p.x, y: p.y, layer: padLayer, amount, ...(t ?? {}) }); }
   };
   const onPadDown = (e: ReactPointerEvent) => {
@@ -229,7 +230,7 @@ export default function RemoteControl() {
     const p = padPoint(e);
     padTouches.current.set(e.pointerId, p);
     const now = performance.now();
-    if (now - (padLastSend.current.get(e.pointerId) ?? 0) < 33) return;   // 30 Hz along each drag
+    if (now - (padLastSend.current.get(e.pointerId) ?? 0) < (padTool === 'press' ? 16 : 33)) return;   // 30 Hz along a drag, 60 for a held press
     padLastSend.current.set(e.pointerId, now);
     padSend(e.buttons === 32 ? 'blow' : padTool, e, p);
   };
@@ -299,7 +300,7 @@ export default function RemoteControl() {
       data-testid="remote-pad"
     >
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[10px] uppercase tracking-[0.25em] text-white/25">
-        {padTool === 'blow' ? 'drag to blow air across the plate' : 'tap or drag to drop dye'}
+        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : 'tap or drag to drop dye'}
         {penSeen ? ' · pen: press for more, lean to steer' : ''}
       </span>
       {padTouchCount > 0 && (
@@ -327,7 +328,7 @@ export default function RemoteControl() {
           ))}
         </div>
         <div className="flex gap-1.5">
-          {(['blow', 'drop'] as const).map((t) => (
+          {(['blow', 'drop', 'press'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setPadTool(t)}
@@ -468,6 +469,30 @@ export default function RemoteControl() {
           <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Evolve Speed" field="automateRate" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dimmer" field="dimmer" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
+          <div className="mb-6 flex gap-3">
+            <button
+              onClick={() => action('blackout-toggle')}
+              disabled={!connected}
+              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
+                state?.blackout ? 'border-red-400/40 bg-red-500/20 text-red-100' : 'border-white/10 bg-white/5 text-white/80'
+              }`}
+              data-testid="remote-blackout"
+            >
+              <Lightbulb size={16} /> {state?.blackout ? 'Lights up' : 'Blackout'}
+            </button>
+            <button
+              onClick={() => action('record-toggle')}
+              disabled={!connected}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
+                state?.recording != null ? 'border-red-500 bg-red-600 text-white' : 'border-white/10 bg-white/5 text-white/70'
+              }`}
+              data-testid="remote-record"
+            >
+              {state?.recording != null ? <Square size={14} fill="currentColor" /> : <Circle size={14} />}
+              {state?.recording != null ? `${Math.floor(state.recording / 60)}:${String(state.recording % 60).padStart(2, '0')}` : 'Rec'}
+            </button>
+          </div>
           <Slider label="Dye Budget" field="dyeBudget" min={0} max={1.5} step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
 
