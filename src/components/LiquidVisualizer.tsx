@@ -10,6 +10,7 @@ import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
 import { classifyGpu, detectTier, devicePixels, qualityLadder, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
+import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 
 interface LiquidVisualizerProps {
@@ -81,6 +82,7 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'neon-coral-reef':    ['streak', 'drop'],
   'stardust-collapse':  ['spray', 'splatter'],
   'poster-1969':        ['pour', 'drop'],
+  'fillmore-1969':      ['pour', 'drop'],
   'oil-on-water':       ['drop'],
   'colorful-cosmos':    ['pour'],
   'sunny-side-up':      ['pour', 'drop'],
@@ -157,6 +159,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'sensual-laboratory': [14, 12],
   'oil-wheel':          [0, 6, 8],
   'poster-1969':        [2, 6],
+  'fillmore-1969':      [1, 0, 3, 7, 5, 10],
+  'fillmore-wash':      [5, 10, 9],            // the second projector: emerald, purple, cobalt
   'oil-on-water':       [0, 1],
   'colorful-cosmos':    [9, 2, 0],
   'sunny-side-up':      [7, 10, 2],
@@ -438,10 +442,15 @@ class FluidSimulation {
 
   private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {
     radius *= GRID_SCALE; // caller radii are in 128-grid units
-    const rCeil = Math.ceil(radius * 2);
+    // A round window, wide enough that the Gaussian has died away at its
+    // edge: the old square window cut the blob off where it was still 14%
+    // strong, and seeded plates showed square blobs with soft middles.
+    const rCeil = Math.ceil(radius * 2.6);
+    const rLimit2 = rCeil * rCeil;
     for (let dy = -rCeil; dy <= rCeil; dy++) {
       for (let dx = -rCeil; dx <= rCeil; dx++) {
         const dist2 = dx * dx + dy * dy;
+        if (dist2 > rLimit2) continue;
         const nx = Math.floor(cx) + dx, ny = Math.floor(cy) + dy;
         if (nx < 1 || nx >= this.size - 1 || ny < 1 || ny >= this.size - 1) continue;
         const w = Math.exp(-dist2 / (2 * radius * radius));
@@ -492,6 +501,38 @@ class FluidSimulation {
             const spd = 0.12 / (1 + (dist / k) * 0.025);
             this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
           }
+        }
+        break;
+      }
+
+      case 'fillmore-wash': {
+        // The second projector: a soft green and purple wash with a cobalt
+        // corner, the plate seen at the left of the Fillmore stills.
+        this.splatBlob(cx - 18 * k, cy + 10 * k, 24, 1.0, col(0).r, col(0).g, col(0).b);
+        this.splatBlob(cx + 22 * k, cy - 14 * k, 20, 1.0, col(1).r, col(1).g, col(1).b);
+        this.splatBlob(cx + 4 * k, cy + 30 * k, 14, 0.9, col(2).r, col(2).g, col(2).b);
+        break;
+      }
+
+      case 'fillmore-1969': {
+        // The Fillmore dish: a cool core at the centre of the plate (icy
+        // blue over cobalt), a ring of warm blobs round it (orange, yellow,
+        // cherry) that the beads sit in, and green and purple wisps out at
+        // the rim. Amounts stay short of saturation so the ground shows.
+        const cool = [3, 4].map(i => col(i));      // icy blue, emerald in the contract order
+        this.splatBlob(cx, cy, 20, 1.1, cool[0].r, cool[0].g, cool[0].b);
+        this.splatBlob(cx + 6 * k, cy - 4 * k, 9, 1.4, 0.65, 0.95, 0.95);
+        for (let i = 0; i < 11; i++) {
+          const a = (i / 11) * Math.PI * 2 + 0.3;
+          const rr = (30 + (i % 3) * 7) * k;
+          const c = col(i % 3);                     // orange, yellow, cherry
+          this.splatBlob(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 7 + (i % 2) * 3, 1.5, c.r, c.g, c.b);
+        }
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + 1.1;
+          const rr = 52 * k;
+          const c = col(4 + (i % 2));               // emerald, purple
+          this.splatBlob(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 6, 1.0, c.r, c.g, c.b);
         }
         break;
       }
@@ -804,23 +845,47 @@ class FluidSimulation {
     return harmony;
   }
 
-  applySquish(x: number, y: number, radius: number, amount: number) {
+  /**
+   * Press the top glass over a disc. With `fingering`, the thinning is not
+   * even round the press: the film thins more along a ring of spokes and the
+   * outflow is pushed along them, so the front breaks into radial fingers
+   * (Saffman–Taylor: the thin liquid shooting through the thick one) instead
+   * of spreading as a smooth ring. The spoke phase is fixed by where the press
+   * is, so a held press keeps its fingers.
+   */
+  applySquish(x: number, y: number, radius: number, amount: number, fingering = 0) {
     radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
+    const spokes = fingering > 0 ? 10 + Math.round(14 * fingering) : 0;
+    const phase = fingering > 0 ? (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000 / 1000 * Math.PI * 2 : 0;
+    const spokeGain = fingering * 0.9;
     for (let i = -radius; i <= radius; i++) {
       for (let j = -radius; j <= radius; j++) {
-        if (i * i + j * j >= r2) continue;
+        const d2 = i * i + j * j;
+        if (d2 >= r2) continue;
         const nx = x + i;
         const ny = y + j;
         if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
           const idx = nx + ny * this.size;
           this.dirty = true;
+          let a = amount;
+          if (spokes > 0 && d2 > 0) {
+            const ang = Math.cos(spokes * Math.atan2(j, i) + phase);
+            a *= Math.max(0.05, 1 + spokeGain * ang);
+            // Along a spoke the outflow is shoved outward too.
+            if (ang > 0) {
+              const dist = Math.sqrt(d2);
+              const push = amount * 8 * ang * fingering;
+              this.vx[idx] += (i / dist) * push;
+              this.vy[idx] += (j / dist) * push;
+            }
+          }
           if (this.gpu) {
-            this.gap[idx] -= amount;    // a delta; the shader clamps and derives dh/dt
+            this.gap[idx] -= a;    // a delta; the shader clamps and derives dh/dt
             continue;
           }
           const prevGap = this.gap[idx];
-          this.gap[idx] = Math.max(0.005, this.gap[idx] - amount);
+          this.gap[idx] = Math.max(0.005, this.gap[idx] - a);
           this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
         }
       }
@@ -1555,6 +1620,7 @@ interface GLResources {
   maxTexture: number;
   /** The film projector's frame — a video file or the camera — uploaded each frame it plays. */
   filmTexture: WebGLTexture;
+  beadTexture: WebGLTexture;
 }
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -1590,6 +1656,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     return contract.length <= 3 ? windowOf(contract, null, lead) : harmonyWithin(contract);
   };
   const bubblesRef = useRef(new BubbleField(GRID_SIZE));
+  const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
@@ -1687,6 +1754,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const contract = presetContractRef.current;
         harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
       }
+      // The Fillmore look is two projectors: the second plate starts with its own wash.
+      if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
       drainFrameRef.current = 0;
       macroCamRef.current.reset();
@@ -1864,9 +1933,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         case 'press': {
           // Pressed harder, the film thins over a wider palm.
           const a = 0.002 + 0.004 * amt;
-          af.applySquish(x, y, 20 + 12 * amt, a);
-          af.applySquish(x, y, 12 + 6 * amt, a);
-          af.applySquish(x, y, 6, a);
+          const fg = settingsRef.current.fingering ?? 0;
+          af.applySquish(x, y, 20 + 12 * amt, a, fg);
+          af.applySquish(x, y, 12 + 6 * amt, a, fg);
+          af.applySquish(x, y, 6, a, fg);
+          if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
           break;
         }
         case 'spray':
@@ -2017,6 +2088,10 @@ uniform float u_kaleido;           // mirror folds (0 = off, else 2/4/6)
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
+uniform sampler2D u_beadTex;       // oil beads: interiors in red, rims in green (fluid uv)
+uniform float u_beads;             // how much of them
+uniform float u_dishSpread;        // each layer its own dish, spread apart like three projectors
+uniform float u_cells;             // fine cell network on the lead plate, plate-wide
 uniform float u_postBlur;          // gooey blur radius multiplier
 uniform float u_gridSize;          // fluid sim texture resolution (what we sample)
 uniform float u_logicalGrid;       // the 192-cell grid the look was tuned on
@@ -2355,6 +2430,34 @@ float cellHeight(float d, float rimWidth) {
   float sunk = 1.0 - smoothstep(-rimWidth * 1.6, rimWidth * 0.1, d);
   float ridge = exp(-pow((d - rimWidth * 0.25) / (rimWidth * 1.2), 2.0));
   return ridge * 0.55 - sunk * 0.85;
+}
+
+// Each layer's own dish when the layers are spread: the lead plate large and
+// a little right of centre, the second smaller at the left, the way three
+// projectors overlap on one screen. Returns (inside, rim).
+vec2 layerDish(vec2 uvScreen, int layer, float aspect) {
+  // Both dishes stay inside the plate's inscribed circle (radius 0.5 of the
+  // frame height), so the square plate's corners never show through a dish.
+  float s = u_dishSpread;
+  vec2 c = layer == 0 ? vec2(0.5 + 0.144 * s / aspect, 0.5 - 0.02 * s) : vec2(0.5 - 0.304 * s / aspect, 0.5 + 0.06 * s);
+  float rad = layer == 0 ? mix(0.98, 0.66, s) : mix(0.98, 0.36, s);
+  vec2 d = (uvScreen - c) * vec2(aspect, 1.0);
+  float dr = length(d) / 0.5;
+  float inside = 1.0 - smoothstep(rad - 0.02, rad + 0.012, dr);
+  float rim = smoothstep(rad - 0.03, rad - 0.01, dr) * (1.0 - smoothstep(rad - 0.004, rad + 0.012, dr));
+  return vec2(inside, rim);
+}
+
+// With the layers spread, each dish is a whole plate: the dish's disc is the
+// plate's inscribed circle, so the corners of the square glass stay hidden
+// and everything on the plate is in the picture, rotated with the plate.
+vec2 dishToPlate(vec2 uvScreen, int layer, float aspect, float c, float s) {
+  float sp = u_dishSpread;
+  vec2 cen = layer == 0 ? vec2(0.5 + 0.144 * sp / aspect, 0.5 - 0.02 * sp) : vec2(0.5 - 0.304 * sp / aspect, 0.5 + 0.06 * sp);
+  float rad = layer == 0 ? mix(0.98, 0.66, sp) : mix(0.98, 0.36, sp);
+  vec2 d = (uvScreen - cen) * vec2(aspect, 1.0) / (rad * 0.5);   // dish edge at |d| = 1
+  d = vec2(c * d.x - s * d.y, s * d.x + c * d.y);
+  return 0.5 + d * 0.5;
 }
 
 struct Cell {
@@ -2714,10 +2817,16 @@ void main() {
   // ── Layer 0 ──────────────────────────────────────────────────────
   float c0 = cos(-u_rotation0), s0 = sin(-u_rotation0);
   vec2 fuv0 = uvToFluid(uv, c0, s0);
+  if (u_dishSpread > 0.001 && !macro) fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0);
   vec2 fuvBase = fuv0;   // the plate before any macro warp: where bubbles live
   vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) : vec2(0.0);
   if (macro) fuv0 = macroWarp(fuv0);
   vec4 fluid0 = decodeFluidDof(u_layer0, fuv0, blurFluid, useBlur, dof);
+  vec2 dish0 = vec2(1.0, 0.0), dish1 = vec2(1.0, 0.0);
+  if (u_dishSpread > 0.001 && !macro) {
+    dish0 = layerDish(uvScreen, 0, u_resolution.x / u_resolution.y);
+    fluid0.a *= dish0.x;
+  }
 
   // Gooey contrast on alpha
   if (useBlur && fluid0.a > 0.0) {
@@ -2739,6 +2848,28 @@ void main() {
     fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
   }
   if (!macro && u_edgeRelief > 0.005 && sharp0) fluid0.rgb = meniscus(fluid0.rgb, normal0, fluid0.a, fuv0);
+  // ── Plate cells ───────────────────────────────────────────────
+  // The fine network in the dish core of the Fillmore stills: cells the
+  // size of a few grid cells, carried by the dye, dark-edged, strongest in
+  // the thick dye and toward the lead dish's centre.
+  if (!macro && u_cells > 0.005 && fluid0.a > 0.03) {
+    float cfreq = u_logicalGrid / 3.2;
+    vec2 cflow = fluidFlow(u_vel0, fuv0) * cfreq;
+    Cell cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13);
+    Cell cg1 = cellField(fuv0 * cfreq, cflow, 17.0, 3.2, 0.5, 0.13);
+    float ccore = max(cg0.core, cg1.core);
+    float crim = abs(cg0.rim) > abs(cg1.rim) ? cg0.rim : cg1.rim;
+    float centreW = 1.0;
+    if (u_dishSpread > 0.001) {
+      float casp = u_resolution.x / u_resolution.y;
+      vec2 cc = vec2(0.5 + 0.144 * u_dishSpread / casp, 0.5 - 0.02 * u_dishSpread);
+      centreW = 1.0 - smoothstep(0.25, 0.7, length((uvScreen - cc) * vec2(casp, 1.0)) / (0.5 * mix(0.98, 0.66, u_dishSpread)));
+    }
+    float kc = u_cells * smoothstep(0.03, 0.35, fluid0.a) * centreW;
+    fluid0.rgb *= 1.0 - max(0.0, -crim) * 0.7 * kc;
+    fluid0.rgb *= 1.0 + max(0.0, crim) * 0.35 * kc;
+    fluid0.rgb = mix(fluid0.rgb, fluid0.rgb * 1.1 + vec3(0.02), ccore * kc * 0.4);
+  }
 
   if (macro) {
     float grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
@@ -2805,12 +2936,17 @@ void main() {
   if (u_layerCount > 1) {
     float c1 = cos(-u_rotation1), s1 = sin(-u_rotation1);
     vec2 fuv1 = uvToFluid(uv, c1, s1);
+    if (u_dishSpread > 0.001 && !macro) fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1);
     // A second projector at a different throw: the layer is viewed magnified
     // about the centre and drifts slowly, so one frame carries two scales.
     if (!macro && u_layerZoom1 > 1.001) fuv1 = (fuv1 - 0.5) / u_layerZoom1 + 0.5 + u_layerDrift1;
     vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) : vec2(0.0);
     if (macro) fuv1 = macroWarp(fuv1);
     vec4 fluid1 = decodeFluidDof(u_layer1, fuv1, blurFluid, useBlur, dof);
+    if (u_dishSpread > 0.001 && !macro) {
+      dish1 = layerDish(uvScreen, 1, u_resolution.x / u_resolution.y);
+      fluid1.a *= dish1.x;
+    }
 
     if (useBlur && fluid1.a > 0.0) {
       float contrast = 1.2 + u_gooey * 4.0;
@@ -2971,6 +3107,26 @@ void main() {
     }
   }
 
+  // ── Oil beads ────────────────────────────────────────────────────
+  // Hundreds of small immiscible beads: a dark meniscus ring, the ground
+  // showing through inside with a little of the lamp on it.
+  if (u_beads > 0.001 && !macro) {
+    vec4 bm = texture(u_beadTex, fuvBase);
+    float inner = bm.r, ring = bm.g;
+    outColor *= 1.0 - ring * 0.75 * u_beads;
+    outColor = mix(outColor, outColor * 1.1 + vec3(0.025, 0.022, 0.018), inner * (1.0 - ring) * 0.55 * u_beads);
+    auxB = max(auxB, inner * 0.4 * u_beads);
+  }
+
+  // ── The projectors' rims ─────────────────────────────────────────
+  // Beyond every dish the screen is black; each rim catches the lamp.
+  if (u_dishSpread > 0.001 && !macro) {
+    float anyIn = max(dish0.x, u_layerCount > 1 ? dish1.x : 0.0);
+    outColor *= mix(1.0, anyIn, u_dishSpread);
+    float rims = dish0.y + (u_layerCount > 1 ? dish1.y : 0.0);
+    outColor += vec3(0.95, 0.8, 0.55) * rims * 0.16 * u_dishSpread;
+  }
+
   // ── Film projector ───────────────────────────────────────────────
   // A loop or the camera projected through the dye: keyed on its own
   // brightness, refracted by the dye's surface and tinted where the dye is.
@@ -3108,6 +3264,7 @@ void main() {
       'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
+      'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
       'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
     ];
@@ -3123,12 +3280,21 @@ void main() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // The oil beads' mask: interiors in red, rims in green.
+    const beadTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, beadTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     webGLRef.current = {
       gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
       packFbos: new Map(), texSizes: new Map(),
       maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
       filmTexture,
+      beadTexture,
     };
 
     const resize = () => {
@@ -3176,6 +3342,20 @@ void main() {
       // cursor at any magnification.
       const shot = macroShotRef.current;
       const z = Math.max(0.0001, shot.zoom);
+      const spread = settingsRef.current.macroMode ? 0 : Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0));
+      if (spread > 0.001) {
+        // The layers are spread into dishes: this layer's dish is its whole plate.
+        const layer = activeLayerRef.current;
+        const aspect = rect.width / Math.max(1, rect.height);
+        const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
+        const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
+        const u = (clientX - rect.left) / rect.width, v = 1 - (clientY - rect.top) / rect.height;
+        let dx = (u - cen[0]) * aspect / (rad * 0.5), dy = (v - cen[1]) / (rad * 0.5);
+        const ca = Math.cos(-angle), sa = Math.sin(-angle);
+        const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
+        dx = px; dy = py;
+        return { x: Math.floor((0.5 + dx * 0.5) * GRID_SIZE), y: Math.floor((0.5 + dy * 0.5) * GRID_SIZE) };
+      }
       let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
       let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
       // The second layer is viewed through its own zoom and drift.
@@ -3459,6 +3639,7 @@ void main() {
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
                 bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
               }
+              if (activeLayerRef.current === 0 && tool !== 'press' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 
               // Feed the performance recorder (~15 Hz while painting)
               if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
@@ -3478,9 +3659,11 @@ void main() {
               if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
-                af.applySquish(x, y, 30, 0.004);
-                af.applySquish(x, y, 18, 0.004);
-                af.applySquish(x, y, 8, 0.004);
+                const fg = currentSettings.fingering ?? 0;
+                af.applySquish(x, y, 30, 0.004, fg);
+                af.applySquish(x, y, 18, 0.004, fg);
+                af.applySquish(x, y, 8, 0.004, fg);
+                if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 af.blowAir(x, y, 4, 0.06);
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
@@ -3829,9 +4012,11 @@ void main() {
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
                 const a = 0.0012 * squeezeAmt * bass01;
-                leadPlate.applySquish(cx, cy, 40, a);
-                leadPlate.applySquish(cx, cy, 27, a);
-                leadPlate.applySquish(cx, cy, 15, a);
+                const fg = currentSettings.fingering ?? 0;
+                leadPlate.applySquish(cx, cy, 40, a, fg);
+                leadPlate.applySquish(cx, cy, 27, a, fg);
+                leadPlate.applySquish(cx, cy, 15, a, fg);
+                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01);
               }
             }
             const w = 2 * Math.PI * 0.9, z = 0.22;
@@ -3849,6 +4034,27 @@ void main() {
             const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
             const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
             for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; }
+
+            // ── Oil beads ───────────────────────────────────────
+            {
+              const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
+              const beads = beadsRef.current;
+              if (beadAmt <= 0) {
+                if (beads.beads.length) beads.clear();
+              } else {
+                if (simStep === 0 && gestureFrameRef.current % 30 === 0) beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt);
+                if (isActiveRef.current && drainFrameRef.current === 0) {
+                  const lead0 = fluidsRef.current[0];
+                  const bvx = lead0?.readVx, bvy = lead0?.readVy;
+                  beads.step(SIM_STEP, (bx, by) => {
+                    if (!bvx || !bvy) return [0, 0];
+                    const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
+                    const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
+                    return [bvx[ix + iy * GRID_SIZE], bvy[ix + iy * GRID_SIZE]];
+                  }, tiltX, tiltY);
+                }
+              }
+            }
 
             // ── Bubbles ─────────────────────────────────────────
             const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
@@ -4104,7 +4310,7 @@ void main() {
           const encode = 127.5 / velRange;
           for (let l = 0; l < fluidsRef.current.length; l++) {
             const fluid = fluidsRef.current[l];
-            const wantVel = macroOn && l < 2;
+            const wantVel = (macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2;
 
             if (fluid.gpu) {
               // The field never leaves the GPU: sqrt-encode straight into the
@@ -4149,9 +4355,23 @@ void main() {
           for (let l = 0; l < fluidsRef.current.length; l++) {
             glCtx.activeTexture(glCtx.TEXTURE0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-            if (macroOn && l < 2) {
+            if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
               glCtx.activeTexture(glCtx.TEXTURE6 + l);
               glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
+            }
+          }
+
+          // The oil beads' mask, when there are beads and they moved.
+          {
+            const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
+            if (beadAmt > 0) {
+              const cv = beadsRef.current.render();
+              if (cv) {
+                glCtx.activeTexture(glCtx.TEXTURE9);
+                glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
+                glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+                glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
+              }
             }
           }
 
@@ -4259,6 +4479,10 @@ void main() {
             glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
             glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
             glCtx.uniform1i(uLocs['u_film'], 8);
+            glCtx.uniform1i(uLocs['u_beadTex'], 9);
+            glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
+            glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
+            glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
             glCtx.uniform1i(uLocs['u_filmOn'], filmOn);
             glCtx.uniform1f(uLocs['u_filmMix'], Math.max(0, Math.min(1, currentSettings.filmMix ?? 0.7)));
             glCtx.uniform1f(uLocs['u_filmKey'], Math.max(0, Math.min(0.9, currentSettings.filmKey ?? 0.18)));
@@ -4355,6 +4579,7 @@ void main() {
         governor: governorRef.current,
         externalTilt: externalTiltRef.current,
         bubbles: bubblesRef.current,
+        beads: beadsRef.current.beads.length,
         chemistry: chemRef.current,
         film: filmRef.current,
         fluids: fluidsRef.current,

@@ -105,6 +105,10 @@ export interface VisualizerSettings {
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
+  fingering: number;          // a press breaks into radial fingers (Saffman–Taylor) instead of a smooth ring
+  beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
+  dishSpread: number;         // each layer its own dish, spread apart like three projectors on one screen
+  cells: number;              // fine cell network on the lead plate, strongest in the dish core
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
@@ -231,6 +235,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmKey: 0.18,
   lampWarmth: 0,
   dimmer: 1,
+  fingering: 0,
+  beads: 0,
+  dishSpread: 0,
+  cells: 0,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure

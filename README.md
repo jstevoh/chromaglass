@@ -83,7 +83,8 @@ Playing the visuals for a band is a different job from running them in a living 
 - **A clean feed, not a microphone.** Ask the sound desk for an aux send or matrix out into a USB audio interface (a Scarlett 2i2 is plenty) and pick it under Settings → Sound → **Input**. Ask for a mix heavy on kick, snare and bass. The choice is remembered.
 - **A music file, played here.** The **File** button under the Mic and System buttons plays an MP3, WAV, FLAC or OGG through the speakers and drives the show from it: the straightest signal there is, for rehearsing a set to the studio recordings.
 - **The dimmer and blackout.** `dimmer` is the house lights for the plate; ride it from a fader (it is the master fader on the APC40 mkII and Launch Control XL factory maps). **B** on the keyboard, the Blackout button on the phone and in Settings → Sound, or the *Blackout* action from any controller fades the plate to black in a second and back again when the band comes in.
-- **Pressing the plate.** The **Press** tool, the pad's *press* mode on a tablet, the left trigger on a game controller, or `/chromaglass/press` over OSC: a hand on the top glass. The film thins under it and the dye spreads out in a ring, the way the Joshua Light Show worked its rhythm plate; **Beat Squeeze** (Settings → Show) does the same on every kick.
+- **Pressing the plate.** The **Press** tool, the pad's *press* mode on a tablet, the left trigger on a game controller, or `/chromaglass/press` over OSC: a hand on the top glass. The film thins under it and the dye spreads out in a ring, the way the Joshua Light Show worked its rhythm plate; **Beat Squeeze** (Settings → Show) does the same on every kick. With **Fingering** up, the press breaks into radial spokes instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
+- **The Fillmore look.** The *Fillmore East, 1969* preset (and the *Fillmore East* sequence) is the Joshua Light Show behind the Mothers: **Projectors** (Settings → Show) spreads the layers into their own dishes on a black screen, each dish a whole plate, the lead large and right of centre and the second smaller at the left; **Oil Beads** fills the dye with hundreds of small dark-rimmed droplets that ride the flow and merge; **Plate Cells** lays the fine cell network in the dish core; fingering and beat squeeze press the big dish into a sunburst on every kick.
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
 - **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
@@ -207,7 +208,8 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Lucky | Randomize all settings |
 | Dropper tool | Click/tap to add colored dye |
 | Blow tool | Click/tap to blow air bubbles |
-| Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring |
+| Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring, or into radial fingers with **Fingering** up |
+| Projectors / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
 | Mic / System / File | Where the show listens: the microphone (or the input chosen in Settings → Sound), system audio, or a music file played here with its own small player |
 | Dimmer / Blackout | Settings → Sound: the house lights for the plate; **B** fades to black and back, as does the Blackout button on the phone or from a controller |
 | Record | The red button by Cast: the show to a `.webm` file, music included |
@@ -262,6 +264,7 @@ src/
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
+    beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye
     governor.ts                # Frame-time governor: walks the quality ladder
     platform.ts                # Tier (hosted/local/native), GPU class, quality ladders

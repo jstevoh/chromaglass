@@ -145,6 +145,19 @@ export function builtInSequences(): ShowSequence[] {
       ],
     },
     {
+      id: 'fillmore',
+      name: 'Fillmore East',
+      description: 'The Joshua Light Show over a song: a wash of beads on the black screen, the big dish coming in on the first chorus and pressed into a sunburst on every kick, then burning out to the wash.',
+      loop: false,
+      builtIn: true,
+      stages: [
+        s('The wash', 40, { presetId: 'fillmore-1969', transition: 8, paletteSize: 3, paletteLead: 0, settings: { dyeBudget: 0.7, beads: 0.5, fingering: 0.3, beatSqueeze: 0.3, turbulenceScale: 0.2, dishSpread: 0.9 } }),
+        s('The dish comes in', 45, { advance: 'section', transition: 6, paletteSize: 4, paletteLead: 3, settings: { dyeBudget: 1.1, beads: 0.7, fingering: 0.7, beatSqueeze: 0.7, cells: 0.5, turbulenceScale: 0.3 } }),
+        s('Sunburst', 60, { advance: 'section', transition: 3, paletteSize: 6, paletteLead: 3, settings: { dyeBudget: 1.3, beads: 0.8, fingering: 1.0, beatSqueeze: 1.0, cells: 0.7, audioImpact: 0.85, lampHotspot: 0.8 } }),
+        s('Burn out', 45, { transition: 15, paletteSize: 3, paletteLead: 1, settings: { dyeBudget: 0.6, beads: 0.5, fingering: 0.4, beatSqueeze: 0.4, cells: 0.3, audioImpact: 0.5, turbulenceScale: 0.15 } }),
+      ],
+    },
+    {
       id: 'set-journey',
       name: 'Set Journey',
       description: 'A whole set: the classic wheel, a slow oil wheel, the mirrored dish, the chemistry bench, the 1969 poster, and back — each stage a few minutes.',
@@ -156,6 +169,7 @@ export function builtInSequences(): ShowSequence[] {
         s('Mirrored dish', 150, { presetId: 'classic', transition: 12, settings: { kaleidoscope: 4, dishVignette: 0.7, turbulenceScale: 0.4 } }),
         s('Chemistry bench', 150, { presetId: 'sensual-laboratory', transition: 15 }),
         s('Poster, 1969', 150, { presetId: 'poster-1969', transition: 10 }),
+        s('Fillmore East', 180, { presetId: 'fillmore-1969', transition: 12 }),
         s('Oil on water, photographed', 150, { presetId: 'oil-on-water', transition: 12 }),
         s('Lumia interlude', 120, { presetId: 'lumia', transition: 20 }),
       ],
