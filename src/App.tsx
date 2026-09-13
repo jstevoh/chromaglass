@@ -15,6 +15,9 @@ import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
 import { PresetMenu } from './components/PresetMenu';
+import { useUserPresets, asPreset } from './hooks/useUserPresets';
+import { downloadText, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
+import type { ShowSequence } from './lib/sequencer';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -189,9 +192,17 @@ export default function App() {
     e.target.value = '';
   }, []);
 
-  // Track active preset whenever settings change.
+  // Track active preset whenever settings change. A user preset stays active
+  // while the settings still match what it saved.
+  const userPresetsRef = useRef<UserPreset[]>([]);
   useEffect(() => {
-    setActivePresetId(detectActivePreset(settings));
+    setActivePresetId((prev) => {
+      if (isUserPresetId(prev)) {
+        const up = userPresetsRef.current.find(p => p.id === prev);
+        if (up && Object.keys(up.settings).every(k => k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) return prev;
+      }
+      return detectActivePreset(settings);
+    });
   }, [settings]);
 
   // Set the initial active preset on mount.
@@ -295,6 +306,10 @@ export default function App() {
   const [showSequencer, setShowSequencer] = useState(false);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
   const [castMenu, setCastMenu] = useState(false);
+  // ── The user's own presets: a library in the browser, files on disk ──
+  const userPresets = useUserPresets();
+  const allPresets = useMemo(() => [...PRESETS, ...userPresets.presets.map(asPreset)], [userPresets.presets]);
+  userPresetsRef.current = userPresets.presets;
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
@@ -387,11 +402,37 @@ export default function App() {
     visualizerRef.current?.applyPreset(presetId);
   };
 
+  const applyUserPreset = (p: UserPreset) => {
+    setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
+    setActivePresetId(p.id);
+    setPresetSeq(n => n + 1);
+    visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null });
+  };
+  const saveCurrentPreset = (name: string, description: string) => {
+    const plate = visualizerRef.current?.describePlate();
+    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null);
+    setActivePresetId(p.id);
+  };
+  const loadPresetFile = async (file: File) => {
+    const p = await userPresets.importFile(file);
+    applyUserPreset(p);
+  };
+  const exportSequence = (seq: ShowSequence) => {
+    const used = userPresets.presets.filter(p => seq.stages.some(st => st.presetId === p.id));
+    downloadText(sequenceFileName(seq), serializeSequence(seq, used));
+  };
+
   /** The sequencer's stage change: the preset's dyes and style, the plate kept. */
   const adoptPreset = useCallback((presetId: string) => {
     setActivePresetId(presetId);
+    if (isUserPresetId(presetId)) {
+      // Make sure the plate knows this preset's dyes before adopting them.
+      const up = userPresets.presets.find(p => p.id === presetId);
+      if (up) visualizerRef.current?.applyPreset(presetId, { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null });
+      return;
+    }
     visualizerRef.current?.adoptPreset(presetId);
-  }, []);
+  }, [userPresets.presets]);
 
   // ── Show sequencer ────────────────────────────────────────────────
   // The settings it reads come from a ref so the 250 ms tick never sees a
@@ -406,7 +447,14 @@ export default function App() {
     setPaletteWindow: (size, lead) => visualizerRef.current?.setPaletteWindow(size, lead),
     sectionLabel: musicIntel.state.section?.label ?? null,
     isActive,
+    presets: allPresets,
   });
+  const importSequenceFile = async (file: File) => {
+    const parsed = parseSequenceFile(await file.text());
+    for (const p of parsed.presets ?? []) userPresets.upsert(p);
+    sequencer.upsertSequence(parsed.sequence);
+    sequencer.setSelectedId(parsed.sequence.id);
+  };
 
   const triggerLucky = () => {
     const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
@@ -653,8 +701,8 @@ export default function App() {
   // Derive preset name for display
   const activePresetName = useMemo(() => {
     if (!activePresetId) return null;
-    return PRESETS.find(p => p.id === activePresetId)?.name ?? null;
-  }, [activePresetId]);
+    return allPresets.find(p => p.id === activePresetId)?.name ?? null;
+  }, [activePresetId, allPresets]);
 
   return (
     <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
@@ -953,7 +1001,7 @@ export default function App() {
                     <span className="text-[7px] font-bold uppercase tracking-widest">Presets</span>
                   </button>
                   {presetMenu === 'toolbar' && (
-                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} align="side" anchor={presetAnchorRef.current} />
+                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} align="side" anchor={presetAnchorRef.current} />
                   )}
                 </div>
 
@@ -1134,6 +1182,9 @@ export default function App() {
             onSave={sequencer.upsertSequence}
             onRemove={sequencer.removeSequence}
             hasSections={musicIntel.state.section !== null}
+            presets={allPresets}
+            onExport={exportSequence}
+            onImportFile={importSequenceFile}
             onClose={() => setShowSequencer(false)}
           />
         )}
@@ -1217,7 +1268,7 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} align="left" />
           )}
         </div>
 

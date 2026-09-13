@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard } from 'lucide-react';
-import { PRESETS } from '../presets';
+import { X, Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
+import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence } from '../lib/sequencer';
 
@@ -26,6 +26,11 @@ interface SequencerPanelProps {
   onRemove: (id: string) => void;
   /** Whether the song's sections are known (section-advance stages need them). */
   hasSections: boolean;
+  /** Every preset a stage may name — the built-ins and the user's own. */
+  presets?: Preset[];
+  /** Save a sequence as a file / load one from a file. */
+  onExport?: (seq: ShowSequence) => void;
+  onImportFile?: (file: File) => Promise<void>;
   onClose: () => void;
 }
 
@@ -70,8 +75,11 @@ const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-
 
 export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose,
+  presets = PRESETS, onExport, onImportFile,
 }) => {
   const selected = useMemo(() => sequences.find(q => q.id === selectedId) ?? sequences[0], [sequences, selectedId]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const isRunningThis = status.sequenceId === selected?.id;
   const editable = selected && !selected.builtIn;
@@ -183,7 +191,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                 <span className="text-xs font-semibold truncate">{i + 1}. {st.name}</span>
                 <span className="text-[9px] font-mono opacity-50 shrink-0">
                   {st.advance === 'section' ? 'section' : st.advance === 'hold' ? 'hold' : fmt(st.seconds)}
-                  {st.presetId ? ` · ${PRESETS.find(p => p.id === st.presetId)?.name ?? st.presetId}` : ''}
+                  {st.presetId ? ` · ${presets.find(p => p.id === st.presetId)?.name ?? st.presetId}` : ''}
                   {st.paletteSize ? ` · ${st.paletteSize} dye${st.paletteSize > 1 ? 's' : ''}` : ''}
                 </span>
               </span>
@@ -196,6 +204,26 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
           Section stages wait for the song map from Track intelligence; until a track is identified they advance on their own clock.
         </p>
       )}
+
+      {/* Files: a sequence is a JSON file you can keep and share */}
+      <div className="flex gap-2 mb-2">
+        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
+        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          data-testid="seq-file-input"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (!f || !onImportFile) return;
+            try { setFileError(null); await onImportFile(f); } catch (err) { setFileError(err instanceof Error ? err.message : 'Could not read that file'); }
+          }}
+        />
+      </div>
+      {fileError && <p className="text-[10px] text-red-300 mb-3">{fileError}</p>}
 
       {/* Sequence actions */}
       <div className="flex gap-2 mb-6">
@@ -248,7 +276,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <Field label="Preset">
                 <select value={stage.presetId ?? ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
                   <option value="">Keep the current one</option>
-                  {PRESETS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-2">
