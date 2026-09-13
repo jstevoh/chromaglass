@@ -494,7 +494,9 @@ export default function App() {
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     // Presets that don't mention the macro camera get the plate-wide framing —
     // otherwise a macro preset would leave the next one zoomed in.
-    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', ...presetSettings }));
+    // Likewise the Fillmore projectors, beads, cells and fingering: a preset
+    // that does not ask for them gets a plain plate, not the last preset's.
+    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
     setActivePresetId(presetId);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);

@@ -33,14 +33,28 @@ export class BeadField {
 
   clear(): void { this.beads.length = 0; this.dirty = true; }
 
-  /** Keep the population at `count`: spawn into gaps, retire the oldest extras. */
-  populate(count: number, sizeScale = 1): void {
+  /**
+   * Keep the population at `count`: spawn into gaps, retire the oldest
+   * extras. Sizes follow a long tail (many small, a few big), and with a
+   * density sampler the beads gather where the dye is thick, the way oil
+   * beads collect in the oil rather than spreading evenly over the glass.
+   */
+  populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number): void {
     const N = this.grid;
     while (this.beads.length > count) { this.beads.shift(); this.dirty = true; }
     let tries = 0;
     while (this.beads.length < count && tries++ < count * 4) {
-      const r = (0.9 + Math.random() * Math.random() * 2.6) * sizeScale * (N / 192);
-      const x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
+      const u = Math.random();
+      const r = (0.6 + u * u * u * 4.2) * sizeScale * (N / 192);
+      let x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
+      if (density) {
+        let best = density(x, y);
+        for (let t = 0; t < 3; t++) {
+          const px = 4 + Math.random() * (N - 8), py = 4 + Math.random() * (N - 8);
+          const d = density(px, py);
+          if (d > best) { best = d; x = px; y = py; }
+        }
+      }
       let ok = true;
       for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * 1.1) { ok = false; break; } }
       if (ok) { this.beads.push({ x, y, r, age: 0, seed: Math.random() }); this.dirty = true; }
@@ -90,7 +104,8 @@ export class BeadField {
           if (o === b || gone.has(o)) continue;
           const dx = o.x - b.x, dy = o.y - b.y;
           const d = Math.hypot(dx, dy) || 1e-3;
-          const want = (b.r + o.r) * 1.05;
+          // Not a honeycomb: they may overlap a little, and by different amounts.
+          const want = (b.r + o.r) * (0.82 + 0.16 * b.seed);
           if (d >= want) continue;
           if (d < (b.r + o.r) * 0.45 && b.r + o.r < 7 && Math.random() < 0.02) {
             // Merge: the larger takes the smaller's area.
@@ -111,8 +126,9 @@ export class BeadField {
   }
 
   /**
-   * Draw the mask: red = interior, green = rim (the dark meniscus ring), in
-   * fluid uv (x right, y up: row 0 of the texture is y = 0). Returns the
+   * Draw the mask: red = interior, green = rim (the dark meniscus ring),
+   * blue = a dome ramp (1 at the centre, 0 at the rim) for the lamp to catch,
+   * in fluid uv (x right, y up: row 0 of the texture is y = 0). Returns the
    * canvas to upload, or null when nothing changed.
    */
   render(): HTMLCanvasElement | OffscreenCanvas | null {
@@ -126,11 +142,15 @@ export class BeadField {
     ctx.clearRect(0, 0, S, S);
     ctx.lineJoin = 'round';
     // Interiors first, then rims over them; the texture's y is flipped on upload.
-    ctx.fillStyle = 'rgb(255,0,0)';
     for (const b of this.beads) {
       const fade = Math.min(1, b.age / 0.6);
+      const rr = Math.max(1, b.r * k);
       ctx.globalAlpha = fade;
-      ctx.beginPath(); ctx.arc(b.x * k, b.y * k, Math.max(1, b.r * k), 0, Math.PI * 2); ctx.fill();
+      const grad = ctx.createRadialGradient(b.x * k, b.y * k, 0, b.x * k, b.y * k, rr);
+      grad.addColorStop(0, 'rgb(255,0,255)');
+      grad.addColorStop(1, 'rgb(255,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(b.x * k, b.y * k, rr, 0, Math.PI * 2); ctx.fill();
     }
     ctx.strokeStyle = 'rgb(0,255,0)';
     for (const b of this.beads) {
