@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Second GPU look: the fingers were a perfect turbine. Each press now gets its own spoke count and phase, each spoke its own width, length and strength, a second harmonic shifts the spacing, and the carving is gentler and stops at each spoke's own length, so dye survives between ragged fingers. Bead crowding only pushes apart on a hard overlap, by a per-bead amount, so the small beads no longer settle into a honeycomb. The preset's boundary contrast is 0.05 and edge relief 0.05, so no cool blob carries a hard bright rim
 
+- Third GPU look: the beads gather in patches now (a smooth noise field over the plate decides where they spawn: dense patches, near-empty stretches) and the small ones span a wider size range, so the warm field is scattered lenses rather than an even carpet; under the palm of a press the glass clears, the dye pushed out to the fingers' tips
+
 ### Fixed
 - Choosing a preset after Fillmore East kept its projectors, beads, cells and fingering, since presets merge over the previous settings and older presets do not mention the new ones; `applyPreset` now resets the four the way it resets the macro camera
 - Seeded blobs were square: `splatBlob` evaluated its Gaussian in a square window that cut it off where it was still 14% strong, so a fresh plate showed square blobs with soft middles until the flow smeared them. The window is round now and wide enough for the Gaussian to die away
