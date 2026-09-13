@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Beads: a long-tailed size distribution (many small, a few big), looser and uneven packing instead of a honeycomb, gathering in the thick dye rather than spread evenly over the glass, no rim on bare glass, and an interior drawn as a small dome (a ramp channel in the mask) darker toward the rim with the lamp caught on the side facing it
 - The Fillmore preset's edges softened: boundary contrast 0.18, edge relief 0.12, no gloss, so the cool core has no hard bright rim
 
+- Second GPU look: the fingers were a perfect turbine. Each press now gets its own spoke count and phase, each spoke its own width, length and strength, a second harmonic shifts the spacing, and the carving is gentler and stops at each spoke's own length, so dye survives between ragged fingers. Bead crowding only pushes apart on a hard overlap, by a per-bead amount, so the small beads no longer settle into a honeycomb. The preset's boundary contrast is 0.05 and edge relief 0.05, so no cool blob carries a hard bright rim
+
 ### Fixed
 - Choosing a preset after Fillmore East kept its projectors, beads, cells and fingering, since presets merge over the previous settings and older presets do not mention the new ones; `applyPreset` now resets the four the way it resets the macro camera
 - Seeded blobs were square: `splatBlob` evaluated its Gaussian in a square window that cut it off where it was still 14% strong, so a fresh plate showed square blobs with soft middles until the flow smeared them. The window is round now and wide enough for the Gaussian to die away

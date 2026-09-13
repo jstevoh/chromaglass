@@ -104,8 +104,9 @@ export class BeadField {
           if (o === b || gone.has(o)) continue;
           const dx = o.x - b.x, dy = o.y - b.y;
           const d = Math.hypot(dx, dy) || 1e-3;
-          // Not a honeycomb: they may overlap a little, and by different amounts.
-          const want = (b.r + o.r) * (0.82 + 0.16 * b.seed);
+          // Not a honeycomb: only a hard overlap pushes apart, and by an
+          // amount that differs per bead, so the crowd stays irregular.
+          const want = (b.r + o.r) * (0.55 + 0.35 * b.seed);
           if (d >= want) continue;
           if (d < (b.r + o.r) * 0.45 && b.r + o.r < 7 && Math.random() < 0.02) {
             // Merge: the larger takes the smaller's area.
@@ -114,7 +115,7 @@ export class BeadField {
             gone.add(small);
             continue;
           }
-          const push = (want - d) * 0.25;
+          const push = (want - d) * 0.15;
           b.x -= dx / d * push; b.y -= dy / d * push;
           o.x += dx / d * push; o.y += dy / d * push;
         }
