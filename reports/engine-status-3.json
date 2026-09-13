@@ -1,0 +1,153 @@
+{
+  "steps": [
+    {
+      "name": "initial",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.09200892389017
+      },
+      "beads": 0,
+      "preset": null,
+      "dishSpread": 0,
+      "beadsSetting": 0,
+      "cells": 0,
+      "fingering": 0
+    },
+    {
+      "name": "fillmore-1969",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.461462662922294
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "fillmore-press-1s",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.935166217996457
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "fillmore-press-5s",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.015305202453735
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "leftdish-1",
+      "t": 1789336500680
+    },
+    {
+      "name": "leftdish-2",
+      "t": 1789336501765
+    },
+    {
+      "name": "leftdish-3",
+      "t": 1789336502850
+    },
+    {
+      "name": "fillmore-layer2",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 18.128927735381904
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "classic",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 21.59487994730165
+      },
+      "beads": 0,
+      "preset": null,
+      "dishSpread": 0,
+      "beadsSetting": 0,
+      "cells": 0,
+      "fingering": 0
+    }
+  ],
+  "canvasBox": {
+    "x": 0,
+    "y": 0,
+    "width": 1600,
+    "height": 1000
+  },
+  "pressPoint": {
+    "px": 921.5999999999999,
+    "py": 517
+  },
+  "layer2Visible": true
+}
