@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — A new song, a new look
 - `onNewSong` (Settings → Sound → On a New Song: Keep / New preset / Random, default New preset). A new song is detected two ways: a boundary heard in the audio — music that has run at least twenty seconds, then quiet for at least two and a half, then sound again (`src/lib/songBoundary.ts`; a rest inside a song is too short, a crossfaded set never goes quiet) — or track identification naming a different song than before. Either picks another non-closeup preset or rolls a random look; a gap and an identification close together count once; the sequencer keeps control while it is running
 
+### Fixed — The toolbar's preset menu was black on black
+- The menu opened from the toolbar's Presets button is portalled to the page body to escape the toolbar's clipping, and the body sets no text colour, so its text fell back to black: the Save and Load buttons and the group headings were unreadable. The menu now carries its own text colour
+
+### Added — Save and load presets from Settings too
+- Settings → Presets now has **Save current** (asks for a name) and **Load file**, and lists your own presets under *Yours* above the built-ins, the same library the preset menu shows
+
 ### Added — One command to update everything
 - `npm run ship` pulls main, installs, builds, publishes to Firebase Hosting and starts the show server; `npm run update` and `npm run deploy` are its halves
 
