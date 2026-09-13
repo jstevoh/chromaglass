@@ -107,9 +107,17 @@ export interface LiquidVisualizerHandle {
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
   /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number }) => void;
+  /**
+   * A gesture from any hand: mouse, phone pad, pen, gamepad or MIDI. `amount`
+   * (0..1, default 0.5) scales the drop's size or the puff's strength, so a
+   * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
+   * (a pen's tilt, a stick's push) instead of a radial puff.
+   */
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => void;
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
+  /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
+  drawnRect: () => DOMRect | null;
   /** Film projector: a video file or the camera, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
@@ -127,7 +135,7 @@ export interface LiquidVisualizerHandle {
 // palette indices it may use; seeding, automation, beat injection and the
 // slow harmony rotation all pick from inside that set. A user's palette lock
 // still wins outright.
-const PRESET_CONTRACTS: Record<string, number[]> = {
+export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 2, 8],
   'galaxy':             [9, 10, 7],
   'deep-ocean':         [7, 9, 5],
@@ -842,6 +850,30 @@ class FluidSimulation {
             this.densityG[idx] *= 0.8;
             this.densityB[idx] *= 0.8;
           }
+        }
+      }
+    }
+  }
+
+  /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
+  blowDirected(x: number, y: number, radius: number, strength: number, dx: number, dy: number) {
+    radius = Math.round(radius * GRID_SCALE);
+    const r2 = radius * radius;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len; dy /= len;
+    for (let i = -radius; i <= radius; i++) {
+      for (let j = -radius; j <= radius; j++) {
+        const distSq = i * i + j * j;
+        if (distSq >= r2) continue;
+        const nx = x + i, ny = y + j;
+        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
+          const idx = nx + ny * this.size;
+          const w = 1 - Math.sqrt(distSq) / radius;
+          this.dirty = true;
+          this.vx[idx] += dx * strength * w;
+          this.vy[idx] += dy * strength * w;
+          if (this.gpu) this.mul[idx] *= 1 - 0.15 * w;
+          else { const k = 1 - 0.15 * w; this.density[idx] *= k; this.densityR[idx] *= k; this.densityG[idx] *= k; this.densityB[idx] *= k; }
         }
       }
     }
@@ -1630,7 +1662,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
 
+  const drawnRectRef = useRef<(() => DOMRect) | null>(null);
   useImperativeHandle(ref, () => ({
+    drawnRect: () => drawnRectRef.current?.() ?? null,
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
@@ -1798,17 +1832,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
       const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
       const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
+      // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
+      const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2;
 
       switch (g.tool) {
         case 'blow':
-          af.blowAir(x, y, 4, 0.06);
-          if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15) {
+          if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+          else af.blowAir(x, y, 4, 0.06 * amt);
+          if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15 * amt) {
             bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
           }
           break;
         case 'drop':
-          af.autoInject('drop', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
-          af.addTemp(x, y, 0.6);
+          af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
+          af.addTemp(x, y, 0.6 * amt);
           break;
         case 'streak': {
           // Directional smear along the recorded movement
@@ -3114,6 +3151,7 @@ void main() {
       const w = canvas.width * s, h = canvas.height * s;
       return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
     };
+    drawnRectRef.current = drawnRect;
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
