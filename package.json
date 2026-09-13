@@ -26,7 +26,10 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "remote": "node server/remote-server.js",
-    "tunnel": "cloudflared tunnel --url http://localhost:3000"
+    "tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "update": "git pull origin main && npm install && npm run build",
+    "deploy": "npx firebase-tools deploy --only hosting",
+    "ship": "npm run update && npm run deploy && npm run remote"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

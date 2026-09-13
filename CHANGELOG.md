@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — A new song, a new look
 - `onNewSong` (Settings → Sound → On a New Song: Keep / New preset / Random, default New preset). A new song is detected two ways: a boundary heard in the audio — music that has run at least twenty seconds, then quiet for at least two and a half, then sound again (`src/lib/songBoundary.ts`; a rest inside a song is too short, a crossfaded set never goes quiet) — or track identification naming a different song than before. Either picks another non-closeup preset or rolls a random look; a gap and an identification close together count once; the sequencer keeps control while it is running
 
+### Added — One command to update everything
+- `npm run ship` pulls main, installs, builds, publishes to Firebase Hosting and starts the show server; `npm run update` and `npm run deploy` are its halves
+
 ### Added — Files made for a song
 - A preset or sequence file can name the song it was made for (`song: { title, artist, isrc?, durationSec? }`; `src/lib/songRef.ts` matches by ISRC when both sides have a real one, else by title and artist with remaster tags and punctuation stripped). The preset menu's save form offers "Made for <the song playing now>"; the sequencer's editor has a Song row to make a sequence for the song playing, or forget it
 - When track identification (fingerprint or a manual tag) names a song, a sequence made for it starts at the song's current position — stages laid end to end by their seconds, the settings already where that stage would have them — and a preset made for it is applied. A song-bound sequence stops when the song's known duration runs out or another song takes its place, rather than looping into the next song (`startAt` on the sequencer)
