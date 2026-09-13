@@ -35,10 +35,14 @@ interface SettingsPanelProps {
   /** The house lights. */
   blackout?: boolean;
   onBlackout?: () => void;
+  /** What to do when a second screen is connected. */
+  projectorMode?: 'ask' | 'auto' | 'off';
+  onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
+  projectorName?: string | null;
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const presetFileRef = useRef<HTMLInputElement>(null);
   const [presetFileError, setPresetFileError] = useState<string | null>(null);
@@ -672,6 +676,26 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Projector size={12} /> Projectors
         </h3>
+        {onProjectorMode && (
+          <div className="flex flex-col gap-2 mb-5">
+            <div className="text-xs font-bold uppercase tracking-widest opacity-70">Second Screen</div>
+            <div className="grid grid-cols-3 gap-1">
+              {([['ask', 'Ask'], ['auto', 'Automatic'], ['off', 'Off']] as const).map(([m, label]) => (
+                <button
+                  key={m}
+                  onClick={() => onProjectorMode(m)}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  data-testid={`projector-mode-${m}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] leading-relaxed opacity-40">
+              A projector on HDMI is a second screen. <span className="text-white/70">Ask</span> offers to send the show there; <span className="text-white/70">Automatic</span> sends it the moment the projector is connected, on your next click or key press (the browser needs one), fullscreen with nothing but the plate on it, and the laptop keeps the controls.{projectorName ? ` Connected now: ${projectorName}.` : ' Chrome asks once for permission to see your screens.'}
+            </p>
+          </div>
+        )}
         <p className="text-[10px] leading-relaxed opacity-40 mb-4">
           The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.
         </p>

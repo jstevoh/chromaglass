@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a projector on HDMI, noticed and used
+- **Second Screen** (Settings → Projectors, and the chip): **Ask** offers the projector in one click as before; **Automatic** sends the show there by itself, fullscreen on the projector, on the next click or key press anywhere in the app, and again whenever the projector is plugged back in (`src/hooks/useProjector.ts`, watching `screenschange`); **Off** offers nothing. Closing the projector window by hand does not re-send for the same screen. The choice is kept in localStorage
+- The Second display window opens as a fullscreen popup placed on the projector's own bounds when the screen is known, so no click on the projector window is needed for fullscreen
+
 ### Added — Fillmore East, 1969
 - **Fingering** (`fingering`): a press (the tool, the pad, a kick with Beat Squeeze, OSC) thins the film more along a ring of spokes and shoves the outflow along them, so the front breaks into radial fingers (Saffman–Taylor, the thin liquid shooting through the thick one) instead of a smooth ring. The spoke phase is fixed by where the press is, so a held press keeps its fingers
 - **Oil beads** (`beads`, `src/lib/beads.ts`): up to four hundred small immiscible beads that lag the flow, crowd without overlapping, merge now and then, and are shoved by drops and presses; drawn from a 512² mask texture (interiors red, rims green) as a dark meniscus ring with the ground lit inside. Hundreds of them are too many for uniforms, so the mask is a 2D canvas uploaded when it changes

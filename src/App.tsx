@@ -18,6 +18,7 @@ import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useRecorder } from './hooks/useRecorder';
+import { useProjector } from './hooks/useProjector';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -980,28 +981,13 @@ export default function App() {
     }
   }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad]);
   // ── A projector, noticed ──
-  // With the window-management permission already granted, the app can see
-  // a second screen on load and offer to put the show on it in one click
-  // (the click is needed: a window opened without one is a blocked popup).
-  const [projectorFound, setProjectorFound] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const perms = (navigator as unknown as { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } }).permissions;
-        const w = window as unknown as { getScreenDetails?: () => Promise<{ screens: { isInternal?: boolean; label?: string; left: number; top: number }[]; currentScreen: { left: number; top: number } }> };
-        if (!perms || !w.getScreenDetails) return;
-        let state = 'prompt';
-        try { state = (await perms.query({ name: 'window-management' })).state; } catch { try { state = (await perms.query({ name: 'window-placement' })).state; } catch { return; } }
-        if (state !== 'granted') return;
-        const d = await w.getScreenDetails();
-        const other = d.screens.find(sc => sc.isInternal === false && (sc.left !== d.currentScreen.left || sc.top !== d.currentScreen.top))
-          ?? d.screens.find(sc => sc.left !== d.currentScreen.left || sc.top !== d.currentScreen.top);
-        if (alive && other) setProjectorFound(other.label || 'second screen');
-      } catch { /* no permission yet: the Cast menu asks for it */ }
-    })();
-    return () => { alive = false; };
-  }, []);
+  // A second screen that is not built in is the projector. Ask (a chip),
+  // Automatic (the show goes there on the next click after it appears), or
+  // Off; see useProjector. The window opens fullscreen on that screen.
+  const projector = useProjector({
+    send: (screen) => { void startCast('window', screen); },
+    casting: isCasting,
+  });
   const gamepadCursorStyle = useMemo(() => {
     if (!gamepad.cursor.visible) return null;
     const r = visualizerRef.current?.drawnRect?.();
@@ -1062,16 +1048,21 @@ export default function App() {
           <button onClick={closeMusicFile} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
         </div>
       )}
-      {projectorFound && !isCasting && overlaysVisible && (
-        <button
-          onClick={() => { void startCast('window'); setProjectorFound(null); }}
-          className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl hover:bg-white/10"
-          title="Open the show full size on the second screen"
-          data-testid="projector-hint"
-        >
-          <Projector size={13} /> {projectorFound} connected · send the show there
-          <span className="ml-1 text-white/30" onClick={(e) => { e.stopPropagation(); setProjectorFound(null); }} aria-label="Dismiss"><X size={11} /></span>
-        </button>
+      {projector.projector && !isCasting && overlaysVisible && projector.mode !== 'off' && (
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">
+          <button onClick={() => { void projector.sendNow(); }} className="flex items-center gap-2 hover:text-white" title="Open the show full size on the second screen, with nothing else on it">
+            <Projector size={13} /> {projector.projector.label} connected · {projector.armed ? 'sending on your next click' : 'send the show there'}
+          </button>
+          <button
+            onClick={() => projector.setMode(projector.mode === 'auto' ? 'ask' : 'auto')}
+            className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] ${projector.mode === 'auto' ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-100' : 'border-white/15 text-white/50 hover:text-white'}`}
+            title="Always send the show to a projector the moment it is connected"
+            data-testid="projector-auto"
+          >
+            {projector.mode === 'auto' ? 'automatic' : 'always'}
+          </button>
+          <button onClick={() => projector.setMode('off')} className="p-1 text-white/30 hover:text-white" aria-label="Dismiss and stop offering" title="Don't offer this (Settings → Projectors turns it back on)"><X size={11} /></button>
+        </div>
       )}
       {blackout && overlaysVisible && (
         <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
@@ -1545,6 +1536,9 @@ export default function App() {
             onAudioInput={chooseAudioInput}
             blackout={blackout}
             onBlackout={toggleBlackout}
+            projectorMode={projector.mode}
+            onProjectorMode={projector.setMode}
+            projectorName={projector.projector?.label ?? null}
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}

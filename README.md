@@ -58,9 +58,19 @@ Open [http://localhost:3000](http://localhost:3000) and allow microphone access 
 
 ## A projector on HDMI
 
-The best picture is the cable. Plug the projector in as a second display, then **Cast → Second display**. The show window opens on the projector's screen, moves itself there, and mirrors the laptop's canvas: the laptop renders once, at the projector's pixel size, and shows itself a scaled copy letterboxed behind the controls. Click the projector window once for fullscreen. Nothing is encoded or sent; the projector shows the same frame the laptop drew, so brush strokes, presets, the sequencer and the phone remote all land on the wall as they happen. Keep the laptop window visible (not minimised), since the browser stops drawing a hidden window.
+The best picture is the cable. Plug the projector in as a second display, then **Cast → Second display**. The show window opens on the projector's screen, moves itself there, and mirrors the laptop's canvas: the laptop renders once, at the projector's pixel size, and shows itself a scaled copy letterboxed behind the controls. With the window-management permission it opens fullscreen on the projector; if not, click the projector window once. Nothing is encoded or sent; the projector shows the same frame the laptop drew, so brush strokes, presets, the sequencer and the phone remote all land on the wall as they happen. Keep the laptop window visible (not minimised), since the browser stops drawing a hidden window.
 
 In System Settings → Displays, give the projector its native resolution and keep it as a separate display rather than mirroring, so the controls stay off the wall.
+
+When macOS asks *What do you want to show on the projector?*, choose **Extended Display** (not Mirror): the projector becomes a second screen the show window can move to, and the menus stay on the laptop.
+
+The app also notices the cable itself. With the window-management permission granted (the Cast menu's **Second display**, or the chip below, asks for it once), the app sees every screen and hears one being plugged in; a screen that is not built in is the projector. **Settings → Projectors → Second Screen** chooses what happens then:
+
+- **Ask** (the default): a chip names the projector and offers to send the show there in one click.
+- **Automatic**: the show goes there by itself, fullscreen on the projector, on your next click or key press anywhere in the app (a browser opens no window without a gesture, so the first one is the earliest it can), and again whenever the projector is plugged back in. Closing the projector window by hand does not send it back until the cable is unplugged and replugged.
+- **Off**: nothing is offered; the Cast menu still works.
+
+The chip has the same **automatic** switch, and its × turns the offer off. The choice is kept on this machine.
 
 ## Phone and Tablet Remote
 
@@ -99,7 +109,7 @@ The APC mini mk2 is the cheap, right answer: an 8×8 RGB grid for presets and dy
 
 ChromaGlass is a Progressive Web App. In Chrome or Edge, open the site (or the show server's address) and use the install icon at the right of the address bar: it gets its own dock or taskbar icon and opens in a window with no tabs or address bar. The installed app is the same code, updated on the next open.
 
-With the window-management permission granted (the Cast menu's **Second display** asks for it once), the app notices a projector on load and offers to send the show there in one click; the projector is the screen that is not built in.
+With the window-management permission granted (the Cast menu's **Second display** asks for it once), the app notices a projector on load and when it is plugged in, and either offers to send the show there in one click or, in Automatic mode, sends it fullscreen on the next click (see *A projector on HDMI*).
 
 ## OSC
 
