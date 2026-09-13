@@ -15,7 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fillmore East, 1969** preset: two layers on screen blend, dyes orange / yellow / cherry / icy blue / emerald / purple, a seeded plate with a cool core, a warm ring the beads sit in and green and purple wisps at the rim, fingering, beads, cells and projectors on, beat squeeze high; plus the **Fillmore East** sequence (the wash, the dish comes in, sunburst, burn out) and a stage in the Set Journey
 - The four new settings are MIDI-learnable and have sliders in Settings → Show
 
+### Changed — after the first look on the Mac's GPU
+- Fingering carves the dye out of the spoke channels as well as pushing it, so the fingers stay visible once the gap has bottomed out and the squeeze flow stops (on the GPU the press pinned the gap within a few steps and the front stayed smooth)
+- Beads: a long-tailed size distribution (many small, a few big), looser and uneven packing instead of a honeycomb, gathering in the thick dye rather than spread evenly over the glass, no rim on bare glass, and an interior drawn as a small dome (a ramp channel in the mask) darker toward the rim with the lamp caught on the side facing it
+- The Fillmore preset's edges softened: boundary contrast 0.18, edge relief 0.12, no gloss, so the cool core has no hard bright rim
+
 ### Fixed
+- Choosing a preset after Fillmore East kept its projectors, beads, cells and fingering, since presets merge over the previous settings and older presets do not mention the new ones; `applyPreset` now resets the four the way it resets the macro camera
 - Seeded blobs were square: `splatBlob` evaluated its Gaussian in a square window that cut it off where it was still 14% strong, so a fresh plate showed square blobs with soft middles until the flow smeared them. The window is round now and wide enough for the Gaussian to die away
 
 

@@ -872,12 +872,20 @@ class FluidSimulation {
           if (spokes > 0 && d2 > 0) {
             const ang = Math.cos(spokes * Math.atan2(j, i) + phase);
             a *= Math.max(0.05, 1 + spokeGain * ang);
-            // Along a spoke the outflow is shoved outward too.
+            // Along a spoke the outflow is shoved outward, and the invading
+            // thin liquid carves the dye out of the channel (more toward the
+            // rim, so the centre is not hollowed at once): the fingers stay
+            // visible even once the gap has bottomed out and the flow stops.
             if (ang > 0) {
               const dist = Math.sqrt(d2);
               const push = amount * 8 * ang * fingering;
               this.vx[idx] += (i / dist) * push;
               this.vy[idx] += (j / dist) * push;
+              if (ang > 0.25) {
+                const thin = 1 - Math.min(0.2, amount * 9) * fingering * (ang - 0.25) / 0.75 * (0.3 + 0.7 * dist / radius);
+                if (this.gpu) this.mul[idx] *= thin;
+                else { this.density[idx] *= thin; this.densityR[idx] *= thin; this.densityG[idx] *= thin; this.densityB[idx] *= thin; }
+              }
             }
           }
           if (this.gpu) {
@@ -3112,10 +3120,23 @@ void main() {
   // showing through inside with a little of the lamp on it.
   if (u_beads > 0.001 && !macro) {
     vec4 bm = texture(u_beadTex, fuvBase);
-    float inner = bm.r, ring = bm.g;
-    outColor *= 1.0 - ring * 0.75 * u_beads;
-    outColor = mix(outColor, outColor * 1.1 + vec3(0.025, 0.022, 0.018), inner * (1.0 - ring) * 0.55 * u_beads);
-    auxB = max(auxB, inner * 0.4 * u_beads);
+    float inner = bm.r, ring = bm.g, ramp = bm.b;
+    // Beads sit in the dye: on bare glass there is nothing to rim.
+    float inDye = smoothstep(0.015, 0.2, auxH);
+    float k = u_beads * inDye;
+    // A dark meniscus ring, an interior that is a small dome: darker toward
+    // the rim, a little lighter in the middle, and the lamp caught on the
+    // side facing it (the dome's slope from the ramp's gradient).
+    vec2 slope = vec2(dFdx(ramp), dFdy(ramp));
+    float sl = length(slope);
+    vec3 Lb = lampDir(fuvBase, u_lamp);
+    vec2 lampS = Lb.xy / max(length(Lb.xy), 0.06);
+    float facing = sl > 1e-5 ? dot(slope / sl, lampS) : 0.0;
+    float dome = 0.78 + 0.32 * ramp;
+    float catchL = max(0.0, facing) * (1.0 - ramp) * smoothstep(0.0, 0.5, ramp) * 0.5;
+    outColor *= 1.0 - ring * 0.7 * k;
+    outColor = mix(outColor, outColor * dome + vec3(0.9, 0.85, 0.75) * catchL * 0.35, inner * (1.0 - ring) * k);
+    auxB = max(auxB, inner * 0.4 * k);
   }
 
   // ── The projectors' rims ─────────────────────────────────────────
@@ -4042,7 +4063,10 @@ void main() {
               if (beadAmt <= 0) {
                 if (beads.beads.length) beads.clear();
               } else {
-                if (simStep === 0 && gestureFrameRef.current % 30 === 0) beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt);
+                if (simStep === 0 && gestureFrameRef.current % 30 === 0) {
+                  const dens = fluidsRef.current[0]?.readDensity;
+                  beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt, dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
+                }
                 if (isActiveRef.current && drainFrameRef.current === 0) {
                   const lead0 = fluidsRef.current[0];
                   const bvx = lead0?.readVx, bvy = lead0?.readVy;
