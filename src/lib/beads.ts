@@ -50,8 +50,12 @@ export class BeadField {
       const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
       return (h(ix, iy) * (1 - sx) + h(ix + 1, iy) * sx) * (1 - sy) + (h(ix, iy + 1) * (1 - sx) + h(ix + 1, iy + 1) * sx) * sy;
     };
-    const u = x / N * 6, v = y / N * 6;
-    return Math.max(0, Math.min(1, noise(u, v) * 0.65 + noise(u * 2.3 + 7.1, v * 2.3 + 3.7) * 0.35));
+    const u = x / N * 4, v = y / N * 4;
+    const n = noise(u, v) * 0.7 + noise(u * 2.3 + 7.1, v * 2.3 + 3.7) * 0.3;
+    // Stretch the contrast: value noise sits near 0.5 most of the time, and
+    // a probability that only leans on it fills the plate evenly once the
+    // dense patches are packed. Below the floor is bare glass.
+    return Math.max(0, Math.min(1, (n - 0.4) / 0.32));
   }
 
   /**
@@ -59,6 +63,12 @@ export class BeadField {
    * extras. Sizes follow a long tail (many small, a few big), and with a
    * density sampler the beads gather where the dye is thick, the way oil
    * beads collect in the oil rather than spreading evenly over the glass.
+   *
+   * The patch field is a hard mask, not a lean: where it is zero no bead is
+   * ever placed, so the clear stretches stay clear even when the dense
+   * patches are packed full and `count` cannot be reached (on the Mac the
+   * old probability filled the plate evenly, since every bead the packed
+   * patches refused landed in the gaps between them).
    */
   populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number): void {
     const N = this.grid;
@@ -68,8 +78,10 @@ export class BeadField {
       // Two populations: mostly small beads of clearly different sizes, and
       // a tail of big lenses; the small ones spread over a wider range than
       // before so the carpet is not one size.
+      // Small beads span four to one in diameter within a patch, as in the
+      // reference; the big lenses are a tail on top.
       const u = Math.random();
-      const r = (Math.random() < 0.8 ? 0.5 + Math.random() * 1.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
+      const r = (Math.random() < 0.8 ? 0.45 + Math.random() * Math.random() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
       let x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
       if (density) {
         let best = density(x, y);
@@ -79,11 +91,13 @@ export class BeadField {
           if (d > best) { best = d; x = px; y = py; }
         }
       }
-      // Patches: dense where the field is high, sparse to empty where it is low.
+      // Patches: none where the field is zero, dense where it is high, and
+      // packed tighter there (the crowding step keeps them from overlapping).
       const p = this.patchField(x, y);
-      if (Math.random() > 0.08 + 0.92 * p * p) continue;
+      if (p <= 0 || Math.random() > p) continue;
+      const gap = 1.3 - 0.5 * p;
       let ok = true;
-      for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * 1.1) { ok = false; break; } }
+      for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * gap) { ok = false; break; } }
       if (ok) { this.beads.push({ x, y, r, age: 0, seed: Math.random() }); this.dirty = true; }
     }
   }

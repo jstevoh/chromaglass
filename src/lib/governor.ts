@@ -8,10 +8,11 @@ import type { QualityRung } from './platform';
  * This watches the real frame interval and walks a ladder of rungs: down
  * quickly when frames are being dropped, up slowly when there's clear room.
  *
- * Two rules keep it from hunting. A rung that failed is not retried this
- * session (the hardware hasn't changed), and every move is followed by a
- * settling period before the next judgement, long enough for the new grid
- * to be allocated and the caches to warm.
+ * Two rules keep it from hunting. A rung that failed is not retried until
+ * the machine has run fast for a long stretch (the hardware hasn't changed,
+ * but the load may have: another tab, a camera app, a held tool), and every
+ * move is followed by a settling period before the next judgement, long
+ * enough for the new grid to be allocated and the caches to warm.
  */
 
 /** Frames slower than this are being dropped on any display: step down. */
@@ -30,11 +31,18 @@ const SETTLE_S = 2.5;
  * counts — clamped, so one number doesn't drag the average for ten seconds.
  */
 const HUGE_MS = 500;
+/**
+ * A rung that failed is offered again after this long of fast frames; a
+ * rung that failed while a tool was held (a press costs a burst of work
+ * that says nothing about the rung) is not marked failed at all.
+ */
+const RETRY_AFTER_S = 90;
 
 export class QualityGovernor {
   private index: number;
   private readonly start: number;
-  private readonly failed = new Set<number>();
+  /** Rung index → when it last failed (seconds). */
+  private readonly failed = new Map<number, number>();
   private emaFrame = 16.7;
   private emaWork = 4;
   private slowSince: number | null = null;
@@ -64,10 +72,11 @@ export class QualityGovernor {
 
   /**
    * Feed one frame. `frameS` is the interval since the previous frame,
-   * `workMs` the JavaScript time this frame took; `now` in seconds. Returns
-   * true when the rung changed and the caller should reconfigure.
+   * `workMs` the JavaScript time this frame took; `now` in seconds; `held`
+   * true while a tool is being held on the plate. Returns true when the rung
+   * changed and the caller should reconfigure.
    */
-  sample(frameS: number, workMs: number, now: number): boolean {
+  sample(frameS: number, workMs: number, now: number, held = false): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
     if (frameMs > HUGE_MS) {
@@ -88,7 +97,7 @@ export class QualityGovernor {
       this.fastSince = null;
       this.slowSince ??= now;
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
-        this.failed.add(this.index);
+        if (!held) this.failed.set(this.index, now);
         this.index += 1;
         this.everSteppedDown = true;
         return this.moved(now);
@@ -101,7 +110,8 @@ export class QualityGovernor {
       this.fastSince ??= now;
       if (now - this.fastSince >= UP_AFTER_S) {
         const above = this.index - 1;
-        if (above >= 0 && !this.failed.has(above)) {
+        const failedAt = this.failed.get(above);
+        if (above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S)) {
           this.index = above;
           return this.moved(now);
         }

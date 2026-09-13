@@ -240,6 +240,13 @@ class FluidSimulation {
   gpu: GpuFluid | null = null;
   private dirty = false;
   private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
+  /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
+  private squishKey = 0;
+  private squishSteps = 0;
+  private squishLastAt = 0;
+  private squishLastStep = -1;
+  /** Solver steps taken, so per-press counting is per step, not per call. */
+  private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
   private rbDensity: Float32Array;  // downsampled readback
@@ -864,6 +871,16 @@ class FluidSimulation {
     const spokes = fingering > 0 ? 8 + (seed % 9) + Math.round(8 * fingering) : 0;
     const phase = fingering > 0 ? ((seed >>> 8) % 1000) / 1000 * Math.PI * 2 : 0;
     const spokeGain = fingering * 0.9;
+    // The first moments of a press shove the dye out to the fingers' tips,
+    // where it piles up as a bright rim (the reference's bright finger
+    // ends). Counted per press so a held press does not keep piling.
+    // The tool presses several radii per step; count steps, and let a press
+    // that pauses for a moment start over (a beat squeeze on every kick).
+    const nowMs = performance.now();
+    if (seed !== this.squishKey || nowMs - this.squishLastAt > 150) { this.squishKey = seed; this.squishSteps = 0; this.squishLastStep = -1; }
+    this.squishLastAt = nowMs;
+    if (this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
+    const pile = fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
     const spokeProp = (s: number) => { const h = ((s + 1) * 2654435761 + seed) >>> 0; return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 }; };
     const TAU = Math.PI * 2;
     for (let i = -radius; i <= radius; i++) {
@@ -907,6 +924,14 @@ class FluidSimulation {
                 const thin = 1 - Math.min(0.08, amount * 2.2) * fingering * prop.k * (ang - 0.25) / 0.75 * (0.25 + 0.75 * dist / (radius * prop.len));
                 if (this.gpu) this.mul[idx] *= thin;
                 else { this.density[idx] *= thin; this.densityR[idx] *= thin; this.densityG[idx] *= thin; this.densityB[idx] *= thin; }
+              }
+            } else if (pile > 0 && ang > 0.1) {
+              // Just past the spoke's tip: the pushed dye thickens into a rim.
+              const over = (dist - radius * prop.len) / (radius * 0.2);
+              if (over < 1) {
+                const thick = 1 + pile * prop.k * ang * (1 - over);
+                if (this.gpu) this.mul[idx] *= thick;
+                else { this.density[idx] *= thick; this.densityR[idx] *= thick; this.densityG[idx] *= thick; this.densityB[idx] *= thick; }
               }
             }
           }
@@ -1082,6 +1107,7 @@ class FluidSimulation {
     if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
 
     this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.05);
+    this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
 
@@ -4610,7 +4636,7 @@ void main() {
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
       if (frameS > 0 && governorRef.current) {
-        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001);
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -4626,6 +4652,7 @@ void main() {
         externalTilt: externalTiltRef.current,
         bubbles: bubblesRef.current,
         beads: beadsRef.current.beads.length,
+        beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,
         film: filmRef.current,
         fluids: fluidsRef.current,
