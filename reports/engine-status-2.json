@@ -1,0 +1,95 @@
+{
+  "steps": [
+    {
+      "name": "initial",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.00188822797724
+      },
+      "beads": 0,
+      "preset": null
+    },
+    {
+      "name": "fillmore-1969",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.511783992928763
+      },
+      "beads": 312,
+      "preset": null
+    },
+    {
+      "name": "fillmore-press",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 16.7
+      },
+      "beads": 312,
+      "preset": null
+    },
+    {
+      "name": "blackout",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 16.94604610294918
+      },
+      "beads": 312,
+      "preset": null
+    },
+    {
+      "name": "classic",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 16.96996446672171
+      },
+      "beads": 312,
+      "preset": null
+    }
+  ],
+  "canvasBox": {
+    "x": 0,
+    "y": 0,
+    "width": 1600,
+    "height": 1000
+  }
+}
