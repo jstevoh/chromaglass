@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Fillmore East, 1969
+- **Fingering** (`fingering`): a press (the tool, the pad, a kick with Beat Squeeze, OSC) thins the film more along a ring of spokes and shoves the outflow along them, so the front breaks into radial fingers (Saffman–Taylor, the thin liquid shooting through the thick one) instead of a smooth ring. The spoke phase is fixed by where the press is, so a held press keeps its fingers
+- **Oil beads** (`beads`, `src/lib/beads.ts`): up to four hundred small immiscible beads that lag the flow, crowd without overlapping, merge now and then, and are shoved by drops and presses; drawn from a 512² mask texture (interiors red, rims green) as a dark meniscus ring with the ground lit inside. Hundreds of them are too many for uniforms, so the mask is a 2D canvas uploaded when it changes
+- **Projectors** (`dishSpread`): each layer its own dish on a black screen, the lead large and right of centre, the second smaller at the left, both inside the plate's inscribed circle so the square glass never shows a corner. Each dish is a whole plate (the dish disc maps to the plate's inscribed circle, rotated with the plate), and the mouse mapping mirrors it so the brush lands under the cursor
+- **Plate cells** (`cells`): the macro camera's cell field on the lead plate at show scale, carried by the dye (the velocity texture is bound whenever cells are on), dark-edged, strongest in the thick dye and toward the lead dish's centre
+- **Fillmore East, 1969** preset: two layers on screen blend, dyes orange / yellow / cherry / icy blue / emerald / purple, a seeded plate with a cool core, a warm ring the beads sit in and green and purple wisps at the rim, fingering, beads, cells and projectors on, beat squeeze high; plus the **Fillmore East** sequence (the wash, the dish comes in, sunburst, burn out) and a stage in the Set Journey
+- The four new settings are MIDI-learnable and have sliders in Settings → Show
+
+### Fixed
+- Seeded blobs were square: `splatBlob` evaluated its Gaussian in a square window that cut it off where it was still 14% strong, so a fresh plate showed square blobs with soft middles until the flow smeared them. The window is round now and wide enough for the Gaussian to die away
+
+
 ### Added — The stage kit
 - **Press**: a tool, a tablet pad mode, a game-controller trigger and an OSC address for a hand on the top glass. The film thins under it (three nested squeezes of the Hele-Shaw gap) and the dye spreads out in a ring, the Joshua Light Show's rhythm plate worked by hand; pen pressure and trigger travel set how hard
 - **Dimmer** (`dimmer`, default 1) as the last stage of the plate shader, so the camera pass sees a darker plate and bloom fades with it; **Blackout** (`B`, the phone, Settings → Sound, a MIDI or OSC action) fades it to black over a second and back to where it was, on a timer so it works while the laptop's window is behind the projector's

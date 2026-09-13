@@ -494,6 +494,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ beatSqueeze: v })}
         />
         <Slider
+          label="Fingering"
+          value={settings.fingering ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ fingering: v })}
+        />
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+          A press (the tool, the pad, a kick with Beat Squeeze) breaks into radial fingers instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
+        </p>
+        <Slider
+          label="Oil Beads"
+          value={settings.beads ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ beads: v })}
+        />
+        <Slider
+          label="Plate Cells"
+          value={settings.cells ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ cells: v })}
+        />
+        <Slider
           label="Background Loop"
           value={settings.backgroundLoop ?? 0}
           min={0}
@@ -526,6 +553,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ dishVignette: v })}
         />
+        <Slider
+          label="Projectors"
+          value={settings.dishSpread ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ dishSpread: v })}
+        />
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+          Each layer its own dish, spread apart on a black screen the way two or three projectors overlap: the lead plate large and right of centre, the second smaller at the left.
+        </p>
       </section>
 
       {/* Camera Section */}
