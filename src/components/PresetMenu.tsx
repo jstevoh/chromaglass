@@ -79,7 +79,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
   const menu = (
     <div
       ref={ref}
-      className={`${align === 'side' ? 'fixed' : align === 'left' ? 'absolute top-full mt-2 left-0' : 'absolute top-full mt-2 right-0'} w-72 max-h-[70vh] overflow-y-auto scrollbar-hide bg-[#0b0b10]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl pointer-events-auto z-[60]`}
+      className={`${align === 'side' ? 'fixed' : align === 'left' ? 'absolute top-full mt-2 left-0' : 'absolute top-full mt-2 right-0'} text-white w-72 max-h-[70vh] overflow-y-auto scrollbar-hide bg-[#0b0b10]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl pointer-events-auto z-[60]`}
       style={{
         animation: 'chromaglass-menu-in 0.15s ease-out',
         ...(align === 'side' && anchor ? { top: Math.max(8, Math.min(anchor.top, window.innerHeight * 0.3)), right: window.innerWidth - anchor.left + 12 } : {}),
