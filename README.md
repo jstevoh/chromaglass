@@ -221,6 +221,16 @@ server/
   remote-server.js             # LAN static server + control relay (npm run remote)
 ```
 
+## Updating everything at once
+
+From the clone on the machine that runs the show:
+
+```bash
+npm run ship
+```
+
+That pulls main, installs, builds, publishes the build to Firebase Hosting, and then starts the show server in the same window (Ctrl+C stops it). The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
+
 ## Deploying
 
 Pushes to `main` are typechecked, built and published to Firebase Hosting by
