@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualizerSettings } from '../types';
-import { PRESETS } from '../presets';
+import { PRESETS, type Preset } from '../presets';
 import {
   ShowSequence, ShowStage, SequencerStatus,
   builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
@@ -30,6 +30,8 @@ export interface UseShowSequencerArgs {
   sectionLabel: string | null;
   /** Time-based stages only run while the show is running. */
   isActive: boolean;
+  /** Every preset a stage may name: the built-ins and the user's own. */
+  presets?: Preset[];
 }
 
 interface Run {
@@ -78,7 +80,7 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     const stage: ShowStage | undefined = seq.stages[index];
     if (!stage) return;
     const a = argsRef.current;
-    const preset = stage.presetId ? PRESETS.find(p => p.id === stage.presetId) : null;
+    const preset = stage.presetId ? (a.presets ?? PRESETS).find(p => p.id === stage.presetId) : null;
     if (preset) a.adoptPreset(preset.id);
     const target: Partial<VisualizerSettings> = { ...(preset?.settings ?? {}), ...(stage.settings ?? {}) };
     if (stage.macro !== undefined) target.macroMode = stage.macro;

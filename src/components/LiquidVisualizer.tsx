@@ -91,7 +91,10 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
 
 export interface LiquidVisualizerHandle {
   injectImage: (imageData: ImageData) => void;
-  applyPreset: (presetId: string) => void;
+  /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes and injection styles. */
+  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null }) => void;
+  /** The dyes and injection styles in force, for saving the current look as a preset. */
+  describePlate: () => { contract: number[] | null; injectStyles: string[] };
   /** Take on a preset's dyes and injection style without clearing the plate — the sequencer's way of changing stage. */
   adoptPreset: (presetId: string) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
@@ -1632,7 +1635,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
     },
-    applyPreset: (presetId: string) => {
+    applyPreset: (presetId: string, extras) => {
+      // A user's preset carries its own dyes and injection styles; register
+      // them under its id so seeding and adoption find them like a built-in.
+      if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
+      else if (extras && !extras.contract) delete PRESET_CONTRACTS[presetId];
+      if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       for (const fluid of fluidsRef.current) fluid.clearAll();
       bubblesRef.current.clear();
       chemRef.current.reset();
@@ -1649,6 +1657,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       drainFrameRef.current = 0;
       macroCamRef.current.reset();
     },
+    describePlate: () => ({ contract: presetContractRef.current ? [...presetContractRef.current] : null, injectStyles: [...injectStyleRef.current] }),
     adoptPreset: (presetId: string) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
       // new dyes and injection style take over from here.

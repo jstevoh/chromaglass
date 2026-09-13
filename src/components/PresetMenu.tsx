@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { FolderOpen, Save, Download, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
+import type { UserPreset } from '../lib/userPresets';
 
 /**
  * The presets, one click from the top of the screen. Grouped the way the
@@ -21,6 +23,13 @@ interface PresetMenuProps {
    * viewport and placed beside that rectangle instead.
    */
   anchor?: { top: number; left: number } | null;
+  /** The user's own presets, and what to do with them. */
+  userPresets?: UserPreset[];
+  onApplyUserPreset?: (p: UserPreset) => void;
+  onSaveCurrent?: (name: string, description: string) => void;
+  onLoadFile?: (file: File) => Promise<void>;
+  onExportUserPreset?: (p: UserPreset) => void;
+  onDeleteUserPreset?: (id: string) => void;
 }
 
 const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
@@ -29,8 +38,15 @@ const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
   { label: 'Light show', pick: (p) => !p.settings.macroMode && p.settings.renderStyle !== 'photo' },
 ];
 
-export const PresetMenu: React.FC<PresetMenuProps> = ({ activePresetId, onApplyPreset, onClose, align = 'left', anchor = null }) => {
+export const PresetMenu: React.FC<PresetMenuProps> = ({
+  activePresetId, onApplyPreset, onClose, align = 'left', anchor = null,
+  userPresets = [], onApplyUserPreset, onSaveCurrent, onLoadFile, onExportUserPreset, onDeleteUserPreset,
+}) => {
   const ref = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -67,6 +83,79 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({ activePresetId, onApplyP
       role="menu"
       data-testid="preset-menu"
     >
+      {onSaveCurrent && (
+        <div className="mb-3">
+          {saving ? (
+            <form
+              className="flex flex-col gap-1.5"
+              onSubmit={(e) => { e.preventDefault(); if (saveName.trim()) { onSaveCurrent(saveName, ''); setSaving(false); setSaveName(''); } }}
+            >
+              <input
+                autoFocus
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="Name this look"
+                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40"
+                data-testid="preset-save-name"
+              />
+              <div className="flex gap-1.5">
+                <button type="submit" className="flex-1 py-1.5 rounded-lg bg-white text-black text-[10px] font-bold uppercase tracking-widest" data-testid="preset-save-confirm">Save as file</button>
+                <button type="button" onClick={() => setSaving(false)} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest">Cancel</button>
+              </div>
+              <p className="text-[9px] opacity-40 leading-snug">Saved to your library here and downloaded as a JSON file you can keep or share.</p>
+            </form>
+          ) : (
+            <div className="flex gap-1.5">
+              <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current look as a preset file" data-testid="preset-save">
+                <Save size={12} /> Save current
+              </button>
+              <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a preset file" data-testid="preset-load">
+                <FolderOpen size={12} /> Load file
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                data-testid="preset-file-input"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f || !onLoadFile) return;
+                  try { setError(null); await onLoadFile(f); onClose(); } catch (err) { setError(err instanceof Error ? err.message : 'Could not read that file'); }
+                }}
+              />
+            </div>
+          )}
+          {error && <p className="text-[10px] text-red-300 mt-1.5">{error}</p>}
+        </div>
+      )}
+      {userPresets.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[9px] uppercase tracking-[0.3em] opacity-30 px-1 mb-1.5">Yours</div>
+          <div className="flex flex-col gap-1">
+            {userPresets.map((p) => {
+              const active = p.id === activePresetId;
+              return (
+                <div key={p.id} className={`flex items-center gap-1 rounded-lg ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}>
+                  <button
+                    role="menuitem"
+                    onClick={() => { onApplyUserPreset?.(p); onClose(); }}
+                    className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left ${active ? 'text-white' : 'text-white/75'}`}
+                    title={p.description ?? 'A saved preset'}
+                    data-testid={`preset-menu-${p.id}`}
+                  >
+                    <span className="text-xs font-semibold truncate">{p.name}</span>
+                    {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
+                  </button>
+                  <button onClick={() => onExportUserPreset?.(p)} className="p-1.5 rounded hover:bg-white/10 text-white/50" title="Save this preset as a file"><Download size={11} /></button>
+                  <button onClick={() => onDeleteUserPreset?.(p.id)} className="p-1.5 mr-1 rounded hover:bg-red-500/20 text-white/50" title="Remove from your library"><Trash2 size={11} /></button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {groups.map((g) => (
         <div key={g.label} className="mb-3 last:mb-0">
           <div className="text-[9px] uppercase tracking-[0.3em] opacity-30 px-1 mb-1.5">{g.label}</div>
