@@ -856,9 +856,16 @@ class FluidSimulation {
   applySquish(x: number, y: number, radius: number, amount: number, fingering = 0) {
     radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
-    const spokes = fingering > 0 ? 10 + Math.round(14 * fingering) : 0;
-    const phase = fingering > 0 ? (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000 / 1000 * Math.PI * 2 : 0;
+    // Each press gets its own spoke count and phase (from where it is, so a
+    // held press keeps them), and each spoke its own width, length and
+    // strength, with a second harmonic shifting the spacing: a ragged
+    // sunburst with dye surviving between the fingers, not a turbine.
+    const seed = fingering > 0 ? (((x * 73856093) ^ (y * 19349663)) >>> 0) : 0;
+    const spokes = fingering > 0 ? 8 + (seed % 9) + Math.round(8 * fingering) : 0;
+    const phase = fingering > 0 ? ((seed >>> 8) % 1000) / 1000 * Math.PI * 2 : 0;
     const spokeGain = fingering * 0.9;
+    const spokeProp = (s: number) => { const h = ((s + 1) * 2654435761 + seed) >>> 0; return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 }; };
+    const TAU = Math.PI * 2;
     for (let i = -radius; i <= radius; i++) {
       for (let j = -radius; j <= radius; j++) {
         const d2 = i * i + j * j;
@@ -870,19 +877,27 @@ class FluidSimulation {
           this.dirty = true;
           let a = amount;
           if (spokes > 0 && d2 > 0) {
-            const ang = Math.cos(spokes * Math.atan2(j, i) + phase);
-            a *= Math.max(0.05, 1 + spokeGain * ang);
+            const theta = Math.atan2(j, i);
+            const warped = theta + 0.35 * Math.cos((spokes * 0.5 + 1) * theta + phase * 1.7) / spokes * TAU;
+            const sIdx = Math.floor(((warped + phase / spokes) / TAU * spokes) % spokes + spokes) % spokes;
+            const prop = spokeProp(sIdx);
+            const raw = Math.cos(spokes * warped + phase);
+            // Narrow spokes: the cosine sharpened by this spoke's width.
+            const ang = Math.max(-1, Math.min(1, (raw - (1 - prop.w * 0.85)) / (prop.w * 0.85)));
+            a *= Math.max(0.05, 1 + spokeGain * ang * prop.k);
             // Along a spoke the outflow is shoved outward, and the invading
             // thin liquid carves the dye out of the channel (more toward the
             // rim, so the centre is not hollowed at once): the fingers stay
             // visible even once the gap has bottomed out and the flow stops.
-            if (ang > 0) {
-              const dist = Math.sqrt(d2);
-              const push = amount * 8 * ang * fingering;
+            const dist = Math.sqrt(d2);
+            if (ang > 0 && dist < radius * prop.len) {
+              const push = amount * 8 * ang * fingering * prop.k;
               this.vx[idx] += (i / dist) * push;
               this.vy[idx] += (j / dist) * push;
               if (ang > 0.25) {
-                const thin = 1 - Math.min(0.2, amount * 9) * fingering * (ang - 0.25) / 0.75 * (0.3 + 0.7 * dist / radius);
+                // Gentle per step: the finger reads over a held press and a
+                // faint one stays faint; the dye between spokes is untouched.
+                const thin = 1 - Math.min(0.08, amount * 2.2) * fingering * prop.k * (ang - 0.25) / 0.75 * (0.25 + 0.75 * dist / (radius * prop.len));
                 if (this.gpu) this.mul[idx] *= thin;
                 else { this.density[idx] *= thin; this.densityR[idx] *= thin; this.densityG[idx] *= thin; this.densityB[idx] *= thin; }
               }
