@@ -1,0 +1,106 @@
+{
+  "steps": [
+    {
+      "name": "initial",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 20.481159151376577
+      },
+      "beads": 0,
+      "preset": null,
+      "dishSpread": 0,
+      "beadsSetting": 0,
+      "cells": 0,
+      "fingering": 0
+    },
+    {
+      "name": "fillmore-1969",
+      "status": {
+        "label": "GPU · 768² · 1.0x",
+        "engine": "gpu",
+        "grid": 768,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.7
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "press1-1s",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.018211878834784
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "press2-1s",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.113753846696525
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "beads-crop",
+      "t": 1789337464541
+    }
+  ],
+  "canvasBox": {
+    "x": 0,
+    "y": 0,
+    "width": 1600,
+    "height": 1000
+  },
+  "press1-1s": {
+    "px": 921.5999999999999,
+    "py": 517
+  },
+  "press2-1s": {
+    "px": 1056,
+    "py": 420
+  }
+}
