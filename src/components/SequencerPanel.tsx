@@ -4,6 +4,7 @@ import { X, Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, Chev
 import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence } from '../lib/sequencer';
+import { songLabel, type SongRef } from '../lib/songRef';
 
 /**
  * The show sequencer: a script for how the plate evolves over a song or a
@@ -31,6 +32,9 @@ interface SequencerPanelProps {
   /** Save a sequence as a file / load one from a file. */
   onExport?: (seq: ShowSequence) => void;
   onImportFile?: (file: File) => Promise<void>;
+  /** The song playing now, and how to make a sequence for it. */
+  currentSong?: SongRef | null;
+  onBindSong?: (seq: ShowSequence, song: SongRef | null) => void;
   onClose: () => void;
 }
 
@@ -75,7 +79,7 @@ const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-
 
 export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose,
-  presets = PRESETS, onExport, onImportFile,
+  presets = PRESETS, onExport, onImportFile, currentSong = null, onBindSong,
 }) => {
   const selected = useMemo(() => sequences.find(q => q.id === selectedId) ?? sequences[0], [sequences, selectedId]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -156,6 +160,11 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
         </select>
       </Field>
       {selected?.description && <p className="text-[10px] leading-relaxed opacity-50 mb-4">{selected.description}</p>}
+      {selected?.song && (
+        <p className="text-[10px] leading-relaxed opacity-60 mb-4" data-testid="seq-song">
+          ♪ Made for <span className="text-white/90">{songLabel(selected.song)}</span>: starts when that song is identified, at the right point in it, and stops when it ends.
+        </p>
+      )}
 
       {/* Transport */}
       <div className="flex items-center gap-2 mb-4" data-testid="seq-transport">
@@ -245,6 +254,21 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Loop</span>
             <input type="checkbox" checked={selected.loop} onChange={(e) => update(seq => ({ ...seq, loop: e.target.checked }))} className="accent-white" />
           </label>
+          <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1.5">Song</div>
+            {selected.song ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] truncate">♪ {songLabel(selected.song)}</span>
+                <button onClick={() => onBindSong?.(selected, null)} className="text-[9px] uppercase tracking-widest opacity-60 hover:opacity-100 shrink-0" data-testid="seq-unbind-song">Forget</button>
+              </div>
+            ) : currentSong ? (
+              <button onClick={() => onBindSong?.(selected, currentSong)} className="w-full text-left text-[11px] hover:text-white/100 text-white/80" data-testid="seq-bind-song">
+                Make this for <span className="text-white/100">{songLabel(currentSong)}</span>
+              </button>
+            ) : (
+              <p className="text-[10px] opacity-40">Identify a song (the Track panel) and you can make this sequence for it: it will start with the song and stop when it ends.</p>
+            )}
+          </div>
           <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"><Plus size={12} /> Add stage</button>
           {!stage && <p className="text-[10px] opacity-40">Tap a stage above to edit it.</p>}
           {stage && editIndex !== null && (

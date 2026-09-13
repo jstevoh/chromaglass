@@ -12,6 +12,7 @@
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import type { ShowSequence, ShowStage } from './sequencer';
+import { parseSongRef, type SongRef } from './songRef';
 
 export const PRESET_FORMAT = 'chromaglass-preset';
 export const SEQUENCE_FORMAT = 'chromaglass-sequence';
@@ -31,6 +32,8 @@ export interface UserPreset {
   contract?: number[];
   /** How the automation injects: 'drop' | 'pour' | 'spray' | 'splatter' | 'streak'. */
   injectStyles?: string[];
+  /** The song this look was made for: it is applied when that song is identified. */
+  song?: SongRef;
 }
 
 export interface SequenceFile {
@@ -51,6 +54,7 @@ export function makeUserPreset(
   settings: VisualizerSettings,
   contract: number[] | null,
   injectStyles: string[] | null,
+  song: SongRef | null = null,
 ): UserPreset {
   return {
     format: PRESET_FORMAT,
@@ -62,6 +66,7 @@ export function makeUserPreset(
     settings: cleanSettings(settings),
     contract: contract && contract.length ? [...contract] : undefined,
     injectStyles: injectStyles && injectStyles.length ? [...injectStyles] : undefined,
+    song: song ?? undefined,
   };
 }
 
@@ -102,6 +107,7 @@ export function parsePresetFile(text: string): UserPreset {
     settings: cleanSettings(o.settings),
     contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 16).slice(0, 8) : undefined,
     injectStyles: Array.isArray(o.injectStyles) ? o.injectStyles.filter((s): s is string => typeof s === 'string').slice(0, 6) : undefined,
+    song: parseSongRef(o.song),
   };
 }
 
@@ -150,6 +156,7 @@ export function parseSequenceFile(text: string): SequenceFile {
       loop: s.loop !== false,
       stages,
       builtIn: false,
+      song: parseSongRef(s.song),
     },
     presets,
   };

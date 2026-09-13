@@ -18,6 +18,7 @@ import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
+import { sameSong, songRefFromTrack, type SongRef } from './lib/songRef';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -373,6 +374,10 @@ export default function App() {
   // Switch to the track's chosen preset when a song is identified
   useEffect(() => {
     if (musicIntel.presetPick && musicSettings.autoPreset) {
+      // A preset or sequence the user made for this very song outranks the
+      // track-matched pick.
+      const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
+      if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
       const preset = PRESETS.find(p => p.id === musicIntel.presetPick!.presetId);
       if (preset) applyPreset(preset.id, preset.settings);
     }
@@ -408,11 +413,13 @@ export default function App() {
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null });
   };
-  const saveCurrentPreset = (name: string, description: string) => {
+  const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
-    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null);
+    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, forSong ? currentSong : null);
     setActivePresetId(p.id);
   };
+  /** The song playing now, as a file would remember it. */
+  const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
   const loadPresetFile = async (file: File) => {
     const p = await userPresets.importFile(file);
     applyUserPreset(p);
@@ -449,6 +456,46 @@ export default function App() {
     isActive,
     presets: allPresets,
   });
+  // ── Files made for a song ───────────────────────────────────────
+  // When a song is identified, a sequence made for it starts at the right
+  // point in it and a preset made for it is applied; when the song ends or
+  // another takes its place, a song-bound sequence stops.
+  const songBoundRef = useRef<string | null>(null);   // the sequence running for the current song
+  const lastSongKey = useRef<string | null>(null);
+  useEffect(() => {
+    const key = musicIntel.state.track ? `${musicIntel.state.track.isrc}|${musicIntel.state.track.title}|${musicIntel.state.track.artist}` : null;
+    if (key === lastSongKey.current) return;
+    lastSongKey.current = key;
+    const song = currentSong;
+    const running = sequencer.status.sequenceId;
+    if (songBoundRef.current && (running === songBoundRef.current) && !sameSong(sequencer.sequences.find(q => q.id === running)?.song, song)) {
+      sequencer.stop();
+      songBoundRef.current = null;
+    }
+    if (!song) return;
+    const seq = sequencer.sequences.find(q => sameSong(q.song, song));
+    if (seq) {
+      sequencer.startAt(seq.id, musicIntel.state.positionSec);
+      songBoundRef.current = seq.id;
+      return;
+    }
+    const up = userPresets.presets.find(p => sameSong(p.song, song));
+    if (up) applyUserPreset(up);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [musicIntel.state.track, currentSong]);
+  // The song ran out: stop its sequence rather than looping into the next song.
+  useEffect(() => {
+    const id = songBoundRef.current;
+    if (!id || sequencer.status.sequenceId !== id) return;
+    const seq = sequencer.sequences.find(q => q.id === id);
+    const dur = seq?.song?.durationSec;
+    if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [musicIntel.state.positionSec]);
+  const bindSequenceToSong = (seq: ShowSequence, song: SongRef | null) => {
+    sequencer.upsertSequence({ ...seq, song: song ?? undefined });
+  };
+
   const importSequenceFile = async (file: File) => {
     const parsed = parseSequenceFile(await file.text());
     for (const p of parsed.presets ?? []) userPresets.upsert(p);
@@ -559,6 +606,9 @@ export default function App() {
     lastSongChangeSeq.current = songChange.seq;
     const mode = settings.onNewSong ?? 'off';
     if (mode === 'off' || sequencer.status.running) return;
+    // A preset or sequence made for the song that just started takes precedence.
+    const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
+    if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
     if (mode === 'random') { triggerLucky(); return; }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
     const next = pool[Math.floor(Math.random() * pool.length)];
@@ -1001,7 +1051,7 @@ export default function App() {
                     <span className="text-[7px] font-bold uppercase tracking-widest">Presets</span>
                   </button>
                   {presetMenu === 'toolbar' && (
-                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} align="side" anchor={presetAnchorRef.current} />
+                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="side" anchor={presetAnchorRef.current} />
                   )}
                 </div>
 
@@ -1185,6 +1235,8 @@ export default function App() {
             presets={allPresets}
             onExport={exportSequence}
             onImportFile={importSequenceFile}
+            currentSong={currentSong}
+            onBindSong={bindSequenceToSong}
             onClose={() => setShowSequencer(false)}
           />
         )}
@@ -1268,7 +1320,7 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="left" />
           )}
         </div>
 
