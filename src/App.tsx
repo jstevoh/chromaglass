@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
-import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
+import { LiquidVisualizer, LiquidVisualizerHandle, PRESET_CONTRACTS } from './components/LiquidVisualizer';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -14,6 +14,10 @@ import type { RemoteMessage } from './lib/remoteProtocol';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
+import { MidiPanel } from './components/MidiPanel';
+import { useMidi } from './hooks/useMidi';
+import { useGamepad } from './hooks/useGamepad';
+import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -23,7 +27,7 @@ import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
-import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
+import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 
@@ -305,6 +309,7 @@ export default function App() {
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
+  const [showMidi, setShowMidi] = useState(false);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
   const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
@@ -659,6 +664,51 @@ export default function App() {
     if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message });
   }, [audioData, isCasting, mirrorCount, castSend]);
 
+  // ── One vocabulary of commands for every hand ───────────────────
+  // The phone, a MIDI button, a gamepad face button and a keyboard all fire
+  // the same actions; the presets they cue come from the same list.
+  const cuePreset = useCallback((presetId: string) => {
+    if (isUserPresetId(presetId)) {
+      const up = userPresetsRef.current.find(p => p.id === presetId);
+      if (up) applyUserPreset(up);
+      return;
+    }
+    const preset = PRESETS.find(p => p.id === presetId);
+    if (preset) applyPreset(preset.id, preset.settings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const stepPreset = (dir: 1 | -1) => {
+    if (allPresets.length === 0) return;
+    const i = allPresets.findIndex(p => p.id === activePresetId);
+    const next = allPresets[(i + dir + allPresets.length) % allPresets.length];
+    cuePreset(next.id);
+  };
+  const runAction = (a: MidiAction) => {
+    switch (a) {
+      case 'seed':            setSeedCount(prev => prev + 1); break;
+      case 'clear':           setClearTrigger(prev => prev + 1); break;
+      case 'drain':           setDrainTrigger(prev => prev + 1); break;
+      case 'lucky':           triggerLucky(); break;
+      case 'play-toggle':     setIsActive(v => !v); break;
+      case 'automate-toggle': setIsAutomated(v => !v); break;
+      case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
+      case 'macro-toggle':    updateSettings({ macroMode: !settings.macroMode }); break;
+      case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
+      case 'seq-next':        sequencer.next(); break;
+      case 'seq-prev':        sequencer.prev(); break;
+      case 'seq-stop':        sequencer.stop(); break;
+      case 'preset-next':     stepPreset(1); break;
+      case 'preset-prev':     stepPreset(-1); break;
+    }
+  };
+  /** The selected liquid takes a palette colour; the dropper becomes the tool. */
+  const selectDye = (paletteIndex: number) => {
+    const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
+    updateLiquidColor(selectedLiquidId, c.hex);
+    setActiveTool('dropper');
+  };
+  const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
+
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
   // anything changes, and applies commands the phone sends back. When no relay
@@ -679,7 +729,8 @@ export default function App() {
       progress: Math.round(sequencer.status.progress * 100) / 100,
       stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
     },
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status]);
+    presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -710,11 +761,13 @@ export default function App() {
         case 'patch':
           queuePatch(message.settings);
           break;
-        case 'preset': {
-          const preset = PRESETS.find(p => p.id === message.presetId);
-          if (preset) applyPreset(preset.id, preset.settings);
+        case 'preset':
+          cuePreset(message.presetId);
           break;
-        }
+        case 'dye':
+          updateLiquidColor(selectedLiquidId, message.color);
+          setActiveTool('dropper');
+          break;
         case 'action':
           switch (message.action) {
             case 'play':          setIsActive(true); break;
@@ -731,13 +784,16 @@ export default function App() {
             case 'seq-pause':     sequencer.pause(); break;
             case 'seq-next':      sequencer.next(); break;
             case 'seq-prev':      sequencer.prev(); break;
+            case 'seq-stop':      sequencer.stop(); break;
+            case 'preset-next':   stepPreset(1); break;
+            case 'preset-prev':   stepPreset(-1); break;
           }
           break;
         case 'blow':
-          visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer });
+          visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
           break;
         case 'drop':
-          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer });
+          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, color: message.color ?? selectedLiquid?.color });
           break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
@@ -747,6 +803,47 @@ export default function App() {
   });
 
   relaySendRef.current = remoteLink.send;
+
+  // ── MIDI controller and game controller ─────────────────────────
+  const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
+  const midi = useMidi(
+    {
+      getSetting: (key) => { const v = settings[key]; return typeof v === 'number' ? v : undefined; },
+      setSetting: (key, value) => updateSettings({ [key]: value } as Partial<VisualizerSettings>),
+      action: runAction,
+      applyPreset: cuePreset,
+      selectDye,
+    },
+    {
+      activePresetId,
+      dyeIndex: selectedDyeIndex,
+      presetColor: (id) => {
+        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[id];
+        const idx = contract?.[0];
+        return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
+      },
+      paletteColor: (i) => PALETTE_RGB[i] ?? null,
+      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running },
+    },
+    allPresetIds,
+  );
+  const gamepad = useGamepad({
+    gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
+    action: runAction,
+    cycleDye: (dir) => selectDye((selectedDyeIndex < 0 ? 0 : selectedDyeIndex) + dir),
+    cycleLayer: (dir) => setActiveLayer(l => Math.max(0, Math.min(settings.layerCount - 1, l + dir))),
+  });
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad });
+    }
+  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad]);
+  const gamepadCursorStyle = useMemo(() => {
+    if (!gamepad.cursor.visible) return null;
+    const r = visualizerRef.current?.drawnRect?.();
+    const box = r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    return { left: box.left + gamepad.cursor.x * box.width, top: box.top + (1 - gamepad.cursor.y) * box.height };
+  }, [gamepad.cursor]);
 
   // Derive preset name for display
   const activePresetName = useMemo(() => {
@@ -773,8 +870,18 @@ export default function App() {
         }}
       />
 
+      {/* A game controller's cursor: a ring over the plate, shown while the sticks move */}
+      {gamepadCursorStyle && (
+        <div
+          className="pointer-events-none fixed z-30 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-transform"
+          style={{ left: gamepadCursorStyle.left, top: gamepadCursorStyle.top, width: gamepad.cursor.pressing ? 44 : 28, height: gamepad.cursor.pressing ? 44 : 28, backgroundColor: gamepad.cursor.pressing ? `${selectedLiquid?.color ?? '#fff'}55` : 'transparent' }}
+          data-testid="gamepad-cursor"
+        />
+      )}
+
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
       <AnimatePresence>
+
         {!overlaysVisible && showCleanHint && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1092,6 +1199,19 @@ export default function App() {
                   <span className="text-[7px] font-bold uppercase tracking-widest">Sequence</span>
                 </button>
 
+                {/* MIDI controller */}
+                <button
+                  onClick={() => { setShowMidi(!showMidi); setShowSequencer(false); setShowTrackPanel(false); }}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    showMidi ? 'bg-white text-black border-white' : midi.enabled ? 'bg-emerald-500/20 border-emerald-400/40' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title={midi.enabled ? `MIDI on${midi.activeInputName ? `: ${midi.activeInputName}` : ''}${gamepad.connected ? ` · gamepad: ${gamepad.connected}` : ''}` : 'MIDI controller — faders, pads and buttons for the show'}
+                  data-testid="midi-button"
+                >
+                  <Sliders size={16} className={showMidi || midi.enabled ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">MIDI</span>
+                </button>
+
                 {/* Randomize */}
                 <button
                   onClick={triggerLucky}
@@ -1216,6 +1336,13 @@ export default function App() {
             onLoadPresetFile={loadPresetFile}
             onClose={() => setShowSettings(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── MIDI ───────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showMidi && (
+          <MidiPanel midi={midi} presets={allPresets.map(p => ({ id: p.id, name: p.name }))} onClose={() => setShowMidi(false)} />
         )}
       </AnimatePresence>
 

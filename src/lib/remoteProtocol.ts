@@ -41,7 +41,11 @@ export type RemoteAction =
   | 'seq-play'
   | 'seq-pause'
   | 'seq-next'
-  | 'seq-prev';
+  | 'seq-prev'
+  | 'seq-stop'
+  /** Step through the display's preset list. */
+  | 'preset-next'
+  | 'preset-prev';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -66,6 +70,10 @@ export interface RemoteState {
   trackName?: string | null;
   /** The show sequencer's transport state, when the display has one. */
   sequencer?: RemoteSequencer;
+  /** Every preset the display can cue, the user's own included, so the tablet lists the same library as the laptop. */
+  presets?: { id: string; name: string; macro: boolean; user: boolean }[];
+  /** Whether the display has a MIDI controller live, for the tablet's status line. */
+  midi?: string | null;
 }
 
 export type RemoteMessage =
@@ -90,11 +98,14 @@ export type RemoteMessage =
   /**
    * The phone as a projectionist: a finger on its pad blows air or drops dye
    * at that point of the plate (normalised, y up), on the layer it holds;
-   * its tilt rocks the plate.
+   * its tilt rocks the plate. A pen adds `amount` (pressure) and, for a blow,
+   * the direction it leans (`dx`/`dy`).
    */
-  | { type: 'blow'; x: number; y: number; layer: number }
-  | { type: 'drop'; x: number; y: number; layer: number }
-  | { type: 'tilt'; x: number; y: number };
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string }
+  | { type: 'tilt'; x: number; y: number }
+  /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
+  | { type: 'dye'; color: string };
 
 /** Build the ws:// URL for the relay from the page's own origin. */
 export function remoteSocketUrl(): string {

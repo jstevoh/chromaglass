@@ -62,10 +62,12 @@ The best picture is the cable. Plug the projector in as a second display, then *
 
 In System Settings → Displays, give the projector its native resolution and keep it as a separate display rather than mirroring, so the controls stay off the wall.
 
-## Phone Remote
+## Phone and Tablet Remote
 
-The laptop runs the show — microphone, GPU, full UI — and your phone becomes a
+The laptop runs the show — microphone, GPU, full UI — and your phone or iPad becomes a
 control surface for it over the local network.
+
+On a phone the remote is one column. On an iPad (or any screen wider than a phone) it is two: the **projectionist's pad** fills the left half as a plate you work with your fingers, and the dials, sequencer and presets sit on the right. Several fingers are several hands. An Apple Pencil or any stylus adds two things a finger cannot: how hard it presses sets how much dye a drop lays down, and which way it leans sets which way a blow of air goes; the pen's barrel button blows even in drop mode. A row of dye colours under the pad picks what the pad drops (and the laptop's dropper with it), the **Full** button gives the pad the whole screen (add the page to the home screen on iOS for no browser chrome at all), the screen stays awake while linked, and the preset list is the laptop's own — the presets you have saved as files included.
 
 ```bash
 npm run build
@@ -73,6 +75,18 @@ npm run remote
 ```
 
 The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
+
+## MIDI and game controllers
+
+The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox have no Web MIDI) turns a controller on the desk into the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer.
+
+- **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera) and the Korg nanoKONTROL2 (faders and knobs as above, S buttons one-shots, M buttons toggles, transport keys the sequencer). A Launchpad, MIDImix, Launch Control XL or Faderfox is a few minutes of learn away.
+- **MIDI learn**: pick what a control should do in the panel (any of thirty settings, every action, every preset, every dye), then touch the control. Tick *Endless encoder* first for a knob with no stop (relative "two's-complement" nudges); the binding list flips any CC between `abs` and `enc` later.
+- **Soft takeover**: a fader that disagrees with the app is ignored until it passes through the app's value, so a slider dragged on the phone does not jump back the moment a fader twitches. Turn it off for a controller with motorised faders.
+- **LED feedback**: preset pads light in the preset's lead dye (dim until it is the active one), dye pads in their colour, toggle buttons on or off, on the APC mini mk2 / Launchpad velocity palette; CC-driven LEDs get 127/0. *LEDs: Auto* picks the output that shares a name with the input.
+- **Maps are files**: **Save file** writes a `.chromaglass-midi.json` next to your presets and sequences; **Load file** reads one in. The map also lives in the browser, and MIDI comes back on by itself on the next visit.
+
+A **game controller** needs no setup: plug it in (or pair it) and press a button. The left stick moves a cursor over the plate, the right stick blows air from the cursor in the direction it is pushed, the right trigger drops dye (as much as it is pulled), the left trigger blows a puff, the shoulders cycle the dye colour, the d-pad steps presets (left/right) and plates (up/down), A seeds, B drains, X rolls a random look, Y cleans the screen, Start is play/pause, Back is Random Evolve, R3 is Macro, L3 recentres the cursor. The Gamepad API carries no gyro, so rocking the plate stays with the phone's tilt.
 
 ### The show key
 
@@ -158,7 +172,9 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Macro toggle | Magnify the plate and chase a single bead of liquid |
 | Sequence | Open the Show Sequencer: pick a sequence, play, pause, skip stages, or edit and save your own |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
-| Projectionist pad | On the phone: drag to blow air, tap to drop dye, pick which plate the phone works, and stream the phone's tilt into the plate |
+| Projectionist pad | On the phone or iPad: drag to blow air, tap to drop dye, pick a dye colour, pick which plate the device works, stream the device's tilt into the plate, or give the pad the whole screen. A pen's pressure sets how much dye, its tilt which way the air goes |
+| MIDI | Turn a MIDI controller on, load a factory map (APC mini mk2, nanoKONTROL2) or teach yours with MIDI learn; soft takeover, endless encoders, LED feedback; maps saved as `.chromaglass-midi.json` |
+| Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
 | Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
@@ -192,6 +208,8 @@ src/
     useAudioAnalyzer.ts        # Web Audio FFT hook (bass/mid/treble/energy/timbre/complexity)
     useMusicIntelligence.ts    # Orchestrates identification, song maps, lyrics, evolution
     useRemoteLink.ts           # WebSocket link, either end, with reconnect
+    useMidi.ts                 # Web MIDI: devices, bindings, learn, soft takeover, LED feedback
+    useGamepad.ts              # Gamepad API: cursor, blow, drop, buttons
   lib/
     musicTypes.ts              # Music intelligence interfaces
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
@@ -204,6 +222,7 @@ src/
     macroCamera.ts             # Macro closeup: bead detection, tracking, whip cuts
     audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
     remoteProtocol.ts          # Phone-remote message types and socket URL
+    midi.ts                    # MIDI messages, bindings, factory maps, pad colours, map files
     fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
@@ -214,7 +233,8 @@ src/
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
   components/
-    RemoteControl.tsx          # The phone control surface
+    RemoteControl.tsx          # The phone and tablet control surface
+    MidiPanel.tsx              # MIDI: devices, factory maps, learn, bindings, files
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
