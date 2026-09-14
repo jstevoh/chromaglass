@@ -1,0 +1,180 @@
+{
+  "consoleErrors": [],
+  "pageErrors": [],
+  "feedback": [],
+  "readbacks": {
+    "oil-on-water": {
+      "canvasW": 1600,
+      "canvasH": 1000,
+      "x": 560,
+      "yTop": 350,
+      "meanLum": 208.8,
+      "maxLum": 214.4,
+      "meanRGB": [
+        214,
+        218,
+        98
+      ],
+      "glError": 0
+    },
+    "macro-bead": {
+      "canvasW": 1600,
+      "canvasH": 1000,
+      "x": 560,
+      "yTop": 350,
+      "meanLum": 63.9,
+      "maxLum": 124.7,
+      "meanRGB": [
+        219,
+        24,
+        1
+      ],
+      "glError": 0
+    },
+    "camera-0.6": {
+      "canvasW": 1600,
+      "canvasH": 1000,
+      "x": 560,
+      "yTop": 350,
+      "meanLum": 58.4,
+      "maxLum": 68.1,
+      "meanRGB": [
+        222,
+        1,
+        149
+      ],
+      "glError": 0
+    },
+    "camera-0.6-plus2s": {
+      "canvasW": 1600,
+      "canvasH": 1000,
+      "x": 560,
+      "yTop": 350,
+      "meanLum": 57.4,
+      "maxLum": 60.9,
+      "meanRGB": [
+        218,
+        0,
+        150
+      ],
+      "glError": 0
+    }
+  },
+  "steps": [
+    {
+      "name": "initial",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 16.7
+      },
+      "preset": null,
+      "camera": 0,
+      "focus": 0.55,
+      "macroMode": false,
+      "macroZoom": 4
+    },
+    {
+      "name": "oil-on-water",
+      "status": {
+        "label": "GPU · 384² · 1.0x",
+        "engine": "gpu",
+        "grid": 384,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 98.49849780361271
+      },
+      "preset": null,
+      "camera": 1,
+      "focus": 0.6,
+      "macroMode": false,
+      "macroZoom": 4
+    },
+    {
+      "name": "macro-bead",
+      "status": {
+        "label": "GPU · 256² · 1.0x",
+        "engine": "gpu",
+        "grid": 256,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 106.77984828551665
+      },
+      "preset": null,
+      "camera": 1,
+      "focus": 0.6,
+      "macroMode": true,
+      "macroZoom": 4.5
+    },
+    {
+      "name": "classic",
+      "status": {
+        "label": "CPU · 192²",
+        "engine": "cpu",
+        "grid": 192,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 84.09448002932136
+      },
+      "preset": null,
+      "camera": 1,
+      "focus": 0.6,
+      "macroMode": false,
+      "macroZoom": 7.8
+    },
+    {
+      "name": "camera-0.6",
+      "status": {
+        "label": "CPU · 192²",
+        "engine": "cpu",
+        "grid": 192,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": true,
+        "gpuUnavailable": false,
+        "frameMs": 115.59522562050658
+      },
+      "preset": null,
+      "camera": 0.6,
+      "focus": 0.6,
+      "macroMode": false,
+      "macroZoom": 7.8
+    }
+  ],
+  "picked": {
+    "oil": true,
+    "macro": true,
+    "classic": true
+  },
+  "macroZoom": [
+    4.5,
+    5.4,
+    6.5,
+    7.8
+  ],
+  "focusDisabledBefore": false,
+  "cameraBefore": "1",
+  "cameraAfter": "0.6",
+  "focusDisabledAfter": false
+}
