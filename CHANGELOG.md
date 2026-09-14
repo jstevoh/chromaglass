@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Second Screen** (Settings → Projectors, and the chip): **Ask** offers the projector in one click as before; **Automatic** sends the show there by itself, fullscreen on the projector, on the next click or key press anywhere in the app, and again whenever the projector is plugged back in (`src/hooks/useProjector.ts`, watching `screenschange`); **Off** offers nothing. Closing the projector window by hand does not re-send for the same screen. The choice is kept in localStorage
 - The Second display window opens as a fullscreen popup placed on the projector's own bounds when the screen is known, so no click on the projector window is needed for fullscreen
 
+### Changed — after the sixth look on the Mac's GPU
+- The carpet of small rings in the Fillmore dish, called "the beads" in every report since the third, was the **plate cells** shader at 0.55; the bead field underneath was already in patches with mixed sizes. The preset now runs cells at 0.2 and beads at 0.8 (the Fillmore sequence's stages likewise), so the oil beads carry the look
+- The Fillmore dish drained to a few blobs in about a minute with no music: the dye budget regulator was pulling a full dish back to a 0.95 mean. The preset's budget is 1.2, the most the regulator allows
+- The pile at the fingers' tips is stronger and sits in a band hugging each spoke's own tip, with the channel's thinning stopping short of it, so the rim can stand
+- Governor: the climb threshold is 18.5 ms (17.5 sat on top of the 60 Hz interval's jitter, so the eight-second clock kept resetting and the Mac never left 512²), a long frame between 18.5 and 20 ms holds the clock instead of resetting it, and a rung that failed while a tool was held is retried after thirty seconds rather than ninety
+
 ### Added — the projector window fills its screen from the laptop
 - A title bar on the projector window (the app's name, or the address) is the browser's frame: the OS's full screen keeps it, the browser's own removes it, and that needs a gesture on the window. The show window now hands its own gesture over (capability delegation on `postMessage`): while the projector window has its frame, any click or key on the laptop's show fills it, a chip says so with a button, the projector window shows a hint along its bottom edge until it fills the screen (and explains the green button if the window is OS-fullscreen), and F, Enter or Space on the projector window do it too. `requestFullscreen` asks for `navigationUI: 'hide'`
 

@@ -17,8 +17,15 @@ import type { QualityRung } from './platform';
 
 /** Frames slower than this are being dropped on any display: step down. */
 const SLOW_MS = 22;
-/** Only climb when frames are comfortably at 60 Hz with JS work well under budget. */
-const FAST_MS = 17.5;
+/**
+ * Only climb when frames are at 60 Hz with JS work well under budget. The
+ * 60 Hz interval is 16.7 ms and the average sits at 17.0–17.5 with the
+ * jitter, so the line is drawn clear of it; between FAST and HOLD the
+ * climb clock holds rather than resets, so one long frame in ten seconds
+ * does not keep a machine at its start rung for ever.
+ */
+const FAST_MS = 18.5;
+const HOLD_MS = 20;
 const WORK_BUDGET_MS = 9;
 /** How long a verdict must hold before acting on it. */
 const DOWN_AFTER_S = 1.5;
@@ -34,9 +41,10 @@ const HUGE_MS = 500;
 /**
  * A rung that failed is offered again after this long of fast frames; a
  * rung that failed while a tool was held (a press costs a burst of work
- * that says nothing about the rung) is not marked failed at all.
+ * that says less about the rung) is offered again sooner.
  */
 const RETRY_AFTER_S = 90;
+const HELD_RETRY_AFTER_S = 30;
 
 export class QualityGovernor {
   private index: number;
@@ -97,7 +105,7 @@ export class QualityGovernor {
       this.fastSince = null;
       this.slowSince ??= now;
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
-        if (!held) this.failed.set(this.index, now);
+        this.failed.set(this.index, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.index += 1;
         this.everSteppedDown = true;
         return this.moved(now);
@@ -119,7 +127,7 @@ export class QualityGovernor {
       }
       return false;
     }
-    this.fastSince = null;
+    if (this.emaFrame > HOLD_MS || this.emaWork >= WORK_BUDGET_MS) this.fastSince = null;
     return false;
   }
 
