@@ -234,9 +234,23 @@ The after-press poll is 65 s rather than 100 because I killed leftover Chrome pr
 4. **Governor:** the climb could not be tested here; it needs a quiet machine, or a run with James's projector tab closed. Worth checking separately whether that tab's own governor is the thing bursting the GPU to 99 % every 20–30 s.
 5. **Readback warning:** double-buffer the readback PBO (or skip the readback on frames where the previous one has not been consumed) so the async path is really async.
 
-## 9. What was not done
+## 9. A second session on this Mac at the same time
+
+While this look was running, another relayed session was working in the same `~/chromaglass` checkout on #26 ("The plate no longer goes black with the camera on; macro zoom at will; the show stays put"). From the reflog and file times: it pulled main 57d5496 → **2f4a711 (#26)** at 20:00:38, rebuilt `dist/` at 20:00:47, and killed my show server (key 8228) and started its own at 20:00:57 (**key 6412**, pid 11793, the one running now). Its scripts `shoot26.mjs` / `shoot26b.mjs` ran at 20:01–20:04 and wrote `camera-0.6-gpu.png`, `gpu-check-26.json`, `macro-bead-gpu.png`, `oil-on-water-gpu.png` into `reports/`.
+
+What that means for this report:
+
+- **Every page in this look was loaded from the #25 build.** My last page open was the governed rerun at ~19:57, before the rebuild; the settle series and still press finished at 19:56 and 19:57. The launch section above describes the server I started at 19:14 on #25; that server is gone.
+- **Four files that are not mine are in this commit**: the four #26 outputs listed above were in `reports/` when I ran `git add reports/`. They belong to that session's report; I have left them in place rather than rewrite a pushed branch.
+- **My `git checkout main` at 20:03 removed those four files from the shared working tree** for about four minutes (checking out main drops the tracked `reports/` files). I restored them from this commit as untracked files at 20:07, byte-identical.
+- At 20:00:01 I killed stray Playwright Chrome processes (`pkill -f remote-debugging-pipe`) to clear the GPU; that took my own governed rerun with it (§6). The other session's `shoot26.mjs` started after that and completed; its `shoot26b.mjs` died at 20:04 on the same CDP screenshot timeout that hit three of my runs, which is the load, not my cleanup.
+- The GPU load in §1 was measured 19:15–19:50, before that session's scripts existed, and is James's own show + projector tabs, not the other session.
+
+Two sessions sharing one checkout, one `dist/`, one port and one `reports/` folder will keep tripping over each other like this; a worktree per session (this report was committed from one, `/tmp/mac-reports-wt`, so the shared checkout stayed on main) and a port per server would stop it.
+
+## 10. What was not done
 
 - No deploy (GitHub Actions does it on merge).
 - Nothing committed besides `reports/`; `package-lock.json` and the nested `chromaglass/` clone untouched; nothing pushed to main.
-- The governed after-press poll is 65 s, not 100 (my fault, §6). The governor's climb to 768² was not testable under the load.
+- The governed after-press poll is 65 s, not 100 (my fault, §6 and §9). The governor's climb to 768² was not testable under the load.
 - James's Chrome tabs and the projector window were left alone throughout.
