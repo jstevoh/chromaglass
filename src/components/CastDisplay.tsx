@@ -32,11 +32,44 @@ export default function CastDisplay() {
   return <CastReceiver />;
 }
 
+/**
+ * The browser's own fullscreen: the only thing that removes the window's
+ * title bar (the app's name, or the address). It needs a gesture: a click or
+ * key on this window, or one on the show window handed over by capability
+ * delegation (the opener posts a message with its gesture attached).
+ */
+function goFullscreen() {
+  const el = document.documentElement as HTMLElement & { requestFullscreen?: (o?: { navigationUI?: 'hide' | 'show' | 'auto' }) => Promise<void> };
+  el.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => { /* not allowed here */ });
+}
+
+function useFullscreen() {
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const change = () => setIsFullscreen(!!document.fullscreenElement);
+    const key = (e: KeyboardEvent) => { if (e.key === 'f' || e.key === 'F' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goFullscreen(); } };
+    const message = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if ((e.data as { chromaglass?: string } | null)?.chromaglass === 'fullscreen') goFullscreen();
+    };
+    document.addEventListener('fullscreenchange', change);
+    window.addEventListener('keydown', key);
+    window.addEventListener('message', message);
+    return () => {
+      document.removeEventListener('fullscreenchange', change);
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('message', message);
+    };
+  }, []);
+  return isFullscreen;
+}
+
 /** The projector window: the show window's canvas, and nothing else. */
 function StageMirror({ source }: { source: HTMLCanvasElement }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gone, setGone] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
+  const isFullscreen = useFullscreen();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -100,7 +133,7 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     <div
       className="w-full h-screen bg-black overflow-hidden"
       style={{ cursor: showCursor ? 'default' : 'none' }}
-      onClick={() => document.documentElement.requestFullscreen?.().catch(() => { /* not allowed here */ })}
+      onClick={goFullscreen}
       data-testid="cast-display"
     >
       <canvas ref={canvasRef} className="w-full h-full" id="stage-canvas" />
@@ -111,7 +144,7 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
           </div>
         </div>
       )}
-      <CastHint />
+      <CastHint isFullscreen={isFullscreen} />
     </div>
   );
 }
@@ -199,9 +232,7 @@ function CastReceiver() {
   const linkedRef = useRef(false);
   linkedRef.current = linked;
 
-  const handleFullscreen = useCallback(() => {
-    document.documentElement.requestFullscreen?.().catch(() => { /* not allowed here */ });
-  }, []);
+  const isFullscreen = useFullscreen();
 
   // Hide the cursor after a few seconds still.
   const [showCursor, setShowCursor] = useState(true);
@@ -232,7 +263,7 @@ function CastReceiver() {
     <div
       className="relative w-full h-screen bg-black overflow-hidden text-white overlays-hidden"
       style={{ cursor: showCursor ? 'default' : 'none' }}
-      onClick={handleFullscreen}
+      onClick={goFullscreen}
       data-testid="cast-display"
     >
       <LiquidVisualizer
@@ -256,24 +287,33 @@ function CastReceiver() {
         </div>
       )}
 
-      <CastHint />
+      <CastHint isFullscreen={isFullscreen} />
     </div>
   );
 }
 
 const EMPTY = new Uint8Array(0);
 
-function CastHint() {
-  const [visible, setVisible] = useState(true);
+/**
+ * Shown while the window still has its frame, and gone the moment it fills
+ * the screen. A window opened fullscreen by the show never shows it (the
+ * short delay covers the browser reporting the state).
+ */
+function CastHint({ isFullscreen }: { isFullscreen: boolean }) {
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), 4000);
+    const timer = setTimeout(() => setReady(true), 1500);
     return () => clearTimeout(timer);
   }, []);
-  if (!visible) return null;
+  if (!ready || isFullscreen) return null;
+  // The OS's full screen (the green button) fills the screen but keeps the
+  // browser's title bar; only the browser's own full screen drops it.
+  const osFull = window.innerHeight >= (window.screen?.height ?? 0) - 4;
   return (
-    <div className="fixed bottom-6 inset-x-0 flex justify-center z-50 pointer-events-none" style={{ transition: 'opacity 1s' }}>
-      <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2">
-        <p className="text-white/50 text-xs">Click anywhere for fullscreen</p>
+    <div className="fixed bottom-6 inset-x-0 flex justify-center z-50 pointer-events-none" data-testid="cast-hint">
+      <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2 text-center">
+        <p className="text-white/60 text-xs">Click here, press F, or click the show on the laptop, to fill this screen</p>
+        {osFull && <p className="text-white/35 text-[10px] mt-0.5">That bar at the top is the browser's title bar: its own full screen removes it, the green button does not</p>}
       </div>
     </div>
   );

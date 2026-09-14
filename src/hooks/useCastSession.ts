@@ -14,6 +14,8 @@ import { CAST_CHANNEL, type CastMessage } from '../lib/castProtocol';
  */
 export function useCastSender(onReceiverReady: () => void, onStage?: (size: { width: number; height: number } | null) => void) {
   const [isCasting, setIsCasting] = useState(false);
+  /** For a window we opened: whether it fills its screen (the browser's own fullscreen, no title bar); null when unknown or not a window. */
+  const [windowFullscreen, setWindowFullscreen] = useState<boolean | null>(null);
   const windowRef = useRef<Window | null>(null);
   const connectionRef = useRef<PresentationConnectionLike | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -34,7 +36,31 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
     channelRef.current = null;
     stageRef.current?.(null);
     setIsCasting(false);
+    setWindowFullscreen(null);
   }, []);
+
+  const readWindowFullscreen = useCallback((w: Window): boolean | null => {
+    try { return !!w.document.fullscreenElement; } catch { return null; }   // not ours to read
+  }, []);
+
+  /**
+   * Make the projector window fill its screen from a gesture in this window.
+   * A title bar on it (the app's name, or the address) is the browser's
+   * window frame: the OS's full screen keeps it, the browser's own removes
+   * it, and that needs a gesture — normally one on that window. Capability
+   * delegation hands this window's gesture to it, so a click here does it.
+   * Must be called from a click or key press.
+   */
+  const fillWindow = useCallback(() => {
+    const w = windowRef.current;
+    if (!w || w.closed || readWindowFullscreen(w) !== false) return;
+    const msg = { chromaglass: 'fullscreen' };
+    try {
+      (w.postMessage as unknown as (m: unknown, o: { targetOrigin: string; delegate?: string }) => void)(msg, { targetOrigin: window.location.origin, delegate: 'fullscreen' });
+    } catch {
+      try { w.postMessage(msg, window.location.origin); } catch { /* gone */ }
+    }
+  }, [readWindowFullscreen]);
 
   const openChannel = useCallback(() => {
     if (channelRef.current || typeof BroadcastChannel === 'undefined') return;
@@ -67,7 +93,8 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
     openChannel();
     setIsCasting(true);
     checkIntervalRef.current = setInterval(() => {
-      if (castWindow.closed) cleanup();
+      if (castWindow.closed) { cleanup(); return; }
+      setWindowFullscreen(readWindowFullscreen(castWindow));
     }, 1000);
     try {
       const w = window as unknown as { getScreenDetails?: () => Promise<{ screens: ScreenLike[]; currentScreen: ScreenLike }> };
@@ -88,7 +115,24 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
       // Permission refused or no such API: the window stays where it opened.
     }
     return true;
-  }, [cleanup, openChannel]);
+  }, [cleanup, openChannel, readWindowFullscreen]);
+
+  // While our window is up with its title bar showing, the next click or key
+  // anywhere in this window fills it (delegation needs the gesture itself).
+  useEffect(() => {
+    if (windowFullscreen !== false) return;
+    const fire = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      fillWindow();
+    };
+    window.addEventListener('pointerdown', fire, { capture: true });
+    window.addEventListener('keydown', fire, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', fire, { capture: true });
+      window.removeEventListener('keydown', fire, { capture: true });
+    };
+  }, [windowFullscreen, fillWindow]);
 
   const startCast = useCallback(async (mode: 'window' | 'device' = 'device', screen?: ScreenLike | null) => {
     const debug = new URLSearchParams(window.location.search).has('debug') ? '&debug' : '';
@@ -142,7 +186,7 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
 
   useEffect(() => () => { cleanup(); }, [cleanup]);
 
-  return { isCasting, startCast, stopCast, send };
+  return { isCasting, startCast, stopCast, send, windowFullscreen, fillWindow };
 }
 
 // The Presentation API is not in every TypeScript lib; the shape used here.
