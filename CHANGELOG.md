@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Second Screen** (Settings → Projectors, and the chip): **Ask** offers the projector in one click as before; **Automatic** sends the show there by itself, fullscreen on the projector, on the next click or key press anywhere in the app, and again whenever the projector is plugged back in (`src/hooks/useProjector.ts`, watching `screenschange`); **Off** offers nothing. Closing the projector window by hand does not re-send for the same screen. The choice is kept in localStorage
 - The Second display window opens as a fullscreen popup placed on the projector's own bounds when the screen is known, so no click on the projector window is needed for fullscreen
 
+### Changed — Fillmore on a plate that keeps its dye
+- With the drain gone the Fillmore dish saturated (a density mean of 1.4 against the 1.2 budget, most of the core at the top of the render) and a press could hardly show: its budget is 0.9 now, where the regulator that never used to reach holds the dish full but not solid
+
 ### Fixed — the plate emptied on the GPU
 - The Fillmore dish (and every plate, more slowly) lost its dye over a minute on the GPU solver with evaporation at its lowest, while the CPU solver held it: the Mac measured a loss of a part in seven hundred every step against the setting's four parts in a hundred thousand. The dye field was stored in half floats, and every one of the several writes a step rounds a ten-bit mantissa; the dye and its advection intermediates are 32-bit floats now wherever the context can filter them (`OES_texture_float_linear`), with half floats kept as the fallback
 
