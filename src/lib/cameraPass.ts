@@ -200,8 +200,12 @@ export class CameraPass {
 
     for (const name of UNIFORM_NAMES) this.loc[name] = gl.getUniformLocation(this.program, name);
 
-    const makeTex = () => {
+    // Each target lives on its own unit: creating a texture binds it on the
+    // active unit, and leaving it on the plate pass's bead unit made the
+    // first draw into it a feedback loop (one black frame per resize).
+    const makeTex = (unit: number) => {
       const t = gl.createTexture()!;
+      gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -209,18 +213,21 @@ export class CameraPass {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       return t;
     };
-    this.scene = makeTex();
-    this.aux = makeTex();
+    this.scene = makeTex(SCENE_UNIT);
+    this.aux = makeTex(AUX_UNIT);
+    gl.activeTexture(gl.TEXTURE0);
     this.fbo = gl.createFramebuffer()!;
   }
 
   private ensure(width: number, height: number): void {
     if (this.width === width && this.height === height) return;
     const gl = this.gl;
-    for (const t of [this.scene, this.aux]) {
+    for (const [t, unit] of [[this.scene, SCENE_UNIT], [this.aux, AUX_UNIT]] as const) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     }
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.scene, 0);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.aux, 0);

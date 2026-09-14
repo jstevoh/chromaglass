@@ -42,6 +42,39 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
+/**
+ * A labelled range. Lives outside the panel: defined inside it, it was a new
+ * component type on every render, so every slider remounted on every change
+ * and a drag died after its first step. `disabled` is the reason the control
+ * cannot do anything with the current settings; it is shown greyed with that
+ * reason as its tooltip.
+ */
+const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false }) => {
+  const safeValue = value ?? 0;
+  return (
+    <div className={`flex flex-col gap-2 mb-4 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
+          {Icon && <Icon size={14} />}
+          {label}
+        </div>
+        <span className="text-[10px] font-mono opacity-50">{disabled ? disabled : safeValue.toFixed(2)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={safeValue}
+        disabled={!!disabled}
+        aria-label={label}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className={`w-full h-1 bg-white/10 rounded-full appearance-none accent-white transition-all ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:accent-gray-300'}`}
+      />
+    </div>
+  );
+};
+
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const presetFileRef = useRef<HTMLInputElement>(null);
@@ -55,30 +88,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     return () => clearInterval(id);
   }, [getLiveEngineStatus]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
-
-  const Slider = ({ label, value, min, max, step, onChange, icon: Icon }: any) => {
-    const safeValue = value ?? 0;
-    return (
-      <div className="flex flex-col gap-2 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
-            {Icon && <Icon size={14} />}
-            {label}
-          </div>
-          <span className="text-[10px] font-mono opacity-50">{safeValue.toFixed(2)}</span>
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={safeValue}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white hover:accent-gray-300 transition-all"
-        />
-      </div>
-    );
-  };
 
   return (
     <motion.div
@@ -433,6 +442,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Layer Scale Variety"
+          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 or more Projector Layers'}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
           max={1.0}
@@ -526,6 +536,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Background Loop"
+          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 or more Projector Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
           max={1.0}
@@ -612,11 +623,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </div>
         )}
         <Slider label="Camera" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })} />
-        <Slider label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })} />
-        <Slider label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })} />
-        <Slider label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })} />
-        <Slider label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })} />
-        <Slider label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })} />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })} />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })} />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })} />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })} />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })} />
         <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })} />
         <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })} />
       </section>
@@ -725,6 +736,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Gel Speed (rpm)"
+          disabled={(settings.gelWheel ?? 0) <= 0.001 && 'needs Gel Wheel above 0'}
           value={settings.gelSpeed ?? 0.5}
           min={0}
           max={3}
@@ -788,6 +800,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </div>
         <Slider
           label="Film Mix"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
           value={settings.filmMix ?? 0.7}
           min={0}
           max={1.0}
@@ -796,6 +809,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Film Key"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
           value={settings.filmKey ?? 0.18}
           min={0}
           max={0.9}

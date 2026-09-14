@@ -399,7 +399,7 @@ export default function App() {
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [showMidi, setShowMidi] = useState(false);
-  const [presetMenu, setPresetMenu] = useState<'none' | 'title' | 'toolbar'>('none');
+  const [presetMenu, setPresetMenu] = useState<'none' | 'title'>('none');
   const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
   const userPresets = useUserPresets();
@@ -409,7 +409,6 @@ export default function App() {
   const [mirrorCount, setMirrorCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
   useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
-  const presetAnchorRef = useRef<{ top: number; left: number } | null>(null);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
     setMusicSettings(prev => {
@@ -465,18 +464,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.trigger?.seq]);
 
-  // Switch to the track's chosen preset when a song is identified
-  useEffect(() => {
-    if (musicIntel.presetPick && musicSettings.autoPreset) {
-      // A preset or sequence the user made for this very song outranks the
-      // track-matched pick.
-      const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
-      if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
-      const preset = PRESETS.find(p => p.id === musicIntel.presetPick!.presetId);
-      if (preset) applyPreset(preset.id, preset.settings);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.presetPick?.seq]);
+  // An identified song changes the look only when a preset or sequence was
+  // made for that very song (see the song-bound effects below). The
+  // track-matched pick from the built-in list used to apply here a few
+  // seconds into every set, which read as the show switching presets for no
+  // reason; the look now stays where it was put until a saved one applies.
 
   // Re-fire replayed performance gestures into the fluid
   useEffect(() => {
@@ -783,6 +775,19 @@ export default function App() {
       return !prev;
     });
   }, [fadeDimmer]);
+  // ── Macro zoom at will ──
+  // + and − (and the wheel over the plate, and the chip) move the closeup's
+  // magnification a step at a time; + with the closeup off turns it on at a
+  // gentle 2×, and − never turns it off (the Macro button does that).
+  // (settingsRef is declared above.)
+  const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
+    const cur = settingsRef.current;
+    if (!cur.macroMode) { if (dir > 0) updateSettings({ macroMode: true, macroZoom: 2 }); return; }
+    const z = Math.max(1, cur.macroZoom ?? 4);
+    const next = Math.max(1, Math.min(16, z * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
+    updateSettings({ macroZoom: Math.round(next * 10) / 10 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ── Recording ──
   const recorder = useRecorder();
   const toggleRecording = useCallback(() => {
@@ -793,10 +798,22 @@ export default function App() {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'b' || e.key === 'B') toggleBlackout();
+      if (e.key === '+' || e.key === '=') zoomMacro(1);
+      if (e.key === '-' || e.key === '_') zoomMacro(-1);
+    };
+    // The wheel over the plate zooms the closeup in and out while it is on
+    // (never turns it on: a trackpad brush must not become a camera cut).
+    const onWheel = (e: WheelEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || (t.id !== 'liquid-canvas' && !t.closest?.('#liquid-canvas'))) return;
+      if (!settingsRef.current.macroMode || e.deltaY === 0) return;
+      e.preventDefault();
+      zoomMacro(e.deltaY < 0 ? 1 : -1, Math.min(1, Math.abs(e.deltaY) / 100));
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [toggleBlackout]);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
+  }, [toggleBlackout, zoomMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -1070,6 +1087,14 @@ export default function App() {
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
+      {settings.macroMode && overlaysVisible && (
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
+          <Microscope size={12} className="ml-1" />
+          <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
+          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 4).toFixed(1)}×</span>
+          <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
+        </div>
+      )}
       {blackout && overlaysVisible && (
         <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
@@ -1333,30 +1358,6 @@ export default function App() {
                 </div>
 
                 <div className="w-full h-px bg-white/10" />
-
-                {/* Presets */}
-                <div className="relative w-full">
-                  <button
-                    onClick={(e) => {
-                      const r = e.currentTarget.getBoundingClientRect();
-                      presetAnchorRef.current = { top: r.top, left: r.left };
-                      setPresetMenu(presetMenu === 'toolbar' ? 'none' : 'toolbar');
-                    }}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                      presetMenu === 'toolbar' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
-                    }`}
-                    title="Presets — every look, one click away"
-                    aria-haspopup="menu"
-                    aria-expanded={presetMenu === 'toolbar'}
-                    data-testid="preset-toolbar-button"
-                  >
-                    <LayoutGrid size={16} className={presetMenu === 'toolbar' ? '' : 'opacity-60 group-hover:opacity-100'} />
-                    <span className="text-[7px] font-bold uppercase tracking-widest">Presets</span>
-                  </button>
-                  {presetMenu === 'toolbar' && (
-                    <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="side" anchor={presetAnchorRef.current} />
-                  )}
-                </div>
 
                 {/* Macro closeup */}
                 <button
