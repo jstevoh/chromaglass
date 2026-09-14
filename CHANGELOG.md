@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Second Screen** (Settings → Projectors, and the chip): **Ask** offers the projector in one click as before; **Automatic** sends the show there by itself, fullscreen on the projector, on the next click or key press anywhere in the app, and again whenever the projector is plugged back in (`src/hooks/useProjector.ts`, watching `screenschange`); **Off** offers nothing. Closing the projector window by hand does not re-send for the same screen. The choice is kept in localStorage
 - The Second display window opens as a fullscreen popup placed on the projector's own bounds when the screen is known, so no click on the projector window is needed for fullscreen
 
+### Fixed — the plate going black
+- **The Camera slider, the Photograph presets and the Closeup presets drew black.** The oil beads' mask texture was bound on texture unit 9, the unit the camera pass reads its scene from; whenever the camera pass was on and the beads were not rebinding the unit, the plate pass sampled the very texture it was drawing into, WebGL refused the draw as a feedback loop, and the frame stayed black. The bead mask has its own unit (11) and is bound every frame; the camera pass creates and sizes its targets on its own units
+- Settings sliders remounted on every change (the slider component was defined inside the panel, so it was a new component type each render), which broke a drag after its first step. It is a module-level component now
+- Sliders that cannot do anything with the current settings are greyed out and inert, with the reason in place of their value: Focus, Aperture, Bloom, Chromatic Aberration and Refraction need Camera above 0; Gel Speed needs a Gel Wheel; Film Mix and Film Key need a film loop or the camera; Layer Scale Variety and Background Loop need two or more Projector Layers
+
+### Changed — the show stays where it was put
+- A few seconds into every set the show switched itself to a built-in preset picked for the identified song (Jellyfish Bloom, as often as not): the track-matched pick is gone. An identified song changes the look only when a preset or sequence was made for that very song; the Auto Preset toggle is gone with it
+- The Presets button is gone from the right-hand panel; the preset menu lives under the title at the top left
+- **Macro zoom at will**: + and − (also = and _) step the closeup's magnification, + with the closeup off turns it on at 2×, the wheel over the plate zooms while the closeup is on, and a chip below the title shows the magnification with − and + buttons. The Zoom slider in Settings, the remote's Zoom slider and MIDI learn on Macro Zoom still work
+
 ### Changed — after the sixth look on the Mac's GPU
 - The carpet of small rings in the Fillmore dish, called "the beads" in every report since the third, was the **plate cells** shader at 0.55; the bead field underneath was already in patches with mixed sizes. The preset now runs cells at 0.2 and beads at 0.8 (the Fillmore sequence's stages likewise), so the oil beads carry the look
 - The Fillmore dish drained to a few blobs in about a minute with no music: the dye budget regulator was pulling a full dish back to a 0.95 mean. The preset's budget is 1.2, the most the regulator allows

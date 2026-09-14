@@ -221,6 +221,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Dropper tool | Click/tap to add colored dye |
 | Blow tool | Click/tap to blow air bubbles |
 | Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring, or into radial fingers with **Fingering** up |
+| Macro zoom | With the closeup on: + and − (or = and _), the wheel over the plate, or the − / + chip below the title, from 1× to 16×; + with the closeup off turns it on at 2× |
 | Projectors / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
 | Mic / System / File | Where the show listens: the microphone (or the input chosen in Settings → Sound), system audio, or a music file played here with its own small player |
 | Dimmer / Blackout | Settings → Sound: the house lights for the plate; **B** fades to black and back, as does the Blackout button on the phone or from a controller |

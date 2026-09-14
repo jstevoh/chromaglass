@@ -4434,14 +4434,18 @@ void main() {
             }
           }
 
-          // The oil beads' mask, when there are beads and they moved.
+          // The oil beads' mask: bound every frame on its own unit (11; the
+          // camera pass owns 9 and 10), uploaded when the beads moved. A unit
+          // left pointing at the camera's scene texture made every draw with
+          // the camera on a feedback loop, and the photograph and closeup
+          // presets drew black.
           {
+            glCtx.activeTexture(glCtx.TEXTURE11);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
             const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
             if (beadAmt > 0) {
               const cv = beadsRef.current.render();
               if (cv) {
-                glCtx.activeTexture(glCtx.TEXTURE9);
-                glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
                 glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
                 glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
               }
@@ -4552,7 +4556,7 @@ void main() {
             glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
             glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
             glCtx.uniform1i(uLocs['u_film'], 8);
-            glCtx.uniform1i(uLocs['u_beadTex'], 9);
+            glCtx.uniform1i(uLocs['u_beadTex'], 11);
             glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
             glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
             glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));

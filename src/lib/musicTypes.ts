@@ -87,7 +87,7 @@ export interface LyricTrigger {
 /** Settings for the music intelligence layer (persisted in localStorage, separate from visual presets). */
 export interface MusicSettings {
   enabled: boolean;
-  autoPreset: boolean;    // switch to a track-matched preset on identification
+  autoPreset: boolean;    // (kept for stored settings; the built-in per-track look no longer applies, only presets and sequences made for a song)
   lyricTriggers: boolean;
   sentimentArc: boolean;
   lyricsOverlay: boolean;
@@ -96,7 +96,7 @@ export interface MusicSettings {
 
 export const DEFAULT_MUSIC_SETTINGS: MusicSettings = {
   enabled: true,
-  autoPreset: true,
+  autoPreset: false,
   lyricTriggers: true,
   sentimentArc: true,
   lyricsOverlay: false,
