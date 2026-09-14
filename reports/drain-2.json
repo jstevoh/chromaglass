@@ -1,0 +1,3838 @@
+{
+ "startedAt": "2026-09-14T14:41:47.237Z",
+ "runs": {
+  "gpu512": {
+   "url": "http://localhost:3000/?debug&sim=512",
+   "keys": {
+    "own": [
+     "meanDensity",
+     "tiltX",
+     "tiltY",
+     "layerIndex",
+     "gpu",
+     "dirty",
+     "squishSteps",
+     "squishLastAt",
+     "squishLastStep",
+     "stepIndex",
+     "size",
+     "dt",
+     "diff",
+     "visc",
+     "s",
+     "sR",
+     "sG",
+     "sB",
+     "density",
+     "densityR",
+     "densityG",
+     "densityB",
+     "vx",
+     "vy",
+     "vx0",
+     "vy0",
+     "pressure",
+     "gap",
+     "dhdt",
+     "temp",
+     "temp0",
+     "mul",
+     "dyeAdd",
+     "velAdd",
+     "rbDensity",
+     "rbVx",
+     "rbVy",
+     "mcA",
+     "mcB"
+    ],
+    "proto": [
+     "constructor",
+     "readDensity",
+     "readVx",
+     "readVy",
+     "attachGpu",
+     "detachGpu",
+     "dropGpu",
+     "syncFromGpu",
+     "pullStateFromGpu",
+     "flushDeltas",
+     "addDensity",
+     "addVelocity",
+     "addTemp",
+     "injectImage",
+     "clearAll",
+     "splatBlob",
+     "seedPreset",
+     "applySquish",
+     "blowAir",
+     "blowDirected",
+     "autoInject",
+     "applyVibration",
+     "step",
+     "deriveStep",
+     "solveSqueezePressure",
+     "updateSqueezeVelocity",
+     "applyImmiscibility",
+     "applyFingering",
+     "applyAirflow",
+     "applySmear",
+     "applyDripping",
+     "diffuse",
+     "linSolve",
+     "project",
+     "advect",
+     "advectMacCormack",
+     "setBoundary",
+     "applyRadialImpulse",
+     "applyCurlTurbulence",
+     "injectVorticity"
+    ],
+    "layers": 2,
+    "gridSize": 192
+   },
+   "floatLinear": true,
+   "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+   "picked": true,
+   "framesAtPick": 215,
+   "samples": [
+    {
+     "frames": 218,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 42.26466051592709,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.7126826498905017,
+      "lit": 0.7042100694444444,
+      "top10": 1.9000356101627527,
+      "max": 2.5385642051696777
+     },
+     "d1": {
+      "mean": 0.4193542952990062,
+      "lit": 0.8067491319444444,
+      "top10": 1.2431248810649629,
+      "max": 1.5139797925949097
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.7126826498905017,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.61008799999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 0,
+     "framesSincePick": 3
+    },
+    {
+     "frames": 258,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 48.44143247672898,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.711689162028019,
+      "lit": 0.7046440972222222,
+      "top10": 1.8921210620950502,
+      "max": 2.527700901031494
+     },
+     "d1": {
+      "mean": 0.41853064508642496,
+      "lit": 0.8079155815972222,
+      "top10": 1.2401469774823182,
+      "max": 1.5100380182266235
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.711689162028019,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.77071549999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 1,
+     "framesSincePick": 43
+    },
+    {
+     "frames": 305,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.403049395589704,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.713887335645496,
+      "lit": 0.7044270833333334,
+      "top10": 1.8951048654055893,
+      "max": 3.497469425201416
+     },
+     "d1": {
+      "mean": 0.4176079419823313,
+      "lit": 0.8101671006944444,
+      "top10": 1.2369588437897967,
+      "max": 1.5058109760284424
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.713887335645496,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 126.22963950000009,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 2,
+     "framesSincePick": 90
+    },
+    {
+     "frames": 355,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 16.7,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.721469600962957,
+      "lit": 0.7049424913194444,
+      "top10": 1.9263263865132987,
+      "max": 4.693377494812012
+     },
+     "d1": {
+      "mean": 0.41663831625251474,
+      "lit": 0.8110622829861112,
+      "top10": 1.233673082249228,
+      "max": 1.5014466047286987
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.721469600962957,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 125.92835850000014,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 3,
+     "framesSincePick": 140
+    },
+    {
+     "frames": 402,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.638292878471788,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.7337489616405193,
+      "lit": 0.7057020399305556,
+      "top10": 1.991858825435214,
+      "max": 5.774487495422363
+     },
+     "d1": {
+      "mean": 0.41572668749506025,
+      "lit": 0.8116861979166666,
+      "top10": 1.230617551265433,
+      "max": 1.49738347530365
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.7337489616405193,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 124.93463399999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 4,
+     "framesSincePick": 187
+    },
+    {
+     "frames": 451,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 29.493745684942827,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.7531323538778646,
+      "lit": 0.7063259548611112,
+      "top10": 2.1195627113301923,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4147792781601954,
+      "lit": 0.8119574652777778,
+      "top10": 1.2274701449448042,
+      "max": 1.4931873083114624
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.7531323538778646,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.9148284999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 5,
+     "framesSincePick": 236
+    },
+    {
+     "frames": 503,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 28.943326027064405,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.7816393540376619,
+      "lit": 0.7070041232638888,
+      "top10": 2.32319073666067,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4138117409922383,
+      "lit": 0.8120659722222222,
+      "top10": 1.224276440239315,
+      "max": 1.4889285564422607
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.7816393540376619,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 124.31610299999991,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 6,
+     "framesSincePick": 288
+    },
+    {
+     "frames": 547,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 21.525003337860106,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.8185880569789347,
+      "lit": 0.7081976996527778,
+      "top10": 2.5855527189330307,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4128281514947607,
+      "lit": 0.8121202256944444,
+      "top10": 1.221036476475741,
+      "max": 1.4846127033233643
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.8185880569789347,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.0418835,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 7,
+     "framesSincePick": 332
+    },
+    {
+     "frames": 591,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.01246833151834,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.8570891465013079,
+      "lit": 0.7101236979166666,
+      "top10": 2.8439170187152216,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4119111111028858,
+      "lit": 0.8121473524305556,
+      "top10": 1.2180208513352513,
+      "max": 1.4805972576141357
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.8570891465013079,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 124.23173649999998,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 8,
+     "framesSincePick": 376
+    },
+    {
+     "frames": 637,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 31.494780970633805,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.898551010826398,
+      "lit": 0.7161729600694444,
+      "top10": 3.1059709793513584,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4109459974069962,
+      "lit": 0.8119845920138888,
+      "top10": 1.2148536397462557,
+      "max": 1.4763813018798828
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.898551010826398,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 127.98285699999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 9,
+     "framesSincePick": 422
+    },
+    {
+     "frames": 680,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.54260590892392,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.9368529650430504,
+      "lit": 0.7240397135416666,
+      "top10": 3.341282123886756,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.40999661128071874,
+      "lit": 0.811767578125,
+      "top10": 1.2117580756569322,
+      "max": 1.472251534461975
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.9368529650430504,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 118.54242549999981,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 10,
+     "framesSincePick": 465
+    },
+    {
+     "frames": 728,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 16.7,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 0.9724123054937659,
+      "lit": 0.7324490017361112,
+      "top10": 3.5589876030038634,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.409016570283706,
+      "lit": 0.8118489583333334,
+      "top10": 1.2085652363669013,
+      "max": 1.46799635887146
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 0.9724123054937659,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.79186999999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 11,
+     "framesSincePick": 513
+    },
+    {
+     "frames": 777,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 29.085601119604448,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.0040129814621452,
+      "lit": 0.7400173611111112,
+      "top10": 3.749462907785187,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4080394784880031,
+      "lit": 0.8116048177083334,
+      "top10": 1.205374301838215,
+      "max": 1.4637609720230103
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.0040129814621452,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 126.97373200000007,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 12,
+     "framesSincePick": 562
+    },
+    {
+     "frames": 827,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 28.658024264718012,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.0295382764943477,
+      "lit": 0.7463650173611112,
+      "top10": 3.9030750299754895,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.407130275999788,
+      "lit": 0.8115234375,
+      "top10": 1.2023998044847601,
+      "max": 1.459821343421936
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.0295382764943477,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 122.3051784999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 13,
+     "framesSincePick": 612
+    },
+    {
+     "frames": 879,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 25.508780282190468,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.0524269187277855,
+      "lit": 0.7517361111111112,
+      "top10": 4.038712686969738,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4061905032604265,
+      "lit": 0.8114420572916666,
+      "top10": 1.1993265274550302,
+      "max": 1.4557535648345947
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.0524269187277855,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.21501749999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 14,
+     "framesSincePick": 664
+    },
+    {
+     "frames": 931,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.158912219746025,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.0725264213033534,
+      "lit": 0.7567545572916666,
+      "top10": 4.154088233129136,
+      "max": 5.999641418457031
+     },
+     "d1": {
+      "mean": 0.40522027141334044,
+      "lit": 0.8113606770833334,
+      "top10": 1.1961585833401507,
+      "max": 1.4515577554702759
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.0725264213033534,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.35809799999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 15,
+     "framesSincePick": 716
+    },
+    {
+     "frames": 979,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.15634191954955,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.0893626439819697,
+      "lit": 0.7615831163194444,
+      "top10": 4.245903600316558,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.40431651650487993,
+      "lit": 0.8111165364583334,
+      "top10": 1.1932221150760474,
+      "max": 1.4476524591445923
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.0893626439819697,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 129.39037649999977,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 16,
+     "framesSincePick": 764
+    },
+    {
+     "frames": 1024,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 26.645736744666234,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.1062274520608508,
+      "lit": 0.7662760416666666,
+      "top10": 4.327155854478195,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4033178443035359,
+      "lit": 0.8109809027777778,
+      "top10": 1.1899750327455951,
+      "max": 1.4433435201644897
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.1062274520608508,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 118.07505849999998,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 17,
+     "framesSincePick": 809
+    },
+    {
+     "frames": 1070,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 29.414567120394775,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.1202605402242714,
+      "lit": 0.7706434461805556,
+      "top10": 4.384905553549706,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.40238613713817645,
+      "lit": 0.8108181423611112,
+      "top10": 1.186935060708599,
+      "max": 1.4393266439437866
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.1202605402242714,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 122.51212249999982,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 18,
+     "framesSincePick": 855
+    },
+    {
+     "frames": 1115,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 31.099190021852678,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.133306830685598,
+      "lit": 0.7744411892361112,
+      "top10": 4.431155449271655,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.4014403423847684,
+      "lit": 0.8107096354166666,
+      "top10": 1.1838507738310038,
+      "max": 1.4352526664733887
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.133306830685598,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 125.69112949999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 19,
+     "framesSincePick": 900
+    },
+    {
+     "frames": 1166,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 25.198633464547065,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.1461388560893662,
+      "lit": 0.7781032986111112,
+      "top10": 4.474206784336837,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.400512615519102,
+      "lit": 0.8104112413194444,
+      "top10": 1.180827030104525,
+      "max": 1.431260108947754
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.1461388560893662,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 132.70797949999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 20,
+     "framesSincePick": 951
+    },
+    {
+     "frames": 1217,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 24.189099846849075,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.161178384993799,
+      "lit": 0.7817111545138888,
+      "top10": 4.537065704685156,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.3995390935850339,
+      "lit": 0.8102756076388888,
+      "top10": 1.1776556903036535,
+      "max": 1.4270724058151245
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.161178384993799,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 122.73461449999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 21,
+     "framesSincePick": 1002
+    },
+    {
+     "frames": 1264,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 29.685598004479903,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.175482859313119,
+      "lit": 0.7847493489583334,
+      "top10": 4.593076659878893,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.3986472606767303,
+      "lit": 0.8102484809027778,
+      "top10": 1.1747524349895173,
+      "max": 1.4232386350631714
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.175482859313119,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 125.99416000000005,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 22,
+     "framesSincePick": 1049
+    },
+    {
+     "frames": 1312,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 28.71783550583036,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.1890386814020468,
+      "lit": 0.7880045572916666,
+      "top10": 4.6199373942772075,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.39768949759569394,
+      "lit": 0.8101128472222222,
+      "top10": 1.1716590107489848,
+      "max": 1.4191453456878662
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.1890386814020468,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 127.22678149999987,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 23,
+     "framesSincePick": 1097
+    },
+    {
+     "frames": 1361,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.523771789046663,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2005966688479248,
+      "lit": 0.791015625,
+      "top10": 4.635169575929771,
+      "max": 5.999314308166504
+     },
+     "d1": {
+      "mean": 0.396747343079583,
+      "lit": 0.8099772135416666,
+      "top10": 1.168623065114086,
+      "max": 1.415164589881897
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2005966688479248,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 134.7255969999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 24,
+     "framesSincePick": 1146
+    },
+    {
+     "frames": 1413,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.203792693577725,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.210773361994314,
+      "lit": 0.79345703125,
+      "top10": 4.645100320996115,
+      "max": 5.99877405166626
+     },
+     "d1": {
+      "mean": 0.3958230779968315,
+      "lit": 0.8098415798611112,
+      "top10": 1.1656476093645143,
+      "max": 1.411258339881897
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.210773361994314,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.10982349999983,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 25,
+     "framesSincePick": 1198
+    },
+    {
+     "frames": 1463,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.076869215407005,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2202655701145277,
+      "lit": 0.7960883246527778,
+      "top10": 4.651903260743818,
+      "max": 5.99857234954834
+     },
+     "d1": {
+      "mean": 0.3948883558136178,
+      "lit": 0.8097330729166666,
+      "top10": 1.1626281064939576,
+      "max": 1.4072778224945068
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2202655701145277,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 125.05368850000005,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 26,
+     "framesSincePick": 1248
+    },
+    {
+     "frames": 1510,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.530336124770475,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2285042437261535,
+      "lit": 0.7984754774305556,
+      "top10": 4.657882300201991,
+      "max": 5.997990131378174
+     },
+     "d1": {
+      "mean": 0.3939909217047045,
+      "lit": 0.8095974392361112,
+      "top10": 1.1597116374477898,
+      "max": 1.403440237045288
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2285042437261535,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 126.87039100000005,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 27,
+     "framesSincePick": 1295
+    },
+    {
+     "frames": 1558,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 26.197768738487547,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2362271206461262,
+      "lit": 0.8005642361111112,
+      "top10": 4.663456076652022,
+      "max": 5.998505592346191
+     },
+     "d1": {
+      "mean": 0.39304732551114346,
+      "lit": 0.8094889322916666,
+      "top10": 1.1566476078377557,
+      "max": 1.399410605430603
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2362271206461262,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.5913099999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 28,
+     "framesSincePick": 1343
+    },
+    {
+     "frames": 1606,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 27.200600921175365,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2426288666388996,
+      "lit": 0.8024088541666666,
+      "top10": 4.665188762265835,
+      "max": 5.999117851257324
+     },
+     "d1": {
+      "mean": 0.392137719008279,
+      "lit": 0.8092990451388888,
+      "top10": 1.1536960357631345,
+      "max": 1.3955265283584595
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2426288666388996,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.46990399999991,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 29,
+     "framesSincePick": 1391
+    },
+    {
+     "frames": 1654,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 28.858938794858886,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2479239236132478,
+      "lit": 0.804443359375,
+      "top10": 4.664776384539405,
+      "max": 5.9966816902160645
+     },
+     "d1": {
+      "mean": 0.39123070746307065,
+      "lit": 0.8092176649305556,
+      "top10": 1.1507520146882217,
+      "max": 1.3916524648666382
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2479239236132478,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 129.67016299999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 30,
+     "framesSincePick": 1439
+    },
+    {
+     "frames": 1701,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 25.393220002916305,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.252598336794974,
+      "lit": 0.8064778645833334,
+      "top10": 4.663238674547772,
+      "max": 5.979238033294678
+     },
+     "d1": {
+      "mean": 0.3902946301952626,
+      "lit": 0.8090277777777778,
+      "top10": 1.1477148361459608,
+      "max": 1.3876558542251587
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.252598336794974,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 129.7153174999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 31,
+     "framesSincePick": 1486
+    },
+    {
+     "frames": 1751,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 23.489073378287294,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2565448161551358,
+      "lit": 0.8084581163194444,
+      "top10": 4.660334969951093,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.3894073882096005,
+      "lit": 0.8088650173611112,
+      "top10": 1.144837200253539,
+      "max": 1.3838703632354736
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2565448161551358,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.91681100000002,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 32,
+     "framesSincePick": 1536
+    },
+    {
+     "frames": 1802,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 26.253794089149682,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2608129229114253,
+      "lit": 0.8104926215277778,
+      "top10": 4.654947081339211,
+      "max": 5.997374534606934
+     },
+     "d1": {
+      "mean": 0.38850661077856063,
+      "lit": 0.8086480034722222,
+      "top10": 1.1419167588795907,
+      "max": 1.3800290822982788
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2608129229114253,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 127.21877250000006,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 33,
+     "framesSincePick": 1587
+    },
+    {
+     "frames": 1854,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 26.04129733816657,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2679008055814238,
+      "lit": 0.812255859375,
+      "top10": 4.655073399590333,
+      "max": 5.999227046966553
+     },
+     "d1": {
+      "mean": 0.3875614470595669,
+      "lit": 0.8087022569444444,
+      "top10": 1.1388535063938154,
+      "max": 1.3759998083114624
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2679008055814238,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 128.3670055,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 34,
+     "framesSincePick": 1639
+    },
+    {
+     "frames": 1902,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 22.87222543261788,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2772317060011709,
+      "lit": 0.8137749565972222,
+      "top10": 4.664387317435999,
+      "max": 5.998898983001709
+     },
+     "d1": {
+      "mean": 0.38669482737879024,
+      "lit": 0.8085666232638888,
+      "top10": 1.136051914547037,
+      "max": 1.3723315000534058
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2772317060011709,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 127.8894065,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 35,
+     "framesSincePick": 1687
+    },
+    {
+     "frames": 1948,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 24.415658861807955,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2880328260325713,
+      "lit": 0.8152940538194444,
+      "top10": 4.675100987008002,
+      "max": 5.998764991760254
+     },
+     "d1": {
+      "mean": 0.38579436225697755,
+      "lit": 0.808349609375,
+      "top10": 1.133160895827149,
+      "max": 1.3685444593429565
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2880328260325713,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 124.37799200000006,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 36,
+     "framesSincePick": 1733
+    },
+    {
+     "frames": 1992,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.515707088431714,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.298352825499746,
+      "lit": 0.8167860243055556,
+      "top10": 4.6835907630408125,
+      "max": 6
+     },
+     "d1": {
+      "mean": 0.38489490773749124,
+      "lit": 0.8081325954861112,
+      "top10": 1.1302771010899504,
+      "max": 1.364759922027588
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.298352825499746,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.35367649999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 37,
+     "framesSincePick": 1777
+    },
+    {
+     "frames": 2034,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 33.75487126524511,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3075137298801143,
+      "lit": 0.8184950086805556,
+      "top10": 4.687057813871055,
+      "max": 5.999913692474365
+     },
+     "d1": {
+      "mean": 0.3839688166653658,
+      "lit": 0.8079969618055556,
+      "top10": 1.1273016838747978,
+      "max": 1.3608559370040894
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3075137298801143,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.4380974999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 38,
+     "framesSincePick": 1819
+    },
+    {
+     "frames": 2073,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 32.35609726766643,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3147487623810685,
+      "lit": 0.8199869791666666,
+      "top10": 4.688912721800532,
+      "max": 5.998612403869629
+     },
+     "d1": {
+      "mean": 0.3830636502724963,
+      "lit": 0.8078884548611112,
+      "top10": 1.1243755821132557,
+      "max": 1.3570315837860107
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3147487623810685,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 122.13742099999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 39,
+     "framesSincePick": 1858
+    },
+    {
+     "frames": 2112,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 30.90874983866488,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3220274712514462,
+      "lit": 0.8210720486111112,
+      "top10": 4.688948891503101,
+      "max": 5.997676849365234
+     },
+     "d1": {
+      "mean": 0.38219230565035495,
+      "lit": 0.807861328125,
+      "top10": 1.1215564004765601,
+      "max": 1.3533490896224976
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3220274712514462,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.43719799999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 40,
+     "framesSincePick": 1897
+    },
+    {
+     "frames": 2156,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 29.749896215883684,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.33128274345663,
+      "lit": 0.8224555121527778,
+      "top10": 4.699309182115307,
+      "max": 5.990964412689209
+     },
+     "d1": {
+      "mean": 0.38130797984225445,
+      "lit": 0.807861328125,
+      "top10": 1.1186966319415341,
+      "max": 1.3496140241622925
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.33128274345663,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 122.27581099999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 41,
+     "framesSincePick": 1941
+    },
+    {
+     "frames": 2196,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 33.26946635677277,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3415166521455861,
+      "lit": 0.8234592013888888,
+      "top10": 4.725034203143852,
+      "max": 5.99941873550415
+     },
+     "d1": {
+      "mean": 0.38044087139076344,
+      "lit": 0.8077528211805556,
+      "top10": 1.1158936976157512,
+      "max": 1.3459560871124268
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3415166521455861,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.63645299999989,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 42,
+     "framesSincePick": 1981
+    },
+    {
+     "frames": 2235,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.65452623063438,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3482944502120686,
+      "lit": 0.8245171440972222,
+      "top10": 4.744474073822448,
+      "max": 5.995108127593994
+     },
+     "d1": {
+      "mean": 0.37956165815609544,
+      "lit": 0.8075358072916666,
+      "top10": 1.1130457829989238,
+      "max": 1.3422465324401855
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3482944502120686,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.41255549999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 43,
+     "framesSincePick": 2020
+    },
+    {
+     "frames": 2269,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 37.81442239950769,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3503789254533691,
+      "lit": 0.8250054253472222,
+      "top10": 4.7431065572453015,
+      "max": 5.930495738983154
+     },
+     "d1": {
+      "mean": 0.37874607961134277,
+      "lit": 0.8074544270833334,
+      "top10": 1.110397511245243,
+      "max": 1.338803768157959
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3503789254533691,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 110.12803549999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 44,
+     "framesSincePick": 2054
+    },
+    {
+     "frames": 2308,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 34.78746586074921,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3495389735886576,
+      "lit": 0.8258192274305556,
+      "top10": 4.723150876314823,
+      "max": 5.8154191970825195
+     },
+     "d1": {
+      "mean": 0.377900099470524,
+      "lit": 0.8075629340277778,
+      "top10": 1.107664846542796,
+      "max": 1.3352442979812622
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3495389735886576,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 117.44248549999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 45,
+     "framesSincePick": 2093
+    },
+    {
+     "frames": 2345,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 38.7815790024489,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3469351291242706,
+      "lit": 0.8267957899305556,
+      "top10": 4.693536292258256,
+      "max": 5.717069149017334
+     },
+     "d1": {
+      "mean": 0.37705571675743366,
+      "lit": 0.8074815538194444,
+      "top10": 1.1049393458788122,
+      "max": 1.331695318222046
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3469351291242706,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 121.38712250000005,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 46,
+     "framesSincePick": 2130
+    },
+    {
+     "frames": 2382,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 36.81547339521361,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3433344254108444,
+      "lit": 0.827392578125,
+      "top10": 4.65683738873565,
+      "max": 5.621832370758057
+     },
+     "d1": {
+      "mean": 0.3761831480040979,
+      "lit": 0.8074815538194444,
+      "top10": 1.1021238047663957,
+      "max": 1.3280296325683594
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3433344254108444,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 116.84619049999985,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 47,
+     "framesSincePick": 2167
+    },
+    {
+     "frames": 2420,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 34.31605515842348,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3392743875652804,
+      "lit": 0.8285319010416666,
+      "top10": 4.616226682440457,
+      "max": 5.53646183013916
+     },
+     "d1": {
+      "mean": 0.37532757230194247,
+      "lit": 0.8074544270833334,
+      "top10": 1.0993638899393594,
+      "max": 1.3244374990463257
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3392743875652804,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 120.32322249999989,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 48,
+     "framesSincePick": 2205
+    },
+    {
+     "frames": 2458,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.110252310137376,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3350905254679202,
+      "lit": 0.8294542100694444,
+      "top10": 4.577284113777376,
+      "max": 5.46154260635376
+     },
+     "d1": {
+      "mean": 0.37453376906845703,
+      "lit": 0.807373046875,
+      "top10": 1.096803996188448,
+      "max": 1.321106195449829
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3350905254679202,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 120.89567049999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 49,
+     "framesSincePick": 2243
+    },
+    {
+     "frames": 2494,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 44.08590508933855,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3303091066100117,
+      "lit": 0.8301323784722222,
+      "top10": 4.535982850835948,
+      "max": 5.384068012237549
+     },
+     "d1": {
+      "mean": 0.3737014477636109,
+      "lit": 0.8073187934027778,
+      "top10": 1.0941026630895783,
+      "max": 1.3175967931747437
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3303091066100117,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.59148599999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 50,
+     "framesSincePick": 2279
+    },
+    {
+     "frames": 2531,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 36.707541272331994,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3253058130555762,
+      "lit": 0.8308376736111112,
+      "top10": 4.49368596743192,
+      "max": 5.312527179718018
+     },
+     "d1": {
+      "mean": 0.37285894885002885,
+      "lit": 0.807373046875,
+      "top10": 1.0913612218861728,
+      "max": 1.314056396484375
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3253058130555762,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 116.36565649999983,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 51,
+     "framesSincePick": 2316
+    },
+    {
+     "frames": 2567,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 36.707541272331994,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.320424864162151,
+      "lit": 0.8316514756944444,
+      "top10": 4.454228867025266,
+      "max": 5.243706226348877
+     },
+     "d1": {
+      "mean": 0.3720624364368777,
+      "lit": 0.8072102864583334,
+      "top10": 1.0887693396678,
+      "max": 1.3106982707977295
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.320424864162151,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 118.92344749999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 52,
+     "framesSincePick": 2352
+    },
+    {
+     "frames": 2602,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 39.20574501451663,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3157970148263347,
+      "lit": 0.8323838975694444,
+      "top10": 4.41786488572088,
+      "max": 5.183973789215088
+     },
+     "d1": {
+      "mean": 0.3713086576160147,
+      "lit": 0.8072102864583334,
+      "top10": 1.086325691209432,
+      "max": 1.3075233697891235
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3157970148263347,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 123.20347449999987,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 53,
+     "framesSincePick": 2387
+    },
+    {
+     "frames": 2637,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.061043974554956,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3108977094190697,
+      "lit": 0.833251953125,
+      "top10": 4.379604901558539,
+      "max": 5.120157718658447
+     },
+     "d1": {
+      "mean": 0.37040486690972063,
+      "lit": 0.8069661458333334,
+      "top10": 1.083414967510924,
+      "max": 1.3037337064743042
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3108977094190697,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 117.44744599999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 54,
+     "framesSincePick": 2422
+    },
+    {
+     "frames": 2673,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 39.63892687734855,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3077567595578818,
+      "lit": 0.8342556423611112,
+      "top10": 4.35403823115162,
+      "max": 5.707638740539551
+     },
+     "d1": {
+      "mean": 0.3695612908834274,
+      "lit": 0.8068305121527778,
+      "top10": 1.0806962802755529,
+      "max": 1.3002022504806519
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3077567595578818,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.6633395,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 55,
+     "framesSincePick": 2458
+    },
+    {
+     "frames": 2708,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 53.43300197786592,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3054234185146472,
+      "lit": 0.8352864583333334,
+      "top10": 4.337111310278406,
+      "max": 5.9877471923828125
+     },
+     "d1": {
+      "mean": 0.36876514328813675,
+      "lit": 0.8067220052083334,
+      "top10": 1.0781294090134645,
+      "max": 1.2968642711639404
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3054234185146472,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 117.48835949999993,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 56,
+     "framesSincePick": 2493
+    },
+    {
+     "frames": 2746,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 51.76576088927621,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3022173846225757,
+      "lit": 0.8360460069444444,
+      "top10": 4.315461369745769,
+      "max": 5.867914199829102
+     },
+     "d1": {
+      "mean": 0.3679402151341263,
+      "lit": 0.8066677517361112,
+      "top10": 1.0754735639123767,
+      "max": 1.2934114933013916
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3022173846225757,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 124.21657549999989,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 57,
+     "framesSincePick": 2531
+    },
+    {
+     "frames": 2778,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 50.2574119805428,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2985499435414918,
+      "lit": 0.8369411892361112,
+      "top10": 4.291163247755799,
+      "max": 5.79341459274292
+     },
+     "d1": {
+      "mean": 0.3671472036082777,
+      "lit": 0.8065592447916666,
+      "top10": 1.0729235769999914,
+      "max": 1.2900913953781128
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2985499435414918,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.52636849999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 58,
+     "framesSincePick": 2563
+    },
+    {
+     "frames": 2815,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.38713527443231,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2947412585166023,
+      "lit": 0.8376736111111112,
+      "top10": 4.267001200420858,
+      "max": 5.720992565155029
+     },
+     "d1": {
+      "mean": 0.36637056913793636,
+      "lit": 0.806640625,
+      "top10": 1.070427155759887,
+      "max": 1.2868417501449585
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2947412585166023,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 116.57358399999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 59,
+     "framesSincePick": 2600
+    },
+    {
+     "frames": 2852,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 44.97393349174521,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2908691017545408,
+      "lit": 0.8383517795138888,
+      "top10": 4.243241719169844,
+      "max": 5.644702434539795
+     },
+     "d1": {
+      "mean": 0.36559557204228604,
+      "lit": 0.8066677517361112,
+      "top10": 1.0679366422197576,
+      "max": 1.2836004495620728
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2908691017545408,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 112.95741800000008,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 60,
+     "framesSincePick": 2637
+    },
+    {
+     "frames": 2885,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 50.08305287826152,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.286743759873868,
+      "lit": 0.8388943142361112,
+      "top10": 4.21745212163475,
+      "max": 5.58052396774292
+     },
+     "d1": {
+      "mean": 0.3647930543759855,
+      "lit": 0.8065592447916666,
+      "top10": 1.0653584589469194,
+      "max": 1.2802455425262451
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.286743759873868,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 115.84262249999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 61,
+     "framesSincePick": 2670
+    },
+    {
+     "frames": 2920,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 40.082922657644446,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2822480685104436,
+      "lit": 0.8397081163194444,
+      "top10": 4.191630825424609,
+      "max": 5.515610694885254
+     },
+     "d1": {
+      "mean": 0.36400683340662665,
+      "lit": 0.8065049913194444,
+      "top10": 1.0628333496646394,
+      "max": 1.2769609689712524
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2822480685104436,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.01568999999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 62,
+     "framesSincePick": 2705
+    },
+    {
+     "frames": 2954,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.17059872939565,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.277804806446875,
+      "lit": 0.8401963975694444,
+      "top10": 4.167124775073092,
+      "max": 5.456448554992676
+     },
+     "d1": {
+      "mean": 0.36326510893024605,
+      "lit": 0.8063151041666666,
+      "top10": 1.0604513311153252,
+      "max": 1.2738667726516724
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.277804806446875,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.04437199999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 63,
+     "framesSincePick": 2739
+    },
+    {
+     "frames": 2986,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.33757808183516,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2730199695785376,
+      "lit": 0.841064453125,
+      "top10": 4.139547265423295,
+      "max": 5.393892765045166
+     },
+     "d1": {
+      "mean": 0.3624530133536084,
+      "lit": 0.8062065972222222,
+      "top10": 1.0578442990973924,
+      "max": 1.2704784870147705
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2730199695785376,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 114.06177699999989,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 64,
+     "framesSincePick": 2771
+    },
+    {
+     "frames": 3021,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 46.7409429339062,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2687995993352583,
+      "lit": 0.8415798611111112,
+      "top10": 4.114127095730099,
+      "max": 5.329609394073486
+     },
+     "d1": {
+      "mean": 0.36170072178780444,
+      "lit": 0.8061794704861112,
+      "top10": 1.0554298996860672,
+      "max": 1.2673403024673462
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2687995993352583,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.40707499999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 65,
+     "framesSincePick": 2806
+    },
+    {
+     "frames": 3054,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 44.20281351196459,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.264210497873293,
+      "lit": 0.8421495225694444,
+      "top10": 4.085628266639834,
+      "max": 5.267605781555176
+     },
+     "d1": {
+      "mean": 0.3608343355751223,
+      "lit": 0.8060438368055556,
+      "top10": 1.0526511715568412,
+      "max": 1.2637290954589844
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.264210497873293,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.51562549999991,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 66,
+     "framesSincePick": 2839
+    },
+    {
+     "frames": 3087,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 41.6250983804329,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2603429019294314,
+      "lit": 0.8427463107638888,
+      "top10": 4.06063923360987,
+      "max": 5.21517276763916
+     },
+     "d1": {
+      "mean": 0.360056611780049,
+      "lit": 0.805908203125,
+      "top10": 1.0501565225604301,
+      "max": 1.2604882717132568
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2603429019294314,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.63350499999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 67,
+     "framesSincePick": 2872
+    },
+    {
+     "frames": 3120,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 47.53108240185875,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2569630903739464,
+      "lit": 0.8432888454861112,
+      "top10": 4.037124483985093,
+      "max": 5.1650261878967285
+     },
+     "d1": {
+      "mean": 0.3593244019575435,
+      "lit": 0.8058268229166666,
+      "top10": 1.047810669881264,
+      "max": 1.2574352025985718
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2569630903739464,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 116.2628469999998,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 68,
+     "framesSincePick": 2905
+    },
+    {
+     "frames": 3155,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 46.38186368112459,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2536930497965748,
+      "lit": 0.8436957465277778,
+      "top10": 4.013040798097218,
+      "max": 5.114950180053711
+     },
+     "d1": {
+      "mean": 0.35853472550552246,
+      "lit": 0.8058539496527778,
+      "top10": 1.0452847430645222,
+      "max": 1.2541509866714478
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2536930497965748,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 121.42866299999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 69,
+     "framesSincePick": 2940
+    },
+    {
+     "frames": 3187,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 38.960324209357736,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2514814482183754,
+      "lit": 0.8443739149305556,
+      "top10": 3.9913752756232617,
+      "max": 5.075740814208984
+     },
+     "d1": {
+      "mean": 0.35781698257663086,
+      "lit": 0.8057996961805556,
+      "top10": 1.0429918605448174,
+      "max": 1.25117027759552
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2514814482183754,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 117.6289584999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 70,
+     "framesSincePick": 2972
+    },
+    {
+     "frames": 3223,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 38.51739012904754,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2511516011252803,
+      "lit": 0.8448893229166666,
+      "top10": 3.966936766486807,
+      "max": 5.030378818511963
+     },
+     "d1": {
+      "mean": 0.357015802144521,
+      "lit": 0.8057454427083334,
+      "top10": 1.0404298122137445,
+      "max": 1.247840404510498
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2511516011252803,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.58733049999996,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 71,
+     "framesSincePick": 3008
+    },
+    {
+     "frames": 3261,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 37.31238819804425,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2557419669978083,
+      "lit": 0.8455674913194444,
+      "top10": 3.9518801792122007,
+      "max": 4.990747451782227
+     },
+     "d1": {
+      "mean": 0.35620369760042175,
+      "lit": 0.8056640625,
+      "top10": 1.0378309417146092,
+      "max": 1.2444595098495483
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2557419669978083,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 118.08970499999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 72,
+     "framesSincePick": 3046
+    },
+    {
+     "frames": 3294,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 37.32534289012541,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.264449055741747,
+      "lit": 0.8460828993055556,
+      "top10": 3.961302777120618,
+      "max": 5.707671642303467
+     },
+     "d1": {
+      "mean": 0.35547887770762077,
+      "lit": 0.8055555555555556,
+      "top10": 1.0355102739059854,
+      "max": 1.241442322731018
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.264449055741747,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 114.54311199999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 73,
+     "framesSincePick": 3079
+    },
+    {
+     "frames": 3329,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 40.411748985965204,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2762227976793044,
+      "lit": 0.8465711805555556,
+      "top10": 3.9933890797040155,
+      "max": 5.998919486999512
+     },
+     "d1": {
+      "mean": 0.3546701246263354,
+      "lit": 0.8053385416666666,
+      "top10": 1.0329191144464849,
+      "max": 1.2380791902542114
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2762227976793044,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 117.00794599999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 74,
+     "framesSincePick": 3114
+    },
+    {
+     "frames": 3366,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 38.831192803097515,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2856774631945118,
+      "lit": 0.8471137152777778,
+      "top10": 4.023439920472503,
+      "max": 5.999654769897461
+     },
+     "d1": {
+      "mean": 0.3538478436194381,
+      "lit": 0.8051486545138888,
+      "top10": 1.0302922611351706,
+      "max": 1.2346664667129517
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2856774631945118,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 114.04341799999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 75,
+     "framesSincePick": 3151
+    },
+    {
+     "frames": 3400,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 39.871161458756916,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.291112902783448,
+      "lit": 0.8477647569444444,
+      "top10": 4.038618665833352,
+      "max": 5.984022617340088
+     },
+     "d1": {
+      "mean": 0.3530788845756165,
+      "lit": 0.8049858940972222,
+      "top10": 1.0278513128027862,
+      "max": 1.2315006256103516
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.291112902783448,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 110.36723399999991,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 76,
+     "framesSincePick": 3185
+    },
+    {
+     "frames": 3438,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 38.71018943708474,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2938453385012096,
+      "lit": 0.8485785590277778,
+      "top10": 4.040707303076675,
+      "max": 5.921812534332275
+     },
+     "d1": {
+      "mean": 0.3522965540571735,
+      "lit": 0.8047417534722222,
+      "top10": 1.0253715260127156,
+      "max": 1.2283015251159668
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2938453385012096,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.98266749999999,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 77,
+     "framesSincePick": 3223
+    },
+    {
+     "frames": 3471,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 40.31432497584993,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2943887530276301,
+      "lit": 0.8490397135416666,
+      "top10": 4.032402070009766,
+      "max": 5.859864711761475
+     },
+     "d1": {
+      "mean": 0.35160127498083615,
+      "lit": 0.8046332465277778,
+      "top10": 1.0231682709456138,
+      "max": 1.225439190864563
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2943887530276301,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 119.13531749999993,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 78,
+     "framesSincePick": 3256
+    },
+    {
+     "frames": 3503,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.5880890447041,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2932428817239077,
+      "lit": 0.849853515625,
+      "top10": 4.01408215411254,
+      "max": 5.799014091491699
+     },
+     "d1": {
+      "mean": 0.35081043346990853,
+      "lit": 0.8044162326388888,
+      "top10": 1.02066134460517,
+      "max": 1.2221771478652954
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2932428817239077,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 108.55162949999993,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 79,
+     "framesSincePick": 3288
+    },
+    {
+     "frames": 3538,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 42.30324883755708,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.291281465834257,
+      "lit": 0.8506130642361112,
+      "top10": 3.991534742142154,
+      "max": 5.744894981384277
+     },
+     "d1": {
+      "mean": 0.35003798889078674,
+      "lit": 0.8042534722222222,
+      "top10": 1.0182080862157317,
+      "max": 1.218984603881836
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.291281465834257,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 114.57459149999995,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 80,
+     "framesSincePick": 3323
+    },
+    {
+     "frames": 3572,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 37.711324435116516,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2888673713694332,
+      "lit": 0.8514268663194444,
+      "top10": 3.9664591323792515,
+      "max": 5.691092014312744
+     },
+     "d1": {
+      "mean": 0.34928129339299485,
+      "lit": 0.8041449652777778,
+      "top10": 1.0158044814060903,
+      "max": 1.2158600091934204
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2888673713694332,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.82799749999997,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 81,
+     "framesSincePick": 3357
+    },
+    {
+     "frames": 3605,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 45.45110206914007,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2860542520832272,
+      "lit": 0.85205078125,
+      "top10": 3.939377435897914,
+      "max": 5.644464015960693
+     },
+     "d1": {
+      "mean": 0.34858081742617775,
+      "lit": 0.8040907118055556,
+      "top10": 1.0135805536985267,
+      "max": 1.2129745483398438
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2860542520832272,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.53692749999986,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 82,
+     "framesSincePick": 3390
+    },
+    {
+     "frames": 3638,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 40.32539385820385,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.282918017641042,
+      "lit": 0.8528103298611112,
+      "top10": 3.909058530112032,
+      "max": 5.592863082885742
+     },
+     "d1": {
+      "mean": 0.3478405984757258,
+      "lit": 0.8039822048611112,
+      "top10": 1.0112231252507806,
+      "max": 1.2099236249923706
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.282918017641042,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.18973499999989,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 83,
+     "framesSincePick": 3423
+    },
+    {
+     "frames": 3672,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 44.143697798751106,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2807151541731234,
+      "lit": 0.8534342447916666,
+      "top10": 3.8811867715092503,
+      "max": 5.547218322753906
+     },
+     "d1": {
+      "mean": 0.34715926463058566,
+      "lit": 0.8038736979166666,
+      "top10": 1.0090412467928342,
+      "max": 1.20711088180542
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2807151541731234,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 112.81154549999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 84,
+     "framesSincePick": 3457
+    },
+    {
+     "frames": 3706,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 46.34015809805872,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2791218508198898,
+      "lit": 0.8542751736111112,
+      "top10": 3.8493697561133637,
+      "max": 5.48964786529541
+     },
+     "d1": {
+      "mean": 0.3464100236171245,
+      "lit": 0.8037380642361112,
+      "top10": 1.0066430360741805,
+      "max": 1.2040194272994995
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2791218508198898,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.66922249999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 85,
+     "framesSincePick": 3491
+    },
+    {
+     "frames": 3740,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 45.27114964373958,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2791928484404744,
+      "lit": 0.8551161024305556,
+      "top10": 3.816025313513472,
+      "max": 5.443105220794678
+     },
+     "d1": {
+      "mean": 0.34566267587231236,
+      "lit": 0.8036295572916666,
+      "top10": 1.00425354341612,
+      "max": 1.200938105583191
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2791928484404744,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.21157549999987,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 86,
+     "framesSincePick": 3525
+    },
+    {
+     "frames": 3772,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 45.27114964373958,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2812247677217985,
+      "lit": 0.856689453125,
+      "top10": 3.7867196558353635,
+      "max": 5.388655662536621
+     },
+     "d1": {
+      "mean": 0.3449725891032078,
+      "lit": 0.8036566840277778,
+      "top10": 1.0020512628024905,
+      "max": 1.1980936527252197
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2812247677217985,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 114.35891549999998,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 87,
+     "framesSincePick": 3557
+    },
+    {
+     "frames": 3805,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.768021533442116,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2864075069738612,
+      "lit": 0.8586154513888888,
+      "top10": 3.7647840744506,
+      "max": 5.332888126373291
+     },
+     "d1": {
+      "mean": 0.3442700640571517,
+      "lit": 0.8036295572916666,
+      "top10": 0.9998099602439516,
+      "max": 1.1952006816864014
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2864075069738612,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 113.11499149999987,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 88,
+     "framesSincePick": 3590
+    },
+    {
+     "frames": 3838,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 42.721343049556324,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.2953676677605621,
+      "lit": 0.8607584635416666,
+      "top10": 3.751214115825349,
+      "max": 5.607839584350586
+     },
+     "d1": {
+      "mean": 0.3435685288487147,
+      "lit": 0.8035210503472222,
+      "top10": 0.9975687751967947,
+      "max": 1.1923160552978516
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.2953676677605621,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.57232750000001,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 89,
+     "framesSincePick": 3623
+    },
+    {
+     "frames": 3874,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 59.82983456974799,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3096057557688472,
+      "lit": 0.8631727430555556,
+      "top10": 3.749463925009762,
+      "max": 5.995041370391846
+     },
+     "d1": {
+      "mean": 0.34282887131622836,
+      "lit": 0.8033854166666666,
+      "top10": 0.9952032171024037,
+      "max": 1.1892694234848022
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3096057557688472,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 108.64987149999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 90,
+     "framesSincePick": 3659
+    },
+    {
+     "frames": 3905,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 44.03533732819061,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3254934761996298,
+      "lit": 0.8655598958333334,
+      "top10": 3.7618928884463796,
+      "max": 5.968611240386963
+     },
+     "d1": {
+      "mean": 0.34215892370660606,
+      "lit": 0.8033854166666666,
+      "top10": 0.9930619265291915,
+      "max": 1.1865127086639404
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3254934761996298,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 111.06157849999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 91,
+     "framesSincePick": 3690
+    },
+    {
+     "frames": 3937,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 50.883299228386775,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3421762832344775,
+      "lit": 0.8688422309027778,
+      "top10": 3.784803500786076,
+      "max": 5.966109275817871
+     },
+     "d1": {
+      "mean": 0.3414756232457095,
+      "lit": 0.8033311631944444,
+      "top10": 0.990882585214262,
+      "max": 1.1837080717086792
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3421762832344775,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 110.18127549999987,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 92,
+     "framesSincePick": 3722
+    },
+    {
+     "frames": 3973,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 50.15341331339917,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.35665929193486,
+      "lit": 0.8718532986111112,
+      "top10": 3.8084584132394776,
+      "max": 5.850127220153809
+     },
+     "d1": {
+      "mean": 0.34079397807157935,
+      "lit": 0.8033311631944444,
+      "top10": 0.9887116617375072,
+      "max": 1.1809114217758179
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.35665929193486,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 108.88877750000005,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 93,
+     "framesSincePick": 3758
+    },
+    {
+     "frames": 4005,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 57.527005302292146,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3676051272386132,
+      "lit": 0.875244140625,
+      "top10": 3.821754703299222,
+      "max": 5.731405258178711
+     },
+     "d1": {
+      "mean": 0.34005932544087497,
+      "lit": 0.8033311631944444,
+      "top10": 0.9863723768401391,
+      "max": 1.1778991222381592
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3676051272386132,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 112.13883399999993,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 94,
+     "framesSincePick": 3790
+    },
+    {
+     "frames": 4038,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 49.157190511860605,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3736810942197204,
+      "lit": 0.8783094618055556,
+      "top10": 3.8227519573107145,
+      "max": 5.619627952575684
+     },
+     "d1": {
+      "mean": 0.33938050006028614,
+      "lit": 0.8033040364583334,
+      "top10": 0.984211470339522,
+      "max": 1.1751174926757812
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3736810942197204,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.18262299999991,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 95,
+     "framesSincePick": 3823
+    },
+    {
+     "frames": 4073,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 48.65771113199101,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.376551446904202,
+      "lit": 0.8818359375,
+      "top10": 3.8150278455332707,
+      "max": 5.501811504364014
+     },
+     "d1": {
+      "mean": 0.3385947546030575,
+      "lit": 0.8031955295138888,
+      "top10": 0.9817108277451778,
+      "max": 1.1718995571136475
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.376551446904202,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.73244549999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 96,
+     "framesSincePick": 3858
+    },
+    {
+     "frames": 4107,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 47.265771632352795,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3762185118205197,
+      "lit": 0.8848198784722222,
+      "top10": 3.8022804730493482,
+      "max": 5.404841899871826
+     },
+     "d1": {
+      "mean": 0.33791884365018837,
+      "lit": 0.8030870225694444,
+      "top10": 0.9795602802601575,
+      "max": 1.169132947921753
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3762185118205197,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 109.33460599999994,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 97,
+     "framesSincePick": 3892
+    },
+    {
+     "frames": 4140,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 43.51000912586883,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3740938883040992,
+      "lit": 0.8871527777777778,
+      "top10": 3.7869014123568894,
+      "max": 5.315018177032471
+     },
+     "d1": {
+      "mean": 0.3372712356285523,
+      "lit": 0.8029242621527778,
+      "top10": 0.9775002120114252,
+      "max": 1.1664834022521973
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3740938883040992,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 110.47779499999992,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 98,
+     "framesSincePick": 3925
+    },
+    {
+     "frames": 4170,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 46.56033454431411,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3702732301045726,
+      "lit": 0.8893771701388888,
+      "top10": 3.7656934607371775,
+      "max": 5.2205986976623535
+     },
+     "d1": {
+      "mean": 0.3365576060221969,
+      "lit": 0.8028428819444444,
+      "top10": 0.9752307232960501,
+      "max": 1.1635655164718628
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3702732301045726,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 107.67629749999988,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 99,
+     "framesSincePick": 3955
+    },
+    {
+     "frames": 4200,
+     "engine": "gpu",
+     "grid": 512,
+     "frameMs": 45.7260763801887,
+     "label": "GPU · 512² · 1.0x",
+     "d0": {
+      "mean": 1.3655590904881663,
+      "lit": 0.8911675347222222,
+      "top10": 3.742663244869938,
+      "max": 5.135147571563721
+     },
+     "d1": {
+      "mean": 0.3358723288623513,
+      "lit": 0.8027615017361112,
+      "top10": 0.9730519344317674,
+      "max": 1.1607756614685059
+     },
+     "extra": {
+      "gapMean": 0,
+      "meanDensity": 1.3655590904881663,
+      "dhdtMean": 0
+     },
+     "dyeBudget": 1.2,
+     "evaporationRate": 0.002,
+     "dimmer": 1,
+     "preset": null,
+     "lum": 109.46564699999986,
+     "canvas": [
+      1600,
+      1000,
+      1600,
+      1000
+     ],
+     "t": 100,
+     "framesSincePick": 3985
+    }
+   ]
+  }
+ }
+}
