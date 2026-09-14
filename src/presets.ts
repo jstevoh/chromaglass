@@ -1331,7 +1331,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       glossiness: 0.0,
       postBlurRadius: 0.0,
-      dyeBudget: 1.2,
+      dyeBudget: 0.9,
       edgeRelief: 0.05,
       bubbles: 0.2,
       beads: 0.8,
