@@ -241,7 +241,6 @@ class FluidSimulation {
   private dirty = false;
   private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
-  private squishKey = 0;
   private squishSteps = 0;
   private squishLastAt = 0;
   private squishLastStep = -1;
@@ -860,7 +859,7 @@ class FluidSimulation {
    * of spreading as a smooth ring. The spoke phase is fixed by where the press
    * is, so a held press keeps its fingers.
    */
-  applySquish(x: number, y: number, radius: number, amount: number, fingering = 0) {
+  applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false) {
     radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
     // Each press gets its own spoke count and phase (from where it is, so a
@@ -874,13 +873,17 @@ class FluidSimulation {
     // The first moments of a press shove the dye out to the fingers' tips,
     // where it piles up as a bright rim (the reference's bright finger
     // ends). Counted per press so a held press does not keep piling.
-    // The tool presses several radii per step; count steps, and let a press
-    // that pauses for a moment start over (a beat squeeze on every kick).
+    // The pile at the fingers' tips belongs to one press, counted in solver
+    // steps: only the outermost of the tool's nested radii piles (the Mac's
+    // seventh look found the three radii tiling the palm with a blob), and a
+    // press is one press while it keeps coming, even as a finger drifts
+    // across grid cells; a pause of a moment starts a new one (a beat
+    // squeeze on every kick).
     const nowMs = performance.now();
-    if (seed !== this.squishKey || nowMs - this.squishLastAt > 150) { this.squishKey = seed; this.squishSteps = 0; this.squishLastStep = -1; }
+    if (nowMs - this.squishLastAt > 150) { this.squishSteps = 0; this.squishLastStep = -1; }
     this.squishLastAt = nowMs;
-    if (this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
-    const pile = fingering > 0 && this.squishSteps <= 45 ? 0.05 * fingering * Math.min(1, amount * 250) : 0;
+    if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
+    const pile = pileTips && fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
     const spokeProp = (s: number) => { const h = ((s + 1) * 2654435761 + seed) >>> 0; return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 }; };
     const TAU = Math.PI * 2;
     for (let i = -radius; i <= radius; i++) {
@@ -1991,7 +1994,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // Pressed harder, the film thins over a wider palm.
           const a = 0.002 + 0.004 * amt;
           const fg = settingsRef.current.fingering ?? 0;
-          af.applySquish(x, y, 20 + 12 * amt, a, fg);
+          af.applySquish(x, y, 20 + 12 * amt, a, fg, true);
           af.applySquish(x, y, 12 + 6 * amt, a, fg);
           af.applySquish(x, y, 6, a, fg);
           if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
@@ -3730,7 +3733,7 @@ void main() {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
                 const fg = currentSettings.fingering ?? 0;
-                af.applySquish(x, y, 30, 0.004, fg);
+                af.applySquish(x, y, 30, 0.004, fg, true);
                 af.applySquish(x, y, 18, 0.004, fg);
                 af.applySquish(x, y, 8, 0.004, fg);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
@@ -4083,7 +4086,7 @@ void main() {
                 // from the middle instead of only at one hard ring.
                 const a = 0.0012 * squeezeAmt * bass01;
                 const fg = currentSettings.fingering ?? 0;
-                leadPlate.applySquish(cx, cy, 40, a, fg);
+                leadPlate.applySquish(cx, cy, 40, a, fg, true);
                 leadPlate.applySquish(cx, cy, 27, a, fg);
                 leadPlate.applySquish(cx, cy, 15, a, fg);
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01);
