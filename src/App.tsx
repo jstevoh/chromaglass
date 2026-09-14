@@ -133,7 +133,7 @@ export default function App() {
   // because the state it snapshots is declared further down.
   const castReadyRef = useRef<() => void>(() => {});
   const stageRef = useRef<{ width: number; height: number } | null>(null);
-  const { isCasting, startCast, stopCast, send: castSend } = useCastSender(
+  const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow } = useCastSender(
     () => castReadyRef.current(),
     (size) => { stageRef.current = size; visualizerRef.current?.setStage(size); },
   );
@@ -1064,6 +1064,12 @@ export default function App() {
           <button onClick={() => projector.setMode('off')} className="p-1 text-white/30 hover:text-white" aria-label="Dismiss and stop offering" title="Don't offer this (Settings → Projectors turns it back on)"><X size={11} /></button>
         </div>
       )}
+      {isCasting && windowFullscreen === false && overlaysVisible && (
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
+          <Projector size={13} /> The projector window still has its title bar
+          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
+        </div>
+      )}
       {blackout && overlaysVisible && (
         <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
@@ -1719,7 +1725,7 @@ export default function App() {
                   data-testid="cast-window"
                 >
                   <div className="text-xs font-semibold">Second display</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">A projector on HDMI: opens a window on the second screen showing this very canvas, rendered at the projector's own pixels. Click it once for fullscreen. This window keeps the controls and a scaled copy.</div>
+                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">A projector on HDMI: opens a window on the second screen showing this very canvas, rendered at the projector's own pixels, filling that screen with no title bar (with the permission; else the next click here fills it). This window keeps the controls and a scaled copy.</div>
                 </button>
                 <div className="px-3 py-2 rounded-lg" data-testid="cast-network">
                   <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>

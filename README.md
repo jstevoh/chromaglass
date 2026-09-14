@@ -58,7 +58,7 @@ Open [http://localhost:3000](http://localhost:3000) and allow microphone access 
 
 ## A projector on HDMI
 
-The best picture is the cable. Plug the projector in as a second display, then **Cast → Second display**. The show window opens on the projector's screen, moves itself there, and mirrors the laptop's canvas: the laptop renders once, at the projector's pixel size, and shows itself a scaled copy letterboxed behind the controls. With the window-management permission it opens fullscreen on the projector; if not, click the projector window once. Nothing is encoded or sent; the projector shows the same frame the laptop drew, so brush strokes, presets, the sequencer and the phone remote all land on the wall as they happen. Keep the laptop window visible (not minimised), since the browser stops drawing a hidden window.
+The best picture is the cable. Plug the projector in as a second display, then **Cast → Second display**. The show window opens on the projector's screen, moves itself there, and mirrors the laptop's canvas: the laptop renders once, at the projector's pixel size, and shows itself a scaled copy letterboxed behind the controls. With the window-management permission it opens fullscreen on the projector; if not, the next click anywhere on the laptop's show fills it (or click the projector window, or press F on it). Nothing is encoded or sent; the projector shows the same frame the laptop drew, so brush strokes, presets, the sequencer and the phone remote all land on the wall as they happen. Keep the laptop window visible (not minimised), since the browser stops drawing a hidden window.
 
 In System Settings → Displays, give the projector its native resolution and keep it as a separate display rather than mirroring, so the controls stay off the wall.
 
@@ -71,6 +71,8 @@ The app also notices the cable itself. With the window-management permission gra
 - **Off**: nothing is offered; the Cast menu still works.
 
 The chip has the same **automatic** switch, and its × turns the offer off. The choice is kept on this machine.
+
+**A title bar on the projector window** (the app's name, or the laptop's address) is the browser's window frame. The Mac's green full-screen button keeps it; only the browser's own full screen removes it, and that takes a click. The window asks for one along its bottom edge until it fills the screen, and a chip on the laptop says so: any click or key on the laptop's show is passed to the projector window (Chrome hands the gesture over), or click the projector window itself, or press F on it. Esc on the projector window brings the frame back.
 
 ## Phone and Tablet Remote
 
