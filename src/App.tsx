@@ -489,7 +489,7 @@ export default function App() {
     // otherwise a macro preset would leave the next one zoomed in.
     // Likewise the Fillmore projectors, beads, cells and fingering: a preset
     // that does not ask for them gets a plain plate, not the last preset's.
-    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
+    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
     setActivePresetId(presetId);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);
