@@ -880,7 +880,7 @@ class FluidSimulation {
     if (seed !== this.squishKey || nowMs - this.squishLastAt > 150) { this.squishKey = seed; this.squishSteps = 0; this.squishLastStep = -1; }
     this.squishLastAt = nowMs;
     if (this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
-    const pile = fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
+    const pile = fingering > 0 && this.squishSteps <= 45 ? 0.05 * fingering * Math.min(1, amount * 250) : 0;
     const spokeProp = (s: number) => { const h = ((s + 1) * 2654435761 + seed) >>> 0; return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 }; };
     const TAU = Math.PI * 2;
     for (let i = -radius; i <= radius; i++) {
@@ -914,25 +914,26 @@ class FluidSimulation {
               if (this.gpu) this.mul[idx] *= core;
               else { this.density[idx] *= core; this.densityR[idx] *= core; this.densityG[idx] *= core; this.densityB[idx] *= core; }
             }
+            // The rim at the finger's end: a band hugging this spoke's own
+            // tip, where the dye pushed along the channel piles up.
+            const tipW = pile > 0 && ang > 0.1 ? Math.max(0, 1 - Math.abs(dist - radius * prop.len) / (radius * 0.2)) : 0;
             if (ang > 0 && dist < radius * prop.len) {
               const push = amount * 8 * ang * fingering * prop.k;
               this.vx[idx] += (i / dist) * push;
               this.vy[idx] += (j / dist) * push;
-              if (ang > 0.25) {
+              if (ang > 0.25 && tipW === 0) {
                 // Gentle per step: the finger reads over a held press and a
-                // faint one stays faint; the dye between spokes is untouched.
+                // faint one stays faint; the dye between spokes is untouched,
+                // and the channel stops short of the tip so the rim stands.
                 const thin = 1 - Math.min(0.08, amount * 2.2) * fingering * prop.k * (ang - 0.25) / 0.75 * (0.25 + 0.75 * dist / (radius * prop.len));
                 if (this.gpu) this.mul[idx] *= thin;
                 else { this.density[idx] *= thin; this.densityR[idx] *= thin; this.densityG[idx] *= thin; this.densityB[idx] *= thin; }
               }
-            } else if (pile > 0 && ang > 0.1) {
-              // Just past the spoke's tip: the pushed dye thickens into a rim.
-              const over = (dist - radius * prop.len) / (radius * 0.2);
-              if (over < 1) {
-                const thick = 1 + pile * prop.k * ang * (1 - over);
-                if (this.gpu) this.mul[idx] *= thick;
-                else { this.density[idx] *= thick; this.densityR[idx] *= thick; this.densityG[idx] *= thick; this.densityB[idx] *= thick; }
-              }
+            }
+            if (tipW > 0) {
+              const thick = 1 + pile * prop.k * ang * tipW;
+              if (this.gpu) this.mul[idx] *= thick;
+              else { this.density[idx] *= thick; this.densityR[idx] *= thick; this.densityG[idx] *= thick; this.densityB[idx] *= thick; }
             }
           }
           if (this.gpu) {

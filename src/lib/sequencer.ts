@@ -152,9 +152,9 @@ export function builtInSequences(): ShowSequence[] {
       builtIn: true,
       stages: [
         s('The wash', 40, { presetId: 'fillmore-1969', transition: 8, paletteSize: 3, paletteLead: 0, settings: { dyeBudget: 0.7, beads: 0.5, fingering: 0.3, beatSqueeze: 0.3, turbulenceScale: 0.2, dishSpread: 0.9 } }),
-        s('The dish comes in', 45, { advance: 'section', transition: 6, paletteSize: 4, paletteLead: 3, settings: { dyeBudget: 1.1, beads: 0.7, fingering: 0.7, beatSqueeze: 0.7, cells: 0.5, turbulenceScale: 0.3 } }),
-        s('Sunburst', 60, { advance: 'section', transition: 3, paletteSize: 6, paletteLead: 3, settings: { dyeBudget: 1.3, beads: 0.8, fingering: 1.0, beatSqueeze: 1.0, cells: 0.7, audioImpact: 0.85, lampHotspot: 0.8 } }),
-        s('Burn out', 45, { transition: 15, paletteSize: 3, paletteLead: 1, settings: { dyeBudget: 0.6, beads: 0.5, fingering: 0.4, beatSqueeze: 0.4, cells: 0.3, audioImpact: 0.5, turbulenceScale: 0.15 } }),
+        s('The dish comes in', 45, { advance: 'section', transition: 6, paletteSize: 4, paletteLead: 3, settings: { dyeBudget: 1.1, beads: 0.7, fingering: 0.7, beatSqueeze: 0.7, cells: 0.2, turbulenceScale: 0.3 } }),
+        s('Sunburst', 60, { advance: 'section', transition: 3, paletteSize: 6, paletteLead: 3, settings: { dyeBudget: 1.3, beads: 0.8, fingering: 1.0, beatSqueeze: 1.0, cells: 0.3, audioImpact: 0.85, lampHotspot: 0.8 } }),
+        s('Burn out', 45, { transition: 15, paletteSize: 3, paletteLead: 1, settings: { dyeBudget: 0.6, beads: 0.5, fingering: 0.4, beatSqueeze: 0.4, cells: 0.1, audioImpact: 0.5, turbulenceScale: 0.15 } }),
       ],
     },
     {
