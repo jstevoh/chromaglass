@@ -1,0 +1,6518 @@
+{
+  "steps": [
+    {
+      "name": "initial",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 18.792066875414218
+      },
+      "beads": 0,
+      "preset": null,
+      "dishSpread": 0,
+      "beadsSetting": 0,
+      "cells": 0,
+      "fingering": 0
+    },
+    {
+      "name": "fillmore-1969",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.201334427244284
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    },
+    {
+      "name": "press-1s",
+      "status": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.02144915845496
+      },
+      "beads": 312,
+      "preset": null,
+      "dishSpread": 0.85,
+      "beadsSetting": 0.7,
+      "cells": 0.55,
+      "fingering": 0.85
+    }
+  ],
+  "poll": [
+    {
+      "phase": "fillmore-settle",
+      "t": 0,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 24.11479087551006,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 24.11479087551006
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 1,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 18.816830710538603,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 18.816830710538603
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 2,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.698344756704756,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.698344756704756
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 3,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.09876673016164,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.09876673016164
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 4,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.90911480292671,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.90911480292671
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 5,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.18882688647237,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.18882688647237
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 6,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.979648881197026,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.979648881197026
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 7,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.482595165460456,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.482595165460456
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 8,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.043342730891354,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.043342730891354
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 9,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.15780704002247,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.15780704002247
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 10,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.055599624265454,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.055599624265454
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 11,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.956640710867354,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.956640710867354
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 12,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.867133632345208,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.867133632345208
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 13,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.071808562469634,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.071808562469634
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 14,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.890705611632217,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.890705611632217
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 15,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.208229236071674,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.208229236071674
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 16,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.402533149465956,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.402533149465956
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 17,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.21575470210122,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.21575470210122
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 18,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.213381620827548,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.213381620827548
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 19,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.009697502235927,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.009697502235927
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 20,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.470825203779548,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.470825203779548
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 21,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.31366587804444,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.31366587804444
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 22,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.048555918887292,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.048555918887292
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 23,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.10092771230302,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.10092771230302
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 24,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.783833270470286,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.783833270470286
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 25,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.95865422278906,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.95865422278906
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 26,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.147116955468697,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.147116955468697
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 27,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.198445871095736,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.198445871095736
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 28,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.096397900379696,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.096397900379696
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 29,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.91860761283008,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.91860761283008
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 30,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.097555272776606,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.097555272776606
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 31,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.041366097762307,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.041366097762307
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 32,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.09564103409337,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.09564103409337
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 33,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.135611390703986,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.135611390703986
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 34,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.26520467411412,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.26520467411412
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 35,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.274398350348175,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.274398350348175
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 36,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.076961631566235,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.076961631566235
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 37,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.068945609956582,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.068945609956582
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 38,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.336332833874973,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.336332833874973
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 39,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.87962928009441,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.87962928009441
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 40,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.882708831940402,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.882708831940402
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 41,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.160756287707418,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.160756287707418
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 42,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.91961345688628,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.91961345688628
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 43,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.94519432156212,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.94519432156212
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 44,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.055120251726773,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.055120251726773
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 45,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.299034271405223,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.299034271405223
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 46,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.82100356870011,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.82100356870011
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 47,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.203054720242648,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.203054720242648
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 48,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.203054720242648,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.203054720242648
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 49,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.084310581903562,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.084310581903562
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 50,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.635553452425267,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.635553452425267
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 51,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.32753749215598,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.32753749215598
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 52,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.259508335916003,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.259508335916003
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 53,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.055938662132583,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.055938662132583
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 54,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.556904539498177,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.556904539498177
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 55,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.205203598089067,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.205203598089067
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 56,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.013837222353718,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.013837222353718
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 57,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.15052294656822,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.15052294656822
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 58,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.77037928259402,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.77037928259402
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 59,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.055534938715084,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.055534938715084
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 60,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.14700921125195,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.14700921125195
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 61,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.07804633334501,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.07804633334501
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 62,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.010702380663446,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.010702380663446
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 63,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.63814187578808,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.63814187578808
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 64,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.804749069015845,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.804749069015845
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 65,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.101520787014238,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.101520787014238
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 66,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.749513914806585,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.749513914806585
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 67,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.02385213732185,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.02385213732185
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 68,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.910036863098604,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.910036863098604
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 69,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.388853651147098,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.388853651147098
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 70,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.34504469702769,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.34504469702769
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 71,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.937194030933576,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.937194030933576
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 72,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.443855586726194,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.443855586726194
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 73,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.211849564590118,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.211849564590118
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 74,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.090241691500957,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.090241691500957
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 75,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.419406485807304,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.419406485807304
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 76,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.639964065570453,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.639964065570453
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 77,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.184558096949246,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.184558096949246
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 78,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.69137636530942,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.69137636530942
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 79,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.10247734840858,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.10247734840858
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 80,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.354406272281086,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.354406272281086
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 81,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.397440770541422,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.397440770541422
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 82,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.2459586152636,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.2459586152636
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 83,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.171718088508417,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.171718088508417
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 84,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.969487756793427,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.969487756793427
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 85,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.22452765232943,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.22452765232943
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 86,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.528160630831678,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.528160630831678
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 87,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.63249491379255,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.63249491379255
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 88,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.368466378581246,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.368466378581246
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 89,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.97054493212869,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.97054493212869
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 90,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.22730704405761,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.22730704405761
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 91,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.91416531114227,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.91416531114227
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 92,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.394107109518917,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.394107109518917
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 93,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.354371934183114,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.354371934183114
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 94,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.019877941803646,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.019877941803646
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 95,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.29285674354286,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.29285674354286
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 96,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.354465491625692,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.354465491625692
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 97,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.200382379398707,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.200382379398707
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 98,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.171057116320565,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.171057116320565
+      }
+    },
+    {
+      "phase": "fillmore-settle",
+      "t": 99,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.11426973036698,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.11426973036698
+      }
+    },
+    {
+      "phase": "press-held",
+      "t": 0,
+      "grid": 512,
+      "frameMs": 17.201334427244284,
+      "steppedDown": false,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.201334427244284
+      }
+    },
+    {
+      "phase": "press-held",
+      "t": 1.1,
+      "grid": 512,
+      "frameMs": 17.25158251966736,
+      "steppedDown": false,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.25158251966736
+      }
+    },
+    {
+      "phase": "press-held",
+      "t": 2,
+      "grid": 512,
+      "frameMs": 17.283838163160915,
+      "steppedDown": false,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.283838163160915
+      }
+    },
+    {
+      "phase": "press-held",
+      "t": 3.1,
+      "grid": 512,
+      "frameMs": 17.08259306874049,
+      "steppedDown": false,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.08259306874049
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 0,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.089302518439798,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.089302518439798
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 1,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.22662431989088,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.22662431989088
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 2,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.17483653218531,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.17483653218531
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 3,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.19116373312254,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.19116373312254
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 4,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.47886775992919,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.47886775992919
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 5,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.12327455348646,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.12327455348646
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 6,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.352882640441052,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.352882640441052
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 7,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.352640339804367,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.352640339804367
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 8,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.556437942196148,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.556437942196148
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 9,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.556437942196148,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.556437942196148
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 10,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.31243679142781,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.31243679142781
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 11,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.619323471749723,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.619323471749723
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 12,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.321636164436367,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.321636164436367
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 13,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.281217427679895,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.281217427679895
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 14,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.466906138977652,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.466906138977652
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 15,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.412676799295074,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.412676799295074
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 16,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.423870612199778,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.423870612199778
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 17,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.410808190626476,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.410808190626476
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 18,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.556925341510937,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.556925341510937
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 19,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.299974878029943,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.299974878029943
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 20,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.223999868406263,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.223999868406263
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 21,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.216302741549704,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.216302741549704
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 22,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.58255485681649,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.58255485681649
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 23,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.13876164382098,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.13876164382098
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 24,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.649767722302407,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.649767722302407
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 25,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.078079695207368,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.078079695207368
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 26,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.36966043822974,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.36966043822974
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 27,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.253156893637478,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.253156893637478
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 28,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.617810199164236,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.617810199164236
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 29,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.10081307145092,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.10081307145092
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 30,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.336556052218832,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.336556052218832
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 31,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.28246450101198,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.28246450101198
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 32,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.526475367232017,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.526475367232017
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 33,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.197827615457435,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.197827615457435
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 34,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.415821441948783,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.415821441948783
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 35,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.529107333086543,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.529107333086543
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 36,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.930572623493077,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.930572623493077
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 37,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.25215048673282,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.25215048673282
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 38,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.268323692594155,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.268323692594155
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 39,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.54310046470393,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.54310046470393
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 40,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.34569710887121,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.34569710887121
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 41,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.202076203527444,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.202076203527444
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 42,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.015721089609325,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.015721089609325
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 43,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.994461963432546,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.994461963432546
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 44,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.31208632456685,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.31208632456685
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 45,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.408377974445838,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.408377974445838
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 46,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.15660562236801,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.15660562236801
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 47,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.23768005337578,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.23768005337578
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 48,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.896515027705465,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.896515027705465
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 49,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.45266272200711,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.45266272200711
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 50,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.459555298935488,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.459555298935488
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 51,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.732216975192426,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.732216975192426
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 52,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.981579915539,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.981579915539
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 53,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.931253788339568,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.931253788339568
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 54,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.336753882059405,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.336753882059405
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 55,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.01812009571536,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.01812009571536
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 56,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 20.777481862790818,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 20.777481862790818
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 57,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.473356176034798,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.473356176034798
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 58,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.878878873872903,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.878878873872903
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 59,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.191753141170764,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.191753141170764
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 60,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.816110206065822,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.816110206065822
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 61,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.129865750264873,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.129865750264873
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 62,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.012323519652913,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.012323519652913
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 63,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.296678007577906,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.296678007577906
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 64,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.13876972534062,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.13876972534062
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 65,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.809394830955682,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.809394830955682
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 66,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.034370655411184,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.034370655411184
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 67,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.243715935407444,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.243715935407444
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 68,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.354353064023194,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.354353064023194
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 69,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.858055563839034,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.858055563839034
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 70,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.91491397017233,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.91491397017233
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 71,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.261932350128266,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.261932350128266
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 72,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.340411458103652,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.340411458103652
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 73,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.396048422282792,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.396048422282792
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 74,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.313921934611898,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.313921934611898
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 75,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.23523373455773,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.23523373455773
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 76,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.30891129502384,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.30891129502384
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 77,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.86944873101858,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.86944873101858
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 78,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.439624741154454,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.439624741154454
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 79,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.125574201851204,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.125574201851204
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 80,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 24.224613145658836,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 24.224613145658836
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 81,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.500902418712485,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.500902418712485
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 82,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.470045207057602,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.470045207057602
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 83,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.16475721098278,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.16475721098278
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 84,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.19446443275215,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.19446443275215
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 85,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.01635449086118,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.01635449086118
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 86,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.11025871416248,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.11025871416248
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 87,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.11025871416248,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.11025871416248
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 88,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.932675999515823,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.932675999515823
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 89,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.160125939229605,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.160125939229605
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 90,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 22.857416214262372,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 22.857416214262372
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 91,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 20.21052824433503,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 20.21052824433503
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 92,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.31613957323765,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.31613957323765
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 93,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.915926740183306,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.915926740183306
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 94,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.99337426988778,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.99337426988778
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 95,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.000950739485468,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.000950739485468
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 96,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.935715811326908,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.935715811326908
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 97,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.991872188795227,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.991872188795227
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 98,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 17.209437840342115,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 17.209437840342115
+      }
+    },
+    {
+      "phase": "after-press",
+      "t": 99,
+      "engine": "gpu",
+      "grid": 512,
+      "frameMs": 16.82232041130821,
+      "steppedDown": false,
+      "governed": true,
+      "tier": "local",
+      "gpu": "strong",
+      "beads": 312,
+      "raw": {
+        "label": "GPU · 512² · 1.0x",
+        "engine": "gpu",
+        "grid": 512,
+        "dpr": 1,
+        "tier": "local",
+        "gpu": "strong",
+        "governed": true,
+        "steppedDown": false,
+        "gpuUnavailable": false,
+        "frameMs": 16.82232041130821
+      }
+    }
+  ],
+  "beadList": [
+    [
+      64.29541679897936,
+      51.81116835539811,
+      0.6929897778085904
+    ],
+    [
+      128.47718830695334,
+      29.01904282783592,
+      0.7801627050171323
+    ],
+    [
+      128.61906520513494,
+      21.19793186026124,
+      2.312687411592034
+    ],
+    [
+      16.206361921153,
+      48.171645954003026,
+      1.2374659646397672
+    ],
+    [
+      141.94013959374524,
+      154.22195780681406,
+      4.700441255551618
+    ],
+    [
+      134.6259175810303,
+      30.273542580751375,
+      0.6416338012516787
+    ],
+    [
+      154.82572770765992,
+      23.465710867318986,
+      1.6008067444058174
+    ],
+    [
+      62.295888181524276,
+      178.80070797701504,
+      3.0194015348108594
+    ],
+    [
+      143.52525322539122,
+      68.03631075935388,
+      2.886307775237009
+    ],
+    [
+      159.4105130097977,
+      156.11120099670742,
+      1.9007898502250922
+    ],
+    [
+      132.82087111545107,
+      183.9304248208707,
+      1.4839285193605847
+    ],
+    [
+      161.29995452922296,
+      151.04446719115174,
+      0.5686446836128043
+    ],
+    [
+      14.035844214171982,
+      38.99297959504134,
+      1.2539629013721119
+    ],
+    [
+      146.7031816913988,
+      29.98612862398447,
+      1.1787958147842732
+    ],
+    [
+      69.18058762586547,
+      67.72856426777984,
+      1.439364758990304
+    ],
+    [
+      80.69284901293493,
+      38.974335233436825,
+      2.4180433027564647
+    ],
+    [
+      181.26780366436145,
+      51.51099150818586,
+      1.9444958670531736
+    ],
+    [
+      15.259333537938115,
+      153.32581799056055,
+      0.822275630011585
+    ],
+    [
+      171.52225898743143,
+      69.33622589357861,
+      2.342631736700989
+    ],
+    [
+      105.16466399367543,
+      19.500454239998355,
+      1.0043513264353199
+    ],
+    [
+      98.50346515472617,
+      18.527883904158674,
+      1.961904348597274
+    ],
+    [
+      96.53298591098205,
+      31.908718680033044,
+      1.1306178499366424
+    ],
+    [
+      32.804684765938426,
+      124.5741729162571,
+      1.499699811237377
+    ],
+    [
+      139.3610992052769,
+      38.84145100975136,
+      1.9874621746360783
+    ],
+    [
+      124.89744100561191,
+      10.013725882211903,
+      2.5938582809781185
+    ],
+    [
+      131.92414987151096,
+      33.43712763490684,
+      2.6026358762959196
+    ],
+    [
+      96.51929404120715,
+      48.15395300289452,
+      1.9019158824828473
+    ],
+    [
+      124.82174198866852,
+      27.628332929572142,
+      0.8955026546064201
+    ],
+    [
+      80.91434769444702,
+      32.30184377731873,
+      3.185459051585377
+    ],
+    [
+      115.06442129507843,
+      186.63020309894583,
+      4.437755747607694
+    ],
+    [
+      110.92777562577433,
+      21.62070950665818,
+      1.2358019673015908
+    ],
+    [
+      66.59216740577648,
+      173.08420844586678,
+      1.1698480112424068
+    ],
+    [
+      161.42134771289233,
+      142.42438371042525,
+      0.6348437425823616
+    ],
+    [
+      84.22882207844442,
+      6.9506913303769515,
+      0.5379543486072867
+    ],
+    [
+      76.20707573533272,
+      50.77580228933264,
+      1.3095818239649466
+    ],
+    [
+      187.93230057469623,
+      178.21541128648633,
+      3.2476802184272264
+    ],
+    [
+      138.159261942983,
+      61.30215902265869,
+      0.48985502287475585
+    ],
+    [
+      80.06301264143508,
+      175.20181622169423,
+      1.482955624260847
+    ],
+    [
+      129.38093426528903,
+      126.15004925142276,
+      1.3310284862398578
+    ],
+    [
+      155.21217808161595,
+      176.97947023148998,
+      1.2083220334367795
+    ],
+    [
+      85.37508215084173,
+      19.528260461631053,
+      0.8614885740470777
+    ],
+    [
+      62.9308857900168,
+      64.23709076679967,
+      0.6635478461996475
+    ],
+    [
+      166.86334127742074,
+      29.460275421685754,
+      1.8662168851267693
+    ],
+    [
+      155.40918860912873,
+      26.19799543410246,
+      1.8882455846866533
+    ],
+    [
+      170.86618551745678,
+      120.36828530707122,
+      0.4922857341335299
+    ],
+    [
+      159.005447450381,
+      152.62337353623613,
+      0.7344096876703818
+    ],
+    [
+      44.22239233238982,
+      152.23380583878384,
+      5.185660582453392
+    ],
+    [
+      152.4849801915652,
+      153.54120676392512,
+      1.540636080656039
+    ],
+    [
+      81.01341187241684,
+      45.70674419042112,
+      1.071983515918492
+    ],
+    [
+      30.59470939880879,
+      54.566249679707965,
+      1.5660838750287702
+    ],
+    [
+      174.41985055744502,
+      142.5772093071183,
+      1.90556092323558
+    ],
+    [
+      135.3743830245471,
+      52.94796126329151,
+      1.344802841701953
+    ],
+    [
+      112.75851195476677,
+      55.42437166856713,
+      0.7255902033420525
+    ],
+    [
+      74.97794162293056,
+      29.09004385104922,
+      0.8998067551454448
+    ],
+    [
+      56.770941035062386,
+      56.65239861799786,
+      5.3611572901841225
+    ],
+    [
+      59.14061033171336,
+      22.619853032758083,
+      0.6588675617146315
+    ],
+    [
+      81.36716698522157,
+      5.7802932258410955,
+      0.8936493545293853
+    ],
+    [
+      129.68569559613562,
+      52.327193326749864,
+      1.2835258219812595
+    ],
+    [
+      162.2399063338969,
+      175.4475546141508,
+      2.112319300166457
+    ],
+    [
+      162.74500504304464,
+      181.6957705282987,
+      2.1480864842634255
+    ],
+    [
+      28.930029696310402,
+      61.99241946933549,
+      0.7999018596572055
+    ],
+    [
+      138.69012167644135,
+      40.73029845419791,
+      0.5512401008437376
+    ],
+    [
+      140.1059240905541,
+      20.461416483626945,
+      0.5197373146331458
+    ],
+    [
+      10.057427548349292,
+      33.09920845146335,
+      0.8380730258811587
+    ],
+    [
+      166.45921114576436,
+      61.251598821964855,
+      0.6231823746033429
+    ],
+    [
+      38.27843755122007,
+      56.35824783146983,
+      0.9148826509513578
+    ],
+    [
+      162.90325024159972,
+      184.33865809535146,
+      0.5321649172698404
+    ],
+    [
+      13.769479410244147,
+      46.185972087780755,
+      2.608810302127483
+    ],
+    [
+      74.68417584598943,
+      15.029832929328968,
+      2.0445406819417578
+    ],
+    [
+      57.75425908989258,
+      48.16726339184738,
+      3.8272738271301012
+    ],
+    [
+      11.14194663336747,
+      61.16852531365165,
+      2.414231926115283
+    ],
+    [
+      67.89232976834258,
+      178.6866360305968,
+      1.2186398238567804
+    ],
+    [
+      144.46083752773524,
+      167.81886090437825,
+      1.762746434145064
+    ],
+    [
+      134.580021951882,
+      153.28754496104267,
+      1.4078294639437388
+    ],
+    [
+      138.40263950778805,
+      18.495038926116234,
+      0.9728772813749511
+    ],
+    [
+      160.56899355839596,
+      129.42770366101428,
+      2.2160120296099644
+    ],
+    [
+      43.31752791244745,
+      55.26605539479531,
+      2.1987483186194714
+    ],
+    [
+      177.68636254475447,
+      104.40114547740019,
+      1.0612884775495273
+    ],
+    [
+      24.445411984657767,
+      61.84740296291851,
+      2.3877496938875438
+    ],
+    [
+      54.166972232115604,
+      81.90760046436002,
+      2.6119401885682283
+    ],
+    [
+      4.066275766875207,
+      48.27183255136896,
+      1.7468451297977643
+    ],
+    [
+      110.07233646505036,
+      16.635529146829732,
+      3.865717310456028
+    ],
+    [
+      132.51937446994026,
+      36.89416901652804,
+      1.889613980107656
+    ],
+    [
+      146.9585544586546,
+      84.82359727583672,
+      5.338620323633487
+    ],
+    [
+      144.90332427683262,
+      22.84211626701902,
+      1.5822803928494047
+    ],
+    [
+      107.77518179011045,
+      57.908543248686044,
+      2.864556438726866
+    ],
+    [
+      29.312484164876775,
+      153.51663166704353,
+      2.3437963124951153
+    ],
+    [
+      166.89746884356498,
+      176.4598493530438,
+      0.5381753954690389
+    ],
+    [
+      30.563260493624586,
+      57.16921157708335,
+      1.3805058104401926
+    ],
+    [
+      148.36981180872854,
+      161.6213050771573,
+      2.0225592535796535
+    ],
+    [
+      84.41224240273128,
+      11.396186807520396,
+      0.7105183409592334
+    ],
+    [
+      123.67699498363653,
+      23.716412977388572,
+      0.6119245317181542
+    ],
+    [
+      135.73633308025143,
+      51.748567878295255,
+      0.5806831084050121
+    ],
+    [
+      55.80003396835295,
+      61.63190616950405,
+      0.5723422633809022
+    ],
+    [
+      130.86395738326664,
+      53.55809161543977,
+      0.7418275241525458
+    ],
+    [
+      49.34842652544219,
+      64.16567048470338,
+      0.6466255098845187
+    ],
+    [
+      168.7824947149387,
+      36.11192312953819,
+      0.5007237843824965
+    ],
+    [
+      160.5995351312288,
+      80.6336821439412,
+      1.300970809228179
+    ],
+    [
+      32.89803070676785,
+      42.094794012112494,
+      2.438247586527767
+    ],
+    [
+      184.13061825965121,
+      107.64362009847375,
+      0.8441113577716035
+    ],
+    [
+      143.29630809151632,
+      75.5805625467389,
+      1.2655757192053874
+    ],
+    [
+      99.12932703219836,
+      42.349472455512306,
+      1.5026396968439901
+    ],
+    [
+      172.1332585435838,
+      33.14994877591802,
+      3.671126579688134
+    ],
+    [
+      159.48323625967143,
+      22.991707592067602,
+      2.5358308240646834
+    ],
+    [
+      74.10152111516314,
+      53.8702576575886,
+      4.289084295631171
+    ],
+    [
+      104.59469357489533,
+      16.871105288594418,
+      1.976543922045122
+    ],
+    [
+      5.670406312256015,
+      153.63197739443748,
+      4.180986878332899
+    ],
+    [
+      27.903340389738343,
+      61.24009263382947,
+      0.5991118048926238
+    ],
+    [
+      185.47913491413962,
+      60.038294301974894,
+      0.6202689674513652
+    ],
+    [
+      154.2810274558776,
+      84.03948513661574,
+      2.225328173966183
+    ],
+    [
+      166.61308873665703,
+      133.716825870207,
+      2.3554901011490847
+    ],
+    [
+      170.28426934715034,
+      71.72019234032778,
+      0.7706718202585866
+    ],
+    [
+      24.18793895521071,
+      35.785184491352,
+      2.280881905627659
+    ],
+    [
+      27.64074720768415,
+      160.15814207741357,
+      0.5514726731103383
+    ],
+    [
+      85.6789672939676,
+      17.433624289369515,
+      0.5851122603096204
+    ],
+    [
+      180.06605170103256,
+      113.50943805952487,
+      1.1166536318223421
+    ],
+    [
+      135.4481200773663,
+      41.88073861458193,
+      1.076518539895101
+    ],
+    [
+      72.14226273657327,
+      60.581026225587706,
+      1.35556012939871
+    ],
+    [
+      87.83264882683811,
+      16.445349476769646,
+      1.525235584258079
+    ],
+    [
+      156.31685433338,
+      85.59940337332596,
+      0.5635000558185369
+    ],
+    [
+      165.98831882888052,
+      140.11373802388718,
+      0.57263693255272
+    ],
+    [
+      167.41309372650278,
+      163.84565961643835,
+      1.5698961569838124
+    ],
+    [
+      139.45336944385588,
+      46.239041139490475,
+      1.0585459664082064
+    ],
+    [
+      132.85961983498964,
+      42.99922991734215,
+      0.9607520322619325
+    ],
+    [
+      181.74255877458532,
+      90.8558927216761,
+      3.358499503459054
+    ],
+    [
+      102.60980553110267,
+      18.981949478893526,
+      0.9938970455822855
+    ],
+    [
+      66.45261676376357,
+      28.216434072140345,
+      3.142617050392315
+    ],
+    [
+      120.97361546730765,
+      30.554771821117747,
+      0.9684370001868459
+    ],
+    [
+      62.74155320177708,
+      24.685891271887698,
+      2.0400658399710268
+    ],
+    [
+      107.52690953506617,
+      23.80491553843459,
+      0.6327214112061097
+    ],
+    [
+      28.540832699159704,
+      157.5277735233927,
+      1.9971736854915134
+    ],
+    [
+      148.57630992009973,
+      121.09341697969056,
+      2.2137409336915845
+    ],
+    [
+      169.09424387186883,
+      159.55557736821075,
+      2.0326903381055628
+    ],
+    [
+      79.51773562312596,
+      77.36404777973704,
+      2.9237254773265744
+    ],
+    [
+      96.6633771118145,
+      186.78675344140845,
+      4.520950721289709
+    ],
+    [
+      138.93095296117258,
+      43.25587062798164,
+      2.82429720832111
+    ],
+    [
+      160.79369779444713,
+      69.06172971856138,
+      0.8340695283342698
+    ],
+    [
+      94.81011647413747,
+      17.364237258215752,
+      1.2833883279029823
+    ],
+    [
+      181.0584477567072,
+      101.01260171275047,
+      2.0938830619644686
+    ],
+    [
+      96.8790566734539,
+      13.993014425932012,
+      1.102668616399695
+    ],
+    [
+      164.61110505091648,
+      176.4449894882755,
+      0.8875016871163168
+    ],
+    [
+      28.369497237883397,
+      163.29035784427847,
+      0.6777872010918485
+    ],
+    [
+      16.13731184684172,
+      170.7313463856334,
+      2.079828078389264
+    ],
+    [
+      92.40377384075711,
+      183.64602418025441,
+      2.3480449032685646
+    ],
+    [
+      128.151136293647,
+      50.02242690752084,
+      1.2667444048472665
+    ],
+    [
+      113.83576792490184,
+      28.314679809310793,
+      0.9287250982286079
+    ],
+    [
+      110.39733024308775,
+      183.8206307346338,
+      1.1042096167591915
+    ],
+    [
+      69.22917085429114,
+      71.66823266769373,
+      1.177248101878393
+    ],
+    [
+      61.528946636719795,
+      76.00507589163743,
+      0.968456829111985
+    ],
+    [
+      73.44399446622033,
+      57.04152183533053,
+      0.9993933153531295
+    ],
+    [
+      59.76294130825127,
+      4.521271117005778,
+      1.1954133347133313
+    ],
+    [
+      172.60563820395993,
+      55.19739825389994,
+      0.5520817865787684
+    ],
+    [
+      83.21602197740891,
+      18.93658751171905,
+      0.5515902426150328
+    ],
+    [
+      166.42346194302758,
+      64.74758146747288,
+      0.4867383585564648
+    ],
+    [
+      166.57811561913255,
+      63.144477634302206,
+      1.554607720568273
+    ],
+    [
+      92.17935690719086,
+      12.198866237830503,
+      1.0113021185255677
+    ],
+    [
+      123.00418579867808,
+      28.67872129535342,
+      1.6497313451862012
+    ],
+    [
+      148.38618233669249,
+      27.970226190819123,
+      0.827138118599433
+    ],
+    [
+      150.9707711729878,
+      29.59155077987491,
+      0.6092582459637069
+    ],
+    [
+      62.242576602135685,
+      78.00991747500107,
+      1.5100715802855913
+    ],
+    [
+      163.2259337082983,
+      89.36057063072879,
+      1.6465605289803404
+    ],
+    [
+      90.25815333863962,
+      29.656251634132104,
+      5.000516594811661
+    ],
+    [
+      171.3483452314735,
+      163.60752258333076,
+      0.6011844647373444
+    ],
+    [
+      39.10994092699491,
+      14.448069787551606,
+      1.0719969820437916
+    ],
+    [
+      181.07426847610134,
+      167.9078720727144,
+      1.0969766170447943
+    ],
+    [
+      137.0366714683229,
+      178.828259576203,
+      2.5155388498877302
+    ],
+    [
+      31.096496932084612,
+      29.038129682626987,
+      1.0694028110277534
+    ],
+    [
+      143.82946945047215,
+      173.6582407384189,
+      2.8614632575980803
+    ],
+    [
+      65.22137131341522,
+      62.26150054753187,
+      1.5027706639846146
+    ],
+    [
+      51.72572036563031,
+      4.554033870779833,
+      0.8220770751597192
+    ],
+    [
+      158.42610717487733,
+      182.018242499711,
+      3.318978652292617
+    ],
+    [
+      147.23713215144687,
+      154.76411877834371,
+      1.5035037535149443
+    ],
+    [
+      161.72945257951872,
+      160.92041920249403,
+      2.7578543915838076
+    ],
+    [
+      138.43328907614517,
+      79.60650496765258,
+      1.913406774175522
+    ],
+    [
+      78.71340875484154,
+      180.74354732802556,
+      1.1270201194027365
+    ],
+    [
+      147.89376284141773,
+      117.80264027924976,
+      0.6780780461543946
+    ],
+    [
+      150.0921839950026,
+      27.931386038537728,
+      0.79812029732569
+    ],
+    [
+      2.9776184609136016,
+      138.40754664692585,
+      0.6257312801575271
+    ],
+    [
+      175.55469396243262,
+      111.80955827276964,
+      0.7895721936487141
+    ],
+    [
+      131.23152811088298,
+      182.75855693049058,
+      1.275820336861662
+    ],
+    [
+      96.57611263168037,
+      39.01680529478019,
+      0.6812215652982246
+    ],
+    [
+      162.52349860439367,
+      48.01491974911588,
+      2.1614786536551427
+    ],
+    [
+      169.91896527587187,
+      170.02263337003347,
+      1.8699615103808553
+    ],
+    [
+      137.48017800298314,
+      168.4903730715944,
+      0.9046889509347698
+    ],
+    [
+      169.51236625309977,
+      99.88314712778259,
+      0.9981627785608749
+    ],
+    [
+      146.59139334881954,
+      34.46582321079775,
+      2.7319694682911293
+    ],
+    [
+      53.38078487758825,
+      3.6995487025002443,
+      1.138501866323314
+    ],
+    [
+      134.4289473955737,
+      46.40905282886219,
+      2.0163334271014737
+    ],
+    [
+      120.25727661566577,
+      45.28800661232954,
+      4.968537691138926
+    ],
+    [
+      79.07679029871102,
+      5.8300744047079585,
+      1.3692408991243195
+    ],
+    [
+      160.37904788127662,
+      176.01676202860125,
+      0.49375573427320363
+    ],
+    [
+      128.09820755462172,
+      53.59590202363014,
+      0.8091334224391727
+    ],
+    [
+      125.64346002306655,
+      30.063262382801717,
+      0.6588921281026099
+    ],
+    [
+      178.7291996735139,
+      174.45699527252836,
+      2.7192201674688556
+    ],
+    [
+      154.66155906946773,
+      181.9143765640598,
+      1.3362949430835207
+    ],
+    [
+      52.63685330649201,
+      175.56168854350733,
+      1.5008710387909785
+    ],
+    [
+      167.88370768983978,
+      68.70002824924823,
+      1.304814986287757
+    ],
+    [
+      154.8655524385019,
+      86.29886410813828,
+      0.7669055855626232
+    ],
+    [
+      153.93439242943853,
+      164.56563888291143,
+      3.316162689896214
+    ],
+    [
+      91.57918733591076,
+      18.45261760919799,
+      1.5972150281392694
+    ],
+    [
+      148.1364377392394,
+      167.02701228804304,
+      0.5180963916496915
+    ],
+    [
+      129.72471678584253,
+      49.05254845953514,
+      1.1223134615079255
+    ],
+    [
+      6.1129537156931875,
+      176.50387628453885,
+      1.2653997402414714
+    ],
+    [
+      131.16218849559613,
+      161.5363772855205,
+      0.6456739065813516
+    ],
+    [
+      134.95590781286623,
+      61.29594596967895,
+      2.7786533632914328
+    ],
+    [
+      125.28920432708485,
+      25.193973997811135,
+      1.9111661584589401
+    ],
+    [
+      32.36728773903513,
+      8.947230115934792,
+      4.840576050213086
+    ],
+    [
+      150.4815093927263,
+      139.5002697988162,
+      2.1166384736586186
+    ],
+    [
+      147.1493332778784,
+      160.00360092444336,
+      0.5961649097711164
+    ],
+    [
+      135.50640490217398,
+      12.097874265389727,
+      4.801731212760664
+    ],
+    [
+      121.27200299213756,
+      27.717529217484643,
+      0.5547455533281651
+    ],
+    [
+      145.98235162456766,
+      152.57557817754852,
+      1.20035789719739
+    ],
+    [
+      95.0788777007026,
+      63.88782534557304,
+      0.8673301014309864
+    ],
+    [
+      68.54241256063386,
+      55.909402172202235,
+      0.8625531708993084
+    ],
+    [
+      19.47857062787094,
+      76.75687861184952,
+      0.6242956502599843
+    ],
+    [
+      31.964733596680873,
+      23.087820119837087,
+      0.5407591761209605
+    ],
+    [
+      86.45684244578004,
+      187.17164726278813,
+      4.455840149119886
+    ],
+    [
+      40.46206058954288,
+      26.02755226053136,
+      0.5093569056296521
+    ],
+    [
+      155.35938263931772,
+      157.31642472781976,
+      2.0581845323899217
+    ],
+    [
+      19.33550304250343,
+      31.468837834366465,
+      0.8527448952381328
+    ],
+    [
+      89.87208939650834,
+      11.444819114786801,
+      1.5054432573129568
+    ],
+    [
+      27.91356501851721,
+      126.391126171898,
+      1.5169462887746885
+    ],
+    [
+      117.73104640739855,
+      27.935041920113598,
+      0.8393344576864407
+    ],
+    [
+      184.85710940309744,
+      97.87371919163716,
+      3.5740482984211903
+    ],
+    [
+      11.378715265260174,
+      148.5102612932249,
+      1.0087874357200493
+    ],
+    [
+      38.20708759805206,
+      26.18005714336406,
+      0.5419532567010521
+    ],
+    [
+      171.21186349069768,
+      88.63899168646607,
+      1.9686092131598618
+    ],
+    [
+      169.3372506130409,
+      70.84804924004409,
+      0.880914396678766
+    ],
+    [
+      101.04621829371959,
+      15.66334285047591,
+      2.866273031415017
+    ],
+    [
+      130.35825262968376,
+      6.554261843925787,
+      0.5967031180227247
+    ],
+    [
+      97.00735944116481,
+      24.323828354073683,
+      3.136580460333554
+    ],
+    [
+      149.42067362195178,
+      25.855852984611396,
+      1.2020083073123295
+    ],
+    [
+      167.63127639584675,
+      130.42746002144202,
+      0.9096121808956497
+    ],
+    [
+      111.83075379438483,
+      20.24883647157204,
+      0.5341988737510932
+    ],
+    [
+      41.4807503851195,
+      7.71243621770869,
+      0.7223354522653898
+    ],
+    [
+      133.8827942259939,
+      65.0313282520309,
+      1.3559901163055248
+    ],
+    [
+      33.21750870545957,
+      21.05324558837369,
+      1.4606481191084557
+    ],
+    [
+      33.44479902656578,
+      58.38193143552525,
+      1.4161411064749436
+    ],
+    [
+      183.09958113385412,
+      80.3920627104852,
+      1.7515460600043198
+    ],
+    [
+      68.9203660600021,
+      3.8483791274761012,
+      0.619219328354302
+    ],
+    [
+      156.06135396824195,
+      143.92584413823988,
+      1.3857964605190152
+    ],
+    [
+      38.69110484146282,
+      17.96989272923134,
+      1.1654924051385926
+    ],
+    [
+      42.99911297783344,
+      22.054291994600067,
+      1.9927501950352569
+    ],
+    [
+      36.12906751978227,
+      24.52041574600669,
+      0.5949749865133952
+    ],
+    [
+      17.881326411311413,
+      72.79982969315215,
+      1.3536663219338014
+    ],
+    [
+      178.76342422111853,
+      75.54667527169187,
+      1.934236737234529
+    ],
+    [
+      46.143014033879105,
+      13.040146812029809,
+      1.77563109057829
+    ],
+    [
+      100.6347051382121,
+      65.48596789667546,
+      0.5092239919677553
+    ],
+    [
+      38.63843821168848,
+      20.92953493041951,
+      1.8275062876158306
+    ],
+    [
+      126.78533285509073,
+      53.29938078551918,
+      0.49955982025290396
+    ],
+    [
+      106.41603111382213,
+      24.582706520738522,
+      0.5168628740411424
+    ],
+    [
+      142.0778206618978,
+      84.04214734341147,
+      0.8407847590794806
+    ],
+    [
+      119.4980955453725,
+      28.787710159217234,
+      1.1158996603725033
+    ],
+    [
+      114.3537321086028,
+      22.09383214060962,
+      2.7631490910072882
+    ],
+    [
+      126.51751709907151,
+      45.12088472555943,
+      0.5921371534551161
+    ],
+    [
+      69.87842799321072,
+      63.12694091978281,
+      1.6464517463085362
+    ],
+    [
+      51.44757810420352,
+      19.103538526014248,
+      1.1959062370709352
+    ],
+    [
+      174.64680570700824,
+      185.74869423126503,
+      3.983304537469374
+    ],
+    [
+      64.80468065460715,
+      65.88308941865346,
+      1.1985855300156318
+    ],
+    [
+      127.61105632162241,
+      35.54012322326783,
+      2.9973644826355876
+    ],
+    [
+      3.5913882239351365,
+      176.39248908098398,
+      1.2123646718498018
+    ],
+    [
+      168.95589492066813,
+      26.93166180472591,
+      0.541018566121672
+    ],
+    [
+      150.32939912161345,
+      163.9488363990185,
+      0.5838478953703307
+    ],
+    [
+      125.96289146479772,
+      58.158717592126656,
+      0.6748644621693025
+    ],
+    [
+      121.34470311331036,
+      182.10899666258808,
+      2.4986989635371537
+    ],
+    [
+      114.9475853538102,
+      18.031593148928394,
+      1.4380377410043887
+    ],
+    [
+      72.24545777367503,
+      63.649834284883696,
+      0.9655749471395051
+    ],
+    [
+      150.64035264977437,
+      161.2171889658497,
+      1.064881136326391
+    ],
+    [
+      34.06835024681447,
+      34.22977959795918,
+      2.156871223295708
+    ],
+    [
+      177.4023380573209,
+      30.31298889530077,
+      1.9144816621203349
+    ],
+    [
+      39.70996018375757,
+      42.311339774719706,
+      0.8233243703253257
+    ],
+    [
+      113.64064945405848,
+      24.634692869732213,
+      0.6018481412987902
+    ],
+    [
+      139.4543738357746,
+      73.10215281434282,
+      1.780282918127195
+    ],
+    [
+      36.06599604117398,
+      61.370155813157794,
+      0.7401622811182409
+    ],
+    [
+      64.28171076929975,
+      79.06702325933581,
+      0.5942878738065805
+    ],
+    [
+      155.0451941334496,
+      137.58089640305934,
+      2.4461787563026873
+    ],
+    [
+      128.54054411211837,
+      181.97955514042275,
+      0.5653431481740878
+    ],
+    [
+      153.3392672695616,
+      88.37085120525758,
+      1.5425327272935512
+    ],
+    [
+      38.33201890481868,
+      68.51815526632852,
+      2.211069313249197
+    ],
+    [
+      133.72735651071102,
+      48.89341932106495,
+      0.7613497381742323
+    ],
+    [
+      60.81806242077395,
+      69.44596584515766,
+      0.7156750009852048
+    ],
+    [
+      19.317928534710568,
+      163.1059140375351,
+      2.1982743136659098
+    ],
+    [
+      180.34361177868033,
+      104.3049423143727,
+      1.0695023160206287
+    ],
+    [
+      34.55698874687619,
+      25.379733883672912,
+      0.7355903123246412
+    ],
+    [
+      137.44089300026084,
+      171.4571585924029,
+      0.7172238581885733
+    ],
+    [
+      28.295130129902223,
+      51.03886642070819,
+      0.8429084394629385
+    ],
+    [
+      164.2354444444004,
+      77.84005465046812,
+      1.6478330303794715
+    ],
+    [
+      149.15911622838274,
+      179.72536618188357,
+      0.6221660200758944
+    ],
+    [
+      57.12840165114336,
+      3.1727123912054687,
+      1.441183907582342
+    ],
+    [
+      81.19844770493846,
+      9.04226570393973,
+      2.3696973570829862
+    ],
+    [
+      149.14524477159844,
+      116.19157191848018,
+      1.5842878973509322
+    ],
+    [
+      96.35337010444307,
+      36.80813585113209,
+      1.1528300233241382
+    ],
+    [
+      119.7257219127715,
+      24.67536618070442,
+      3.3305188007626247
+    ],
+    [
+      155.90998134185466,
+      151.0210243939946,
+      0.9445498506102341
+    ],
+    [
+      83.39026526700941,
+      21.501217976342573,
+      0.9523167555024613
+    ],
+    [
+      101.91791679904944,
+      22.166794136465136,
+      0.5333510492453172
+    ],
+    [
+      81.94770604422558,
+      18.2757472342454,
+      0.9309216554064925
+    ],
+    [
+      94.22390547773396,
+      57.680265122986626,
+      1.2367689217868678
+    ],
+    [
+      57.38173103719516,
+      20.94724883346944,
+      0.8197486444437734
+    ],
+    [
+      126.55482089252111,
+      27.81749972639715,
+      0.5053075682759324
+    ],
+    [
+      141.39037645976026,
+      113.68392036402092,
+      0.6314707362906887
+    ],
+    [
+      91.7567694784197,
+      20.183220894537925,
+      0.6209345168881174
+    ],
+    [
+      121.99505429537778,
+      20.21196901113333,
+      0.9969977273029181
+    ],
+    [
+      144.40149516903358,
+      5.824759781946634,
+      2.0979487017354463
+    ],
+    [
+      157.01703749323934,
+      67.93445716501776,
+      0.6387960087689866
+    ],
+    [
+      92.18340174736106,
+      56.018402532490406,
+      0.8766077209535533
+    ],
+    [
+      71.53290725310616,
+      59.05137806994765,
+      0.6677321763056476
+    ],
+    [
+      127.33753018140963,
+      182.00385410307473,
+      0.4910422519849055
+    ],
+    [
+      152.1768240915013,
+      28.340823448618792,
+      1.9450302811237072
+    ],
+    [
+      28.868738041570094,
+      146.04562857813494,
+      1.1817798953998326
+    ],
+    [
+      144.24748505651172,
+      116.15890355356237,
+      2.0341666456627303
+    ],
+    [
+      130.22398018802807,
+      38.75102754932579,
+      1.6808767820865265
+    ]
+  ],
+  "beadGrid": 512,
+  "canvasBox": {
+    "x": 0,
+    "y": 0,
+    "width": 1600,
+    "height": 1000
+  },
+  "press": {
+    "px": 921.5999999999999,
+    "py": 517
+  }
+}
