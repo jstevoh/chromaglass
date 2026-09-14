@@ -558,14 +558,26 @@ export class GpuFluid {
     gl.bindVertexArray(null);
 
     const N = physicalSize, L = logicalSize;
-    this.dye = this.pingPong(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
+    // The dye lives in 32-bit floats where the context can filter them. In
+    // half floats the Fillmore plate emptied over a minute with evaporation
+    // at its lowest: every store rounds a half-float mantissa (ten bits,
+    // a part in a thousand), and with the advection's two samples, the
+    // correction, the diffusion passes and the decay each writing the field
+    // once a step, the plate lost a part in seven hundred every step, some
+    // thirty times what the evaporation setting asked for. The velocity
+    // stays in half floats: it is damped by a few percent a step anyway.
+    const f32 = !!gl.getExtension('OES_texture_float_linear');
+    const dyeInternal = f32 ? gl.RGBA32F : gl.RGBA16F, dyeType = f32 ? gl.FLOAT : gl.HALF_FLOAT;
+    this.dye = this.pingPong(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
     this.vel = this.pingPong(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
     this.squeeze = this.pingPong(N, gl.RG16F, gl.RG, gl.HALF_FLOAT, gl.LINEAR);
     this.press = this.pingPong(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.spress = this.pingPong(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.div = this.target(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
-    this.scratchA = this.target(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
-    this.scratchB = this.target(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
+    // The scratch targets carry the dye's advection intermediates, so they
+    // match the dye's precision (the velocity passes through them too).
+    this.scratchA = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
+    this.scratchB = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
     this.readbackTarget = this.target(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
     this.deltaDye = this.texture(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
     this.deltaVel = this.texture(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
