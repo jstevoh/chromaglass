@@ -2684,19 +2684,41 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   // is a fraction of a pixel wide at under half weight, which is no thread at
   // all, and the pass drew only the curls.
   float fold = max(smoothstep(0.15, 1.6, bend), 0.4);                  // 1 curling, 0.4 straight
-  // One and a half threads across the span, and never closer together than a
-  // few screen pixels.
-  float px = max(fwidth(fuv.x), fwidth(fuv.y)) + 1e-6;
-  float perPixel = al * px / e;                 // colour change per screen pixel
-  float freq = min(1.5 / max(span, 0.03), 1.0 / max(4.0 * perPixel, 1e-5));
-  float f = fC * freq + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.6;
-  float lvl = abs(fract(f) - 0.5);
+  // One thread, at the middle of the change — found by walking out along the
+  // normal until the colour stops changing at a boundary's rate, rather than by
+  // laying a repeating level across a fixed window. The fixed window is what
+  // stacked a wide steep band: its ends fall inside the change, the spacing
+  // comes from part of it, and the level then repeats four or five times across
+  // the one boundary. Walking ends that by construction — there is one middle.
+  float fP = fC, fM = fC;
+  float step = al * 0.35;                       // still changing at a boundary's rate
+  bool goP = true, goM = true;
+  vec3 prevP = color, prevM = color;
+  for (int i = 1; i <= 5; i++) {
+    vec2 o = n * e * 2.0 * float(i);
+    if (goP) {
+      vec3 cp = decodeFluid(tex, fuv + o, 0.0, false).rgb;
+      if (length(cp - prevP) < step) goP = false; else { fP = dot(cp, axis); prevP = cp; }
+    }
+    if (goM) {
+      vec3 cm = decodeFluid(tex, fuv - o, 0.0, false).rgb;
+      if (length(cm - prevM) < step) goM = false; else { fM = dot(cm, axis); prevM = cm; }
+    }
+  }
+  float reach = abs(fP - fM);                   // the whole change, in colour
+  if (reach < 0.02) return color;
+  // The level to draw at: the middle of that change, jittered a little so the
+  // threads are not a drawn contour.
+  float mid = 0.5 * (fP + fM) + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.14 * reach;
+  float lvl = abs(fC - mid);
   // Never thinner than the pixel it is drawn on, or a thread samples as a row
   // of broken dots — which is what the plate drawn small in a second dish was
   // showing.
-  float wide = max(mix(0.07, 0.30, fold), fwidth(f) * 0.75);
+  // One thread carries what a stack of them used to, so it is drawn bolder than
+  // any one line of that stack was.
+  float wide = max(mix(0.10, 0.30, fold) * reach, fwidth(fC) * 0.75);
   float line = 1.0 - smoothstep(0.0, wide, lvl);
-  float thread = line * band * mix(0.4, 1.0, fold);
+  float thread = line * band * mix(0.55, 1.0, fold);
   vec3 pale = mix(vec3(1.0), color, 0.18) * mix(0.85, 1.2, fold);
   return mix(color, pale, clamp(thread * amount, 0.0, 1.0) * smoothstep(0.02, 0.16, alpha));
 }
