@@ -14,6 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed — Fillmore on a plate that keeps its dye
 - With the drain gone the Fillmore dish saturated (a density mean of 1.4 against the 1.2 budget, most of the core at the top of the render) and a press could hardly show: its budget is 0.9 now, where the regulator that never used to reach holds the dish full but not solid
 
+### Added — sharp liquid (plan batch 1, first half)
+- **Sharpness** (`sharpness`, Settings → Liquid, MIDI-learnable): interface sharpening in
+  both solvers. Every step advects and diffuses the dye, so a boundary that starts as a
+  step becomes a ramp within a second and the plate goes soft; measured against frames
+  of filmed liquid, ours put 2.4 % of its pixels on a hard edge where a pour puts
+  4.2–7.3 %. The new pass runs diffusion backwards along the dye's own gradient, which
+  steepens any profile that is not already straight. Two things make that safe: each
+  cell may only move inside the range its four neighbours already span, so the pass can
+  undo smearing but never invent a value and never grow the checkerboard that
+  unlimited anti-diffusion produces; and each face's flux is gated by how much of an
+  interface the two cells straddle, so a boundary against empty glass is left alone
+  rather than being drained until a hole opens. All four channels sharpen, so a red
+  edge against blue of the same thickness sharpens as well as a thickness edge.
+  Measured on the Fillmore plate: pixels on a hard edge 4.5 % → 5.4 %, hardest edges
+  +14 %, the field's own mean gradient +25 %, mass drift under 0.3 % over 20 s, no NaN.
+- `npm run detail` reports the same numbers for any frame, so the rest of the batch is
+  judged the same way.
+
 ### Fixed — the plate emptied on the GPU
 - The Fillmore dish (and every plate, more slowly) lost its dye over a minute on the GPU solver with evaporation at its lowest, while the CPU solver held it: the Mac measured a loss of a part in seven hundred every step against the setting's four parts in a hundred thousand. The dye field was stored in half floats, and every one of the several writes a step rounds a ten-bit mantissa; the dye and its advection intermediates are 32-bit floats now wherever the context can filter them (`OES_texture_float_linear`), with half floats kept as the fallback
 
