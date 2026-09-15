@@ -120,6 +120,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — lacing, after the projector saw it
+- **It was drawing a contour map.** The level spacing came from the colour change per
+  cell, so a soft ramp got a stack of four to six evenly spaced parallel lines instead of
+  a thread at the boundary. The spacing now comes from the whole colour change across the
+  boundary — one and a half threads laid across that span, whatever it is — so a wide ramp
+  gets a line at its middle and a hard edge gets a tight braid
+- **The plate drawn small in a second dish got stipple, not threads**, because its level
+  lines fell under a screen pixel. Lines are now never allowed closer than a few pixels,
+  measured from the screen derivative of the fluid coordinates, so every dish draws
+  filaments at the size a filament should be
+- **The width no longer comes from the strain rate.** The strain across the interface is
+  the truer quantity and is what the pass was written against, but measured on the plate
+  its sign holds for only three or four cells — about ten pixels — so along one thread it
+  changes too often to read as anything, and the projector desk could not see it at all.
+  A boundary that folds is a boundary that curves, and a curve holds over the whole length
+  of a curl, so the thread's width and brightness now come from the level line's own bend:
+  a braid where it curls, a hair along a straight run
+
 ### Added — lacing (plan batch 2)
 - **Lacing** (`lacing`, Settings → Liquid, MIDI-learnable, 0 by default so no preset
   changes under anyone): the pale hair-thin threads that outline every colour boundary in
