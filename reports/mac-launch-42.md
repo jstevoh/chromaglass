@@ -145,3 +145,20 @@ Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 a
 - **The top of the slider goes wrong from 0.7.** Lines turn white, break into single-pixel glitter along the steepest ramps, and paint pale speckle patches where two shades of one hue meet (inside the red tongue and the pushed blue blob). At 1.0 lacing leads the colour.
 - **The amount isn't the real problem; the spacing is.** `dot(cC.rgb, axis/al) * 4.0` puts about four level lines per unit of colour change. So any wide soft ramp gets a stack of evenly spaced parallel lines, and only the steepness packs them. If the aim is one braid at a boundary rather than isolines across a ramp, the thread probably wants gating on the gradient being steep (a higher `band` threshold or a band × steepness weight), not a lower amount.
 - **Small dish:** the magnified layer draws stipple rather than lines at every value. `lacing()` samples `u_layer1` with the same one-cell `e` and the same `fbm3` scale as layer 0, while `fuv1` is magnified by `u_layerZoom1`. I'd guess the level lines fall under a screen pixel there. Scaling `e` and the fbm frequency by the layer's zoom, or skipping layer 1, would be the first thing I'd try.
+
+## 3. Sharpness with lacing in (first pair; the repeat pair follows)
+
+`sharp4.mjs` on Fillmore, which now carries lacing 0.45. It is seeded (`SEED=7`) with Granulation 0 and Plate Cells 0 set by slider. The page is captured after 1100 frames past the slider change (1536 and 1540 total, so the pair is matched by frames). I used a fresh page per value, because sharpening acts in the solver and can't be swept in one page.
+
+The main dish, 380 px at 1×, sharpness 0 | 0.5:
+
+![sharpness main](l42-sharp-main-0-05.png)
+
+The small dish at 2×, sharpness 0 | 0.5:
+
+![sharpness small](l42-sharp-small-0-05.png)
+
+- **The two seeded pages still diverged in composition.** In the small dish, 0 is blue into green with a dark line across it, and 0.5 is purple into green. A pixel diff is useless: 41 % of the main dish differs by more than 8.
+- **Main dish: I can't see sharpness 0.5.** Both frames have the same lacing isolines, a similar soft rim on the red tongue and similar ramp widths. High-pass is 5.57 at 0 and 5.48 at 0.5.
+- **Small dish (`dishblock`):** gradFrac 0.49 → 0.57 and step/1000 19 → 29. axisFrac is 0.116 → 0.113, and 0.11 is isotropic, so there are no blocks. At #37 the gradient fraction measured composition, not sharpness, and these compositions differ.
+- **So far PLAN.md's test comes out the same with lacing in:** the threads give sharpening edges to act on, but they are drawn after the solver. So they sharpen nothing, and the solver's own edges look the same at 0 and 0.5.
