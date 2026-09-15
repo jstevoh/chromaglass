@@ -300,6 +300,32 @@ if (OSC_PORT > 0) {
 
 // ── Startup banner ─────────────────────────────────────────────────────
 
+/**
+ * A port that is already taken is the ordinary way this fails — a show server
+ * still running in another window, or a `npm run dev` on the same port — and
+ * without a handler here it arrives as an unhandled 'error' event: twelve
+ * lines of Node stack ending in EADDRINUSE. That is a poor thing to have to
+ * read in a dark room five minutes before a set, so it says what happened and
+ * what to do about it instead. The OSC socket already degrades to "off" rather
+ * than taking the show down with it.
+ */
+const portTaken = (err) => {
+  if (err.code !== 'EADDRINUSE') throw err;
+  console.error(`\n  Port ${PORT} is already in use, so the show server did not start.\n`);
+  console.error('  Something is already listening there — most likely a show server still');
+  console.error('  running in another window (look for the one printing a show key), or a');
+  console.error('  "npm run dev".\n');
+  console.error(`  Take the port back:   lsof -ti tcp:${PORT} | xargs kill`);
+  console.error(`  Or use another one:   PORT=${PORT + 1} npm run remote\n`);
+  console.error('  Nothing else was changed, and anything already deployed is unaffected.\n');
+  process.exit(1);
+};
+// Both of them: `ws` attaches to the http server and re-emits its listen error
+// on itself, and it is that copy which goes unhandled and prints the stack.
+// Handling only the http server looks right and changes nothing.
+server.on('error', portTaken);
+wss.on('error', portTaken);
+
 server.listen(PORT, '0.0.0.0', () => {
   const hosts = lanAddresses();
   console.log('\n  ChromaGlass show server\n');
