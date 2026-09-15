@@ -110,4 +110,38 @@ Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 a
 - **Stripes around the blob spread outward with the push,** but they look the same as the still frame's. Nothing there piles up.
 - **The fold map from the solver doesn't help.** I read `gpu.dye.read` and `gpu.vel.read` (512²) and applied the shader's formula: fold = −(v(+n) − v(−n))·n across the colour gradient. Fold and stretch come out as patches 20–40 px across all over the plate, in near-equal counts (fold 76k / stretch 68k at release, 83k / 71k at +30, 71k / 78k at +90). There is no coherent ring at the press. Its band mask also covers 88 % of the plate on raw dye, so it can't pick out the pixels the threads are on. I can't tie a visible thread to a fold or stretch sign from it.
 - **Why it's probably inaudible:** in the shader, fold only changes the line's smoothstep width from 0.10 to 0.22 of a level (a factor of 2.2 on a 1–2 px line), and brightness by 0.55 → 1.0. The `* 7.0` gain clamps most of the plate to one end or the other. Fold or stretch flips sign every 20–40 px, so along any one thread the width changes too often to read as braid against hair.
-- **Motion baseline:** on consecutive frames, lacing 0 → 0 lifts 2.7–3.4 % of main-dish pixels, and 0 → 1.0 lifts 22–24 % (braid 7.5–8.5 %, hp 3.8 → 8.9–9.5). The sweep table above has ~20 frames between captures, so its 1.0 row (28.8 % / 15.1 %) includes ~5 points of motion. The lower values are affected less.
+- **Motion baseline (strain runs):** on consecutive frames, lacing 0 → 0 lifts 2.7–3.4 % of main-dish pixels, and 0 → 1.0 lifts 22–24 % (braid 7.5–8.5 %, hp 3.8 → 8.9–9.5). The sweep table above has ~20 frames between captures, so its 1.0 row (28.8 % / 15.1 %) includes ~5 points of motion. The lower values are affected less.
+
+### With the grain on (the Fillmore default): **no fight, no errors**
+
+`lace42.mjs g` uses the same seed with granulation 0.5 and cells 0.2 (Fillmore's own values), sweeping at frame 1100. 2× crops, each row lacing 0 / 0.45 / 0.7 / 1.0.
+
+![grain core](l42-grain-core.png)
+
+![grain left](l42-grain-left.png)
+
+![grain small dish](l42-grain-small.png)
+
+- **The two textures sit at different scales, so they layer rather than fight.** The grain is a 5–10 px pigment mottle over the colour, and the threads are continuous 1–2 px pale lines on top of it. At 0.45 the grain softens the lines and partly breaks them, which takes some of the edge off the contour-map look. At 0.7 and 1.0 the lines are plain again and start to glitter.
+- **The small dish's stipple hides in the grain at 0.45** but shows as bright dashes near its blue edge at 0.7–1.0.
+- Numbers (1 frame per value would be better; these are ~25 frames apart):
+
+| crop | lacing | lifted % | braid % | hp |
+|---|---|---|---|---|
+| main dish 380 px | 0 | – | – | 6.36 |
+| | 0.45 | 23.1 | 6.0 | 7.26 |
+| | 0.7 | 34.8 | 11.7 | 8.40 |
+| | 1.0 | 39.3 | 16.6 | 10.21 |
+| small dish | 0 | – | – | 3.76 |
+| | 0.45 | 9.5 | 0.4 | 5.10 |
+| | 1.0 | 14.4 | 3.7 | 7.87 |
+
+- **Errors:** 0 GL errors in the first 25 s, no shader console lines, and 0 NaN in the dye at the end. The same holds for the grain-off run.
+
+### The value to set on Fillmore: **0.35; 0.7 and above goes wrong**
+
+- **0.35.** It's between 0.25 (a quiet hatch that still reads on a clean plate) and 0.45 (plain isolines when grain is off). Under the Fillmore grain it still draws a visible outline on every hard edge. A projector loses contrast, so I wouldn't go below 0.3.
+- **0.45 is acceptable with grain on** but reads as a contour map whenever granulation is turned down.
+- **The top of the slider goes wrong from 0.7.** Lines turn white, break into single-pixel glitter along the steepest ramps, and paint pale speckle patches where two shades of one hue meet (inside the red tongue and the pushed blue blob). At 1.0 lacing leads the colour.
+- **The amount isn't the real problem; the spacing is.** `dot(cC.rgb, axis/al) * 4.0` puts about four level lines per unit of colour change. So any wide soft ramp gets a stack of evenly spaced parallel lines, and only the steepness packs them. If the aim is one braid at a boundary rather than isolines across a ramp, the thread probably wants gating on the gradient being steep (a higher `band` threshold or a band × steepness weight), not a lower amount.
+- **Small dish:** the magnified layer draws stipple rather than lines at every value. `lacing()` samples `u_layer1` with the same one-cell `e` and the same `fbm3` scale as layer 0, while `fuv1` is magnified by `u_layerZoom1`. I'd guess the level lines fall under a screen pixel there. Scaling `e` and the fbm frequency by the layer's zoom, or skipping layer 1, would be the first thing I'd try.
