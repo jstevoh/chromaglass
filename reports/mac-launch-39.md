@@ -26,6 +26,18 @@
 - The key changed, so any of James's tabs or displays still holding key 7594 need a reload with 9281. I left James's Chrome and the projector alone.
 - **Load:** GPU utilisation 99 % and load average 5.3–5.5 at the start (MOTIV Mix, James's Chrome, WindowServer). That is the same as #37, so timings below are compared by frames, not seconds.
 
+## 2. The grain (first result; the sweep and the crossover watch are running)
+
+Fillmore, `?debug&sim=512`, granulation 0.5, grain scale 110. 10 s after the preset pick, which is 372 frames after load:
+- **GL errors: none.** A `getError` after every draw for the first 25 s after load caught nothing (#37: 4 `INVALID_OPERATION`s on `seedGrain`).
+- **Both phases seeded everywhere:** non-zero fraction 1.00 (#37: 0 until ~450 frames).
+- **NaN: 0** in the grain coordinates and 0 in the dye.
+- **High-pass in the small dish: 4.21**, against 1.27 at 30 s on #37 and 1.5 for #37's granulation-0 control. On #37 it took ~900 frames to reach this level (4.09–4.14).
+
+2× at 10 s, main dish core and small dish:
+
+![core at 10 s](s39-grain-first-core-10s.png) ![small dish at 10 s](s39-grain-first-small-10s.png)
+
 ## 3. The sheet — **everything at 8 but two stop-row words; three breaks read badly**
 
 Method: `~/cg-scratch/surface39.mjs` (surface37 pointed at a new folder) and `surface39z.mjs` (3× zooms).
