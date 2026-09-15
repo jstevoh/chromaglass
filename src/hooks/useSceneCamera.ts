@@ -17,6 +17,12 @@ import { SceneSense, type SceneReading, type SceneSenseOptions } from '../lib/sc
  *   - **A timer, not an animation frame.** The projector window is often in
  *     front of the laptop's own, and a hidden tab stops animating while the
  *     room, and the people in it, carry on. The gamepad hook does the same.
+ *     The cost of that choice, measured under software WebGL at 0.6 frames a
+ *     second: a saturated main thread starves the timer, so the sensor slows
+ *     down exactly when the machine is already struggling. At any normal frame
+ *     rate it is nowhere near the budget, and if it ever needs to stop
+ *     competing, the analysis is a pure function over a pixel buffer and moves
+ *     to a worker as a transfer rather than a rewrite.
  *   - **A ref, not state.** The reading changes twenty times a second and only
  *     the render loop reads it; putting it in state would re-render the app on
  *     every frame of it. What the panel needs — a meter and a cost — comes back
@@ -159,7 +165,15 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
       video.playsInline = true;
       video.autoplay = true;
       video.srcObject = local;
-      try { await video.play(); } catch { /* autoplay policy: the next gesture starts it */ }
+
+      // Never await this. On a video element that is not in the document the
+      // promise can simply never settle — not resolve, not reject — and every
+      // line after it is then dead code: the sensor held the camera open,
+      // reported itself as still opening, and drew nothing, with no error
+      // anywhere to say why. The analysis loop starts regardless and each tick
+      // checks `readyState` for itself, which is the check that actually
+      // matters.
+      void video.play().catch(() => { /* a gesture will start it */ });
 
       const label = local.getVideoTracks()[0]?.label ?? null;
       setState(s => ({ ...s, active: true, error: null, device: label }));
