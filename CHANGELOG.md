@@ -120,6 +120,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — sharpening is off everywhere
+- The test this work set itself has been run at the grid the show actually falls to, and
+  the pass fails it. At 256², where a solver cell is nearly three screen pixels and
+  sharpening should matter most, switching it on and off **on one plate** moves the 10–90 %
+  edge width by less than the plate's own drift: −1.25 to +1.33 px at 0.5 and −0.3 px at
+  full strength. Across separate pages it narrows edges by a pixel in two captures of
+  five, at different frame counts in the two sets, and at 384° the sign flips
+- What it does add over hundreds of frames on a coarse grid is pale terraces inside the
+  colour and torn, ragged lips on the tongues — the old fault arriving slowly. Tying it to
+  the governor's rung would switch that on exactly when the machine is already struggling
+- So `sharpness` defaults to 0 and no preset sets it. The control stays: on the CPU solver
+  at 192² it measurably steepens (mean gradient 0.091 → 0.104), and that is the engine a
+  weak machine runs
+
+### Changed — lacing: a thread on a boundary, a hair on a straight run
+- **A boundary worth outlining is one that changes quickly**, not merely one that
+  changes. Without that second test a wide soft ramp was still a span, and laying threads
+  across it drew the contour map the pass exists to avoid: a fifty-cell ramp took six or
+  seven parallel lines where it wanted none. The curvature term had been hiding most of
+  them rather than preventing them
+- **A floor under the curvature term**, so a straight boundary gets its hair. Without one
+  the thread there was a fraction of a pixel wide at under half weight — no thread at all
+  — and the pass drew only the curls, with blank edges between them
+- **Never thinner than the pixel it is drawn on.** A sub-pixel thread samples as a row of
+  broken dots, which is what the plate drawn small in a second dish was showing: two
+  thirds of its lit pixels had no lit neighbour. It draws a continuous filament now
+- Fillmore East, 1969 goes to 0.5
+
+### Changed — lacing, after the projector saw it
+- **It was drawing a contour map.** The level spacing came from the colour change per
+  cell, so a soft ramp got a stack of four to six evenly spaced parallel lines instead of
+  a thread at the boundary. The spacing now comes from the whole colour change across the
+  boundary — one and a half threads laid across that span, whatever it is — so a wide ramp
+  gets a line at its middle and a hard edge gets a tight braid
+- **The plate drawn small in a second dish got stipple, not threads**, because its level
+  lines fell under a screen pixel. Lines are now never allowed closer than a few pixels,
+  measured from the screen derivative of the fluid coordinates, so every dish draws
+  filaments at the size a filament should be
+- **The width no longer comes from the strain rate.** The strain across the interface is
+  the truer quantity and is what the pass was written against, but measured on the plate
+  its sign holds for only three or four cells — about ten pixels — so along one thread it
+  changes too often to read as anything, and the projector desk could not see it at all.
+  A boundary that folds is a boundary that curves, and a curve holds over the whole length
+  of a curl, so the thread's width and brightness now come from the level line's own bend:
+  a braid where it curls, a hair along a straight run
+
+### Added — lacing (plan batch 2)
+- **Lacing** (`lacing`, Settings → Liquid, MIDI-learnable, 0 by default so no preset
+  changes under anyone): the pale hair-thin threads that outline every colour boundary in
+  a poured film. Fillmore East, 1969 carries it at 0.45
+- They cannot be found in the dye, because the solver has no structure below its own grid:
+  a boundary there is a smooth ramp a few cells wide. So they are made as level lines of
+  the colour as it changes across the boundary, which means each thread follows the
+  boundary's own shape rather than being noise sprayed near it, and where the boundary is
+  steep they crowd into a braid the way a stretched film does
+- What the flow decides is the width: the strain rate across the interface — the velocity
+  difference either side of the boundary, projected along the boundary's normal — draws a
+  thread out to a hair where the two sides pull apart and piles it into a thicker,
+  brighter one where they fold. Only where dye lies on both sides, so a blob's outer
+  silhouette against bare glass is left alone
+- Measured on a seeded plate with the grain and cells off, a 380 px crop inside the dish:
+  pixels on a hard edge 6.5 % → 8.5 % at the default and 13.8 % at full, typical local
+  contrast 3.2 → 4.6 → 5.8. Both are inside the filmed references' band for the first
+  time (4.2–7.3 % and 2.0–7.2). Structure at 4 and 8 px moved only 0.4 % → 0.5 %, so that
+  half of the batch's gate is not met and has moved to batch 3, where the drops and cells
+  that actually carry mid-scale structure live
+
 ### Fixed — the pigment grain was never drawn for the first nine hundred steps
 - Seeding the grain's pigment coordinates bound the very texture it was drawing into,
   which is a feedback loop; WebGL refused the draw and dropped it silently. The

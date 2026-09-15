@@ -170,6 +170,7 @@ export interface VisualizerSettings {
   saturationBoost: number;    // final color grade saturation multiplier
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye, no beat, no dye
@@ -275,7 +276,15 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
-  sharpness: 0.5,           // boundaries stay boundaries instead of becoming ramps
+  // Off. Measured on the projector's GPU it does nothing a viewer can see: at
+  // 512² and 384² it cannot be told from 0 on a fixed composition, and at 256²,
+  // the rung the governor falls to when the machine is busy, switching it on
+  // for hundreds of frames grows pale terraces and tears the lips of the
+  // tongues rather than narrowing an edge — on the same plate it moves the
+  // 10-90% edge width by less than the plate's own drift, even at full
+  // strength. The control stays for the CPU solver at low grids, where it does
+  // measurably steepen.
+  sharpness: 0,
   granulation: 0.5,         // pigment texture between the boundaries, not just at them
   grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
@@ -292,6 +301,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  lacing: 0,
   bubbles: 0.5,
   plateRock: 0.45,
   layerScaleVariety: 0.5,
