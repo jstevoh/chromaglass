@@ -148,3 +148,14 @@ Saved PNG, on paper:
 ![presets on paper, 3x](s39-zoom-presets-paper.png)
 ![knobs on screen, 3x](s39-zoom-knobs-screen.png)
 ![stop row on paper, 3x](s39-zoom-stoprow-paper.png)
+
+## 4. Sharpening — **I agree with PLAN.md**
+
+No new runs. The entry in PLAN.md matches what I measured on #36 and #37:
+- harmless at every value in the shallow dish
+- indistinguishable from 0 at 0.5 in the main dish on a fixed composition
+- at 1.0 the picture moves without getting sharper
+
+Deciding after lacing and drops exist is the right call, because Fillmore at 512² gives the pass nothing to steepen. The test I'd want then is the same seeded, frame-matched comparison, run on a preset with hard edges.
+
+One thing to carry into that decision: with the grain now live from frame one, the high-pass in the main dish is about 5 at the default. Any edge metric used for sharpening should be run with `Granulation` 0, or the grain will swamp it. On #37 one run was spoiled that way.
