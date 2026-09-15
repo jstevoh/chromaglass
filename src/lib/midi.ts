@@ -345,7 +345,10 @@ export function apc40Mk2Map(presetIds: string[]): MidiMap {
   // liquid itself reads; the cue encoder is endless, so it nudges the grain.
   b.push(bind(cc(15), setting('sharpness')));
   b.push(bind(cc(47), setting('granulation'), 'relative'));
-  const scenes: MidiAction[] = ['seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop', 'lucky'];
+  // Random is the one a hand goes for mid-song, so it sits at the top of the
+  // column rather than directly above Drain; the button above Drain is the
+  // harmless one.
+  const scenes: MidiAction[] = ['lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
   scenes.forEach((a, i) => b.push(bind(note(82 + i), { kind: 'action', action: a })));
   // Master select and Stop All Clips, alone under the scene column: the two
   // one-shots that empty the plate, kept away from Seed.

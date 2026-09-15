@@ -33,6 +33,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — sharpening that knows how much liquid is there
+- The sharpening pass fades in with the dye a cell actually holds, so the full dish
+  keeps every bit of the steepening and a thin wash is left alone. Measured on the
+  settled plate (CPU, 192², mean gradient and the high-frequency energy that is the
+  staircase): in the body, gradient 0.095 → 0.096 and roughness 0.083 → 0.087 at the
+  default, i.e. unchanged; in thin dye, roughness 0.043 → 0.016, down 62 %, and at the
+  top of the slider 0.165 → 0.051, down 69 %. That is the axis-aligned blockiness the
+  shallow dish showed on the projector, taken out without touching the look of the
+  main plate
+
+### Changed — the cheat sheet, second pass
+- Labels are set at the largest readable size that holds the whole name, trying a
+  comfortable margin first and a tight one only when the alternative is a smaller
+  size: 186 of 200 labels are now at full size, none is cut, and none sits on its
+  outline
+- A fader's track line breaks wider around its label, so the longer names on the tall
+  faders have air either side rather than the line running into the first letter
+- Ink is measured against the control's own fill rather than the bare panel, which is
+  what the label actually sits on: Hot Pink and Cherry Red were at 2.2 against their
+  own pads on paper and now clear 3.6
+- A few names that are longer than any button — Random Evolve, Clean Screen, the
+  sequencer four, Background Loop — have short forms used only where the full name
+  would have to be set small; the list beside the picture always says the full thing
+- The four arrow keys are drawn as the cluster they are on the hardware. Laid out in a
+  list they wrapped across rows, so Next Preset sat to the left of Previous Preset —
+  the one pair a hand reaches for blind
+- Random moves to the top of the scene column, so the button directly above Drain is a
+  harmless one
+- Swatches carry an outline (Pure White was a blank square on paper), the assign list
+  keeps its full weight in paper mode, and the saved PNG has a title band naming the
+  map, how many controls are assigned and the date
+
 ### Changed — a cheat sheet you can read in the dark
 - Labels on the controller picture are measured against the type they are drawn in and
   shrink and wrap to fit, so the whole word is there: no more `Sunsh…` twice in a row on

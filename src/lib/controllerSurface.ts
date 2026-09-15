@@ -147,13 +147,23 @@ function apc40Mk2(): ControllerSurface {
   add({ id: 'crossfader', label: 'Crossfader', shape: 'fader', section: 'transport', x: 806, y: 322, w: 104, h: 24, kind: 'cc', number: 0x0F });
 
   const transport: [number, string][] = [
-    [0x5B, 'Play'], [0x5C, 'Stop'], [0x5D, 'Record'], [0x66, 'Session Rec'],
-    [0x63, 'Tap Tempo'], [0x5A, 'Metronome'], [0x64, 'Nudge −'], [0x65, 'Nudge +'],
-    [0x62, 'Shift'], [0x5E, 'Up'], [0x5F, 'Down'], [0x61, 'Left'], [0x60, 'Right'],
+    [0x5B, 'Play'], [0x5C, 'Stop'], [0x5D, 'Record'],
+    [0x66, 'Session Rec'], [0x63, 'Tap Tempo'], [0x5A, 'Metronome'],
+    [0x64, 'Nudge −'], [0x65, 'Nudge +'], [0x62, 'Shift'],
   ];
   transport.forEach(([n, label], i) => add({
     id: `tr-${n}`, label, shape: 'button', section: 'transport',
     x: 806 + (i % 3) * 58, y: 362 + Math.floor(i / 3) * 32, w: 52, h: 26, kind: 'note', number: n,
+  }));
+  // The four arrows are a cluster on the hardware, so they are a cluster here:
+  // laid out in a list they wrapped across rows, and Next Preset ended up to
+  // the left of Previous, which is the one pair a hand reaches for blind.
+  const arrows: [number, string, number, number][] = [
+    [0x5E, 'Up', 1, 0], [0x61, 'Left', 0, 1], [0x5F, 'Down', 1, 1], [0x60, 'Right', 2, 1],
+  ];
+  arrows.forEach(([n, label, col, row]) => add({
+    id: `tr-${n}`, label, shape: 'button', section: 'transport',
+    x: 806 + col * 58, y: 462 + row * 32, w: 52, h: 26, kind: 'note', number: n,
   }));
 
   return {
