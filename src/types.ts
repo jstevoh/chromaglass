@@ -1,5 +1,19 @@
 export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
 
+/**
+ * What a liquid writes into the plate's liquid field when it lands — see
+ * `src/lib/liquidPhase.ts`, which is what turns these into forces that go on
+ * acting rather than a shove at the moment of the drop.
+ */
+export interface LiquidBehaviour {
+  /** Breaks the surface tension: liquid runs away from it while it is there. */
+  soap?: number;
+  /** Thicker than water: it crawls where it lies while the plate flows past. */
+  body?: number;
+  /** Refuses to let go of itself: a pool of it keeps its edge. */
+  repel?: number;
+}
+
 export interface LiquidType {
   id: string;
   name: string;
@@ -8,6 +22,8 @@ export interface LiquidType {
   injectRadius: number;   // cells — how wide each drop spreads
   injectAmount: number;   // density injected per frame while held
   heatAmount: number;     // heat injected (drives buoyancy-based rise)
+  /** What it does to the plate beyond colouring it. Absent = it is only a dye. */
+  behaviour?: LiquidBehaviour;
 }
 
 export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
@@ -16,6 +32,23 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Thin, rises and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5  },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0  },
   { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Very heavy, barely moves once placed', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0  },
+
+  // The four that change what the plate does rather than only what colour it
+  // is. Each writes into the liquid field, and the field goes on acting for as
+  // long as the liquid is there — which is the whole difference between soap
+  // and a blue dye called Soap.
+  { id: 'soap',      name: 'Soap',      color: '#bfe9d8',
+    description: 'Breaks the film: colour runs away from it and curls into filaments',
+    injectRadius: 3, injectAmount: 0.12, heatAmount: 0.0, behaviour: { soap: 1 } },
+  { id: 'milk',      name: 'Milk',      color: '#f4efe4',
+    description: 'A pale ground that holds its own edge instead of blending away',
+    injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0, behaviour: { repel: 1, body: 0.35 } },
+  { id: 'silicone',  name: 'Silicone',  color: '#dfe7ee',
+    description: 'Shoulders colour aside into a ring — the cell maker',
+    injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0, behaviour: { soap: 0.8, repel: 0.45 } },
+  { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff',
+    description: 'Thick and slow: it crawls where it lands while the plate moves past it',
+    injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0, behaviour: { body: 1, repel: 0.25 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**

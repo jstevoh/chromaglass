@@ -12,6 +12,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
+import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, getSceneValue, type SceneReading } from '../lib/sceneSense';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -481,6 +482,28 @@ class FluidSimulation {
     this.dirty = true;
   }
 
+  /**
+   * What liquid is where on this plate. Empty until one of the four liquids
+   * that do something is dropped, and skipped entirely while it is empty, so a
+   * plate of ordinary dye runs exactly the arithmetic it always did.
+   */
+  readonly liquid = new LiquidPhase(GRID_SIZE);
+
+  /**
+   * Let the liquid field act, then carry it along with the plate.
+   *
+   * Both go through the delta arrays, which is what makes this work on the GPU
+   * engine as well: what is written here is uploaded and applied before the
+   * next step. The field itself moves on the readback, which is the plate's
+   * own velocity on the CPU engine and one frame old on the GPU one.
+   */
+  stepLiquid(dt: number, disp: number) {
+    if (!this.liquid.active) return;
+    this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
+    this.liquid.step(this.readVx, this.readVy, disp, dt);
+    this.dirty = true;
+  }
+
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
     this.dirty = true;
@@ -513,6 +536,7 @@ class FluidSimulation {
   }
 
   clearAll() {
+    this.liquid.clear();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
@@ -1958,10 +1982,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
         break;
-      case 'drop':
+      case 'drop': {
+        const liq = selectedLiquidRef.current;
+        if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
         af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
+      }
       case 'streak': {
         // Directional smear along the recorded movement
         const dx = g.dx ?? 1, dy = g.dy ?? 0;
@@ -4188,6 +4215,10 @@ void main() {
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
+                // Soap, milk, silicone and glycerine put their properties into
+                // the plate on the same disc as their colour, and the plate
+                // keeps acting on them long after the drop.
+                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, 1);
               }
             }
           }
@@ -4550,6 +4581,12 @@ void main() {
           // ── Advance the solver ───────────────────────────────
           if (isActiveRef.current && drainFrameRef.current === 0) {
             const t0 = performance.now();
+            // What liquid is where acts first, so the forces it adds are in
+            // the deltas the step is about to take. Costs nothing on a plate
+            // with none of the four liquids on it, which is every preset that
+            // does not ask for them.
+            const disp = SIM_STEP * (currentSettings.advection ?? 0.45) * (GRID_SIZE - 2);
+            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, disp);
             for (const fluid of fluidsRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;
