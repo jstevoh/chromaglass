@@ -33,6 +33,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — a cheat sheet you can read in the dark
+- Labels on the controller picture are measured against the type they are drawn in and
+  shrink and wrap to fit, so the whole word is there: no more `Sunsh…` twice in a row on
+  two different dyes, and nothing spilling past the shape it belongs to
+- A fader's track line runs along the fader whichever way it lies and breaks around its
+  own label, instead of being drawn upright through the crossfader's name
+- A colour that is the colour of the panel it sits on — Crimson on black, Icy Blue on
+  paper — is lifted or dropped until it separates, keeping its hue
+- **On paper** turns the whole sheet to paper, the list beside the picture included, so
+  what is printed or photographed is what is on screen
+- The APC40 mkII factory map is laid out for a hand in the dark: dyes move from the
+  track-select row onto the bottom row of clip pads, which are full colour and light in
+  the dye they drop; Drain and Clear leave the row that carries Seed for the two buttons
+  under the scene column; the arrows step presets; and the crossfader and cue encoder
+  take Sharpness and Granulation
+
+### Changed — the top of the sharpness slider
+- Sharpening holds its middle and compresses its top: 0.5 is the strength measured on the
+  projector, and 1.0 now stops three-quarters of the way up, short of where a bright rim
+  appeared along boundaries and thin dye went blocky
+
 ### Added — the controller, drawn
 - **APC40 mkII picture** (MIDI panel): the whole control surface to scale, every control carrying
   the MIDI address it really sends, taken from Akai's Communications Protocol v1.2 rather than
