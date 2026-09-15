@@ -1305,10 +1305,12 @@ class FluidSimulation {
       tiltX: this.tiltX, tiltY: this.tiltY,
       advection: settings.advection,
       // The nine-point stencil pushes about twice as hard per unit as the
-      // four-point one it replaced, so the slider maps to half of what it did:
-      // the default lands on the strength the Mac judged good, and the top of
-      // the slider stops short of the strength that grew fur along boundaries.
-      sharpness: Math.max(0, Math.min(1, settings.sharpness ?? 0)) * 0.18,
+      // four-point one it replaced, so the slider maps to half of what it did.
+      // The curve is chosen to hold the middle and compress the top: at 0.5 it
+      // is the strength that measured well on the projector, and at 1.0 it stops
+      // three-quarters of the way up, short of where a bright rim appears along
+      // boundaries and thin dye goes blocky.
+      sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, surfaceTension, fingering,
