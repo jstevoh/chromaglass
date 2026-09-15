@@ -22,8 +22,8 @@ screen capture.
 | Structure at 4 px | 1.5 % | 0.9 % | 1.3 % | 0.3 % |
 | Structure at 8 px | 2.3 % | 2.2 % | 2.5 % | 0.5 % |
 
-`scratchpad/detail.mjs` produces this table. Batch 1 moves it into the repo as
-`npm run detail` so every batch is judged the same way.
+`npm run detail` (`scripts/detail.mjs`) produces this table, so every batch is judged
+the same way rather than by eye.
 
 ## Running order
 
@@ -109,52 +109,107 @@ the interface physics:
 
 ### 5. Playing it: sound learn, shutter, and a look link
 
-`src/lib/soundLearn.ts` (new), `src/components/MidiPanel.tsx`, `src/lib/cameraPass.ts`, `src/App.tsx`
+`src/lib/soundLearn.ts` (new), `src/hooks/useAudioAnalyzer.ts`, `src/components/MidiPanel.tsx`,
+`src/lib/cameraPass.ts`, `src/App.tsx`
 
-- **Sound learn.** The Learn flow that already binds a control to a MIDI knob gains a
-  second source: the music. Pick a control, pick kick, bass, snare, hats, level or a
-  frequency band, set a depth, and the plate follows it. Onset triggers fire the
-  existing actions, so a kick can press the big dish and a bar line can step the
-  preset. Our sources beat a plain FFT: the beat clock predicts beats and the song map
-  knows bars and sections, so a trigger can land on the beat rather than behind it.
-  Needs per-band energies and per-band onsets added to `useAudioAnalyzer`.
-- **Shutter** (`shutter`, camera pass). Long exposure where it is physically
-  motivated: the reference photographs are long exposures, and their light trails are
-  part of why they read as film. Accumulates into the camera's existing scene buffer
-  with a decay, coupled to aperture and bloom. Off in the light-show style, on in the
-  Photograph presets.
-- **Look link.** The whole settings state in a URL, for sending a look between the
-  laptop, the phone and anyone else.
+Independent of batches 1–4, so it can be built while the Mac is judging a look, and it
+is the batch that changes how the show feels to play.
 
-Independent of batches 1–4, so this can be built while the Mac is judging a look.
+**Sound learn.** Today the music drives three fixed things: sound drive, beat squeeze
+and macro sync. Anything else is a hand on a knob. The reference tool does better than
+that with two kinds of row: a *mapping* (source → target × depth, where the source is a
+frequency band, the overall level or a drum) and a *trigger* (a one-shot on an onset:
+a flash, a zoom punch, the next preset).
+
+The better version of that reuses a vocabulary the app already has rather than adding
+a second one. The Learn button that binds a control to a MIDI knob grows a second
+source: the music. Pick a slider, pick kick, bass, snare, hats, level or a band, set a
+depth, and the plate follows it. Triggers map onsets onto the existing `MidiAction`
+list, so a kick presses the big dish into a sunburst, a snare drops the lead dye, a bar
+line steps the preset. One learn flow, one action list, one set of bindings saved in
+the same file, whether the hand on the control is yours, a fader's or the drummer's.
+
+Ours can be better than a plain FFT for a reason they cannot match: the beat clock
+predicts the next beat and the song map knows bars and sections, so a trigger fires
+*on* the beat rather than a few tens of milliseconds behind the microphone. A
+band-energy mapping still follows the sound directly; it is the discrete hits that get
+to arrive on time.
+
+Needs per-band energies and per-band onsets added to `useAudioAnalyzer` (it exposes
+bass, mid, treble, energy and the raw `frequencyData` today, but no named bands and no
+onsets).
+
+**Shutter** (`shutter`, camera pass). Their trail buffer is a generic VJ smear laid
+over everything. Here it belongs in the camera, where it is physically motivated: the
+photographs that the Photograph style is built from are long exposures, and their light
+trails and motion blur are part of why they read as film rather than as a screen. An
+exposure-time control accumulates frames into the camera's existing scene buffer with a
+decay, which puts it downstream of aperture and bloom so the three couple the way a
+real lens does. Off in the light-show style, on by default in the Photograph presets.
+
+**Look link.** The whole settings state in a URL. Preset files already do this properly
+for a look you want to keep; a link is for the other case, showing someone a look right
+now, between the laptop, the phone and anyone you want to send it to. Opening one sets
+the look only: the projector window, the remote and the show server are untouched.
 
 ### 6. Render a song
 
-`src/lib/rng.ts` (new), `src/lib/render.ts` (new), `src/hooks/useRecorder.ts`
+`src/lib/rng.ts` (new), `src/lib/render.ts` (new), `src/hooks/useRecorder.ts`,
+`src/lib/songMap.ts`, `src/lib/sequencer.ts`
 
-Step the show frame by frame and encode it, instead of capturing the screen:
+This is the batch that changes what ChromaGlass is.
 
-- **Seeded randomness first.** There are 104 `Math.random` calls in the solver, the
-  beads, the bubbles and the macro camera. Every one becomes a draw from a seeded
-  generator carried on the fluid, or the render is not reproducible. This is the real
-  work of the batch and the reason it comes last: doing it earlier would collide with
-  every batch above.
-- **Offline audio analysis.** Pre-compute the bands per frame from the song file, so
-  the reactivity is identical every run and not tied to the frame rate.
-- **WebCodecs encode to MP4** with the audio track, at a grid the live machine cannot
-  hold (768² or 1024²) and a resolution up to 4K, streaming to disk. Chrome only;
-  elsewhere the current MediaRecorder capture stays as the fallback.
-- Runs a sequence and a per-song preset end to end, so the output is a finished light
-  show for that song.
+Recording today is `MediaRecorder` on the canvas: it captures whatever reached the
+screen, drops frames whenever the machine is busy, and gives back a WebM whose timing
+follows the render loop's bad luck. The reference tool does the opposite and is right
+to: it steps the effect frame by frame, pre-analyses the loaded audio with an offline
+FFT so the reactivity is identical on every run, encodes with WebCodecs and muxes to
+MP4 with the audio track, up to 4K and ten minutes, streaming to disk rather than
+holding the clip in memory.
+
+We can go past that, because we have the pieces it has no equivalent for: song
+identification, song maps, presets saved for a song and sequences with cue sheets. A
+**Render this song** that plays the sequence deterministically, at a grid the live
+machine cannot hold (768² or 1024²), with every solver step computed rather than every
+displayed frame captured, produces a finished light-show film of that song. Not a
+screen recording of a performance: the performance itself, run again at full quality.
+Nobody else in this space ships that.
+
+- **Seeded randomness.** There are 104 `Math.random` calls in the solver, the beads,
+  the bubbles and the macro camera. Every one becomes a draw from a seeded generator
+  carried on the fluid, or the same song rendered twice is two different films. This is
+  the bulk of the work.
+- **Offline audio analysis.** Bands and onsets pre-computed per frame from the song
+  file, so the reactivity is fixed to the timeline rather than to the frame rate, and a
+  render at 60 fps matches a render at 30.
+- **WebCodecs encode to MP4** with the audio track, streaming to disk. Chrome only; on
+  other browsers the current `MediaRecorder` capture stays as the fallback and says so.
+- **Runs the show, not the settings.** A sequence, a per-song preset and the cue sheet
+  play out over the song's real timeline.
 
 **Gate:** the same song rendered twice is byte-identical, and a 3-minute 1080p render
 completes without dropping a frame.
 
 ## Not doing
 
-Kaleidoscope, tiling, tunnel, halftone, posterize and solarize: warps of a picture
-that would erase the plate's identity. A built-in drum machine: the music file player
-already covers rehearsal.
+- **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.
+  They are what every VJ tool already offers and they would erase the plate's identity.
+- **A built-in drum machine.** Reacting to a synthesized beat is fine for rehearsal,
+  but you perform with a band, and the music file player already covers practice.
+
+## If you want to reorder
+
+Two things decide the order above, and both can be moved.
+
+- **Batches 5 and 6 are the ones that matter most**, and they sit last only because of
+  a dependency, not because they are worth less: 6 changes what the app is, 5 changes
+  how it feels to play. 5 touches no fluid code and can be pulled forward at any time.
+- **The seeded generator is the hinge.** It is a mechanical sweep over 104 call sites
+  in files that batches 1–4 also edit. Doing it last means one sweep over code that has
+  just changed; doing it first means every later batch is written against the seeded
+  generator from the start, which is cleaner but delays the first visible improvement
+  and will shift existing bead layouts and finger spokes slightly. It is worth pulling
+  forward as its own small PR the moment rendering a song is the next thing wanted.
 
 ## Operating rules
 
