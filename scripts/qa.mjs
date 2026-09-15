@@ -101,7 +101,30 @@ await page.addInitScript(() => {
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
+/**
+ * `.first()`, because a panel may legitimately carry a control the toolbar
+ * also has. It is deliberately forgiving — which is why the duplicate check
+ * below exists: without it, this helper silently drives one of two buttons and
+ * the other could be anything at all.
+ */
 const firstVisible = (testId) => page.getByTestId(testId).first();
+
+/** Every `data-testid` in the document now, with how many elements carry it. */
+const testIdCounts = () => page.evaluate(() => {
+  const seen = {};
+  for (const el of document.querySelectorAll('[data-testid]')) {
+    const id = el.getAttribute('data-testid');
+    seen[id] = (seen[id] ?? 0) + 1;
+  }
+  return seen;
+});
+/** Ids seen more than once across everything opened so far. */
+const duplicated = {};
+const noteDuplicates = async () => {
+  for (const [id, n] of Object.entries(await testIdCounts())) {
+    if (n > 1) duplicated[id] = Math.max(duplicated[id] ?? 0, n);
+  }
+};
 
 try {
   // ── It loads ──────────────────────────────────────────────────────
@@ -150,6 +173,7 @@ try {
   await settle();
   const headings = await page.locator('section h3').allInnerTexts();
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
+  await noteDuplicates();
 
   const sliders = page.locator('input[type="range"]:visible');
   const sliderCount = await sliders.count();
@@ -265,10 +289,28 @@ try {
       await b.click();
       await settle(800);
       check(`${what} opens`, true);
+      await noteDuplicates();
       await page.keyboard.press('Escape');
       await settle(400);
     } else {
       check(`${what} opens`, true, 'no button — skipped');
+    }
+  }
+
+  // The manual: it opens, it has its sections, and it closes again.
+  {
+    const b = page.getByTestId('guide-button');
+    if (await b.count()) {
+      await b.first().click();
+      await settle(1200);
+      const navs = await page.locator('[data-testid^="guide-nav-"]').count();
+      check('the manual opens with its sections', navs > 8, `${navs} sections`);
+      await noteDuplicates();
+      await page.keyboard.press('Escape');
+      await settle(500);
+      check('and closes again', (await page.getByTestId('guide-panel').count()) === 0);
+    } else {
+      check('the manual opens with its sections', false, 'no ? button');
     }
   }
 
@@ -285,6 +327,21 @@ try {
   await settle(1500);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('nothing spills off a phone-width screen', overflow <= 2, `${overflow}px of overflow`);
+
+  // ── Nothing is on the screen twice ────────────────────────────────
+  //
+  // The Band button was in the sound picker twice — the same markup pasted
+  // twice in the commit that added it — and it shipped, because every check
+  // here reaches for a control with `.first()` and the first one worked
+  // perfectly. A user found it by reading the menu.
+  //
+  // Two identical buttons is the harmless version. The same id on two
+  // *different* controls means every check that touches it is driving
+  // whichever happens to be first in the document, and passing.
+  await noteDuplicates();
+  const dupes = Object.entries(duplicated);
+  check('no control appears on the screen twice', dupes.length === 0,
+    dupes.map(([id, n]) => `${id} ×${n}`).join(', '));
 
   check('the console stayed clean', errors.length === 0, errors.slice(0, 5).join(' | '));
 } catch (err) {

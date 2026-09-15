@@ -1660,19 +1660,6 @@ export default function App() {
                     <Music size={14} />
                     <span>Band</span>
                   </button>
-                  <button
-                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
-                      audioSource === 'simulated'
-                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
-                    data-testid="simulated-audio-button"
-                  >
-                    <Music size={14} />
-                    <span>Band</span>
-                  </button>
                   <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
                 </div>
