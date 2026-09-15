@@ -2656,7 +2656,11 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   vec4 fAhead = decodeFluid(tex, fuv + n * e * 4.0, 0.0, false);
   vec4 fBack  = decodeFluid(tex, fuv - n * e * 4.0, 0.0, false);
   float span = abs(dot(fAhead.rgb - fBack.rgb, axis)) * smoothstep(0.02, 0.2, min(fAhead.a, fBack.a));
-  float band = smoothstep(0.05, 0.3, span);     // a boundary worth outlining
+  // A boundary worth outlining is one that changes quickly, not merely one that
+  // changes. Without the second test a wide soft ramp is still a span, and
+  // laying threads across it draws the contour map this pass exists to avoid:
+  // a fifty-cell ramp got six or seven parallel lines where it wanted none.
+  float band = smoothstep(0.05, 0.3, span) * smoothstep(0.03, 0.10, al);
   if (band < 0.004) return color;
   // Whether the boundary here is folding or being drawn out, taken from its own
   // shape rather than from the velocity field. The strain rate across the
@@ -2672,7 +2676,10 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   float bend = abs(dot(decodeFluid(tex, fuv + tang * t2, 0.0, false).rgb, axis)
                  + dot(decodeFluid(tex, fuv - tang * t2, 0.0, false).rgb, axis)
                  - 2.0 * fC) / max(al, 1e-3);
-  float fold = smoothstep(0.15, 1.6, bend);                            // 1 curling, 0 straight
+  // A floor, so a straight boundary still gets its hair: without one the thread
+  // is a fraction of a pixel wide at under half weight, which is no thread at
+  // all, and the pass drew only the curls.
+  float fold = max(smoothstep(0.15, 1.6, bend), 0.4);                  // 1 curling, 0.4 straight
   // One and a half threads across the span, and never closer together than a
   // few screen pixels.
   float px = max(fwidth(fuv.x), fwidth(fuv.y)) + 1e-6;
@@ -2680,7 +2687,11 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   float freq = min(1.5 / max(span, 0.03), 1.0 / max(4.0 * perPixel, 1e-5));
   float f = fC * freq + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.6;
   float lvl = abs(fract(f) - 0.5);
-  float line = 1.0 - smoothstep(0.0, mix(0.07, 0.30, fold), lvl);
+  // Never thinner than the pixel it is drawn on, or a thread samples as a row
+  // of broken dots — which is what the plate drawn small in a second dish was
+  // showing.
+  float wide = max(mix(0.07, 0.30, fold), fwidth(f) * 0.75);
+  float line = 1.0 - smoothstep(0.0, wide, lvl);
   float thread = line * band * mix(0.4, 1.0, fold);
   vec3 pale = mix(vec3(1.0), color, 0.18) * mix(0.85, 1.2, fold);
   return mix(color, pale, clamp(thread * amount, 0.0, 1.0) * smoothstep(0.02, 0.16, alpha));
