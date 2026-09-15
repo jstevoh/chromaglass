@@ -49,6 +49,17 @@ Both land in the GPU and CPU solvers so the two engines still agree. Shipped as 
 PRs rather than one, so the first improvement reaches the projector sooner: sharpening
 first, granulation second. Both are in.
 
+**Where sharpening stands, after four looks on the projector's GPU.** The pass is
+harmless now — the shallow dish is clean at every slider value at a matched step count —
+but on Fillmore at 512² the main dish at 0.5 cannot be told from 0 on a fixed
+composition, and at 1.0 the picture moves without getting sharper. At 192² on the CPU
+solver it measurably steepens (mean gradient 0.091 → 0.104 at the default). The reading
+is that Fillmore's colour boundaries at 512² are wide soft gradients with almost nothing
+in them to steepen. **Decide after batch 2:** lacing and drops are what make hard edges,
+and if the pass still shows nothing on the GPU once they exist, it should be dropped
+rather than carried. Granulation is a separate matter and now works from the first frame;
+before that fix no GPU ever drew it for the first nine hundred steps of a page.
+
 **Gate:** typical local contrast ≥ 3.0 on the Fillmore plate at the preset's default,
 with no more than 15 % frame-time cost at 512², and no oscillation over a 100 s settle.
 Met: 3.3, from 2.7 with granulation off and 0.8 as first measured. That first figure was
