@@ -433,6 +433,7 @@ void main() {
 
   sharpenDye: `${PRELUDE}
 uniform sampler2D u_dye; uniform float u_sharp;
+#define SHARP_FLOOR 0.08
 // How much of an interface a pair of cells straddles: 1 where both hold
 // comparable dye, 0 where one of them is empty. Without it the pass keeps
 // pulling dye off the thin side of a boundary until a hole opens, which is
@@ -456,15 +457,20 @@ void main() {
   // are the isotropic nine-point Laplacian's, 0.2 per axis and 0.05 per corner.
   vec4 f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
          + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
-  // Thin dye carries small differences, and steepening those turns a smooth
-  // wash into a staircase of flat plateaus — which is what went blocky in the
-  // shallow dish while the full dish sharpened cleanly. Fade the pass in with
-  // how much dye a cell actually holds, so the amount of liquid decides, not
-  // the slider.
-  float body = smoothstep(0.15, 0.70, c.a);
-  vec4 s = c + u_sharp * body * f;
   vec4 lo = min(min(min(l, r), min(d, u)), min(min(dl, dr), min(ul, ur)));
   vec4 hi = max(max(max(l, r), max(d, u)), max(max(dl, dr), max(ul, ur)));
+  // Backward diffusion grows whatever curvature it is given, so left to itself
+  // it does not only steepen boundaries: over a long settle it takes the faint
+  // curvature of a smooth wash and grows that into a staircase of flat terraces.
+  // That is what the shallow dish did on the projector, and why gating on how
+  // much dye was there did not help — the wash and the boundary are told apart
+  // by whether the curvature is already an edge, not by how much liquid is in
+  // the dish. Anything below a fraction of the local range of the dye is a wash
+  // and is left alone; a smeared edge carries several times that and keeps
+  // nearly all of its flux.
+  vec4 scale = max(hi, c) - min(lo, c);
+  vec4 fl = sign(f) * max(abs(f) - SHARP_FLOOR * scale, vec4(0.0));
+  vec4 s = c + u_sharp * fl;
   fragColor = max(clamp(s, min(lo, c), max(hi, c)), vec4(0.0));
 }`,
 

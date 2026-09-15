@@ -33,6 +33,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Fixed — sharpening that stops before it builds a staircase
+- The gate on how much dye a cell holds was the wrong axis. Backward diffusion grows
+  whatever curvature it is given, so over a long settle it does not only steepen
+  boundaries: it takes the faint curvature of a smooth wash and grows that into flat
+  terraces, whatever the density. What tells a wash from a boundary is whether the
+  curvature is already an edge, so the pass now ignores curvature below 8 % of the local
+  range of the dye and keeps nearly all of a real edge's
+- Measured on the settled plate with the grain off, 90 s, Fillmore, CPU 192², over the
+  two dishes separately (the shallow dish holds a wash with no boundaries, so every step
+  in it is an artefact). At the default, main dish: mean gradient 0.091 unsharpened →
+  0.104, where the old pass reached 0.328 by terracing, and roughness 0.0068 → 0.046
+  against the old 0.93. Shallow dish: roughness 0.0011 unsharpened → 0.011, against the
+  old 0.66 — sixty times less. At the top of the slider the main dish reaches the old
+  pass's steepening (0.120) with a tenth of its staircase
+- The slider is useful over its whole travel again rather than dangerous at the top: a
+  wash carries no curvature above the floor, so turning it up cannot start a terrace
+
+### Changed — the cheat sheet, third pass
+- Labels are measured at the size they are drawn in. A system font with optical sizes —
+  SF on a Mac — sets small type wider and more loosely, so measuring once at a large
+  size made every label on that machine 14–17 % narrower than it drew, which ate the
+  margin and put eight names on their outlines
+- A name switches to its short form when the full one has to be set small **or** pushed
+  against its outline, so Clean Screen and Background Loop now use theirs on a machine
+  where they do not fit comfortably
+
 ### Changed — sharpening that knows how much liquid is there
 - The sharpening pass fades in with the dye a cell actually holds, so the full dish
   keeps every bit of the steepening and a thin wash is left alone. Measured on the
