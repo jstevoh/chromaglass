@@ -28,7 +28,7 @@
 - The key changed, so any tab or display still holding key 9281 needs a reload with 1678. I left James's Chrome and the projector alone. James's Chrome has one tab open, and it isn't the show.
 - **Load at the start:** GPU utilisation 94 %, load average 4.3. Timings below are compared by frames, not seconds.
 
-## 2. Lacing (first pass; more to follow)
+## 2. Lacing
 
 **Method.** `~/cg-scratch/lace42.mjs` runs Fillmore at `?debug&sim=512` on "GPU · 512² · 1.0x" throughout. `Math.random` is seeded (mulberry32, seed 7), and Granulation 0 and Plate Cells 0 are set over OSC. It runs one page at a time.
 
@@ -98,7 +98,7 @@ Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 a
 - **A 1920×1080 run doesn't settle it either.** I asked for DPR 2 to get the projector's 4K, but the app draws 1920×1080 whatever the DPR.
   - Medians: 16.82 ms on, 16.92 off.
   - Frames per window: 804/835, 791/727, 727/725, 724/694 (on/off in turn). Adjacent pairs give about 4 % fewer frames with lacing on. The load was falling through the whole run, so that is within the noise.
-  - A per-draw GPU timer (`lacegpu42.mjs`) follows.
+  - The per-draw GPU timer in §4 resolves it.
 
 ### Does the strain coupling show? **No, I can't see it.**
 
