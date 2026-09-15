@@ -134,6 +134,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - What looked like a mottle creeping over the plate after two minutes was this: the grain
   switching on late. Anything judged in a page's first minute was judged without it
 
+### Changed — where a long name comes apart
+- A break inside a word's own parts reads as a different word for a moment, which on a
+  dark stage is the cost the picture exists to avoid. A compound now comes apart at its
+  prefix: **Back-ground**, **Micro-scopic**, **Under-ground**, **Cyber-punk**, with the
+  consonant-pair and after-a-vowel rules behind it (**Irides-cence**, **Granu-lation**,
+  **Labora-tory**)
+- A name that would need three lines inside a circle takes its short form instead, so the
+  Background Loop knob reads "Bg Loop" on one line rather than three crowded ones
+
 ### Changed — long names break rather than shrink
 - A name too long for its control is hyphenated and set at full size rather than set
   smaller: "Irides-cence" on a knob, "Under-ground" on a pad. The break goes between two
