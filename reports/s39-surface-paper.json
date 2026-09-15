@@ -1,0 +1,1187 @@
+{
+ "paper": "true",
+ "scale": 1.150375939849624,
+ "vb": [
+  1064,
+  632
+ ],
+ "bound": 80,
+ "unbound": 67,
+ "sizes": {
+  "7": 1,
+  "8": 208,
+  "7.5": 1
+ },
+ "small": [
+  {
+   "id": "strip-52-1",
+   "label": "Evolve",
+   "units": 7,
+   "px": 8.1
+  },
+  {
+   "id": "strip-52-2",
+   "label": "Macro",
+   "units": 7.5,
+   "px": 8.6
+  }
+ ],
+ "ellipsis": [],
+ "tightest": [
+  {
+   "id": "strip-52-2",
+   "label": "Macro",
+   "units": 7.5,
+   "margin": 1.7,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-1",
+   "label": "Evolve",
+   "units": 7,
+   "margin": 1.9,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-3",
+   "label": "Clean",
+   "units": 8,
+   "margin": 2.1,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-0",
+   "label": "Seed",
+   "units": 8,
+   "margin": 3.5,
+   "shape": "ellipse"
+  },
+  {
+   "id": "tr-90",
+   "label": "Metronome",
+   "units": 8,
+   "margin": 3.5,
+   "shape": "rect"
+  },
+  {
+   "id": "pad-0",
+   "label": "Sunshine / Yellow",
+   "units": 8,
+   "margin": 3.6,
+   "shape": "rect"
+  },
+  {
+   "id": "pad-1",
+   "label": "Sunshine / Orange",
+   "units": 8,
+   "margin": 3.6,
+   "shape": "rect"
+  },
+  {
+   "id": "dev-knob-2",
+   "label": "Hot-Spot",
+   "units": 8,
+   "margin": 3.6,
+   "shape": "ellipse"
+  },
+  {
+   "id": "dev-knob-6",
+   "label": "Aperture",
+   "units": 8,
+   "margin": 4.2,
+   "shape": "ellipse"
+  },
+  {
+   "id": "pad-16",
+   "label": "Stardust / Collapse",
+   "units": 8,
+   "margin": 4.7,
+   "shape": "rect"
+  },
+  {
+   "id": "strip-52-4",
+   "label": "Stop",
+   "units": 8,
+   "margin": 4.8,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-5",
+   "label": "Stop",
+   "units": 8,
+   "margin": 4.8,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-6",
+   "label": "Stop",
+   "units": 8,
+   "margin": 4.8,
+   "shape": "ellipse"
+  },
+  {
+   "id": "strip-52-7",
+   "label": "Stop",
+   "units": 8,
+   "margin": 4.8,
+   "shape": "ellipse"
+  },
+  {
+   "id": "pad-28",
+   "label": "Jellyfish / Bloom",
+   "units": 8,
+   "margin": 4.9,
+   "shape": "rect"
+  }
+ ],
+ "overflow": [],
+ "faders": [
+  {
+   "id": "fader-0",
+   "label": "Sound Drive",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-1",
+   "label": "Evolve Speed",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-2",
+   "label": "Speed",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-3",
+   "label": "Dye Budget",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-4",
+   "label": "Turbulence",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-5",
+   "label": "Plate Rock",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-6",
+   "label": "Bubbles",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-7",
+   "label": "Saturation",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "fader-master",
+   "label": "Dimmer",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  },
+  {
+   "id": "crossfader",
+   "label": "Sharpness",
+   "units": 8,
+   "clearance": [
+    5,
+    5
+   ]
+  }
+ ],
+ "inks": [
+  {
+   "id": "pad-0",
+   "label": "Sunshine / Yellow",
+   "ink": "#887c00",
+   "fill": "#FFEA0055",
+   "vsPanel": 4.26,
+   "vsOwn": 3.91
+  },
+  {
+   "id": "pad-1",
+   "label": "Sunshine / Orange",
+   "ink": "#a75100",
+   "fill": "#FF7B0055",
+   "vsPanel": 5.5,
+   "vsOwn": 3.97
+  },
+  {
+   "id": "pad-2",
+   "label": "Vibrant / Hot Pink",
+   "ink": "#ba005d",
+   "fill": "#FF007F55",
+   "vsPanel": 6.47,
+   "vsOwn": 3.68
+  },
+  {
+   "id": "pad-3",
+   "label": "Cherry / Red",
+   "ink": "#ba0000",
+   "fill": "#FF000055",
+   "vsPanel": 6.8,
+   "vsOwn": 3.75
+  },
+  {
+   "id": "pad-4",
+   "label": "Crimson",
+   "ink": "#a60e09",
+   "fill": "#B80F0A55",
+   "vsPanel": 7.81,
+   "vsOwn": 4.15
+  },
+  {
+   "id": "pad-5",
+   "label": "Emerald",
+   "ink": "#34834f",
+   "fill": "#50C87855",
+   "vsPanel": 4.66,
+   "vsOwn": 3.63
+  },
+  {
+   "id": "pad-6",
+   "label": "Limpid / Green",
+   "ink": "#1e880b",
+   "fill": "#39FF1455",
+   "vsPanel": 4.58,
+   "vsOwn": 3.95
+  },
+  {
+   "id": "pad-7",
+   "label": "Icy Blue",
+   "ink": "#588181",
+   "fill": "#A5F2F355",
+   "vsPanel": 4.31,
+   "vsOwn": 3.97
+  }
+ ],
+ "lowInk": [],
+ "pos": {
+  "pad-32": {
+   "label": "Classic / Light / Show",
+   "aria": "Clip 1/5, Classic Light Show",
+   "x": 286.4,
+   "y": 44.8
+  },
+  "pad-33": {
+   "label": "Galaxy",
+   "aria": "Clip 2/5, Galaxy",
+   "x": 338.3,
+   "y": 44.8
+  },
+  "pad-34": {
+   "label": "Deep / Ocean",
+   "aria": "Clip 3/5, Deep Ocean",
+   "x": 390.2,
+   "y": 44.8
+  },
+  "pad-35": {
+   "label": "Cyber- / punk / Neon",
+   "aria": "Clip 4/5, Cyberpunk Neon",
+   "x": 442.1,
+   "y": 44.8
+  },
+  "pad-36": {
+   "label": "Lava / Lamp",
+   "aria": "Clip 5/5, Lava Lamp",
+   "x": 494.1,
+   "y": 44.8
+  },
+  "pad-37": {
+   "label": "Acid / Trip",
+   "aria": "Clip 6/5, Acid Trip",
+   "x": 546,
+   "y": 44.8
+  },
+  "pad-38": {
+   "label": "Bass / Drop",
+   "aria": "Clip 7/5, Bass Drop",
+   "x": 597.9,
+   "y": 44.8
+  },
+  "pad-39": {
+   "label": "Timbre / Shifter",
+   "aria": "Clip 8/5, Timbre Shifter",
+   "x": 649.8,
+   "y": 44.8
+  },
+  "pad-24": {
+   "label": "Boiling / Point",
+   "aria": "Clip 1/4, Boiling Point",
+   "x": 286.4,
+   "y": 96.7
+  },
+  "pad-25": {
+   "label": "Micros- / copic / Chaos",
+   "aria": "Clip 2/4, Microscopic Chaos",
+   "x": 338.3,
+   "y": 96.7
+  },
+  "pad-26": {
+   "label": "Aurora / Borealis",
+   "aria": "Clip 3/4, Aurora Borealis",
+   "x": 390.2,
+   "y": 96.7
+  },
+  "pad-27": {
+   "label": "Solar / Flare",
+   "aria": "Clip 4/4, Solar Flare",
+   "x": 442.1,
+   "y": 96.7
+  },
+  "pad-28": {
+   "label": "Jellyfish / Bloom",
+   "aria": "Clip 5/4, Jellyfish Bloom",
+   "x": 494.1,
+   "y": 96.7
+  },
+  "pad-29": {
+   "label": "Fractal / Dream",
+   "aria": "Clip 6/4, Fractal Dream",
+   "x": 546,
+   "y": 96.7
+  },
+  "pad-30": {
+   "label": "Velvet / Under- / ground",
+   "aria": "Clip 7/4, Velvet Underground",
+   "x": 597.9,
+   "y": 96.7
+  },
+  "pad-31": {
+   "label": "Neon / Coral / Reef",
+   "aria": "Clip 8/4, Neon Coral Reef",
+   "x": 649.8,
+   "y": 96.7
+  },
+  "pad-16": {
+   "label": "Stardust / Collapse",
+   "aria": "Clip 1/3, Stardust Collapse",
+   "x": 286.4,
+   "y": 148.6
+  },
+  "pad-17": {
+   "label": "Lumia",
+   "aria": "Clip 2/3, Lumia",
+   "x": 338.3,
+   "y": 148.6
+  },
+  "pad-18": {
+   "label": "Sensual / Labo- / ratory",
+   "aria": "Clip 3/3, Sensual Laboratory",
+   "x": 390.2,
+   "y": 148.6
+  },
+  "pad-19": {
+   "label": "Oil / Wheel",
+   "aria": "Clip 4/3, Oil Wheel",
+   "x": 442.1,
+   "y": 148.6
+  },
+  "pad-20": {
+   "label": "Poster, / 1969",
+   "aria": "Clip 5/3, Poster, 1969",
+   "x": 494.1,
+   "y": 148.6
+  },
+  "pad-21": {
+   "label": "Oil on / Water",
+   "aria": "Clip 6/3, Oil on Water",
+   "x": 546,
+   "y": 148.6
+  },
+  "pad-22": {
+   "label": "Colorful / Cosmos",
+   "aria": "Clip 7/3, Colorful Cosmos",
+   "x": 597.9,
+   "y": 148.6
+  },
+  "pad-23": {
+   "label": "Sunny / Side Up",
+   "aria": "Clip 8/3, Sunny Side Up",
+   "x": 649.8,
+   "y": 148.6
+  },
+  "pad-8": {
+   "label": "Macro / Bead",
+   "aria": "Clip 1/2, Macro Bead",
+   "x": 286.4,
+   "y": 200.5
+  },
+  "pad-9": {
+   "label": "Cell / Bloom",
+   "aria": "Clip 2/2, Cell Bloom",
+   "x": 338.3,
+   "y": 200.5
+  },
+  "pad-10": {
+   "label": "Lacing / Run",
+   "aria": "Clip 3/2, Lacing Run",
+   "x": 390.2,
+   "y": 200.5
+  },
+  "pad-11": {
+   "label": "Fillmore / East, / 1969",
+   "aria": "Clip 4/2, Fillmore East, 1969",
+   "x": 442.1,
+   "y": 200.5
+  },
+  "pad-12": {
+   "label": "Crowd / Plate",
+   "aria": "Clip 5/2, Crowd Plate",
+   "x": 494.1,
+   "y": 200.5
+  },
+  "pad-13": {
+   "label": "Clip 6/2",
+   "aria": "Clip 6/2, unassigned",
+   "x": 546,
+   "y": 200.5
+  },
+  "pad-14": {
+   "label": "Clip 7/2",
+   "aria": "Clip 7/2, unassigned",
+   "x": 597.9,
+   "y": 200.5
+  },
+  "pad-15": {
+   "label": "Clip 8/2",
+   "aria": "Clip 8/2, unassigned",
+   "x": 649.8,
+   "y": 200.5
+  },
+  "pad-0": {
+   "label": "Sunshine / Yellow",
+   "aria": "Clip 1/1, Sunshine Yellow",
+   "x": 286.4,
+   "y": 252.5
+  },
+  "pad-1": {
+   "label": "Sunshine / Orange",
+   "aria": "Clip 2/1, Sunshine Orange",
+   "x": 338.3,
+   "y": 252.5
+  },
+  "pad-2": {
+   "label": "Vibrant / Hot Pink",
+   "aria": "Clip 3/1, Vibrant Hot Pink",
+   "x": 390.2,
+   "y": 252.5
+  },
+  "pad-3": {
+   "label": "Cherry / Red",
+   "aria": "Clip 4/1, Cherry Red",
+   "x": 442.1,
+   "y": 252.5
+  },
+  "pad-4": {
+   "label": "Crimson",
+   "aria": "Clip 5/1, Crimson",
+   "x": 494.1,
+   "y": 252.5
+  },
+  "pad-5": {
+   "label": "Emerald",
+   "aria": "Clip 6/1, Emerald",
+   "x": 546,
+   "y": 252.5
+  },
+  "pad-6": {
+   "label": "Limpid / Green",
+   "aria": "Clip 7/1, Limpid Green",
+   "x": 597.9,
+   "y": 252.5
+  },
+  "pad-7": {
+   "label": "Icy Blue",
+   "aria": "Clip 8/1, Icy Blue",
+   "x": 649.8,
+   "y": 252.5
+  },
+  "scene-0": {
+   "label": "Random",
+   "aria": "Scene 1, Random",
+   "x": 711.7,
+   "y": 44.8
+  },
+  "scene-1": {
+   "label": "Sequencer / Play / Pause",
+   "aria": "Scene 2, Sequencer Play / Pause",
+   "x": 711.7,
+   "y": 96.7
+  },
+  "scene-2": {
+   "label": "Sequencer / Previous",
+   "aria": "Scene 3, Sequencer Previous",
+   "x": 711.7,
+   "y": 148.6
+  },
+  "scene-3": {
+   "label": "Sequencer / Next",
+   "aria": "Scene 4, Sequencer Next",
+   "x": 711.7,
+   "y": 200.5
+  },
+  "scene-4": {
+   "label": "Sequencer / Stop",
+   "aria": "Scene 5, Sequencer Stop",
+   "x": 711.7,
+   "y": 252.5
+  },
+  "master-sel": {
+   "label": "Drain",
+   "aria": "Master, Drain",
+   "x": 711.7,
+   "y": 304.4
+  },
+  "stop-all": {
+   "label": "Clear",
+   "aria": "Stop All Clips, Clear",
+   "x": 711.7,
+   "y": 340.3
+  },
+  "strip-50-0": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 295.4,
+   "y": 318.3
+  },
+  "strip-50-1": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 347.3,
+   "y": 318.3
+  },
+  "strip-50-2": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 399.2,
+   "y": 318.3
+  },
+  "strip-50-3": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 451.1,
+   "y": 318.3
+  },
+  "strip-50-4": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 503,
+   "y": 318.3
+  },
+  "strip-50-5": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 555,
+   "y": 318.3
+  },
+  "strip-50-6": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 606.9,
+   "y": 318.3
+  },
+  "strip-50-7": {
+   "label": "Act",
+   "aria": "Act, unassigned",
+   "x": 658.8,
+   "y": 318.3
+  },
+  "strip-66-0": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 295.4,
+   "y": 348.3
+  },
+  "strip-66-1": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 347.3,
+   "y": 348.3
+  },
+  "strip-66-2": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 399.2,
+   "y": 348.3
+  },
+  "strip-66-3": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 451.1,
+   "y": 348.3
+  },
+  "strip-66-4": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 503,
+   "y": 348.3
+  },
+  "strip-66-5": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 555,
+   "y": 348.3
+  },
+  "strip-66-6": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 606.9,
+   "y": 348.3
+  },
+  "strip-66-7": {
+   "label": "A|B",
+   "aria": "A|B, unassigned",
+   "x": 658.8,
+   "y": 348.3
+  },
+  "strip-49-0": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 295.4,
+   "y": 378.2
+  },
+  "strip-49-1": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 347.3,
+   "y": 378.2
+  },
+  "strip-49-2": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 399.2,
+   "y": 378.2
+  },
+  "strip-49-3": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 451.1,
+   "y": 378.2
+  },
+  "strip-49-4": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 503,
+   "y": 378.2
+  },
+  "strip-49-5": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 555,
+   "y": 378.2
+  },
+  "strip-49-6": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 606.9,
+   "y": 378.2
+  },
+  "strip-49-7": {
+   "label": "Solo",
+   "aria": "Solo, unassigned",
+   "x": 658.8,
+   "y": 378.2
+  },
+  "strip-48-0": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 295.4,
+   "y": 408.2
+  },
+  "strip-48-1": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 347.3,
+   "y": 408.2
+  },
+  "strip-48-2": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 399.2,
+   "y": 408.2
+  },
+  "strip-48-3": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 451.1,
+   "y": 408.2
+  },
+  "strip-48-4": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 503,
+   "y": 408.2
+  },
+  "strip-48-5": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 555,
+   "y": 408.2
+  },
+  "strip-48-6": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 606.9,
+   "y": 408.2
+  },
+  "strip-48-7": {
+   "label": "Arm",
+   "aria": "Arm, unassigned",
+   "x": 658.8,
+   "y": 408.2
+  },
+  "strip-52-0": {
+   "label": "Seed",
+   "aria": "Stop, Seed",
+   "x": 295.4,
+   "y": 438.2
+  },
+  "strip-52-1": {
+   "label": "Evolve",
+   "aria": "Stop, Random Evolve",
+   "x": 347.3,
+   "y": 438.2
+  },
+  "strip-52-2": {
+   "label": "Macro",
+   "aria": "Stop, Macro",
+   "x": 399.2,
+   "y": 438.2
+  },
+  "strip-52-3": {
+   "label": "Clean",
+   "aria": "Stop, Clean Screen",
+   "x": 451.1,
+   "y": 438.2
+  },
+  "strip-52-4": {
+   "label": "Stop",
+   "aria": "Stop, unassigned",
+   "x": 503,
+   "y": 438.2
+  },
+  "strip-52-5": {
+   "label": "Stop",
+   "aria": "Stop, unassigned",
+   "x": 555,
+   "y": 438.2
+  },
+  "strip-52-6": {
+   "label": "Stop",
+   "aria": "Stop, unassigned",
+   "x": 606.9,
+   "y": 438.2
+  },
+  "strip-52-7": {
+   "label": "Stop",
+   "aria": "Stop, unassigned",
+   "x": 658.8,
+   "y": 438.2
+  },
+  "fader-0": {
+   "label": "Sound Drive",
+   "aria": "Fader 1, Sound Drive",
+   "x": 298.4,
+   "y": 480.1
+  },
+  "select-0": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 295.4,
+   "y": 581.9
+  },
+  "fader-1": {
+   "label": "Evolve Speed",
+   "aria": "Fader 2, Evolve Speed",
+   "x": 350.3,
+   "y": 480.1
+  },
+  "select-1": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 347.3,
+   "y": 581.9
+  },
+  "fader-2": {
+   "label": "Speed",
+   "aria": "Fader 3, Speed",
+   "x": 402.2,
+   "y": 480.1
+  },
+  "select-2": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 399.2,
+   "y": 581.9
+  },
+  "fader-3": {
+   "label": "Dye Budget",
+   "aria": "Fader 4, Dye Budget",
+   "x": 454.1,
+   "y": 480.1
+  },
+  "select-3": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 451.1,
+   "y": 581.9
+  },
+  "fader-4": {
+   "label": "Turbulence",
+   "aria": "Fader 5, Turbulence",
+   "x": 506,
+   "y": 480.1
+  },
+  "select-4": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 503,
+   "y": 581.9
+  },
+  "fader-5": {
+   "label": "Plate Rock",
+   "aria": "Fader 6, Plate Rock",
+   "x": 558,
+   "y": 480.1
+  },
+  "select-5": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 555,
+   "y": 581.9
+  },
+  "fader-6": {
+   "label": "Bubbles",
+   "aria": "Fader 7, Bubbles",
+   "x": 609.9,
+   "y": 480.1
+  },
+  "select-6": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 606.9,
+   "y": 581.9
+  },
+  "fader-7": {
+   "label": "Saturation",
+   "aria": "Fader 8, Saturation",
+   "x": 661.8,
+   "y": 480.1
+  },
+  "select-7": {
+   "label": "Sel",
+   "aria": "Sel, unassigned",
+   "x": 658.8,
+   "y": 581.9
+  },
+  "fader-master": {
+   "label": "Dimmer",
+   "aria": "Master Fader, Dimmer",
+   "x": 729.7,
+   "y": 480.1
+  },
+  "dev-knob-0": {
+   "label": "Light / Play",
+   "aria": "Device 1, Light Play",
+   "x": 34.8,
+   "y": 54.8
+  },
+  "dev-knob-1": {
+   "label": "Lamp / Motion",
+   "aria": "Device 2, Lamp Motion",
+   "x": 92.7,
+   "y": 54.8
+  },
+  "dev-knob-2": {
+   "label": "Hot-Spot",
+   "aria": "Device 3, Hot-Spot",
+   "x": 150.6,
+   "y": 54.8
+  },
+  "dev-knob-3": {
+   "label": "Second / Lamp",
+   "aria": "Device 4, Second Lamp",
+   "x": 208.5,
+   "y": 54.8
+  },
+  "dev-knob-4": {
+   "label": "Camera",
+   "aria": "Device 5, Camera",
+   "x": 34.8,
+   "y": 120.7
+  },
+  "dev-knob-5": {
+   "label": "Focus",
+   "aria": "Device 6, Focus",
+   "x": 92.7,
+   "y": 120.7
+  },
+  "dev-knob-6": {
+   "label": "Aperture",
+   "aria": "Device 7, Aperture",
+   "x": 150.6,
+   "y": 120.7
+  },
+  "dev-knob-7": {
+   "label": "Bloom",
+   "aria": "Device 8, Bloom",
+   "x": 208.5,
+   "y": 120.7
+  },
+  "dev-btn-58": {
+   "label": "Device ←",
+   "aria": "Device ←, unassigned",
+   "x": 34.8,
+   "y": 196.5
+  },
+  "dev-btn-59": {
+   "label": "Device →",
+   "aria": "Device →, unassigned",
+   "x": 92.7,
+   "y": 196.5
+  },
+  "dev-btn-60": {
+   "label": "Bank ←",
+   "aria": "Bank ←, unassigned",
+   "x": 150.6,
+   "y": 196.5
+  },
+  "dev-btn-61": {
+   "label": "Bank →",
+   "aria": "Bank →, unassigned",
+   "x": 208.5,
+   "y": 196.5
+  },
+  "dev-btn-62": {
+   "label": "Dev / On/Off",
+   "aria": "Dev On/Off, unassigned",
+   "x": 34.8,
+   "y": 230.5
+  },
+  "dev-btn-63": {
+   "label": "Dev Lock",
+   "aria": "Dev Lock, unassigned",
+   "x": 92.7,
+   "y": 230.5
+  },
+  "dev-btn-64": {
+   "label": "Clip/Dev",
+   "aria": "Clip/Dev, unassigned",
+   "x": 150.6,
+   "y": 230.5
+  },
+  "dev-btn-65": {
+   "label": "Detail",
+   "aria": "Detail, unassigned",
+   "x": 208.5,
+   "y": 230.5
+  },
+  "trk-knob-0": {
+   "label": "Beat / Squeeze",
+   "aria": "Track 1, Beat Squeeze",
+   "x": 805.6,
+   "y": 54.8
+  },
+  "trk-knob-1": {
+   "label": "Edge / Relief",
+   "aria": "Track 2, Edge Relief",
+   "x": 863.5,
+   "y": 54.8
+  },
+  "trk-knob-2": {
+   "label": "Irides- / cence",
+   "aria": "Track 3, Iridescence",
+   "x": 921.4,
+   "y": 54.8
+  },
+  "trk-knob-3": {
+   "label": "Hue / Journey",
+   "aria": "Track 4, Hue Journey",
+   "x": 979.3,
+   "y": 54.8
+  },
+  "trk-knob-4": {
+   "label": "Backg- / round / Loop",
+   "aria": "Track 5, Background Loop",
+   "x": 805.6,
+   "y": 120.7
+  },
+  "trk-knob-5": {
+   "label": "Round / Dish",
+   "aria": "Track 6, Round Dish",
+   "x": 863.5,
+   "y": 120.7
+  },
+  "trk-knob-6": {
+   "label": "Macro / Zoom",
+   "aria": "Track 7, Macro Zoom",
+   "x": 921.4,
+   "y": 120.7
+  },
+  "trk-knob-7": {
+   "label": "Macro / Music / Sync",
+   "aria": "Track 8, Macro Music Sync",
+   "x": 979.3,
+   "y": 120.7
+  },
+  "trk-btn-87": {
+   "label": "Pan",
+   "aria": "Pan, unassigned",
+   "x": 805.6,
+   "y": 196.5
+  },
+  "trk-btn-88": {
+   "label": "Sends",
+   "aria": "Sends, unassigned",
+   "x": 863.5,
+   "y": 196.5
+  },
+  "trk-btn-89": {
+   "label": "User",
+   "aria": "User, unassigned",
+   "x": 921.4,
+   "y": 196.5
+  },
+  "tempo": {
+   "label": "Tempo",
+   "aria": "Tempo, unassigned",
+   "x": 805.6,
+   "y": 252.5
+  },
+  "cue": {
+   "label": "Granu- / lation",
+   "aria": "Cue Level, Granulation",
+   "x": 863.5,
+   "y": 252.5
+  },
+  "crossfader": {
+   "label": "Sharpness",
+   "aria": "Crossfader, Sharpness",
+   "x": 805.6,
+   "y": 322.3
+  },
+  "tr-91": {
+   "label": "Play / / Pause",
+   "aria": "Play, Play / Pause",
+   "x": 805.6,
+   "y": 362.3
+  },
+  "tr-92": {
+   "label": "Blackout",
+   "aria": "Stop, Blackout",
+   "x": 863.5,
+   "y": 362.3
+  },
+  "tr-93": {
+   "label": "Record",
+   "aria": "Record, Record",
+   "x": 921.4,
+   "y": 362.3
+  },
+  "tr-102": {
+   "label": "Session / Rec",
+   "aria": "Session Rec, unassigned",
+   "x": 805.6,
+   "y": 394.2
+  },
+  "tr-99": {
+   "label": "Tap / Tempo",
+   "aria": "Tap Tempo, unassigned",
+   "x": 863.5,
+   "y": 394.2
+  },
+  "tr-90": {
+   "label": "Metronome",
+   "aria": "Metronome, unassigned",
+   "x": 921.4,
+   "y": 394.2
+  },
+  "tr-100": {
+   "label": "Nudge −",
+   "aria": "Nudge −, unassigned",
+   "x": 805.6,
+   "y": 426.2
+  },
+  "tr-101": {
+   "label": "Nudge +",
+   "aria": "Nudge +, unassigned",
+   "x": 863.5,
+   "y": 426.2
+  },
+  "tr-98": {
+   "label": "Shift",
+   "aria": "Shift, unassigned",
+   "x": 921.4,
+   "y": 426.2
+  },
+  "tr-94": {
+   "label": "Up",
+   "aria": "Up, unassigned",
+   "x": 863.5,
+   "y": 462.1
+  },
+  "tr-97": {
+   "label": "Previous / Preset",
+   "aria": "Left, Previous Preset",
+   "x": 805.6,
+   "y": 494.1
+  },
+  "tr-95": {
+   "label": "Down",
+   "aria": "Down, unassigned",
+   "x": 863.5,
+   "y": 494.1
+  },
+  "tr-96": {
+   "label": "Next / Preset",
+   "aria": "Right, Next Preset",
+   "x": 921.4,
+   "y": 494.1
+  }
+ },
+ "swatchShadows": [
+  "rgba(17, 24, 39, 0.35) 0px 0px 0px 1px inset"
+ ],
+ "chipOpacity": [
+  "1"
+ ]
+}

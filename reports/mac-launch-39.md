@@ -25,3 +25,65 @@
 
 - The key changed, so any of James's tabs or displays still holding key 7594 need a reload with 9281. I left James's Chrome and the projector alone.
 - **Load:** GPU utilisation 99 % and load average 5.3–5.5 at the start (MOTIV Mix, James's Chrome, WindowServer). That is the same as #37, so timings below are compared by frames, not seconds.
+
+## 3. The sheet — **everything at 8 but two stop-row words; three breaks read badly**
+
+Method: `~/cg-scratch/surface39.mjs` (surface37 pointed at a new folder) and `surface39z.mjs` (3× zooms).
+- MIDI panel open, MIDI enabled with no hardware attached, APC40 mkII factory map loaded.
+- Every `<text>` and shape measured in the DOM in both modes, then the PNG saved in both modes.
+- The old script's extra zoom block stopped on a control id this picture doesn't have (`fader-8`), after all measurements and both PNGs were saved. The zooms come from `surface39z.mjs`.
+
+**Factory map: 80 bound / 67 unbound** (#37: 79 / 68). Ink against its own fill: 0 controls below 3.6 in either mode.
+
+### a) Sizes — **208 of 210 lines at full size on this Mac**
+
+| units | #37 lines | #39 lines |
+|---|---|---|
+| 8 | 189 | **208** |
+| 7.5 | 1 | 1 (Macro) |
+| 7 | 3 | 1 (Evolve) |
+| 6.5 | 2 | 0 |
+| 6 | 4 | 0 |
+| 5.5 | 2 | 0 |
+
+- **This is better than your 203.** Nothing is below 7 here, and Evolve is at 7, not 6.5. My guess is Chrome on macOS measures the font slightly narrower than your machine does; the numbers are the same in both modes.
+- **Smallest:** Evolve at 7 units, which is 8.1 px on the Mac screen. Macro is at 7.5.
+
+### b) Margins and cuts — **unchanged and clean**
+
+- **Tightest margins:** Macro +1.7, Evolve +1.9, Clean +2.1 (all in the stop row, same as #37), then Seed and Metronome at +3.5.
+- **The hyphenated labels** all sit further in than that: none is in the ten tightest, so each has at least 3.6 units of air.
+- **Ellipses: 0. Text outside its shape: 0.** Both modes.
+- **Fader label clearance:** 5.0 units at both ends, as on #37.
+- **Saved PNGs:** 2128×1324 in both modes, with the title band.
+
+### c) The hyphenated names — **four read well, three don't**
+
+On the Mac at 1× (screenshot below), every hyphenated name is readable, in both modes. That is a clear improvement on #37's grey smudges at 5.5–6 units. The same holds on the saved PNG. What's left is the choice of break:
+
+| label | reads | say instead |
+|---|---|---|
+| Cyber- / punk / Neon | **well**: breaks between the two words it's made of | — |
+| Velvet / Under- / ground | **well** | — |
+| Irides- / cence | **well** | — |
+| Granu- / lation | **well** | — |
+| Backg- / round / Loop | **badly**: "Backg" isn't a syllable | **Back- / ground**. Or "Bg Loop", which on #37 fit on one line at 8. |
+| Micros- / copic / Chaos | **badly**: "Micros" reads as a word of its own | **Micro- / scopic** |
+| Sensual / Labo- / ratory | **awkward**: readable, but the eye stalls on "Labo" | **Lab- / oratory** or **Labora- / tory** |
+
+- Yes, I would rather have **"Back-ground"**. The same rule (break between the parts of a compound, or after a prefix) fixes Microscopic too.
+- Background Loop is also the one knob that now needs three lines. On #37 its short form "Bg Loop" fit on one.
+
+On screen at 1×:
+
+![sheet on screen](s39-surface-screen.png)
+
+Saved PNG, on paper:
+
+![saved sheet, paper](s39-cheatsheet-paper.png)
+
+3×: presets on paper, knobs on screen, stop row on paper:
+
+![presets on paper, 3x](s39-zoom-presets-paper.png)
+![knobs on screen, 3x](s39-zoom-knobs-screen.png)
+![stop row on paper, 3x](s39-zoom-stoprow-paper.png)
