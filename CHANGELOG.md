@@ -120,6 +120,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — lacing: a thread on a boundary, a hair on a straight run
+- **A boundary worth outlining is one that changes quickly**, not merely one that
+  changes. Without that second test a wide soft ramp was still a span, and laying threads
+  across it drew the contour map the pass exists to avoid: a fifty-cell ramp took six or
+  seven parallel lines where it wanted none. The curvature term had been hiding most of
+  them rather than preventing them
+- **A floor under the curvature term**, so a straight boundary gets its hair. Without one
+  the thread there was a fraction of a pixel wide at under half weight — no thread at all
+  — and the pass drew only the curls, with blank edges between them
+- **Never thinner than the pixel it is drawn on.** A sub-pixel thread samples as a row of
+  broken dots, which is what the plate drawn small in a second dish was showing: two
+  thirds of its lit pixels had no lit neighbour. It draws a continuous filament now
+- Fillmore East, 1969 goes to 0.5
+
 ### Changed — lacing, after the projector saw it
 - **It was drawing a contour map.** The level spacing came from the colour change per
   cell, so a soft ramp got a stack of four to six evenly spaced parallel lines instead of
