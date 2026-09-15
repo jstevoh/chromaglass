@@ -1,17 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Save, FolderOpen, Video } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
-import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
-  onApplyPreset: (presetId: string, settings: Partial<VisualizerSettings>) => void;
-  activePresetId: string | null;
   /** Live room-calibration readout, null when auto-calibration is off. */
   calibration?: RoomCalibration | null;
   onRecalibrate?: () => void;
@@ -33,11 +30,6 @@ interface SettingsPanelProps {
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
   onFilmClear?: () => void;
-  /** The user's own presets, and saving or loading one as a file. */
-  userPresets?: { id: string; name: string; description?: string; settings: Partial<VisualizerSettings> }[];
-  onApplyUserPreset?: (id: string) => void;
-  onSavePreset?: (name: string) => void;
-  onLoadPresetFile?: (file: File) => Promise<void>;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
   audioInputs?: { id: string; label: string }[];
   audioInputId?: string;
@@ -105,10 +97,8 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
-  const presetFileRef = useRef<HTMLInputElement>(null);
-  const [presetFileError, setPresetFileError] = useState<string | null>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
     if (!getLiveEngineStatus) return;
@@ -134,97 +124,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </button>
       </div>
 
-      {/* Presets Section */}
-      <section className="mb-8">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Palette size={12} /> Presets
-        </h3>
-        {(onSavePreset || onLoadPresetFile) && (
-          <div className="flex gap-2 mb-3">
-            {onSavePreset && (
-              <button
-                onClick={() => { const name = window.prompt('Name this look'); if (name && name.trim()) onSavePreset(name.trim()); }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"
-                title="Save the current look as a preset file and keep it in your library"
-                data-testid="settings-preset-save"
-              >
-                <Save size={12} /> Save current
-              </button>
-            )}
-            {onLoadPresetFile && (
-              <button
-                onClick={() => presetFileRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"
-                title="Load a preset file"
-                data-testid="settings-preset-load"
-              >
-                <FolderOpen size={12} /> Load file
-              </button>
-            )}
-            <input
-              ref={presetFileRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (!f || !onLoadPresetFile) return;
-                try { setPresetFileError(null); await onLoadPresetFile(f); } catch (err) { setPresetFileError(err instanceof Error ? err.message : 'Could not read that file'); }
-              }}
-            />
-          </div>
-        )}
-        {presetFileError && <p className="text-[10px] text-red-300 mb-3">{presetFileError}</p>}
-        {userPresets.length > 0 && (
-          <>
-            <div className="text-[9px] uppercase tracking-[0.3em] opacity-30 mb-2">Yours</div>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {userPresets.map((preset) => {
-                const isActive = activePresetId === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => onApplyUserPreset?.(preset.id)}
-                    className={`flex flex-col items-start p-2 border rounded-lg transition-all text-left group ${
-                      isActive ? 'bg-white/15 border-white/40 shadow-[0_0_8px_rgba(255,255,255,0.1)]' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                    }`}
-                    title={preset.description ?? 'A saved preset'}
-                  >
-                    <span className="text-xs font-bold truncate w-full">{preset.name}</span>
-                    <span className="text-[9px] opacity-50 truncate w-full">{preset.description ?? 'Saved preset'}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-[9px] uppercase tracking-[0.3em] opacity-30 mb-2">Built in</div>
-          </>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          {PRESETS.map((preset) => {
-            const isActive = activePresetId === preset.id;
-            return (
-              <button
-                key={preset.id}
-                onClick={() => onApplyPreset(preset.id, preset.settings)}
-                className={`flex flex-col items-start p-2 border rounded-lg transition-all text-left group ${
-                  isActive
-                    ? 'bg-white/15 border-white/40 shadow-[0_0_8px_rgba(255,255,255,0.1)]'
-                    : 'bg-white/5 hover:bg-white/10 border-white/10'
-                }`}
-                title={preset.description}
-              >
-                <div className="flex items-center gap-1 mb-1 w-full">
-                  <span className={`text-xs font-bold transition-colors flex-1 ${isActive ? 'text-white' : 'group-hover:text-white text-white/80'}`}>{preset.name}</span>
-                  {isActive && <span className="text-[7px] px-1 py-0.5 rounded bg-white/20 text-white font-bold uppercase tracking-wider shrink-0">ON</span>}
-                </div>
-                <span className="text-[9px] opacity-50 line-clamp-2 leading-tight">{preset.description}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
+      {/* The presets live on the title, not here. One menu opened from the
+          plate's own name is where a projectionist already looks for them,
+          and it carries saving and loading too; a second copy buried in a
+          scrolling panel was one more place to keep in step. */}
       {/* Sound Section */}
       <section className="mb-8">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">

@@ -1677,8 +1677,6 @@ export default function App() {
           <SettingsPanel
             settings={settings}
             onUpdate={updateSettings}
-            onApplyPreset={applyPreset}
-            activePresetId={activePresetId}
             calibration={audioData?.calibration ?? null}
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             engineStatus={engineStatus}
@@ -1702,10 +1700,6 @@ export default function App() {
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
             onFilmClear={clearFilm}
-            userPresets={userPresets.presets.map(p => ({ id: p.id, name: p.name, description: p.song ? `♪ ${p.song.title} — ${p.song.artist}` : p.description, settings: p.settings }))}
-            onApplyUserPreset={(id) => { const p = userPresets.presets.find(q => q.id === id); if (p) applyUserPreset(p); }}
-            onSavePreset={(name) => saveCurrentPreset(name, '')}
-            onLoadPresetFile={loadPresetFile}
             onClose={() => setShowSettings(false)}
           />
         )}
