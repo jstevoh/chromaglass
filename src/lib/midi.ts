@@ -97,6 +97,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
+  { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
   { key: 'lightPlay',       label: 'Light Play',       min: 0, max: 1 },
   { key: 'lampMotion',      label: 'Lamp Motion',      min: 0, max: 1 },
   { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0, max: 1 },

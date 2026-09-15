@@ -129,6 +129,7 @@ export interface VisualizerSettings {
   saturationBoost: number;    // final color grade saturation multiplier
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye, no beat, no dye
@@ -251,6 +252,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  lacing: 0,
   bubbles: 0.5,
   plateRock: 0.45,
   layerScaleVariety: 0.5,

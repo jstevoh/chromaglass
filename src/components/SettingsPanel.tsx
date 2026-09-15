@@ -480,6 +480,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ edgeRelief: v })}
         />
         <Slider
+          label="Lacing"
+          value={settings.lacing ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lacing: v })}
+        />
+        <Slider
           label="Bubbles"
           value={settings.bubbles ?? 0.5}
           min={0}
