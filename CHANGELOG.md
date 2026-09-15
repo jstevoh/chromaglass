@@ -33,6 +33,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — sharpening that knows how much liquid is there
+- The sharpening pass fades in with the dye a cell actually holds, so the full dish
+  keeps every bit of the steepening and a thin wash is left alone. Measured on the
+  settled plate (CPU, 192², mean gradient and the high-frequency energy that is the
+  staircase): in the body, gradient 0.095 → 0.096 and roughness 0.083 → 0.087 at the
+  default, i.e. unchanged; in thin dye, roughness 0.043 → 0.016, down 62 %, and at the
+  top of the slider 0.165 → 0.051, down 69 %. That is the axis-aligned blockiness the
+  shallow dish showed on the projector, taken out without touching the look of the
+  main plate
+
+### Changed — the cheat sheet, second pass
+- Labels are set at the largest readable size that holds the whole name, trying a
+  comfortable margin first and a tight one only when the alternative is a smaller
+  size: 186 of 200 labels are now at full size, none is cut, and none sits on its
+  outline
+- A fader's track line breaks wider around its label, so the longer names on the tall
+  faders have air either side rather than the line running into the first letter
+- Ink is measured against the control's own fill rather than the bare panel, which is
+  what the label actually sits on: Hot Pink and Cherry Red were at 2.2 against their
+  own pads on paper and now clear 3.6
+- A few names that are longer than any button — Random Evolve, Clean Screen, the
+  sequencer four, Background Loop — have short forms used only where the full name
+  would have to be set small; the list beside the picture always says the full thing
+- The four arrow keys are drawn as the cluster they are on the hardware. Laid out in a
+  list they wrapped across rows, so Next Preset sat to the left of Previous Preset —
+  the one pair a hand reaches for blind
+- Random moves to the top of the scene column, so the button directly above Drain is a
+  harmless one
+- Swatches carry an outline (Pure White was a blank square on paper), the assign list
+  keeps its full weight in paper mode, and the saved PNG has a title band naming the
+  map, how many controls are assigned and the date
+
+### Changed — a cheat sheet you can read in the dark
+- Labels on the controller picture are measured against the type they are drawn in and
+  shrink and wrap to fit, so the whole word is there: no more `Sunsh…` twice in a row on
+  two different dyes, and nothing spilling past the shape it belongs to
+- A fader's track line runs along the fader whichever way it lies and breaks around its
+  own label, instead of being drawn upright through the crossfader's name
+- A colour that is the colour of the panel it sits on — Crimson on black, Icy Blue on
+  paper — is lifted or dropped until it separates, keeping its hue
+- **On paper** turns the whole sheet to paper, the list beside the picture included, so
+  what is printed or photographed is what is on screen
+- The APC40 mkII factory map is laid out for a hand in the dark: dyes move from the
+  track-select row onto the bottom row of clip pads, which are full colour and light in
+  the dye they drop; Drain and Clear leave the row that carries Seed for the two buttons
+  under the scene column; the arrows step presets; and the crossfader and cue encoder
+  take Sharpness and Granulation
+
+### Changed — the top of the sharpness slider
+- Sharpening holds its middle and compresses its top: 0.5 is the strength measured on the
+  projector, and 1.0 now stops three-quarters of the way up, short of where a bright rim
+  appeared along boundaries and thin dye went blocky
+
+### Added — the controller, drawn
+- **APC40 mkII picture** (MIDI panel): the whole control surface to scale, every control carrying
+  the MIDI address it really sends, taken from Akai's Communications Protocol v1.2 rather than
+  guessed. Touch a control on the hardware and the picture selects it, then pick what it should do
+  from the list beside it. Each control is labelled with what it does and coloured by what kind of
+  thing that is, dyes in their own colour.
+- The same picture is the cheat sheet: **On paper** switches it to black on white and **Save PNG**
+  writes it at twice size for the phone or the desk. It works before the controller is plugged in,
+  so a map can be built in advance, and Escape closes it.
+- `src/lib/controllerSurface.ts` holds the layout, so another controller is a data change.
+
+### Changed — sharpening without the grid showing
+- The Mac's look at the first sharpening build found its artefacts ran along the grid axes:
+  stair-steps on angled boundaries at the default, fur combed along x and y at full strength. The
+  pass uses the isotropic nine-point weights now, and the slider maps to half its old strength
+  since the wider stencil pushes about twice as hard per unit. At the default: the same steepening
+  as before (field mean gradient 0.073 against 0.075) with a third of the high-frequency energy
+  (0.039 against 0.097).
+
 ### Added — sharp liquid (plan batch 1, first half)
 - **Sharpness** (`sharpness`, Settings → Liquid, MIDI-learnable): interface sharpening in
   both solvers. Every step advects and diffuses the dye, so a boundary that starts as a

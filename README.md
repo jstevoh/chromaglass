@@ -136,7 +136,8 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 
 The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox have no Web MIDI) turns a controller on the desk into the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer.
 
-- **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, transport play / blackout / record), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
+- **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets with the bottom row of pads the dye palette, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, crossfader Sharpness and the cue encoder Granulation, arrows step presets, transport play / blackout / record, and Drain and Clear alone under the scene column, away from Seed), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
+- **The controller, drawn.** The **APC40 mkII picture** button in the MIDI panel opens the whole panel to scale: forty clip pads, the five button rows under the grid, nine faders, sixteen knobs, the crossfader and the transport, every one carrying the MIDI address it really sends (taken from Akai's Communications Protocol v1.2). Touch a control on the desk and the picture selects it; pick what it should do from the list beside it and it is bound. Every control shows what it does, coloured by what kind of thing that is, with dyes in their own colour. Labels are measured against the type they are drawn in, so they shrink and wrap to fit rather than being cut short, and a colour that would disappear into the panel is lifted or dropped until it reads. **On paper** turns the whole sheet — picture and list — to black on white, and **Save PNG** writes it out at twice size, so the same picture that made the map is the cheat sheet on the phone or taped to the desk. It works before the hardware arrives, and Escape closes it.
 - **MIDI learn**: pick what a control should do in the panel (any of thirty settings, every action, every preset, every dye), then touch the control. Tick *Endless encoder* first for a knob with no stop (relative "two's-complement" nudges); the binding list flips any CC between `abs` and `enc` later.
 - **Soft takeover**: a fader that disagrees with the app is ignored until it passes through the app's value, so a slider dragged on the phone does not jump back the moment a fader twitches. Turn it off for a controller with motorised faders.
 - **LED feedback**: preset pads light in the preset's lead dye (dim until it is the active one), dye pads in their colour, toggle buttons on or off, on the APC mini mk2 / Launchpad velocity palette; CC-driven LEDs get 127/0. *LEDs: Auto* picks the output that shares a name with the input.
@@ -286,7 +287,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Sequence | Open the Show Sequencer: pick a sequence, play, pause, skip stages, or edit and save your own |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
 | Projectionist pad | On the phone or iPad: drag to blow air, tap to drop dye, pick a dye colour, pick which plate the device works, stream the device's tilt into the plate, or give the pad the whole screen. A pen's pressure sets how much dye, its tilt which way the air goes |
-| MIDI | Turn a MIDI controller on, load a factory map (APC mini mk2, nanoKONTROL2) or teach yours with MIDI learn; soft takeover, endless encoders, LED feedback; maps saved as `.chromaglass-midi.json` |
+| MIDI | Turn a MIDI controller on, load a factory map (APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad, Launch Control XL), assign from a picture of the controller that doubles as a printable cheat sheet, or teach yours with MIDI learn; soft takeover, endless encoders, LED feedback; maps saved as `.chromaglass-midi.json` |
 | Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
 | The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
 | Band | A synthesised band played silently into the show — no microphone, no permission |
@@ -355,6 +356,7 @@ src/
     audioCalibration.ts        # Room calibration: adaptive floor/ceiling per feature
     remoteProtocol.ts          # Phone-remote message types and socket URL
     midi.ts                    # MIDI messages, bindings, factory maps, pad colours, map files
+    controllerSurface.ts       # Where every control sits on a controller's face, and what it sends
     fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
@@ -367,6 +369,7 @@ src/
   components/
     RemoteControl.tsx          # The phone and tablet control surface
     MidiPanel.tsx              # MIDI: devices, factory maps, learn, bindings, files
+    ControllerSurface.tsx      # The controller drawn to scale: assign by touching, and the cheat sheet
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud

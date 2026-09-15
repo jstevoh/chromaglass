@@ -322,19 +322,26 @@ export function nanoKontrol2Map(): MidiMap {
 }
 
 /**
- * Akai APC40 mkII: the classic VJ desk. Eight track faders (CC 7 on channels
- * 1–8) ride the show, the master fader (CC 14) is the dimmer, the eight
- * device knobs (CC 16–23) are the lamp and camera, the eight track knobs
- * (CC 48–55) the plate, the 8×5 clip grid (notes 0–39, bottom-left first)
- * cues presets from the top row down, the scene launch column (notes 82–86)
- * runs the sequencer, and the transport keys are play / blackout / record.
+ * Akai APC40 mkII: the classic VJ desk.
+ *
+ * Laid out for a hand in the dark. The 8×5 clip grid cues presets from the top
+ * row down, and its bottom row — full-colour pads, so each one lights in the
+ * dye it drops — is the palette. Track faders (CC 7 on channels 1–8) ride the
+ * show under the master dimmer (CC 14); the device knobs (CC 16–23) are the
+ * lamp and camera, the track knobs (CC 48–55) the plate, and the crossfader and
+ * cue encoder take the two controls that decide how the liquid itself reads.
+ * The scene column runs the sequencer, the arrows step presets, and the two
+ * destructive one-shots sit alone under the scene column, a hand's width from
+ * Seed, where they cannot be hit by mistake.
  */
 export function apc40Mk2Map(presetIds: string[]): MidiMap {
   const b: MidiBinding[] = [];
-  presetIds.slice(0, 40).forEach((id, i) => {
+  // Rows 5–2 of the grid (notes 8–39) are presets; row 1 (notes 0–7) is dyes.
+  presetIds.slice(0, 32).forEach((id, i) => {
     const row = 4 - Math.floor(i / 8), col = i % 8;
     b.push(bind(note(row * 8 + col), { kind: 'preset', presetId: id }));
   });
+  for (let i = 0; i < 8; i++) b.push(bind(note(i), { kind: 'dye', paletteIndex: i }));
   const faders: (keyof VisualizerSettings)[] = ['audioImpact', 'automateRate', 'globalSpeed', 'dyeBudget', 'turbulenceScale', 'plateRock', 'bubbles', 'saturationBoost'];
   faders.forEach((k, ch) => b.push(bind(cc(7, ch), setting(k))));
   b.push(bind(cc(14), setting('dimmer')));
@@ -342,16 +349,29 @@ export function apc40Mk2Map(presetIds: string[]): MidiMap {
   device.forEach((k, i) => b.push(bind(cc(16 + i), setting(k))));
   const track: (keyof VisualizerSettings)[] = ['beatSqueeze', 'edgeRelief', 'iridescence', 'hueJourney', 'backgroundLoop', 'dishVignette', 'macroZoom', 'macroSync'];
   track.forEach((k, i) => b.push(bind(cc(48 + i), setting(k))));
-  const scenes: MidiAction[] = ['seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop', 'lucky'];
+  // The crossfader's long throw suits the one control that changes how the
+  // liquid itself reads; the cue encoder is endless, so it nudges the grain.
+  b.push(bind(cc(15), setting('sharpness')));
+  b.push(bind(cc(47), setting('granulation'), 'relative'));
+  // Random is the one a hand goes for mid-song, so it sits at the top of the
+  // column rather than directly above Drain; the button above Drain is the
+  // harmless one.
+  const scenes: MidiAction[] = ['lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
   scenes.forEach((a, i) => b.push(bind(note(82 + i), { kind: 'action', action: a })));
-  // Clip stop buttons (note 52 on channels 1–8): the one-shots and toggles.
-  const stops: MidiAction[] = ['seed', 'drain', 'clear', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'preset-prev', 'preset-next'];
+  // Master select and Stop All Clips, alone under the scene column: the two
+  // one-shots that empty the plate, kept away from Seed.
+  b.push(bind(note(80), { kind: 'action', action: 'drain' }));
+  b.push(bind(note(81), { kind: 'action', action: 'clear' }));
+  // Clip stop buttons (note 52 on channels 1–8): Seed and the toggles.
+  const stops: MidiAction[] = ['seed', 'automate-toggle', 'macro-toggle', 'overlays-toggle'];
   stops.forEach((a, ch) => b.push(bind(note(52, ch), { kind: 'action', action: a })));
   b.push(bind(note(91), { kind: 'action', action: 'play-toggle' }));     // play
   b.push(bind(note(92), { kind: 'action', action: 'blackout-toggle' })); // stop
   b.push(bind(note(93), { kind: 'action', action: 'record-toggle' }));   // record
-  // Track select (note 51 on channels 1–8): the first eight dyes.
-  for (let ch = 0; ch < 8; ch++) b.push(bind(note(51, ch), { kind: 'dye', paletteIndex: ch }));
+  // The arrows either side of the transport step the preset, which is what a
+  // hand reaches for between songs.
+  b.push(bind(note(97), { kind: 'action', action: 'preset-prev' }));     // left
+  b.push(bind(note(96), { kind: 'action', action: 'preset-next' }));     // right
   return { format: MIDI_FORMAT, version: 1, name: 'APC40 mkII', device: 'APC40 mkII', bindings: b };
 }
 
