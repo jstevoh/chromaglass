@@ -114,28 +114,43 @@ const SIZES = [8, 7.5, 7, 6.5, 6, 5.5, 5];
  * than either "Irid." or type two steps down.
  */
 const VOWEL = /[aeiouy]/i;
+/**
+ * Where a compound wants to come apart. A break inside the word's own parts —
+ * "Backg-round", "Micros-copic" — reads as a different word for a moment, which
+ * on a dark stage is exactly the cost the whole picture is trying to avoid.
+ * Nothing here is specific to this app's names; they are the ordinary English
+ * pieces that turn up in preset names.
+ */
+const PREFIXES = [
+  'background', 'back', 'under', 'over', 'out', 'up', 'down', 'cross', 'fore',
+  'micro', 'macro', 'multi', 'inter', 'super', 'semi', 'anti', 'auto', 'photo',
+  'hydro', 'poly', 'mono', 'counter', 'cyber', 'sub', 'trans', 'ultra',
+];
 
 /**
  * Break one long word in two, with a hyphen on the first half. A cheat sheet
  * wants the whole name at a size you can read across a stage, and
  * "Irides-cence" is a better answer to a narrow knob than either "Irid." or
- * type two steps down. The break goes between two consonants where it can, or
- * after a vowel, and near the middle: that is "Under-ground" rather than
- * "Underg-round".
+ * type two steps down. The break comes apart at a prefix where the word has
+ * one, otherwise between two consonants, otherwise after a vowel, and near the
+ * middle of the word.
  */
 function split(word: string, width: number, bold: boolean, size: number): [string, string] | null {
   // Only a word long enough to be worth breaking: "Evo-lve" and "Mac-ro" read
   // worse than the same words a size down.
   if (word.length < 9) return null;
+  const lower = word.toLowerCase();
+  const prefix = PREFIXES.find(p => lower.startsWith(p) && p.length < word.length - 2)?.length ?? -1;
   let best: [string, string] | null = null;
   let bestScore = -Infinity;
   for (let at = 3; at <= word.length - 3; at++) {
     const head = `${word.slice(0, at)}-`, tail = word.slice(at);
     if (em(head, bold, size) > width || em(tail, bold, size) > width) continue;
     const a = word[at - 1], b = word[at];
-    const kind = !VOWEL.test(a) && !VOWEL.test(b) ? 2 : VOWEL.test(a) && !VOWEL.test(b) ? 1 : 0;
+    const kind = at === prefix ? 4 : !VOWEL.test(a) && !VOWEL.test(b) ? 2 : VOWEL.test(a) && !VOWEL.test(b) ? 1 : 0;
+    // A tie goes to the later break: "Labora-tory" over "Labo-ratory".
     const score = kind * 10 - Math.abs(at - word.length / 2);
-    if (score > bestScore) { bestScore = score; best = [head, tail]; }
+    if (score >= bestScore) { bestScore = score; best = [head, tail]; }
   }
   return best;
 }
@@ -351,9 +366,12 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     // The short form when the full name has to be set small *or* pushed against
     // its outline — both of those are the sheet failing at a glance.
     let fit = fitLabel(label, c.w, c.h, along, round, !!target);
-    if (short && (fit.size < 8 || fit.tight)) {
+    if (short && (fit.size < 8 || fit.tight || (round && fit.lines.length > 2))) {
       const alt = fitLabel(short, c.w, c.h, along, round, !!target);
-      if (alt.size > fit.size || (alt.size === fit.size && !alt.tight && fit.tight)) fit = alt;
+      const better = alt.size > fit.size
+        || (alt.size === fit.size && !alt.tight && fit.tight)
+        || (alt.size === fit.size && round && alt.lines.length < fit.lines.length);
+      if (better) fit = alt;
     }
     const { lines, size: fontSize } = fit;
     const fill = raw ? `${raw}${target?.kind === 'dye' ? '55' : '33'}` : (paper ? 'rgba(17,24,39,0.04)' : 'rgba(255,255,255,0.04)');
