@@ -146,19 +146,27 @@ Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 a
 - **The amount isn't the real problem; the spacing is.** `dot(cC.rgb, axis/al) * 4.0` puts about four level lines per unit of colour change. So any wide soft ramp gets a stack of evenly spaced parallel lines, and only the steepness packs them. If the aim is one braid at a boundary rather than isolines across a ramp, the thread probably wants gating on the gradient being steep (a higher `band` threshold or a band × steepness weight), not a lower amount.
 - **Small dish:** the magnified layer draws stipple rather than lines at every value. `lacing()` samples `u_layer1` with the same one-cell `e` and the same `fbm3` scale as layer 0, while `fuv1` is magnified by `u_layerZoom1`. I'd guess the level lines fall under a screen pixel there. Scaling `e` and the fbm frequency by the layer's zoom, or skipping layer 1, would be the first thing I'd try.
 
-## 3. Sharpness with lacing in (first pair; the repeat pair follows)
+## 3. Sharpness with lacing in: **0.5 still doesn't show in the main dish**
 
-`sharp4.mjs` on Fillmore, which now carries lacing 0.45. It is seeded (`SEED=7`) with Granulation 0 and Plate Cells 0 set by slider. The page is captured after 1100 frames past the slider change (1536 and 1540 total, so the pair is matched by frames). I used a fresh page per value, because sharpening acts in the solver and can't be swept in one page.
+`sharp4.mjs` on Fillmore, which now carries lacing 0.45. It is seeded (`SEED=7`) with Granulation 0 and Plate Cells 0 set by slider. Each page is captured 1100 frames after the slider change (1528–1540 frames in total). I used a fresh page per value, because sharpening acts in the solver and can't be swept in one page. There are four pages in the order 0.5, 0, 0, 0.5, and all have 0 NaN. Layer means are 1.010–1.017 in the main dish and 0.391–0.392 in the small dish, whatever the value.
 
-The main dish, 380 px at 1×, sharpness 0 | 0.5:
+One hard edge (a red tongue with lacing on it), 2×, in page order 0 / 0 again / 0.5 / 0.5 again:
 
-![sharpness main](l42-sharp-main-0-05.png)
+![sharpness edge, four pages](l42-sharp-edge-4.png)
 
-The small dish at 2×, sharpness 0 | 0.5:
+The main dish, 380 px at 1×, from the second pair: sharpness 0 | 0.5:
 
-![sharpness small](l42-sharp-small-0-05.png)
+![sharpness main, repeat pair](l42-sharp-main-rep.png)
 
-- **The two seeded pages still diverged in composition.** In the small dish, 0 is blue into green with a dark line across it, and 0.5 is purple into green. A pixel diff is useless: 41 % of the main dish differs by more than 8.
-- **Main dish: I can't see sharpness 0.5.** Both frames have the same lacing isolines, a similar soft rim on the red tongue and similar ramp widths. High-pass is 5.57 at 0 and 5.48 at 0.5.
-- **Small dish (`dishblock`):** gradFrac 0.49 → 0.57 and step/1000 19 → 29. axisFrac is 0.116 → 0.113, and 0.11 is isotropic, so there are no blocks. At #37 the gradient fraction measured composition, not sharpness, and these compositions differ.
-- **So far PLAN.md's test comes out the same with lacing in:** the threads give sharpening edges to act on, but they are drawn after the solver. So they sharpen nothing, and the solver's own edges look the same at 0 and 0.5.
+- **The first page (0.5) is an outlier in composition, not in sharpness.** The other three pages put the red tongue in the same place, and the third crop above is a different arrangement. By pixels (share differing by more than 8):
+
+| pair | main dish | small dish |
+|---|---|---|
+| 0 vs 0 again (same setting: seed drift) | 15.5 % | 6.6 % |
+| 0 again vs 0.5 again (the matched pair) | 15.8 % | 6.6 % |
+| 0.5 vs 0.5 again (same setting) | 40.2 % | 59.9 % |
+
+  The matched pair differs by exactly the seed drift. The first page drifted on its own: it was the first page in a fresh browser, and I'd guess its startup timing differed. (I pushed a first-pair note that read this as sharpening. It was wrong, and this section replaces it.)
+- **At matched composition, sharpness 0.5 is invisible.** The tongue's curved edge, its lacing threads and the cyan ramp are the same at 0 and 0.5, at 2× by eye. High-pass: main dish 5.49 → 5.42, small dish 2.89 → 2.78.
+- **Small dish (`dishblock`):** gradFrac 0.490 / 0.503 at 0 and 0.481 at the matched 0.5. axisFrac is 0.113–0.116 on all four, and 0.11 is isotropic, so no blocks at 0.5.
+- **The same verdict as #37, now with hard edges to work on.** The lacing threads give a sharpener crisp edges to act on, but the pass runs after the solver, so there is nothing for sharpening to reach. The solver's own boundaries look the same at 0 and 0.5. On this evidence the sharpening pass buys nothing visible on Fillmore at its default. PLAN.md's test comes out against keeping it at 0.5, though I haven't tried other presets.
