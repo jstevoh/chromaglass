@@ -5,7 +5,7 @@
 **In short**
 - **Launch:** server pid **32470**, show key **7699**, curl 200. Details in §1.
 - **Filaments: better in the main dish, not fixed.** At 0.45, lacing touches 8.7 % of the main dish, one frame apart (#42: 20.8 %). What remains sits on boundaries, as one or two lines along the edge. The core's rings are gone. But a wide soft ramp still gets a thin stack of 6–7 lines (the pink → cyan ramp), and the red tongue keeps a comb of short parallel stripes. Speckle where two reds meet, and glitter from 0.7, are unchanged.
-- **Small dish: the stipple is hidden, not gone.** It draws almost nothing at 0.45 (0.9 %). With `fold` forced to 1 it is #42's stipple again. It isn't the colour the level reads: a bilinear sample changes nothing. §2 has the further tests.
+- **Small dish: the stipple is hidden, not gone.** It draws almost nothing at 0.45 (0.9 %). With `fold` forced to 1 it is #42's stipple again. It is not the colour source, not the fbm, and not the 4 px spacing: page-only patches of each change nothing. **It is the line width.** A hair is 0.07 of a level, which is under a pixel there. Flooring the width at `fwidth(f)` joins the dots (isolated pixels 67–84 % → 8–40 %). But then the small dish shows a faint grey hatch across its ramp: the contour map drawn small. So floor the width, and the spacing fix decides the rest.
 - **Curvature coupling: visible, but as a gate, not braid against hair.** A page-only shader patch, one frame apart, shows it. Forcing `fold` to 0 removes almost every thread (lift 0.1–0.7), so **straight runs draw no hair at all**. Forcing it to 1 brings the contour map back. So what `fold` actually does is hide the stacks. Keep it, but it needs the spacing fixed before it can have a floor. A `fold` floor of 0.5 gives straight edges a real hair, and also re-stacks every wide ramp.
 - **Fillmore: 0.55.** Under the grain, 0.45 is now too quiet for a projector. 0.55–0.6 carries a clear braid on curls and lips with no glitter. 0.7 starts to glitter. Grain and lacing still layer. 0 GL errors, 0 NaN.
 - **Frame cost: no longer measurable.** On − off is +0.08 ms at 0.45 and −0.02 at 1.0 at 1600×1000 (#42: +0.40), and +0.25 ms at 1920×1080. The GPU was at 95–97 %, so this is inside the noise, and at most #42's cost.
@@ -78,7 +78,26 @@ The small dish (`fluids[1]`), purple into green:
 | 12 px minimum spacing | 4.0 % | 54.6 % |
 | real 0.45 / 12 px at 0.45 | 1.4 % / 1.4 % | 68.6 % / 66.6 % |
 
-  A 12 px clamp that changes nothing means the clamp isn't the binding term in the small dish; the span term already spaces the lines wider. What's left is **the line's own width**. A hair is 0.07 of a level on each side, and in the small dish that is well under a pixel, so a thin line samples as broken dots. The braid-forced width (0.30) drew continuous wavy bands, with only 10 % of its pixels isolated. Testing a line width floored at `fwidth(f)` next.
+  A 12 px clamp that changes nothing means the clamp isn't the binding term in the small dish; the span term already spaces the lines wider. What's left is **the line's own width**. A hair is 0.07 of a level on each side, and in the small dish that is well under a pixel, so a thin line samples as broken dots. The braid-forced width (0.30) drew continuous wavy bands, with only 10 % of its pixels isolated.
+- **Flooring the line width at a pixel joins the dots.** Page-only patch: `lw = max(mix(0.07, 0.30, fold), fwidth(f) * 0.75)`, one frame apart. Small dish at lacing 0 | real 1.0 | floored 1.0 | real 0.7 | floored 0.7:
+
+![small dish: width floored at a pixel](l43-width-small.png)
+
+| | small dish coverage | small dish isolated pixels | main dish coverage | main dish isolated pixels |
+|---|---|---|---|---|
+| real 0.45 / floored | 1.0 % / 6.8 % | 83.7 % / 40.1 % | 9.0 % / 13.0 % | 12.8 % / 6.3 % |
+| real 0.7 / floored | 2.1 % / 15.2 % | 74.3 % / 16.4 % | 11.8 % / 17.0 % | 10.7 % / 4.9 % |
+| real 1.0 / floored | 3.2 % / 22.4 % | 67.3 % / 8.3 % | 12.4 % / 19.3 % | 11.7 % / 4.2 % |
+
+  Main dish, cyan core and the wide left ramp, real 0.45 | floored 0.45 | real 0.7 | floored 0.7:
+
+![core: width floored](l43-width-core.png)
+
+![left ramp: width floored](l43-width-left.png)
+
+  - **The stipple was sub-pixel lines.** With the width floored, the small dish's isolated pixels fall from 67–84 % to 8–40 %.
+  - **But what it shows then is not threads either.** It is a faint grey hatch over the whole purple → green ramp, with short parallel strokes along the blue edge. That is the contour map again, drawn small. So the width floor is the right anti-aliasing (cheap, and it tidies the main dish's broken dots too: isolated pixels 12 % → 5 %). Whether the small dish gets threads, though, comes down to the same spacing fix as the wide ramps.
+  - **In the main dish** the floor makes the core's braid slightly more continuous. It also makes the left ramp's stack a little more visible, as it does to everything thin.
 
 ![small dish: 0 | real 1.0 | braid forced](l43-small-braid.png)
 
