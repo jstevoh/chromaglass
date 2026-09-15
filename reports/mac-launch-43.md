@@ -66,7 +66,19 @@ The small dish (`fluids[1]`), purple into green:
 - **Speckle and glitter are still there.** The pale speckled patch where two reds meet (red crop, lower middle) and a pale crumbly fringe along the green/yellow boundary (bottom crop) are present from 0.25. From 0.7 the core's braid breaks into single-pixel white glitter, as in #42.
 - **The small dish draws almost nothing now, rather than threads.** Coverage at 0.45 is **0.9 %** (#42: 9.4 %), and 3.1 % at 1.0: sparse single-pixel dots along the blue edge and the green band. There are no filaments at any value.
 - **The stipple is only hidden.** With `fold` forced to 1 (braid everywhere, below: lacing 0 | real 1.0 | braid-forced 0.992), the small dish is the same aliased stipple as #42: single-pixel dots in wavy bands, 24 % coverage. The 4-px `fwidth` clamp doesn't stop it.
-- **It is not the colour source.** My first guess was that the level's `color` (the displayed colour) carries per-pixel noise. A page-only patch that takes `fC` from a bilinear `decodeFluid` sample instead changes nothing, one frame apart: small-dish coverage 24.1 against 24.2 % braid-forced (3.1 against 3.1 % real at 1.0), and the share of lifted pixels with no lifted neighbour is 10.5 against 10.4 % braid-forced (69.6 against 69.7 % real). The main dish is also unchanged (42.9 / 43.3 %). The remaining suspects are tested below.
+- **It is not the colour source.** My first guess was that the level's `color` (the displayed colour) carries per-pixel noise. A page-only patch that takes `fC` from a bilinear `decodeFluid` sample instead changes nothing, one frame apart: small-dish coverage 24.1 against 24.2 % braid-forced (3.1 against 3.1 % real at 1.0), and the share of lifted pixels with no lifted neighbour is 10.5 against 10.4 % braid-forced (69.6 against 69.7 % real). The main dish is also unchanged (42.9 / 43.3 %).
+- **It is not the fbm and not the 4 px spacing either.** Same page-only patching, one frame apart: small dish at lacing 0 | real 1.0 | 1.0 with no fbm on the level | 1.0 with lines never closer than 12 px:
+
+![small dish: 0 | real | no fbm | 12 px spacing](l43-stipple-small.png)
+
+| small dish 180×260 | coverage | isolated pixels (no lifted neighbour) |
+|---|---|---|
+| real 1.0 | 3.9 % | 57.5 % |
+| no fbm | 3.8 % | 56.2 % |
+| 12 px minimum spacing | 4.0 % | 54.6 % |
+| real 0.45 / 12 px at 0.45 | 1.4 % / 1.4 % | 68.6 % / 66.6 % |
+
+  A 12 px clamp that changes nothing means the clamp isn't the binding term in the small dish; the span term already spaces the lines wider. What's left is **the line's own width**. A hair is 0.07 of a level on each side, and in the small dish that is well under a pixel, so a thin line samples as broken dots. The braid-forced width (0.30) drew continuous wavy bands, with only 10 % of its pixels isolated. Testing a line width floored at `fwidth(f)` next.
 
 ![small dish: 0 | real 1.0 | braid forced](l43-small-braid.png)
 
