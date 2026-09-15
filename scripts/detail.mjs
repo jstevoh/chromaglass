@@ -27,7 +27,8 @@
  *             edge 2.4%  p50 0.8   detail@4px 0.3%  @8px 0.5%
  *
  * Needs Playwright for image decoding (the Mac's ~/cg-scratch has it); run it
- * from a directory where `playwright` resolves.
+ * from a directory where `playwright` resolves. It borrows an installed Chrome
+ * when Playwright's own headless shell is not downloaded; CHROMIUM_PATH wins.
  */
 // Playwright is only a decoder here, and it is not a dependency of the app, so
 // it is resolved from this script, then from the working directory.
@@ -42,8 +43,20 @@ if (!chromium) { console.error('scripts/detail.mjs needs Playwright to decode im
 import fs from 'node:fs';
 const files = process.argv.slice(2);
 if (files.length === 0) { console.error('usage: node scripts/detail.mjs <image> [image ...]'); process.exit(2); }
-const exe = process.env.CHROMIUM_PATH || undefined;   // unset: Playwright's own build
-const browser = await chromium.launch(exe ? { executablePath: exe } : {});
+// Playwright's own headless shell is often not downloaded on a machine that
+// only uses the installed browser, so fall back to whatever Chrome is there.
+const CHROME = [
+  process.env.CHROMIUM_PATH,
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+].filter(Boolean);
+let browser;
+for (const exe of [undefined, ...CHROME]) {
+  try { browser = await chromium.launch(exe ? { executablePath: exe } : {}); break; } catch { /* try the next */ }
+}
+if (!browser) { console.error('No browser to decode with. Set CHROMIUM_PATH to a Chrome or Chromium binary, or run `npx playwright install chromium`.'); process.exit(2); }
 const page = await browser.newPage();
 await page.goto('about:blank');
 const rows = [];

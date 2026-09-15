@@ -1304,7 +1304,11 @@ class FluidSimulation {
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
       advection: settings.advection,
-      sharpness: Math.max(0, Math.min(1, settings.sharpness ?? 0)) * 0.35,
+      // The nine-point stencil pushes about twice as hard per unit as the
+      // four-point one it replaced, so the slider maps to half of what it did:
+      // the default lands on the strength the Mac judged good, and the top of
+      // the slider stops short of the strength that grew fur along boundaries.
+      sharpness: Math.max(0, Math.min(1, settings.sharpness ?? 0)) * 0.18,
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, surfaceTension, fingering,
@@ -1572,7 +1576,6 @@ class FluidSimulation {
     // comparable dye, 0 where one is empty. See the note in `sharpenDye` in
     // gpuFluid.ts for why the pass carves holes without it.
     const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
-    const kq = k * 0.25;
     for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
       this.shp.set(ch);
       const o = this.shp;
@@ -1580,10 +1583,14 @@ class FluidSimulation {
         for (let x = 1; x < N - 1; x++) {
           const i = x + y * N;
           const c = o[i], l = o[i - 1], r = o[i + 1], d = o[i - N], u = o[i + N];
-          const f = gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u);
-          const s = c + kq * f;
-          const lo = Math.min(Math.min(l, r), Math.min(d, u), c);
-          const hi = Math.max(Math.max(l, r), Math.max(d, u), c);
+          const dl = o[i - N - 1], dr = o[i - N + 1], ul = o[i + N - 1], ur = o[i + N + 1];
+          // The isotropic nine-point weights; see the note in gpuFluid.ts for
+          // why the diagonals matter.
+          const f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
+                  + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
+          const s = c + k * f;
+          const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
+          const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
           ch[i] = Math.max(0, Math.min(hi, Math.max(lo, s)));
         }
       }
