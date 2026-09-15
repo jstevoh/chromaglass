@@ -1333,6 +1333,7 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.0,
       dyeBudget: 0.9,
       edgeRelief: 0.05,
+      lacing: 0.45,
       bubbles: 0.2,
       beads: 0.8,
       fingering: 0.85,

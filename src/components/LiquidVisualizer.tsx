@@ -2263,6 +2263,7 @@ uniform float u_glossiness;        // specular intensity, 0 = flat backlit dye
 uniform float u_saturation;        // final grade saturation multiplier
 uniform float u_boundaryContrast;  // bright interface line between dye colors
 uniform float u_edgeRelief;        // meniscus at every blob edge, at any zoom
+uniform float u_lacing;            // pale filaments along a colour boundary, set by the strain across it
 uniform float u_layerZoom1;        // second layer viewed magnified about the centre
 uniform vec2  u_layerDrift1;
 uniform vec4  u_bubbles[40];       // x, y, r (fluid uv) and opacity
@@ -2603,6 +2604,61 @@ float fbm3(vec2 p) {
   for (int i = 0; i < 3; i++) { sum += a * vnoise(p); p *= 2.07; a *= 0.5; }
   return sum * 1.14;   // ~0..1
 }
+
+/**
+ * Lacing: the pale hair-thin threads that outline every colour boundary in a
+ * poured film.
+ *
+ * They cannot be found in the dye, because the solver has no structure below
+ * its own grid: a boundary there is a smooth ramp a few cells wide, and no
+ * amount of reading it gives a thread. So the threads are made, and then put
+ * where they belong. The noise that makes them is stretched along the boundary
+ * rather than along the flow, so a filament runs with the edge it outlines, and
+ * it is masked to the neighbourhood of a real interface — dye on both sides,
+ * two different colours — so a blob's outer silhouette against bare glass is
+ * left alone.
+ *
+ * What the flow decides is the width. Where the two sides are pulling apart the
+ * film between them is drawn out to a hair and reads faint; where they fold
+ * together it piles into a thicker, brighter braid. That is the strain rate
+ * across the interface: the velocity difference either side of the boundary,
+ * projected along the boundary's own normal.
+ */
+vec3 lacing(vec3 color, sampler2D tex, sampler2D vtex, vec2 fuv, float alpha, float amount) {
+  float e = 3.0 / u_logicalGrid;       // one solver cell, in fluid uv
+  vec4 cR = decodeFluid(tex, fuv + vec2( e, 0.0), 0.0, false);
+  vec4 cL = decodeFluid(tex, fuv + vec2(-e, 0.0), 0.0, false);
+  vec4 cT = decodeFluid(tex, fuv + vec2(0.0,  e), 0.0, false);
+  vec4 cB = decodeFluid(tex, fuv + vec2(0.0, -e), 0.0, false);
+  vec2 g = vec2(length(cR.rgb - cL.rgb) * smoothstep(0.02, 0.2, min(cR.a, cL.a)),
+                length(cT.rgb - cB.rgb) * smoothstep(0.02, 0.2, min(cT.a, cB.a)));
+  float gm = length(g);
+  float band = smoothstep(0.012, 0.11, gm);     // near where two colours meet
+  if (band < 0.004) return color;
+  vec2 n = g / max(gm, 1e-5);                   // across the boundary
+  // How fast the flow is pulling the two sides apart, per cell. Positive is a
+  // stretch, negative a fold.
+  float e2 = e * 2.0;
+  vec2 vP = fluidFlow(vtex, fuv + n * e2);
+  vec2 vM = fluidFlow(vtex, fuv - n * e2);
+  float fold = clamp(-dot(vP - vM, n) * 7.0, -1.0, 1.0) * 0.5 + 0.5;   // 1 folding, 0 stretching
+  // The threads are level lines of the colour as it changes across the
+  // boundary, so each one follows the boundary's own shape instead of being
+  // noise sprayed near it — and where the boundary is steep they crowd
+  // together into a braid, which is what a stretched film does. A little noise
+  // on the level keeps them from reading as a contour map.
+  vec3 axis = (cR.rgb - cL.rgb) * n.x + (cT.rgb - cB.rgb) * n.y;
+  float al = length(axis);
+  if (al < 1e-4) return color;
+  vec4 cC = decodeFluid(tex, fuv, 0.0, false);
+  float f = dot(cC.rgb, axis / al) * 4.0 + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.7;
+  float lvl = abs(fract(f) - 0.5);
+  float line = 1.0 - smoothstep(0.0, mix(0.10, 0.22, fold), lvl);
+  float thread = line * band * mix(0.55, 1.0, fold);
+  vec3 pale = mix(vec3(1.0), color, 0.18) * mix(0.9, 1.2, fold);
+  return mix(color, pale, clamp(thread * amount, 0.0, 1.0) * smoothstep(0.02, 0.16, alpha));
+}
+
 
 /**
  * Pigment texture, painted on the liquid rather than on the glass.
@@ -3087,6 +3143,7 @@ void main() {
     float edge0 = boundaryEdge(u_layer0, fuv0);
     fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
   }
+  if (u_lacing > 0.005 && fluid0.a > 0.02 && sharp0) fluid0.rgb = lacing(fluid0.rgb, u_layer0, u_vel0, fuv0, fluid0.a, u_lacing);
   if (!macro && u_edgeRelief > 0.005 && sharp0) fluid0.rgb = meniscus(fluid0.rgb, normal0, fluid0.a, fuv0);
   // ── Plate cells ───────────────────────────────────────────────
   // The fine network in the dish core of the Fillmore stills: cells the
@@ -3207,6 +3264,7 @@ void main() {
       float edge1 = boundaryEdge(u_layer1, fuv1);
       fluid1.rgb += fluid1.rgb * edge1 * u_boundaryContrast * 1.6 + vec3(edge1 * u_boundaryContrast * 0.25);
     }
+    if (u_lacing > 0.005 && fluid1.a > 0.02 && sharp1) fluid1.rgb = lacing(fluid1.rgb, u_layer1, u_vel1, fuv1, fluid1.a, u_lacing);
     if (!macro && u_edgeRelief > 0.005 && sharp1) fluid1.rgb = meniscus(fluid1.rgb, normal1, fluid1.a, fuv1);
 
     if (macro) {
@@ -3518,7 +3576,7 @@ void main() {
       'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
       'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
       'u_filmLevel','u_filmGain','u_logicalGrid',
-      'u_edgeRelief','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
+      'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
@@ -4789,6 +4847,7 @@ void main() {
           glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
           glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
+          glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
           glCtx.uniform1f(uLocs['u_dimmer'], Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)));
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));

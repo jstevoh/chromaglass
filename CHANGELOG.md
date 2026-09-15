@@ -120,6 +120,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Added — lacing (plan batch 2)
+- **Lacing** (`lacing`, Settings → Liquid, MIDI-learnable, 0 by default so no preset
+  changes under anyone): the pale hair-thin threads that outline every colour boundary in
+  a poured film. Fillmore East, 1969 carries it at 0.45
+- They cannot be found in the dye, because the solver has no structure below its own grid:
+  a boundary there is a smooth ramp a few cells wide. So they are made as level lines of
+  the colour as it changes across the boundary, which means each thread follows the
+  boundary's own shape rather than being noise sprayed near it, and where the boundary is
+  steep they crowd into a braid the way a stretched film does
+- What the flow decides is the width: the strain rate across the interface — the velocity
+  difference either side of the boundary, projected along the boundary's normal — draws a
+  thread out to a hair where the two sides pull apart and piles it into a thicker,
+  brighter one where they fold. Only where dye lies on both sides, so a blob's outer
+  silhouette against bare glass is left alone
+- Measured on a seeded plate with the grain and cells off, a 380 px crop inside the dish:
+  pixels on a hard edge 6.5 % → 8.5 % at the default and 13.8 % at full, typical local
+  contrast 3.2 → 4.6 → 5.8. Both are inside the filmed references' band for the first
+  time (4.2–7.3 % and 2.0–7.2). Structure at 4 and 8 px moved only 0.4 % → 0.5 %, so that
+  half of the batch's gate is not met and has moved to batch 3, where the drops and cells
+  that actually carry mid-scale structure live
+
 ### Fixed — the pigment grain was never drawn for the first nine hundred steps
 - Seeding the grain's pigment coordinates bound the very texture it was drawing into,
   which is a feedback loop; WebGL refused the draw and dropped it silently. The
