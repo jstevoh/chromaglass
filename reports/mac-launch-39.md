@@ -10,7 +10,7 @@
 - **The crossover doesn't show.** The designed contrast dip is measurable but small: 0.965× in the small dish at the default and 1.00× at granulation 1.0, against 0.71× for independent noise. I found no pulse and no jump at a reseed, by numbers or by eye. The reason: a reseeded phase is nearly the same texture as the one it replaces.
 - **Sheet:** 208 of 210 lines at full size on this Mac, nothing cut or over an outline. Three breaks read badly: **Backg-round** (I'd rather have Back-ground), **Micros-copic** (Micro-scopic) and **Labo-ratory** (Labora-tory).
 - **Sharpening:** I agree with PLAN.md.
-- **GL errors after 25 s and frame cost:** the probe is running; see "Errors and cost" in §2.
+- **Cost and errors:** the grain costs about 1 ms a frame (1.3 % by median, 5 % by frame count, under 99 % GPU load). 0 GL errors in the first 25 s of 8 pages and no NaN. Each page's console line "WebGL: too many errors" is the app's own READ-usage performance warnings (256 at load) hitting Chrome's cap, not a GL error; but it means later GL errors would not reach the console.
 
 ## 1. Launch
 
@@ -145,11 +145,33 @@ Fillmore, `?debug&sim=512`, granulation 0.5, grain scale 110. 10 s after the pre
 
 ![core at 10 s](s39-grain-first-core-10s.png) ![small dish at 10 s](s39-grain-first-small-10s.png)
 
-### Errors and cost
+### Errors and cost — **no GL errors, no NaN; the grain costs about 1 ms a frame (1–5 %)**
 
-*Probe running (`errcost39.mjs`); results will be added here.*
-- Every page in the sweep, the granulation-0 control included, logged one console line: "WebGL: too many errors, no more errors will be reported to the console for this context". Chrome prints that once a context has sent 32 messages to the console, and my filter hid the "READ-usage buffer" warnings my own float `readPixels` raise. So it may be mine, not the app's. The probe runs with no readbacks first, then with a burst of them, to tell which.
-- Granulation 0 only stops the display binding the grain texture; the solver still advects and reseeds the coordinates. So the probe measures cost by detaching the grain from the solver in alternate windows, not by moving the slider.
+**GL errors.**
+- A `getError` after every `drawArrays`/`drawElements`, installed before the app loads, caught **0 errors in the first 25 s of all 8 pages**. That window covers the reset, where #37 had its 4.
+- **No NaN** in the grain coordinates or the dye at any capture (24 captures).
+- Every page also logged one console line: "WebGL: too many errors, no more errors will be reported to the console for this context". **That is not a GL error.**
+  - `errcost39.mjs` logged every console message, and my script did no readbacks at all until the last phase.
+  - During load alone, the app's own async readback raised **256** "performance warning: READ-usage buffer was written, then fenced…" warnings, then Chrome printed the cap line.
+  - After that the context was silent through every later phase, including my `readPixels` burst.
+- **The caveat that follows:** once the cap is hit, Chrome prints nothing further for that context, so a real GL error after the first seconds would not reach the console. My `getError` hook covers only the first 25 s. Past that, I am relying on the grain and dye readbacks showing no NaN and the pictures staying right.
+
+**Cost.**
+- **Method:** one page (Fillmore, 512², granulation 0.5 / 110), measured after a 90 s quiet phase.
+- **Why not the slider:** granulation 0 only stops the display binding the grain texture; the solver still advects and reseeds the coordinates every step. So instead I set `fluids[0].gpu.grain` to null in alternate windows. That skips the advection, the reseeds and the display sampling.
+- **Windows:** eight 15 s windows in A/B/B/A order, with a 2 s settle before each.
+- **Load:** GPU at 99 % the whole time.
+
+| window | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| grain | on | off | off | on | on | off | off | on |
+| median frame (ms) | 65.7 | 66.1 | 65.8 | 67.4 | 66.6 | 65.2 | 66.3 | 67.1 |
+| frames in 15 s | 176 | 178 | 184 | 172 | 177 | 193 | 192 | 184 |
+
+- **Median frame:** 66.7 ms with the grain on against 65.9 ms off, **+0.9 ms (1.3 %)**. By pair: −0.4, +1.6, +1.4, +0.8 ms.
+- **Frames:** 709 with the grain on against 747 off, **5 % fewer** (by pair: 2, 12, 16, 8 fewer frames).
+- The two measures disagree because under this load the medians sit on four vsyncs (66.7 ms), while the frame count also sees the long frames.
+- Read together: the grain costs about 1 ms a frame, and at most ~5 %. That is inside PLAN.md's 15 % gate. On a quiet machine at 60 Hz, 1 ms is ~6 % of a 16.7 ms frame; I could not measure that here.
 
 ## 3. The sheet — **everything at 8 but two stop-row words; three breaks read badly**
 
@@ -235,4 +257,5 @@ One thing to carry into that decision: with the grain now live from frame one, t
 
 - `reports/s39-grain-first-*.png`, `s39-d05-*.png`, `s39-sweep-*.png`, `s39-grain.json`: §2
 - `reports/s39-surface-{screen,paper}.{png,json}`, `s39-cheatsheet-{screen,paper}.png`, `s39-zoom-*.png`: §3
+- `reports/s39-errcost.json`: §2, errors and cost
 - Scripts on the Mac, in `~/cg-scratch/`: `grain39.mjs`, `grainwatch.mjs`, `sweep39.sh`, `errcost39.mjs`, `grainhp.mjs`, `zoomrow.mjs`, `surface39.mjs`, `surface39z.mjs`

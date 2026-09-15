@@ -1,0 +1,272 @@
+{
+ "quietSeconds": 90,
+ "windows": [
+  {
+   "n": 176,
+   "med": 65.7,
+   "p90": 216.2,
+   "frames": 1398,
+   "attached": true,
+   "grain": true,
+   "framesInWindow": 176
+  },
+  {
+   "n": 178,
+   "med": 66.1,
+   "p90": 215.9,
+   "frames": 1602,
+   "attached": false,
+   "grain": false,
+   "framesInWindow": 178
+  },
+  {
+   "n": 184,
+   "med": 65.8,
+   "p90": 200,
+   "frames": 1810,
+   "attached": false,
+   "grain": false,
+   "framesInWindow": 184
+  },
+  {
+   "n": 172,
+   "med": 67.4,
+   "p90": 216.8,
+   "frames": 2006,
+   "attached": true,
+   "grain": true,
+   "framesInWindow": 172
+  },
+  {
+   "n": 177,
+   "med": 66.6,
+   "p90": 215.7,
+   "frames": 2210,
+   "attached": true,
+   "grain": true,
+   "framesInWindow": 177
+  },
+  {
+   "n": 193,
+   "med": 65.2,
+   "p90": 185.3,
+   "frames": 2430,
+   "attached": false,
+   "grain": false,
+   "framesInWindow": 193
+  },
+  {
+   "n": 192,
+   "med": 66.3,
+   "p90": 199.9,
+   "frames": 2650,
+   "attached": false,
+   "grain": false,
+   "framesInWindow": 192
+  },
+  {
+   "n": 184,
+   "med": 67.1,
+   "p90": 200.1,
+   "frames": 2861,
+   "attached": true,
+   "grain": true,
+   "framesInWindow": 184
+  }
+ ],
+ "onMean": 66.7,
+ "offMean": 65.8,
+ "costMs": 0.9,
+ "pairDiffs": [
+  -0.4,
+  1.6,
+  1.4,
+  0.8
+ ],
+ "console": {
+  "load|warning|performance warning: READ-usage buffer was written, then fenced, but written again before ": 256,
+  "load|warning|WebGL: too many errors, no more errors will be reported to the console for this context.": 1
+ },
+ "firstMsgs": [
+  {
+   "t": 1.1,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.1,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.2,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.4,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  },
+  {
+   "t": 1.6,
+   "phase": "load",
+   "type": "warning",
+   "text": "performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback."
+  }
+ ]
+}
