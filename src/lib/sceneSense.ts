@@ -583,3 +583,26 @@ function scratch(size: number, slot: number): Float32Array {
 export const SCENE_LATTICE = LATTICE;
 /** The most people the sensor will hold, so `crowd` can be read back as a count. */
 export const SCENE_MAX_PEOPLE = MAX_PEOPLE;
+
+/**
+ * One of the room's features, as a number to put on a setting.
+ *
+ * Unipolar features come back 0..1 and push a setting one way from where it
+ * was. The two directions are −1..1, so the room moves a setting either side
+ * of its resting value: the lamp follows the crowd left and right rather than
+ * only ever sliding one way.
+ */
+export function getSceneValue(r: SceneReading, feature: string): number {
+  switch (feature) {
+    case 'motion': return r.energy;
+    case 'spread': return r.spread;
+    case 'centroidX': return r.centroidX;
+    case 'centroidY': return r.centroidY;
+    case 'dirX': return r.dirX;
+    case 'dirY': return r.dirY;
+    case 'crowd': return r.crowd;
+    case 'brightness': return r.brightness;
+    case 'sceneHue': return r.hue;
+    default: return 0;
+  }
+}

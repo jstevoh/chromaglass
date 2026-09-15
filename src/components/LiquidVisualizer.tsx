@@ -12,8 +12,47 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
-import { SCENE_LATTICE, SCENE_MAX_PEOPLE, type SceneReading } from '../lib/sceneSense';
+import { SCENE_LATTICE, getSceneValue, type SceneReading } from '../lib/sceneSense';
+import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+
+/**
+ * How far each setting the room may ride can travel. Shared with the MIDI
+ * faders on purpose: a scene mapping and a knob move a control over the same
+ * range, so "half depth" means the same thing whichever hand is on it.
+ */
+const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: number; max: number }>> =
+  Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, { min: s.min, max: s.max }]));
+
+/**
+ * The scene mappings folded into a settings object.
+ *
+ * Returns `base` untouched when there is nothing to fold in, so the ordinary
+ * case — no camera, or no mappings — costs one comparison and no copying.
+ */
+function applySceneMappings(
+  base: VisualizerSettings,
+  reading: SceneReading | null,
+  into: VisualizerSettings,
+): VisualizerSettings {
+  const maps = base.sceneMappings;
+  const impact = base.sceneImpact ?? 0;
+  if (!reading || !reading.ready || !maps || maps.length === 0 || impact <= 0) return base;
+  if (performance.now() - reading.at > ROOM_STALE_MS) return base;
+
+  Object.assign(into, base);
+  for (const m of maps) {
+    if (!m || m.feature === 'none' || !m.depth) continue;
+    const travel = SETTING_TRAVEL[m.setting];
+    if (!travel) continue;
+    const current = base[m.setting];
+    if (typeof current !== 'number') continue;
+    const moved = current + getSceneValue(reading, m.feature) * m.depth * impact * (travel.max - travel.min);
+    (into as unknown as Record<string, number>)[m.setting] =
+      moved < travel.min ? travel.min : moved > travel.max ? travel.max : moved;
+  }
+  return into;
+}
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -100,6 +139,7 @@ const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'stardust-collapse':  ['spray', 'splatter'],
   'poster-1969':        ['pour', 'drop'],
   'fillmore-1969':      ['pour', 'drop'],
+  'crowd-plate':        ['drop', 'pour'],
   'oil-on-water':       ['drop'],
   'colorful-cosmos':    ['pour'],
   'sunny-side-up':      ['pour', 'drop'],
@@ -187,6 +227,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'macro-bead':         [0, 1, 3, 2],
   'cell-bloom':         [0, 1, 2, 3],
   'lace-run':           [0, 1, 4, 3],
+  // Six dyes rather than the usual two or three: the point of this one is that
+  // a person gets a colour of their own, and a crowd wants more than three.
+  'crowd-plate':        [0, 2, 5, 7, 9, 10],
 };
 
 /** A working harmony drawn from inside a contract: the whole set when small, else three of it. */
@@ -1798,6 +1841,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const roomStirRef = useRef(new RoomStir(SCENE_LATTICE));
   /** The reading the room's hands last acted on, so each one acts once. */
   const lastHandsAtRef = useRef(-1);
+  /** The settings with the room's mappings folded in, rewritten each frame. */
+  const sceneModRef = useRef<VisualizerSettings>({ ...settings });
   const gelAngleRef = useRef(0);
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -3613,7 +3658,15 @@ void main() {
       const workStart = performance.now();
       let frameS = 0;
       const currentAudioData = audioDataRef.current;
-      const currentSettings = settingsRef.current;
+      // ── The room, on the settings ─────────────────────────────
+      // A scene mapping is a feature, a setting and a depth, the same shape
+      // the music has used all along. Applied here, once, so everything
+      // downstream reads a settings object that already has the room in it and
+      // nothing has to learn about the camera.
+      //
+      // One object, reused: a copy per frame of a hundred-key settings object
+      // is sixty allocations a second for a show that runs for hours.
+      const currentSettings = applySceneMappings(settingsRef.current, sceneRef?.current ?? null, sceneModRef.current);
       const glr = webGLRef.current;
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {

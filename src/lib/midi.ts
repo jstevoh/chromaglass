@@ -26,7 +26,9 @@ export type MidiAction =
   /** The house lights: fade the plate to black and back. */
   | 'blackout-toggle'
   /** Record the show to a video file / stop recording. */
-  | 'record-toggle';
+  | 'record-toggle'
+  /** Open or close the camera that watches the room. */
+  | 'scene-toggle';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -75,6 +77,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record',
+  'scene-toggle': 'Watch the Room',
 };
 
 /** The settings worth a fader, with their travel. */
@@ -115,6 +118,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   { key: 'beatLead',        label: 'Beat Lead (ms)',   min: 0, max: 250 },
+  // The room. Worth a fader more than most: how hard the crowd drives the
+  // plate is the thing you ride between a verse and a chorus.
+  { key: 'sceneDrive',      label: 'Room Drive',       min: 0, max: 1 },
+  { key: 'sceneHands',      label: 'Room Hands',       min: 0, max: 1 },
+  { key: 'sceneImpact',     label: 'Room Impact',      min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 
