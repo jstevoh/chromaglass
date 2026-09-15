@@ -2,6 +2,15 @@
 
 2026-09-15, late morning. The Mac is on `main` at aab272f "Lacing: threads at a boundary, not a contour map (#43)".
 
+**In short**
+- **Launch:** server pid **32470**, show key **7699**, curl 200. Details in §1.
+- **Filaments: better in the main dish, not fixed.** At 0.45, lacing touches 8.7 % of the main dish, one frame apart (#42: 20.8 %). What remains sits on boundaries, as one or two lines along the edge. The core's rings are gone. But a wide soft ramp still gets a thin stack of 6–7 lines (the pink → cyan ramp), and the red tongue keeps a comb of short parallel stripes. Speckle where two reds meet, and glitter from 0.7, are unchanged.
+- **Small dish: the stipple is hidden, not gone.** It draws almost nothing at 0.45 (0.9 %). With `fold` forced to 1 it is #42's stipple again. It isn't the colour the level reads: a bilinear sample changes nothing. §2 has the further tests.
+- **Curvature coupling: visible, but as a gate, not braid against hair.** A page-only shader patch, one frame apart, shows it. Forcing `fold` to 0 removes almost every thread (lift 0.1–0.7), so **straight runs draw no hair at all**. Forcing it to 1 brings the contour map back. So what `fold` actually does is hide the stacks. Keep it, but it needs the spacing fixed before it can have a floor. A `fold` floor of 0.5 gives straight edges a real hair, and also re-stacks every wide ramp.
+- **Fillmore: 0.55.** Under the grain, 0.45 is now too quiet for a projector. 0.55–0.6 carries a clear braid on curls and lips with no glitter. 0.7 starts to glitter. Grain and lacing still layer. 0 GL errors, 0 NaN.
+- **Frame cost: no longer measurable.** On − off is +0.08 ms at 0.45 and −0.02 at 1.0 at 1600×1000 (#42: +0.40), with the GPU at 95–97 %.
+- **Sharpening: unchanged verdict.** One test is proposed in §3 before dropping it: the governor's 256² / 384² rungs, with edge width measured in pixels.
+
 ## 1. Launch
 
 - **Pull.** I stashed only `package-lock.json`, fast-forwarded b687f94 → aab272f (#43: `CHANGELOG.md` and `LiquidVisualizer.tsx`), and popped the stash cleanly, so the local lockfile edit is kept. The nested `chromaglass/` clone is untouched. No `npm install`.
@@ -137,6 +146,18 @@ Lacing 0 against 0 six frames later lifts 4.7 %, so 0.35 is barely above motion.
 - **0.7 starts to go wrong** on the red tongue. Its comb of short parallel stripes across the red → orange ramp turns bright, and the core's braid picks up single-pixel glitter.
 - **The small dish under the grain** shows nothing at 0.45. With a floor, the stipple is back as bright dots, mostly lost in the grain.
 - **Errors:** 0 GL errors, 0 NaN in both dishes, grain on and off.
+
+### Frame cost: **not measurable any more, and at most what #42 was**
+
+The machine was only quiet at the start (GPU 41 %). By the time the cost runs began, the look pages and OBSBOT had it at **95–97 %**, the same as #42's runs. Method as #42 (`~/cg-scratch/lacegpu43.mjs`): Fillmore at its own grain and cells, seeded. Lacing is flipped every frame by writing `settings.lacing`, and only the display draw is timed, between two 1 px `readPixels` syncs, so on and off draws share the load. 60 s per run.
+
+| canvas | lacing | draws on / off | on: median, mean ms | off: median, mean ms | on − off (median / mean) | #42 on − off |
+|---|---|---|---|---|---|---|
+| 1600×1000 | 0.45 | 914 / 914 | 21.0, 20.40 | 20.6, 20.32 | +0.4 / **+0.08** | +0.2 / +0.40 |
+| 1600×1000 | 1.0 | 887 / 886 | 21.0, 21.59 | 20.5, 21.61 | +0.5 / **−0.02** | +0.4 / +0.40 |
+
+- **The mean difference fell from +0.40 ms to about zero at both amounts.** The medians move in 0.5 ms steps from timer rounding, and the interquartile spread is 4–5 ms. So I'd read the pass as **under ~0.2 ms at 1600×1000**, and cheaper than #42's. That is consistent with six velocity samples going and two dye samples coming in, but this bracket can't separate a tenth of a millisecond.
+- As in #42, the ~20 ms bracket is the whole queued frame, not the pass; only the difference means anything.
 
 ## 3. Sharpening: **I haven't changed my mind; on Fillmore at 512² it doesn't earn its place**
 
