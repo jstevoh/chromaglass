@@ -69,3 +69,22 @@ Numbers (`lacediff42.mjs`). "Lifted" means a pixel more than 8 luminance units b
 | | 1.0 | 14.0 | 32 | 3.9 | 6.52 |
 
 Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 at 1.0). A fifth of the main dish is touched at the default.
+
+### Frame cost at 1600×1000: **not resolvable here**
+
+`lacecost42.mjs` runs one page on Fillmore at its own defaults (grain 0.5, cells 0.2, seeded). Lacing alternates 0.45 / 0 over OSC in 20 s windows, A B B A × 2, with the median rAF interval taken per window.
+
+| window | lacing | median ms | p90 ms | frames |
+|---|---|---|---|---|
+| 1 | 0.45 | 16.7 | 18.1 | 1200 |
+| 2 | 0 | 16.7 | 18.1 | 1201 |
+| 3 | 0 | 16.7 | 18.0 | 1200 |
+| 4 | 0.45 | 16.7 | 33.4 | 991 |
+| 5 | 0.45 | 16.7 | 34.7 | 873 |
+| 6 | 0 | 16.8 | 48.8 | 837 |
+| 7 | 0 | 17.1 | 48.9 | 825 |
+| 8 | 0.45 | 16.8 | 49.4 | 808 |
+
+- The first three windows sat on the 60 Hz vsync floor with either value. Then OBSBOT Center (89 % CPU) and MOTIV Mix loaded the machine, and every later window slowed, whatever the setting.
+- Means: 16.72 ms on against 16.83 off, and 968 against 1016 frames per window. The 5 % frame gap is in the load drift's direction (on/off/off/on straddles it) and is not a cost I can stand behind.
+- **At this canvas size the pass does not push the Mac off vsync.** A 4K-canvas run (1920×1080 at DPR 2, the projector's pixel count) follows.
