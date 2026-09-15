@@ -9,7 +9,7 @@
 - **Strain coupling: I can't see it.** In consecutive-frame captures at and after a press, no side of a pushed blob is thinner or brighter than another. The fold sign flips every 20–40 px, and the width only spans 0.10–0.22 of a level.
 - **Grain + lacing: they layer and don't fight.** 0 GL errors and 0 NaN in every run.
 - **Sharpness 0.5 with lacing in: still invisible** at matched composition. A first-pair note I pushed said otherwise; that was page-to-page drift, and §3 corrects it.
-- **Frame cost:** *being measured (a per-draw GPU timer); the first attempt measured nothing because `gl.finish()` doesn't wait in Chrome.*
+- **Frame cost: ≤ 0.4 ms a frame, about 2.5 % of a 60 Hz frame, inside PLAN's 15 %.** Timed by a per-draw GPU timer with lacing flipped every frame, so on and off share the load. The difference is smaller than frame-to-frame spread at 1600×1000 and 1920×1080, and at 0.45 and 1.0. Details in §4.
 
 ## 1. Launch
 
@@ -177,3 +177,20 @@ The main dish, 380 px at 1×, from the second pair: sharpness 0 | 0.5:
 - **At matched composition, sharpness 0.5 is invisible.** The tongue's curved edge, its lacing threads and the cyan ramp are the same at 0 and 0.5, at 2× by eye. High-pass: main dish 5.49 → 5.42, small dish 2.89 → 2.78.
 - **Small dish (`dishblock`):** gradFrac 0.490 / 0.503 at 0 and 0.481 at the matched 0.5. axisFrac is 0.113–0.116 on all four, and 0.11 is isotropic, so no blocks at 0.5.
 - **The same verdict as #37, now with hard edges to work on.** The lacing threads give a sharpener crisp edges to act on, but the pass runs after the solver, so there is nothing for sharpening to reach. The solver's own boundaries look the same at 0 and 0.5. On this evidence the sharpening pass buys nothing visible on Fillmore at its default. PLAN.md's test comes out against keeping it at 0.5, though I haven't tried other presets.
+
+## 4. Frame cost, by GPU draw: **≤ 0.4 ms, about 2.5 %**
+
+The rAF windows (§2) couldn't resolve the pass: at 1600×1000 the page sat on vsync, and at 1920×1080 the load drifted more than any setting did. The app draws 1920×1080 even at DPR 2, so I couldn't get the projector's 4K canvas here.
+
+`~/cg-scratch/lacegpu42.mjs` wraps `drawArrays`/`drawElements` in an init script. On the display draw only (the program that has a `u_lacing` uniform), it syncs with a 1 px `readPixels`, times the draw, and syncs again. It reads `u_lacing` back at draw time, and flips lacing between 0 and the test value every frame by writing `chromaglassDebug().settings.lacing`, so on and off draws alternate and share the machine's load. Fillmore at its own defaults (grain 0.5, cells 0.2), seeded, 60 s per run, GPU utilisation 89–97 %.
+
+| canvas | lacing | draws on / off | on: median, mean ms | off: median, mean ms | on − off (median / mean) |
+|---|---|---|---|---|---|
+| 1600×1000 | 0.45 | 1019 / 1019 | 20.8, 19.65 | 20.6, 19.25 | +0.2 / +0.40 |
+| 1600×1000 | 1.0 | 751 / 751 | 22.2, 26.51 | 21.8, 26.11 | +0.4 / +0.40 |
+| 1920×1080 | 0.45 | 708 / 707 | 24.2, 28.69 | 24.8, 28.59 | −0.6 / +0.10 |
+
+- **The bracket is about 20 ms, a whole frame, not the draw alone.** The sync after the draw waits on everything Chrome's GPU process has queued, including the compositor under this load. So the absolute column isn't the cost of the display pass; only the on/off difference is.
+- **That difference is at most 0.4 ms**, both at 0.45 and at full strength, and the 1920×1080 median goes the other way. The interquartile spread is 7–13 ms, so 0.4 ms is at the edge of what this can resolve. I'd read it as **under ~0.5 ms a frame, about 2.5 % of a 16.7 ms frame**, well inside PLAN's 15 %. Cost barely moves with the amount (0.45 and 1.0 give the same mean difference), as expected: the amount only scales a mix, and the samples and fbm run wherever the band is lit.
+- **A first attempt with `gl.finish()` measured 0 ms for every draw.** In Chrome it doesn't wait for the GPU process, so don't reuse that method.
+- **Caveat:** this is the Mac's GPU at 1920×1080 at most. Cost scales with lit pixels, so on a 4K projector canvas I'd expect up to ~4× the per-frame figure. That is still inside the budget if it scales linearly, but I couldn't measure it.
