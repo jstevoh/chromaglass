@@ -138,6 +138,67 @@ the interface physics:
 
 **Depends on** batches 1 and 3 to read properly.
 
+**Shipped, with milk's optics still owed.** `src/lib/liquidPhase.ts` is a second field
+the plate carries beside the dye — `soap`, `body` and `repel`, advected by the same
+velocity, decaying over 6, 22 and 26 seconds. All three are deviations from an
+ordinary plate, so a show with none of them in it runs exactly the arithmetic it
+always did and the whole pass is skipped; that is the first thing `npm run liquids`
+checks, because a field that changes every existing look is a regression with a menu
+entry rather than a feature. It needs no GPU work: with the GPU solver attached the
+CPU arrays are the next step's deltas, so a force written as a velocity delta and a
+thinning written as a dye multiplier reach both engines through a path that exists.
+
+What each one measures at, on a stand-in plate:
+
+| | |
+|---|---|
+| Soap | dye within 8 cells of the drop falls to 55% and the disc stays open |
+| Glycerine | the plate moves at 0.0081, the thick patch at 0.0002 |
+| Milk | a pool spreads 5.99 against 6.01 for bare dye under the same shear |
+| Silicone | the middle goes 67 → 0 with 262 in the ring around it |
+
+Two things went wrong and are worth keeping. Milk was first written as a cohesive pull
+toward the middle, and measured *wider* than bare dye: a cohesive force with no
+pressure term to balance it collapses the pool and throws it out the far side. It is
+now a one-way damper that can only remove the velocity that is escaping, and a force
+that can only take energy away cannot overshoot. And the first spread measurement was
+taken about a fixed point, so a plate that merely drifted read as a pool that had
+spread — it is measured about the pool's own centroid now.
+
+**Still owed: milk's opacity.** What ships is behaviour, not optics. Colour still
+transmits through milk rather than sitting on it, because the dye texture's RGBA is
+already fully spent — three log-absorptions and a density — and there is no channel
+left for an opaque ground. That is the part of the reference's solid reds this does
+not yet reach, and it needs a render change rather than a solver one.
+
+### 4a. What is in each preset's dish
+
+`src/presetPlate.ts` (new), `src/presets.ts`, `scripts/plate.mjs` (new)
+
+A liquid nothing pours is a menu entry. Every preset now names what is in its dish
+alongside the dyes it may use and how the automation puts them there — the three maps
+moved out of the component into `src/presetPlate.ts` so a harness can read them without
+a browser. The list doubles as the dilution: `doseLiquid` picks from it uniformly, and
+the five inert liquids are how a preset says *mostly nothing, once in a while
+something*. `['water', 'water', 'soap']` is a plate broken open every third dose;
+`['soap', 'silicone']` never stops reacting.
+
+Three presets exist only because the liquids do: **Milk Marbling** (the kitchen dish —
+four spots of food colouring dead still until a drop of soap sends them for the rim),
+**Soap Film** (one sheet of interference colour, torn open again and again) and
+**Glycerine Drift** (bands shearing against patches that will not go along).
+
+An automated show adds liquid for hours and pours none of it out, so `LiquidPhase`
+carries a coverage ceiling and the automation scales each dose by the headroom left.
+Measured: dosing every frame unchecked leaves 92% of cells too thick to move; with
+headroom asked, 2%. A hand on the dropper is never limited.
+
+`npm run plate` checks that every preset's dyes, injection styles and liquids name
+things that exist — the failure it is really for is a typo in a liquid id, which reads
+as "this preset has no liquid", silently, forever. It found three on its first run:
+Lumia, Sensual Laboratory and Oil Wheel had no injection style and had been quietly
+taking the `drop` default.
+
 ### 5. Playing it: sound learn, shutter, and a look link
 
 `src/lib/soundLearn.ts` (new), `src/hooks/useAudioAnalyzer.ts`, `src/components/MidiPanel.tsx`,

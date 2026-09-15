@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeH
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
+import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
 import { BeatClock } from '../lib/beatClock';
@@ -12,6 +13,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
+import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, getSceneValue, type SceneReading } from '../lib/sceneSense';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -126,46 +128,42 @@ const SIM_MAX_CATCHUP = (() => {
 const FILM_BINS = 64;
 const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
 
-const PRESET_INJECT_STYLES: Record<string, string[]> = {
-  'classic':            ['drop'],
-  'galaxy':             ['spray', 'streak'],
-  'deep-ocean':         ['pour', 'drop'],
-  'cyberpunk':          ['streak', 'splatter'],
-  'lava-lamp':          ['pour'],
-  'acid-trip':          ['splatter', 'spray'],
-  'bass-drop':          ['splatter', 'drop'],
-  'timbre-shifter':     ['spray'],
-  'boiling-point':      ['spray', 'splatter'],
-  'microscopic-chaos':  ['drop'],
-  'aurora-borealis':    ['streak', 'spray'],
-  'solar-flare':        ['splatter', 'streak'],
-  'jellyfish-bloom':    ['pour', 'drop'],
-  'fractal-dream':      ['streak', 'spray'],
-  'velvet-underground': ['pour', 'drop'],
-  'neon-coral-reef':    ['streak', 'drop'],
-  'stardust-collapse':  ['spray', 'splatter'],
-  'poster-1969':        ['pour', 'drop'],
-  'fillmore-1969':      ['pour', 'drop'],
-  'crowd-plate':        ['drop', 'pour'],
-  'oil-on-water':       ['drop'],
-  'colorful-cosmos':    ['pour'],
-  'sunny-side-up':      ['pour', 'drop'],
-  'macro-bead':         ['drop', 'splatter'],
-  'cell-bloom':         ['drop'],
-  'lace-run':           ['pour', 'streak'],
-};
+/**
+ * Pour one dose of whatever the preset keeps in the dish.
+ *
+ * Picks uniformly from the list, so the inert entries are the dilution: most
+ * of the time this lands on `water` and returns having done nothing, which is
+ * what makes `['water', 'water', 'soap']` a different plate from `['soap']`.
+ *
+ * The dose is scaled by the plate's remaining headroom for that liquid, so a
+ * show left running overnight cannot end as a dish of solid glycerine. See
+ * `CEILING` in `liquidPhase.ts` for why that matters and `npm run liquids`
+ * for the measurement — unchecked, an hour of this leaves 92% of the plate
+ * too thick to move.
+ */
+function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number, strength = 1): void {
+  if (ids.length === 0) return;
+  const liq = LIQUIDS_BY_ID.get(ids[Math.floor(Math.random() * ids.length)]);
+  if (!liq?.behaviour) return;            // water, oil, ink, syrup: colour and nothing else
+  const room = fluid.liquid.headroom(liq.behaviour);
+  if (room <= 0.02) return;
+  const r = Math.max(2, Math.round((liq.injectRadius ?? 3) * GRID_SCALE));
+  fluid.liquid.deposit(x, y, r, liq.behaviour, AUTO_DOSE * strength * room);
+}
 
 export interface LiquidVisualizerHandle {
   injectImage: (imageData: ImageData) => void;
-  /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes and injection styles. */
-  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null }) => void;
-  /** The dyes and injection styles in force, for saving the current look as a preset. */
-  describePlate: () => { contract: number[] | null; injectStyles: string[] };
-  /** Take on a preset's dyes and injection style without clearing the plate — the sequencer's way of changing stage. */
+  /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids. */
+  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
+  /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
+  describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
+  /** Take on a preset's dyes, injection style and liquids without clearing the plate — the sequencer's way of changing stage. */
   adoptPreset: (presetId: string) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
+  /** What the automation may pour, as liquid ids. An empty list is a plate with only dye on it. */
+  setPlateLiquids: (ids: string[]) => void;
   /** Pin the color harmony to a specific palette-index set (music intelligence). */
   setHarmony: (indices: number[]) => void;
   /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
@@ -195,49 +193,6 @@ export interface LiquidVisualizerHandle {
   setStage: (size: { width: number; height: number } | null) => void;
 }
 
-// ─── Palette contracts ───────────────────────────────────────────────
-// A projected clock face carries two or three dyes, and the richness of a
-// show comes from stacking plates, not from rainbow dye. Each preset names the
-// palette indices it may use; seeding, automation, beat injection and the
-// slow harmony rotation all pick from inside that set. A user's palette lock
-// still wins outright.
-export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [0, 2, 8],
-  'galaxy':             [9, 10, 7],
-  'deep-ocean':         [7, 9, 5],
-  'cyberpunk':          [6, 10, 2],
-  'lava-lamp':          [0, 1, 3],
-  'acid-trip':          [8, 3, 0, 10],
-  'bass-drop':          [8, 3, 0],
-  'timbre-shifter':     [2, 8, 0],
-  'boiling-point':      [0, 1, 3],
-  'microscopic-chaos':  [9, 10, 5],
-  'aurora-borealis':    [5, 6, 7],
-  'solar-flare':        [0, 1, 3],
-  'jellyfish-bloom':    [2, 11, 10],
-  'fractal-dream':      [6, 10, 2],
-  'velvet-underground': [9, 10, 4],
-  'neon-coral-reef':    [0, 6, 2],
-  'stardust-collapse':  [7, 15, 5],
-  'lumia':              [10, 7, 1],
-  'sensual-laboratory': [14, 12],
-  'oil-wheel':          [0, 6, 8],
-  'poster-1969':        [2, 6],
-  'fillmore-1969':      [1, 0, 3, 7, 5, 10],
-  'fillmore-wash':      [5, 10, 9],            // the second projector: emerald, purple, cobalt
-  'oil-on-water':       [0, 1],
-  'colorful-cosmos':    [9, 2, 0],
-  'sunny-side-up':      [7, 10, 2],
-  // Warm, fully-saturated sets only: white and graphite wash out fast under
-  // subtractive mixing, and at this magnification the highlights and the
-  // blacks come from the cell rings and lacing, not from the dye.
-  'macro-bead':         [0, 1, 3, 2],
-  'cell-bloom':         [0, 1, 2, 3],
-  'lace-run':           [0, 1, 4, 3],
-  // Six dyes rather than the usual two or three: the point of this one is that
-  // a person gets a colour of their own, and a crowd wants more than three.
-  'crowd-plate':        [0, 2, 5, 7, 9, 10],
-};
 
 /** A working harmony drawn from inside a contract: the whole set when small, else three of it. */
 const harmonyWithin = (contract: number[]): number[] => {
@@ -481,6 +436,43 @@ class FluidSimulation {
     this.dirty = true;
   }
 
+  /**
+   * What liquid is where on this plate. Empty until one of the four liquids
+   * that do something is dropped, and skipped entirely while it is empty, so a
+   * plate of ordinary dye runs exactly the arithmetic it always did.
+   */
+  readonly liquid = new LiquidPhase(GRID_SIZE);
+
+  /**
+   * Let the liquid field act, then carry it along with the plate.
+   *
+   * Both go through the delta arrays, which is what makes this work on the GPU
+   * engine as well: what is written here is uploaded and applied before the
+   * next step. The field itself moves on the readback, which is the plate's
+   * own velocity on the CPU engine and one frame old on the GPU one.
+   */
+  stepLiquid(dt: number, disp: number) {
+    if (!this.liquid.active) return;
+    this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
+    // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
+    // the deltas and nothing else reads it. The CPU solver has no such step —
+    // its density arrays *are* the plate — so on the fallback the thinning has
+    // to be folded in here, or the forces arrive and soap's clear disc simply
+    // never opens. Every other writer of `mul` in this file is already guarded
+    // by `if (this.gpu)` with an else branch doing exactly this; the liquid
+    // pass is shared between both engines, so it does it after the fact.
+    if (!this.gpu) {
+      for (let i = 0; i < GRID_AREA; i++) {
+        const m = this.mul[i];
+        if (m === 1) continue;
+        this.density[i] *= m; this.densityR[i] *= m; this.densityG[i] *= m; this.densityB[i] *= m;
+        this.mul[i] = 1;
+      }
+    }
+    this.liquid.step(this.readVx, this.readVy, disp, dt);
+    this.dirty = true;
+  }
+
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
     this.dirty = true;
@@ -513,6 +505,7 @@ class FluidSimulation {
   }
 
   clearAll() {
+    this.liquid.clear();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
@@ -909,6 +902,47 @@ class FluidSimulation {
           const x = S * 0.18 + Math.random() * S * 0.7;
           const y = S * 0.5 + (Math.random() - 0.5) * S * 0.35;
           this.splatBlob(x, y, (1 + Math.random() * 3) * k, 1.6, trail.r, trail.g, trail.b);
+        }
+        break;
+      }
+
+      case 'milk-marble': {
+        // The dish on the kitchen table: a pale ground across the whole plate,
+        // four spots of food colouring sitting on it, and nothing moving at
+        // all until the soap arrives. Which is the entire trick — the colour
+        // has been ready to run the whole time, it just had no reason to.
+        this.splatBlob(cx, cy, S * 0.52, 0.85, 0.96, 0.94, 0.89);
+        const spots: [number, number][] = [[0.37, 0.37], [0.63, 0.37], [0.37, 0.63], [0.63, 0.63]];
+        spots.forEach(([fx, fy], i) => {
+          const c = col(i);
+          this.splatBlob(fx * S, fy * S, 7 * k, 3.2, c.r, c.g, c.b);
+        });
+        break;
+      }
+
+      case 'soap-film': {
+        // One unbroken sheet. Everything this preset does it does by tearing
+        // holes in that sheet, so the seed is the sheet and nothing else.
+        for (let i = 0; i < 3; i++) {
+          const c = col(i);
+          this.splatBlob(cx + (Math.random() - 0.5) * S * 0.28, cy + (Math.random() - 0.5) * S * 0.28,
+            S * 0.4, 1.1, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'glycerine-drift': {
+        // Bands laid across the plate, drifting in alternate directions. The
+        // look is what happens where a patch that will not move meets one
+        // that will, so the seed lays something for the shear to cut.
+        for (let b = 0; b < 5; b++) {
+          const c = col(b);
+          const y = S * (0.15 + b * 0.175);
+          for (let t = 0; t < 48; t++) {
+            const x = S * 0.06 + t * (S * 0.88 / 48);
+            this.splatBlob(x, y + Math.sin(t * 0.13 + b) * 6 * k, 9 * k, 1.5, c.r, c.g, c.b);
+            this.addVelocity(Math.floor(x), Math.floor(y), b % 2 === 0 ? 0.05 : -0.05, 0);
+          }
         }
         break;
       }
@@ -1882,6 +1916,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     f.kind = 'none';
   };
   const injectStyleRef = useRef<string[]>(['drop']);
+  const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
 
@@ -1958,10 +1993,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
         break;
-      case 'drop':
+      case 'drop': {
+        const liq = selectedLiquidRef.current;
+        if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
         af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
+      }
       case 'streak': {
         // Directional smear along the recorded movement
         const dx = g.dx ?? 1, dy = g.dy ?? 0;
@@ -2011,6 +2049,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
       else if (extras && !extras.contract) delete PRESET_CONTRACTS[presetId];
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
+      if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
       for (const fluid of fluidsRef.current) fluid.clearAll();
       bubblesRef.current.clear();
       chemRef.current.reset();
@@ -2026,16 +2065,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // The Fillmore look is two projectors: the second plate starts with its own wash.
       if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+      plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
+      // The plate is laid with its liquids as well as its dye, rather than
+      // waiting a minute for the automation to dose its way there. Because
+      // `doseLiquid` picks uniformly from the list, the inert entries thin
+      // this out on their own: a plate of `['water', 'water', 'soap']` gets
+      // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
+      if (fluid) for (let i = 0; i < 15; i++) {
+        doseLiquid(fluid, plateLiquidsRef.current,
+          10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+      }
       drainFrameRef.current = 0;
       macroCamRef.current.reset();
     },
-    describePlate: () => ({ contract: presetContractRef.current ? [...presetContractRef.current] : null, injectStyles: [...injectStyleRef.current] }),
+    describePlate: () => ({
+      contract: presetContractRef.current ? [...presetContractRef.current] : null,
+      injectStyles: [...injectStyleRef.current],
+      liquids: [...plateLiquidsRef.current],
+    }),
     adoptPreset: (presetId: string) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
       // new dyes and injection style take over from here.
       presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
       journeyRef.current = { lead: 0, lastAt: -1 };
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+      // The plate keeps what is already dissolved in it; from here the new
+      // preset's liquids are what gets poured.
+      plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
       if (!harmonyLockRef.current) {
         const contract = presetContractRef.current;
         harmonyRef.current = contract ? harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0) : pickHarmony();
@@ -2049,6 +2105,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     setInjectStyle: (styles: string[]) => {
       injectStyleRef.current = styles;
+    },
+    setPlateLiquids: (ids: string[]) => {
+      plateLiquidsRef.current = ids.filter(id => LIQUIDS_BY_ID.has(id));
     },
     setHarmony: (indices: number[]) => {
       // Music-driven harmony never overrides an explicit user palette lock
@@ -2184,6 +2243,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // Seed initial preset pattern
           harmonyRef.current = fluid.seedPreset('classic', noise2D);
           presetContractRef.current = PRESET_CONTRACTS['classic'];
+          for (let d = 0; d < 15; d++) {
+            doseLiquid(fluid, plateLiquidsRef.current,
+              10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+          }
         }
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
@@ -4210,6 +4273,10 @@ void main() {
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
+                // Soap, milk, silicone and glycerine put their properties into
+                // the plate on the same disc as their colour, and the plate
+                // keeps acting on them long after the drop.
+                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, 1);
               }
             }
           }
@@ -4246,6 +4313,9 @@ void main() {
                   const style = styles[Math.floor(Math.random() * styles.length)];
                   af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
                   af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
+                  // A hand reaching for the dropper reaches for whatever is on
+                  // the bench, and half the bottles there are not just colour.
+                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.6 + energy * 0.8);
                 }
               }
             }
@@ -4285,6 +4355,8 @@ void main() {
                 const style = styles[Math.floor(Math.random() * styles.length)];
                 fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 2.0);
+                // A fresh plate is laid with its liquids, not dosed into them.
+                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 1.4);
               }
             }
           }
@@ -4386,6 +4458,16 @@ void main() {
                         activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
                         activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
                       }
+                    }
+                    // The beat is when an operator adds something, so it is
+                    // when the plate's own liquids arrive too — somewhere on
+                    // the ring rather than always dead centre, which would
+                    // build one permanent patch of soap in the middle and
+                    // leave the rest of the plate clean.
+                    {
+                      const da = Math.random() * Math.PI * 2;
+                      doseLiquid(activeFluid, plateLiquidsRef.current,
+                        centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
                     }
                   }
                   lastBass01Ref.current = bass01;
@@ -4572,6 +4654,12 @@ void main() {
           // ── Advance the solver ───────────────────────────────
           if (isActiveRef.current && drainFrameRef.current === 0) {
             const t0 = performance.now();
+            // What liquid is where acts first, so the forces it adds are in
+            // the deltas the step is about to take. Costs nothing on a plate
+            // with none of the four liquids on it, which is every preset that
+            // does not ask for them.
+            const disp = SIM_STEP * (currentSettings.advection ?? 0.45) * (GRID_SIZE - 2);
+            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, disp);
             for (const fluid of fluidsRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;

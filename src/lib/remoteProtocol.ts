@@ -115,7 +115,14 @@ export type RemoteMessage =
   | { type: 'press'; x: number; y: number; layer: number; amount?: number }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
-  | { type: 'dye'; color: string };
+  | { type: 'dye'; color: string }
+  /**
+   * The tablet reaches for a different bottle. Soap, milk, silicone and
+   * glycerine are not colours — they change what the plate does where they
+   * land — so picking one from the pad has to set the display's *liquid*,
+   * not its dye. An id the display does not know is ignored.
+   */
+  | { type: 'liquid'; id: string };
 
 /** Build the ws:// URL for the relay from the page's own origin. */
 export function remoteSocketUrl(): string {

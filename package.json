@@ -29,12 +29,14 @@
     "detail": "node scripts/detail.mjs",
     "scene": "node --experimental-strip-types scripts/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
+    "liquids": "node --experimental-strip-types scripts/liquids.mjs",
     "qa": "npm run build && node scripts/qa.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",
     "deploy": "npx firebase-tools deploy --only hosting",
     "ship": "npm run update && npm run deploy && npm run remote",
-    "show": "npm run update && npm run remote"
+    "show": "npm run update && npm run remote",
+    "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

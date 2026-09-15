@@ -46,16 +46,35 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/** Anything the preview server said on stderr, so a startup failure explains itself. */
+const notes = [];
+
 async function serve() {
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
+  // Its own process group, and the local binary rather than `npx`. Through npx
+  // this leaked: killing the shim left `vite preview` holding the port, so the
+  // *second* run in a session died on `--strictPort` with nothing but
+  // "preview exited 1" to go on — a harness that only works once.
+  const proc = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview',
+    '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
   await new Promise((resolve, reject) => {
     const bail = setTimeout(() => reject(new Error('preview server did not start')), 30_000);
     proc.stdout.on('data', d => { if (String(d).includes('localhost')) { clearTimeout(bail); resolve(); } });
-    proc.on('exit', c => { clearTimeout(bail); reject(new Error(`preview exited ${c}`)); });
+    proc.stderr.on('data', d => { notes.push(String(d).trim()); });
+    proc.on('exit', c => {
+      clearTimeout(bail);
+      reject(new Error(`preview exited ${c}${notes.length ? `: ${notes.join(' ').slice(0, 200)}` : ''}`));
+    });
   });
   return proc;
+}
+
+
+/** Take the whole process group down, so nothing is left holding the port. */
+function stopServer(proc) {
+  try { process.kill(-proc.pid, 'SIGTERM'); } catch { proc.kill('SIGTERM'); }
 }
 
 const server = await serve();
@@ -272,7 +291,7 @@ try {
   check('the run completed', false, String(err).split('\n')[0]);
 } finally {
   await browser.close();
-  server.kill();
+  stopServer(server);
 }
 
 const failed = results.filter(r => !r.ok);

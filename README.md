@@ -22,6 +22,7 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **The room drives the plate** — a camera pointed at the floor is read back rather than shown: the movement in front of it stirs the liquid, everyone it can hold becomes a hand on the glass carrying a dye of their own, and any feature of the room — how busy, how many, how spread out, where, which way, how light, what colour — can ride any control a MIDI fader can learn (Settings → The Room; preset *Crowd Plate*)
 - **A band in the box** — a synthesised kick, snare, hats, bass and pad in verses and choruses, played silently into the analyser so the show can be built and rehearsed with no microphone, no stereo and no permission
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
+- **Liquids that stay liquids** — the dropper's nine bottles are not nine colours. Water, oil, alcohol, ink and syrup put dye on the glass; **soap**, **milk**, **silicone** and **glycerine** also write themselves into a field the plate carries and keeps acting on for the next half-minute: soap breaks the film so colour runs away from it and curls into filaments, glycerine crawls where it lands while the plate flows past, milk holds its own edge instead of feathering out, silicone shoulders colour aside into a ring. Every preset names what is in its dish, and the automation pours from that — mostly water with a drop of soap now and then for *Classic Light Show*, nothing but soap and silicone for *Lacing Run*. Measured by `npm run liquids`
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
 - **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
@@ -272,7 +273,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Play/Pause | Start or stop the simulation |
 | Mic / Monitor | Toggle microphone or system audio input |
 | Lucky | Randomize all settings |
-| Dropper tool | Click/tap to add colored dye |
+| Dropper tool | Click/tap to add colored dye — and with soap, milk, silicone or glycerine selected, to change what that part of the plate does for the next half-minute |
 | Blow tool | Click/tap to blow air bubbles |
 | Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring, or into radial fingers with **Fingering** up |
 | Macro zoom | With the closeup on: + and − (or = and _), the wheel over the plate, or the − / + chip below the title, from 1× to 16×; + with the closeup off turns it on at 2× |
@@ -295,6 +296,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
 | Camera | Settings → Camera: light show or photograph, paper colours, camera, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
+| About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup, with *Yours* on top; **Save current** writes the look to a `.chromaglass-preset.json` file and your library, **Load file** reads one back |
@@ -304,12 +306,14 @@ still keeps up with wall-clock time, and `?debug` exposes
 
 ## Judging it by numbers
 
-Four harnesses, so a change to any of this is judged the same way every time
+Six harnesses, so a change to any of this is judged the same way every time
 rather than by watching a plate and forming an impression.
 
 | | |
 |---|---|
 | `npm run detail` | How much structure a frame carries, and at what scale — the plate against filmed liquid |
+| `npm run liquids` | Soap, milk, silicone and glycerine, each measured on the thing it is for — and first that an empty plate is left completely alone |
+| `npm run plate` | What is on every preset's plate: that its dyes, injection styles and liquids all name things that exist, and an audit of which presets use which liquid |
 | `npm run scene` | The room sensor: painted rooms through the real analysis, plus a closed feedback loop and a person who walks in and stops |
 | `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |
 | `npm run qa` | The app itself — it builds, serves, and walks a browser through a show night, watching the console |

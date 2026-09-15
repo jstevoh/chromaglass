@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
+import { DEFAULT_LIQUID_TYPES } from '../types';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
@@ -195,6 +196,7 @@ export default function RemoteControl() {
   const [padLayer, setPadLayer] = useState(0);
   const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press'>('blow');
   const [padColor, setPadColor] = useState<string | null>(null);
+  const [padLiquid, setPadLiquid] = useState<string>('water');
   const [padFull, setPadFull] = useState(false);
   const [penSeen, setPenSeen] = useState(false);
   const padRef = useRef<HTMLDivElement>(null);
@@ -240,6 +242,7 @@ export default function RemoteControl() {
     setPadTouchCount(padTouches.current.size);
   };
   const chooseColor = (hex: string) => { setPadColor(hex); send({ type: 'dye', color: hex }); setPadTool('drop'); };
+  const chooseLiquid = (id: string) => { setPadLiquid(id); send({ type: 'liquid', id }); setPadTool('drop'); };
   const toggleFull = async () => {
     const next = !padFull;
     setPadFull(next);
@@ -347,6 +350,37 @@ export default function RemoteControl() {
           >
             <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
           </button>
+        </div>
+      </div>
+      {/*
+        The bottles. Four of these are not colours: soap, milk, silicone and
+        glycerine change what the plate does where they land, and for as long
+        as they are there. Without this row the pad could only ever drop dye,
+        which meant the most performable gesture in the app — a drop of soap
+        on a full plate — was reachable from the laptop and nowhere else.
+      */}
+      <div className="mt-3" data-testid="remote-liquids">
+        <div className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-1.5">Bottle</div>
+        <div className="flex flex-wrap gap-1.5">
+          {DEFAULT_LIQUID_TYPES.map((liq) => {
+            const on = padLiquid === liq.id;
+            return (
+              <button
+                key={liq.id}
+                onClick={() => chooseLiquid(liq.id)}
+                disabled={!connected}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
+                  on ? 'border-white bg-white/15 text-white' : 'border-white/10 text-white/55'
+                }`}
+                title={liq.description}
+              >
+                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={{ backgroundColor: liq.color }} />
+                {liq.name}
+                {/* A dot for the four that do something the dye cannot. */}
+                {liq.behaviour && <span className="h-1 w-1 rounded-full bg-amber-300/80" />}
+              </button>
+            );
+          })}
         </div>
       </div>
       {/* Dye colours: a tap picks the colour this pad drops and the laptop's dropper with it */}

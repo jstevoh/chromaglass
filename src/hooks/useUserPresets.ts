@@ -29,8 +29,8 @@ export function useUserPresets() {
   }, []);
 
   /** Snapshot the current look as a new preset, keep it, and hand the file over. */
-  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, song: SongRef | null = null): UserPreset => {
-    const p = makeUserPreset(name, description, settings, contract, injectStyles, song);
+  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null, song: SongRef | null = null): UserPreset => {
+    const p = makeUserPreset(name, description, settings, contract, injectStyles, liquids, song);
     upsert(p);
     downloadText(presetFileName(p), serializePreset(p));
     return p;
