@@ -1,0 +1,251 @@
+{
+ "startedAt": "2026-09-15T02:59:52.407Z",
+ "runs": {
+  "0": {
+   "val": 0,
+   "picked": true,
+   "sliderVal": "0",
+   "st": {
+    "mean": 1.0134051675305056,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0,
+    "frames": 1466
+   },
+   "rafMs": 24.366471734892787,
+   "metrics": {
+    "core": {
+     "mean": 143.3,
+     "edgeFrac": 0.324,
+     "axisFrac": 0.124,
+     "ridgePer1000": 14
+    },
+    "dish": {
+     "mean": 58.9,
+     "edgeFrac": 0.009,
+     "axisFrac": 0.112,
+     "ridgePer1000": 0.3
+    },
+    "green": {
+     "mean": 35.2,
+     "edgeFrac": 0.035,
+     "axisFrac": 0.092,
+     "ridgePer1000": 0.5
+    },
+    "full": {
+     "mean": 62,
+     "edgeFrac": 0.09,
+     "axisFrac": 0.119,
+     "ridgePer1000": 3
+    }
+   }
+  },
+  "1": {
+   "val": 1,
+   "picked": true,
+   "sliderVal": "1",
+   "st": {
+    "mean": 1.2021621777609237,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 1,
+    "frames": 1618
+   },
+   "rafMs": 21.20441051738762,
+   "metrics": {
+    "core": {
+     "mean": 127.2,
+     "edgeFrac": 0.277,
+     "axisFrac": 0.113,
+     "ridgePer1000": 25.4
+    },
+    "dish": {
+     "mean": 48.4,
+     "edgeFrac": 0.018,
+     "axisFrac": 0.112,
+     "ridgePer1000": 0.2
+    },
+    "green": {
+     "mean": 68.4,
+     "edgeFrac": 0.101,
+     "axisFrac": 0.076,
+     "ridgePer1000": 2.4
+    },
+    "full": {
+     "mean": 65.7,
+     "edgeFrac": 0.112,
+     "axisFrac": 0.115,
+     "ridgePer1000": 8
+    }
+   }
+  },
+  "05": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 1.0260882033166034,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "frames": 1369
+   },
+   "rafMs": 28.089887640449437,
+   "metrics": {
+    "core": {
+     "mean": 139.2,
+     "edgeFrac": 0.142,
+     "axisFrac": 0.118,
+     "ridgePer1000": 6.9
+    },
+    "dish": {
+     "mean": 48.7,
+     "edgeFrac": 0.027,
+     "axisFrac": 0.12,
+     "ridgePer1000": 0.5
+    },
+    "green": {
+     "mean": 55.2,
+     "edgeFrac": 0.068,
+     "axisFrac": 0.135,
+     "ridgePer1000": 0.5
+    },
+    "full": {
+     "mean": 57.5,
+     "edgeFrac": 0.055,
+     "axisFrac": 0.13,
+     "ridgePer1000": 1.5
+    }
+   }
+  },
+  "1b": {
+   "val": 1,
+   "picked": true,
+   "sliderVal": "1",
+   "st": {
+    "mean": 1.0213804630139667,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 1,
+    "frames": 1282
+   },
+   "rafMs": 28.47380410022779,
+   "metrics": {
+    "core": {
+     "mean": 129.5,
+     "edgeFrac": 0.288,
+     "axisFrac": 0.121,
+     "ridgePer1000": 16.6
+    },
+    "dish": {
+     "mean": 58.6,
+     "edgeFrac": 0.031,
+     "axisFrac": 0.125,
+     "ridgePer1000": 0.6
+    },
+    "green": {
+     "mean": 47,
+     "edgeFrac": 0.08,
+     "axisFrac": 0.093,
+     "ridgePer1000": 0.8
+    },
+    "full": {
+     "mean": 59.9,
+     "edgeFrac": 0.095,
+     "axisFrac": 0.115,
+     "ridgePer1000": 3.9
+    }
+   }
+  },
+  "05b": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 1.14290911468802,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "frames": 1316
+   },
+   "rafMs": 26.881720430107528,
+   "metrics": {
+    "core": {
+     "mean": 131,
+     "edgeFrac": 0.328,
+     "axisFrac": 0.113,
+     "ridgePer1000": 26.9
+    },
+    "dish": {
+     "mean": 73.6,
+     "edgeFrac": 0.018,
+     "axisFrac": 0.13,
+     "ridgePer1000": 0.1
+    },
+    "green": {
+     "mean": 55.4,
+     "edgeFrac": 0.032,
+     "axisFrac": 0.04,
+     "ridgePer1000": 0.5
+    },
+    "full": {
+     "mean": 64.5,
+     "edgeFrac": 0.103,
+     "axisFrac": 0.109,
+     "ridgePer1000": 6.4
+    }
+   }
+  },
+  "075": {
+   "val": 0.75,
+   "picked": true,
+   "sliderVal": "0.75",
+   "st": {
+    "mean": 1.175169043098467,
+    "nan": 0,
+    "grid": 512,
+    "engine": "gpu",
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.75,
+    "frames": 1247
+   },
+   "rafMs": 29.976019184652277,
+   "metrics": {
+    "core": {
+     "mean": 131.6,
+     "edgeFrac": 0.313,
+     "axisFrac": 0.114,
+     "ridgePer1000": 33.2
+    },
+    "dish": {
+     "mean": 60.6,
+     "edgeFrac": 0.053,
+     "axisFrac": 0.091,
+     "ridgePer1000": 0.7
+    },
+    "green": {
+     "mean": 64.3,
+     "edgeFrac": 0.156,
+     "axisFrac": 0.084,
+     "ridgePer1000": 6.2
+    },
+    "full": {
+     "mean": 65.2,
+     "edgeFrac": 0.115,
+     "axisFrac": 0.106,
+     "ridgePer1000": 8.9
+    }
+   }
+  }
+ }
+}
