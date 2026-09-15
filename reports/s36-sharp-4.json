@@ -1,0 +1,230 @@
+{
+ "startedAt": "2026-09-15T03:45:43.244Z",
+ "runs": {
+  "0": {
+   "val": 0,
+   "picked": true,
+   "sliderVal": "0",
+   "st": {
+    "mean": 0.7931500642142293,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.7931500642142293
+     },
+     {
+      "mean": 0.4096143659826562
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0,
+    "cells": 0.2,
+    "frames": 396
+   },
+   "rafMs": 96.89922480620154,
+   "extra": "",
+   "sliders": {}
+  },
+  "1": {
+   "val": 1,
+   "picked": true,
+   "sliderVal": "1",
+   "st": {
+    "mean": 0.8244419286367272,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8244419286367272
+     },
+     {
+      "mean": 0.4073607610537555
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 1,
+    "cells": 0.2,
+    "frames": 384
+   },
+   "rafMs": 105.04201680672269,
+   "extra": "",
+   "sliders": {}
+  },
+  "05": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 0.8126136883424493,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8126136883424493
+     },
+     {
+      "mean": 0.41048086219846047
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "cells": 0.2,
+    "frames": 378
+   },
+   "rafMs": 101.6260162601626,
+   "extra": "",
+   "sliders": {}
+  },
+  "06": {
+   "val": 0.6,
+   "picked": true,
+   "sliderVal": "0.6",
+   "st": {
+    "mean": 0.815299806248319,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.815299806248319
+     },
+     {
+      "mean": 0.4105554209097277
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.6,
+    "cells": 0.2,
+    "frames": 384
+   },
+   "rafMs": 101.6260162601626,
+   "extra": "",
+   "sliders": {}
+  },
+  "07": {
+   "val": 0.7,
+   "picked": true,
+   "sliderVal": "0.7",
+   "st": {
+    "mean": 0.8192533166990614,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8192533166990614
+     },
+     {
+      "mean": 0.4089110143884649
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.7,
+    "cells": 0.2,
+    "frames": 384
+   },
+   "rafMs": 100.80645161290323,
+   "extra": "",
+   "sliders": {}
+  },
+  "1b": {
+   "val": 1,
+   "picked": true,
+   "sliderVal": "1",
+   "st": {
+    "mean": 0.8262706079381869,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8262706079381869
+     },
+     {
+      "mean": 0.4071038831728638
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 1,
+    "cells": 0.2,
+    "frames": 394
+   },
+   "rafMs": 98.81422924901186,
+   "extra": "",
+   "sliders": {}
+  },
+  "05b": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 0.8103901268621101,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8103901268621101
+     },
+     {
+      "mean": 0.41045435196433966
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "cells": 0.2,
+    "frames": 383
+   },
+   "rafMs": 101.21457489878543,
+   "extra": "",
+   "sliders": {}
+  },
+  "07b": {
+   "val": 0.7,
+   "picked": true,
+   "sliderVal": "0.7",
+   "st": {
+    "mean": 0.8102333310735013,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8102333310735013
+     },
+     {
+      "mean": 0.40950849635899234
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.7,
+    "cells": 0.2,
+    "frames": 369
+   },
+   "rafMs": 104.60251046025104,
+   "extra": "",
+   "sliders": {}
+  },
+  "06b": {
+   "val": 0.6,
+   "picked": true,
+   "sliderVal": "0.6",
+   "st": {
+    "mean": 0.8122597414525752,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8122597414525752
+     },
+     {
+      "mean": 0.41050968557531153
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.6,
+    "cells": 0.2,
+    "frames": 383
+   },
+   "rafMs": 103.7344398340249,
+   "extra": "",
+   "sliders": {}
+  }
+ }
+}
