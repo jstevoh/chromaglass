@@ -120,6 +120,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — sharpening is off everywhere
+- The test this work set itself has been run at the grid the show actually falls to, and
+  the pass fails it. At 256², where a solver cell is nearly three screen pixels and
+  sharpening should matter most, switching it on and off **on one plate** moves the 10–90 %
+  edge width by less than the plate's own drift: −1.25 to +1.33 px at 0.5 and −0.3 px at
+  full strength. Across separate pages it narrows edges by a pixel in two captures of
+  five, at different frame counts in the two sets, and at 384° the sign flips
+- What it does add over hundreds of frames on a coarse grid is pale terraces inside the
+  colour and torn, ragged lips on the tongues — the old fault arriving slowly. Tying it to
+  the governor's rung would switch that on exactly when the machine is already struggling
+- So `sharpness` defaults to 0 and no preset sets it. The control stays: on the CPU solver
+  at 192² it measurably steepens (mean gradient 0.091 → 0.104), and that is the engine a
+  weak machine runs
+
 ### Changed — lacing: a thread on a boundary, a hair on a straight run
 - **A boundary worth outlining is one that changes quickly**, not merely one that
   changes. Without that second test a wide soft ramp was still a span, and laying threads

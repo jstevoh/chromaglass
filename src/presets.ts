@@ -1369,7 +1369,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.0,
       centerGravity: 0.05,
       surfaceTension: 0.1,
-      sharpness: 0.6,
       granulation: 0.5,
       diffusionRate: 0.00012,
       buoyancy: 0.3,
