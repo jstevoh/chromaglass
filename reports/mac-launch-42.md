@@ -2,7 +2,14 @@
 
 2026-09-15, morning. The Mac is on `main` at b687f94 "Lacing: the threads that outline a boundary, drawn by the strain across it (#42)".
 
-*This report is pushed in stages. The launch section is final. The lacing looks follow.*
+**In short**
+- **Launch:** server pid **30897**, show key **1678**, curl 200. Details in §1.
+- **Filaments or texture: filaments in the main dish, but they read as a contour map.** They follow each boundary's shape. But any soft colour ramp gets a stack of 4–6 evenly spaced parallel lines, not one braid at the edge. They zigzag on shallow ramps and paint pale speckle where two shades of one hue meet. **In the small dish the pass draws aliased stipple, not threads, at every value.**
+- **The value to set on Fillmore: 0.35.** 0.45 is fine with the grain on but plain isolines without it. **The top of the slider goes wrong from 0.7:** white lines, single-pixel glitter, pale patches, and lacing leads the colour. The amount isn't the real lever. The `* 4.0` level spacing puts lines across whole ramps, and gating on a steep gradient would get closer to "a braid at the boundary".
+- **Strain coupling: I can't see it.** In consecutive-frame captures at and after a press, no side of a pushed blob is thinner or brighter than another. The fold sign flips every 20–40 px, and the width only spans 0.10–0.22 of a level.
+- **Grain + lacing: they layer and don't fight.** 0 GL errors and 0 NaN in every run.
+- **Sharpness 0.5 with lacing in: still invisible** at matched composition. A first-pair note I pushed said otherwise; that was page-to-page drift, and §3 corrects it.
+- **Frame cost:** *being measured (a per-draw GPU timer); the first attempt measured nothing because `gl.finish()` doesn't wait in Chrome.*
 
 ## 1. Launch
 
