@@ -87,4 +87,27 @@ Frame 400 matches within 2 points (main dish hp 3.92 → 5.32 at 0.45 → 8.44 a
 
 - The first three windows sat on the 60 Hz vsync floor with either value. Then OBSBOT Center (89 % CPU) and MOTIV Mix loaded the machine, and every later window slowed, whatever the setting.
 - Means: 16.72 ms on against 16.83 off, and 968 against 1016 frames per window. The 5 % frame gap is in the load drift's direction (on/off/off/on straddles it) and is not a cost I can stand behind.
-- **At this canvas size the pass does not push the Mac off vsync.** A 4K-canvas run (1920×1080 at DPR 2, the projector's pixel count) follows.
+- **At this canvas size the pass does not push the Mac off vsync.**
+- **A 1920×1080 run doesn't settle it either.** I asked for DPR 2 to get the projector's 4K, but the app draws 1920×1080 whatever the DPR.
+  - Medians: 16.82 ms on, 16.92 off.
+  - Frames per window: 804/835, 791/727, 727/725, 724/694 (on/off in turn). Adjacent pairs give about 4 % fewer frames with lacing on. The load was falling through the whole run, so that is within the noise.
+  - A per-draw GPU timer (`lacegpu42.mjs`) follows.
+
+### Does the strain coupling show? **No, I can't see it.**
+
+`~/cg-scratch/lacefold42.mjs` keeps the same seeded Fillmore with grain 0 and cells 0. It switches lacing by writing `chromaglassDebug().settings.lacing` inside a rAF, which the render loop picks up on the next frame. So each capture is three consecutive frames: lacing 0, lacing 1.0, lacing 0 again. The second lacing-0 frame is the motion baseline. Captures are at frame 1121 (still), then after a 1 s press at the dish centre: at release (1235), +30 frames (1329) and +90 (1491).
+
+2× crops of the pressed region, lacing 0 | 1.0 on the next frame. At release:
+
+![press at release](l42-press-release.png)
+
+30 frames later, the push still spreading:
+
+![press +30](l42-press-p30.png)
+
+- **Along the pushed blob's edge the threads are the same everywhere.** At 1.0 the whole cyan-into-yellow outline gets a crisp double white line. The blob is pushing outward on some sides and being squeezed on others, but no side reads thicker, brighter or finer than another. The width varies 1–3 px with how steep the ramp is, not with which way the edge moves.
+- **The brightest thing in the press is inside the blue, not on its edge:** pale curling streaks where two blues meet, and pale speckle in the dusky red above it. Those are same-hue boundaries, and the level lines land on shade steps.
+- **Stripes around the blob spread outward with the push,** but they look the same as the still frame's. Nothing there piles up.
+- **The fold map from the solver doesn't help.** I read `gpu.dye.read` and `gpu.vel.read` (512²) and applied the shader's formula: fold = −(v(+n) − v(−n))·n across the colour gradient. Fold and stretch come out as patches 20–40 px across all over the plate, in near-equal counts (fold 76k / stretch 68k at release, 83k / 71k at +30, 71k / 78k at +90). There is no coherent ring at the press. Its band mask also covers 88 % of the plate on raw dye, so it can't pick out the pixels the threads are on. I can't tie a visible thread to a fold or stretch sign from it.
+- **Why it's probably inaudible:** in the shader, fold only changes the line's smoothstep width from 0.10 to 0.22 of a level (a factor of 2.2 on a 1–2 px line), and brightness by 0.55 → 1.0. The `* 7.0` gain clamps most of the plate to one end or the other. Fold or stretch flips sign every 20–40 px, so along any one thread the width changes too often to read as braid against hair.
+- **Motion baseline:** on consecutive frames, lacing 0 → 0 lifts 2.7–3.4 % of main-dish pixels, and 0 → 1.0 lifts 22–24 % (braid 7.5–8.5 %, hp 3.8 → 8.9–9.5). The sweep table above has ~20 frames between captures, so its 1.0 row (28.8 % / 15.1 %) includes ~5 points of motion. The lower values are affected less.
