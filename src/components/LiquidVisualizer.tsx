@@ -157,8 +157,17 @@ export interface LiquidVisualizerHandle {
   applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
-  /** Take on a preset's dyes, injection style and liquids without clearing the plate — the sequencer's way of changing stage. */
-  adoptPreset: (presetId: string) => void;
+  /**
+   * Take on a preset's dyes, injection style and liquids without clearing the
+   * plate — the sequencer's way of changing stage, and the desk's Go.
+   *
+   * `extras` is how a user preset gets adopted. Its dyes are not in the maps
+   * here (they live in the saved file), so before this took them the only way
+   * to register them was `applyPreset` — which clears. A sequence that
+   * changed to one of your own looks cut the plate to black; the built-ins
+   * next to it did not.
+   */
+  adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -2083,9 +2092,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       injectStyles: [...injectStyleRef.current],
       liquids: [...plateLiquidsRef.current],
     }),
-    adoptPreset: (presetId: string) => {
+    adoptPreset: (presetId: string, extras) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
       // new dyes and injection style take over from here.
+      if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
+      if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
+      if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
       presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
       journeyRef.current = { lead: 0, lastAt: -1 };
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];

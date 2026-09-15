@@ -15,6 +15,13 @@ import { songLabel, type SongRef } from '../lib/songRef';
 interface PresetMenuProps {
   activePresetId: string | null;
   onApplyPreset: (presetId: string, settings: Partial<VisualizerSettings>) => void;
+  /**
+   * Arm a look instead of cutting to it. When this is given, a click cues and
+   * the stage does not change until Go — which is what a room wants. Loading
+   * it outright (which clears the plate) stays available on the same row for
+   * building a look, where landing on clean glass is the point.
+   */
+  onCuePreset?: (presetId: string) => void;
   onClose: () => void;
   /** Where the menu hangs from: under the title on the left, or beside the toolbar. */
   align?: 'left' | 'right' | 'side';
@@ -42,7 +49,7 @@ const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
 ];
 
 export const PresetMenu: React.FC<PresetMenuProps> = ({
-  activePresetId, onApplyPreset, onClose, align = 'left', anchor = null,
+  activePresetId, onApplyPreset, onCuePreset, onClose, align = 'left', anchor = null,
   userPresets = [], onApplyUserPreset, onSaveCurrent, onLoadFile, onExportUserPreset, onDeleteUserPreset, currentSong = null,
 }) => {
   const [forSong, setForSong] = useState(false);
@@ -176,19 +183,33 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
             {g.presets.map((p) => {
               const active = p.id === activePresetId;
               return (
-                <button
-                  key={p.id}
-                  role="menuitem"
-                  onClick={() => { onApplyPreset(p.id, p.settings); onClose(); }}
-                  className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                    active ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-white/75'
-                  }`}
-                  title={p.description}
-                  data-testid={`preset-menu-${p.id}`}
-                >
-                  <span className="text-xs font-semibold truncate">{p.name}</span>
-                  {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
-                </button>
+                <div key={p.id} className={`flex items-stretch rounded-lg transition-colors ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}>
+                  <button
+                    role="menuitem"
+                    // Cue where the desk can, load where it cannot. A click
+                    // used to put the look on the wall that instant, through
+                    // the path that clears the plate first.
+                    onClick={() => { if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
+                    className={`flex flex-1 items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left ${active ? 'text-white' : 'text-white/75'}`}
+                    title={onCuePreset ? `Cue ${p.name} — ${p.description}` : p.description}
+                    data-testid={`preset-menu-${p.id}`}
+                  >
+                    <span className="text-xs font-semibold truncate">{p.name}</span>
+                    {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
+                  </button>
+                  {onCuePreset && (
+                    <button
+                      // The old behaviour, kept where it belongs: landing on
+                      // clean glass is the point when you are building a look.
+                      onClick={() => { onApplyPreset(p.id, p.settings); onClose(); }}
+                      className="px-2 rounded-r-lg text-[8px] font-bold uppercase tracking-wider text-white/30 hover:text-white hover:bg-white/10 shrink-0"
+                      title={`Load ${p.name} onto a cleared plate — cuts the stage`}
+                      data-testid={`preset-load-${p.id}`}
+                    >
+                      Load
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

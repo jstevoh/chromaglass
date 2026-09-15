@@ -4,6 +4,8 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
+import { CueBar } from './components/CueBar';
+import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
@@ -643,13 +645,14 @@ export default function App() {
   /** The sequencer's stage change: the preset's dyes and style, the plate kept. */
   const adoptPreset = useCallback((presetId: string) => {
     setPinnedPresetId(presetId);
-    if (isUserPresetId(presetId)) {
-      // Make sure the plate knows this preset's dyes before adopting them.
-      const up = userPresets.presets.find(p => p.id === presetId);
-      if (up) visualizerRef.current?.applyPreset(presetId, { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null });
-      return;
-    }
-    visualizerRef.current?.adoptPreset(presetId);
+    const up = isUserPresetId(presetId) ? userPresets.presets.find(p => p.id === presetId) : null;
+    // A user preset's dyes live in its file rather than in the plate's maps,
+    // so they are handed over here. This used to go through `applyPreset`
+    // to register them — which clears the plate, so a sequence changing to
+    // one of your own looks cut to black where a built-in did not.
+    visualizerRef.current?.adoptPreset(presetId, up
+      ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
+      : undefined);
   }, [userPresets.presets]);
 
   // ── Show sequencer ────────────────────────────────────────────────
@@ -658,6 +661,106 @@ export default function App() {
   // slider, so the phone and the panel show the glide as it happens.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // ── Cue and Go ────────────────────────────────────────────────────
+  //
+  // `applyPreset` above clears every layer and reseeds, which is what you want
+  // while you are building a look and exactly what you do not want at 11pm
+  // with the plate on a wall: the clear is a hard cut through near-black in
+  // front of a room.
+  //
+  // So a look can also be *armed* and then faded in. The fade adopts the new
+  // preset's dyes without touching the plate and walks the settings across
+  // over a few seconds, so nothing is ever wiped. `npm run desk` drives a
+  // whole fade and checks the stage never darkens; today's clearing path is
+  // the control, and it fails that check by a mile.
+  const [cued, setCued] = useState<{ id: string; name: string; settings: Partial<VisualizerSettings> } | null>(null);
+  const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
+  const [fading, setFading] = useState(0);        // 0..1 while a Go is running
+  // On a timer rather than requestAnimationFrame, for the same reason the
+  // dimmer is: the laptop's window spends a show behind the projector's, and
+  // a hidden tab stops animating. A Go fired from a MIDI pad while the
+  // operator is watching the wall would otherwise freeze half-way through the
+  // crossfade and stay there. (rAF also runs at the compositor's rate, which
+  // on a machine falling back to software WebGL is under a frame a second —
+  // the fade would arrive in three steps.)
+  const lookFadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** The look before the last Go, so one step back is always available. */
+  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
+
+  /** What the desk should say is on stage. */
+  const liveLookName = useMemo(
+    () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
+    [allPresets, activePresetId]);
+
+  const cueLook = useCallback((presetId: string) => {
+    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
+    const built = PRESETS.find(p => p.id === presetId);
+    const settings = up ? up.settings : built?.settings;
+    const name = up?.name ?? built?.name ?? presetId;
+    if (settings) setCued({ id: presetId, name, settings });
+  }, []);
+
+  /** Send the armed look to the stage. With no fade this is still not a clear. */
+  const goLook = useCallback((seconds = fadeSeconds) => {
+    const next = cued;
+    if (!next) return;
+    if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
+
+    const from = settingsRef.current;
+    const to = targetLook(from, next.settings);
+    previousLook.current = { id: pinnedPresetId, settings: from };
+    adoptPreset(next.id);
+    setCued(null);
+
+    if (seconds <= 0) { setSettings(to); setFading(0); return; }
+    const started = performance.now();
+    const ms = seconds * 1000;
+    // ~30 a second: a crossfade over seconds does not need sixty settings
+    // objects a second, and the solver is the expensive part of a settings
+    // change rather than React.
+    lookFadeRef.current = setInterval(() => {
+      const t = Math.min(1, (performance.now() - started) / ms);
+      if (t >= 1) {
+        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
+        lookFadeRef.current = null;
+        setSettings(to);
+        setFading(0);
+        return;
+      }
+      setSettings(blendLooks(from, to, t));
+      setFading(t);
+    }, 33);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cued, fadeSeconds, pinnedPresetId, adoptPreset]);
+
+  /** One step back, at the same fade. The fastest fix mid-show is undo. */
+  const revertLook = useCallback(() => {
+    const prev = previousLook.current;
+    if (!prev) return;
+    previousLook.current = null;
+    const from = settingsRef.current;
+    if (prev.id) adoptPreset(prev.id);
+    if (fadeSeconds <= 0) { setSettings(prev.settings); return; }
+    const started = performance.now();
+    const ms = fadeSeconds * 1000;
+    if (lookFadeRef.current) clearInterval(lookFadeRef.current);
+    lookFadeRef.current = setInterval(() => {
+      const t = Math.min(1, (performance.now() - started) / ms);
+      if (t >= 1) {
+        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
+        lookFadeRef.current = null;
+        setSettings(prev.settings);
+        setFading(0);
+        return;
+      }
+      setSettings(blendLooks(from, prev.settings, t));
+      setFading(t);
+    }, 33);
+  }, [fadeSeconds, adoptPreset]);
+
+  useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
+
   const sequencer = useShowSequencer({
     getSettings: () => settingsRef.current,
     applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
@@ -1841,7 +1944,7 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="left" />
           )}
         </div>
 
@@ -1942,6 +2045,22 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* ── The cued look, and the button that sends it ────────── */}
+      <AnimatePresence>
+        {(cued || fading > 0 || previousLook.current) && (
+          <CueBar
+            cued={cued}
+            liveName={liveLookName}
+            fading={fading}
+            fadeSeconds={fadeSeconds}
+            onFadeSeconds={setFadeSeconds}
+            onGo={() => goLook()}
+            onCancel={() => setCued(null)}
+            onRevert={previousLook.current ? revertLook : null}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── About: the manual ─────────────────────────────────── */}
       {/*

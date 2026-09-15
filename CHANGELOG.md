@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the desk, part one: Cue and Go (plan batch 8a)
+- Clicking a preset used to put it on the wall that instant, through `applyPreset` —
+  which clears every layer and reseeds. That is right while you are *building* a look
+  and wrong at 11pm with the plate on a wall behind you: the clear is a hard cut
+  through near-black in front of a room. A look is now **cued** instead, and nothing
+  reaches the stage until **Go**
+- **Go** adopts the new preset's dyes onto the plate that is already there and walks
+  the ~80 settings across over a chosen time (cut, 1, 2, 4 or 8 seconds), so the dye is
+  never wiped. `src/lib/lookFade.ts` is pure, so `npm run desk` drives a whole fade and
+  measures what came out — over all 992 pairs of presets a faded change never sags
+  below either end at all, while the clearing path drops the stage to 2%. **Load**
+  stays on each row for when landing on clean glass is the point
+- **Revert**: one step back to the look before the last Go, at the same fade. The
+  fastest fix mid-show is undo, and a menu is not fast
+
+### Fixed — a sequence changing to one of your own looks cut to black
+- `adoptPreset` is the non-destructive path, but a *user* preset's dyes live in its file
+  rather than in the plate's maps, so the only way to register them was `applyPreset` —
+  which clears. A sequence that changed to a built-in glided; the same sequence changing
+  to one of your own saved looks wiped the plate. `adoptPreset` takes the dyes directly
+  now
+
+### Fixed — a fade that did not quite land where it was aimed
+- `a + (b - a) * 1` is not `b` in floating point: fading 0.5 to 0.05 landed on
+  0.04999999999999999. Too small to see, but it means the look you cued is not the look
+  you got, so fading back and forth would drift rather than return
+- The crossfade runs on a timer rather than `requestAnimationFrame`, for the reason the
+  dimmer already did: the laptop's window spends a show behind the projector's, and a
+  hidden tab stops animating. A Go fired from a MIDI pad while the operator is watching
+  the wall would otherwise freeze half-way through and stay there
+
 ### Added — the manual, in the app
 - **About ChromaGlass** (the `?` button, or `?` on the keyboard): a fourteen-section
   guide — getting started, the mental model of the plate, a reference for every group
