@@ -32,6 +32,11 @@ const DEFAULT_HZ = 20;
 
 export interface SceneCameraOptions extends SceneSenseOptions {
   enabled: boolean;
+  /**
+   * True when `enabled` came from a click in this session rather than from a
+   * setting remembered across a reload. Only a click may let the browser ask.
+   */
+  userAsked?: boolean;
   /** `deviceId` from `enumerateDevices`, or '' for whatever the browser picks. */
   deviceId?: string;
   /** Flip left for right — a camera facing the audience sees the room mirrored. */
@@ -84,7 +89,7 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
     } catch { /* no permission yet: the list fills in once the camera is open */ }
   }, []);
 
-  const { enabled, deviceId = '', hz = DEFAULT_HZ } = opts;
+  const { enabled, deviceId = '', hz = DEFAULT_HZ, userAsked = false } = opts;
 
   useEffect(() => {
     if (!enabled) {
@@ -108,6 +113,24 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     const start = async () => {
+      // A camera is not opened behind anyone's back. `enabled` means somebody
+      // pressed the button, and when the button was pressed in an earlier
+      // session the camera only comes back where permission is already
+      // granted — so a reload never puts a prompt over the plate.
+      if (!userAsked) {
+        try {
+          const status = await navigator.permissions?.query({ name: 'camera' as PermissionName });
+          if (status && status.state !== 'granted') {
+            setState({ ...IDLE, error: 'Switch the room camera on to let the browser ask for it.' });
+            return;
+          }
+        } catch {
+          // No camera descriptor in this browser: wait to be asked rather than
+          // guess and prompt.
+          setState({ ...IDLE, error: 'Switch the room camera on to let the browser ask for it.' });
+          return;
+        }
+      }
       try {
         local = await navigator.mediaDevices.getUserMedia({
           video: deviceId
@@ -196,7 +219,7 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
       stream.current = null;
       reading.current = null;
     };
-  }, [enabled, deviceId, hz, refreshDevices]);
+  }, [enabled, deviceId, hz, userAsked, refreshDevices]);
 
   return { reading, state, devices, refreshDevices, stream };
 }

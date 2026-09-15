@@ -18,6 +18,7 @@ import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
+import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import type { MidiAction } from './lib/midi';
@@ -44,9 +45,40 @@ function loadMusicSettings(): MusicSettings {
   return { ...DEFAULT_MUSIC_SETTINGS };
 }
 
-type AudioSource = 'none' | 'microphone' | 'system' | 'file';
+type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated';
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
+/**
+ * Where the show listened last time.
+ *
+ * It used to open the microphone on load, every load, which meant a permission
+ * prompt in front of the plate before anyone had asked for one. Now the choice
+ * is remembered and nothing is opened on its own: the microphone comes back
+ * only if the browser already says permission is granted (so no prompt
+ * appears), and anything else waits for a click.
+ */
+const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
+
+function rememberedSource(): AudioSource {
+  try {
+    const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
+    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
+    if (raw === 'microphone' || raw === 'simulated') return raw;
+  } catch { /* private */ }
+  return 'none';
+}
+
+/** True only if the browser will hand over the microphone without asking. */
+async function micAlreadyAllowed(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
+    return status?.state === 'granted';
+  } catch {
+    // Firefox has no microphone descriptor for the Permissions API. Better to
+    // wait for a click than to guess and prompt.
+    return false;
+  }
+}
 /**
  * The room camera lives outside the settings: a preset carries how hard the
  * room drives the plate, never whether a camera is switched on or which one.
@@ -74,7 +106,7 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
-  const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
+  const [audioSource, setAudioSource] = useState<AudioSource>('none');
   // ── The input the show listens to ──
   // A USB interface fed from the desk beats the laptop's own microphone in
   // any room with a crowd in it. The choice is remembered; the list of
@@ -211,6 +243,8 @@ export default function App() {
     };
   }, [overlaysVisible]);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  /** The synthesised band, when that is what the show is listening to. */
+  const simulatedRef = useRef<SimulatedMusic | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -258,12 +292,24 @@ export default function App() {
       audioStream.getTracks().forEach(track => track.stop());
       setAudioStream(null);
     }
+    if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
 
     setAudioSource(source);
+    try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
       // The stream comes from the element once it is ready; see playMusicFile.
+      return;
+    }
+    if (source === 'simulated') {
+      // A band in a box: no device, no permission, nothing to be asked for.
+      // Downstream it is a stream like any other, so the analyser, the room
+      // calibration and the beat clock are all exercised for real.
+      const band = startSimulatedMusic();
+      simulatedRef.current = band;
+      void band.resume();
+      setAudioStream(band.stream);
       return;
     }
 
@@ -364,10 +410,33 @@ export default function App() {
     if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
   }, [musicFile, audioSource]);
 
+  // What the show listened to last time, brought back without asking for
+  // anything. The microphone only reopens where permission is already granted,
+  // so a reload is silent rather than a prompt over the plate.
   useEffect(() => {
-    if (audioSource === 'microphone' && !audioStream) {
-      handleSourceChange('microphone');
-    }
+    let cancelled = false;
+    const restore = async () => {
+      const remembered = rememberedSource();
+      if (remembered === 'none') return;
+      if (remembered === 'microphone' && !(await micAlreadyAllowed())) return;
+      if (cancelled) return;
+      void handleSourceChange(remembered);
+    };
+    void restore();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The browser will not run audio before a gesture, so a restored band stays
+  // silent until the first click anywhere. One listener, then gone.
+  useEffect(() => {
+    const wake = () => { void simulatedRef.current?.resume(); };
+    window.addEventListener('pointerdown', wake, { once: true });
+    window.addEventListener('keydown', wake, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    };
   }, []);
 
   useEffect(() => {
@@ -403,7 +472,10 @@ export default function App() {
   const [sceneOn, setSceneOn] = useState<boolean>(() => { try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; } });
   const [sceneDeviceId, setSceneDeviceId] = useState<string>(() => { try { return localStorage.getItem(SCENE_DEVICE_KEY) ?? ''; } catch { return ''; } });
   const scenePreviewRef = useRef<HTMLCanvasElement | null>(null);
+  /** True once the camera has been switched on by hand in this session. */
+  const sceneAskedRef = useRef(false);
   const toggleScene = useCallback((on: boolean) => {
+    if (on) sceneAskedRef.current = true;
     setSceneOn(on);
     try { localStorage.setItem(SCENE_ON_KEY, on ? '1' : '0'); } catch { /* private */ }
   }, []);
@@ -413,6 +485,7 @@ export default function App() {
   }, []);
   const scene = useSceneCamera({
     enabled: sceneOn,
+    userAsked: sceneAskedRef.current,
     deviceId: sceneDeviceId,
     mirror: settings.sceneMirror !== false,
     deadzone: settings.sceneDeadzone ?? 0.25,
@@ -882,6 +955,7 @@ export default function App() {
       case 'preset-next':     stepPreset(1); break;
       case 'preset-prev':     stepPreset(-1); break;
       case 'blackout-toggle': toggleBlackout(); break;
+      case 'scene-toggle':    toggleScene(!sceneOn); break;
       case 'record-toggle':   toggleRecording(); break;
     }
   };
@@ -1523,6 +1597,32 @@ export default function App() {
                   >
                     <FileAudio size={14} />
                     <span>File</span>
+                  </button>
+                  <button
+                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                      audioSource === 'simulated'
+                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
+                    data-testid="simulated-audio-button"
+                  >
+                    <Music size={14} />
+                    <span>Band</span>
+                  </button>
+                  <button
+                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                      audioSource === 'simulated'
+                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
+                    data-testid="simulated-audio-button"
+                  >
+                    <Music size={14} />
+                    <span>Band</span>
                   </button>
                   <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
