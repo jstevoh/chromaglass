@@ -286,10 +286,10 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Sequence | Open the Show Sequencer: pick a sequence, play, pause, skip stages, or edit and save your own |
 | Phone remote | Presets, drive, speed, macro and gestures from `?remote=1` on another device |
 | Projectionist pad | On the phone or iPad: drag to blow air, tap to drop dye, pick a dye colour, pick which plate the device works, stream the device's tilt into the plate, or give the pad the whole screen. A pen's pressure sets how much dye, its tilt which way the air goes |
-| The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
-| Band | A synthesised band played silently into the show — no microphone, no permission |
 | MIDI | Turn a MIDI controller on, load a factory map (APC mini mk2, nanoKONTROL2) or teach yours with MIDI learn; soft takeover, endless encoders, LED feedback; maps saved as `.chromaglass-midi.json` |
 | Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
+| The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
+| Band | A synthesised band played silently into the show — no microphone, no permission |
 | Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
