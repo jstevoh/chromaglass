@@ -78,6 +78,10 @@ export interface VisualizerSettings {
   surfaceTension: number;
   /** Interface sharpening: how hard a dye boundary resists the solver's own smearing. 0 = the old soft plate. */
   sharpness: number;
+  /** Pigment separating into a fine speckle that travels with the dye. */
+  granulation: number;
+  /** How fine that speckle is: grain lattice cells across the plate. */
+  grainScale: number;
   diffusionRate: number;
   buoyancy: number;
   advection: number;
@@ -192,6 +196,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledSpeed: 0.05,
   surfaceTension: 0.05,
   sharpness: 0.5,           // boundaries stay boundaries instead of becoming ramps
+  granulation: 0.5,         // pigment texture between the boundaries, not just at them
+  grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
   advection: 0.45,

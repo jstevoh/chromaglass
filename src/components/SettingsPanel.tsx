@@ -409,6 +409,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ sharpness: v })}
         />
         <Slider
+          label="Granulation"
+          value={settings.granulation ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ granulation: v })}
+        />
+        <Slider
+          label="Grain Size"
+          disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
+          value={settings.grainScale ?? 320}
+          min={60}
+          max={900}
+          step={20}
+          onChange={(v: number) => onUpdate({ grainScale: v })}
+        />
+        <Slider
           label="Blob Surface Tension"
           value={settings.blobSurfaceTension}
           min={0}
