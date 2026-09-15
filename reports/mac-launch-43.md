@@ -8,7 +8,7 @@
 - **Small dish: the stipple is hidden, not gone.** It draws almost nothing at 0.45 (0.9 %). With `fold` forced to 1 it is #42's stipple again. It isn't the colour the level reads: a bilinear sample changes nothing. §2 has the further tests.
 - **Curvature coupling: visible, but as a gate, not braid against hair.** A page-only shader patch, one frame apart, shows it. Forcing `fold` to 0 removes almost every thread (lift 0.1–0.7), so **straight runs draw no hair at all**. Forcing it to 1 brings the contour map back. So what `fold` actually does is hide the stacks. Keep it, but it needs the spacing fixed before it can have a floor. A `fold` floor of 0.5 gives straight edges a real hair, and also re-stacks every wide ramp.
 - **Fillmore: 0.55.** Under the grain, 0.45 is now too quiet for a projector. 0.55–0.6 carries a clear braid on curls and lips with no glitter. 0.7 starts to glitter. Grain and lacing still layer. 0 GL errors, 0 NaN.
-- **Frame cost: no longer measurable.** On − off is +0.08 ms at 0.45 and −0.02 at 1.0 at 1600×1000 (#42: +0.40), with the GPU at 95–97 %.
+- **Frame cost: no longer measurable.** On − off is +0.08 ms at 0.45 and −0.02 at 1.0 at 1600×1000 (#42: +0.40), and +0.25 ms at 1920×1080. The GPU was at 95–97 %, so this is inside the noise, and at most #42's cost.
 - **Sharpening: unchanged verdict.** One test is proposed in §3 before dropping it: the governor's 256² / 384² rungs, with edge width measured in pixels.
 
 ## 1. Launch
@@ -155,8 +155,9 @@ The machine was only quiet at the start (GPU 41 %). By the time the cost runs be
 |---|---|---|---|---|---|---|
 | 1600×1000 | 0.45 | 914 / 914 | 21.0, 20.40 | 20.6, 20.32 | +0.4 / **+0.08** | +0.2 / +0.40 |
 | 1600×1000 | 1.0 | 887 / 886 | 21.0, 21.59 | 20.5, 21.61 | +0.5 / **−0.02** | +0.4 / +0.40 |
+| 1920×1080 | 0.45 | 778 / 778 | 23.3, 26.26 | 22.6, 26.01 | +0.7 / **+0.25** | −0.6 / +0.10 |
 
-- **The mean difference fell from +0.40 ms to about zero at both amounts.** The medians move in 0.5 ms steps from timer rounding, and the interquartile spread is 4–5 ms. So I'd read the pass as **under ~0.2 ms at 1600×1000**, and cheaper than #42's. That is consistent with six velocity samples going and two dye samples coming in, but this bracket can't separate a tenth of a millisecond.
+- **The mean difference at 1600×1000 fell from +0.40 ms to about zero at both amounts.** At 1920×1080 it is +0.25 ms (#42: +0.10), with an interquartile spread of 11 ms (GPU 97 %), so all three rows are inside the noise. The medians move in 0.5 ms steps from timer rounding, and the interquartile spread is 4–5 ms. So I'd read the pass as **under ~0.2 ms at 1600×1000**, and cheaper than #42's. That is consistent with six velocity samples going and two dye samples coming in, but this bracket can't separate a tenth of a millisecond.
 - As in #42, the ~20 ms bracket is the whole queued frame, not the pass; only the difference means anything.
 
 ## 3. Sharpening: **I haven't changed my mind; on Fillmore at 512² it doesn't earn its place**
