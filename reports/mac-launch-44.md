@@ -5,7 +5,10 @@
 **In short**
 - **Launch:** server pid **34070**, show key **1703**, curl 200. Details in §1.
 - **Sharpening: drop it.** I ran your test at 256² and 384² and measured the 10–90 % width of every clean edge in each page (300–950 of them). Page against page at 256², 0.5 is 0.2–2.6 px narrower in some captures and not in others; at 384² the sign flips. **On one plate with the value switched every 300 frames, 0.5 moves the width by −1.25 to +1.33 px, inside the plate's own drift, and 1.0 by −0.3 px.** What 0.5 does add over hundreds of frames at 256² is pale magenta terraces and torn lips, not crisper edges. Details in §3.
-- §2 (lacing) follows.
+- **Lacing: the stacks are not gone. The steepness gate is open on most ramps.** With `fold` forced to 1 the contour map comes straight back (lift 38 % with the gate, 52 % without it). At the real 0.5 a wide pink → teal ramp still carries 6–7 parallel isolines, and more visibly than on #43, because the hair floor now draws what the fold gate used to hide. A page-only `al` map explains why: on the ramps `al` has a median of 0.07–0.09, so `smoothstep(0.03, 0.10, al)` is past half-open on 64 % of the laced main dish. **Raising the gate to `smoothstep(0.08, 0.20, al)` removed the isolines on the ramps and kept one thread on the boundaries** (tested one frame apart, §2). The exception is a stack along a soft red-on-red outline at 1.0.
+- **Hair against braid: yes.** Straight outlines carry a continuous fine hair and curls carry a brighter braid. The hair-forced frame (`fold` = 0.4 everywhere) is within 0.3 points of the real one, so most of the dish sits on the floor.
+- **Small dish: not threads, but no longer dots.** 4.6 % coverage at 0.5 and 11.6 % at 1.0, with 17–19 % and 6.5 % of lit pixels isolated (#43: 67–84 %). That is the faint grey hatch, because its plate is all ramp: `al` median 0.042, so any stricter gate draws nothing there, which is probably right.
+- **Fillmore: 0.45 on this build, 0.55 if the gate goes to 0.08–0.20.** Under the grain, #44 at 0.45 lays down #43-at-0.55's braid (1.06 % against 1.23 % of pixels changed by > 40). At the shipped 0.5 the ramps' stacks are the first thing you see.
 
 ## 1. Launch
 
@@ -24,6 +27,146 @@
 
 - The key changed, so any tab or display still holding key 7699 needs a reload with 1703. I left James's Chrome and the projector alone. James's Chrome has one tab open (a news site), and it isn't the show.
 - **Load at the start:** GPU utilisation 36 %, load average 3.2 (MOTIV Mix 55 % CPU, OBSBOT Center 15 %).
+
+## 2. Lacing, third pass
+
+**Method.** As in #43. Fillmore at `?debug&sim=512` on "GPU · 512² · 1.0x", seeded (mulberry32, 7), Granulation 0 and Plate Cells 0 unless stated, captures at ~1100 frames, and `chromaglassDebug().settings.lacing` written in consecutive rAFs, so **every frame in a row is one frame from the next**. `~/cg-scratch/lace44.mjs` patches the lacing shader **in the test page only**. I checked that all three of #44's lines are in `castProtocol-Dsjz6BH9.js` once each, and `__patched` was 1 on every page. The thousandths digit of the amount picks a mode:
+
+| digit | mode |
+|---|---|
+| 0 | real #44 shader |
+| 1 | `fold` = 0.4 everywhere (hair) |
+| 2 | `fold` = 1 everywhere (braid) |
+| 3 | fold map |
+| 4 | braid everywhere **and no steepness gate** |
+| 5 | no width floor |
+| 6 | the #43 shader (no gate, no fold floor, no width floor) |
+| 7 | paints R = `al`×5, G = the gate, B = `span` |
+| 8 | gate `smoothstep(0.10, 0.25, al)` |
+| 9 | gate `smoothstep(0.08, 0.20, al)` |
+
+"Lifted" is the share of a region more than 8 luminance above lacing 0. "Isolated" is the share of lifted pixels with no lifted neighbour. "Braid" is the share changed by more than 40. The main-dish region is the 380 px crop at 730,330; the small dish is 180×260 at 380,310. Lacing 0 against 0, 17 frames later, lifts 6.3 % (main).
+
+### Are the stacks gone? **No. With `fold` forced to 1 the contour map is back, so the gate isn't doing its job.**
+
+Main dish, one frame apart: lacing 0 | real 1.0 | braid forced (gate in) | braid forced, no gate.
+
+![braid forced](l44-braid.png)
+
+| main dish | lifted | braid | 5×5 high-pass |
+|---|---|---|---|
+| real 0.5 / 1.0 | 13.4 / 19.9 % | 0.75 / 4.55 % | 4.76 / 6.26 |
+| braid forced at 1.0, gate in | 37.8 % | 17.1 % | 8.70 |
+| braid forced at 1.0, no gate | 51.9 % | 23.6 % | 12.20 |
+| #43 shader at 0.5 | 12.1 % | 3.4 % | 4.95 |
+
+- **The gate takes out about a third of the forced braid**, and what is left is still wide white stripes stacked across every ramp.
+- **The real shader at the default draws stacks too.** The whole dish at 0.5 (Granulation 0, Cells 0):
+
+![full at 0.5](l44-full-l05.png)
+
+  Rows below, 2×: lacing 0 | real 0.5 | hair-forced 0.5 | no width floor | #43 shader | real 1.0.
+
+  The wide pink → teal → green ramp:
+
+  ![left ramp](l44-row-left.png)
+
+  The green tongue against red and orange:
+
+  ![bottom](l44-row-bottom.png)
+
+  The top red:
+
+  ![top](l44-row-top.png)
+
+  - **On the pink → teal ramp** there are 6–7 parallel wavy isolines at 0.5, brighter at 1.0. On the #43 shader the same stack is only faint broken dashes. The width floor and the hair floor are what make it continuous and visible.
+  - **The green tongue's outline gets what #44 wanted**: one continuous thread along its edge and a braid on its curl. But the red → orange ramp beside it gets 2–3 jagged sawtooth strokes.
+  - **The top red** has 4–5 wavy vertical lines down a nearly flat red.
+
+### Why the gate misses: `al` on a ramp is 0.07–0.09
+
+Mode 7 paints `al`, the gate and `span` (under Fillmore's grain and cells, one frame from the laced frames): R = `al`×5 (so white/yellow is ≥ 0.2), G = the gate, B = `span`.
+
+![al map](l44-almap.png)
+
+| region (pixels where lacing runs) | `al` p10 / p50 / p90 | gate p50 | gate > 0.5 |
+|---|---|---|---|
+| main dish 380 px | 0.038 / 0.070 / 0.199 | 0.82 | 64 % |
+| a wide pink/red/green ramp | 0.038 / 0.091 / 0.198 | 0.71 | 71 % |
+| red → orange ramp | 0.022 / 0.050 / 0.070 | 0.25 | 40 % |
+| small dish | 0.010 / 0.042 / 0.056 | 0.08 | 11 % |
+
+The gate is green over broad bands of soft ramp, not just along boundaries. Only the real boundaries (the yellow/white ribbons) carry `al` ≥ 0.2. So 0.03–0.10 sits right on top of a ramp's per-cell change on this grid.
+
+### A stricter gate, tested: **0.08–0.20 does it**
+
+The same seed and settings, one frame apart, 1.6×: lacing 0 | real 0.5 | gate 0.10–0.25 at 0.5 | gate 0.08–0.20 at 0.5 | real 1.0 | gate 0.10–0.25 at 1.0.
+
+![k left](l44-k-left.png)
+
+![k top](l44-k-top.png)
+
+![k blob](l44-k-blob.png)
+
+![k bottom](l44-k-bottom.png)
+
+| lifted | real 0.5 | 0.10–0.25 | 0.08–0.20 | real 1.0 | 0.10–0.25 at 1.0 | 0.08–0.20 at 1.0 |
+|---|---|---|---|---|---|---|
+| main dish | 12.4 % | 7.1 % | 8.7 % | 19.3 % | 10.4 % | 12.5 % |
+| wide ramp | 15.3 % | 4.7 % | 6.5 % | 23.9 % | 7.1 % | 9.3 % |
+| small dish | 4.6 % | 0 | 0 | 9.9 % | 0 | 0 |
+
+- **The ramps' isolines go and the boundaries keep a thread.** On the pink/red/green ramp the six vertical isolines vanish, and the red/orange boundary keeps its braid. Around the cyan core the real shader's 3–4 parallel lines become one thin thread along the edge (two at 1.0). The orange ramp's faint hairs go.
+- **One place it doesn't reach:** the concentric stack around the soft pale-red blob in the top red. It is gone at 0.5 with either gate, and back as 5–6 lines at 1.0. That outline has `al` around the threshold, so the amount pushes it over. `span` doesn't separate it either, so a second test is needed there, not a higher threshold.
+- **0.08–0.20** keeps a little more thread than 0.10–0.25 with the same clean ramps. That's the one I'd ship.
+
+### Is the small dish drawing threads now? **No, but it no longer draws dots**
+
+Lacing 0 | real 0.5 | real 1.0 | no width floor at 0.5 | the #43 shader at 0.5, 2×:
+
+![small](l44-small.png)
+
+| small dish | lifted | isolated |
+|---|---|---|
+| real 0.5 / 1.0 | 4.6 / 11.6 % | 19.1 / 6.5 % |
+| no width floor, 0.5 / 1.0 | 1.9 / 4.3 % | 39.4 / 25.6 % |
+| #43 shader at 0.5 | 1.6 % | 62.7 % |
+
+- **The width floor works as measured in #43.** Isolated pixels drop from 63 % (#43 shader) to 19 % at 0.5 and 6.5 % at 1.0. At release and 30 frames after a press the numbers are within 3 points.
+- **What it draws is the faint grey hatch** across the green → purple wash, strongest where green meets purple. There are no threads because there are no boundaries: `al` p90 is 0.056, and the whole plate is soft ramp. A stricter gate draws nothing there, which matches "no thread on a ramp". If you want the second dish laced, it needs edges in its plate, not a lower threshold.
+
+### Braid against hair: **yes**
+
+- **Hair-forced (`fold` = 0.4 everywhere) is within 1 point of the real shader** in every region, still, at release and under the grain (13.2 against 13.4 % at 0.5 in the main dish, 19.1 against 19.9 % at 1.0, 15.9 against 15.1 % under the grain). So most of the laced dish sits on the floor, and the curls are the few places above it.
+- **On screen:** the green tongue's straight outline carries a continuous thin pale hair, and its curl and the cyan core's hook carry the brighter, wider braid (the bottom row and the blob row). That is the look #43 couldn't get.
+
+### Fillmore's value: **0.45 on this build**
+
+Fillmore's own grain 0.5 and cells 0.2, one frame apart. Lacing 0 | 0.35 | 0.45 | 0.5 | 0.55 | 0.6 | 0.7.
+
+The cyan core:
+
+![grain core](l44-grain-core.png)
+
+A ramp by the green blob:
+
+![grain left](l44-grain-left.png)
+
+| main dish, grain + cells | 0.35 | 0.45 | 0.5 | 0.55 | 0.6 | 0.7 | 1.0 |
+|---|---|---|---|---|---|---|---|
+| lifted | 10.7 % | 13.6 % | 15.1 % | 16.2 % | 17.2 % | 18.8 % | 22.1 % |
+| braid | 0.47 % | 1.06 % | 1.66 % | 2.30 % | 3.01 % | 4.04 % | 6.42 % |
+| #43 at the same value | 6.8 % / 0.26 % | 8.9 % / 0.65 % | — | 10.7 % / 1.23 % | 11.5 % / 1.65 % | 12.6 % / 2.32 % | 13.7 % / 3.25 % |
+
+- **With the floors, every value lays down more.** #43's 0.55 (the value I named) matches #44's 0.45 in braid (1.23 against 1.06 %), and #44's 0.35 in coverage.
+- **Under the grain the rows look much alike** at this zoom. The core's outline braid grows from 0.45 up, and the ramp's faint isolines show through the grain from 0.5.
+- **So on this build: 0.45.** It carries the braid I asked for at 0.55 and draws fewer ramp stacks than the shipped 0.5. **If the gate goes to 0.08–0.20**, that takes out about 30–40 % of the coverage and nearly all of it on ramps, so name **0.55** again against that build.
+
+### Errors, NaN, under the grain
+
+0 GL errors from `getError` after every draw in the first 25 s, on all four lacing pages. The only console line is Chrome's usual "too many errors" cap from the app's READ-usage warnings. 0 NaN in both dishes, still and after a 1 s press. Grain and lacing still layer: the grain is the 5–10 px mottle, and the threads sit on top.
+
+**Frame cost: nothing to see.** This is `~/cg-scratch/lacegpu43.mjs` unchanged (Fillmore's own grain and cells, lacing 0.45 flipped every frame, display draw bracketed by 1 px `readPixels` syncs, 1600×1000, GPU 512²): 1257 draws each. On: median 13.7 ms, mean 16.27. Off: median 14.1 ms, mean 16.55. So on − off is −0.4 / −0.28 ms. That is inside the noise, and consistent with #44 adding only an `fwidth` and two `max`es.
 
 ## 3. Sharpening at the governor's low rungs: **it fails the bar. Drop it.**
 
@@ -63,7 +206,7 @@ Page against page can't tell "the pass narrows edges" from "the pass sends the p
 | median px (steps ≥ 100) | 9.78 | 10.71 | 8.97 | 7.47 | 8.19 | 7.61 | 7.25 |
 | clean steps (≥ 50) | 699 | 658 | 806 | 797 | 900 | 1017 | 839 |
 
-Against the mean of its two neighbours, each 0.5 window is **−0.04 and −1.25 px** (steps ≥ 50) or **+1.33 and −1.11 px** (≥ 100). The **1.0** window is **−0.3 / −0.1 px**. The plate itself drifts a mean |Δ| 10–19 per window, and the widths trend down from 9 to 7 px at every value. So **the pass doesn't move the edge width on the same plate by anything outside that drift, even at full strength.** A shorter 65-frame toggle on another page (0 / 0.5 / 0 / 0.5 / 0 / 0.5 / 0 / 1 / 0) said the same: 9.33 / 9.55 / 9.56 / 9.51 / 9.23 / 7.37 / 7.11 / 6.60 / 6.85.
+Against the mean of its two neighbours, each 0.5 window is **−0.04 and −1.25 px** (steps ≥ 50) or **+1.33 and −1.11 px** (≥ 100). The **1.0** window is **−0.3 / −0.1 px**. The plate itself drifts a mean |Δ| 10–19 per window, and the widths trend down from 9 to 7 px at every value. So **the pass doesn't move the edge width on the same plate by anything outside that drift, even at full strength.** A shorter 65-frame toggle on another page (0 / 0.5 / 0 / 0.5 / 0 / 0.5 / 0 / 1 / 0) said the same: 9.33 / 9.55 / 9.56 / 9.51 / 9.23 / 7.37 / 7.11 / 6.60 / 6.85. That page wrote `settings.sharpness` directly rather than over OSC, and I didn't confirm the solver reads that live, so the 300-frame OSC run above is the one to trust.
 
 ### By eye, 2×
 
