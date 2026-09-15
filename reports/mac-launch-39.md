@@ -2,7 +2,15 @@
 
 2026-09-14, late night. The Mac is on `main` at ba3733f "The pigment grain was never drawn for the first nine hundred steps (#39)".
 
-*This report is pushed in parts. Sections after §1 are still to come if they are not below.*
+**In short**
+- **The grain is live from the first frame.** At 10 s there are no GL errors and no NaN, and both phases carry coordinates. The texture is the same at 10 s, 30 s and 2 min. #37's four `INVALID_OPERATION`s on `seedGrain` are gone.
+- **The default to set: granulation 0.5 at grain scale 110**, which is what Fillmore already has.
+  - At 0.25 the grain is lost under the plate cells, and 0.75–1.0 muddies thin dye.
+  - Scale 55 reads as blur, 220 as sand and 440 as video static.
+- **The crossover doesn't show.** The designed contrast dip is measurable but small: 0.965× in the small dish at the default and 1.00× at granulation 1.0, against 0.71× for independent noise. I found no pulse and no jump at a reseed, by numbers or by eye. The reason: a reseeded phase is nearly the same texture as the one it replaces.
+- **Sheet:** 208 of 210 lines at full size on this Mac, nothing cut or over an outline. Three breaks read badly: **Backg-round** (I'd rather have Back-ground), **Micros-copic** (Micro-scopic) and **Labo-ratory** (Labora-tory).
+- **Sharpening:** I agree with PLAN.md.
+- **GL errors after 25 s and frame cost:** the probe is running; see "Errors and cost" in §2.
 
 ## 1. Launch
 
@@ -137,6 +145,12 @@ Fillmore, `?debug&sim=512`, granulation 0.5, grain scale 110. 10 s after the pre
 
 ![core at 10 s](s39-grain-first-core-10s.png) ![small dish at 10 s](s39-grain-first-small-10s.png)
 
+### Errors and cost
+
+*Probe running (`errcost39.mjs`); results will be added here.*
+- Every page in the sweep, the granulation-0 control included, logged one console line: "WebGL: too many errors, no more errors will be reported to the console for this context". Chrome prints that once a context has sent 32 messages to the console, and my filter hid the "READ-usage buffer" warnings my own float `readPixels` raise. So it may be mine, not the app's. The probe runs with no readbacks first, then with a burst of them, to tell which.
+- Granulation 0 only stops the display binding the grain texture; the solver still advects and reseeds the coordinates. So the probe measures cost by detaching the grain from the solver in alternate windows, not by moving the slider.
+
 ## 3. The sheet — **everything at 8 but two stop-row words; three breaks read badly**
 
 Method: `~/cg-scratch/surface39.mjs` (surface37 pointed at a new folder) and `surface39z.mjs` (3× zooms).
@@ -209,3 +223,16 @@ No new runs. The entry in PLAN.md matches what I measured on #36 and #37:
 Deciding after lacing and drops exist is the right call, because Fillmore at 512² gives the pass nothing to steepen. The test I'd want then is the same seeded, frame-matched comparison, run on a preset with hard edges.
 
 One thing to carry into that decision: with the grain now live from frame one, the high-pass in the main dish is about 5 at the default. Any edge metric used for sharpening should be run with `Granulation` 0, or the grain will swamp it. On #37 one run was spoiled that way.
+
+## What I did not measure
+
+- **The projector:** not looked at, per the house rules. I judged the grain on the Mac screen and in 2× crops.
+- **Repeats:** one unseeded run per sweep variant, so each has a different composition. The 0.75 run is the one where that visibly skews the metric.
+- **The crossover at scale 440,** where a speckle is ~1 texel and a 1-texel drift would decorrelate the phases: not watched. If a pulse shows anywhere it would be there, but I don't recommend that scale.
+- **The CPU solver:** not run.
+
+## Files on this branch
+
+- `reports/s39-grain-first-*.png`, `s39-d05-*.png`, `s39-sweep-*.png`, `s39-grain.json`: §2
+- `reports/s39-surface-{screen,paper}.{png,json}`, `s39-cheatsheet-{screen,paper}.png`, `s39-zoom-*.png`: §3
+- Scripts on the Mac, in `~/cg-scratch/`: `grain39.mjs`, `grainwatch.mjs`, `sweep39.sh`, `errcost39.mjs`, `grainhp.mjs`, `zoomrow.mjs`, `surface39.mjs`, `surface39z.mjs`
