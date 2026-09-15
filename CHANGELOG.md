@@ -120,6 +120,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Fixed — the pigment grain was never drawn for the first nine hundred steps
+- Seeding the grain's pigment coordinates bound the very texture it was drawing into,
+  which is a feedback loop; WebGL refused the draw and dropped it silently. The
+  coordinates stayed at zero, the first advection copied the zeros over the other phase,
+  and the shader painted **no grain at all** until the phase clock reseeded a phase some
+  nine hundred steps later — a quarter of a minute on a quiet machine, two minutes on a
+  loaded one. Each target is seeded from the other one now
+- Measured in a headless GPU page at 512², granulation 1.0: four `INVALID_OPERATION`s on
+  the seed draw become none, and the fine texture in the plate at eight seconds goes from
+  0.27 to 4.19 — fifteen times as much, which is the grain arriving on the first frame
+  rather than after the first period
+- What looked like a mottle creeping over the plate after two minutes was this: the grain
+  switching on late. Anything judged in a page's first minute was judged without it
+
+### Changed — long names break rather than shrink
+- A name too long for its control is hyphenated and set at full size rather than set
+  smaller: "Irides-cence" on a knob, "Under-ground" on a pad. The break goes between two
+  consonants where it can, or after a vowel, and near the middle of the word; a word
+  under nine letters is never broken, because "Evo-lve" reads worse than "Evolve" a size
+  down. 203 of 210 lines on the APC40 picture are now at full size, against 189 before,
+  and none is cut or over its outline
+
 ### Fixed — sharpening that stops before it builds a staircase
 - The gate on how much dye a cell holds was the wrong axis. Backward diffusion grows
   whatever curvature it is given, so over a long settle it does not only steepen

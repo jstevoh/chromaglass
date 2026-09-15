@@ -107,17 +107,58 @@ function em(text: string, bold: boolean, size: number): number {
 
 const SIZES = [8, 7.5, 7, 6.5, 6, 5.5, 5];
 
+/**
+ * Break one long word in two, as near the middle as both halves allow, with a
+ * hyphen on the first. A cheat sheet wants the whole name at a size you can
+ * read across a stage, and "Irides-/cence" is a better answer to a narrow knob
+ * than either "Irid." or type two steps down.
+ */
+const VOWEL = /[aeiouy]/i;
+
+/**
+ * Break one long word in two, with a hyphen on the first half. A cheat sheet
+ * wants the whole name at a size you can read across a stage, and
+ * "Irides-cence" is a better answer to a narrow knob than either "Irid." or
+ * type two steps down. The break goes between two consonants where it can, or
+ * after a vowel, and near the middle: that is "Under-ground" rather than
+ * "Underg-round".
+ */
+function split(word: string, width: number, bold: boolean, size: number): [string, string] | null {
+  // Only a word long enough to be worth breaking: "Evo-lve" and "Mac-ro" read
+  // worse than the same words a size down.
+  if (word.length < 9) return null;
+  let best: [string, string] | null = null;
+  let bestScore = -Infinity;
+  for (let at = 3; at <= word.length - 3; at++) {
+    const head = `${word.slice(0, at)}-`, tail = word.slice(at);
+    if (em(head, bold, size) > width || em(tail, bold, size) > width) continue;
+    const a = word[at - 1], b = word[at];
+    const kind = !VOWEL.test(a) && !VOWEL.test(b) ? 2 : VOWEL.test(a) && !VOWEL.test(b) ? 1 : 0;
+    const score = kind * 10 - Math.abs(at - word.length / 2);
+    if (score > bestScore) { bestScore = score; best = [head, tail]; }
+  }
+  return best;
+}
+
 /** Greedy wrap at a measured width, or null if the words will not fit. */
-function layout(text: string, width: number, maxLines: number, bold: boolean, size: number): string[] | null {
+function layout(text: string, width: number, maxLines: number, bold: boolean, size: number, hyphen: boolean): string[] | null {
   const out: string[] = [];
   let cur = '';
+  const push = (line: string) => { out.push(line); return out.length > maxLines; };
   for (const w of text.split(' ')) {
-    if (em(w, bold, size) > width) return null; // one word is wider than the shape
+    if (em(w, bold, size) > width) {
+      // One word is wider than the shape: break it, or give up on this size.
+      const parts = hyphen ? split(w, width, bold, size) : null;
+      if (!parts) return null;
+      if (cur && push(cur)) return null;
+      if (push(parts[0])) return null;
+      cur = parts[1];
+      continue;
+    }
     const next = cur ? `${cur} ${w}` : w;
     if (em(next, bold, size) <= width) { cur = next; continue; }
-    out.push(cur);
+    if (push(cur)) return null;
     cur = w;
-    if (out.length >= maxLines) return null;
   }
   if (cur) out.push(cur);
   return out.length <= maxLines ? out : null;
@@ -140,9 +181,13 @@ function fitLabel(text: string, w: number, h: number, along: boolean, round: boo
   const margins = [round ? room * 0.20 : 9, round ? room * 0.12 : 5];
   for (const size of SIZES) {
     const maxLines = Math.max(1, Math.min(3, Math.floor((down - 2) / (size + 1.5))));
-    for (const [tight, margin] of margins.entries()) {
-      const lines = layout(text, (room - margin) / size, maxLines, bold, size);
-      if (lines) return { lines, size, tight: tight > 0 };
+    // Whole words first, then a hyphen, and only then smaller type: a broken
+    // word at a readable size beats an unbroken one you have to lean in to.
+    for (const hyphen of [false, true]) {
+      for (const [tight, margin] of margins.entries()) {
+        const lines = layout(text, (room - margin) / size, maxLines, bold, size, hyphen);
+        if (lines) return { lines, size, tight: tight > 0 };
+      }
     }
   }
   const across = room - (round ? room * 0.12 : 5);

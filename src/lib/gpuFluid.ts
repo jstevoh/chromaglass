@@ -686,9 +686,16 @@ export class GpuFluid {
     this.clearTarget(this.squeeze.write, 0.03, 0, 0, 0);
     if (this.grain) {
       this.grainAge = 0;
-      for (const t of [this.grain.read, this.grain.write]) {
-        this.runInto('seedGrain', t.fbo, (u) => {
-          this.bind(u, 'u_src', this.grain!.read.tex, 0);
+      // Both phases are reseeded from the uv grid here, so what is bound as the
+      // source is never read — but it is still bound, and binding the very
+      // texture being drawn into is a feedback loop, which WebGL refuses. That
+      // dropped the draw silently: the coordinates stayed at zero, the first
+      // advection copied the zeros over the other phase, and the shader painted
+      // no grain at all until the phase clock reseeded a phase some nine hundred
+      // steps later. Each target reads from the other one instead.
+      for (const [into, src] of [[this.grain.read, this.grain.write], [this.grain.write, this.grain.read]] as const) {
+        this.runInto('seedGrain', into.fbo, (u) => {
+          this.bind(u, 'u_src', src.tex, 0);
           gl.uniform2f(u.get('u_keep')!, 0, 0);
         });
       }
