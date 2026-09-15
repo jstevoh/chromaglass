@@ -82,16 +82,23 @@ const RULER: SVGTextElement | null = (() => {
   } catch { return null; }
 })();
 const widths = new Map<string, number>();
-/** Width of a label at one unit of type, in the weight it will be drawn in. */
-function em(text: string, bold: boolean): number {
-  const key = `${bold ? 'b' : 'r'}|${text}`;
+/**
+ * Width of a label at one unit of type, in the weight and at the size it will
+ * be drawn in. The size matters: a system font with optical sizes — SF on a Mac
+ * — switches to a wider, more loosely spaced cut for small type, and measuring
+ * at 100 units made every label on that machine 14–17 % narrower than it drew,
+ * which ate the margin and put eight names on their outlines.
+ */
+function em(text: string, bold: boolean, size: number): number {
+  const key = `${bold ? 'b' : 'r'}|${size}|${text}`;
   const hit = widths.get(key);
   if (hit !== undefined) return hit;
   let w = 0;
   if (RULER) {
     RULER.setAttribute('font-weight', bold ? '700' : '400');
+    RULER.setAttribute('font-size', String(size));
     RULER.textContent = text;
-    w = RULER.getComputedTextLength() / 100;
+    w = RULER.getComputedTextLength() / size;
   }
   if (!w) w = text.length * (bold ? 0.68 : 0.62);   // nothing laid out yet: a safe average
   widths.set(key, w);
@@ -101,13 +108,13 @@ function em(text: string, bold: boolean): number {
 const SIZES = [8, 7.5, 7, 6.5, 6, 5.5, 5];
 
 /** Greedy wrap at a measured width, or null if the words will not fit. */
-function layout(text: string, width: number, maxLines: number, bold: boolean): string[] | null {
+function layout(text: string, width: number, maxLines: number, bold: boolean, size: number): string[] | null {
   const out: string[] = [];
   let cur = '';
   for (const w of text.split(' ')) {
-    if (em(w, bold) > width) return null;       // one word is wider than the shape
+    if (em(w, bold, size) > width) return null; // one word is wider than the shape
     const next = cur ? `${cur} ${w}` : w;
-    if (em(next, bold) <= width) { cur = next; continue; }
+    if (em(next, bold, size) <= width) { cur = next; continue; }
     out.push(cur);
     cur = w;
     if (out.length >= maxLines) return null;
@@ -122,7 +129,7 @@ function layout(text: string, width: number, maxLines: number, bold: boolean): s
  * in a row is no use at all on a dark stage; only a label that will not fit even
  * at the smallest type gets an ellipsis.
  */
-function fitLabel(text: string, w: number, h: number, along: boolean, round: boolean, bold: boolean): { lines: string[]; size: number } {
+function fitLabel(text: string, w: number, h: number, along: boolean, round: boolean, bold: boolean): { lines: string[]; size: number; tight?: boolean } {
   const down = along ? w : h;           // across it, where the lines stack
   const room = along ? h : w;           // along the label's own reading direction
   // Readable type comes first: at each size, the label is tried with a
@@ -133,16 +140,16 @@ function fitLabel(text: string, w: number, h: number, along: boolean, round: boo
   const margins = [round ? room * 0.20 : 9, round ? room * 0.12 : 5];
   for (const size of SIZES) {
     const maxLines = Math.max(1, Math.min(3, Math.floor((down - 2) / (size + 1.5))));
-    for (const margin of margins) {
-      const lines = layout(text, (room - margin) / size, maxLines, bold);
-      if (lines) return { lines, size };
+    for (const [tight, margin] of margins.entries()) {
+      const lines = layout(text, (room - margin) / size, maxLines, bold, size);
+      if (lines) return { lines, size, tight: tight > 0 };
     }
   }
   const across = room - (round ? room * 0.12 : 5);
   const size = SIZES[SIZES.length - 1];
   let cut = text;
-  while (cut.length > 1 && em(`${cut}…`, bold) * size > across) cut = cut.slice(0, -1);
-  return { lines: [`${cut}…`], size };
+  while (cut.length > 1 && em(`${cut}…`, bold, size) * size > across) cut = cut.slice(0, -1);
+  return { lines: [`${cut}…`], size, tight: true };
 }
 
 /** Relative luminance, for deciding whether a colour will read on a ground. */
@@ -296,10 +303,12 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     // The full name first; the short form only if the full one would have to be
     // set smaller than is comfortable to read on a dark stage.
     const short = target ? shortForm(target) : undefined;
+    // The short form when the full name has to be set small *or* pushed against
+    // its outline — both of those are the sheet failing at a glance.
     let fit = fitLabel(label, c.w, c.h, along, round, !!target);
-    if (short && fit.size < 7) {
+    if (short && (fit.size < 8 || fit.tight)) {
       const alt = fitLabel(short, c.w, c.h, along, round, !!target);
-      if (alt.size > fit.size) fit = alt;
+      if (alt.size > fit.size || (alt.size === fit.size && !alt.tight && fit.tight)) fit = alt;
     }
     const { lines, size: fontSize } = fit;
     const fill = raw ? `${raw}${target?.kind === 'dye' ? '55' : '33'}` : (paper ? 'rgba(17,24,39,0.04)' : 'rgba(255,255,255,0.04)');
@@ -308,7 +317,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     // the horizontal crossfader a vertical one struck through its own label —
     // and it breaks around the label rather than scoring it through.
     const long = along ? c.h : c.w;
-    const gap = Math.min(long - 16, Math.max(...lines.map(l => em(l, !!target))) * fontSize + 10);
+    const gap = Math.min(long - 16, Math.max(...lines.map(l => em(l, !!target, fontSize))) * fontSize + 10);
     const track: [number, number][] = c.shape !== 'fader' ? []
       : [[6, (long - gap) / 2], [(long + gap) / 2, long - 6]].filter(([a, b]) => b - a > 2) as [number, number][];
     return (
