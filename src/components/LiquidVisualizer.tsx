@@ -12,7 +12,8 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
-import { SCENE_MAX_PEOPLE, type SceneReading } from '../lib/sceneSense';
+import { SCENE_LATTICE, SCENE_MAX_PEOPLE, type SceneReading } from '../lib/sceneSense';
+import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -411,6 +412,15 @@ class FluidSimulation {
     this.dirty = true;
     this.vx[index] += amountX;
     this.vy[index] += amountY;
+  }
+
+  /**
+   * Say that the delta arrays have been written to directly. A caller that
+   * fills a whole field in one pass — the room's flow does — has no reason to
+   * pay for the bounds check and the flag on every one of 37,000 cells.
+   */
+  markDirty() {
+    this.dirty = true;
   }
 
   addTemp(x: number, y: number, amount: number) {
@@ -1733,7 +1743,7 @@ interface GLResources {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true, onManualGesture, onEngineStatus,
+  isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -1772,6 +1782,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
   const chemRef = useRef(new ChemistryField(GRID_SIZE));
+  /**
+   * The steady part of the room's flow, learned and subtracted. Two floats a
+   * lattice cell, and the reason a camera that can see the projection screen
+   * does not turn the plate into an oscillator.
+   */
+  const roomStirRef = useRef(new RoomStir(SCENE_LATTICE));
   const gelAngleRef = useRef(0);
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -3780,7 +3796,30 @@ void main() {
         // ── Fixed-timestep phase ───────────────────────────────
         // Injection and the solver share one loop so dye-per-second, air
         // bursts and beat rings stay constant whatever the frame rate is.
+        // ── The room ───────────────────────────────────────────
+        // One verdict per frame on whether the camera has anything to say, so
+        // every solver step this frame stirs from the same reading rather than
+        // re-deciding. A reading that has stopped arriving is not the room.
+        const roomDrive = Math.max(0, Math.min(1, currentSettings.sceneDrive ?? 0));
+        const roomReading = (() => {
+          if (roomDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
+          const r = sceneRef?.current ?? null;
+          if (!r || !r.ready) return null;
+          return performance.now() - r.at < ROOM_STALE_MS ? r : null;
+        })();
+
         for (let simStep = 0; simStep < simSteps; simStep++) {
+          // The room stirs the lead plate: it is ambient, not a tool, so it
+          // goes where the show is rather than onto whichever layer happens to
+          // be selected.
+          if (roomReading) {
+            const lead = fluidsRef.current[0];
+            if (lead) {
+              roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP);
+              lead.markDirty();
+            }
+          }
+
           // ── Manual injection ───────────────────────────────────
           if (isMouseDownRef.current && drainFrameRef.current === 0) {
             const { x, y } = mousePosRef.current;

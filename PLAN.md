@@ -269,9 +269,17 @@ and one dye for 30 s of ordinary movement.
 **Risks.**
 
 - **The feedback loop.** A camera that can see the projection screen makes the plate
-  drive itself. Guarded three ways: the coupling high-passes the flow (the plate moves
-  slowly, people move fast), `sceneDrive` has a hard ceiling, and the dye-budget
-  regulator is already downstream of everything.
+  drive itself. Two guards were tried and the harness threw both out. Subtracting the
+  steady part of the flow field removes 0 % of a pattern that *travels*, which is what
+  a loop looks like. Comparing the room's flow against the plate's own velocity —
+  the loop being the plate seen through a lens — scored a fan in the corner of the
+  frame *higher* than a real loop: from one camera the two are not distinguishable,
+  because a driven plate moves the way the room moved. What holds it is the per-cell
+  cap against the solver's damping, which makes the loop saturate rather than diverge:
+  measured over forty closed-loop seconds it settles at 0.26, about what one wave of an
+  arm peaks at, and climbs 1.04x over its last third. So a mis-aimed camera is a plate
+  stirred by nothing in particular, not a show that has to be restarted — and aiming it
+  away from the screen is still the instruction, not an optimisation.
 - **Latency.** Capture to analysis is 50–100 ms. Right for *the room stirs the liquid*,
   wrong for anything expected to land on a beat — discrete hits stay on the beat clock.
 - **The venue.** Strobes, auto-exposure pumping and rolling shutter all read as

@@ -17,10 +17,20 @@
  *   walker    one figure crossing the frame          → one id, held throughout
  *   strobe    the whole frame flashing, nobody there → not mistaken for motion
  *
+ * Then the coupling, on a plate that is just the velocity field the solver would
+ * have been handed, damped the way a viscous solver damps:
+ *
+ *   a camera on itself   a closed loop — the bar on screen is carried by the
+ *                        plate's own velocity — run for forty seconds to show
+ *                        whether it finds a ceiling or keeps climbing
+ *   a fan in the corner  motion that repeats but is nobody's doing
+ *   one wave             a single gesture: how fast it arrives, how far it gets
+ *
  * Exits non-zero if any of them fails, so it can stand in a check.
  */
 
 import { SceneSense } from '../src/lib/sceneSense.ts';
+import { RoomStir } from '../src/lib/roomStir.ts';
 
 const N = 96;
 const FRAMES = 40;
@@ -117,6 +127,100 @@ for (const r of results) {
   );
 }
 
+// ── The coupling ────────────────────────────────────────────────────
+//
+// What reaches the liquid, and whether a camera pointed at the screen can
+// build on itself. The plate here is the velocity field the solver would have
+// been handed, at 48² rather than 192², damped each step the way a viscous
+// solver damps: what is being measured is the coupling, not the solve.
+const PLATE = 48;
+const SIM_STEP = 1 / 60;
+const STEPS = 3;
+/** How much of its speed the plate keeps from one solver step to the next. */
+const DAMPING = 0.985;
+
+function plateRun(paint, seconds, { drive = 1 } = {}) {
+  const sense = new SceneSense();
+  const stir = new RoomStir(24);
+  const vx = new Float32Array(PLATE * PLATE), vy = new Float32Array(PLATE * PLATE);
+  const add = [new Float32Array(PLATE * PLATE), new Float32Array(PLATE * PLATE)];
+  const frames = Math.round(seconds / DT);
+  const trace = [];
+  let state = { meanVx: 0 };
+
+  for (let f = 0; f < frames; f++) {
+    const px = room(f * 7919 + 13);
+    paint(px, f / (frames - 1), f, state);
+    const r = sense.push(px, N, N, DT, f * DT * 1000, OPTS);
+    if (!r.ready) continue;
+
+    for (let k = 0; k < STEPS; k++) {
+      add[0].fill(0); add[1].fill(0);
+      stir.apply(add[0], add[1], PLATE, r, drive, SIM_STEP);
+      for (let i = 0; i < vx.length; i++) {
+        vx[i] = vx[i] * DAMPING + add[0][i];
+        vy[i] = vy[i] * DAMPING + add[1][i];
+      }
+    }
+
+    let sum = 0, sx = 0;
+    for (let i = 0; i < vx.length; i++) { sum += Math.hypot(vx[i], vy[i]); sx += vx[i]; }
+    state = { meanVx: sx / vx.length };
+    trace.push({ t: f * DT, speed: sum / vx.length });
+  }
+  return trace;
+}
+
+/**
+ * The camera pointed at the projection. The bar on screen is not on a clock:
+ * it is carried by the plate's own velocity, which is what makes this a loop
+ * rather than a moving picture.
+ */
+const mirrorBar = () => {
+  let x = 0.1;
+  return (px, _t, f, state) => {
+    // A loop needs something to have happened first. For the opening half
+    // second the bar moves on its own — someone walked past — and after that
+    // it is carried only by the plate.
+    const t = f * DT;
+    x += t < 0.6 ? 0.9 * DT : (state?.meanVx ?? 0) * 900 * DT;
+    if (x > 1) x -= 1 + BAR;
+    if (x < -BAR) x += 1 + BAR;
+    box(px, x, 0.3, BAR, 0.4, 210);
+  };
+};
+
+/** A bar going round on its own clock — a fan, an escalator, a passing car. */
+const carousel = (px, _t, f) => box(px, ((f * DT) % 1.0) * 0.85, 0.3, BAR, 0.4, 210);
+/** One wave of an arm, then nothing. */
+const wave = (px, _t, f) => {
+  const t = f * DT;
+  if (t < 0.4) box(px, 0.1 + (t / 0.4) * 0.7, 0.3, BAR, 0.4, 210);
+};
+
+// Forty seconds of closed loop: long enough to tell a ceiling from a climb.
+const LOOP_SECONDS = 40;
+const loopTrace = plateRun(mirrorBar(), LOOP_SECONDS);
+const carouselTrace = plateRun(carousel, 16);
+const waveTrace = plateRun(wave, 1.2);
+
+const mean = (a) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
+const slice = (tr, from, to, key = 'speed') => mean(tr.filter(p => p.t >= from && p.t < to).map(p => p[key]));
+const loopEarly = slice(loopTrace, 1, 4);
+const loopMid = slice(loopTrace, 18, 26);
+const loopLate = slice(loopTrace, 32, 40);
+const carEarly = slice(carouselTrace, 1, 4), carLate = slice(carouselTrace, 12, 16);
+const waveOnset = waveTrace.find(p => p.speed > 0.01);
+const wavePeak = Math.max(...waveTrace.map(p => p.speed));
+
+console.log('');
+console.log(`${pad('the plate, driven by', 24)} ${pad('opening', 10)} ${pad('middle', 10)} ${pad('end', 10)} still climbing?`);
+const row = (name, a, b, c) =>
+  console.log(`${pad(name, 24)} ${pad(a.toFixed(4), 10)} ${pad(b.toFixed(4), 10)} ${pad(c.toFixed(4), 10)} ${(c / b).toFixed(2)}x`);
+row('a camera on itself', loopEarly, loopMid, loopLate);
+row('a fan in the corner', carEarly, (carEarly + carLate) / 2, carLate);
+console.log(`one wave               reaches the plate after ${waveOnset ? `${(waveOnset.t * 1000).toFixed(0)} ms` : 'never'}, peak ${wavePeak.toFixed(4)}`);
+
 const by = Object.fromEntries(results.map(r => [r.name, r]));
 const checks = [
   ['a still room reads as still', by.still.energy < 0.25],
@@ -128,6 +232,11 @@ const checks = [
   ['a walker keeps one id', by.walker.ids <= 2 && by.walker.hold > 0.7],
   ['a strobe is not a crowd', by.strobe.people <= 1],
   ['analysis costs under 2 ms', Math.max(...results.map(r => r.ms)) < 2],
+  ['a camera on itself finds a ceiling', loopLate < loopMid * 1.25],
+  ['and the ceiling is a plate, not a wall', loopLate < 20],
+  ['a fan in the corner still drives the plate', carLate > carEarly * 0.5],
+  ['a wave reaches the plate inside 200 ms', !!waveOnset && waveOnset.t < 0.2],
+  ['a wave moves the plate', wavePeak > 0.02],
 ];
 
 console.log('');
