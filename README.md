@@ -392,11 +392,16 @@ That pulls main, installs, builds, publishes the build to Firebase Hosting, and 
 ## Deploying
 
 Pushes to `main` are typechecked, built and published to Firebase Hosting by
-`.github/workflows/deploy.yml`. Before the first run, add a repository secret
-named `FIREBASE_SERVICE_ACCOUNT` containing a service-account JSON key with the
-**Firebase Hosting Admin** role on the `chromaglass` project (Firebase console →
-Project settings → Service accounts → Generate new private key). Optionally add
+`.github/workflows/deploy.yml`. It authenticates with the repository secret
+`FIREBASE_SERVICE_ACCOUNT`, a service-account JSON key with the **Firebase
+Hosting Admin** role on the `chromaglass` project (Firebase console → Project
+settings → Service accounts → Generate new private key) — already set, and
+recreated the same way if the key is ever rotated. Optionally add
 `VITE_FINGERPRINT_PROXY_URL` to enable automatic song identification.
+
+The workflow stays green when that secret is missing, building and typechecking
+without publishing, so a green check is not by itself proof of a deploy: the
+"Deploy to Firebase Hosting" step carries the check that is.
 
 To deploy by hand instead:
 
