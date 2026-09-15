@@ -30,7 +30,17 @@ import { getSongMap, putSongMap, getTrackState, putTrackState, getAllTrackStates
 const IDENTIFY_INTERVAL_MS = 35_000; // API re-check cadence while a track is identified
 const IDENTIFY_RETRY_MS = 10_000;    // API retry cadence while nothing is identified
 const LOCAL_MATCH_RETRY_MS = 6_000;  // local matching is free — try often when unidentified
-const LOCAL_MATCH_INTERVAL_MS = 20_000; // and periodically to catch track changes
+/**
+ * How often the local matcher re-checks while a track is already known.
+ *
+ * This is the only thing that catches a track change on a gapless service,
+ * where there is no silence for the boundary detector to hear and the API
+ * (when there is one at all) is on a 35-second leash to spare its quota. It
+ * was 20 seconds, so half a short song could play under the last one's
+ * colours. Matching is local and free; the cost is the four-second capture,
+ * not the arithmetic.
+ */
+const LOCAL_MATCH_INTERVAL_MS = 12_000;
 const SILENCE_END_MS = 5_000;   // this long below the silence floor ⇒ listen ended
 const GAP_MS = 1_600;           // a dip this long looks like a between-song gap
 const SILENCE_VOLUME = 2.5;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioData } from './useAudioAnalyzer';
-import { SongBoundary } from '../lib/songBoundary';
+import { SongBoundary, roomIsQuiet } from '../lib/songBoundary';
 
 /**
  * Fires a counter when a new song starts: on the first sound after a gap
@@ -39,9 +39,7 @@ export function useSongChange(audioData: AudioData | null, trackKey: string | nu
     const dt = env.at ? (now - env.at) / 1000 : 0;
     env.at = now;
     env.peak = Math.max(audioData.energy, env.peak * Math.exp(-dt / 20));
-    // With calibration the analyser already knows the room's floor; without it
-    // a gap is the energy falling to a fraction of what the music has been.
-    const quiet = cal ? !cal.signal : audioData.energy < Math.max(0.012, env.peak * 0.2);
+    const quiet = roomIsQuiet(cal, audioData.energy, env.peak);
     if (boundary.current.update(quiet, now)) fire('gap');
   });
 
