@@ -1,39 +1,5 @@
 export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
 
-/**
- * What a liquid does when it lands, beyond the colour it carries.
- *
- * Until now a liquid was an inject radius, an amount and a heat: five ways of
- * dropping the same dye. These are the four behaviours that actually change
- * what happens to what is already on the plate, and each is a real thing a
- * projectionist put in a clock face.
- */
-export interface LiquidBehaviour {
-  /**
-   * Soap. A surfactant lowers the surface tension where it lands, and the
-   * liquid around it, still at full tension, pulls away from the spot — the
-   * Marangoni flow. Colour flees the disc and the front curls into filaments.
-   */
-  surfactant?: number;
-  /**
-   * Silicone. It does not colour what it lands on, it shoulders it aside:
-   * the dye piles into a ring and the middle is left as bare glass. Every
-   * cell in a pour comes from something doing this.
-   */
-  displace?: number;
-  /**
-   * Glycerine. Poured thick it falls rather than spreads, and a falling
-   * thread this viscous buckles instead of landing straight — the
-   * rope-coiling instability.
-   */
-  body?: number;
-  /**
-   * Milk. A ground rather than a dye: dense, slow, holding its own edge, so
-   * colour dropped on it beads and rides instead of mixing in.
-   */
-  immiscible?: number;
-}
-
 export interface LiquidType {
   id: string;
   name: string;
@@ -42,8 +8,6 @@ export interface LiquidType {
   injectRadius: number;   // cells — how wide each drop spreads
   injectAmount: number;   // density injected per frame while held
   heatAmount: number;     // heat injected (drives buoyancy-based rise)
-  /** How it behaves when it lands. Absent = it is only a dye. */
-  behaviour?: LiquidBehaviour;
 }
 
 export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
@@ -52,11 +16,6 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Thin, rises and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5  },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0  },
   { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Very heavy, barely moves once placed', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0  },
-  // The four that do something to the plate rather than just colouring it.
-  { id: 'soap',      name: 'Soap',      color: '#bfe9d8', description: 'Breaks the film: colour flees the spot and curls into filaments', injectRadius: 3, injectAmount: 0.12, heatAmount: 0.0, behaviour: { surfactant: 1 } },
-  { id: 'milk',      name: 'Milk',      color: '#f4efe4', description: 'A pale ground colour rides on rather than mixes into',          injectRadius: 4, injectAmount: 2.2,  heatAmount: 0.0, behaviour: { immiscible: 1 } },
-  { id: 'silicone',  name: 'Silicone',  color: '#dfe7ee', description: 'Shoulders colour aside into a ring — the cell maker',           injectRadius: 3, injectAmount: 0.06, heatAmount: 0.0, behaviour: { displace: 1 } },
-  { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff', description: 'Falls in a thread and coils where it lands',                    injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0, behaviour: { body: 1 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**
