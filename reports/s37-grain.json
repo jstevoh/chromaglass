@@ -1,0 +1,496 @@
+{
+ "runs": {
+  "a05": {
+   "gran": "",
+   "gscale": "",
+   "before": {
+    "g": 0.5,
+    "s": 110,
+    "sh": 0.5
+   },
+   "caps": [
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 315,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 110,
+     "grainAge": 1.4240931839999846,
+     "grainMix": 0.5397028741782511,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 31,
+     "stepsSinceSet": 195
+    },
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 544,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 110,
+     "grainAge": 2.9355540479999993,
+     "grainMix": 0.0011382133878572265,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 63.2,
+     "stepsSinceSet": 424
+    },
+    {
+     "seedCalls": 3,
+     "seedErr": 1,
+     "frames": 975,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 110,
+     "grainAge": 5.740056576000108,
+     "grainMix": 0.9815892487989166,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": 1.09,
+      "devP99": 20.36,
+      "strMed": 1,
+      "strP90": 1.05,
+      "strP99": 1.93
+     },
+     "t": 121.1,
+     "stepsSinceSet": 855
+    },
+    {
+     "seedCalls": 5,
+     "seedErr": 1,
+     "frames": 1862,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 110,
+     "grainAge": 5.491762176000217,
+     "grainMix": 0.9308399593337142,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": 0.9,
+      "devP99": 51.72,
+      "strMed": 1,
+      "strP90": 1.13,
+      "strP99": 2.86
+     },
+     "phaseB": {
+      "devMed": 1.54,
+      "devP99": 23.87,
+      "strMed": 1,
+      "strP90": 1.09,
+      "strP99": 1.85
+     },
+     "t": 241.1,
+     "stepsSinceSet": 1742
+    }
+   ]
+  },
+  "b1": {
+   "gran": "1",
+   "gscale": "",
+   "before": {
+    "g": 0.5,
+    "s": 110,
+    "sh": 0.5
+   },
+   "caps": [
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 315,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 1,
+     "grainScale": 110,
+     "grainAge": 1.467777023999983,
+     "grainMix": 0.5168687091078304,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 31.1,
+     "stepsSinceSet": 201
+    },
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 528,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 1,
+     "grainScale": 110,
+     "grainAge": 2.8685721599999967,
+     "grainMix": 0.0047280965187812395,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 60.7,
+     "stepsSinceSet": 414
+    },
+    {
+     "seedCalls": 3,
+     "seedErr": 1,
+     "frames": 959,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 1,
+     "grainScale": 110,
+     "grainAge": 5.670162432000105,
+     "grainMix": 0.970469187059137,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": 1.39,
+      "devP99": 20.46,
+      "strMed": 1,
+      "strP90": 1.08,
+      "strP99": 1.89
+     },
+     "t": 121,
+     "stepsSinceSet": 845
+    },
+    {
+     "seedCalls": 5,
+     "seedErr": 1,
+     "frames": 1832,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 1,
+     "grainScale": 110,
+     "grainAge": 5.33158809600021,
+     "grainMix": 0.8824342002375188,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": 2.2,
+      "devP99": 31.55,
+      "strMed": 1,
+      "strP90": 1.14,
+      "strP99": 2.02
+     },
+     "phaseB": {
+      "devMed": 1.33,
+      "devP99": 4.4,
+      "strMed": 1,
+      "strP90": 1.06,
+      "strP99": 1.35
+     },
+     "t": 241.2,
+     "stepsSinceSet": 1718
+    }
+   ]
+  },
+  "c440": {
+   "gran": "",
+   "gscale": "440",
+   "before": {
+    "g": 0.5,
+    "s": 110,
+    "sh": 0.5
+   },
+   "caps": [
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 318,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 440,
+     "grainAge": 1.464864767999983,
+     "grainMix": 0.5183926139243229,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 30.9,
+     "stepsSinceSet": 201
+    },
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 536,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 440,
+     "grainAge": 2.906431487999998,
+     "grainMix": 0.002398331386124262,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 61.1,
+     "stepsSinceSet": 419
+    },
+    {
+     "seedCalls": 3,
+     "seedErr": 1,
+     "frames": 979,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 440,
+     "grainAge": 5.760442368000109,
+     "grainMix": 0.9843491309814673,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": 1.27,
+      "devP99": 24.35,
+      "strMed": 1,
+      "strP90": 1.06,
+      "strP99": 2.06
+     },
+     "t": 120.8,
+     "stepsSinceSet": 862
+    },
+    {
+     "seedCalls": 5,
+     "seedErr": 1,
+     "frames": 1868,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0.5,
+     "grainScale": 440,
+     "grainAge": 5.480113152000216,
+     "grainMix": 0.9277128182348187,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": 0.99,
+      "devP99": 51.52,
+      "strMed": 1,
+      "strP90": 1.12,
+      "strP99": 2.92
+     },
+     "phaseB": {
+      "devMed": 0.98,
+      "devP99": 9.17,
+      "strMed": 1,
+      "strP90": 1.05,
+      "strP99": 1.56
+     },
+     "t": 241.2,
+     "stepsSinceSet": 1751
+    }
+   ]
+  },
+  "d0": {
+   "gran": "0",
+   "gscale": "",
+   "before": {
+    "g": 0.5,
+    "s": 110,
+    "sh": 0.5
+   },
+   "caps": [
+    {
+     "seedCalls": 2,
+     "seedErr": 1,
+     "frames": 418,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0,
+     "grainScale": 110,
+     "grainAge": 2.0851752959999663,
+     "grainMix": 0.21242228513846573,
+     "nonzeroFrac": 0,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "t": 30.6,
+     "stepsSinceSet": 288
+    },
+    {
+     "seedCalls": 3,
+     "seedErr": 1,
+     "frames": 741,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0,
+     "grainScale": 110,
+     "grainAge": 4.088807424000044,
+     "grainMix": 0.2912920108153414,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": null,
+      "devP99": null,
+      "strMed": null,
+      "strP90": null,
+      "strP99": null
+     },
+     "phaseB": {
+      "devMed": 0.1,
+      "devP99": 21.97,
+      "strMed": 1,
+      "strP90": 1.02,
+      "strP99": 1.73
+     },
+     "t": 60.7,
+     "stepsSinceSet": 611
+    },
+    {
+     "seedCalls": 4,
+     "seedErr": 1,
+     "frames": 1388,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0,
+     "grainScale": 110,
+     "grainAge": 2.2329477120000902,
+     "grainMix": 0.15281608560261223,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": 0.88,
+      "devP99": 46.44,
+      "strMed": 1,
+      "strP90": 1.07,
+      "strP99": 3.7
+     },
+     "phaseB": {
+      "devMed": 1.95,
+      "devP99": 54.17,
+      "strMed": 1,
+      "strP90": 1.16,
+      "strP99": 4.2
+     },
+     "t": 120.8,
+     "stepsSinceSet": 1258
+    },
+    {
+     "seedCalls": 7,
+     "seedErr": 1,
+     "frames": 2670,
+     "label": "GPU · 512² · 1.0x",
+     "granulation": 0,
+     "grainScale": 110,
+     "grainAge": 4.413474816000293,
+     "grainMix": 0.4547574856650356,
+     "nonzeroFrac": 1,
+     "N": 512,
+     "phaseA": {
+      "devMed": 0.79,
+      "devP99": 86.17,
+      "strMed": 1,
+      "strP90": 1.26,
+      "strP99": 5.86
+     },
+     "phaseB": {
+      "devMed": 0.5,
+      "devP99": 28.28,
+      "strMed": 1,
+      "strP90": 1.04,
+      "strP99": 3.07
+     },
+     "t": 240.7,
+     "stepsSinceSet": 2540
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,140 @@
+{
+ "startedAt": "2026-09-15T05:22:52.768Z",
+ "runs": {
+  "s06": {
+   "val": 0.6,
+   "picked": true,
+   "sliderVal": "0.6",
+   "st": {
+    "mean": 0.7646540844656506,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.7646540844656506
+     },
+     {
+      "mean": 0.3828022446148373
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.6,
+    "cells": 0.2,
+    "frames": 1139
+   },
+   "rafMs": 109.68931068931069,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  },
+  "s0": {
+   "val": 0,
+   "picked": true,
+   "sliderVal": "0",
+   "st": {
+    "mean": 0.777722782847382,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.777722782847382
+     },
+     {
+      "mean": 0.3833755063326921
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0,
+    "cells": 0.2,
+    "frames": 1153
+   },
+   "rafMs": 120.84890656063618,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  },
+  "s1": {
+   "val": 1,
+   "picked": true,
+   "sliderVal": "1",
+   "st": {
+    "mean": 0.7351762689341074,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.7351762689341074
+     },
+     {
+      "mean": 0.38228329117012405
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 1,
+    "cells": 0.2,
+    "frames": 1126
+   },
+   "rafMs": 108.28472222222223,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  },
+  "s05": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 0.7533975604114701,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.7533975604114701
+     },
+     {
+      "mean": 0.3826980409210391
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "cells": 0.2,
+    "frames": 1147
+   },
+   "rafMs": 102.06937561942517,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  },
+  "s07": {
+   "val": 0.7,
+   "picked": true,
+   "sliderVal": "0.7",
+   "st": {
+    "mean": 0.7420800365612537,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.7420800365612537
+     },
+     {
+      "mean": 0.38271580437542363
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.7,
+    "cells": 0.2,
+    "frames": 1099
+   },
+   "rafMs": 138.07270916334662,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  }
+ }
+}
