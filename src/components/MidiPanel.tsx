@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Download, FolderOpen, Trash2, Radio, Zap } from 'lucide-react';
+import { X, Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel, type MidiAction, type MidiTarget } from '../lib/midi';
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
+import { ControllerSurface } from './ControllerSurface';
+import { SURFACES, surfaceFor } from '../lib/controllerSurface';
 
 /**
  * The MIDI panel: turn the controller on, pick a factory map or teach it
@@ -21,6 +23,11 @@ const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[10px] f
 
 export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
+  // The controller drawn to scale: the fastest way to make a map, and the
+  // cheat sheet to read during a show. Falls back to the first surface we
+  // know so a map can be built before the hardware arrives.
+  const [showSurface, setShowSurface] = useState(false);
+  const surface = surfaceFor(midi.activeInputName) ?? SURFACES[0];
   const [encoder, setEncoder] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -54,6 +61,9 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
       className="fixed top-0 left-0 w-80 h-full bg-black/80 backdrop-blur-xl border-r border-white/10 z-40 overflow-y-auto p-8 pt-28 scrollbar-hide text-white"
       data-testid="midi-panel"
     >
+      {showSurface && (
+        <ControllerSurface midi={midi} presets={presets} surface={surface} onClose={() => setShowSurface(false)} />
+      )}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold tracking-tighter flex items-center gap-2"><Sliders size={18} /> MIDI</h2>
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close MIDI">
@@ -125,6 +135,14 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
               try { await midi.importFile(f); } catch (err) { setFileError(err instanceof Error ? err.message : 'Could not read that file.'); }
             }} />
         </div>
+        <button
+          onClick={() => setShowSurface(true)}
+          className={`${chip(false)} w-full mt-1.5 flex items-center justify-center gap-1.5`}
+          title="The controller drawn to scale: assign by touching a control, and keep the picture as a cheat sheet"
+          data-testid="midi-surface-open"
+        >
+          <LayoutGrid size={11} /> {surface.name} picture
+        </button>
         {fileError && <p className="text-[10px] text-red-300 mt-2" data-testid="midi-file-error">{fileError}</p>}
         <p className="text-[9px] text-white/40 mt-2" data-testid="midi-binding-count">{midi.map.bindings.length} bindings{midi.map.device ? ` · made on ${midi.map.device}` : ''}</p>
       </div>
