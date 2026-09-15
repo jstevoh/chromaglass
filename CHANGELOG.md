@@ -120,6 +120,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — one thread, found by walking the boundary out
+- A wide *steep* band still stacked four or five threads, at the default and not only at
+  full strength, and no threshold closed it without taking the real boundaries too: the
+  band is as steep per cell as a real boundary, so nothing sampled at the pixel tells them
+  apart. What it has that a boundary does not is **more than one level crossing across the
+  one change** — because the spacing came from a fixed ±4-cell window whose ends fall
+  inside a change that wide, so the level repeats
+- The pass now walks out along the normal, two cells at a time, while the colour is still
+  changing at a boundary's rate, and draws a single thread at the middle of the whole
+  change. There is one middle, so there is one thread, whatever the band's width. The
+  repeating level and its frequency are gone
+- One thread carries what a stack used to, so it is drawn bolder than any one line of that
+  stack was
+
 ### Changed — the steepness gate, where the plate says it belongs
 - The gate that decides whether a boundary is worth outlining opened at a colour change of
   0.03 per cell. Measured on the plate, a soft ramp changes by 0.07–0.09 a cell and only a
