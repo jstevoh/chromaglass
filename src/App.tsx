@@ -136,7 +136,15 @@ export default function App() {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [activePresetId, setActivePresetId] = useState<string | null>('classic');
+  /**
+   * The preset last applied by hand. Which preset is *active* is derived from
+   * the settings below rather than stored: it only ever differed from them
+   * transiently, and keeping it as state meant a second render of the whole
+   * app on every settings change, plus a walk over every preset comparing
+   * every key. The sequencer glides settings continuously through a show, so
+   * that ran on every frame of every transition.
+   */
+  const [pinnedPresetId, setPinnedPresetId] = useState<string | null>('classic');
   const [settings, setSettings] = useState<VisualizerSettings>(() => {
     const classic = PRESETS.find(p => p.id === 'classic');
     const base = classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
@@ -269,23 +277,7 @@ export default function App() {
     e.target.value = '';
   }, []);
 
-  // Track active preset whenever settings change. A user preset stays active
-  // while the settings still match what it saved.
   const userPresetsRef = useRef<UserPreset[]>([]);
-  useEffect(() => {
-    setActivePresetId((prev) => {
-      if (isUserPresetId(prev)) {
-        const up = userPresetsRef.current.find(p => p.id === prev);
-        if (up && Object.keys(up.settings).every(k => k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) return prev;
-      }
-      return detectActivePreset(settings);
-    });
-  }, [settings]);
-
-  // Set the initial active preset on mount.
-  useEffect(() => {
-    setActivePresetId(detectActivePreset(settings));
-  }, []);
 
   const handleSourceChange = useCallback(async (source: AudioSource) => {
     if (audioStream) {
@@ -510,6 +502,26 @@ export default function App() {
   const userPresets = useUserPresets();
   const allPresets = useMemo(() => [...PRESETS, ...userPresets.presets.map(asPreset)], [userPresets.presets]);
   userPresetsRef.current = userPresets.presets;
+  /**
+   * Which preset the plate is currently wearing, derived rather than stored.
+   *
+   * A preset applied by hand is pinned above; everything else — a slider moved,
+   * a fader ridden, a stage of the sequencer gliding a dozen settings past each
+   * other — changes the settings, and whether they still add up to a preset is
+   * a question about the settings, not a separate fact to keep in step with
+   * them. One of the user's own presets keeps its name while the settings still
+   * match what it saved, which a walk over the built-ins cannot tell.
+   */
+  const activePresetId = useMemo(() => {
+    if (isUserPresetId(pinnedPresetId)) {
+      const up = userPresets.presets.find(p => p.id === pinnedPresetId);
+      if (up && Object.keys(up.settings).every(k =>
+        k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) {
+        return pinnedPresetId;
+      }
+    }
+    return detectActivePreset(settings);
+  }, [settings, pinnedPresetId, userPresets.presets]);
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
@@ -595,21 +607,21 @@ export default function App() {
     // Likewise the Fillmore projectors, beads, cells and fingering: a preset
     // that does not ask for them gets a plain plate, not the last preset's.
     setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
-    setActivePresetId(presetId);
+    setPinnedPresetId(presetId);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);
   };
 
   const applyUserPreset = (p: UserPreset) => {
     setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
-    setActivePresetId(p.id);
+    setPinnedPresetId(p.id);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null });
   };
   const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
     const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, forSong ? currentSong : null);
-    setActivePresetId(p.id);
+    setPinnedPresetId(p.id);
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
@@ -624,7 +636,7 @@ export default function App() {
 
   /** The sequencer's stage change: the preset's dyes and style, the plate kept. */
   const adoptPreset = useCallback((presetId: string) => {
-    setActivePresetId(presetId);
+    setPinnedPresetId(presetId);
     if (isUserPresetId(presetId)) {
       // Make sure the plate knows this preset's dyes before adopting them.
       const up = userPresets.presets.find(p => p.id === presetId);
@@ -780,7 +792,7 @@ export default function App() {
       macroRelief: 0.4 + Math.random() * 0.6,
       simResolution: settings.simResolution,
     });
-    setActivePresetId(null);
+    setPinnedPresetId(null);
     // Randomize inject style for the evolve
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
     const s1 = allStyles[Math.floor(Math.random() * allStyles.length)];

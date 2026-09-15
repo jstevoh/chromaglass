@@ -29,6 +29,7 @@
     "detail": "node scripts/detail.mjs",
     "scene": "node --experimental-strip-types scripts/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
+    "qa": "npm run build && node scripts/qa.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",
     "deploy": "npx firebase-tools deploy --only hosting",
@@ -49,6 +50,7 @@
     "@types/node": "^22.14.0",
     "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.21",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
   }
