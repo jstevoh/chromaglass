@@ -120,6 +120,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Changed — the steepness gate, where the plate says it belongs
+- The gate that decides whether a boundary is worth outlining opened at a colour change of
+  0.03 per cell. Measured on the plate, a soft ramp changes by 0.07–0.09 a cell and only a
+  real boundary carries 0.2, so the gate stood open over 64 % of the laced dish and the
+  isoline stacks it was meant to stop were only being hidden by the curvature term. It
+  opens at 0.08 and is full at 0.20 now: the ramps' parallel lines go, the boundaries keep
+  their thread, and around the cyan core three or four lines become one
+- Fillmore East, 1969 goes to 0.55, which is the braid the projector desk asked for
+
 ### Changed — sharpening is off everywhere
 - The test this work set itself has been run at the grid the show actually falls to, and
   the pass fails it. At 256², where a solver cell is nearly three screen pixels and

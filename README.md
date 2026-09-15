@@ -384,19 +384,32 @@ public/
 From the clone on the machine that runs the show:
 
 ```bash
-npm run ship
+npm run show
 ```
 
-That pulls main, installs, builds, publishes the build to Firebase Hosting, and then starts the show server in the same window (Ctrl+C stops it). The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
+That pulls main, installs, builds, and starts the show server in the same window (Ctrl+C stops it). It does not publish, because pushes to `main` already deploy themselves — so a show-night run has nothing to re-publish, and no way to put a local working tree over what was released.
+
+`npm run ship` is the same thing with a deploy in the middle, for publishing from this machine when something has to be live that isn't on `main` yet. The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
 
 ## Deploying
 
 Pushes to `main` are typechecked, built and published to Firebase Hosting by
-`.github/workflows/deploy.yml`. Before the first run, add a repository secret
-named `FIREBASE_SERVICE_ACCOUNT` containing a service-account JSON key with the
-**Firebase Hosting Admin** role on the `chromaglass` project (Firebase console →
-Project settings → Service accounts → Generate new private key). Optionally add
+`.github/workflows/deploy.yml`. It authenticates with the repository secret
+`FIREBASE_SERVICE_ACCOUNT`, a service-account JSON key with the **Firebase
+Hosting Admin** role on the `chromaglass` project (Firebase console → Project
+settings → Service accounts → Generate new private key) — already set, and
+recreated the same way if the key is ever rotated. Optionally add
 `VITE_FINGERPRINT_PROXY_URL` to enable automatic song identification.
+
+A run that cannot find the secret fails rather than passing without publishing,
+so a green check on `main` means the site moved.
+
+Deploying by hand authenticates as you (`npx firebase-tools login`, once) rather
+than with that key, and lands on the same live channel: last write wins, and the
+workflow's concurrency guard cannot see it coming. It also publishes whatever is
+in the working tree, uncommitted work included, leaving no record of what went
+up — so prefer letting `main` do it. Firebase console → Hosting → Release
+history → **Rollback** undoes a release that shouldn't have happened.
 
 To deploy by hand instead:
 
