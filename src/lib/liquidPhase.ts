@@ -72,6 +72,24 @@ const EDGE_HOLD = 0.9;
 /** The most any of this may add to a cell in one step, as a velocity. */
 const MAX_FORCE = 0.22;
 
+/**
+ * How much of the plate, on average, one channel may claim before the dish is
+ * considered full of that liquid.
+ *
+ * A show that runs itself adds liquid every few seconds and never pours any of
+ * it out, so without a ceiling an hour of automated glycerine ends with `body`
+ * near 1 in every cell — and a plate that is thick everywhere is not a thick
+ * plate, it is a stopped one. Worse for soap: the Marangoni force is a
+ * *gradient*, so a plate that is uniformly soaped has no force left in it at
+ * all. Both failures look the same from the front — the liquid stops doing the
+ * thing it was added for, and the only way back is a clear.
+ *
+ * So the automation asks `headroom()` before it doses, and stops adding as the
+ * mean approaches these. Nothing clamps a hand on the dropper: a person who
+ * wants a plate of solid glycerine can still make one.
+ */
+const CEILING = { soap: 0.35, body: 0.3, repel: 0.45 };
+
 export class LiquidPhase {
   readonly size: number;
   /** Tension broken, 0..1. */
@@ -84,6 +102,8 @@ export class LiquidPhase {
   private readonly scratch: Float32Array;
   /** True while any channel holds anything worth spending a pass on. */
   private live = false;
+  /** Sum of each channel over the plate, kept current by `deposit` and `step`. */
+  private readonly totals = { soap: 0, body: 0, repel: 0 };
 
   constructor(size: number) {
     this.size = size;
@@ -103,7 +123,27 @@ export class LiquidPhase {
     this.soap.fill(0);
     this.body.fill(0);
     this.repel.fill(0);
+    this.totals.soap = this.totals.body = this.totals.repel = 0;
     this.live = false;
+  }
+
+  /**
+   * How much room is left for a deposit of this shape, 0..1.
+   *
+   * The tightest of the channels it would write to, so a liquid that is part
+   * soap and part repel is held back by whichever of the two the plate has
+   * had enough of. Automation multiplies its dose by this; a person does not
+   * have to ask.
+   */
+  headroom(what: LiquidDeposit): number {
+    const cells = (this.size - 2) * (this.size - 2);
+    let room = 1;
+    for (const key of ['soap', 'body', 'repel'] as const) {
+      if (!what[key]) continue;
+      const mean = this.totals[key] / cells;
+      room = Math.min(room, 1 - Math.min(1, mean / CEILING[key]));
+    }
+    return room;
   }
 
   /**
@@ -130,10 +170,11 @@ export class LiquidPhase {
         const w = 1 - Math.sqrt(d2) / r;
         const i = x + y * s;
         // Saturating rather than summing: a second drop of soap on the same
-        // spot cannot break the tension by more than all of it.
-        if (soap) this.soap[i] = Math.min(1, this.soap[i] + soap * w);
-        if (body) this.body[i] = Math.min(1, this.body[i] + body * w);
-        if (repel) this.repel[i] = Math.min(1, this.repel[i] + repel * w);
+        // spot cannot break the tension by more than all of it. What actually
+        // lands is the difference, which is what the running totals are told.
+        if (soap) { const v = Math.min(1, this.soap[i] + soap * w); this.totals.soap += v - this.soap[i]; this.soap[i] = v; }
+        if (body) { const v = Math.min(1, this.body[i] + body * w); this.totals.body += v - this.body[i]; this.body[i] = v; }
+        if (repel) { const v = Math.min(1, this.repel[i] + repel * w); this.totals.repel += v - this.repel[i]; this.repel[i] = v; }
       }
     }
     this.live = true;
@@ -149,17 +190,15 @@ export class LiquidPhase {
    */
   step(vx: Float32Array, vy: Float32Array, disp: number, dt: number): void {
     if (!this.live) return;
-    const s = this.size;
     const keep = {
       soap: Math.exp(-dt / DECAY_SECONDS.soap),
       body: Math.exp(-dt / DECAY_SECONDS.body),
       repel: Math.exp(-dt / DECAY_SECONDS.repel),
     };
-    let any = 0;
-    for (const [field, k] of [[this.soap, keep.soap], [this.body, keep.body], [this.repel, keep.repel]] as const) {
-      any += this.advectDecay(field, vx, vy, disp, k);
-    }
-    this.live = any > 0;
+    this.totals.soap = this.advectDecay(this.soap, vx, vy, disp, keep.soap);
+    this.totals.body = this.advectDecay(this.body, vx, vy, disp, keep.body);
+    this.totals.repel = this.advectDecay(this.repel, vx, vy, disp, keep.repel);
+    this.live = this.totals.soap + this.totals.body + this.totals.repel > 0;
   }
 
   /** One channel: semi-Lagrangian backtrace, then decay. Returns what is left. */

@@ -1418,4 +1418,192 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
+
+  // ── Three that could not exist before the liquids did ──────────────
+  //
+  // Every preset above is a set of numbers describing how the plate behaves.
+  // These three are looks where the *liquid on the plate* is the subject, so
+  // they lean on the soap, body and repel field rather than on the solver's
+  // own tuning. Each is close to something a person can put on a table.
+  {
+    id: 'milk-marble',
+    name: 'Milk Marbling',
+    description: 'The kitchen-table experiment: four spots of food colouring sitting still on a dish of milk until a drop of soap sends them running for the rim.',
+    settings: {
+      // The dish does almost nothing on its own. Turbulence, buoyancy, heat
+      // and rotation are all near zero, because if the plate is already
+      // churning then the soap arriving is just one more thing moving. The
+      // entire look is the contrast between a plate that is *dead still* and
+      // the half second after the soap lands.
+      globalSpeed: 0.03,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.45,
+      rotationSpeed: 0.0,
+      centerGravity: 0.0,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      surfaceTension: 0.3,         // the spots hold as spots until something breaks them
+      diffusionRate: 0.00004,      // near-zero: food colouring on milk does not bleed on its own
+      buoyancy: 0.05,
+      advection: 0.5,
+      damping: 0.985,
+      heatDecay: 0.995,
+      automateRate: 0.07,          // a drop of soap now and then, not a stream of it
+      platePressure: 0.1,
+      glassSmear: 0.1,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.9,               // the colours stay four colours, not one brown one
+      heatIntensity: 0.02,
+      boilingPoint: 0.98,
+      evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
+      airVelocity: 0.0,
+      vibrationFrequency: 0.0,
+      sensitivity: 0.5,
+      audioImpact: 0.3,            // the beat is when a drop lands, not a shove of its own
+      turbulenceScale: 0.05,
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.7,
+      boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
+      saturationBoost: 1.5,
+      glossiness: 0.05,
+      postBlurRadius: 0.1,
+      dyeBudget: 1.0,
+      edgeRelief: 0.3,
+      bubbles: 0.0,
+      plateRock: 0.1,
+      beatSqueeze: 0.25,
+      layerScaleVariety: 0.0,
+      hueJourney: 0,               // four food colourings, and they stay those four
+      lightPlay: 0.2,
+      lampHotspot: 0.35,
+      iridescence: 0,
+      secondLamp: 0,
+      audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
+    }
+  },
+  {
+    id: 'soap-film',
+    name: 'Soap Film',
+    description: 'One sheet of interference colour, torn open again and again: each hole rushes outward, thins to a rim, and curls into filaments before the next one lands.',
+    settings: {
+      // Thin-film optics over a plate whose only event is the tear. The film
+      // has to be thin for the colour to be there at all, which is also what
+      // makes it easy to break — so evaporation runs high and the dye budget
+      // low, and the soap keeps re-opening what the flow closes.
+      globalSpeed: 0.04,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.3,
+      rotationSpeed: 0.004,
+      centerGravity: 0.08,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      surfaceTension: 0.06,        // low: the film is what tension is missing from
+      diffusionRate: 0.00009,
+      buoyancy: 0.2,
+      advection: 0.6,              // the rush has to actually carry the dye
+      damping: 0.982,
+      heatDecay: 0.99,
+      automateRate: 0.2,           // tears often — this is the one preset that wants soap
+      platePressure: 0.2,
+      glassSmear: 0.35,
+      rainDrip: 0.0,
+      viscosity: 'thin',
+      polarity: 0.5,
+      heatIntensity: 0.08,
+      boilingPoint: 0.9,
+      evaporationRate: 0.006,      // a film that is always thinning is always about to go
+      airVelocity: 0.05,
+      vibrationFrequency: 0.05,
+      sensitivity: 0.55,
+      audioImpact: 0.5,
+      turbulenceScale: 0.3,        // some vorticity, so the fronts curl instead of ringing
+      turbulenceDetail: 3,
+      blobSurfaceTension: 0.2,
+      boundaryContrast: 0.7,       // the rim of a hole is the brightest thing in frame
+      saturationBoost: 1.35,
+      glossiness: 0.2,
+      postBlurRadius: 0.2,
+      dyeBudget: 0.5,
+      edgeRelief: 0.55,
+      bubbles: 0.1,
+      plateRock: 0.25,
+      beatSqueeze: 0.4,
+      layerScaleVariety: 0.0,
+      hueJourney: 7,
+      lightPlay: 0.6,
+      lampMotion: 0.2,
+      lampHotspot: 0.45,
+      iridescence: 0.75,           // the reason a soap film is worth looking at
+      thinFilm: 0.6,
+      secondLamp: 0,
+      audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
+    }
+  },
+  {
+    id: 'glycerine-drift',
+    name: 'Glycerine Drift',
+    description: 'Bands of deep dye drifting against each other, with thick patches that simply refuse to go along — the plate slides past them and shears.',
+    settings: {
+      // A plate with a real current in it and nothing to stop the current
+      // except the glycerine itself. Damping and advection both run high so
+      // the bands keep moving for minutes; what makes the picture is the
+      // handful of places that do not move with them.
+      globalSpeed: 0.025,
+      layerCount: 2,
+      blendMode: 'screen',
+      gooeyEffect: 0.55,
+      rotationSpeed: 0.006,
+      centerGravity: 0.0,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      surfaceTension: 0.12,
+      diffusionRate: 0.0001,
+      buoyancy: 0.15,              // sideways, not upward: this is shear, not convection
+      advection: 0.7,
+      damping: 0.992,              // the current has to survive long enough to shear something
+      heatDecay: 0.994,
+      automateRate: 0.1,
+      platePressure: 0.15,
+      glassSmear: 0.45,            // the smear reads as the drift
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.75,
+      heatIntensity: 0.05,
+      boilingPoint: 0.95,
+      evaporationRate: 0.002,
+      airVelocity: 0.08,
+      vibrationFrequency: 0.0,
+      sensitivity: 0.45,
+      audioImpact: 0.4,
+      turbulenceScale: 0.18,       // low: a smooth current shows a stuck patch, a rough one hides it
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.45,
+      boundaryContrast: 0.35,
+      saturationBoost: 1.5,
+      glossiness: 0.1,
+      postBlurRadius: 0.25,
+      dyeBudget: 0.9,
+      edgeRelief: 0.35,
+      bubbles: 0.05,
+      plateRock: 0.45,             // the rock is what supplies the current
+      beatSqueeze: 0.3,
+      layerScaleVariety: 0.3,
+      hueJourney: 9,
+      lightPlay: 0.4,
+      lampMotion: 0.35,
+      lampHotspot: 0.4,
+      iridescence: 0.1,
+      secondLamp: 0.25,
+      audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
+    }
+  },
 ];

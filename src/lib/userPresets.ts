@@ -32,6 +32,8 @@ export interface UserPreset {
   contract?: number[];
   /** How the automation injects: 'drop' | 'pour' | 'spray' | 'splatter' | 'streak'. */
   injectStyles?: string[];
+  /** What is in the dish, as liquid ids. Absent means dye and nothing else — which is every preset saved before liquids existed. */
+  liquids?: string[];
   /** The song this look was made for: it is applied when that song is identified. */
   song?: SongRef;
 }
@@ -54,6 +56,7 @@ export function makeUserPreset(
   settings: VisualizerSettings,
   contract: number[] | null,
   injectStyles: string[] | null,
+  liquids: string[] | null = null,
   song: SongRef | null = null,
 ): UserPreset {
   return {
@@ -66,6 +69,7 @@ export function makeUserPreset(
     settings: cleanSettings(settings),
     contract: contract && contract.length ? [...contract] : undefined,
     injectStyles: injectStyles && injectStyles.length ? [...injectStyles] : undefined,
+    liquids: liquids && liquids.length ? [...liquids] : undefined,
     song: song ?? undefined,
   };
 }
@@ -107,6 +111,7 @@ export function parsePresetFile(text: string): UserPreset {
     settings: cleanSettings(o.settings),
     contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 16).slice(0, 8) : undefined,
     injectStyles: Array.isArray(o.injectStyles) ? o.injectStyles.filter((s): s is string => typeof s === 'string').slice(0, 6) : undefined,
+    liquids: Array.isArray(o.liquids) ? o.liquids.filter((s): s is string => typeof s === 'string').slice(0, 8) : undefined,
     song: parseSongRef(o.song),
   };
 }

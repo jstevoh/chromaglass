@@ -21,6 +21,11 @@
  *   glycerine  the liquid crawls where it lies while the plate around it flows
  *   milk       a pool of it holds an edge instead of feathering out
  *   silicone   it opens a clear disc rather than colouring one
+ *
+ * And one that is about the app rather than the physics: a show that runs
+ * itself for an hour and doses the plate the whole time must not end up with
+ * a plate that is uniformly thick, which is a stopped plate rather than a
+ * thick one.
  */
 
 import { LiquidPhase } from '../src/lib/liquidPhase.ts';
@@ -226,7 +231,61 @@ function spread(density) {
   check('and the dye is pushed out, not destroyed', ring > after);
 }
 
-// ── 6. What it costs ─────────────────────────────────────────────────
+// ── 6. An automated show cannot dose the plate solid ─────────────────
+//
+// Two rates, because the interesting failure is not at the rate the app uses.
+// At four doses a second the decay alone holds the field low and the ceiling
+// never binds — worth measuring so the number is on the record rather than
+// assumed. At one full-strength dose every frame, decay loses, and without a
+// ceiling the plate ends thick in every cell: `body` near 1 everywhere is not
+// a thick plate, it is a stopped one, and uniform soap has no gradient left to
+// pull with at all. So the ceiling is checked where it actually bites.
+{
+  const WHAT = { body: 1 };
+  /** Dose every `every` frames at `dose`, optionally asking for headroom first. */
+  const soak = (every, dose, useHeadroom, seconds) => {
+    const ph = new LiquidPhase(N);
+    const p = plate({ flow: 0.01 });
+    const steps = Math.round(seconds / DT);
+    for (let s = 0; s < steps; s++) {
+      if (s % every === 0) {
+        const room = useHeadroom ? ph.headroom(WHAT) : 1;
+        ph.deposit(6 + Math.random() * (N - 12), 6 + Math.random() * (N - 12), 6, WHAT, dose * room);
+      }
+      p.addVx.fill(0); p.addVy.fill(0); p.mul.fill(1);
+      ph.apply(p.addVx, p.addVy, p.mul, p.vx, p.vy, p.density, DT);
+      for (let i = 0; i < p.vx.length; i++) {
+        p.vx[i] = (p.vx[i] + p.addVx[i]) * 0.99;
+        p.vy[i] = (p.vy[i] + p.addVy[i]) * 0.99;
+      }
+      ph.step(p.vx, p.vy, DISP, DT);
+    }
+    let sum = 0, thick = 0;
+    for (let j = 1; j < N - 1; j++) {
+      for (let i = 1; i < N - 1; i++) {
+        const v = ph.body[idx(i, j)];
+        sum += v;
+        if (v > 0.5) thick++;
+      }
+    }
+    const cells = (N - 2) * (N - 2);
+    return { mean: sum / cells, thick: thick / cells, room: ph.headroom(WHAT) };
+  };
+
+  const normal = soak(15, 0.35, true, 120);
+  console.log(`     ceiling: at the app's rate, 120 s leaves body averaging ${normal.mean.toFixed(3)}, ${(normal.thick * 100).toFixed(0)}% of cells thick`);
+  check('dosing at the app\'s rate settles far below the ceiling', normal.mean < 0.2, `mean ${normal.mean.toFixed(3)}`);
+  check('and almost none of the plate is thick', normal.thick < 0.05, `${(normal.thick * 100).toFixed(1)}% thick`);
+
+  const naive = soak(1, 1, false, 60);
+  const held = soak(1, 1, true, 60);
+  console.log(`     ceiling: dosing every frame, 60 s leaves body at ${naive.mean.toFixed(2)} unchecked, ${held.mean.toFixed(2)} with headroom asked`);
+  check('unchecked dosing really does fill the plate', naive.thick > 0.5, `${(naive.thick * 100).toFixed(0)}% of cells thick`);
+  check('and the ceiling holds it to a plate that still works', held.mean <= 0.33 && held.thick < naive.thick * 0.5,
+    `mean ${held.mean.toFixed(2)}, ${(held.thick * 100).toFixed(0)}% thick, ${held.room.toFixed(2)} headroom left`);
+}
+
+// ── 7. What it costs ─────────────────────────────────────────────────
 {
   const ph = new LiquidPhase(N);
   const p = plate();

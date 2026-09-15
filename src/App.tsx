@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
-import { LiquidVisualizer, LiquidVisualizerHandle, PRESET_CONTRACTS } from './components/LiquidVisualizer';
+import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
+import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -616,11 +617,11 @@ export default function App() {
     setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
     setPinnedPresetId(p.id);
     setPresetSeq(n => n + 1);
-    visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null });
+    visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null, liquids: p.liquids ?? null });
   };
   const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
-    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, forSong ? currentSong : null);
+    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
     setPinnedPresetId(p.id);
   };
   /** The song playing now, as a file would remember it. */
@@ -640,7 +641,7 @@ export default function App() {
     if (isUserPresetId(presetId)) {
       // Make sure the plate knows this preset's dyes before adopting them.
       const up = userPresets.presets.find(p => p.id === presetId);
-      if (up) visualizerRef.current?.applyPreset(presetId, { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null });
+      if (up) visualizerRef.current?.applyPreset(presetId, { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null });
       return;
     }
     visualizerRef.current?.adoptPreset(presetId);
