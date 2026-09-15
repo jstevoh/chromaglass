@@ -417,6 +417,20 @@ void main() {
   // All four channels sharpen independently: alpha carries thickness, and the
   // three absorption channels carry colour, so a red edge against blue of the
   // same thickness sharpens too — which is most of what a pour looks like.
+  // Pigment coordinates. Each texel remembers where the fluid under it came
+  // from, so a texture evaluated at those coordinates is painted on the liquid
+  // rather than on the screen. Two phases are carried at once (rg and ba) and
+  // reseeded to identity half a period apart: coordinates advected for long
+  // enough stretch into streaks, so the renderer crossfades to whichever phase
+  // is fresher, with each phase's weight at zero the moment it resets so the
+  // reset itself is invisible.
+  seedGrain: `${PRELUDE}
+uniform sampler2D u_src; uniform vec2 u_keep;   // 1 = keep this phase, 0 = reseed it
+void main() {
+  vec4 g = texture(u_src, v_uv);
+  fragColor = vec4(mix(v_uv, g.rg, u_keep.x), mix(v_uv, g.ba, u_keep.y));
+}`,
+
   sharpenDye: `${PRELUDE}
 uniform sampler2D u_dye; uniform float u_sharp;
 // How much of an interface a pair of cells straddles: 1 where both hold
@@ -544,6 +558,11 @@ export class GpuFluid {
   private pbo: { dye: WebGLBuffer; vel: WebGLBuffer; fence: WebGLSync | null }[] = [];
   private pboSlot = 0;
   private disposed = false;
+  /** Pigment coordinates: .rg is one phase, .ba the other. Null without float render targets. */
+  private grain: PingPong | null = null;
+  /** Seconds since this phase pair was last reseeded, and how long a phase lives. */
+  private grainAge = 0;
+  private static readonly GRAIN_PERIOD = 6;
 
   /**
    * True when this context can run the solver: float render targets, and a
@@ -618,6 +637,11 @@ export class GpuFluid {
     // match the dye's precision (the velocity passes through them too).
     this.scratchA = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
     this.scratchB = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
+    // Pigment coordinates need more precision than a half float has: a uv is
+    // near 1.0 where a 16-bit mantissa steps by about half a texel. Without
+    // full floats the field is left off and the renderer falls back to a
+    // screen-fixed grain.
+    this.grain = f32 ? this.pingPong(N, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.LINEAR) : null;
     this.readbackTarget = this.target(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
     this.deltaDye = this.texture(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
     this.deltaVel = this.texture(L, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
@@ -638,6 +662,15 @@ export class GpuFluid {
     }
     this.clearTarget(this.squeeze.read, 0.03, 0, 0, 0);
     this.clearTarget(this.squeeze.write, 0.03, 0, 0, 0);
+    if (this.grain) {
+      this.grainAge = 0;
+      for (const t of [this.grain.read, this.grain.write]) {
+        this.runInto('seedGrain', t.fbo, (u) => {
+          this.bind(u, 'u_src', this.grain!.read.tex, 0);
+          gl.uniform2f(u.get('u_keep')!, 0, 0);
+        });
+      }
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
@@ -673,6 +706,19 @@ export class GpuFluid {
       gl.uniform1f(u.get('u_hasDelta')!, 1);
     });
     this.squeeze.swap();
+  }
+
+  /** Pigment coordinates for the renderer, or null when this context cannot hold them. */
+  get grainTexture(): WebGLTexture | null { return this.grain ? this.grain.read.tex : null; }
+
+  /**
+   * How much of the second phase to show. Each phase's weight is zero at the
+   * moment it resets and one at the middle of its life, and the two sum to one,
+   * so neither the reset nor the crossover is visible.
+   */
+  get grainMix(): number {
+    const c = Math.cos(Math.PI * (this.grainAge / GpuFluid.GRAIN_PERIOD));
+    return c * c;
   }
 
   /** One solver step. Call applyDeltas first when there is anything to add. */
@@ -759,6 +805,31 @@ export class GpuFluid {
         gl.uniform1f(u.get('u_sharp')!, p.sharpness);
       });
       this.dye.swap();
+    }
+
+    // 9.6. Pigment coordinates ride along with the dye, so granulation is
+    // painted on the liquid instead of on the glass.
+    if (this.grain) {
+      this.run('advect', this.grain.write, (u) => {
+        this.bind(u, 'u_src', this.grain!.read.tex, 0);
+        this.bind(u, 'u_vel', this.vel.read.tex, 1);
+        gl.uniform1f(u.get('u_disp')!, disp);
+      });
+      this.grain.swap();
+      const P = GpuFluid.GRAIN_PERIOD;
+      const before = this.grainAge;
+      this.grainAge = (this.grainAge + p.dt) % P;
+      // One phase resets at the start of the period, the other halfway through.
+      const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
+      const keepA = crossed(before, this.grainAge, 0) && this.grainAge < P * 0.5 ? 0 : 1;
+      const keepB = before < P * 0.5 && this.grainAge >= P * 0.5 ? 0 : 1;
+      if (keepA === 0 || keepB === 0) {
+        this.run('seedGrain', this.grain.write, (u) => {
+          this.bind(u, 'u_src', this.grain!.read.tex, 0);
+          gl.uniform2f(u.get('u_keep')!, keepA, keepB);
+        });
+        this.grain.swap();
+      }
     }
 
     // 10. Decay: damping, speed limit, evaporation, cap, heat decay
@@ -899,6 +970,7 @@ export class GpuFluid {
     }
     for (const s of this.pbo) { gl.deleteBuffer(s.dye); gl.deleteBuffer(s.vel); if (s.fence) gl.deleteSync(s.fence); }
     this.pbo = [];
+    if (this.grain) for (const t of [this.grain.read, this.grain.write]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
     for (const t of [this.div, this.scratchA, this.scratchB, this.readbackTarget]) {
       gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex);
     }

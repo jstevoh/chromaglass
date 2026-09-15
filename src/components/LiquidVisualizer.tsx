@@ -2185,6 +2185,12 @@ uniform float u_kaleido;           // mirror folds (0 = off, else 2/4/6)
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
+uniform sampler2D u_grain0;         // pigment coordinates, lead plate: .rg one phase, .ba the other
+uniform sampler2D u_grain1;
+uniform float u_grainOn;           // 1 when the solver is carrying the coordinates
+uniform float u_grainMix;          // crossfade between the two phases
+uniform float u_granulation;       // how strongly the pigment separates
+uniform float u_grainScale;        // grain lattice cells across the plate
 uniform sampler2D u_beadTex;       // oil beads: interiors in red, rims in green (fluid uv)
 uniform float u_beads;             // how much of them
 uniform float u_dishSpread;        // each layer its own dish, spread apart like three projectors
@@ -2486,6 +2492,27 @@ float fbm3(vec2 p) {
   float a = 0.5, sum = 0.0;
   for (int i = 0; i < 3; i++) { sum += a * vnoise(p); p *= 2.07; a *= 0.5; }
   return sum * 1.14;   // ~0..1
+}
+
+/**
+ * Pigment texture, painted on the liquid rather than on the glass.
+ *
+ * Heavy pigment does not stay in suspension: it separates into a fine speckle
+ * that is part of why a filmed pour carries texture everywhere and not only at
+ * its boundaries. The coordinates come from the solver, which carries them
+ * along with the flow, so the speckle travels with the dye instead of swimming
+ * under it. Two phases are blended because coordinates advected for long enough
+ * stretch into streaks; see seedGrain in gpuFluid.ts.
+ */
+float grainAt(vec2 p) {
+  // Mostly one octave: an fbm puts its energy two octaves up, which lands the
+  // speckle at a pixel or two and reads as video noise rather than as pigment.
+  return vnoise(p) * 0.78 + vnoise(p * 2.13 + 11.7) * 0.22;
+}
+float pigmentGrain(sampler2D grainTex, vec2 fuv) {
+  vec2 a = fuv, b = fuv;
+  if (u_grainOn > 0.5) { vec4 g = texture(grainTex, fuv); a = g.rg; b = g.ba; }
+  return mix(grainAt(a * u_grainScale), grainAt(b * u_grainScale), u_grainMix) - 0.5;
 }
 
 // Satellite droplets: the hundreds of tiny beads that sit on the glass around
@@ -2925,6 +2952,12 @@ void main() {
     fluid0.a *= dish0.x;
   }
 
+  // Pigment separates into a speckle; it rides on the thickness, so the colour
+  // and the lighting follow it rather than it being painted over the top.
+  if (u_granulation > 0.002 && fluid0.a > 0.004) {
+    fluid0.a = max(0.0, fluid0.a * (1.0 + u_granulation * pigmentGrain(u_grain0, fuv0) * 1.6));
+  }
+
   // Gooey contrast on alpha
   if (useBlur && fluid0.a > 0.0) {
     float contrast = 1.2 + u_gooey * 4.0;
@@ -3043,6 +3076,10 @@ void main() {
     if (u_dishSpread > 0.001 && !macro) {
       dish1 = layerDish(uvScreen, 1, u_resolution.x / u_resolution.y);
       fluid1.a *= dish1.x;
+    }
+
+    if (u_granulation > 0.002 && fluid1.a > 0.004) {
+      fluid1.a = max(0.0, fluid1.a * (1.0 + u_granulation * pigmentGrain(u_grain1, fuv1) * 1.6));
     }
 
     if (useBlur && fluid1.a > 0.0) {
@@ -3375,6 +3412,7 @@ void main() {
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
+      'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
       'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
       'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
     ];
@@ -4474,6 +4512,30 @@ void main() {
             }
           }
 
+          // Pigment coordinates, one plate per unit (12 and 13). A layer without
+          // them (the CPU solver, or a context without float render targets)
+          // leaves the unit on the bead mask and the shader falls back to a
+          // screen-fixed grain, which is why u_grainOn is per-frame, not per-layer.
+          let grainOn = 0;
+          {
+            const lead = fluidsRef.current[0];
+            const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
+            if (gran > 0.002) {
+              for (let l = 0; l < 2; l++) {
+                const tex = fluidsRef.current[l]?.gpu?.grainTexture ?? null;
+                if (!tex) continue;
+                glCtx.activeTexture(glCtx.TEXTURE12 + l);
+                glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+                if (l === 0) grainOn = 1;
+              }
+              // The second plate borrows the lead's coordinates when it has none.
+              if (grainOn && !fluidsRef.current[1]?.gpu?.grainTexture) {
+                glCtx.activeTexture(glCtx.TEXTURE13);
+                glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
+              }
+            }
+          }
+
           // The oil beads' mask: bound every frame on its own unit (11; the
           // camera pass owns 9 and 10), uploaded when the beads moved. A unit
           // left pointing at the camera's scene texture made every draw with
@@ -4597,6 +4659,8 @@ void main() {
             glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
             glCtx.uniform1i(uLocs['u_film'], 8);
             glCtx.uniform1i(uLocs['u_beadTex'], 11);
+            glCtx.uniform1i(uLocs['u_grain0'], 12);
+            glCtx.uniform1i(uLocs['u_grain1'], 13);
             glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
             glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
             glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
@@ -4651,6 +4715,10 @@ void main() {
           const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
           if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
           const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
+          glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
+          glCtx.uniform1f(uLocs['u_grainMix'], fluidsRef.current[0]?.gpu?.grainMix ?? 0);
+          glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
+          glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
           glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
           if (cam) {
             cam.bindTarget(canvas.width, canvas.height);

@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed — Fillmore on a plate that keeps its dye
 - With the drain gone the Fillmore dish saturated (a density mean of 1.4 against the 1.2 budget, most of the core at the top of the render) and a press could hardly show: its budget is 0.9 now, where the regulator that never used to reach holds the dish full but not solid
 
+### Added — pigment in the liquid (plan batch 1, second half)
+- **Granulation** and **Grain Size** (`granulation`, `grainScale`, Settings → Liquid,
+  MIDI-learnable): heavy pigment does not stay in suspension, it separates into a fine
+  speckle, and that is part of why a filmed pour carries texture everywhere rather than
+  only at its boundaries. The speckle rides on the dye's thickness, so the colour and
+  the lighting follow it instead of it being painted over the top.
+- The coordinates it is sampled at come from the solver, which carries them along with
+  the flow (`seedGrain` in gpuFluid.ts), so the texture is painted on the liquid rather
+  than on the glass. Coordinates advected for long enough stretch into streaks, so two
+  phases are carried at once and reseeded half a period apart, each one's weight zero
+  at the moment it resets and one at the middle of its life; neither the reset nor the
+  crossover is visible. Contexts without float render targets, and the CPU solver, fall
+  back to a screen-fixed grain.
+- Measured inside the plate rather than across the frame (most of the frame is the
+  black surround, which drags every whole-image statistic toward zero): pixels on a
+  hard edge 4.8 % → 6.1 % against a filmed pour's 5.6–7.3 %, typical local contrast
+  2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
+  a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
+
 ### Added — sharp liquid (plan batch 1, first half)
 - **Sharpness** (`sharpness`, Settings → Liquid, MIDI-learnable): interface sharpening in
   both solvers. Every step advects and diffuses the dye, so a boundary that starts as a

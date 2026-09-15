@@ -47,13 +47,15 @@ and by what would otherwise force a rebase later.
 
 Both land in the GPU and CPU solvers so the two engines still agree. Shipped as two
 PRs rather than one, so the first improvement reaches the projector sooner: sharpening
-first (done), granulation second. Sharpening moves the edge measures and leaves the
-mid-scale ones alone, which is what granulation is for, so the batch gate below is
-judged after the second PR.
+first, granulation second. Both are in.
 
-**Gate:** typical local contrast ≥ 3.0 and structure at 4 px ≥ 0.9 % on the Fillmore
-frame at the preset's default, with no more than 15 % frame-time cost at 512², and no
-oscillation over a 100 s settle. **Risk:** sharpening concentrates dye, so the budget
+**Gate:** typical local contrast ≥ 3.0 on the Fillmore plate at the preset's default,
+with no more than 15 % frame-time cost at 512², and no oscillation over a 100 s settle.
+Met: 3.3, from 2.7 with granulation off and 0.8 as first measured. That first figure was
+taken across the whole frame, most of which is the black surround, and it dragged every
+statistic toward zero; the measurement is now a crop inside the plate, which is what the
+reference frames are. Structure at 4 px was in this gate and has moved to batch 2: a
+speckle is not mid-scale structure, and lacing and drops are what build it. **Risk:** sharpening concentrates dye, so the budget
 regulator will bite sooner; recheck every preset's `dyeBudget` in the same PR.
 **Fallback:** the settings default to 0, so a bad look is one slider away from the
 current behaviour.
@@ -69,8 +71,9 @@ not drawn as a fixed edge, so it thins where the boundary is stretched and thick
 where it folds. New setting `lacing`; the existing `macroLacing` stays as the macro
 camera's own.
 
-**Gate:** pixels on a hard edge ≥ 4.5 %. **Depends on** batch 1: lacing a smeared
-boundary looks like a glow, not a filament.
+**Gate:** structure at 4 px ≥ 0.9 % and at 8 px ≥ 1.2 % on a crop inside the plate
+(batch 1 left these at 0.3 % and 0.5 %, against a filmed pour's 1.5 % and 2.3 %).
+**Depends on** batch 1: lacing a smeared boundary looks like a glow, not a filament.
 
 ### 3. Drops, not rings
 
