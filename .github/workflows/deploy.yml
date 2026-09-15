@@ -55,23 +55,22 @@ jobs:
         env:
           VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
 
-      # Until the secret is added, build and typecheck still run and the job
-      # stays green — a red X on main for setup that hasn't happened yet is
-      # noise, not a signal.
+      # The secret exists now, so a run that builds but cannot publish means it
+      # was removed or renamed. That is worth a red X: it used to be pending
+      # setup, and green-but-not-deployed is the one state nobody would notice.
       - name: Check for deploy credentials
-        id: creds
-        run: echo "present=${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error title=Not deployed::FIREBASE_SERVICE_ACCOUNT is not set, so the build cannot be published. See the setup notes at the top of .github/workflows/deploy.yml."
+            exit 1
+          fi
 
       - name: Deploy to Firebase Hosting
-        if: steps.creds.outputs.present == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: chromaglass
           channelId: live
-
-      - name: Deploy skipped
-        if: steps.creds.outputs.present != 'true'
-        run: |
-          echo "::warning title=Not deployed::FIREBASE_SERVICE_ACCOUNT is not set, so the build was not published. See the setup notes at the top of .github/workflows/deploy.yml."
