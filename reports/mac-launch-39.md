@@ -26,7 +26,56 @@
 - The key changed, so any of James's tabs or displays still holding key 7594 need a reload with 9281. I left James's Chrome and the projector alone.
 - **Load:** GPU utilisation 99 % and load average 5.3–5.5 at the start (MOTIV Mix, James's Chrome, WindowServer). That is the same as #37, so timings below are compared by frames, not seconds.
 
-## 2. The grain (first result; the sweep and the crossover watch are running)
+## 2. The grain (default and crossover below; the sweep is still running)
+
+### Crossover — **no pulse and no jump that I can see; the designed dip is there but small**
+
+Method: `grain39.mjs` samples in-page every 3 frames for 1000 frames after the 2-min capture. Each sample logs `grainAge`, `grainMix` and the high-pass energy in the small dish and the core. There were 333 samples over frames 1635–2631, covering 4.9 s of simulation clock including one reseed of each phase.
+
+- **Where the dip should be:** a linear mix of two independent speckle fields would lose contrast to √(w² + (1−w)²), which is 0.71 at `grainAge` 1.5 and 4.5.
+- **What I measured (small dish):**
+
+| `grainAge` bin | 0.0 | 0.5 | 1.0 | 1.5 | 2.5 | 3.0 | 3.5 | 4.0 | 4.5 | 5.0 | 5.5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| designed contrast | 0.98 | 0.86 | 0.74 | 0.71 | 0.99 | 0.98 | 0.87 | 0.74 | 0.74 | 0.87 | 0.98 |
+| small-dish high-pass | 4.04 | 3.98 | 3.92 | 3.90 | 4.14 | 4.14 | 4.13 | 4.01 | 3.97 | 4.02 | 4.06 |
+
+- **It follows the design (correlation 0.72), but shallowly.** At equal weights the energy is **0.965×** its value at one phase in the small dish and **0.92×** in the core, not 0.71×.
+  - Two phases don't make independent noise: a phase is reseeded to the grid when the other has drifted only ~1 texel (median), and a speckle at scale 110 is ~4.7 texels. So the two phases are mostly the same texture.
+  - Where the liquid is still, a reseeded phase lands on the same noise it left. In the 2× crops below, the speckles in the small dish are in the same places at mix 0, ½, 1 and ½.
+- **No jump at a reseed.** The median step between samples is 0.007 and the p99 is 0.044.
+  - The one large step (−0.148, at `grainAge` 4.36) holds its new level and does not show in the core. It lands where nothing reseeds and the weights change smoothly, so it is not the crossover. Most likely something in the composition moved in the small dish.
+- **By eye:** the 2× frames at mix 0 / ½ / 1 / ½ show no change in speckle size or strength in the small dish. In the core the picture changes only because a new orange flood spreads across it.
+
+2× small dish at mix 0, ½ rising, 1, ½ falling (`grainAge` 2.73, 4.44, 5.73, 1.45):
+
+![crossover small dish](s39-d05-cross-small.png)
+
+The same frames in the core:
+
+![crossover core](s39-d05-cross-core.png)
+
+### The default over time
+
+At 10 s, 30 s and 2 min the default is the same texture, and it is there from the first capture:
+
+| granulation 0.5, scale 110 | 10 s | 30 s | 2 min |
+|---|---|---|---|
+| frames since load | 372 | 597 | 1631 |
+| small-dish high-pass | 4.21 | 4.24 | 4.16 |
+| core high-pass | 5.05 | 5.30 | 5.08 |
+| GL errors, NaN in grain or dye | 0, 0 | 0, 0 | 0, 0 |
+| phase stretch p50 / p99 | 1.00 / 1.37 | 1.00 / 2.35 | 1.00 / 4.8–5.2 |
+
+2× core at 10 s, 30 s, 2 min:
+
+![default core over time](s39-d05-core-10-30-120.png)
+
+2× small dish at 10 s, 30 s, 2 min:
+
+![default small dish over time](s39-d05-small-10-30-120.png)
+
+### First look
 
 Fillmore, `?debug&sim=512`, granulation 0.5, grain scale 110. 10 s after the preset pick, which is 372 frames after load:
 - **GL errors: none.** A `getError` after every draw for the first 25 s after load caught nothing (#37: 4 `INVALID_OPERATION`s on `seedGrain`).
