@@ -3,6 +3,7 @@ import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
+import { GuidePanel } from './components/GuidePanel';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
@@ -175,6 +176,10 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
+  // The message handler is built once and must not go stale when a liquid's
+  // colour is edited.
+  const liquidTypesRef = useRef(liquidTypes);
+  useEffect(() => { liquidTypesRef.current = liquidTypes; }, [liquidTypes]);
 
   // ── Cast ──
   // The receiver runs its own visualizer; it is fed a snapshot of the show
@@ -916,6 +921,7 @@ export default function App() {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'b' || e.key === 'B') toggleBlackout();
+      if (e.key === '?') setShowHelp(h => !h);
       if (e.key === '+' || e.key === '=') zoomMacro(1);
       if (e.key === '-' || e.key === '_') zoomMacro(-1);
     };
@@ -1040,6 +1046,14 @@ export default function App() {
         case 'dye':
           updateLiquidColor(selectedLiquidId, message.color);
           setActiveTool('dropper');
+          break;
+        case 'liquid':
+          // Only a bottle that is actually on the bench: the pad may be a
+          // newer build than the display, or the other way round.
+          if (liquidTypesRef.current.some(l => l.id === message.id)) {
+            setSelectedLiquidId(message.id);
+            setActiveTool('dropper');
+          }
           break;
         case 'action':
           switch (message.action) {
@@ -1250,43 +1264,65 @@ export default function App() {
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
-                {/* Liquid Type Selector — always visible */}
-                <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Liquid</span>
-                  {liquidTypes.map((liq) => {
-                    const isSelected = liq.id === selectedLiquidId;
-                    return (
-                      <button
-                        key={liq.id}
-                        onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
-                        className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
-                          isSelected ? 'text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
-                        }`}
-                        style={isSelected ? {
-                          borderColor: liq.color,
-                          backgroundColor: `${liq.color}28`,
-                        } : {}}
-                      >
-                        <span
-                          className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
-                          style={{ backgroundColor: liq.color }}
-                        />
-                        <span className="text-[10px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
-                        {isSelected && (
-                          <label className="relative cursor-pointer flex-shrink-0" onClick={e => e.stopPropagation()} title="Change color">
-                            <span className="text-[9px] text-white/40 hover:text-white transition-colors px-1">color</span>
-                            <input
-                              type="color"
-                              value={liq.color}
-                              onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            />
-                          </label>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/*
+                  The bottles, in two groups — always visible.
+
+                  They used to be one flat list of nine coloured chips, which
+                  made Soap look like a pale green dye and Milk like an off-
+                  white one. Four of the nine are not colours at all: they
+                  write into a field the plate carries and go on acting for
+                  half a minute, and nothing in a flat list said so. The
+                  split, and the line of what the selected one does, are the
+                  whole difference between a menu and an instrument.
+                */}
+                {([
+                  ['Dye', liquidTypes.filter(l => !l.behaviour)],
+                  ['Changes the plate', liquidTypes.filter(l => l.behaviour)],
+                ] as const).map(([groupLabel, group]) => group.length === 0 ? null : (
+                  <div key={groupLabel} className="flex flex-col gap-1.5 w-full">
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">{groupLabel}</span>
+                    {group.map((liq) => {
+                      const isSelected = liq.id === selectedLiquidId;
+                      return (
+                        <button
+                          key={liq.id}
+                          onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
+                          title={liq.description}
+                          data-testid={`liquid-${liq.id}`}
+                          className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                            isSelected ? 'text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
+                          }`}
+                          style={isSelected ? {
+                            borderColor: liq.color,
+                            backgroundColor: `${liq.color}28`,
+                          } : {}}
+                        >
+                          <span
+                            className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
+                            style={{ backgroundColor: liq.color }}
+                          />
+                          <span className="text-[10px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
+                          {isSelected && (
+                            <label className="relative cursor-pointer flex-shrink-0" onClick={e => e.stopPropagation()} title="Change color">
+                              <span className="text-[9px] text-white/40 hover:text-white transition-colors px-1">color</span>
+                              <input
+                                type="color"
+                                value={liq.color}
+                                onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </label>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+                {selectedLiquid?.description && (
+                  <p className="text-[9px] leading-snug text-white/40 w-full -mt-1" data-testid="liquid-description">
+                    {selectedLiquid.description}
+                  </p>
+                )}
 
                 {/* Quick color swatches — one click recolors the selected liquid */}
                 <div className="flex flex-col gap-1.5 w-full">
@@ -1912,47 +1948,24 @@ export default function App() {
             className={`p-2 rounded-full transition-all text-[9px] font-bold ${
               showHelp ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60'
             }`}
-            title="Help"
+            title="About ChromaGlass — getting started, every control, and how they interact (?)"
+            data-testid="guide-button"
           >
             ?
           </button>
         </div>
       </div>
 
-      {/* ── Help Overlay ───────────────────────────────────────── */}
+      {/* ── About: the manual ─────────────────────────────────── */}
+      {/*
+        This used to be a five-line popover, and by the time anyone read it two
+        of the five lines were wrong — it still sent people to the settings
+        panel for presets months after the presets moved to the title. A short
+        help text that nobody owns rots; a manual with a section per control
+        group is at least somewhere the truth can be kept.
+      */}
       <AnimatePresence>
-        {showHelp && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-20 right-6 z-50 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl w-72"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold">How to use</h3>
-              <button onClick={() => setShowHelp(false)} className="p-1 hover:bg-white/10 rounded-full">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="flex flex-col gap-3 text-[11px] text-white/70 leading-relaxed">
-              <div>
-                <span className="text-white/90 font-bold">Click & drag</span> on the canvas to interact with the fluid. Use the <span className="text-white/90">Drop</span> tool to add color, or <span className="text-white/90">Blow</span> to push air through the liquid.
-              </div>
-              <div>
-                <span className="text-white/90 font-bold">Auto mode</span> generates drops and airflow driven by the audio input.
-              </div>
-              <div>
-                <span className="text-white/90 font-bold">Layers</span> are independent fluid simulations composited together. Switch layers to paint on different planes.
-              </div>
-              <div>
-                <span className="text-white/90 font-bold">Presets</span> are in the <Settings size={11} className="inline" /> settings panel. Tweak any slider to customize.
-              </div>
-              <div>
-                <span className="text-white/90 font-bold">Random</span> <Sparkles size={11} className="inline text-yellow-400" /> shuffles all parameters for happy accidents.
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {showHelp && <GuidePanel onClose={() => setShowHelp(false)} />}
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}

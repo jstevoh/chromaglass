@@ -296,6 +296,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
 | Camera | Settings → Camera: light show or photograph, paper colours, camera, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
+| About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
 | Preset name / Presets | The preset's name under the title, and the Presets button in the toolbar, open a menu of every preset, grouped Light show / Photograph / Closeup, with *Yours* on top; **Save current** writes the look to a `.chromaglass-preset.json` file and your library, **Load file** reads one back |

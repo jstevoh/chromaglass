@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the manual, in the app
+- **About ChromaGlass** (the `?` button, or `?` on the keyboard): a fourteen-section
+  guide — getting started, the mental model of the plate, a reference for every group
+  of controls, a section on how they interact, and a history of the app. The
+  interaction section is the one that earns it: the app has about eighty controls and
+  a dozen real couplings between them, and the couplings are what nothing else
+  documents (Dye Budget and Evaporation and Evolve Speed are one loop; Blob Surface
+  Tension does nothing at all with Polarity at zero)
+- It replaces a five-line help popover which, by the time anyone read it, had two
+  lines wrong — it was still sending people to the settings panel for presets months
+  after the presets moved to the title
+
+### Added — the bottles, where a hand can reach them
+- The dropper's nine liquids are shown in two groups, **Dye** and **Changes the
+  plate**, with the selected one's description under the list. They were one flat row
+  of coloured chips, which made Soap look like a pale green dye and Milk like an
+  off-white one — nothing said that four of the nine write into a field the plate
+  keeps acting on
+- The phone and iPad pad gained a **Bottle** row. It had dye colours only, so the
+  most performable gesture in the app — a drop of soap on a full plate — was reachable
+  from the laptop and nowhere else. A new `liquid` message sets the display's selected
+  bottle; an id the display does not know is ignored, so a newer pad and an older
+  display do not have to agree
+
 ### Added — the room in the plate (plan batch 7)
 - **The Room** (Settings → The Room): the camera has always been able to show through
   the dye as a film loop; it is read back now instead. `src/lib/sceneSense.ts` takes
