@@ -17,8 +17,10 @@
  *     cost is the size of the frame and not the size of the search radius.
  *   - a **presence mask** against a background that creeps toward the frame at
  *     a fixed rate — a running median in all but name. It survives the house
- *     lights coming up, and it holds a person who has stopped moving, which
- *     frame differencing alone cannot do.
+ *     lights coming up, and unlike frame differencing it sees a person who is
+ *     standing still. Not forever: any adaptive background eventually absorbs
+ *     someone who does not move, and it is the *tracker* that holds them
+ *     after that, by coasting a track it knows is not going anywhere.
  *   - **scalars** for everything else worth mapping: how much is happening,
  *     where, which way, how spread out, how many people, how bright the room
  *     is and what colour it is.
@@ -124,6 +126,21 @@ const MIN_AREA = 0.004;
 const MAX_AREA = 0.55;
 /** How fast the background creeps toward the frame, luma units per second. */
 const BG_RATE = 26;
+/**
+ * Seconds a track survives with no detection to match it, once it has been
+ * standing still.
+ *
+ * Any adaptive background absorbs someone who stops moving — at `BG_RATE` a
+ * figure well clear of the room takes about five seconds — and holding the
+ * background back where a person is standing only trades that for a trail of
+ * ghosts along the way they walked in. So the mask is left alone and the
+ * *tracker* does the holding: a track that was still when its detection went
+ * needs no detection to say where it is, because it is not going anywhere.
+ *
+ * It does mean the plate forgets a hand held on the glass for longer than
+ * this. Moving brings it back.
+ */
+const STILL_GRACE = 5.0;
 /** Luma distance from the background that counts as foreground. */
 const FG_THRESHOLD = 18;
 /** Frame widths per second below which a track counts as still. */
@@ -504,11 +521,14 @@ export class SceneSense {
       if (taken.has(i)) continue;
       const t = this.tracks[i];
       t.missing += dt;
-      // Carry them on at their last speed for the grace period — a person
-      // briefly lost behind someone else should not come back as a stranger.
+      // Carry them on at their last speed — a person briefly lost behind
+      // someone else should not come back as a stranger. Someone who had
+      // stopped moving is carried much longer, because the background will
+      // have absorbed them and coasting a still track is exact.
       t.x = clamp(t.x + t.vx * dt, 0, 1);
       t.y = clamp(t.y + t.vy * dt, 0, 1);
-      if (t.missing > TRACK_GRACE) this.tracks.splice(i, 1);
+      if (t.still > 0) t.still += dt;
+      if (t.missing > (t.still > 0 ? STILL_GRACE : TRACK_GRACE)) this.tracks.splice(i, 1);
     }
 
     this.out.people = this.tracks;

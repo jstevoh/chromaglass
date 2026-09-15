@@ -202,6 +202,40 @@ const wave = (px, _t, f) => {
 const LOOP_SECONDS = 40;
 const loopTrace = plateRun(mirrorBar(), LOOP_SECONDS);
 const carouselTrace = plateRun(carousel, 16);
+
+// ── A hand on the glass ─────────────────────────────────────────────
+//
+// Someone walks in, stops, and stands there. The hands path reads "moving"
+// from the track's own speed and "still" from how long it has been below it,
+// so what matters is that one id survives the stop: a track lost when a person
+// stands still would hand them a new dye every time they paused.
+function stopper() {
+  const sense = new SceneSense();
+  const frames = Math.round(8 / DT);
+  let ids = new Set(), movingFrames = 0, stillFrames = 0, lastId = null, idChanges = 0;
+  for (let f = 0; f < frames; f++) {
+    const t = f * DT;
+    const px = room(f * 7919 + 13);
+    // In from outside the frame over two seconds, then standing at 0.55 for
+    // six. Starting outside matters: anyone already there on the first frame
+    // is baked into the background and leaves a hole behind them.
+    const x = t < 2 ? -0.15 + (t / 2) * 0.7 : 0.55;
+    box(px, x, 0.3, 0.12, 0.42, 200);
+    const r = sense.push(px, N, N, DT, t * 1000, OPTS);
+    if (!r.ready || t < 0.6) continue;
+    for (const p of r.people) {
+      ids.add(p.id);
+      if (lastId !== null && p.id !== lastId) idChanges++;
+      lastId = p.id;
+      if (p.still > 0.35) stillFrames++;
+      else if (Math.hypot(p.vx, p.vy) > 0.06) movingFrames++;
+    }
+  }
+  return { ids: ids.size, idChanges, movingFrames, stillFrames };
+}
+const stop = stopper();
+console.log('');
+console.log(`walk then stand        ids ${stop.ids}, changes ${stop.idChanges}, blowing ${stop.movingFrames} readings, pressing ${stop.stillFrames}`);
 const waveTrace = plateRun(wave, 1.2);
 
 const mean = (a) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
@@ -237,6 +271,9 @@ const checks = [
   ['a fan in the corner still drives the plate', carLate > carEarly * 0.5],
   ['a wave reaches the plate inside 200 ms', !!waveOnset && waveOnset.t < 0.2],
   ['a wave moves the plate', wavePeak > 0.02],
+  ['someone walking in blows', stop.movingFrames > 8],
+  ['and presses once they stand still', stop.stillFrames > 8],
+  ['keeping the id, and the dye, across the stop', stop.ids === 1 && stop.idChanges === 0],
 ];
 
 console.log('');

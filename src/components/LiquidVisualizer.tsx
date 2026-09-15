@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeH
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
+import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
@@ -14,6 +14,14 @@ import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { SCENE_LATTICE, SCENE_MAX_PEOPLE, type SceneReading } from '../lib/sceneSense';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+
+/** Seconds a track must survive before it is allowed to touch the plate. */
+const HAND_SETTLE = 0.25;
+/** Seconds of standing still before a person becomes a palm on the glass. */
+const HAND_STILL_HOLD = 0.35;
+/** Frame widths a second above which a person is blowing rather than pressing. */
+const HAND_MOVING = 0.06;
+
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -1788,6 +1796,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * does not turn the plate into an oscillator.
    */
   const roomStirRef = useRef(new RoomStir(SCENE_LATTICE));
+  /** The reading the room's hands last acted on, so each one acts once. */
+  const lastHandsAtRef = useRef(-1);
   const gelAngleRef = useRef(0);
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -1851,6 +1861,79 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmGainRef = useRef(4.5);
 
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
+  /**
+   * A gesture from any hand, applied to the plate.
+   *
+   * The mouse, the pen, the phone pad, the gamepad, OSC, a replayed
+   * performance and — since the room camera — a person standing in front of
+   * the lens all arrive here. Keeping it one function is what lets a new kind
+   * of hand be added without teaching it about bubbles, beads or the squeeze
+   * film all over again.
+   */
+  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => {
+    const layer = g.layer ?? activeLayerRef.current;
+    const af = fluidsRef.current[layer];
+    if (!af || drainFrameRef.current > 0) return;
+    if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
+      const airy = g.tool === 'blow' || g.tool === 'press';
+      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * GRID_SCALE, airy ? 'air' : 'dye');
+    }
+    const S = GRID_SIZE;
+    const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
+    const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
+    const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
+    // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
+    const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2;
+
+    switch (g.tool) {
+      case 'blow':
+        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+        else af.blowAir(x, y, 4, 0.06 * amt);
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15 * amt) {
+          bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+        }
+        break;
+      case 'drop':
+        af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
+        af.addTemp(x, y, 0.6 * amt);
+        break;
+      case 'streak': {
+        // Directional smear along the recorded movement
+        const dx = g.dx ?? 1, dy = g.dy ?? 0;
+        const len = 8 * GRID_SCALE;
+        for (let t = -len; t <= len; t += 0.8) {
+          const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
+          if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
+          const w = 1.0 - Math.abs(t) / len;
+          af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
+          af.addVelocity(sx, sy, dx * 0.3 * w, dy * 0.3 * w);
+        }
+        break;
+      }
+      case 'press': {
+        // Pressed harder, the film thins over a wider palm.
+        const a = 0.002 + 0.004 * amt;
+        const fg = settingsRef.current.fingering ?? 0;
+        af.applySquish(x, y, 20 + 12 * amt, a, fg, true);
+        af.applySquish(x, y, 12 + 6 * amt, a, fg);
+        af.applySquish(x, y, 6, a, fg);
+        if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
+        break;
+      }
+      case 'spray':
+        af.autoInject('spray', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
+        break;
+      case 'splatter':
+        af.autoInject('splatter', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+        break;
+      case 'pour':
+        af.autoInject('pour', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+        break;
+      default: // dropper
+        af.autoInject('drop', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     drawnRect: () => drawnRectRef.current?.() ?? null,
     injectImage: (imageData: ImageData) => {
@@ -2011,69 +2094,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
       }
     },
-    applyGesture: (g) => {
-      const layer = g.layer ?? activeLayerRef.current;
-      const af = fluidsRef.current[layer];
-      if (!af || drainFrameRef.current > 0) return;
-      if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
-        const airy = g.tool === 'blow' || g.tool === 'press';
-        bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * GRID_SCALE, airy ? 'air' : 'dye');
-      }
-      const S = GRID_SIZE;
-      const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
-      const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
-      const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
-      // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
-      const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2;
-
-      switch (g.tool) {
-        case 'blow':
-          if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
-          else af.blowAir(x, y, 4, 0.06 * amt);
-          if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15 * amt) {
-            bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
-          }
-          break;
-        case 'drop':
-          af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
-          af.addTemp(x, y, 0.6 * amt);
-          break;
-        case 'streak': {
-          // Directional smear along the recorded movement
-          const dx = g.dx ?? 1, dy = g.dy ?? 0;
-          const len = 8 * GRID_SCALE;
-          for (let t = -len; t <= len; t += 0.8) {
-            const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
-            if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
-            const w = 1.0 - Math.abs(t) / len;
-            af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
-            af.addVelocity(sx, sy, dx * 0.3 * w, dy * 0.3 * w);
-          }
-          break;
-        }
-        case 'press': {
-          // Pressed harder, the film thins over a wider palm.
-          const a = 0.002 + 0.004 * amt;
-          const fg = settingsRef.current.fingering ?? 0;
-          af.applySquish(x, y, 20 + 12 * amt, a, fg, true);
-          af.applySquish(x, y, 12 + 6 * amt, a, fg);
-          af.applySquish(x, y, 6, a, fg);
-          if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
-          break;
-        }
-        case 'spray':
-          af.autoInject('spray', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
-          break;
-        case 'splatter':
-          af.autoInject('splatter', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
-          break;
-        case 'pour':
-          af.autoInject('pour', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
-          break;
-        default: // dropper
-          af.autoInject('drop', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
-      }
-    },
+    applyGesture: (g) => performGesture(g),
   }));
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
@@ -3801,12 +3822,54 @@ void main() {
         // every solver step this frame stirs from the same reading rather than
         // re-deciding. A reading that has stopped arriving is not the room.
         const roomDrive = Math.max(0, Math.min(1, currentSettings.sceneDrive ?? 0));
-        const roomReading = (() => {
-          if (roomDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
+        const roomHands = Math.max(0, Math.min(1, currentSettings.sceneHands ?? 0));
+        const roomFresh = (() => {
+          if ((roomDrive <= 0 && roomHands <= 0) || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = sceneRef?.current ?? null;
           if (!r || !r.ready) return null;
           return performance.now() - r.at < ROOM_STALE_MS ? r : null;
         })();
+        const roomReading = roomDrive > 0 ? roomFresh : null;
+
+        // ── The room's hands ───────────────────────────────────
+        // Everyone the sensor is holding is a projectionist. Standing still is
+        // a palm on the top glass, so the film thins and fingering breaks it
+        // into spokes exactly as the Press tool does; moving is a puff along
+        // the way they are going; arriving is a drop of their own dye.
+        //
+        // The dye is the point. A track's id picks from the working harmony,
+        // which is already the preset's palette contract narrowed by whatever
+        // the sequencer and the hue journey have done to it, so a person gets
+        // a colour that is stable across a set and never one the preset was
+        // not allowed. Lose the track and they come back as someone else,
+        // which reads as a new dancer rather than as a fault.
+        //
+        // Once per reading, not once per frame: the sensor runs at 20 Hz and a
+        // 120 Hz machine should not press six times as hard as a 20 Hz one.
+        if (roomFresh && roomHands > 0 && roomFresh.at !== lastHandsAtRef.current) {
+          lastHandsAtRef.current = roomFresh.at;
+          const harmony = harmonyRef.current;
+          for (const p of roomFresh.people) {
+            if (p.age < HAND_SETTLE && !p.fresh) continue;
+            const speed = Math.hypot(p.vx, p.vy);
+            const size = Math.min(1, p.area * 8);
+            const color = harmony.length ? PALETTE[harmony[p.id % harmony.length]].hex : undefined;
+
+            if (p.fresh) {
+              performGesture({ tool: 'drop', x: p.x, y: p.y, color, layer: 0, amount: roomHands * (0.35 + 0.4 * size) });
+              continue;
+            }
+            if (p.still > HAND_STILL_HOLD) {
+              performGesture({ tool: 'press', x: p.x, y: p.y, layer: 0, amount: roomHands * (0.3 + 0.7 * size) });
+            } else if (speed > HAND_MOVING) {
+              performGesture({
+                tool: 'blow', x: p.x, y: p.y,
+                dx: p.vx / speed, dy: p.vy / speed,
+                layer: 0, amount: roomHands * Math.min(1, 0.25 + speed * 2.5),
+              });
+            }
+          }
+        }
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
