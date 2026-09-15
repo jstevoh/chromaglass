@@ -12,6 +12,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
+import { SCENE_MAX_PEOPLE, type SceneReading } from '../lib/sceneSense';
 
 interface LiquidVisualizerProps {
   audioData: AudioData | null;
@@ -24,6 +25,13 @@ interface LiquidVisualizerProps {
   activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak';
   isAutomated?: boolean;
   isActive?: boolean;
+  /**
+   * What the room camera is seeing, or null when nothing is watching. A ref
+   * rather than a prop value: the reading changes twenty times a second and
+   * only the render loop reads it, so putting it in state would re-render the
+   * app around it for nothing.
+   */
+  sceneRef?: React.MutableRefObject<SceneReading | null>;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */

@@ -27,6 +27,7 @@
     "lint": "tsc --noEmit",
     "remote": "node server/remote-server.js",
     "detail": "node scripts/detail.mjs",
+    "scene": "node --experimental-strip-types scripts/scene.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",
     "deploy": "npx firebase-tools deploy --only hosting",

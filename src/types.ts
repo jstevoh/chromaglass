@@ -32,6 +32,33 @@ export interface AudioMappings {
   rotation: AudioFeature;
 }
 
+/**
+ * What the camera can tell the plate about the room, in the same shape the
+ * music already uses: a feature, something to put it on, and how deep.
+ */
+export type SceneFeature =
+  | 'none'
+  /** How much is happening, against the room's own recent range. */
+  | 'motion'
+  /** How spread out that motion is: one dancer, or the whole floor. */
+  | 'spread'
+  /** Where the motion is, 0..1 across the frame. */
+  | 'centroidX' | 'centroidY'
+  /** Which way the room is moving as a whole, −1..1, offset onto the travel. */
+  | 'dirX' | 'dirY'
+  /** How many people the sensor is holding, against the most it will hold. */
+  | 'crowd'
+  /** The room's light and its colour. */
+  | 'brightness' | 'sceneHue';
+
+export interface SceneMapping {
+  feature: SceneFeature;
+  /** Any numeric setting — the same list a MIDI fader can learn. */
+  setting: keyof VisualizerSettings;
+  /** How far the feature moves it, as a share of the setting's travel. −1..1. */
+  depth: number;
+}
+
 export interface VisualizerSettings {
   // Sound Settings
   sensitivity: number;
@@ -157,6 +184,18 @@ export interface VisualizerSettings {
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
   macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
 
+  // The room — the camera read back as a sensor rather than shown as a slide.
+  // Every one of these defaults to nothing happening: a look saved before the
+  // sensor existed is the same look after it.
+  sceneDrive: number;         // how hard the room's motion stirs the liquid (0 = off)
+  sceneHands: number;         // how strongly the people the sensor holds press and blow on the plate (0 = off)
+  sceneImpact: number;        // master depth over every scene → setting mapping
+  sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
+  sceneDeadzone: number;      // motion below this is the room breathing, not a person
+  sceneSmooth: number;        // how much the flow field is smoothed in time
+  scenePeople: boolean;       // run the presence and tracking pass (off is cheaper)
+  sceneMirror: boolean;       // flip left for right, for a camera facing the room
+
   // Solver
   simResolution: SimResolution;
 }
@@ -262,5 +301,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,
+  sceneDrive: 0,            // the room does nothing to the plate until it is asked to
+  sceneHands: 0,
+  sceneImpact: 0.5,         // the depth mappings are read at once any are added
+  sceneMappings: [],
+  sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
+  sceneSmooth: 0.35,
+  scenePeople: true,
+  sceneMirror: true,        // a camera on the desk faces the room
   simResolution: 'auto',    // GPU at 384-512² where float render targets exist, else the CPU solver
 };

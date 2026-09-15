@@ -17,6 +17,7 @@ import { SequencerPanel } from './components/SequencerPanel';
 import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
+import { useSceneCamera } from './hooks/useSceneCamera';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import type { MidiAction } from './lib/midi';
@@ -46,6 +47,13 @@ function loadMusicSettings(): MusicSettings {
 type AudioSource = 'none' | 'microphone' | 'system' | 'file';
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
+/**
+ * The room camera lives outside the settings: a preset carries how hard the
+ * room drives the plate, never whether a camera is switched on or which one.
+ * Loading someone else's look should not open your camera.
+ */
+const SCENE_ON_KEY = 'chromaglass-scene-on';
+const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
 
 // Detect which preset (if any) matches the current settings.
 function detectActivePreset(settings: VisualizerSettings): string | null {
@@ -389,6 +397,30 @@ export default function App() {
     visualizerRef.current?.clearFilm();
     setFilmSource('none');
   };
+  // ── The room ────────────────────────────────────────────────────
+  // The camera as a sensor: it stirs the plate, puts hands on it and rides
+  // whatever settings the mappings name. Off unless someone switched it on.
+  const [sceneOn, setSceneOn] = useState<boolean>(() => { try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; } });
+  const [sceneDeviceId, setSceneDeviceId] = useState<string>(() => { try { return localStorage.getItem(SCENE_DEVICE_KEY) ?? ''; } catch { return ''; } });
+  const scenePreviewRef = useRef<HTMLCanvasElement | null>(null);
+  const toggleScene = useCallback((on: boolean) => {
+    setSceneOn(on);
+    try { localStorage.setItem(SCENE_ON_KEY, on ? '1' : '0'); } catch { /* private */ }
+  }, []);
+  const chooseSceneDevice = useCallback((id: string) => {
+    setSceneDeviceId(id);
+    try { localStorage.setItem(SCENE_DEVICE_KEY, id); } catch { /* private */ }
+  }, []);
+  const scene = useSceneCamera({
+    enabled: sceneOn,
+    deviceId: sceneDeviceId,
+    mirror: settings.sceneMirror !== false,
+    deadzone: settings.sceneDeadzone ?? 0.25,
+    smooth: settings.sceneSmooth ?? 0.35,
+    people: settings.scenePeople !== false,
+    preview: scenePreviewRef,
+  });
+
   const audioData = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
@@ -1025,6 +1057,7 @@ export default function App() {
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+        sceneRef={scene.reading}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -1546,6 +1579,13 @@ export default function App() {
             projectorMode={projector.mode}
             onProjectorMode={projector.setMode}
             projectorName={projector.projector?.label ?? null}
+            sceneOn={sceneOn}
+            onSceneToggle={toggleScene}
+            sceneState={scene.state}
+            sceneDevices={scene.devices}
+            sceneDeviceId={sceneDeviceId}
+            onSceneDevice={chooseSceneDevice}
+            scenePreviewRef={scenePreviewRef}
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
