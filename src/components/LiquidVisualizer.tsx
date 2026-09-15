@@ -2660,7 +2660,11 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   // changes. Without the second test a wide soft ramp is still a span, and
   // laying threads across it draws the contour map this pass exists to avoid:
   // a fifty-cell ramp got six or seven parallel lines where it wanted none.
-  float band = smoothstep(0.05, 0.3, span) * smoothstep(0.03, 0.10, al);
+  // The threshold is where it is because it was measured rather than guessed:
+  // on a soft ramp the colour changes by 0.07-0.09 a cell, and only a real
+  // boundary carries 0.2, so a gate opening at 0.03 stood open over most of the
+  // plate.
+  float band = smoothstep(0.05, 0.3, span) * smoothstep(0.08, 0.20, al);
   if (band < 0.004) return color;
   // Whether the boundary here is folding or being drawn out, taken from its own
   // shape rather than from the velocity field. The strain rate across the
