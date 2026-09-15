@@ -39,6 +39,8 @@ export interface GpuStepParams {
   tiltX: number;        // plate tilt, applied as a uniform acceleration
   tiltY: number;
   advection: number;
+  /** Interface sharpening, 0 = off. Counteracts the solver's own numerical diffusion. */
+  sharpness: number;
   damping: number;
   heatDecay: number;
   turbScale: number;
@@ -398,6 +400,44 @@ void main() {
   fragColor = clamp(r, mn, mx);
 }`,
 
+  // Interface sharpening: anti-diffusion with a clamp.
+  //
+  // Every step advects the dye and diffuses it, so a boundary that starts as a
+  // step becomes a ramp within a second and the plate goes soft. This runs the
+  // heat equation backwards along the dye's own gradient, which steepens any
+  // profile that is not already straight, so the ramp walks back toward a step.
+  //
+  // Backwards diffusion is unstable on its own: the shortest wavelength the grid
+  // can hold grows fastest, and a checkerboard appears. The clamp is what makes
+  // it safe. A cell may only move inside the range its four neighbours already
+  // span, so the pass can undo smearing but can never invent a value that was
+  // not there, and a checkerboard cell (already outside its neighbours' range)
+  // is pinned rather than amplified.
+  //
+  // All four channels sharpen independently: alpha carries thickness, and the
+  // three absorption channels carry colour, so a red edge against blue of the
+  // same thickness sharpens too — which is most of what a pour looks like.
+  sharpenDye: `${PRELUDE}
+uniform sampler2D u_dye; uniform float u_sharp;
+// How much of an interface a pair of cells straddles: 1 where both hold
+// comparable dye, 0 where one of them is empty. Without it the pass keeps
+// pulling dye off the thin side of a boundary until a hole opens, which is
+// what unlimited anti-diffusion does to a field that has a void in it.
+vec4 gate(vec4 a, vec4 b) { return min(a, b) / (max(a, b) + 1e-4); }
+void main() {
+  vec4 c = texture(u_dye, v_uv);
+  vec4 l = texture(u_dye, v_uv - vec2(u_texel.x, 0.0));
+  vec4 r = texture(u_dye, v_uv + vec2(u_texel.x, 0.0));
+  vec4 d = texture(u_dye, v_uv - vec2(0.0, u_texel.y));
+  vec4 u = texture(u_dye, v_uv + vec2(0.0, u_texel.y));
+  // One uphill flux per face, so what a cell gains its neighbour loses.
+  vec4 f = gate(c, l) * (c - l) + gate(c, r) * (c - r)
+         + gate(c, d) * (c - d) + gate(c, u) * (c - u);
+  vec4 s = c + u_sharp * 0.25 * f;
+  vec4 lo = min(min(l, r), min(d, u)), hi = max(max(l, r), max(d, u));
+  fragColor = max(clamp(s, min(lo, c), max(hi, c)), vec4(0.0));
+}`,
+
   decayDye: `${PRELUDE}
 uniform sampler2D u_dye; uniform float u_evap;
 void main() {
@@ -711,6 +751,15 @@ export class GpuFluid {
     const a = p.dt * p.diff * n2;
     this.jacobi(this.dye, [a, a, a, a], DYE_ITERS);
     this.macCormack(this.dye, this.vel.read.tex, disp);
+
+    // 9.5. Sharpen the interfaces the advection and the diffusion just softened.
+    if (p.sharpness > 0.0001) {
+      this.run('sharpenDye', this.dye.write, (u) => {
+        this.bind(u, 'u_dye', this.dye.read.tex, 0);
+        gl.uniform1f(u.get('u_sharp')!, p.sharpness);
+      });
+      this.dye.swap();
+    }
 
     // 10. Decay: damping, speed limit, evaporation, cap, heat decay
     this.run('decayDye', this.dye.write, (u) => {

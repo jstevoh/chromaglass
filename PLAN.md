@@ -45,7 +45,11 @@ and by what would otherwise force a rebase later.
   instead of sitting on the screen, modulated by dye thickness and by how slowly the
   cell is moving (pigment settles where the flow is slack).
 
-Both land in the GPU and CPU solvers so the two engines still agree.
+Both land in the GPU and CPU solvers so the two engines still agree. Shipped as two
+PRs rather than one, so the first improvement reaches the projector sooner: sharpening
+first (done), granulation second. Sharpening moves the edge measures and leaves the
+mid-scale ones alone, which is what granulation is for, so the batch gate below is
+judged after the second PR.
 
 **Gate:** typical local contrast ≥ 3.0 and structure at 4 px ≥ 0.9 % on the Fillmore
 frame at the preset's default, with no more than 15 % frame-time cost at 512², and no

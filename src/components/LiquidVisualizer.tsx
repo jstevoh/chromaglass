@@ -253,6 +253,8 @@ class FluidSimulation {
   private rbVy: Float32Array;
   private mcA: Float32Array;        // MacCormack intermediates (CPU path)
   private mcB: Float32Array;
+  /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
+  private shp: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
@@ -293,6 +295,7 @@ class FluidSimulation {
     this.rbVy = new Float32Array(GRID_AREA);
     this.mcA = new Float32Array(GRID_AREA);
     this.mcB = new Float32Array(GRID_AREA);
+    this.shp = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -1190,6 +1193,9 @@ class FluidSimulation {
     this.advectMacCormack(0, this.densityB, this.sB,    this.vx, this.vy, dt * p.advection);
     this.advect(0, this.temp,     this.temp0, this.vx, this.vy, dt * p.advection);
 
+    // 9.5. Sharpen the interfaces the advection and the diffusion just softened.
+    this.sharpenDye(p.sharpness);
+
     // 10. Evaporation, damping, stability
     let densSum = 0;
     for (let i = 0; i < GRID_AREA; i++) {
@@ -1298,6 +1304,7 @@ class FluidSimulation {
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
       advection: settings.advection,
+      sharpness: Math.max(0, Math.min(1, settings.sharpness ?? 0)) * 0.35,
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, surfaceTension, fingering,
@@ -1553,6 +1560,36 @@ class FluidSimulation {
    * Semi-Lagrangian transport alone is dissipative enough to smear a thin
    * filament away within a few steps; this is what lets them survive.
    */
+  /**
+   * Interface sharpening: anti-diffusion with a clamp. The GPU solver runs the
+   * same operation in `sharpenDye`; see the note there for why the clamp is
+   * what keeps backwards diffusion from growing a checkerboard.
+   */
+  private sharpenDye(k: number) {
+    if (k <= 0.0001) return;
+    const N = this.size;
+    // How much of an interface a pair of cells straddles: 1 where both hold
+    // comparable dye, 0 where one is empty. See the note in `sharpenDye` in
+    // gpuFluid.ts for why the pass carves holes without it.
+    const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
+    const kq = k * 0.25;
+    for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
+      this.shp.set(ch);
+      const o = this.shp;
+      for (let y = 1; y < N - 1; y++) {
+        for (let x = 1; x < N - 1; x++) {
+          const i = x + y * N;
+          const c = o[i], l = o[i - 1], r = o[i + 1], d = o[i - N], u = o[i + N];
+          const f = gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u);
+          const s = c + kq * f;
+          const lo = Math.min(Math.min(l, r), Math.min(d, u), c);
+          const hi = Math.max(Math.max(l, r), Math.max(d, u), c);
+          ch[i] = Math.max(0, Math.min(hi, Math.max(lo, s)));
+        }
+      }
+    }
+  }
+
   private advectMacCormack(b: number, d: Float32Array, d0: Float32Array, velocX: Float32Array, velocY: Float32Array, dt: number) {
     this.advect(b, this.mcA, d0, velocX, velocY, dt);         // φ̂ₙ₊₁ = A(φₙ)
     this.advect(b, this.mcB, this.mcA, velocX, velocY, -dt);  // φ̂ₙ = A⁻¹(φ̂ₙ₊₁)

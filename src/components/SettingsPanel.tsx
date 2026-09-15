@@ -401,6 +401,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ turbulenceDetail: Math.round(v) })}
         />
         <Slider
+          label="Sharpness"
+          value={settings.sharpness ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sharpness: v })}
+        />
+        <Slider
           label="Blob Surface Tension"
           value={settings.blobSurfaceTension}
           min={0}

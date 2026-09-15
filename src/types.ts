@@ -76,6 +76,8 @@ export interface VisualizerSettings {
   
   // Fluid Physics (High Fidelity)
   surfaceTension: number;
+  /** Interface sharpening: how hard a dye boundary resists the solver's own smearing. 0 = the old soft plate. */
+  sharpness: number;
   diffusionRate: number;
   buoyancy: number;
   advection: number;
@@ -189,6 +191,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
+  sharpness: 0.5,           // boundaries stay boundaries instead of becoming ramps
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
   advection: 0.45,

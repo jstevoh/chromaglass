@@ -103,6 +103,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
   { key: 'aperture',        label: 'Aperture',         min: 0, max: 1 },
   { key: 'bloom',           label: 'Bloom',            min: 0, max: 1 },
+  { key: 'sharpness',       label: 'Sharpness',        min: 0, max: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 12 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
