@@ -37,6 +37,14 @@ export interface FingerprintMatch {
   /** Estimated playback position (seconds into the track) at the END of the snippet. */
   offsetSec: number;
   score: number;
+  /** Share of all the snippet's votes that landed in the winning alignment. */
+  concentration: number;
+  /** How many hashes the snippet produced, for judging the score against. */
+  queryHashes: number;
+  /** The winning track's own 90th-percentile alignment — the noise the winner must beat. */
+  background: number;
+  /** Winning votes per hash the snippet offered. */
+  perHash: number;
 }
 
 // ── FFT (radix-2, real input) ──────────────────────────────────────────
@@ -170,6 +178,22 @@ export function buildIndex(records: TrackFingerprint[]): FingerprintIndex {
 
 const MIN_SCORE = 12;        // aligned hash votes needed for a confident match
 const NEIGHBOR_FRAMES = 6;   // deltas this close to the winner count as the same alignment
+/**
+ * How far the winner must stand above its own track's background.
+ *
+ * The runner-up test alone cannot answer "is this track playing at all": with
+ * one track in the library there is no runner-up, so the test is vacuous and
+ * the matcher named that track for every song put in front of it — and a
+ * library of one is where everybody starts. Even at two tracks it leaked one
+ * stranger in six.
+ *
+ * Measured by `npm run music` over twelve genuine snippets (clean and through
+ * a simulated microphone) and twelve from tracks the library had never heard:
+ * genuine matches stand 3.9–5.0x over their track's own 90th-percentile
+ * alignment, strangers 1.5–2.1x. Three is the gap between them, with close to
+ * a factor of two of margin on each side.
+ */
+const MIN_BACKGROUND_RATIO = 3.0;
 
 /** Match a live snippet against the index. */
 export function matchSnippet(pcm: Float32Array, sampleRate: number, index: FingerprintIndex): FingerprintMatch | null {
@@ -181,6 +205,7 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   const DELTA_BIAS = 1 << 21;
   const KEY_STRIDE = 1 << 22;
   const votes = new Map<number, number>();
+  let totalVotes = 0;
   for (let i = 0; i < q.hashes.length; i++) {
     const entries = index.inverted.get(q.hashes[i]);
     if (!entries) continue;
@@ -191,6 +216,7 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
       if (delta < -2) continue; // snippet can't start before the track
       const key = trackIdx * KEY_STRIDE + delta + DELTA_BIAS;
       votes.set(key, (votes.get(key) ?? 0) + 1);
+      totalVotes++;
     }
   }
   if (votes.size === 0) return null;
@@ -225,6 +251,17 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   const best = entries[bestIdx];
   const score = windowSums[bestIdx];
 
+  // How loud is this track's own background? Every alignment the winning
+  // track offers, at the 90th percentile: a genuine match towers over it,
+  // while a chance match IS the background, being simply the largest bump in
+  // a flat field of noise. A percentile rather than the runner-up window
+  // because loop-heavy music legitimately matches its own repeated phrase —
+  // one or two strong repeats barely move a percentile.
+  const sameTrack = [];
+  for (let i = 0; i < entries.length; i++) if (entries[i].trackIdx === best.trackIdx) sameTrack.push(windowSums[i]);
+  sameTrack.sort((a, b) => a - b);
+  const background = sameTrack.length ? sameTrack[Math.floor(sameTrack.length * 0.9)] : 0;
+
   // Runner-up = best window on any OTHER track. Competing alignments within
   // the same track (loop-heavy music repeating a phrase) don't undermine the
   // track's identity — at worst the offset snaps to a repeat of the phrase.
@@ -233,11 +270,13 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
     if (entries[i].trackIdx !== best.trackIdx && windowSums[i] > runnerUp) runnerUp = windowSums[i];
   }
 
-  if (score < MIN_SCORE || score < runnerUp * 1.5) return null;
+  if (score < MIN_SCORE || score < runnerUp * 1.5 || score < background * MIN_BACKGROUND_RATIO) return null;
 
   const track = index.tracks[best.trackIdx];
   if (!track) return null;
 
   const offsetSec = Math.max(0, best.delta * FP_HOP_SEC + q.durationSec);
-  return { isrc: track.isrc, title: track.title, artist: track.artist, offsetSec, score };
+  return { isrc: track.isrc, title: track.title, artist: track.artist, offsetSec, score,
+           concentration: totalVotes > 0 ? score / totalVotes : 0, queryHashes: q.hashes.length,
+           background, perHash: score / Math.max(1, q.hashes.length) };
 }

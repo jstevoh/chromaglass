@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Save, FolderOpen } from 'lucide-react';
-import { VisualizerSettings, BlendMode, LedMode, SimResolution } from '../types';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Save, FolderOpen, Video } from 'lucide-react';
+import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
+import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { PRESETS } from '../presets';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -18,6 +19,15 @@ interface SettingsPanelProps {
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
   getLiveEngineStatus?: () => EngineStatus | null;
+  /** The room camera: whether it is watching, which one, and what it is seeing. */
+  sceneOn?: boolean;
+  onSceneToggle?: (on: boolean) => void;
+  sceneState?: { active: boolean; error: string | null; device: string | null; ms: number; energy: number; raw: number; people: number } | null;
+  sceneDevices?: MediaDeviceInfo[];
+  sceneDeviceId?: string;
+  onSceneDevice?: (id: string) => void;
+  /** Where the sensor draws what it sees, so the camera can be aimed. */
+  scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
   filmSource?: 'none' | 'file' | 'camera';
   onFilmFile?: (file: File) => void;
@@ -41,6 +51,26 @@ interface SettingsPanelProps {
   projectorName?: string | null;
   onClose: () => void;
 }
+
+/** What the room can be read for, in the order they are worth reaching for. */
+const SCENE_FEATURES: [SceneFeature, string][] = [
+  ['motion', 'How busy'],
+  ['crowd', 'How many'],
+  ['spread', 'How spread out'],
+  ['centroidX', 'Where — across'],
+  ['centroidY', 'Where — up'],
+  ['dirX', 'Which way — across'],
+  ['dirY', 'Which way — up'],
+  ['brightness', 'How light'],
+  ['sceneHue', 'What colour'],
+];
+
+/**
+ * What a room feature may be put on: the same list a MIDI fader can learn,
+ * less the room's own controls. Letting the room ride how hard it rides itself
+ * is a loop nobody asked for.
+ */
+const sceneTargets = LEARNABLE_SETTINGS.filter(s => !String(s.key).startsWith('scene'));
 
 /**
  * A labelled range. Lives outside the panel: defined inside it, it was a new
@@ -75,7 +105,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onApplyPreset, activePresetId, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, userPresets = [], onApplyUserPreset, onSavePreset, onLoadPresetFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const presetFileRef = useRef<HTMLInputElement>(null);
   const [presetFileError, setPresetFileError] = useState<string | null>(null);
@@ -705,6 +735,207 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ iridescence: v })}
         />
+      </section>
+
+      {/* The Room Section */}
+      <section className="mb-8">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Video size={12} /> The Room
+        </h3>
+        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+          The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
+        </p>
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={() => onSceneToggle?.(!sceneOn)}
+            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            data-testid="scene-toggle"
+          >
+            {sceneOn ? 'Watching' : 'Watch the room'}
+          </button>
+        </div>
+        {sceneOn && sceneDevices.length > 1 && (
+          <select
+            value={sceneDeviceId}
+            onChange={(e) => onSceneDevice?.(e.target.value)}
+            aria-label="Room camera"
+            className="w-full mb-3 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none"
+          >
+            <option value="">Default camera</option>
+            {sceneDevices.map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>
+            ))}
+          </select>
+        )}
+        {sceneOn && (
+          <div className="mb-4">
+            <canvas
+              ref={scenePreviewRef}
+              width={192}
+              height={192}
+              className="w-full aspect-square rounded-lg border border-white/10 bg-black/60"
+              data-testid="scene-preview"
+            />
+            {sceneState?.error ? (
+              <p className="mt-2 text-[10px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
+            ) : (
+              <>
+                <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full bg-white/70 transition-[width] duration-100" style={{ width: `${Math.round((sceneState?.energy ?? 0) * 100)}%` }} />
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[10px] font-mono opacity-40">
+                  <span>{sceneState?.active ? `${sceneState.people} tracked` : 'opening…'}</span>
+                  <span>{sceneState ? `${sceneState.ms.toFixed(1)} ms` : ''}</span>
+                </div>
+              </>
+            )}
+            <p className="mt-2 text-[10px] leading-relaxed opacity-40">
+              Frames are read in this page and never leave it. Nothing is recorded, and the camera stops the moment this is switched off.
+            </p>
+          </div>
+        )}
+        <Slider
+          label="Room Drive"
+          value={settings.sceneDrive ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneDrive: v })}
+          disabled={!sceneOn && 'off'}
+        />
+        <Slider
+          label="Hands"
+          value={settings.sceneHands ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneHands: v })}
+          disabled={!sceneOn ? 'off' : settings.scenePeople === false && 'needs Hold people'}
+        />
+        <Slider
+          label="Deadzone"
+          value={settings.sceneDeadzone ?? 0.25}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneDeadzone: v })}
+          disabled={!sceneOn && 'off'}
+        />
+        <Slider
+          label="Smoothing"
+          value={settings.sceneSmooth ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneSmooth: v })}
+          disabled={!sceneOn && 'off'}
+        />
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            onClick={() => onUpdate({ scenePeople: !(settings.scenePeople !== false) })}
+            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            data-testid="scene-people"
+          >
+            Hold people
+          </button>
+          <button
+            onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
+            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            data-testid="scene-mirror"
+          >
+            Mirror
+          </button>
+        </div>
+        <div className="mt-5 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold uppercase tracking-widest opacity-70">On the controls</div>
+            <button
+              onClick={() => onUpdate({ sceneMappings: [...(settings.sceneMappings ?? []), { feature: 'motion', setting: 'turbulenceScale', depth: 0.5 }] })}
+              className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"
+              data-testid="scene-map-add"
+            >
+              Add
+            </button>
+          </div>
+          {(settings.sceneMappings ?? []).length === 0 ? (
+            <p className="text-[10px] leading-relaxed opacity-40">
+              Nothing yet. A row is a feature of the room, a control, and how far it moves it — a floor filling up can open the turbulence, a crowd going still can slow the plate, someone crossing left to right can walk the lamp across with them.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {(settings.sceneMappings ?? []).map((m, i) => (
+                <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={m.feature}
+                      aria-label="Room feature"
+                      onChange={(e) => {
+                        const next = [...(settings.sceneMappings ?? [])];
+                        next[i] = { ...m, feature: e.target.value as SceneFeature };
+                        onUpdate({ sceneMappings: next });
+                      }}
+                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                    >
+                      {SCENE_FEATURES.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={m.setting}
+                      aria-label="Control"
+                      onChange={(e) => {
+                        const next = [...(settings.sceneMappings ?? [])];
+                        next[i] = { ...m, setting: e.target.value as SceneMapping['setting'] };
+                        onUpdate({ sceneMappings: next });
+                      }}
+                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                    >
+                      {sceneTargets.map(t => (
+                        <option key={t.key} value={t.key}>{t.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
+                      className="p-1 rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      aria-label="Remove mapping"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.05}
+                      value={m.depth}
+                      aria-label="Depth"
+                      onChange={(e) => {
+                        const next = [...(settings.sceneMappings ?? [])];
+                        next[i] = { ...m, depth: parseFloat(e.target.value) };
+                        onUpdate({ sceneMappings: next });
+                      }}
+                      className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <Slider
+          label="Room Impact"
+          value={settings.sceneImpact ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneImpact: v })}
+          disabled={!sceneOn ? 'off' : (settings.sceneMappings ?? []).length === 0 && 'no rows'}
+        />
+        <p className="text-[10px] leading-relaxed opacity-40">
+          <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Mirror</span> for a camera facing the room, so a hand moved left moves the dye left.
+        </p>
       </section>
 
       {/* Projectors Section */}

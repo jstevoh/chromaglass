@@ -17,6 +17,8 @@ import { SequencerPanel } from './components/SequencerPanel';
 import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
+import { useSceneCamera } from './hooks/useSceneCamera';
+import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import type { MidiAction } from './lib/midi';
@@ -43,9 +45,47 @@ function loadMusicSettings(): MusicSettings {
   return { ...DEFAULT_MUSIC_SETTINGS };
 }
 
-type AudioSource = 'none' | 'microphone' | 'system' | 'file';
+type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated';
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
+/**
+ * Where the show listened last time.
+ *
+ * It used to open the microphone on load, every load, which meant a permission
+ * prompt in front of the plate before anyone had asked for one. Now the choice
+ * is remembered and nothing is opened on its own: the microphone comes back
+ * only if the browser already says permission is granted (so no prompt
+ * appears), and anything else waits for a click.
+ */
+const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
+
+function rememberedSource(): AudioSource {
+  try {
+    const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
+    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
+    if (raw === 'microphone' || raw === 'simulated') return raw;
+  } catch { /* private */ }
+  return 'none';
+}
+
+/** True only if the browser will hand over the microphone without asking. */
+async function micAlreadyAllowed(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
+    return status?.state === 'granted';
+  } catch {
+    // Firefox has no microphone descriptor for the Permissions API. Better to
+    // wait for a click than to guess and prompt.
+    return false;
+  }
+}
+/**
+ * The room camera lives outside the settings: a preset carries how hard the
+ * room drives the plate, never whether a camera is switched on or which one.
+ * Loading someone else's look should not open your camera.
+ */
+const SCENE_ON_KEY = 'chromaglass-scene-on';
+const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
 
 // Detect which preset (if any) matches the current settings.
 function detectActivePreset(settings: VisualizerSettings): string | null {
@@ -66,7 +106,7 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
-  const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
+  const [audioSource, setAudioSource] = useState<AudioSource>('none');
   // ── The input the show listens to ──
   // A USB interface fed from the desk beats the laptop's own microphone in
   // any room with a crowd in it. The choice is remembered; the list of
@@ -96,7 +136,15 @@ export default function App() {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [activePresetId, setActivePresetId] = useState<string | null>('classic');
+  /**
+   * The preset last applied by hand. Which preset is *active* is derived from
+   * the settings below rather than stored: it only ever differed from them
+   * transiently, and keeping it as state meant a second render of the whole
+   * app on every settings change, plus a walk over every preset comparing
+   * every key. The sequencer glides settings continuously through a show, so
+   * that ran on every frame of every transition.
+   */
+  const [pinnedPresetId, setPinnedPresetId] = useState<string | null>('classic');
   const [settings, setSettings] = useState<VisualizerSettings>(() => {
     const classic = PRESETS.find(p => p.id === 'classic');
     const base = classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
@@ -203,6 +251,8 @@ export default function App() {
     };
   }, [overlaysVisible]);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  /** The synthesised band, when that is what the show is listening to. */
+  const simulatedRef = useRef<SimulatedMusic | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -227,35 +277,31 @@ export default function App() {
     e.target.value = '';
   }, []);
 
-  // Track active preset whenever settings change. A user preset stays active
-  // while the settings still match what it saved.
   const userPresetsRef = useRef<UserPreset[]>([]);
-  useEffect(() => {
-    setActivePresetId((prev) => {
-      if (isUserPresetId(prev)) {
-        const up = userPresetsRef.current.find(p => p.id === prev);
-        if (up && Object.keys(up.settings).every(k => k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) return prev;
-      }
-      return detectActivePreset(settings);
-    });
-  }, [settings]);
-
-  // Set the initial active preset on mount.
-  useEffect(() => {
-    setActivePresetId(detectActivePreset(settings));
-  }, []);
 
   const handleSourceChange = useCallback(async (source: AudioSource) => {
     if (audioStream) {
       audioStream.getTracks().forEach(track => track.stop());
       setAudioStream(null);
     }
+    if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
 
     setAudioSource(source);
+    try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
       // The stream comes from the element once it is ready; see playMusicFile.
+      return;
+    }
+    if (source === 'simulated') {
+      // A band in a box: no device, no permission, nothing to be asked for.
+      // Downstream it is a stream like any other, so the analyser, the room
+      // calibration and the beat clock are all exercised for real.
+      const band = startSimulatedMusic();
+      simulatedRef.current = band;
+      void band.resume();
+      setAudioStream(band.stream);
       return;
     }
 
@@ -356,10 +402,33 @@ export default function App() {
     if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
   }, [musicFile, audioSource]);
 
+  // What the show listened to last time, brought back without asking for
+  // anything. The microphone only reopens where permission is already granted,
+  // so a reload is silent rather than a prompt over the plate.
   useEffect(() => {
-    if (audioSource === 'microphone' && !audioStream) {
-      handleSourceChange('microphone');
-    }
+    let cancelled = false;
+    const restore = async () => {
+      const remembered = rememberedSource();
+      if (remembered === 'none') return;
+      if (remembered === 'microphone' && !(await micAlreadyAllowed())) return;
+      if (cancelled) return;
+      void handleSourceChange(remembered);
+    };
+    void restore();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The browser will not run audio before a gesture, so a restored band stays
+  // silent until the first click anywhere. One listener, then gone.
+  useEffect(() => {
+    const wake = () => { void simulatedRef.current?.resume(); };
+    window.addEventListener('pointerdown', wake, { once: true });
+    window.addEventListener('keydown', wake, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    };
   }, []);
 
   useEffect(() => {
@@ -389,6 +458,34 @@ export default function App() {
     visualizerRef.current?.clearFilm();
     setFilmSource('none');
   };
+  // ── The room ────────────────────────────────────────────────────
+  // The camera as a sensor: it stirs the plate, puts hands on it and rides
+  // whatever settings the mappings name. Off unless someone switched it on.
+  const [sceneOn, setSceneOn] = useState<boolean>(() => { try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; } });
+  const [sceneDeviceId, setSceneDeviceId] = useState<string>(() => { try { return localStorage.getItem(SCENE_DEVICE_KEY) ?? ''; } catch { return ''; } });
+  const scenePreviewRef = useRef<HTMLCanvasElement | null>(null);
+  /** True once the camera has been switched on by hand in this session. */
+  const sceneAskedRef = useRef(false);
+  const toggleScene = useCallback((on: boolean) => {
+    if (on) sceneAskedRef.current = true;
+    setSceneOn(on);
+    try { localStorage.setItem(SCENE_ON_KEY, on ? '1' : '0'); } catch { /* private */ }
+  }, []);
+  const chooseSceneDevice = useCallback((id: string) => {
+    setSceneDeviceId(id);
+    try { localStorage.setItem(SCENE_DEVICE_KEY, id); } catch { /* private */ }
+  }, []);
+  const scene = useSceneCamera({
+    enabled: sceneOn,
+    userAsked: sceneAskedRef.current,
+    deviceId: sceneDeviceId,
+    mirror: settings.sceneMirror !== false,
+    deadzone: settings.sceneDeadzone ?? 0.25,
+    smooth: settings.sceneSmooth ?? 0.35,
+    people: settings.scenePeople !== false,
+    preview: scenePreviewRef,
+  });
+
   const audioData = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
@@ -405,6 +502,26 @@ export default function App() {
   const userPresets = useUserPresets();
   const allPresets = useMemo(() => [...PRESETS, ...userPresets.presets.map(asPreset)], [userPresets.presets]);
   userPresetsRef.current = userPresets.presets;
+  /**
+   * Which preset the plate is currently wearing, derived rather than stored.
+   *
+   * A preset applied by hand is pinned above; everything else — a slider moved,
+   * a fader ridden, a stage of the sequencer gliding a dozen settings past each
+   * other — changes the settings, and whether they still add up to a preset is
+   * a question about the settings, not a separate fact to keep in step with
+   * them. One of the user's own presets keeps its name while the settings still
+   * match what it saved, which a walk over the built-ins cannot tell.
+   */
+  const activePresetId = useMemo(() => {
+    if (isUserPresetId(pinnedPresetId)) {
+      const up = userPresets.presets.find(p => p.id === pinnedPresetId);
+      if (up && Object.keys(up.settings).every(k =>
+        k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) {
+        return pinnedPresetId;
+      }
+    }
+    return detectActivePreset(settings);
+  }, [settings, pinnedPresetId, userPresets.presets]);
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
@@ -490,21 +607,21 @@ export default function App() {
     // Likewise the Fillmore projectors, beads, cells and fingering: a preset
     // that does not ask for them gets a plain plate, not the last preset's.
     setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
-    setActivePresetId(presetId);
+    setPinnedPresetId(presetId);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);
   };
 
   const applyUserPreset = (p: UserPreset) => {
     setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
-    setActivePresetId(p.id);
+    setPinnedPresetId(p.id);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null });
   };
   const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
     const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, forSong ? currentSong : null);
-    setActivePresetId(p.id);
+    setPinnedPresetId(p.id);
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
@@ -519,7 +636,7 @@ export default function App() {
 
   /** The sequencer's stage change: the preset's dyes and style, the plate kept. */
   const adoptPreset = useCallback((presetId: string) => {
-    setActivePresetId(presetId);
+    setPinnedPresetId(presetId);
     if (isUserPresetId(presetId)) {
       // Make sure the plate knows this preset's dyes before adopting them.
       const up = userPresets.presets.find(p => p.id === presetId);
@@ -675,7 +792,7 @@ export default function App() {
       macroRelief: 0.4 + Math.random() * 0.6,
       simResolution: settings.simResolution,
     });
-    setActivePresetId(null);
+    setPinnedPresetId(null);
     // Randomize inject style for the evolve
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
     const s1 = allStyles[Math.floor(Math.random() * allStyles.length)];
@@ -850,6 +967,7 @@ export default function App() {
       case 'preset-next':     stepPreset(1); break;
       case 'preset-prev':     stepPreset(-1); break;
       case 'blackout-toggle': toggleBlackout(); break;
+      case 'scene-toggle':    toggleScene(!sceneOn); break;
       case 'record-toggle':   toggleRecording(); break;
     }
   };
@@ -1025,6 +1143,7 @@ export default function App() {
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+        sceneRef={scene.reading}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -1491,6 +1610,32 @@ export default function App() {
                     <FileAudio size={14} />
                     <span>File</span>
                   </button>
+                  <button
+                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                      audioSource === 'simulated'
+                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
+                    data-testid="simulated-audio-button"
+                  >
+                    <Music size={14} />
+                    <span>Band</span>
+                  </button>
+                  <button
+                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                      audioSource === 'simulated'
+                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
+                    data-testid="simulated-audio-button"
+                  >
+                    <Music size={14} />
+                    <span>Band</span>
+                  </button>
                   <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
                 </div>
@@ -1546,6 +1691,13 @@ export default function App() {
             projectorMode={projector.mode}
             onProjectorMode={projector.setMode}
             projectorName={projector.projector?.label ?? null}
+            sceneOn={sceneOn}
+            onSceneToggle={toggleScene}
+            sceneState={scene.state}
+            sceneDevices={scene.devices}
+            sceneDeviceId={sceneDeviceId}
+            onSceneDevice={chooseSceneDevice}
+            scenePreviewRef={scenePreviewRef}
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}

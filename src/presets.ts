@@ -1353,4 +1353,69 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
+  {
+    id: 'crowd-plate',
+    name: 'Crowd Plate',
+    description: 'The room plays it: the floor stirs the liquid, everyone dancing is a hand on the glass, and a busier room opens the turbulence.',
+    settings: {
+      // A plate that wants stirring rather than one that is already busy: the
+      // turbulence starts low so what the room adds is what is seen moving,
+      // and the dye budget runs full so there is something there to move.
+      globalSpeed: 0.03,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.5,
+      rotationSpeed: 0.0,
+      centerGravity: 0.05,
+      surfaceTension: 0.1,
+      sharpness: 0.6,
+      granulation: 0.5,
+      diffusionRate: 0.00012,
+      buoyancy: 0.3,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.08,          // the room does the injecting; automation only tops it up
+      platePressure: 0.35,
+      glassSmear: 0.25,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.7,
+      heatIntensity: 0.1,
+      evaporationRate: 0.0025,
+      audioImpact: 0.35,           // the music is still there, but it is not the loudest hand
+      turbulenceScale: 0.12,
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0.1,
+      saturationBoost: 1.45,
+      dyeBudget: 1.0,
+      edgeRelief: 0.15,
+      bubbles: 0.3,
+      beads: 0.2,
+      fingering: 0.6,              // a palm on the glass breaks into spokes
+      plateRock: 0.2,
+      beatSqueeze: 0.5,
+      lightPlay: 0.35,
+      lampMotion: 0.25,
+      lampHotspot: 0.5,
+      hueJourney: 5,
+
+      // The room, on.
+      sceneDrive: 0.55,
+      sceneHands: 0.6,
+      sceneImpact: 0.6,
+      sceneMappings: [
+        // A fuller floor is a rougher plate, and a room that goes quiet
+        // settles rather than stopping.
+        { feature: 'motion', setting: 'turbulenceScale', depth: 0.45 },
+        // The lamp walks with the crowd instead of sitting under the middle.
+        { feature: 'dirX', setting: 'lampMotion', depth: 0.35 },
+        // More people, more dye on the plate.
+        { feature: 'crowd', setting: 'dyeBudget', depth: 0.25 },
+      ],
+      scenePeople: true,
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
+    }
+  },
 ];

@@ -109,6 +109,16 @@ export interface RoomCalibration {
   /** True when the room is currently louder than its own noise floor. */
   signal: boolean;
   /**
+   * The same verdict before any smoothing.
+   *
+   * `signal` is held open for about a second and a half after the sound stops,
+   * because gating the visuals on the silence between beats would strobe the
+   * whole show. Anything *timing* silence — where one song ends, above all —
+   * wants this one: the held version cannot see a gap shorter than its own
+   * release, which is longer than the gap between most tracks.
+   */
+  sound: boolean;
+  /**
    * Smoothed 0..1 version of `signal`. A single quiet frame between beats
    * shouldn't blank the visuals, so this opens fast and closes slowly.
    */
@@ -176,6 +186,7 @@ export class RoomTracker {
       progress: Math.min(1, this.elapsed / CALIBRATION_SECONDS),
       calibrating: this.elapsed < CALIBRATION_SECONDS,
       signal: this.gate > 0.15,
+      sound: signal,
       gate: this.gate,
     };
   }

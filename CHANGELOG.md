@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the room in the plate (plan batch 7)
+- **The Room** (Settings → The Room): the camera has always been able to show through
+  the dye as a film loop; it is read back now instead. `src/lib/sceneSense.ts` takes
+  pixels and gives a reading — a 24² Lucas–Kanade flow lattice, a presence mask against
+  a creeping background, and the scalars worth mapping — with no DOM and no WebGL, so
+  `npm run scene` can judge it against painted rooms rather than a webcam and a sofa
+- **Room Drive** (`sceneDrive`): the flow lattice upsampled onto the grid and added as
+  velocity each solver step. With the GPU solver attached the CPU arrays are that step's
+  deltas, so one loop drives both engines and neither needed a new upload path. A wave
+  of an arm reaches the plate 100 ms after it happens
+- **Hands** (`sceneHands`): everyone the sensor holds becomes a projectionist — still is
+  a palm on the top glass (so **Fingering** breaks it into spokes), moving is a puff of
+  air the way they are going, arriving is a drop. All of it through `performGesture`,
+  which is the body `applyGesture` always had, lifted out so the handle and the room
+  share one path. A track's id picks its dye from the preset's palette contract, so the
+  same dancer keeps the same colour across a set
+- **On the controls** (`sceneMappings`, `sceneImpact`): how busy the floor is, how many
+  people, how spread out, where they are, which way they are going, how light the room
+  is and what colour — any of them on any control a MIDI fader can learn, over the same
+  travel table the faders use, with one master depth. Folded into the settings once a
+  frame into a reused object, so nothing downstream knows the camera exists
+- **Room Drive**, **Room Hands** and **Room Impact** are MIDI-learnable and **Watch the
+  Room** is an action, so the camera can be brought in and killed from a pad mid-show
+- Preset **Crowd Plate**: a plate deliberately calm to start with so what the room adds
+  is what is seen moving, the music down to 0.35 so it is not the loudest hand, and six
+  dyes in the contract rather than the usual two or three — a crowd wants more colours
+  to hand out than a clock face does
+- Whether a camera is watching, and which one, lives in localStorage rather than in the
+  settings: loading someone else's preset should not open your camera. Frames are read
+  in the page and never leave it, and nothing is recorded
+
+### Fixed — the camera that opened and was never read
+- `await video.play()` on a video element that is not in the document can never settle,
+  so the state update that marks the sensor live and the interval that does the analysis
+  were both dead code: the panel said Watching, the camera light was on, the preview was
+  blank, and no error said why. Found by driving the built app in a browser
+
+### Added — a band in the box, and nothing opened unasked
+- **Band**, beside Mic, System and File: a synthesised kick, snare, hats, bass and pad
+  in verses, choruses and a break at 122 bpm, played silently into the analyser
+  (`src/lib/simulatedMusic.ts`). It is a stream rather than a set of numbers, so the
+  analyser, the room calibration, the beat clock's tempo lock and the band mappings all
+  run exactly as they do on a microphone. No device, so no permission and nothing to ask
+- The app opened the microphone on load, every load, putting a permission prompt over
+  the plate before anyone had asked for one. Where the show listened last is remembered
+  now, and the microphone only comes back where the Permissions API already says
+  granted. The room camera gets the same rule: a click may prompt, a remembered setting
+  may not
+
+### Fixed — track intelligence: the gap it could never hear, the song it never heard
+- The song-boundary detector timed silence against `calibration.signal`, the room gate
+  held open 1.5 s so the visuals do not strobe between beats. Its release alone is
+  2.85 s and the boundary wanted 2.5 s on top, so a song could not end until 5.35 s of
+  silence — longer than the gap between almost any two tracks. Measured with
+  `npm run music`: of a 1 s, 2 s, 3 s and 6 s gap, only the six-second one ever fired.
+  The unsmoothed verdict is exposed as `calibration.sound` and timed against over 1.8 s
+  of the boundary's own; a CD's two seconds, a playlist's three, a long gap and a gap in
+  a loud room now all fire the instant the next song starts, while a crossfade and a
+  rest inside a song still do not
+- The local fingerprint matcher's confidence test was the winner against the best
+  alignment on *another* track, so with one track in the library there was no runner-up,
+  the test was vacuous, and it named that track for every song put in front of it — and
+  a library of one is where everyone starts. The winner must now also stand 3× over its
+  own track's 90th-percentile alignment. Measured over twelve genuine snippets, clean
+  and through a simulated microphone, and twelve from tracks never heard: genuine
+  3.9–5.0×, strangers 1.5–2.1×. After the gate, 12/12 genuine still match with position
+  good to 0.03 s, and 0/12 strangers and no white noise do
+- Local re-matching while a track is known drops from 20 s to 12 s — the only thing that
+  catches a change on a gapless service, where no boundary can be heard and the API is
+  on a 35-second leash to spare its quota
+
+### Added — judging it by numbers
+- `npm run scene`: the room sensor against painted rooms through the real analysis,
+  plus a closed feedback loop run for forty seconds and a person who walks in and stops
+- `npm run music`: level traces through the real calibration into the boundary detector,
+  and synthetic songs through the real matcher
+- `npm run qa`: builds, serves and walks a browser through a show night — a preset
+  applied, every slider ridden, every panel opened, the camera switched on, the band
+  started, the plate dragged, a reload, a phone-width screen — watching the console
+
+### Changed — which preset is active, derived rather than stored
+- It was state re-derived by an effect on every settings change, walking every preset
+  and comparing every key. It is a question about the settings, not a separate fact to
+  keep in step with them, so it is computed during render. No measurable speed-up — a
+  CPU profile puts that sweep's cost in the software-WebGL fluid solver, with React
+  at about 2 % — but one effect, one render pass and a class of drift gone
+
 ### Added — a projector on HDMI, noticed and used
 - **Second Screen** (Settings → Projectors, and the chip): **Ask** offers the projector in one click as before; **Automatic** sends the show there by itself, fullscreen on the projector, on the next click or key press anywhere in the app, and again whenever the projector is plugged back in (`src/hooks/useProjector.ts`, watching `screenschange`); **Off** offers nothing. Closing the projector window by hand does not re-send for the same screen. The choice is kept in localStorage
 - The Second display window opens as a fullscreen popup placed on the projector's own bounds when the screen is known, so no click on the projector window is needed for fullscreen

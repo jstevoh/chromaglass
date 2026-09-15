@@ -19,6 +19,8 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
 - **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, with synthesised paint cells, lacing filaments and shallow depth of field for extreme detail at high magnification
+- **The room drives the plate** — a camera pointed at the floor is read back rather than shown: the movement in front of it stirs the liquid, everyone it can hold becomes a hand on the glass carrying a dye of their own, and any feature of the room — how busy, how many, how spread out, where, which way, how light, what colour — can ride any control a MIDI fader can learn (Settings → The Room; preset *Crowd Plate*)
+- **A band in the box** — a synthesised kick, snare, hats, bass and pad in verses and choruses, played silently into the analyser so the show can be built and rehearsed with no microphone, no stereo and no permission
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
@@ -173,6 +175,57 @@ is that a page loaded from the hosted `https://` site can't open a `ws://` socke
 to your laptop (mixed content), so remote control means running the show from
 `npm run remote`.
 
+## The room in the plate
+
+The **Room** section of Settings points a camera at the floor rather than at the
+screen, and reads it back instead of showing it. Movement in front of the lens
+becomes movement in the liquid.
+
+- **Room Drive** stirs the lead plate from what the camera sees. An arm swept
+  across the room sweeps the dye the same way, about a tenth of a second later.
+- **Hands** puts each person on the glass: standing still is a palm pressed on
+  the plate (so **Fingering** breaks it into spokes), walking is a puff of air
+  the way they are going, and arriving drops dye. The dye is theirs — picked
+  from the preset's palette by who they are, so the same dancer stays the same
+  colour all set, and a room of six is six colours rather than a wash.
+- **On the controls** is the rest of it: how busy the floor is, how many people,
+  how spread out, where they are, which way they are going, how light the room
+  is and what colour — any of them on any control a MIDI fader can learn, with
+  one master depth over the lot. A floor filling up can open the turbulence; a
+  crowd going still can settle the plate; someone crossing left to right can
+  walk the lamp across with them. The *Crowd Plate* preset arrives with it on.
+
+The preview in the panel draws what the sensor sees, with the flow it found
+over it and a ring round everyone it is holding: a camera in a dark venue is
+otherwise aimed by guesswork. `Deadzone` is how much movement counts as
+somebody rather than the room breathing, `Smoothing` how long the liquid
+remembers a gesture, and `Mirror` is for a camera facing the audience.
+
+**Aim it at the floor or the crowd, not at the screen.** A camera that can see
+the projection makes the plate drive itself. That settles rather than running
+away — the per-cell cap and the solver's damping give it a ceiling, measured
+over forty closed-loop seconds at about what one wave of an arm peaks at — but
+what it settles into is a plate stirred by nothing in particular.
+
+Frames are read in the page and never leave it. Nothing is recorded, and the
+camera stops the moment the panel's switch goes off. Chrome, Edge or Opera; a
+click is what lets the browser ask for the camera, and a remembered setting
+never prompts on its own.
+
+## A band in the box
+
+The **Band** button, next to Mic, System and File, plays a synthesised band into
+the show and nothing else: a kick on the floor, a snare on two and four, hats, a
+bassline and a pad that changes chord, arranged into verses and choruses so the
+sequencer and the song-structure work have something shaped like a song. It is
+silent — it goes to the analyser, not to the speakers — and it opens no device,
+so it needs no permission and asks for nothing. For building a look at a desk,
+for demonstrating the show without a stereo, and for rehearsing the sequencer.
+
+Nothing is opened on its own any more, either: where the show listened last is
+remembered, and the microphone only comes back if the browser already has
+permission, so a reload never puts a prompt over the plate.
+
 ## Simulation Engine
 
 The solver is Jos Stam's stable-fluids scheme — diffuse, project, advect,
@@ -236,6 +289,8 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Projectionist pad | On the phone or iPad: drag to blow air, tap to drop dye, pick a dye colour, pick which plate the device works, stream the device's tilt into the plate, or give the pad the whole screen. A pen's pressure sets how much dye, its tilt which way the air goes |
 | MIDI | Turn a MIDI controller on, load a factory map (APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad, Launch Control XL), assign from a picture of the controller that doubles as a printable cheat sheet, or teach yours with MIDI learn; soft takeover, endless encoders, LED feedback; maps saved as `.chromaglass-midi.json` |
 | Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
+| The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
+| Band | A synthesised band played silently into the show — no microphone, no permission |
 | Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
@@ -246,6 +301,21 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Sequence files | In the Show Sequencer, **Save file** writes the selected sequence to a `.chromaglass-sequence.json` file (with any of your presets it uses); **Load file** reads one in |
 | Cast | A menu: **Second display** (a projector on HDMI) opens a window on the second screen that mirrors this very canvas pixel for pixel — one render, at the projector's own resolution, every stroke on the laptop on the wall the same frame, the laptop keeping all the controls and a scaled copy (click the window once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
+
+## Judging it by numbers
+
+Four harnesses, so a change to any of this is judged the same way every time
+rather than by watching a plate and forming an impression.
+
+| | |
+|---|---|
+| `npm run detail` | How much structure a frame carries, and at what scale — the plate against filmed liquid |
+| `npm run scene` | The room sensor: painted rooms through the real analysis, plus a closed feedback loop and a person who walks in and stops |
+| `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |
+| `npm run qa` | The app itself — it builds, serves, and walks a browser through a show night, watching the console |
+
+`qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes
+`PW_CHROMIUM` for anywhere else. `npm run qa -- --head` watches it happen.
 
 ## Tech Stack
 
