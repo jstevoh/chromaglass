@@ -26,7 +26,55 @@
 - The key changed, so any of James's tabs or displays still holding key 7594 need a reload with 9281. I left James's Chrome and the projector alone.
 - **Load:** GPU utilisation 99 % and load average 5.3–5.5 at the start (MOTIV Mix, James's Chrome, WindowServer). That is the same as #37, so timings below are compared by frames, not seconds.
 
-## 2. The grain (default and crossover below; the sweep is still running)
+## 2. The grain — **keep granulation 0.5 at grain scale 110; no visible crossover**
+
+### Which pair for a projected plate — **granulation 0.5, grain scale 110 (the current Fillmore default)**
+
+Method: `grain39.mjs` on Fillmore at `?debug&sim=512`, on "GPU · 512² · 1.0x" in every run. The settings were sent over OSC after the preset, with a fresh page per variant and one page at a time. Captures at 10 s, 30 s and 2 min after the pick landed at 128–136, 353–391 and 1378–1421 frames, so the variants are frame-matched to within 3 %. The runs are unseeded, so each is a different arrangement of colour. High-pass is `grainhp.mjs`, as on #37.
+
+| variant | small dish 10 / 30 / 120 s | core 10 / 30 / 120 s | by eye at 2× |
+|---|---|---|---|
+| granulation 0 (control) | 1.60 / 1.56 / 1.54 | 5.61 / 5.99 / 5.67 | clean wash |
+| granulation 0.25, scale 110 | 2.49 / 2.49 / 2.45 | 5.51 / 5.65 / 5.66 | faint; lost under the plate cells and bubbles in the core |
+| **granulation 0.5, scale 110** | **4.21 / 4.24 / 4.16** | **5.05 / 5.30 / 5.08** | **a pigment mottle a few px across; the colour still leads** |
+| granulation 0.75, scale 110 | 4.40 / 4.40 / 4.38 | 7.11 / 7.40 / 7.17 | dark cells start to muddy thin dye |
+| granulation 1.0, scale 110 | 7.96 / 7.92 / 7.78 | 8.34 / 8.71 / 8.42 | heavy blotches; the texture leads the colour |
+| granulation 0.5, scale 55 | 2.13 / 2.12 / 2.16 | 4.91 / 5.19 / 4.80 | soft clouds 10–15 px across; reads as blur, not pigment |
+| granulation 0.5, scale 220 | 6.16 / 6.09 / 6.11 | 10.44 / 10.60 / 10.26 | fine sand |
+| granulation 0.5, scale 440 | 9.62 / 9.59 / 9.20 | 12.50 / 12.65 / 12.12 | single-pixel static; on a projector this is video noise |
+
+- **Every variant is at full strength at 10 s and holds to 2 min.** The rows are flat across time, so nothing builds any more. That settles the question from #37.
+- **Granulation scales contrast, and grain scale sets size.** The high-pass doubles from 0.5 to 1.0.
+  - The 0.75 row reads low only because that run's small dish happened to be a darker purple. By eye, 0.75 is clearly stronger than 0.5.
+  - A 5×5 high-pass rewards fine texture, so the scale rows compare size, not strength.
+- **Why 0.5 / 110:**
+  - It is the only pair here that reads as pigment in the liquid rather than as blur (55), sand or static (220, 440) or dirt (0.75 and 1.0).
+  - A projector loses contrast, which argues against going lower. At 0.25 the grain is already hard to see on the Mac screen, under the plate cells.
+  - If James finds it busy on the wall, the next step I'd try is 0.35 at 110, not a different scale.
+- **Caveat:** I judged this on the Mac screen and in crops, not on the projector.
+
+2× small dish at 10 s. **Granulation** 0.25 / 0.5 / 0.75 / 1.0 at scale 110:
+
+![granulation sweep, small dish](s39-sweep-gran-small-10.png)
+
+**Grain scale** 55 / 110 / 220 / 440 at granulation 0.5:
+
+![scale sweep, small dish](s39-sweep-scale-small-10.png)
+
+2× core at 10 s. Granulation 0.25 / 0.5 / 0.75 / 1.0:
+
+![granulation sweep, core](s39-sweep-gran-core-10.png)
+
+Scale 55 / 110 / 220 / 440:
+
+![scale sweep, core](s39-sweep-scale-core-10.png)
+
+Control, small dish: granulation 0 at 10 s, 0.5 at 10 s, 0 at 2 min, 0.5 at 2 min:
+
+![control vs default](s39-sweep-control-g0-vs-d05-small.png)
+
+The same rows at 2 min are `s39-sweep-gran-small-120.png` and `s39-sweep-scale-small-120.png`.
+
 
 ### Crossover — **no pulse and no jump that I can see; the designed dip is there but small**
 
@@ -45,6 +93,8 @@ Method: `grain39.mjs` samples in-page every 3 frames for 1000 frames after the 2
   - Where the liquid is still, a reseeded phase lands on the same noise it left. In the 2× crops below, the speckles in the small dish are in the same places at mix 0, ½, 1 and ½.
 - **No jump at a reseed.** The median step between samples is 0.007 and the p99 is 0.044.
   - The one large step (−0.148, at `grainAge` 4.36) holds its new level and does not show in the core. It lands where nothing reseeds and the weights change smoothly, so it is not the crossover. Most likely something in the composition moved in the small dish.
+- **At granulation 1.0 as well:** 333 samples over 5.3 s of clock. The small dish reads **1.00×** at equal weights (correlation −0.07) and the core 0.94×. The largest step was 0.084 against a median of 0.013.
+- **Control, granulation 0:** 1.00× in the small dish and 0.99× in the core, with a largest step of 0.029. So the dips above are the grain and not the composition.
 - **By eye:** the 2× frames at mix 0 / ½ / 1 / ½ show no change in speckle size or strength in the small dish. In the core the picture changes only because a new orange flood spreads across it.
 
 2× small dish at mix 0, ½ rising, 1, ½ falling (`grainAge` 2.73, 4.44, 5.73, 1.45):
