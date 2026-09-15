@@ -439,16 +439,26 @@ uniform sampler2D u_dye; uniform float u_sharp;
 // what unlimited anti-diffusion does to a field that has a void in it.
 vec4 gate(vec4 a, vec4 b) { return min(a, b) / (max(a, b) + 1e-4); }
 void main() {
-  vec4 c = texture(u_dye, v_uv);
-  vec4 l = texture(u_dye, v_uv - vec2(u_texel.x, 0.0));
-  vec4 r = texture(u_dye, v_uv + vec2(u_texel.x, 0.0));
-  vec4 d = texture(u_dye, v_uv - vec2(0.0, u_texel.y));
-  vec4 u = texture(u_dye, v_uv + vec2(0.0, u_texel.y));
-  // One uphill flux per face, so what a cell gains its neighbour loses.
-  vec4 f = gate(c, l) * (c - l) + gate(c, r) * (c - r)
-         + gate(c, d) * (c - d) + gate(c, u) * (c - u);
-  vec4 s = c + u_sharp * 0.25 * f;
-  vec4 lo = min(min(l, r), min(d, u)), hi = max(max(l, r), max(d, u));
+  vec2 t = u_texel;
+  vec4 c  = texture(u_dye, v_uv);
+  vec4 l  = texture(u_dye, v_uv - vec2(t.x, 0.0));
+  vec4 r  = texture(u_dye, v_uv + vec2(t.x, 0.0));
+  vec4 d  = texture(u_dye, v_uv - vec2(0.0, t.y));
+  vec4 u  = texture(u_dye, v_uv + vec2(0.0, t.y));
+  vec4 dl = texture(u_dye, v_uv + vec2(-t.x, -t.y));
+  vec4 dr = texture(u_dye, v_uv + vec2( t.x, -t.y));
+  vec4 ul = texture(u_dye, v_uv + vec2(-t.x,  t.y));
+  vec4 ur = texture(u_dye, v_uv + vec2( t.x,  t.y));
+  // One uphill flux per neighbour, so what a cell gains its neighbours lose.
+  // The diagonals are in it because the four-neighbour stencil is anisotropic:
+  // with only the axes, a boundary at an angle sharpens into stair-steps along
+  // the grid, and at high strength into fur combed along x and y. The weights
+  // are the isotropic nine-point Laplacian's, 0.2 per axis and 0.05 per corner.
+  vec4 f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
+         + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
+  vec4 s = c + u_sharp * f;
+  vec4 lo = min(min(min(l, r), min(d, u)), min(min(dl, dr), min(ul, ur)));
+  vec4 hi = max(max(max(l, r), max(d, u)), max(max(dl, dr), max(ul, ur)));
   fragColor = max(clamp(s, min(lo, c), max(hi, c)), vec4(0.0));
 }`,
 

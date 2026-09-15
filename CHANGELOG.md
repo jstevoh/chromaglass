@@ -33,6 +33,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Added — the controller, drawn
+- **APC40 mkII picture** (MIDI panel): the whole control surface to scale, every control carrying
+  the MIDI address it really sends, taken from Akai's Communications Protocol v1.2 rather than
+  guessed. Touch a control on the hardware and the picture selects it, then pick what it should do
+  from the list beside it. Each control is labelled with what it does and coloured by what kind of
+  thing that is, dyes in their own colour.
+- The same picture is the cheat sheet: **On paper** switches it to black on white and **Save PNG**
+  writes it at twice size for the phone or the desk. It works before the controller is plugged in,
+  so a map can be built in advance, and Escape closes it.
+- `src/lib/controllerSurface.ts` holds the layout, so another controller is a data change.
+
+### Changed — sharpening without the grid showing
+- The Mac's look at the first sharpening build found its artefacts ran along the grid axes:
+  stair-steps on angled boundaries at the default, fur combed along x and y at full strength. The
+  pass uses the isotropic nine-point weights now, and the slider maps to half its old strength
+  since the wider stencil pushes about twice as hard per unit. At the default: the same steepening
+  as before (field mean gradient 0.073 against 0.075) with a third of the high-frequency energy
+  (0.039 against 0.097).
+
 ### Added — sharp liquid (plan batch 1, first half)
 - **Sharpness** (`sharpness`, Settings → Liquid, MIDI-learnable): interface sharpening in
   both solvers. Every step advects and diffuses the dye, so a boundary that starts as a
