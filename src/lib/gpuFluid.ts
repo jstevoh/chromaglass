@@ -456,7 +456,13 @@ void main() {
   // are the isotropic nine-point Laplacian's, 0.2 per axis and 0.05 per corner.
   vec4 f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
          + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
-  vec4 s = c + u_sharp * f;
+  // Thin dye carries small differences, and steepening those turns a smooth
+  // wash into a staircase of flat plateaus — which is what went blocky in the
+  // shallow dish while the full dish sharpened cleanly. Fade the pass in with
+  // how much dye a cell actually holds, so the amount of liquid decides, not
+  // the slider.
+  float body = smoothstep(0.15, 0.70, c.a);
+  vec4 s = c + u_sharp * body * f;
   vec4 lo = min(min(min(l, r), min(d, u)), min(min(dl, dr), min(ul, ur)));
   vec4 hi = max(max(max(l, r), max(d, u)), max(max(dl, dr), max(ul, ur)));
   fragColor = max(clamp(s, min(lo, c), max(hi, c)), vec4(0.0));

@@ -255,6 +255,7 @@ class FluidSimulation {
   private mcB: Float32Array;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
+  private shpDens: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
@@ -296,6 +297,7 @@ class FluidSimulation {
     this.mcA = new Float32Array(GRID_AREA);
     this.mcB = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
+    this.shpDens = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -1578,6 +1580,12 @@ class FluidSimulation {
     // comparable dye, 0 where one is empty. See the note in `sharpenDye` in
     // gpuFluid.ts for why the pass carves holes without it.
     const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
+    // Thin dye carries small differences, and steepening those turns a smooth
+    // wash into a staircase of flat plateaus — which is what went blocky in the
+    // shallow dish while the full dish sharpened cleanly. The weight is taken
+    // from the density before the pass, so all four channels see the same one.
+    const dens = this.shpDens;
+    dens.set(this.density);
     for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
       this.shp.set(ch);
       const o = this.shp;
@@ -1590,7 +1598,8 @@ class FluidSimulation {
           // why the diagonals matter.
           const f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
                   + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
-          const s = c + k * f;
+          const t = Math.max(0, Math.min(1, (dens[i] - 0.15) / 0.55));
+          const s = c + k * (t * t * (3 - 2 * t)) * f;
           const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
           const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
           ch[i] = Math.max(0, Math.min(hi, Math.max(lo, s)));

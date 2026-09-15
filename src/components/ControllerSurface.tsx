@@ -30,6 +30,24 @@ const KIND_COLOUR: Record<MidiTarget['kind'], string> = {
   dye: '#ffffff',
 };
 
+/**
+ * A handful of names are longer than any button on a panel, and shrinking the
+ * type until they fit makes a cheat sheet you have to lean into. These are the
+ * short forms, used only when the full name will not fit at a readable size;
+ * the list beside the picture always says the full thing.
+ */
+const SHORT: Partial<Record<string, string>> = {
+  'automate-toggle': 'Evolve', 'overlays-toggle': 'Clean',
+  'seq-play-pause': 'Seq Play', 'seq-prev': 'Seq Prev', 'seq-next': 'Seq Next', 'seq-stop': 'Seq Stop',
+  backgroundLoop: 'Bg Loop', macroSync: 'Macro Sync',
+};
+
+function shortForm(t: MidiTarget): string | undefined {
+  if (t.kind === 'action') return SHORT[t.action];
+  if (t.kind === 'setting') return SHORT[String(t.key)];
+  return undefined;
+}
+
 /** A label short enough to read inside a pad. */
 function shortLabel(t: MidiTarget, presetName: (id: string) => string | undefined): string {
   switch (t.kind) {
@@ -105,15 +123,22 @@ function layout(text: string, width: number, maxLines: number, bold: boolean): s
  * at the smallest type gets an ellipsis.
  */
 function fitLabel(text: string, w: number, h: number, along: boolean, round: boolean, bold: boolean): { lines: string[]; size: number } {
-  // Room along the label's own reading direction; a circle takes its margin as
-  // a fraction, because the shape narrows above and below the centre line.
-  const across = round ? (along ? h : w) * 0.84 : (along ? h : w) - 5;
   const down = along ? w : h;           // across it, where the lines stack
+  const room = along ? h : w;           // along the label's own reading direction
+  // Readable type comes first: at each size, the label is tried with a
+  // comfortable margin — 4.5 units a side on a rectangle, more on a circle,
+  // which narrows away from the centre line — and then with a tight one. A long
+  // name set a size larger and closer to the edge reads better on a dark stage
+  // than the same name set smaller with air around it, and both beat a cut.
+  const margins = [round ? room * 0.20 : 9, round ? room * 0.12 : 5];
   for (const size of SIZES) {
     const maxLines = Math.max(1, Math.min(3, Math.floor((down - 2) / (size + 1.5))));
-    const lines = layout(text, across / size, maxLines, bold);
-    if (lines) return { lines, size };
+    for (const margin of margins) {
+      const lines = layout(text, (room - margin) / size, maxLines, bold);
+      if (lines) return { lines, size };
+    }
   }
+  const across = room - (round ? room * 0.12 : 5);
   const size = SIZES[SIZES.length - 1];
   let cut = text;
   while (cut.length > 1 && em(`${cut}…`, bold) * size > across) cut = cut.slice(0, -1);
@@ -138,10 +163,16 @@ const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a
  * panel and Icy Blue on paper are the colour of the ground they sit on. Lift or
  * drop the ink, keeping the hue, until it separates from the panel it is on.
  */
-function readable(hex: string, onPaper: boolean): string {
-  const ground = onPaper ? 1 : luminance([10, 10, 10]);
+function readable(hex: string, onPaper: boolean, tint = 0): string {
+  const panel = onPaper ? [255, 255, 255] : [10, 10, 10];
+  const self = parse(hex);
+  // The label sits on the control's own fill, not on the bare panel: a dye pad
+  // is its colour at a third over the panel, so that is the ground to read it
+  // against. Measuring against the panel left Hot Pink and Cherry Red at 2.2
+  // on their own pads.
+  const ground = luminance(panel.map((v, i) => v + (self[i] - v) * tint));
   const towards = onPaper ? 0 : 255;
-  let rgb = parse(hex);
+  let rgb = self;
   for (let i = 0; i < 24 && contrast(luminance(rgb), ground) < 3.6; i++) {
     rgb = rgb.map(v => v + (towards - v) * 0.1);
   }
@@ -212,13 +243,24 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
     await img.decode().catch(() => {});
     const scale = 2;
+    // A band at the top saying which map this is: taped to a desk, a sheet with
+    // no name on it is one of several.
+    const band = 30;
     const canvas = document.createElement('canvas');
-    canvas.width = surface.width * scale; canvas.height = surface.height * scale;
+    canvas.width = surface.width * scale; canvas.height = (surface.height + band) * scale;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.fillStyle = paper ? '#ffffff' : '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = paper ? '#111827' : '#ffffff';
+    ctx.font = `700 ${13 * scale}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillText(`ChromaGlass · ${surface.name}`, 16 * scale, 20 * scale);
+    ctx.font = `${10 * scale}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.globalAlpha = 0.55;
+    const when = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    ctx.fillText(`${midi.map.bindings.length} assigned · ${when}`, (surface.width - 170) * scale, 20 * scale);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(img, 0, band * scale, canvas.width, surface.height * scale);
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `chromaglass-${surface.id}-cheatsheet.png`;
@@ -230,7 +272,9 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
   // list is part of what a photograph of this screen has to be readable in.
   const card = paper ? 'border-black/10 bg-black/[0.03]' : 'border-white/10 bg-white/5';
   const btn = `px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${paper ? 'border-black/15 bg-black/5 hover:bg-black/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`;
-  const chip = `px-2 py-1 rounded-md border text-[10px] flex items-center gap-1.5 disabled:opacity-30 ${paper ? 'border-black/15 bg-black/5 hover:bg-black/15' : 'border-white/10 bg-white/5 hover:bg-white/15'}`;
+  // On screen an unusable chip fades to say so; on paper the list is reference
+  // rather than buttons, and a photograph of a faded list is no use.
+  const chip = `px-2 py-1 rounded-md border text-[10px] flex items-center gap-1.5 ${paper ? 'border-black/15 bg-black/5 hover:bg-black/15' : 'border-white/10 bg-white/5 hover:bg-white/15 disabled:opacity-30'}`;
   const faint = paper ? 'rgba(17,24,39,0.45)' : 'rgba(255,255,255,0.35)';
   const panel = paper ? '#ffffff' : '#0a0a0a';
 
@@ -241,21 +285,30 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     const isSel = selected?.id === c.id;
     const touched = performance.now() - (lit[controlKey(c)] ?? -1e9) < 600;
     const raw = target ? colourOf(target) : null;
-    const colour = raw ? readable(raw, paper) : null;
+    const tint = target?.kind === 'dye' ? 0x55 / 255 : 0x33 / 255;
+    const colour = raw ? readable(raw, paper, tint) : null;
     const round = c.shape === 'round' || c.shape === 'knob';
     const r = c.shape === 'knob' ? c.w / 2 : c.shape === 'round' ? c.h / 2 : c.shape === 'pad' ? 6 : 4;
     const label = target ? shortLabel(target, presetName) : c.label;
     // A tall fader is 22 units across and 96 down, so its label runs along it,
     // the way a mixer strip is labelled.
     const along = c.shape === 'fader' && c.h > c.w * 1.5;
-    const { lines, size: fontSize } = fitLabel(label, c.w, c.h, along, round, !!target);
+    // The full name first; the short form only if the full one would have to be
+    // set smaller than is comfortable to read on a dark stage.
+    const short = target ? shortForm(target) : undefined;
+    let fit = fitLabel(label, c.w, c.h, along, round, !!target);
+    if (short && fit.size < 7) {
+      const alt = fitLabel(short, c.w, c.h, along, round, !!target);
+      if (alt.size > fit.size) fit = alt;
+    }
+    const { lines, size: fontSize } = fit;
     const fill = raw ? `${raw}${target?.kind === 'dye' ? '55' : '33'}` : (paper ? 'rgba(17,24,39,0.04)' : 'rgba(255,255,255,0.04)');
     const edge = touched ? (paper ? '#111827' : '#ffffff') : isSel ? '#22d3ee' : (colour ?? faint);
     // The track line runs the length of the fader, whichever way it lies — on
     // the horizontal crossfader a vertical one struck through its own label —
     // and it breaks around the label rather than scoring it through.
     const long = along ? c.h : c.w;
-    const gap = Math.min(long - 16, Math.max(...lines.map(l => em(l, !!target))) * fontSize + 5);
+    const gap = Math.min(long - 16, Math.max(...lines.map(l => em(l, !!target))) * fontSize + 10);
     const track: [number, number][] = c.shape !== 'fader' ? []
       : [[6, (long - gap) / 2], [(long + gap) / 2, long - 6]].filter(([a, b]) => b - a > 2) as [number, number][];
     return (
@@ -310,7 +363,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
               className={chip}
               data-testid={`assign-${r.key}`}
             >
-              {r.swatch && <span className="w-2 h-2 rounded-full" style={{ background: r.swatch }} />}
+              {r.swatch && <span className="w-2 h-2 rounded-full" style={{ background: r.swatch, boxShadow: `inset 0 0 0 1px ${paper ? 'rgba(17,24,39,0.35)' : 'rgba(255,255,255,0.35)'}` }} />}
               {r.label}
             </button>
           ))}
@@ -362,7 +415,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
           <div className="flex flex-wrap gap-3 mt-2 text-[10px] opacity-60">
             {(['preset', 'dye', 'action', 'setting'] as MidiTarget['kind'][]).map(k => (
               <span key={k} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: readable(KIND_COLOUR[k], paper) }} />
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: KIND_COLOUR[k], boxShadow: `inset 0 0 0 1px ${paper ? 'rgba(17,24,39,0.35)' : 'rgba(255,255,255,0.35)'}` }} />
                 {k === 'dye' ? 'Dye (in its own colour)' : k[0].toUpperCase() + k.slice(1)}
               </span>
             ))}
