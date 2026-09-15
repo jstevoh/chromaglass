@@ -4,7 +4,12 @@
 
 **In short**
 - **Launch:** server pid **36169**, show key **5950**, curl 200. Details in §1.
-- Looks to follow.
+- **The gate: not confirmed, and not a number.** With `fold` forced to 1 at 0.08–0.20 the full-dish contour map is gone (lift 23 % against 37 % on the old gate), but stacks come back on some steep ramps: a green → red ramp and your pale-red blob. The blob stacks 4–5 lines **at the real 0.55**. Gates of 0.10–0.25, 0.12–0.30 and 0.15–0.35 all keep 3–5 of those lines while thinning the real boundaries, so **I wouldn't change the number**. Details in §2.
+- **Fillmore: keep 0.55.** Under the grain the core's thread only starts to read at 0.65–0.75, but by then the stacks are the brightest lacing on the plate. The exception decides the look, not the value. Details in §3.
+- **The exception:** its pixels are as steep (`al` ≈ 0.2), as opaque, as straight and as hue-only as a real boundary, so nothing sampled at the pixel separates it. Three tests failed: a second-difference skirt test (it kills the core first) and two `span12`/`span` width gates (they do nothing). What's different is that one change gets several level crossings. My suggestion for the test, untested: measure the change by walking along the normal while `al` holds, or draw only the level nearest the span's midpoint.
+- **Small dish:** effectively unlaced now (0.3 % lifted).
+- **Beads:** still thin dark rings with no interior cue, 10–43 px (p10–p90). Within a neighbourhood they vary 3.6× in size, but the clusters are sparse. They rarely meet the threads, and where they do both stay distinct. Beads under ~12 px dissolve into the grain. Details in §4.
+- 0 GL errors, 0 NaN on all five pages.
 
 ## 1. Launch
 
@@ -117,6 +122,17 @@ Run b (the §2 page):
   - The red blob's soft right edge keeps 2–3 of its 3–4 threads.
   - The orange blob's ribbed stack on the right of the second row is untouched.
   - The core's threads fade.
+- **A tighter width test doesn't work either.** Run e kills the gate where `span12`/`span` > 1.25–1.6. Whole dish, 0.5×: 0 | real 0.55 | ratio 1.25–1.6 at 0.55 | ratio 1.8–2.6 at 0.55 | real 0.99 | ratio 1.25–1.6 at 0.99 | ratio 1.8–2.6 at 0.99.
+
+  ![width ratio](l47-width.png)
+
+  Coverage doesn't move (main dish 5.1 / 5.4 / 5.8 % at 0.55, 7.8 / 7.7 / 8.1 % at 0.99), and the pink → teal stack at the left is untouched. The ratio over laced pixels is p50 ≈ 0.7–1.1 and p90 ≈ 1.6–2.1: on a multi-hue change the ±12-cell samples usually project *shorter* than the ±4-cell ones, so the ratio can't say "this band is wide".
+
+**What I'd give you to write the test against:** the stacks are steep (`al` ≈ 0.2, like a real boundary), straight (on the hair floor), at full alpha, and almost all hue change. So nothing sampled at the pixel separates them. What they have that a real boundary doesn't is **more than one or two level crossings across one change**. The measure that separates them has to follow the change along the normal until `al` drops, not a fixed ±4 or ±12 cells projected on one axis. For example, march along `n` in steps of 2 cells while `al` stays above half its value here, and set `freq` so the whole walked change carries 1.5 threads. I haven't tested that; it is 6–10 more samples. If that is too dear, the cheaper cap is on the count rather than the gate: draw only the level nearest the middle of the `fAhead`/`fBack` span. That would leave the stack's one central thread.
+
+**Small dish:** with the gate at 0.08–0.20 it is effectively unlaced: 0.3 % of its region lifted at 0.55 and 0.6–0.7 % at 0.99 (run d), down from 4.6 % on #44. That fits #44's `al` p90 of 0.056 there.
+
+**Errors and cost:** 0 GL errors (`getError` after every draw for 25 s) and 0 NaN in both dishes, on all five pages. The only console line is the usual "too many errors" cap from the app's READ-usage warnings. #47 changed two constants, so I didn't re-time it.
 
 ## 4. Batch 3: the bead field now, with lacing and the grain
 
