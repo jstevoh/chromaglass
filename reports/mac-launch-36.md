@@ -24,7 +24,17 @@
 
 **The small dish is not fixed.**
 - At 25 s under today's load it looks much better than #35: clean at 0.5 and 0.6, faint at 0.7, a smaller blocky patch at 1.0.
-- Those pages ran only ~380 solver frames, against ~1000 on #35. Re-run at #35's frame count with the grain off, the blocks are back at 0.7 and 1.0, covering a third to a half of the dish. Gradient fraction is 0.46 and 0.45, against 0.21 at 0 and #35's 0.47 and 0.51.
+- Those pages ran only ~380 solver frames, against ~1000 on #35. I re-ran at #35's frame count (~1150) with the grain off. Small-dish gradient fraction:
+
+  | slider | 0 | 0.5 | 0.6 | 0.7 | 1.0 |
+  |---|---|---|---|---|---|
+  | #36, grain off, ~1150 frames | 0.21 | 0.21 | 0.28 | 0.46 | 0.45 |
+  | #35, same measure | — | — | 0.29 | 0.47 | 0.51 |
+
+  - **0.5: clean,** the same as 0.
+  - **0.6: not clean.** Plain crosshatch over a large patch, lower in contrast than 1.0.
+  - **0.7 and 1.0: blocky,** over a third to a half of the dish.
+  - At 0.6 and 0.7 this is the same as #35; the gate has not moved where the blocks start.
 - The blocks sit at layer-1 density **0.3–1.2**, peaking at 0.45–0.9. The 0.15–0.70 window lets the pass through there at half to full weight, and the main dish's own body starts at 0.82. So moving the window can't separate the two dishes cleanly.
 - What does separate them: the small dish's dye is still (no new dye, mean 0.41 → 0.39 over two minutes), and the main dish is stirred.
 
@@ -132,30 +142,37 @@ So the step-count question splits in two:
 - **What I can say:** at 25 s the dish is much less blocky on #36 than on #35 at the same slider values, and 0.5 is clean.
 - **What I can't yet say:** whether the #36 improvement survives at #35's step count. At that step count the plate is dominated by a mottle that isn't sharpening.
 
-**With the grain off, at #35's step count: the blocks are back at 0.7 and 1.0.**
+**With the grain off, at #35's step count: 0.5 is clean; the blocks are back from 0.6 up.**
 
-- Setup: `Granulation` set to 0 on the slider after the preset, `FRAMES=1000`. Captures landed at 1134–1151 frames. Order: 1.0, 0, 0.7.
+- Setup: `Granulation` set to 0 on the slider after the preset, `FRAMES=1000`. Captures landed at 1134–1157 frames.
+- Two batches: 1.0, 0, 0.7 first, then 0.6 and 0.5 about 10 minutes later, under the same load (GPU 99 %, 93–110 ms a frame).
 - Result: the mottle is gone, so it was the pigment grain.
 
-Contact sheet `s36-grain0-dish.png`, left to right 0, 0.7, 1.0:
+Contact sheet `s36-grain0-dish-all.png`, left to right 0, 0.5, 0.6, 0.7, 1.0:
 
-![grain off, 0 / 0.7 / 1.0](s36-grain0-dish.png)
+![grain off, 0 / 0.5 / 0.6 / 0.7 / 1.0](s36-grain0-dish-all.png)
 
-2×, 0 and 1.0:
+2×: 0 and 0.5 on top, 0.6 and 1.0 below:
 
-![grain off, 0 vs 1.0](s36-grain0-zoom-0-vs-1.png)
+![grain off, 0 / 0.5 / 0.6 / 1.0 at 2x](s36-grain0-zoom-0-05-06-1.png)
 
-| grain 0, ~1140 frames | 0 | 0.7 | 1.0 |
-|---|---|---|---|
-| small-dish gradient fraction | **0.214** | **0.457** | **0.449** |
-| axisFrac | 0.100 | 0.126 | 0.098 |
-| steps per 1000 px | 22.7 | 33.3 | 33.7 |
+| grain 0 (frames) | 0 (1134) | 0.5 (1157) | 0.6 (1142) | 0.7 (1138) | 1.0 (1151) |
+|---|---|---|---|---|---|
+| small-dish gradient fraction | **0.214** | **0.207** | **0.280** | **0.457** | **0.449** |
+| axisFrac | 0.100 | 0.111 | 0.121 | 0.126 | 0.098 |
+| steps per 1000 px | 22.7 | 22.3 | 24.0 | 33.3 | 33.7 |
+| by eye | smooth | smooth | plain crosshatch over a large patch, lower contrast | plain blocks | plain blocks, stepped terraces |
 
-Steps per 1000 px by layer-1 density band (rotation fit r 0.65 / 0.56 / 0.80):
+- **0.5:** as smooth as 0, by eye and by every count. At the default the shallow dish is clean at #35's step count.
+- **0.6:** plainly visible at 1:1 and at 2×. It is a fine crosshatch over roughly the lower half of the dish crop, not the large terraces of 1.0. The gradient fraction measures it more mildly (0.28) than it looks, because the lines are low in contrast. On #35 this mask gave 0.289 at 0.6, so this is no better.
+
+Steps per 1000 px by layer-1 density band (rotation fit r: 0 0.65, 0.5 0.66, 0.6 0.75, 0.7 0.56, 1.0 0.80):
 
 | band | 0–0.15 | 0.15–0.3 | 0.3–0.45 | 0.45–0.6 | 0.6–0.7 | 0.7–0.9 | 0.9–1.2 |
 |---|---|---|---|---|---|---|---|
 | 0 | 4 | 19 | 21 | 25 | 28 | 31 | 36 |
+| 0.5 | 8 | 13 | 18 | 24 | 27 | 24 | 32 |
+| 0.6 | 1 | 9 | 18 | 34 | 40 | 46 | 44 |
 | 0.7 | 3 | 19 | 28 | 41 | 41 | 46 | 42 |
 | 1.0 | 2 | 19 | 38 | **48** | **50** | **54** | 52 |
 | excess at 1.0 over 0 | −2 | 0 | +17 | +23 | +22 | +23 | +16 |
@@ -231,6 +248,20 @@ It looks the same as it did. But I have to correct what I said it bought.
 - The default 0.5 is harmless: clean in the small dish at 25 s, identical to 0 in the main dish. I can't say it earns its place.
 
 ![core montage](s36-montage-core.png)
+
+### f) What I could not measure
+
+- **Frame cost of the gate.** Not measured: GPU utilisation was 92–99 % all session, so frame time follows load rather than the setting.
+- **Repeats at the matched step count with the grain off.** Each value there is a single run, so I cannot give a run-to-run spread at ~1140 frames. At 25 s the spread at one value was up to 0.08 in gradient fraction.
+- **0.75, 0.8 and 0.9 at the matched step count.** Not run; only 0, 0.5, 0.6, 0.7 and 1.0.
+- **The main dish at the matched step count on a fixed composition.** The seeded test (§2d) ran at 25 s (~370 frames). I have no seeded frames at ~1150 frames, so "0.5 looks like 0 in the main dish" is shown at 25 s only.
+  - The grain-off, frame-matched frames at 0, 0.5 and 1.0 (`s36-grain0-core-0-05-1.png`) are unseeded, so each is a different composition.
+  - None has stair-steps or rims. All three show the plate-cell carpet and soft colour boundaries, and nothing in them is lost at 0.5.
+  - Their core edge counts (0.198 / 0.298 / 0.157) don't follow the setting, so they measure the plate's state, not sharpening.
+- **A moved gate window.** Trying a different window needs a code change, and this session doesn't change code. §2c gives the densities where the blocks sit instead.
+- **Exact density under each block.** The small dish's plate rotation isn't exposed, so the density bands come from a best-fit rotation (r 0.56–0.80). Treat the bands as approximate.
+- **The projector.** Not looked at, by the house rules. Everything here is my own Playwright windows on the Mac screen.
+- **A printed sheet.** Nothing was printed. The printed type sizes in §3a are computed from the PNG at a 10-inch width.
 
 ## 3. The cheat sheet, second pass
 
@@ -388,7 +419,8 @@ On-screen PNG (`s36-cheatsheet-screen.png`): black ground, same band in white. T
 - `reports/s36-montage-{dish,core,dishzoom}.png`, `s36-smalldish-mask.png`: sharpness at 25 s
 - `reports/s36-frames-dish.png`, `s36-frames-dish-{05,1}.png`, `s36-frames-wide-{05,1}.png`, `s36-frames.json`: frame-matched (~1130 frames)
 - `reports/s36-rim-core-0-05-1.png`: seeded core at 0, 0.5 and 1.0
-- `reports/s36-grain0-dish.png`, `s36-grain0-zoom-0-vs-1.png`, `s36-grain0-wide-{0,1}.png`, `s36-grain0.json`: grain off, frame-matched
+- `reports/s36-grain0-dish-all.png`, `s36-grain0-zoom-0-05-06-1.png`, `s36-grain0-core-0-05-1.png`: grain off, frame-matched, 0 / 0.5 / 0.6 / 0.7 / 1.0
+- `reports/s36-grain0-dish.png`, `s36-grain0-zoom-0-vs-1.png`, `s36-grain0-wide-{0,1}.png`, `s36-grain0.json`: grain off, frame-matched, first batch (0 / 0.7 / 1.0)
 - `reports/s36-rim-core.png`, `s36-rim-dish-05-vs-1.png`: seeded, cells 0
 - `reports/s36-sharp-4.json`, `s36-rim.json`: per-run status
 - Scripts on the Mac, in `~/cg-scratch/`: `sharp4.mjs` (env `SEED`, `SLIDERS`, `FRAMES`), `smalldish.mjs`, `blockdens.mjs`, `dishdens.mjs`, `rimcmp.mjs`, `montage4.mjs`, `surface36.mjs`, `surface36z.mjs`

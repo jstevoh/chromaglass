@@ -81,6 +81,60 @@
    "sliders": {
     "Granulation": 0
    }
+  },
+  "g06": {
+   "val": 0.6,
+   "picked": true,
+   "sliderVal": "0.6",
+   "st": {
+    "mean": 0.8157130572042502,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8157130572042502
+     },
+     {
+      "mean": 0.3792839377577819
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.6,
+    "cells": 0.2,
+    "frames": 1142
+   },
+   "rafMs": 95.11288711288711,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
+  },
+  "g05": {
+   "val": 0.5,
+   "picked": true,
+   "sliderVal": "0.5",
+   "st": {
+    "mean": 0.8174769198610944,
+    "n": 36864,
+    "nan": 0,
+    "layers": [
+     {
+      "mean": 0.8174769198610944
+     },
+     {
+      "mean": 0.38517289042524533
+     }
+    ],
+    "label": "GPU · 512² · 1.0x",
+    "sharpness": 0.5,
+    "cells": 0.2,
+    "frames": 1157
+   },
+   "rafMs": 93.35464535464536,
+   "extra": "",
+   "sliders": {
+    "Granulation": 0
+   }
   }
  }
 }
