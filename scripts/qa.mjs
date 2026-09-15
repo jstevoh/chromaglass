@@ -106,6 +106,14 @@ try {
   const menu = firstVisible('preset-menu');
   const entries = await menu.locator('button').count();
   check('the preset menu opens with presets in it', (await menu.count()) === 1 && entries > 10, `${entries} entries`);
+
+  // Read it while it is still open: applying a preset closes the menu, and
+  // saving and loading must still be reachable now that the settings panel's
+  // copy of the presets is gone — one menu, or the feature was lost rather
+  // than de-duplicated.
+  const menuText = await menu.innerText();
+  check('the preset menu can still save and load a look',
+    /save/i.test(menuText) && /load/i.test(menuText));
   // Apply one and make sure the app survives having its whole look replaced.
   const crowd = menu.locator('button', { hasText: /Crowd Plate/i }).first();
   if (await crowd.count()) {
@@ -127,6 +135,10 @@ try {
   const sliders = page.locator('input[type="range"]:visible');
   const sliderCount = await sliders.count();
   check('settings has sliders', sliderCount > 20, `${sliderCount}`);
+
+  // The presets belong on the title and nowhere else.
+  check('settings does not carry a second copy of the presets',
+    !headings.some(h => /^presets$/i.test(h.trim())), headings.join(', '));
 
   // Ride every one of them, to a value its own min/max/step allows, one per
   // animation frame — which is how a hand on a slider, a MIDI fader and the
