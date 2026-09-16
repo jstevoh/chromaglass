@@ -1900,6 +1900,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     return contract.length <= 3 ? windowOf(contract, null, lead) : harmonyWithin(contract);
   };
   const bubblesRef = useRef(new BubbleField(GRID_SIZE));
+  /** The last values handed to the bubble uniforms, for the harness. */
+  const bubbleDebugRef = useRef({ count: 0, strength: 0, amount: 0 });
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
@@ -3527,16 +3529,30 @@ void main() {
       float ground = dot(outColor, vec3(0.299, 0.587, 0.114));
       float rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
       vec3 c = outColor;
+      // ── What colour is the light a bubble adds? ──
+      // It used to be white, and a little of it blue from the second lamp,
+      // which is why a bubble read as a grey sticker rather than as part of
+      // the liquid: a neutral highlight on a red plate is a hue shift, and
+      // measured over ten bubbles it was 44° on average and 134° at worst.
+      //
+      // Physically almost none of that light is the lamp seen directly. It
+      // is the lamp *through* the dye film that wraps the dome and lies
+      // under it, so it carries the dye's own colour. The tint below is the
+      // ground's hue at unit brightness, taking over as the film thickens; over
+      // bare glass there is nothing to tint it and it stays neutral, which is
+      // also what a real bubble on clean glass looks like.
+      float filmT = smoothstep(0.02, 0.28, fluid0.a);
+      vec3 tint = mix(vec3(1.0), outColor / max(max(outColor.r, max(outColor.g, outColor.b)), 1e-3), filmT);
       // The lens: the plate behind, pulled in toward the bubble's centre.
       vec2 lensUv = fuvBase - bestD * bestRad * (0.15 + 0.35 * play);
       vec4 lensF = decodeFluid(u_layer0, lensUv, 0.0, false);
       vec3 lensCol = mix(bgColor, lensF.rgb, lensF.a);
       c = mix(c, lensCol, inside * 0.45 * play);
-      c = mix(c, c * 1.18 + 0.06, inside * 0.55 + centre * 0.3);     // the lamp through the lens
+      c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);   // the lamp through the lens
       // Shaded as a lens: dimmer toward the lamp, brighter away from it.
       c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
       float arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));
-      c += (c * 0.9 + 0.16) * arcBand * max(0.0, -toward) * 0.9 * play;          // the caustic arc
+      c += (c * 0.9 + tint * 0.16) * arcBand * max(0.0, -toward) * 0.9 * play;   // the caustic arc
       // A little of the plate around the far side sits in the bubble's shadow.
       float halo = smoothstep(0.3, 0.7, edge) * (1.0 - smoothstep(0.7, 0.92, edge));
       c *= 1.0 - halo * max(0.0, -toward) * 0.22 * play;
@@ -3544,21 +3560,21 @@ void main() {
       // Thin-film colour running round the rim, brighter over bright ground.
       if (u_iridescence > 0.001) {
         vec3 film = thinFilm(edge * 2.2 + atan(bestD.y, bestD.x) * 0.5 + u_time * 0.05);
-        c = mix(c, c * (0.55 + 1.2 * film), membrane * u_iridescence * (0.35 + 0.65 * ground));
+        c = mix(c, c * (0.55 + 1.2 * film), membrane * u_iridescence * 0.7 * (0.35 + 0.65 * ground));
       }
       // The lamp's own reflection: a small spot on the lamp side of the dome.
       vec2 hd = bestD - lampSide * 0.36;
-      float hl = exp(-dot(hd, hd) * 22.0) * inside;
-      c += vec3(1.0, 0.98, 0.92) * hl * (0.25 + 0.3 * ground);
+      float hl = exp(-dot(hd, hd) * 26.0) * inside;
+      c += mix(vec3(1.0, 0.98, 0.92), tint, 0.65 * filmT) * hl * (0.18 + 0.24 * ground);
       if (u_lamp2.w > 0.001) {
         vec3 L2 = lampDir(fuvBase, u_lamp2);
         vec2 side2 = L2.xy / max(length(L2.xy), 0.06);
         float toward2 = dot(nd, side2);
-        c += vec3(0.6, 0.78, 1.0) * (0.15 + ground * 0.5) * arcBand * max(0.0, -toward2) * play * u_lamp2.w;
+        c += tint * vec3(0.72, 0.86, 1.0) * (0.12 + ground * 0.38) * arcBand * max(0.0, -toward2) * play * u_lamp2.w;
         vec2 hd2 = bestD - side2 * 0.36;
-        c += vec3(0.75, 0.86, 1.0) * exp(-dot(hd2, hd2) * 22.0) * inside * 0.35 * u_lamp2.w;
+        c += mix(vec3(0.75, 0.86, 1.0), tint, 0.6 * filmT) * exp(-dot(hd2, hd2) * 26.0) * inside * 0.22 * u_lamp2.w;
       }
-      outColor = mix(outColor, c, opac * u_bubbleStrength);
+      outColor = mix(outColor, c, opac * u_bubbleStrength * mix(0.6, 1.0, filmT));
       auxN = mix(auxN, -bestD * 0.8, opac * inside);
       auxB = max(auxB, opac * inside);
     }
@@ -4330,8 +4346,8 @@ void main() {
                 }
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
-                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.25 + (currentSettings.bubbles ?? 0) * 0.4
-                      && bubblesRef.current.bubbles.length < 6 + Math.round(24 * (currentSettings.bubbles ?? 0))) {
+                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
+                      && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
                   }
                 } else {
@@ -4634,9 +4650,12 @@ void main() {
               // Air lives in the oil: a kick releases a few small bubbles into
               // the densest dye near the ring, where they gather into the packed
               // fields the references show, rather than one lens on bare glass.
-              const room = bubbles.bubbles.length < 6 + Math.round(24 * bubbleAmt);
+              // Fewer than it used to be, on purpose. A field of forty reads as
+              // foam on a shower door; three or four reading as air trapped in
+              // the oil is the thing the references actually show.
+              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
-              if (currentAudioData && room && ((onset && Math.random() < 0.8 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.006 * bubbleAmt))) {
+              if (currentAudioData && room && ((onset && Math.random() < 0.45 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.003 * bubbleAmt))) {
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
                 for (let t = 0; t < 6; t++) {
@@ -5105,8 +5124,16 @@ void main() {
             const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
             glCtx.uniform4fv(uLocs['u_bubbles'], bubblesRef.current.packed);
             glCtx.uniform4fv(uLocs['u_bubbleShape'], bubblesRef.current.packedShape);
+            // Fewer bubbles, not fainter ones. The setting now governs how
+            // many are on the plate; each one still has to read as a lens
+            // rather than as a smudge, so its strength starts well above zero
+            // and climbs slowly. Scaling both by the same number made a plate
+            // at the new default nearly invisible — the harness caught it as
+            // "0 pixels changed".
+            const bubbleStrength = Math.min(0.9, 0.35 + bubbleAmt * 0.8);
             glCtx.uniform1i(uLocs['u_bubbleCount'], Math.min(MAX_BUBBLES, count));
-            glCtx.uniform1f(uLocs['u_bubbleStrength'], Math.min(1, bubbleAmt * 1.6));
+            glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbleStrength);
+            bubbleDebugRef.current = { count: Math.min(MAX_BUBBLES, count), strength: bubbleStrength, amount: bubbleAmt };
           }
           glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
           // Sampling math follows the texture actually bound; the tuned look
@@ -5186,6 +5213,9 @@ void main() {
         governor: governorRef.current,
         externalTilt: externalTiltRef.current,
         bubbles: bubblesRef.current,
+        // What the shader was actually told about them last frame: a bubble
+        // that is on the plate but not in these two numbers is not on screen.
+        bubbleUniforms: () => ({ ...bubbleDebugRef.current }),
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,

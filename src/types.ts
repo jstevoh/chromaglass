@@ -171,7 +171,7 @@ export interface VisualizerSettings {
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
-  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none)
+  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye, no beat, no dye
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
@@ -302,7 +302,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,
-  bubbles: 0.5,
+  bubbles: 0.2,
   plateRock: 0.45,
   layerScaleVariety: 0.5,
   hueJourney: 3,
