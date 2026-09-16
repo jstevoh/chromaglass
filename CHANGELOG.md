@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the desk (plan batch 8b–8f)
+- **Perform**, beside Design: the plate becomes a preview and the controls get the
+  room, because during a show the plate is already on a wall behind you and the thing
+  you cannot see is the desk. Design — the plate filling the window — stays, and is
+  still the right shape for building a look. Checked in `npm run qa`: toggling to
+  Perform does not change the canvas's backing store by one pixel (1440×900 in both,
+  while the box it is drawn in goes 1440 → 688 wide), because with a projector
+  attached the render size comes from the projector and never from this window
+- **On the faders**: six controls always out, at 44px of grabbable height, chosen from
+  `LEARNABLE_SETTINGS` — the same list MIDI learn offers, so the desk and the
+  controller map cannot disagree about what is rideable. In Perform the three floating
+  sliders that duplicated them are hidden
+- **A status line**: what is live and for how long, the sequencer's stage and progress,
+  the audio source and its level, and whether the projector, MIDI, room camera and
+  recorder are on. Nearly all of it was already computed and never shown
+- **Lucky is guarded**: it replaces all eighty settings from one click, next to controls
+  used mid-show. It now keeps the look it replaced, so Revert brings it straight back,
+  and in Perform it asks once before firing
+
+### Changed — readable in a dark room
+- Measured rather than judged, and the measurement corrected an assumption: **no**
+  actionable control was ever under 60% opacity. What was real was size — eleven
+  controls carried text at 8, 9 or 10px, the dye swatches were 20px square, and three
+  sliders had a 4px-tall hit area. Type now has an 11px floor and nothing clickable is
+  under 24px, both checked by `npm run qa`
+- The plan asked for 44px hit targets. Measurement showed that to be the wrong target:
+  it would give the sixteen dye swatches 704px of column to themselves
+
 ### Added — the desk, part one: Cue and Go (plan batch 8a)
 - Clicking a preset used to put it on the wall that instant, through `applyPreset` —
   which clears every layer and reseeds. That is right while you are *building* a look

@@ -374,6 +374,45 @@ try {
       back.boxW > perform.boxW * 1.2, `${perform.boxW}px → ${back.boxW}px`);
   }
 
+  // ── Readable in a dark room ───────────────────────────────────────
+  //
+  // The desk is read at arm's length, in a dark room, by someone whose eyes
+  // are adapted to a projection. 8px uppercase at 40% opacity is elegant in a
+  // screenshot and unreadable there.
+  //
+  // The plan's gate said 44px hit targets. Measured, that was the wrong
+  // target: it would give the sixteen dye swatches 704px of column on their
+  // own. What measurement did support is the type — eleven actionable controls
+  // carried text at 8, 9 or 10px, and the dye swatches were 20px square. So
+  // the gate kept is type size and contrast, with a floor on hit targets low
+  // enough to allow a deliberately dense swatch grid.
+  //
+  // One thing measurement contradicted outright: the assumption that the UI
+  // leaned on faint text for things you click. Not one actionable control was
+  // below 60% opacity, then or now.
+  {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await settle(1000);
+    const legible = await page.evaluate(() => {
+      const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(','); return p[3] === undefined ? 1 : parseFloat(p[3]); };
+      const tiny = [], faint = [], small = [];
+      for (const el of document.querySelectorAll('button, input, select, [role="menuitem"], a')) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0 || el.offsetParent === null) continue;
+        const cs = getComputedStyle(el);
+        const text = (el.textContent || '').trim();
+        const name = (text || el.getAttribute('aria-label') || el.getAttribute('title') || el.tagName).slice(0, 26);
+        if (text && parseFloat(cs.fontSize) < 11) tiny.push(`${name} ${cs.fontSize}`);
+        if (text && alpha(cs.color) < 0.6) faint.push(`${name} α${alpha(cs.color)}`);
+        if (Math.min(r.width, r.height) < 24) small.push(`${name} ${Math.round(r.width)}×${Math.round(r.height)}`);
+      }
+      return { tiny, faint, small };
+    });
+    check('nothing you can click has text under 11px', legible.tiny.length === 0, legible.tiny.slice(0, 6).join(', '));
+    check('and none of it is under 60% opacity', legible.faint.length === 0, legible.faint.slice(0, 6).join(', '));
+    check('and nothing is smaller than 24px', legible.small.length === 0, legible.small.slice(0, 6).join(', '));
+  }
+
   // ── Nothing is on the screen twice ────────────────────────────────
   //
   // The Band button was in the sound picker twice — the same markup pasted

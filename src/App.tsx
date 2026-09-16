@@ -6,6 +6,8 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
+import { RideStrip, DEFAULT_RIDE } from './components/RideStrip';
+import { StatusLine } from './components/StatusLine';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -65,6 +67,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
+/** Which controls are on the desk's faders. A property of this desk, like the mode. */
+const RIDE_KEYS_KEY = 'chromaglass-ride-keys';
 
 function rememberedSource(): AudioSource {
   try {
@@ -157,6 +161,13 @@ export default function App() {
     try { return localStorage.getItem(DESK_MODE_KEY) === 'perform' ? 'perform' : 'design'; } catch { return 'design'; }
   });
   useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
+  const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RIDE_KEYS_KEY) ?? 'null');
+      return Array.isArray(saved) ? saved : DEFAULT_RIDE;
+    } catch { return DEFAULT_RIDE; }
+  });
+  useEffect(() => { try { localStorage.setItem(RIDE_KEYS_KEY, JSON.stringify(rideKeys)); } catch { /* private window */ } }, [rideKeys]);
   /**
    * The preset last applied by hand. Which preset is *active* is derived from
    * the settings below rather than stored: it only ever differed from them
@@ -730,6 +741,23 @@ export default function App() {
   // no hole and the plate fills the window, as it always has.
   const preview = usePreviewFrame(performing);
 
+  /**
+   * How long the look on the wall has been up.
+   *
+   * Ticked once a second rather than derived per frame: a clock on a desk
+   * does not need to be right to the millisecond, and the alternative is a
+   * re-render of the whole shell sixty times a second for a number that
+   * changes once.
+   */
+  const lookSince = useRef(Date.now());
+  const [lookFor, setLookFor] = useState(0);
+  useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
+  useEffect(() => {
+    if (deskMode !== 'perform') return;
+    const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
+    return () => clearInterval(id);
+  }, [deskMode]);
+
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -858,7 +886,22 @@ export default function App() {
     sequencer.setSelectedId(parsed.sequence.id);
   };
 
+  /**
+   * Lucky replaces all eighty settings at once, from one click, sitting next
+   * to controls that are used mid-show. That is fine while you are hunting for
+   * a look and alarming during a set, so two things guard it: the look it
+   * replaced is kept, so Revert brings it straight back, and in Perform the
+   * button asks once before it fires.
+   */
+  const [luckyArmed, setLuckyArmed] = useState(false);
+  useEffect(() => {
+    if (!luckyArmed) return;
+    const id = setTimeout(() => setLuckyArmed(false), 3000);
+    return () => clearTimeout(id);
+  }, [luckyArmed]);
+
   const triggerLucky = () => {
+    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
     const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
     const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];
     const audioFeatures: ('none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity')[] = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'];
@@ -1335,17 +1378,17 @@ export default function App() {
           <button onClick={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
             {musicPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
           </button>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate" title={musicFile.name}>{musicFile.name}</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate" title={musicFile.name}>{musicFile.name}</span>
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.t / 60)}:{String(Math.floor(musicTime.t % 60)).padStart(2, '0')}</span>
           <input type="range" min={0} max={Math.max(1, musicTime.d)} step={0.1} value={Math.min(musicTime.t, musicTime.d || 0)}
             onChange={(e) => { const el = musicElRef.current; if (el) el.currentTime = parseFloat(e.target.value); }}
-            className="w-40 h-1 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
+            className="w-40 h-6 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.d / 60)}:{String(Math.floor(musicTime.d % 60)).padStart(2, '0')}</span>
           <button onClick={closeMusicFile} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
         </div>
       )}
       {projector.projector && !isCasting && overlaysVisible && projector.mode !== 'off' && (
-        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">
           <button onClick={() => { void projector.sendNow(); }} className="flex items-center gap-2 hover:text-white" title="Open the show full size on the second screen, with nothing else on it">
             <Projector size={13} /> {projector.projector.label} connected · {projector.armed ? 'sending on your next click' : 'send the show there'}
           </button>
@@ -1361,13 +1404,13 @@ export default function App() {
         </div>
       )}
       {isCasting && windowFullscreen === false && overlaysVisible && (
-        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
           <Projector size={13} /> The projector window still has its title bar
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
       {settings.macroMode && overlaysVisible && (
-        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
+        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
           <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 4).toFixed(1)}×</span>
@@ -1375,7 +1418,7 @@ export default function App() {
         </div>
       )}
       {blackout && overlaysVisible && (
-        <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
+        <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
 
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
@@ -1386,7 +1429,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 1.2 } }}
-            className="pointer-events-none absolute bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/50 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 backdrop-blur-xl"
+            className="pointer-events-none absolute bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white/60 backdrop-blur-xl"
           >
             Esc — or hold a finger down — brings the controls back
           </motion.div>
@@ -1425,7 +1468,7 @@ export default function App() {
                   ['Changes the plate', liquidTypes.filter(l => l.behaviour)],
                 ] as const).map(([groupLabel, group]) => group.length === 0 ? null : (
                   <div key={groupLabel} className="flex flex-col gap-1.5 w-full">
-                    <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">{groupLabel}</span>
+                    <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">{groupLabel}</span>
                     {group.map((liq) => {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
@@ -1446,10 +1489,10 @@ export default function App() {
                             className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
                             style={{ backgroundColor: liq.color }}
                           />
-                          <span className="text-[10px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
+                          <span className="text-[11px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
                           {isSelected && (
                             <label className="relative cursor-pointer flex-shrink-0" onClick={e => e.stopPropagation()} title="Change color">
-                              <span className="text-[9px] text-white/40 hover:text-white transition-colors px-1">color</span>
+                              <span className="text-[11px] text-white/40 hover:text-white transition-colors px-1">color</span>
                               <input
                                 type="color"
                                 value={liq.color}
@@ -1464,14 +1507,14 @@ export default function App() {
                   </div>
                 ))}
                 {selectedLiquid?.description && (
-                  <p className="text-[9px] leading-snug text-white/40 w-full -mt-1" data-testid="liquid-description">
+                  <p className="text-[11px] leading-snug text-white/40 w-full -mt-1" data-testid="liquid-description">
                     {selectedLiquid.description}
                   </p>
                 )}
 
                 {/* Quick color swatches — one click recolors the selected liquid */}
                 <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
                   <div className="grid grid-cols-8 gap-1">
                     {DROPPER_COLORS.map(hex => {
                       const isCurrent = selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
@@ -1479,7 +1522,7 @@ export default function App() {
                         <button
                           key={hex}
                           onClick={() => updateLiquidColor(selectedLiquidId, hex)}
-                          className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                          className={`w-[26px] h-[26px] rounded-full border transition-transform hover:scale-110 ${
                             isCurrent ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/20'
                           }`}
                           style={{ backgroundColor: hex }}
@@ -1494,7 +1537,7 @@ export default function App() {
 
                 {/* Palette lock — pins the ambient/auto/music color harmony */}
                 <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Palette</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Palette</span>
                   <div className="flex flex-col gap-1 max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                     <button
                       onClick={() => selectPalette(null)}
@@ -1502,7 +1545,7 @@ export default function App() {
                         paletteLock == null ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
                       }`}
                     >
-                      <span className="text-[9px] font-bold uppercase tracking-wider flex-1">Auto</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider flex-1">Auto</span>
                       <span className="text-[8px] opacity-50">follows music</span>
                     </button>
                     {COLOR_HARMONIES.map((harmony, idx) => (
@@ -1519,7 +1562,7 @@ export default function App() {
                             <span key={i} className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: PALETTE[pi].hex }} />
                           ))}
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-wider truncate">{COLOR_HARMONY_NAMES[idx]}</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider truncate">{COLOR_HARMONY_NAMES[idx]}</span>
                       </button>
                     ))}
                   </div>
@@ -1529,7 +1572,7 @@ export default function App() {
 
                 {/* Tools */}
                 <div className="flex flex-col gap-1 w-full">
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-white/60">Tools</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Tools</span>
                   <div className="grid grid-cols-3 gap-1 w-full">
                     {([
                       { id: 'dropper' as const, icon: Droplet, label: 'Drop' },
@@ -1600,12 +1643,19 @@ export default function App() {
                   {isActive ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
                 </button>
 
+                {/*
+                  In Perform these three are on the desk's faders, larger and
+                  in one place. Drawing them here as well would put Sound Drive
+                  and Evolve Speed on screen twice, which is exactly the thing
+                  a user caught in the sound picker.
+                */}
+                {!performing && <>
                 <div className="w-full h-px bg-white/10" />
 
                 {/* Sound Drive */}
                 <div className="flex flex-col items-center gap-2 w-full">
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Sound Drive</span>
+                    <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Sound Drive</span>
                     <span className="text-[8px] font-bold text-white/50">{Math.round(settings.audioImpact * 100)}%</span>
                   </div>
                   <input
@@ -1615,7 +1665,7 @@ export default function App() {
                     step="0.01"
                     value={settings.audioImpact}
                     onChange={e => updateSettings({ audioImpact: parseFloat(e.target.value) })}
-                    className="w-full h-1 appearance-none rounded-full cursor-pointer accent-purple-400"
+                    className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
                     style={{ background: `linear-gradient(to right, rgb(192,132,252) ${settings.audioImpact * 100}%, rgba(255,255,255,0.1) ${settings.audioImpact * 100}%)` }}
                     title="Controls how strongly sound impacts the visuals"
                   />
@@ -1625,22 +1675,22 @@ export default function App() {
 
                 {/* Random Evolve */}
                 <div className="flex flex-col items-center gap-1.5 w-full">
-                  <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Random Evolve</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
                   <button
                     onClick={() => setIsAutomated(!isAutomated)}
-                    className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
+                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
                     title="Auto-generate dye drops and air bursts from audio"
                   >
                     <motion.div
-                      className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
-                      animate={{ x: isAutomated ? 20 : 0 }}
+                      className="absolute top-[3px] left-[3px] w-5 h-5 bg-white rounded-full shadow-md"
+                      animate={{ x: isAutomated ? 26 : 0 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     />
                   </button>
                   {/* How fast it evolves: a drop or a blow every second or so at the left, a frenzy at the right */}
                   <div className={`flex flex-col gap-1 w-full mt-1 transition-opacity ${isAutomated ? '' : 'opacity-40'}`}>
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Evolve Speed</span>
+                      <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve Speed</span>
                       <span className="text-[8px] font-bold text-white/50">{Math.round((settings.automateRate ?? 0) * 100)}%</span>
                     </div>
                     <input
@@ -1650,13 +1700,14 @@ export default function App() {
                       step="0.01"
                       value={settings.automateRate ?? 0}
                       onChange={e => updateSettings({ automateRate: parseFloat(e.target.value) })}
-                      className="w-full h-1 appearance-none rounded-full cursor-pointer accent-purple-400"
+                      className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
                       style={{ background: `linear-gradient(to right, rgb(192,132,252) ${(settings.automateRate ?? 0) * 100}%, rgba(255,255,255,0.1) ${(settings.automateRate ?? 0) * 100}%)` }}
                       title="How quickly Random Evolve adds drops and blows"
                       data-testid="evolve-speed"
                     />
                   </div>
                 </div>
+                </>}
 
                 <div className="w-full h-px bg-white/10" />
 
@@ -1729,12 +1780,21 @@ export default function App() {
 
                 {/* Randomize */}
                 <button
-                  onClick={triggerLucky}
-                  className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group w-full"
-                  title="Randomize all settings"
+                  onClick={() => {
+                    if (performing && !luckyArmed) { setLuckyArmed(true); return; }
+                    setLuckyArmed(false);
+                    triggerLucky();
+                  }}
+                  data-testid="lucky-button"
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    luckyArmed ? 'bg-amber-400 text-black border-amber-400' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title={luckyArmed
+                    ? 'Click again to replace every setting with a random one. Revert brings this look back.'
+                    : 'Randomize all settings — the look it replaces is kept, so Revert brings it back'}
                 >
-                  <Sparkles size={16} className="text-yellow-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Random</span>
+                  <Sparkles size={16} className={luckyArmed ? '' : 'text-yellow-400 group-hover:scale-110 transition-transform'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">{luckyArmed ? 'Sure?' : 'Random'}</span>
                 </button>
 
                 <div className="w-full h-px bg-white/10" />
@@ -1750,7 +1810,7 @@ export default function App() {
                       <button
                         key={idx}
                         onClick={() => setActiveLayer(idx)}
-                        className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[10px] font-bold ${
+                        className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[11px] font-bold ${
                           activeLayer === idx ? 'border-white bg-white text-black scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-white/20 text-white/50 hover:border-white/50'
                         }`}
                       >
@@ -1760,7 +1820,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => setDrainTrigger(prev => prev + 1)}
-                    className="text-[8px] uppercase tracking-widest font-bold opacity-40 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                    className="py-1.5 px-2 rounded-lg text-[11px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
                     title="Drain — swirls all dye down the drain"
                   >
                     Drain
@@ -1774,7 +1834,7 @@ export default function App() {
                   <span className="text-[7px] uppercase tracking-widest font-bold opacity-30">Audio</span>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'microphone' ? 'none' : 'microphone')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'microphone'
                         ? 'text-green-400 bg-green-400/10 border border-green-400/30'
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
@@ -1786,7 +1846,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'system' ? 'none' : 'system')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'system'
                         ? 'text-blue-400 bg-blue-400/10 border border-blue-400/30'
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
@@ -1798,7 +1858,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => musicInputRef.current?.click()}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'file'
                         ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
@@ -1811,7 +1871,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[8px] font-bold uppercase tracking-wider w-full justify-center ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'simulated'
                         ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
@@ -1841,7 +1901,7 @@ export default function App() {
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
         <button
           onClick={() => setIsMinimized(!isMinimized)}
-          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[9px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
+          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[11px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
           title={isMinimized ? "Show Controls" : "Hide Controls"}
         >
           {isMinimized ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1849,7 +1909,7 @@ export default function App() {
         </button>
         <button
           onClick={hideOverlays}
-          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[9px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
+          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[11px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
           title="Clean screen: hide every overlay and the cursor. Esc brings them back."
         >
           <MonitorOff size={14} />
@@ -1966,13 +2026,13 @@ export default function App() {
             </div>
             <button
               onClick={musicIntel.savePendingPerformance}
-              className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-[10px] font-bold uppercase tracking-widest transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-[11px] font-bold uppercase tracking-widest transition-colors"
             >
               Save
             </button>
             <button
               onClick={musicIntel.discardPendingPerformance}
-              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold uppercase tracking-widest text-white/60 transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold uppercase tracking-widest text-white/60 transition-colors"
             >
               Discard
             </button>
@@ -1989,13 +2049,13 @@ export default function App() {
           {/* The preset's name is the menu: one click from the top of the screen. */}
           <button
             onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
-            className="flex items-center gap-2 mt-0.5 group"
+            className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
             title="Choose a preset"
             aria-haspopup="menu"
             aria-expanded={presetMenu === 'title'}
             data-testid="preset-title-button"
           >
-            <p className="text-[9px] uppercase tracking-widest opacity-40 group-hover:opacity-80 transition-opacity">
+            <p className="text-[11px] uppercase tracking-widest opacity-40 group-hover:opacity-80 transition-opacity">
               {activePresetName ? activePresetName : 'Custom'}
             </p>
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold flex items-center gap-1 group-hover:bg-white/20 transition-colors">
@@ -2028,7 +2088,7 @@ export default function App() {
               data-testid="record-button"
             >
               {recorder.recording ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
-              {recorder.recording && <span className="text-[9px] font-mono" data-testid="record-time">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, '0')}</span>}
+              {recorder.recording && <span className="text-[11px] font-mono" data-testid="record-time">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, '0')}</span>}
             </button>
           )}
           <div className="relative">
@@ -2094,7 +2154,7 @@ export default function App() {
           </div>
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className={`p-2 rounded-full transition-all text-[9px] font-bold ${
+            className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
               showHelp ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60'
             }`}
             title="About ChromaGlass — getting started, every control, and how they interact (?)"
@@ -2123,18 +2183,39 @@ export default function App() {
             above and the Hide UI / Clean Screen row below. Nothing has to move
             house to make room for the desk — it takes the space that was left.
           */}
-          <div className="h-full flex items-stretch gap-4 pt-24 pb-28 pl-[15rem] pr-[11rem]">
+          <div className="h-full flex flex-col gap-3 pt-24 pb-28 pl-[15rem] pr-[11rem]">
+            <StatusLine
+              lookName={liveLookName}
+              lookFor={lookFor}
+              sequence={{
+                running: sequencer.status.running,
+                name: sequencer.status.name,
+                stageName: sequencer.status.stageName,
+                progress: sequencer.status.progress,
+              }}
+              audioSource={audioSource === 'none' ? 'silent' : audioSource === 'simulated' ? 'band' : audioSource}
+              level={audioData ? Math.min(1, audioData.volume / 70) : 0}
+              engine={engineStatus?.label ?? ''}
+              casting={isCasting}
+              midiOn={midi.enabled}
+              cameraOn={scene.state.active}
+              recordingFor={recorder.recording ? recorder.seconds : null}
+              blackout={blackout}
+            />
+            <div className="flex-1 flex items-stretch gap-4 min-h-0">
             <div ref={preview.ref} className="flex-1 min-w-0" data-testid="desk-preview" />
             <aside
               className="w-80 shrink-0 overflow-y-auto scrollbar-hide rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 pointer-events-auto"
               data-testid="desk-column"
             >
-              <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/35 mb-3">The desk</h2>
-              <p className="text-[11px] leading-relaxed text-white/45">
-                The plate is on the wall; this is where it is played from. Cue a look
-                from the title, then Go.
-              </p>
+              <RideStrip
+                settings={settings}
+                keys={rideKeys}
+                onChange={updateSettings}
+                onKeys={setRideKeys}
+              />
             </aside>
+            </div>
           </div>
         </div>
       )}
