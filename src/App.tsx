@@ -1469,6 +1469,13 @@ export default function App() {
                 ] as const).map(([groupLabel, group]) => group.length === 0 ? null : (
                   <div key={groupLabel} className="flex flex-col gap-1.5 w-full">
                     <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">{groupLabel}</span>
+                    {/*
+                      Two up. Nine bottles in a single column ran the bench past
+                      the bottom of the screen on a laptop, which put the four
+                      that change the plate — the interesting ones — below the
+                      fold. Paired, the whole bench is in view at once.
+                    */}
+                    <div className="grid grid-cols-2 gap-1">
                     {group.map((liq) => {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
@@ -1477,7 +1484,7 @@ export default function App() {
                           onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
-                          className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                          className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
                             isSelected ? 'text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
                           }`}
                           style={isSelected ? {
@@ -1492,7 +1499,7 @@ export default function App() {
                           <span className="text-[11px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
                           {isSelected && (
                             <label className="relative cursor-pointer flex-shrink-0" onClick={e => e.stopPropagation()} title="Change color">
-                              <span className="text-[11px] text-white/40 hover:text-white transition-colors px-1">color</span>
+                              <span className="flex h-6 w-6 items-center justify-center text-[11px] text-white/40 hover:text-white transition-colors">&#9679;</span>
                               <input
                                 type="color"
                                 value={liq.color}
@@ -1504,6 +1511,7 @@ export default function App() {
                         </button>
                       );
                     })}
+                    </div>
                   </div>
                 ))}
                 {selectedLiquid?.description && (

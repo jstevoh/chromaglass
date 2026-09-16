@@ -175,6 +175,51 @@ try {
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
   await noteDuplicates();
 
+  // ── The panel is two tabs, and Perform is the shorter one ─────────
+  //
+  // It used to be one column eight screens deep with 722 words of prose in
+  // it, which is not a control surface. What is checked is the split holding:
+  // Perform must show fewer sections than the panel has, and must be the
+  // shorter scroll of the two, or the tab has stopped earning itself.
+  {
+    const measure = async () => page.evaluate(() => {
+      const vis = [...document.querySelectorAll('section')].filter(s => s.offsetParent !== null);
+      const panel = [...document.querySelectorAll('div')].find(d => d.querySelector('section h3') && d.scrollHeight > d.clientHeight + 4);
+      return { n: vis.length, scroll: panel ? panel.scrollHeight : 0, client: panel ? panel.clientHeight : 1 };
+    });
+    await firstVisible('settings-tab-perform').click();
+    await settle(600);
+    const perform = await measure();
+    await firstVisible('settings-tab-setup').click();
+    await settle(600);
+    const setup = await measure();
+    await firstVisible('settings-tab-perform').click();
+    await settle(600);
+    check('the settings panel is split in two',
+      perform.n > 0 && setup.n > 0 && perform.n + setup.n === headings.length,
+      `${perform.n} perform + ${setup.n} setup = ${headings.length}`);
+    check('and Perform is the shorter half',
+      perform.scroll < setup.scroll,
+      `${(perform.scroll / perform.client).toFixed(1)} screens vs ${(setup.scroll / setup.client).toFixed(1)}`);
+    check('and Perform fits in about three screens',
+      perform.scroll / perform.client < 3.5, `${(perform.scroll / perform.client).toFixed(1)} screens`);
+  }
+
+  // ── The long explanations are folded away ─────────────────────────
+  {
+    const toggles = await page.locator('[data-info="toggle"]').count();
+    const open = await page.locator('[data-info="body"]').count();
+    check('the explanations are behind an info toggle', toggles > 8, `${toggles} of them`);
+    check('and none of them is open until it is asked for', open === 0, `${open} open`);
+    if (toggles) {
+      await page.evaluate(() => document.querySelector('[data-info="toggle"]').click());
+      await settle(400);
+      check('and clicking one opens it', (await page.locator('[data-info="body"]').count()) === 1);
+      await page.evaluate(() => document.querySelector('[data-info="toggle"]').click());
+      await settle(300);
+    }
+  }
+
   const sliders = page.locator('input[type="range"]:visible');
   const sliderCount = await sliders.count();
   check('settings has sliders', sliderCount > 20, `${sliderCount}`);
@@ -225,6 +270,12 @@ try {
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
 
   // ── The room camera ───────────────────────────────────────────────
+  // It lives on the Setup tab now: the panel is split between what a hand
+  // reaches for during a show and what is decided once, and a room camera's
+  // device and mappings are decided once. Without this the harness reached
+  // for a control on the hidden half and sat there until it timed out.
+  await firstVisible('settings-tab-setup').click();
+  await settle(700);
   const roomToggle = firstVisible('scene-toggle');
   await roomToggle.scrollIntoViewIfNeeded();
   await roomToggle.click();

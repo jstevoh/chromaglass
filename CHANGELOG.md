@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the settings panel is a control surface, not a document
+- The panel was **eight screens** of vertical scroll (7309px in a 900px window) with
+  **722 words** of prose in it. One paragraph ran to 198 words directly above a fader
+  someone wants to move mid-song
+- Split in two: **Perform** holds what a hand reaches for during a show — Light Show
+  Look, Show, Lamp, Macro Closeup, Automation, the Mixer. **Setup** holds what is
+  decided once — the audio device, the audio wiring, the camera, the room, the other
+  projectors, the solver grid, and the physics that define a look rather than ride it.
+  Perform is **2.8 screens**, Setup 4.8, and Perform opens first
+- All fourteen explanations are behind an **ⓘ** now, closed until asked for. The writing
+  stays — several of these carry the one fact that stops a control being used wrongly,
+  like aiming the room camera at the floor rather than at the screen — it simply is no
+  longer standing between the projectionist and the sliders
+- The bottles are paired two-up. Nine in a single column ran the bench past the bottom
+  of a laptop screen, which put the four that change the plate below the fold; the left
+  column is 1.3 screens now rather than 1.6
+- `npm run qa` checks the split holds: Perform must be the shorter half and fit in
+  about three screens, every explanation must start closed, and clicking one must open
+  exactly one
+
 ### Added — the desk (plan batch 8b–8f)
 - **Perform**, beside Design: the plate becomes a preview and the controls get the
   room, because during a show the plate is already on a wall behind you and the thing
