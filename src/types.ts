@@ -39,13 +39,21 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // and a blue dye called Soap.
   { id: 'soap',      name: 'Soap',      color: '#bfe9d8',
     description: 'Breaks the film: colour runs away from it and curls into filaments',
-    injectRadius: 3, injectAmount: 0.12, heatAmount: 0.0, behaviour: { soap: 1 } },
+    // 0.12 before, which was physically right and a usability trap: the
+    // bottle still carries a colour swatch and a colour picker, so picking
+    // Cherry Red with Soap selected laid so little dye that what you saw was
+    // the plate underneath — it read as "red is broken". Picking a colour is
+    // a statement of intent, so it has to land. Still the lightest bottle
+    // there is: a fifth of syrup, and soap goes on thinning what it lands in.
+    injectRadius: 3, injectAmount: 0.4, heatAmount: 0.0, behaviour: { soap: 1 } },
   { id: 'milk',      name: 'Milk',      color: '#f4efe4',
     description: 'A pale ground that holds its own edge instead of blending away',
     injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0, behaviour: { repel: 1, body: 0.35 } },
   { id: 'silicone',  name: 'Silicone',  color: '#dfe7ee',
     description: 'Shoulders colour aside into a ring — the cell maker',
-    injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0, behaviour: { soap: 0.8, repel: 0.45 } },
+    // 0.05 before — forty times less than syrup, which made every colour
+    // picked with Silicone selected invisible on a live plate.
+    injectRadius: 3, injectAmount: 0.35, heatAmount: 0.0, behaviour: { soap: 0.8, repel: 0.45 } },
   { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff',
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0, behaviour: { body: 1, repel: 0.25 } },
