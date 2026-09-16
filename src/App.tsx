@@ -2183,7 +2183,7 @@ export default function App() {
             above and the Hide UI / Clean Screen row below. Nothing has to move
             house to make room for the desk — it takes the space that was left.
           */}
-          <div className="h-full flex flex-col gap-3 pt-24 pb-28 pl-[15rem] pr-[11rem]">
+          <div className="h-full flex flex-col gap-3 pt-24 pb-28 pl-[18.5rem] pr-[11rem]">
             <StatusLine
               lookName={liveLookName}
               lookFor={lookFor}

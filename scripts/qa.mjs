@@ -366,6 +366,16 @@ try {
         : `desk ${Math.round(col.left)}–${Math.round(col.right)} under toolbar ${Math.round(bar.left)}–${Math.round(bar.right)}`;
     });
     check('and does not sit underneath the toolbar', clash === null, clash ?? '');
+    // Same on the other side: enlarging the dye swatches for legibility made
+    // the bottles column wider, and it grew over the preview's left edge.
+    const leftClash = await page.evaluate(() => {
+      const hole = document.querySelector('[data-testid="desk-preview"]')?.getBoundingClientRect();
+      const dye = document.querySelector('[data-testid="liquid-water"]')?.closest('div')?.parentElement?.getBoundingClientRect();
+      if (!hole || !dye) return null;
+      return dye.right <= hole.left + 1 ? null
+        : `bottles reach ${Math.round(dye.right)}, preview starts at ${Math.round(hole.left)}`;
+    });
+    check('nor over the bottles on the left', leftClash === null, leftClash ?? '');
     await noteDuplicates();
     await firstVisible('desk-mode-button').click();
     await settle(1200);
