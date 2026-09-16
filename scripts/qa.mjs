@@ -461,8 +461,14 @@ try {
     }, [mid.x, mid.y]);
     check('the plate is what the cursor is over', topmost.ok, `the cursor is over ${topmost.what}`);
 
-    await page.keyboard.press('f');                 // still the liquid
-    await settle(900);
+    // Pause from the overlay's own transport, not the F key: F is gated on
+    // `deskUp` and this section runs at 900px, where the narrow-screen UI is
+    // the surface and F does nothing. Pressed it anyway and the plate kept
+    // running, and the check read the liquid's own evaporation — density fell
+    // by 489 across a drag that had just added dye to it.
+    const pause = page.locator('button[title="Pause"]').first();
+    const canPause = await pause.count() > 0;
+    if (canPause) { await clickOn(pause); await settle(900); }
     const before = await page.evaluate(() => {
       const f = window.chromaglassDebug?.().fluids?.[0];
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
@@ -476,11 +482,12 @@ try {
       const f = window.chromaglassDebug?.().fluids?.[0];
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
     });
-    await page.keyboard.press('f');                 // and let it run again
-    await settle(400);
+    if (canPause) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
     check('and a drag across it lays down dye',
-      before !== null && after !== null && after - before > 1,
-      before === null ? 'no debug hook — run with ?debug' : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
+      canPause && before !== null && after !== null && after - before > 1,
+      !canPause ? 'no transport to pause with — the plate could not be stilled'
+        : before === null ? 'no debug hook — run with ?debug'
+        : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
   }
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
