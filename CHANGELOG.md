@@ -52,6 +52,46 @@ shows, and against what a projectionist actually does on a show night.
   Go, Back, cue stepping and Tap Tempo as actions, so the desk's safe way to
   change a look in front of a room is finally something a pad can do
 
+### Fixed — what a review of the above found
+- **A keystone on a photographic preset was a black wall.** The output pass's
+  own target was allocated only on the branch where no camera pass existed, so
+  with one on — Oil on Water, Colorful Cosmos, Sunny Side Up — the camera
+  rendered into a framebuffer with nothing attached and the output pass then
+  sampled a texture with no storage. `npm run wall` now runs its masking and
+  corner-pin gates a second time through a camera; reverting the fix turns
+  three of them red
+- **Every CI run would have failed.** The new workflow asked for Node 20, and
+  four of the harnesses run their TypeScript directly through
+  `--experimental-strip-types`, which arrived in 22.6 — and `deploy.yml` waits
+  on those harnesses, so nothing would ever have deployed again
+- **Two taps in the same millisecond hung the tab.** A pad that double-sends
+  gives a zero interval, and folding zero into the tempo range doubles it for
+  ever. Taps closer together than a fortieth of a second are now one press
+  arriving twice, which is what they are
+- **One fader drove two settings.** A control with both an always-live binding
+  and one on the current bank fired both. The bank-specific binding now
+  shadows the always-live one, and the LEDs decide once per control rather
+  than once per binding — where before an out-of-bank binding could blank a
+  pad that was live through its other one, depending on list order
+- **A luminance reading that went backwards in time.** Both of the frame
+  probe's buffers can land in the same frame after a stall, and draining them
+  by slot index rather than by when the read was issued left the older one
+  winning — which to a guard counting peaks and troughs is a flash that never
+  happened
+- **A check that could never fail**, in the harness for the guard: it asserted
+  that a debug hook returned an object, which it does whatever the guard is
+  doing
+
+### Fixed — the fluid solver threw away readbacks it had just paid for
+- Pre-existing, found while measuring the above: `readbackAsync` started a read
+  into a pack buffer every frame whether or not the previous one had come back,
+  which discards it — two downsample passes and two `readPixels` for a result
+  nothing would ever look at, on exactly the machines least able to afford
+  them, with the driver saying so about six times every twenty seconds
+- It now collects whatever has landed, in the order the reads were issued, and
+  starts a new one only into a buffer nobody is waiting on. Measured on the GPU
+  path: 0 warnings in 51 seconds, against 9 in 30 before
+
 ### Added — a first visit that shows what this is
 - `audioSource` started at `'none'` and nothing opened on its own — a good
   decision about permissions with the side effect of landing every stranger on

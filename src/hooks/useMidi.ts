@@ -148,11 +148,19 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
     const h = hostRef.current;
     const key = sourceKey(src);
-    for (const b of mapRef.current.bindings) {
-      if (sourceKey(b.source) !== key) continue;
-      // A binding that names a bank only answers on that one. A binding that
-      // names none is always live.
-      if (b.bank !== undefined && b.bank !== bankRef.current) continue;
+    // What this control does *on this layer*.
+    //
+    // A binding that names a bank answers only on that one; a binding that
+    // names none is always live. Where a control has both — which is exactly
+    // what happens when someone learns a fader on the base layer and then
+    // gives it a second job on bank 3 — the bank-specific one wins and the
+    // always-live one stays out of the way. Firing both meant one fader
+    // driving two settings at once, which on a stage reads as the app having
+    // a mind of its own.
+    const matching = mapRef.current.bindings.filter(b => sourceKey(b.source) === key);
+    const onThisBank = matching.filter(b => b.bank === bankRef.current);
+    const live = onThisBank.length ? onThisBank : matching.filter(b => b.bank === undefined);
+    for (const b of live) {
       const t = b.target;
       const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
       switch (t.kind) {
@@ -298,14 +306,31 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const out = outputFor();
     if (!out) return;
     const f = feedbackRef.current;
+    // One decision per control, not one per binding.
+    //
+    // A pad on another layer is not doing anything, so it must not be lit as
+    // though it were: an LED that says "this cues Deep Ocean" while the layer
+    // says otherwise is worse than an LED that is off. But a control can carry
+    // several bindings, and walking them one at a time meant an out-of-bank
+    // one could blank a pad that *is* live on this layer through its
+    // always-live binding — whichever came last in the list won. So the same
+    // rule the message handler uses decides what each control is doing now,
+    // and each control is written exactly once.
+    const byControl = new Map<string, MidiBinding[]>();
     for (const b of mapRef.current.bindings) {
-      // A pad on another layer is not doing anything, so it must not be lit as
-      // though it were: an LED that says "this cues Deep Ocean" while the
-      // layer says otherwise is worse than an LED that is off.
-      if (b.bank !== undefined && b.bank !== bankRef.current) {
+      const k = sourceKey(b.source);
+      const list = byControl.get(k);
+      if (list) list.push(b); else byControl.set(k, [b]);
+    }
+    for (const group of byControl.values()) {
+      const onThisBank = group.filter(x => x.bank === bankRef.current);
+      const b = (onThisBank.length ? onThisBank : group.filter(x => x.bank === undefined))[0];
+      if (!b) {
+        // Bound, but not on this layer: dark.
+        const src = group[0].source;
         try {
-          if (b.source.kind === 'note') out.send([0x90 | (b.source.channel & 0x0f), b.source.number & 0x7f, 0]);
-          else out.send([0xb0 | (b.source.channel & 0x0f), b.source.number & 0x7f, 0]);
+          if (src.kind === 'note') out.send([0x90 | (src.channel & 0x0f), src.number & 0x7f, 0]);
+          else out.send([0xb0 | (src.channel & 0x0f), src.number & 0x7f, 0]);
         } catch { /* the port went away */ }
         continue;
       }

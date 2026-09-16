@@ -5359,11 +5359,18 @@ void main() {
           glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
           glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
           glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
+          // The output pass is prepared whenever it exists, even when the
+          // camera is the thing the plate draws into — the camera renders
+          // *through* it, so its texture has to be allocated and attached
+          // first. Preparing it only in the `else` branch meant that with a
+          // camera on (which is every photographic preset: Oil on Water,
+          // Colorful Cosmos, Sunny Side Up) the camera drew into a framebuffer
+          // with nothing attached and the output pass then sampled a texture
+          // with no storage. A keystone on those presets was a black wall.
+          if (out) out.bindTarget(canvas.width, canvas.height);
           if (cam) {
             cam.bindTarget(canvas.width, canvas.height);
-          } else if (out) {
-            out.bindTarget(canvas.width, canvas.height);
-          } else {
+          } else if (!out) {
             glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
             glCtx.viewport(0, 0, canvas.width, canvas.height);
           }

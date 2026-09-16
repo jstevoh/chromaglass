@@ -66,11 +66,22 @@ const CLOCK_HOLD = 400;
 
 /** Taps more than this far apart are a new attempt, not a slower tempo. */
 const TAP_GAP = 2500;
+/** Two taps closer than this are one press arriving twice. */
+const DOUBLE_TAP_MS = 25;
 
 const clampPeriod = (ms: number) => Math.max(MIN_PERIOD, Math.min(MAX_PERIOD, ms));
 
-/** Fold an interval into the 60–200 bpm range by halving or doubling. */
+/**
+ * Fold an interval into the 60–200 bpm range by halving or doubling.
+ *
+ * Zero and anything not finite go back unchanged rather than into the loop:
+ * doubling zero never reaches the minimum, so this spun for ever and took the
+ * tab with it. Two taps can genuinely share a millisecond — a pad that sends
+ * its note twice, a button bound both on the controller and under a finger.
+ * The caller treats a non-positive result as "no tempo yet".
+ */
 const fold = (ms: number): number => {
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
   let p = ms;
   while (p > MAX_PERIOD) p /= 2;
   while (p < MIN_PERIOD) p *= 2;
@@ -187,7 +198,13 @@ export class TempoSource {
    * on the downbeats and the plate is pressed on the downbeats.
    */
   tap(now: number): void {
-    if (this.taps.length && now - this.taps[this.taps.length - 1] > TAP_GAP) this.taps = [];
+    const last = this.taps.length ? this.taps[this.taps.length - 1] : -Infinity;
+    if (now - last > TAP_GAP) this.taps = [];
+    // A second tap within a fortieth of a second is not a tempo of 1500 bpm,
+    // it is one press arriving twice — a pad that double-fires, or a button
+    // bound on the controller *and* under a finger on the screen. Swallowed
+    // rather than folded into the average it would ruin.
+    else if (now - last < DOUBLE_TAP_MS) return;
     this.taps.push(now);
     while (this.taps.length > 8) this.taps.shift();
     if (this.taps.length < 2) {
@@ -200,7 +217,9 @@ export class TempoSource {
     const ivs: number[] = [];
     for (let i = 1; i < this.taps.length; i++) ivs.push(this.taps[i] - this.taps[i - 1]);
     const mean = ivs.reduce((s, v) => s + v, 0) / ivs.length;
-    this.period = clampPeriod(fold(mean));
+    const folded = fold(mean);
+    if (folded <= 0) return;             // nothing usable in these taps yet
+    this.period = clampPeriod(folded);
     this.kind = 'tap';
     this.beatAt = now;
     this.seq++;

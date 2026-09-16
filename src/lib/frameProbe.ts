@@ -31,7 +31,9 @@ const N = 16;
 export class FrameProbe {
   private readonly fbo: WebGLFramebuffer;
   private readonly tex: WebGLTexture;
-  private readonly slots: { pbo: WebGLBuffer; fence: WebGLSync | null }[];
+  private readonly slots: { pbo: WebGLBuffer; fence: WebGLSync | null; seq: number }[];
+  /** Which read each slot holds, so the newest one that has landed is the one kept. */
+  private seq = 0;
   private readonly pixels = new Uint8Array(N * N * 4);
   /** The last mean that came back, 0..1. */
   private lum = 0;
@@ -56,7 +58,7 @@ export class FrameProbe {
     const complete = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    this.slots = [0, 1].map(() => ({ pbo: gl.createBuffer()!, fence: null }));
+    this.slots = [0, 1].map(() => ({ pbo: gl.createBuffer()!, fence: null, seq: 0 }));
     for (const s of this.slots) {
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, s.pbo);
       gl.bufferData(gl.PIXEL_PACK_BUFFER, this.pixels.byteLength, gl.STREAM_READ);
@@ -79,8 +81,13 @@ export class FrameProbe {
     if (!this.ok || width <= 0 || height <= 0) return;
     const gl = this.gl;
 
-    // Collect anything the GPU has finished with, first.
-    for (const s of this.slots) {
+    // Collect anything the GPU has finished with, first — in the order the
+    // reads were issued, not the order the slots happen to sit in. Both can
+    // land in the same frame after a stall, and draining them by slot index
+    // would leave `lum` holding the *older* of the two: a reading that goes
+    // backwards in time, which to a guard counting peaks and troughs is a
+    // flash that never happened.
+    for (const s of [...this.slots].sort((a, b) => a.seq - b.seq)) {
       if (!s.fence) continue;
       const status = gl.clientWaitSync(s.fence, 0, 0);
       if (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED) continue;
@@ -121,6 +128,7 @@ export class FrameProbe {
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     free.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    free.seq = ++this.seq;
     // A fence is not guaranteed ever to signal unless the commands before it
     // have been flushed, so without this the read can simply never land — and
     // a guard that never gets a reading is a guard that silently does nothing.

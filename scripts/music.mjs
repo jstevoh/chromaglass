@@ -337,6 +337,27 @@ console.log('\nTelling the show the tempo rather than making it work it out:\n')
     checks.push(['and the bar lands on the hand that tapped it', phaseErr <= FRAME + 1]);
   }
 
+  // A control that fires twice.
+  //
+  // A pad that double-sends, or a button bound on the controller *and* under a
+  // finger on the screen, puts two taps in the same millisecond. That used to
+  // average to a zero interval, and folding zero into the tempo range doubles
+  // it for ever: the tab hung. It also must not quietly poison a real tapped
+  // tempo with a 1500 bpm interval.
+  {
+    const t = new TempoSource();
+    t.tap(1000); t.tap(1000); t.tap(1000);
+    const survived = t.active === null || t.bpm > 0;
+    console.log(`  three taps in one instant  ${t.active ?? 'nothing'}${t.bpm ? ` at ${t.bpm.toFixed(1)} bpm` : ''}`);
+    checks.push(['taps in the same instant do not hang the show', survived]);
+
+    const u = new TempoSource();
+    // 100 bpm, with the second press arriving twice.
+    for (const at of [0, 10, 600, 1200, 1800]) u.tap(at);
+    console.log(`  a tap that double-fired    ${u.bpm.toFixed(1)} bpm`);
+    checks.push(['and a double-fired tap does not poison the tempo', Math.abs(u.bpm - 100) < 1]);
+  }
+
   // A typed number: the tempo, and nothing said about the bar.
   {
     const tempo = new TempoSource();

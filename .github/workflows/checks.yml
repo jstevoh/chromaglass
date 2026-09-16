@@ -31,9 +31,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
+      # TypeScript sources directly through `node --experimental-strip-types`,
+      # which arrived in 22.6. On 20 every one of them fails to start, which
+      # with `deploy.yml`'s `needs: checks` would have blocked every deploy.
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
 
@@ -73,7 +77,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
 

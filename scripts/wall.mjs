@@ -434,7 +434,54 @@ try {
   check('output gamma darkens the mid-tones', gamma.it < gamma.base * 0.95,
     `${gamma.base.toFixed(3)} -> ${gamma.it.toFixed(3)}`);
 
-  // ── 6. The flash guard's eyes ──────────────────────────────────────
+  // ── 6. The same, with the camera in the way ────────────────────────
+  //
+  // The photographic presets draw the plate into a texture and look at it
+  // through a lens — refraction, depth of field, bloom, a sensor roll-off —
+  // so with one of those on, the output pass is not the second pass in the
+  // chain but the third. That is a different code path, and it was broken:
+  // the output pass's own target was only ever allocated on the branch where
+  // no camera existed, so the camera rendered into a framebuffer with nothing
+  // attached and the output pass then sampled a texture with no storage. A
+  // keystone on Oil on Water was a black wall, and every check above passed
+  // the whole time because the default look has no camera on it.
+  {
+    const applied = await page.evaluate(() => {
+      if (typeof window.chromaglassApplyPreset !== 'function') return false;
+      window.chromaglassApplyPreset('oil-on-water');
+      return true;
+    });
+    check('a photographic preset can be reached', applied, applied ? 'oil-on-water' : 'no hook');
+    if (applied) {
+      // Long enough for the camera pass to be built and the plate to fill.
+      await withOutput({});
+      let lit = 0;
+      for (let i = 0; i < 12 && !(lit > LIT); i++) {
+        await page.waitForTimeout(1500);
+        lit = meanOver(await gridOf(), () => true);
+      }
+      const camOn = await page.evaluate(() => (window.chromaglassDebug?.().settings?.camera ?? 0) > 0.001);
+      check('and it really has the camera on', camOn, `camera ${camOn}`);
+      check('the plate still draws with a camera on it', lit > LIT, `mean ${lit.toFixed(3)}`);
+
+      await withOutput({ maskBottom: 0.3, maskFeather: 0 });
+      const camMask = await gridOf();
+      const camBlanked = meanOver(camMask, (x, y) => y > 0.72);
+      const camKept = meanOver(camMask, (x, y) => y < 0.6);
+      check('a blanked edge is black through the camera too', camBlanked < 0.004, `mean ${camBlanked.toFixed(4)}`);
+      check('and the picture survives it', camKept > LIT, `mean ${camKept.toFixed(3)}`);
+
+      await withOutput({ corners: pinnedLeft });
+      const camPin = await gridOf();
+      const camOutside = meanOver(camPin, x => x > 0.56);
+      const camInside = meanOver(camPin, x => x > 0.06 && x < 0.44);
+      check('a corner pin holds through the camera too', camOutside < 0.004, `mean ${camOutside.toFixed(4)}`);
+      check('and the picture is inside it', camInside > LIT, `mean ${camInside.toFixed(3)}`);
+    }
+    await withOutput({});
+  }
+
+  // ── 7. The flash guard's eyes ──────────────────────────────────────
   //
   // The guard's arithmetic is checked exhaustively above, on traces, because
   // that is where it can be. What cannot be checked there is the half that
@@ -476,10 +523,15 @@ try {
       `${dark?.toFixed(3)} < ${midLum.toFixed(3)} < ${bright?.toFixed(3)}`);
   }
 
-  const guardOn = await page.evaluate(() => !!window.chromaglassDebug?.().flash?.());
-  check('the guard is on without anyone asking for it', guardOn === true, guardOn ? 'on' : 'absent');
+  // On by default, and on in the config the app actually loaded — not merely
+  // "the debug hook returns an object", which it does whatever the guard is
+  // doing and which is what an earlier version of this line checked.
+  const guardOn = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.flashGuard);
+  check('the guard is on without anyone asking for it', guardOn === true, `flashGuard ${guardOn}`);
+  const reading = await page.evaluate(() => window.chromaglassDebug?.().flash?.()?.luminance ?? null);
+  check('and it is being fed', reading !== null && reading > 0, `luminance ${reading}`);
 
-  // ── 7. Back to nothing ─────────────────────────────────────────────
+  // ── 8. Back to nothing ─────────────────────────────────────────────
   await withOutput({});
   const goneAgain = await page.evaluate(() => !!window.chromaglassDebug?.().outputPass);
   check('resetting drops the pass again', goneAgain === false, goneAgain ? 'still built' : 'gone');
