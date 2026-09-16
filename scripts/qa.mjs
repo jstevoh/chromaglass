@@ -85,7 +85,21 @@ const browser = await chromium.launch({
 });
 
 const errors = [];
-const context = await browser.newContext({ permissions: ['camera'], viewport: { width: 1440, height: 900 } });
+/*
+  Starts narrow on purpose.
+
+  Everything from here to the desk section drives the floating overlay UI —
+  the bottle rail, the toolbar, the preset title menu. That surface has not
+  gone anywhere, but it is now what the app shows *below* 1024px: at laptop
+  width the desk owns the window and none of those controls are rendered.
+  Running these checks at 1440 counted 59 visible buttons instead of 69 and
+  then waited forever for a title button that does not exist.
+
+  So: the overlay checks run at the width the overlay lives at, and the desk
+  gets its own section further down at 1440 — including the two sheets, which
+  are the only way to reach Settings and MIDI once the toolbar is gone.
+*/
+const context = await browser.newContext({ permissions: ['camera'], viewport: { width: 900, height: 860 } });
 const page = await context.newPage();
 page.setDefaultTimeout(60_000);
 const note = (text) => { if (!IGNORED.some(re => re.test(text))) errors.push(text); };
@@ -108,6 +122,42 @@ const settle = (ms = 900) => page.waitForTimeout(ms);
  * the other could be anything at all.
  */
 const firstVisible = (testId) => page.getByTestId(testId).first();
+
+/*
+  Raw coordinates for the desk's controls.
+
+  `locator.click()` stalls on them: its call log stops at "locator resolved to
+  <button …>" and never reports an actionability verdict, while a mouse click
+  at the same point works and the control visibly takes the selection. The
+  element is stable (traced over twenty animation frames: one bounding box)
+  and hit-testable (elementFromPoint returns the button itself), so that is
+  Playwright's machinery queueing behind the render loop, not the app.
+*/
+const clickOn = async (testId) => {
+  const box = await page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, testId);
+  if (!box) throw new Error(`no element [data-testid="${testId}"]`);
+  await page.mouse.click(box.x, box.y);
+};
+
+/** ⌘K, type, Enter — the only way to reach most of the app under a desk. */
+const viaPalette = async (query) => {
+  await page.keyboard.press('Control+k');
+  await settle(500);
+  await page.evaluate((q) => {
+    const input = document.querySelector('[data-testid="palette-input"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, q);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  }, query);
+  await settle(500);
+  await page.keyboard.press('Enter');
+  await settle(700);
+};
 
 /** Every `data-testid` in the document now, with how many elements carry it. */
 const testIdCounts = () => page.evaluate(() => {
@@ -404,39 +454,42 @@ try {
   // does. (It cannot: `frame` does not appear anywhere in the visualizer's
   // `resize`. This is the check that keeps it that way.)
   //
-  // The desk now owns the whole window rather than floating over the plate.
-  // The first build shared the screen with the bottle rail and the toolbar,
-  // and the two surfaces put Sound Drive on screen twice. So the clash checks
-  // that used to measure "does the desk sit under the toolbar" are replaced by
-  // a stronger one: while the desk is up, the old chrome is not rendered at
-  // all. A check that passes because neither element exists is measuring
-  // nothing, so it names the elements it looked for.
+  // The desk owns the whole window rather than floating over the plate, and
+  // Design is the same three columns holding the other half of the job. So
+  // the old "is the desk under the toolbar" clash checks are replaced by a
+  // stronger one — while a desk is up, the overlay UI is not rendered at all —
+  // and by checking that each mode shows its own columns.
   {
-    // Back to a laptop first: the small-screen check above leaves the window
-    // at phone width, and the desk deliberately does not lay out there.
+    // Up to a laptop: everything above ran on the narrow-screen surface, and
+    // the desks deliberately do not lay out below 1024.
     await page.setViewportSize({ width: 1440, height: 900 });
-    await settle(1200);
+    await settle(1800);
     const size = () => page.evaluate(() => {
       const c = document.getElementById('liquid-canvas');
       const r = document.querySelector('[data-testid="plate-frame"]').getBoundingClientRect();
       return { w: c.width, h: c.height, boxW: Math.round(r.width), boxH: Math.round(r.height) };
     });
-    const design = await size();
-    await firstVisible('desk-mode-button').click();
+
+    const bench = await size();
+    check('a desk lays out at laptop width',
+      (await page.getByTestId('design-desk').count()) === 1 || (await page.getByTestId('perform-desk').count()) === 1);
+    check('and the plate is a preview inside it, not the window',
+      bench.boxW < 1440 * 0.75, `${bench.boxW}px of 1440`);
+
+    await clickOn('mode-segmented-perform');
     await settle(1800);
     const perform = await size();
     check('Perform shows the desk', (await page.getByTestId('perform-desk').count()) === 1);
-    check('and makes the plate a preview',
-      perform.boxW < design.boxW * 0.85, `${design.boxW}px wide → ${perform.boxW}px`);
     check('and costs the render not one pixel',
-      perform.w === design.w && perform.h === design.h,
-      `${design.w}×${design.h} → ${perform.w}×${perform.h}`);
+      perform.w === bench.w && perform.h === bench.h,
+      `${bench.w}×${bench.h} → ${perform.w}×${perform.h}`);
 
-    // One control surface, not two.
+    // One control surface, not two. A check that passes because neither
+    // element exists is measuring nothing, so it names what it looked for.
     const legacy = ['liquid-water', 'midi-button', 'desk-mode-button', 'preset-title-button', 'guide-button'];
     const stillUp = [];
     for (const id of legacy) if (await page.getByTestId(id).count() > 0) stillUp.push(id);
-    check('and the old chrome is not drawn underneath it',
+    check('and the overlay UI is not drawn underneath it',
       stillUp.length === 0, stillUp.length ? stillUp.join(', ') : `none of ${legacy.join(', ')}`);
 
     // Its own three columns must not overlap the hole the plate is painted
@@ -453,28 +506,48 @@ try {
     check('and its columns clear the plate', overlap === null, overlap ?? '');
 
     // Go must name where it is going, or it is a button you press and hope.
-    await firstVisible('cue-oil-on-water').click();
-    await settle(400);
+    await clickOn('cue-oil-on-water');
+    await settle(600);
     const goLabel = (await page.getByTestId('go-button').innerText()).trim();
     check('and Go names the look it will send', /Oil on Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
 
     // ⌘K reaches what the desk deliberately does not show.
     await page.keyboard.press('Control+k');
-    await settle(300);
-    const palette = await page.getByTestId('command-palette').count();
-    await page.getByTestId('palette-input').fill('lacing');
-    await settle(200);
+    await settle(500);
+    const paletteUp = await page.getByTestId('command-palette').count();
+    await page.evaluate(() => {
+      const input = document.querySelector('[data-testid="palette-input"]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'lacing');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await settle(500);
     const hit = await page.getByTestId('palette-list').locator('button').first().innerText();
     await page.keyboard.press('Escape');
-    await settle(300);
-    check('and ⌘K finds a look by name', palette === 1 && /lacing/i.test(hit), `“${hit.replace(/\s+/g, ' ')}”`);
+    await settle(400);
+    check('and ⌘K finds a look by name', paletteUp === 1 && /lacing/i.test(hit), `“${hit.replace(/\s+/g, ' ')}”`);
+
+    // Settings and MIDI have no button of their own any more; if the palette
+    // cannot open them they are unreachable on a laptop.
+    for (const [query, id] of [['Settings', 'settings-panel'], ['MIDI', 'midi-panel']]) {
+      await viaPalette(query);
+      const up = await page.getByTestId(id).count();
+      const w = up ? await page.evaluate((i) => Math.round(document.querySelector(`[data-testid="${i}"]`).getBoundingClientRect().width), id) : 0;
+      check(`and ⌘K opens ${query} as a sheet`, up === 1 && w <= 720 && w > 300, up ? `${w}px wide` : 'did not open');
+      await page.keyboard.press('Escape');
+      await settle(500);
+    }
 
     await noteDuplicates();
-    await firstVisible('mode-segmented-design').click();
-    await settle(1200);
-    const back = await size();
-    check('and Design gives the plate the window back',
-      back.boxW > perform.boxW * 1.2, `${perform.boxW}px → ${back.boxW}px`);
+
+    // Design is the bench: the other half of the job, same grid.
+    await clickOn('mode-segmented-design');
+    await settle(1500);
+    const benchUp = await page.getByTestId('design-desk').count();
+    const bottles = await page.getByTestId('bottle-silicone').count();
+    const cuesGone = await page.getByTestId('cue-list').count();
+    check('and Design shows the bench instead of the cue list',
+      benchUp === 1 && bottles === 1 && cuesGone === 0,
+      `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
   }
 
   // ── Readable in a dark room ───────────────────────────────────────
