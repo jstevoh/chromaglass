@@ -134,7 +134,20 @@ try {
     await page.waitForTimeout(800);
   };
 
-  await palette('sunny');                       // Sunny Side Up: a yellow ground
+  /*
+    Which look to paint on, so the report can be chased across presets:
+
+      LOOK="soap film" npm run dye
+
+    Sunny Side Up by default, for its yellow ground. The reason this is a
+    knob: red silicone measured 345° there — red — so whatever turns it blue
+    is not the bottle, and the next suspects are per-preset renderer settings.
+    Iridescence is the strongest: it is thin-film interference, which cycles
+    through blue by construction, and Soap Film runs it at 0.75.
+  */
+  const LOOK = process.env.LOOK || 'sunny';
+  await palette(LOOK);
+  note(`painting on “${LOOK}”`);
   await page.waitForTimeout(3000);
 
   const grab = (slot) => page.evaluate((slot) => {
