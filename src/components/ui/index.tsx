@@ -218,17 +218,20 @@ export interface CueRowProps extends Keyed {
   state: 'live' | 'next' | 'idle';
   trailing?: ReactNode;
   onClick?: () => void;
+  /** Double-click sends it now, the way a cue list has always worked. */
+  onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
   testId?: string;
 }
 
-export function CueRow({ index, name, swatch, state, trailing, onClick, onContextMenu, testId }: CueRowProps) {
+export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId }: CueRowProps) {
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
     : 'border-transparent hover:bg-hover';
   return (
     <button
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       data-testid={testId}
       data-state={state}

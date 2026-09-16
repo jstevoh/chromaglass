@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState } from 'react';
+import type { ReactNode, Ref } from 'react';
+import { Check, SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, StatusDot, Tag, Toggle } from '../ui';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
@@ -32,17 +34,29 @@ export interface Cue {
   fade: number;
 }
 
-/** The six a hand is on during a show, and how each one reads. */
-export const RIDES: { key: keyof VisualizerSettings; label: string; fmt: (v: number) => string; white?: boolean }[] = [
-  { key: 'dimmer',         label: 'Dimmer',      fmt: v => `${Math.round(v * 100)}%`, white: true },
-  { key: 'audioImpact',    label: 'Sound drive', fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'globalSpeed',    label: 'Speed',       fmt: v => v.toFixed(3) },
-  { key: 'automateRate',   label: 'Evolve',      fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'beatSqueeze',    label: 'Beat kick',   fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'macroZoom',      label: 'Zoom',        fmt: v => `${v.toFixed(2)}×` },
+/**
+ * What the strip starts with: the controls a light show is actually played on.
+ *
+ * Which six is the operator's choice, from `LEARNABLE_SETTINGS` — the same
+ * list MIDI learn offers. That is deliberate rather than convenient: if the
+ * desk drew from its own list, the strip and the controller map could
+ * disagree about what is rideable, and the first time anyone noticed would be
+ * on stage.
+ */
+export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
+  'dimmer', 'audioImpact', 'globalSpeed', 'automateRate', 'beatSqueeze', 'macroZoom',
 ];
 
 const RANGE = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));
+
+/** How a few of them read better than a bare percentage. */
+const READS: Partial<Record<string, (v: number) => string>> = {
+  globalSpeed: v => v.toFixed(3),
+  macroZoom:   v => `${v.toFixed(2)}×`,
+};
+
+/** The Dimmer's handle is white because it is the one that can black the room out. */
+const WHITE = new Set<string>(['dimmer']);
 
 interface PerformDeskProps {
   cues: Cue[];
@@ -50,6 +64,8 @@ interface PerformDeskProps {
   nextId: string | null;
   liveFor: string;
   onCue: (id: string) => void;
+  /** Double-click a row: send it now, without arming it first. */
+  onCueNow: (id: string) => void;
   onGo: () => void;
   onBack: (() => void) | null;
   onBlackout: () => void;
@@ -60,6 +76,9 @@ interface PerformDeskProps {
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** Which CC each ride is learned to, so the desk and the controller agree. */
   ccFor: (key: keyof VisualizerSettings) => number | null;
+  /** Which controls are on the strip, and the operator's right to change them. */
+  rideKeys: (keyof VisualizerSettings)[];
+  onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   midiName: string | null;
   layer: number;
   layers: number;
@@ -70,20 +89,24 @@ interface PerformDeskProps {
   dye: string | null;
   onDye: (hex: string) => void;
   /** The hole the plate is painted over. */
-  plateRef: (el: HTMLDivElement | null) => void;
-  status: { audio: string; beat: number | null; fps: number | null; phone: boolean; rec: string | null; version: string };
+  plateRef: Ref<HTMLDivElement>;
+  /** The line along the bottom: what it hears, what it runs on, what it is doing. */
+  status: { audio: string; engine: string; sequence: string | null; phone: boolean; rec: string | null };
   dots: { mic: boolean; wall: boolean; midi: boolean; phone: boolean; rec: string | null };
   onSearch: () => void;
   mode: 'perform' | 'design' | 'sequence';
   onMode: (m: 'perform' | 'design' | 'sequence') => void;
   breadcrumb: ReactNode;
   onFreeze: () => void;
+  /** Whether the solver is already stopped, so the button can say so. */
+  frozen: boolean;
   onDrain: () => void;
 }
 
 const TOOLS = [['dropper', 'Drop', 'D'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P']] as const;
 
 export function PerformDesk(p: PerformDeskProps) {
+  const [picking, setPicking] = useState(false);
   const next = p.cues.find(c => c.id === p.nextId) ?? null;
   const live = p.cues.find(c => c.id === p.liveId) ?? null;
 
@@ -138,6 +161,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>
               }
               onClick={() => p.onCue(c.id)}
+              onDoubleClick={() => p.onCueNow(c.id)}
               testId={`cue-${c.id}`}
             />
           ))}
@@ -163,8 +187,15 @@ export function PerformDesk(p: PerformDeskProps) {
           </Button>
           <div className="mt-2 flex gap-2">
             <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} testId="back-button">Back</Button>
-            <Button full height={40} kbd="B" variant="danger" onClick={p.onBlackout} testId="blackout-button">
-              {p.blackout ? 'Lights' : 'Blackout'}
+            {/* Inverted while it is on: a blacked-out room is exactly when
+                you need the button to say so without reading it. */}
+            <Button
+              full height={40} kbd="B"
+              variant={p.blackout ? 'primary' : 'danger'}
+              onClick={p.onBlackout}
+              testId="blackout-button"
+            >
+              {p.blackout ? 'Blacked out' : 'Blackout'}
             </Button>
           </div>
         </div>
@@ -218,25 +249,67 @@ export function PerformDesk(p: PerformDeskProps) {
       <aside className="flex min-h-0 flex-col border-l border-border" data-testid="rides">
         <div className="flex h-11 shrink-0 items-center justify-between px-4">
           <span className="text-[13px] font-medium">Rides</span>
-          <span className="text-[12px] text-dim">{p.midiName ? `${p.midiName} mapped` : 'no controller'}</span>
+          <button
+            onClick={() => setPicking(v => !v)}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+              picking ? 'bg-text text-bg' : 'text-dim hover:bg-hover hover:text-text'
+            }`}
+            title="Choose which controls ride here"
+            data-testid="ride-pick"
+          >
+            <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+          </button>
         </div>
+        {picking ? (
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-2 pb-2" data-testid="ride-picker">
+            {LEARNABLE_SETTINGS.map(spec => {
+              const on = p.rideKeys.includes(spec.key);
+              return (
+                <button
+                  key={String(spec.key)}
+                  onClick={() => p.onRideKeys(on
+                    ? p.rideKeys.filter(k => k !== spec.key)
+                    : [...p.rideKeys, spec.key].slice(0, 10))}
+                  className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors ${
+                    on ? 'bg-hover text-text' : 'text-muted hover:bg-hover hover:text-text'
+                  }`}
+                  data-testid={`ride-pick-${String(spec.key)}`}
+                >
+                  <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                    on ? 'border-text bg-text text-bg' : 'border-border-strong'
+                  }`}>
+                    {on && <Check size={11} strokeWidth={3} />}
+                  </span>
+                  <span className="text-[13px]">{spec.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-4">
-          {RIDES.map(r => {
-            const spec = RANGE.get(r.key);
-            const raw = p.settings[r.key];
-            const v = typeof raw === 'number' ? raw : (spec?.min ?? 0);
+          {p.rideKeys.length === 0 && (
+            <p className="py-3 text-[13px] leading-relaxed text-dim">
+              Nothing on the strip. <span className="text-text">Choose</span> picks what rides here.
+            </p>
+          )}
+          {p.rideKeys.map(key => {
+            const spec = RANGE.get(key);
+            if (!spec) return null;          // a key saved by an older build
+            const raw = p.settings[key];
+            const v = typeof raw === 'number' ? raw : spec.min;
+            const read = READS[String(key)];
             return (
               <Slider
-                key={String(r.key)}
-                label={r.label}
+                key={String(key)}
+                label={spec.label}
                 value={v}
-                min={spec?.min ?? 0}
-                max={spec?.max ?? 1}
-                display={r.fmt(v)}
-                cc={p.ccFor(r.key)}
-                white={r.white}
-                onChange={n => p.onSetting({ [r.key]: n } as Partial<VisualizerSettings>)}
-                testId={`ride-${String(r.key)}`}
+                min={spec.min}
+                max={spec.max}
+                display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
+                cc={p.ccFor(key)}
+                white={WHITE.has(String(key))}
+                onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                testId={`ride-${String(key)}`}
               />
             );
           })}
@@ -254,24 +327,27 @@ export function PerformDesk(p: PerformDeskProps) {
               testId="toggle-beat"
             />
           </div>
+          <p className="mt-3 pb-2 text-[12px] text-faint">
+            {p.midiName ? `${p.midiName} · a CC on a fader moves it here too` : 'No controller. Settings → MIDI to learn one.'}
+          </p>
         </div>
+        )}
         <div className="flex shrink-0 gap-2 border-t border-border p-3">
-          <Button full height={40} onClick={p.onFreeze} testId="freeze-button">Freeze</Button>
+          <Button full height={40} kbd="F" onClick={p.onFreeze} testId="freeze-button">{p.frozen ? 'Thaw' : 'Freeze'}</Button>
           <Button full height={40} onClick={p.onDrain} testId="drain-button">Drain</Button>
         </div>
       </aside>
 
       {/* ── Status ──────────────────────────────────────────── */}
       <footer className="col-span-3 flex items-center justify-between border-t border-border px-4 font-mono text-[11px] text-dim">
-        <span>
+        <span data-testid="status-hearing">
           {p.status.audio}
-          {p.status.beat != null && ` · beat ${p.status.beat}`}
-          {p.status.fps != null && ` · gpu ${p.status.fps} fps`}
+          {p.status.sequence && ` · ${p.status.sequence}`}
         </span>
-        <span>
+        <span data-testid="status-running">
           {p.status.phone ? 'phone linked · ' : ''}
           {p.status.rec ? `rec ${p.status.rec} · ` : ''}
-          {p.status.version}
+          {p.status.engine}
         </span>
       </footer>
     </div>

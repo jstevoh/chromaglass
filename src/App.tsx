@@ -7,9 +7,8 @@ import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
-import { RideStrip, DEFAULT_RIDE } from './components/RideStrip';
-import { PerformDesk, RIDES, type Cue } from './components/desk/PerformDesk';
-import { StatusLine } from './components/StatusLine';
+import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
+import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -166,8 +165,8 @@ export default function App() {
   const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(RIDE_KEYS_KEY) ?? 'null');
-      return Array.isArray(saved) ? saved : DEFAULT_RIDE;
-    } catch { return DEFAULT_RIDE; }
+      return Array.isArray(saved) ? saved : DEFAULT_RIDES;
+    } catch { return DEFAULT_RIDES; }
   });
   useEffect(() => { try { localStorage.setItem(RIDE_KEYS_KEY, JSON.stringify(rideKeys)); } catch { /* private window */ } }, [rideKeys]);
   /**
@@ -803,10 +802,15 @@ export default function App() {
     if (settings) setCued({ id: presetId, name, settings });
   }, []);
 
-  /** Send the armed look to the stage. With no fade this is still not a clear. */
-  const goLook = useCallback((seconds = fadeSeconds) => {
-    const next = cued;
-    if (!next) return;
+  /**
+   * Send a look to the stage, over `seconds`. With no fade this is still not
+   * a clear: `adoptPreset` takes the new dyes without wiping the plate.
+   *
+   * Taking the look as an argument rather than reading `cued` is what lets
+   * ⇧⏎ in the palette send one that was never armed — arming it first and
+   * then calling Go would read a `cued` that this render does not have yet.
+   */
+  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
     if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
 
     const from = settingsRef.current;
@@ -834,7 +838,21 @@ export default function App() {
       setFading(t);
     }, 33);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cued, fadeSeconds, pinnedPresetId, adoptPreset]);
+  }, [pinnedPresetId, adoptPreset]);
+
+  /** Go: the armed look, at the chosen fade. */
+  const goLook = useCallback((seconds = fadeSeconds) => {
+    if (cued) sendLook(cued, seconds);
+  }, [cued, fadeSeconds, sendLook]);
+
+  /** The same, for a look that was never armed — the palette's ⇧⏎. */
+  const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
+    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
+    const built = PRESETS.find(p => p.id === presetId);
+    const look = up ? { id: presetId, name: up.name, settings: up.settings }
+      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+    if (look) sendLook(look, seconds);
+  }, [fadeSeconds, sendLook]);
 
   /** One step back, at the same fade. The fastest fix mid-show is undo. */
   const revertLook = useCallback(() => {
@@ -1229,7 +1247,10 @@ export default function App() {
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
     blackout,
     recording: recorder.recording ? recorder.seconds : null,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds]);
+    cuedPresetId: cued?.id ?? null,
+    cuedName: cued?.name ?? null,
+    fadeSeconds,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -1262,6 +1283,10 @@ export default function App() {
           break;
         case 'preset':
           cuePreset(message.presetId);
+          break;
+        case 'cue':
+          // Arm, do not apply: `preset` is the destructive one.
+          if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
         case 'dye':
           updateLiquidColor(selectedLiquidId, message.color);
@@ -1296,6 +1321,8 @@ export default function App() {
             case 'preset-prev':   stepPreset(-1); break;
             case 'blackout-toggle': toggleBlackout(); break;
             case 'record-toggle': toggleRecording(); break;
+            case 'go':            goLook(); break;
+            case 'back':          revertLook(); break;
           }
           break;
         case 'blow':
@@ -1365,6 +1392,110 @@ export default function App() {
     const box = r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
     return { left: box.left + gamepad.cursor.x * box.width, top: box.top + (1 - gamepad.cursor.y) * box.height };
   }, [gamepad.cursor]);
+
+  // ── ⌘K, and the keys a hand finds in the dark ───────────────────
+  /*
+    The desk shows six rides and a cue list and nothing else, because those
+    are what a hand is on during a set. Everything else the app can do stays
+    one keystroke away instead of one more panel: ⌘K opens a box, you type
+    three letters, you press Enter.
+
+    The keys themselves are the same commands, without the box. They are
+    printed on the buttons that share them — a shortcut nobody can see is a
+    shortcut nobody uses.
+  */
+  const [showPalette, setShowPalette] = useState(false);
+
+  const paletteCommands = useMemo<Command[]>(() => {
+    const looks: Command[] = allPresets.map(pr => {
+      const contract = isUserPresetId(pr.id)
+        ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
+        : PRESET_CONTRACTS[pr.id];
+      const [a, b] = contract && contract.length
+        ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
+        : ['#52525B', '#27272A'];
+      return {
+        id: `look-${pr.id}`,
+        name: pr.name,
+        kind: 'Looks',
+        look: true,
+        hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
+        swatch: `linear-gradient(135deg, ${a}, ${b})`,
+        // In Perform a look is armed, not applied: the wall does not cut
+        // because someone searched. ⇧⏎ is the one that sends it.
+        run: () => { if (performing) cueLook(pr.id); else cuePreset(pr.id); },
+        runNow: () => { if (performing) goLookNow(pr.id); else cuePreset(pr.id); },
+      };
+    });
+
+    const doing: Command[] = [
+      { id: 'go',        name: 'Go — send the cued look',   kind: 'Actions', kbd: 'Space', run: () => goLook() },
+      { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: '⌫',    run: () => revertLook() },
+      { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: 'B', run: toggleBlackout },
+      { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
+      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
+      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
+      { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
+      { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
+      { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
+      { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'lucky',     name: 'Random look (replaces everything)', kind: 'Actions', run: triggerLucky },
+      { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
+    ];
+
+    const opening: Command[] = [
+      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setShowSettings(true); setShowHelp(false); } },
+      { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
+      { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
+      { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
+      { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
+      { id: 'open-design',   name: deskMode === 'perform' ? 'Design mode' : 'Perform mode', kind: 'Open',
+        run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
+    ];
+
+    return [...looks, ...doing, ...opening];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode,
+      cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+        || (e.target as HTMLElement | null)?.isContentEditable;
+
+      // ⌘K works everywhere, including out of a text field, because that is
+      // the one key whose whole job is to get you out of where you are.
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowPalette(v => !v);
+        return;
+      }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // The rest are the desk's, and only while the desk is up: in Design the
+      // plate has the window and Space should not fire a look change.
+      if (!performing) return;
+
+      if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
+      if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
+      if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
+      if (e.key === 'd' || e.key === 'D') { setActiveTool('dropper'); return; }
+      if (e.key === 'w' || e.key === 'W') { setActiveTool('blow'); return; }
+      if (e.key === 'p' || e.key === 'P') { setActiveTool('press'); return; }
+      // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
+      // and Space sends it, which is how a lighting desk has always worked.
+      if (e.key >= '1' && e.key <= '9') {
+        const cue = allPresets[Number(e.key) - 1];
+        if (cue) cueLook(cue.id);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [performing, goLook, revertLook, cueLook, allPresets]);
+
+  /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
+  const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
 
   // Derive preset name for display
   const activePresetName = useMemo(() => {
@@ -1474,8 +1605,14 @@ export default function App() {
       <div hidden={!overlaysVisible} className="contents">
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
+      {/*
+        Not while the desk is up. The desk is a control surface in its own
+        right; drawing the bottle rail and the toolbar over it as well was
+        what put Sound Drive on screen twice, and a control that exists in
+        two places is a control you cannot trust.
+      */}
       <AnimatePresence>
-        {showControls && !showSettings && (
+        {showControls && !showSettings && !performing && (
           <>
             {/* ── Left Controls ───────────────────────────────── */}
             <motion.div
@@ -1940,6 +2077,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
+      {!performing && (
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
         <button
           onClick={() => setIsMinimized(!isMinimized)}
@@ -1958,6 +2096,7 @@ export default function App() {
           Clean Screen
         </button>
       </div>
+      )}
 
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
@@ -2083,6 +2222,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
+      {!performing && (
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
           <h1 className="text-2xl font-light tracking-tighter italic font-serif">
@@ -2241,65 +2381,99 @@ export default function App() {
           </button>
         </div>
       </div>
+      )}
 
       {/* ── The desk ───────────────────────────────────────────── */}
       {/*
         A layout with a hole in it. The plate is a `position: fixed` canvas
         that must never be re-parented — a remount takes the WebGL context and
-        the show restarts — so the desk lays out normally around an empty box,
-        and the canvas is painted over that box's rectangle.
+        the show restarts, mid-song — so the desk lays out normally around an
+        empty box and the canvas is painted over that box's rectangle.
 
-        The left inset clears the bottles and tools that already float there,
-        so nothing has to move house to make room for this.
+        The desk owns the whole window rather than floating over the plate.
+        The first version shared the screen with the bottle rail and the
+        toolbar, which is how Sound Drive ended up on screen twice; a control
+        that exists in two places is a control you cannot trust mid-set.
       */}
       {performing && overlaysVisible && (
-        <div className="fixed inset-0 z-[5] pointer-events-none" data-testid="desk">
-          {/*
-            The insets clear what already floats over the plate: the bottles
-            and dye swatches on the left, the toolbar on the right, the title
-            above and the Hide UI / Clean Screen row below. Nothing has to move
-            house to make room for the desk — it takes the space that was left.
-          */}
-          <div className="h-full flex flex-col gap-3 pt-24 pb-28 pl-[18.5rem] pr-[11rem]">
-            <StatusLine
-              lookName={liveLookName}
-              lookFor={lookFor}
-              sequence={{
-                running: sequencer.status.running,
-                name: sequencer.status.name,
-                stageName: sequencer.status.stageName,
-                progress: sequencer.status.progress,
-              }}
-              audioSource={audioSource === 'none' ? 'silent' : audioSource === 'simulated' ? 'band' : audioSource}
-              level={audioData ? Math.min(1, audioData.volume / 70) : 0}
-              engine={engineStatus?.label ?? ''}
-              casting={isCasting}
-              midiOn={midi.enabled}
-              cameraOn={scene.state.active}
-              recordingFor={recorder.recording ? recorder.seconds : null}
-              blackout={blackout}
-            />
-            <div className="flex-1 flex items-stretch gap-4 min-h-0">
-            <div ref={preview.ref} className="flex-1 min-w-0" data-testid="desk-preview" />
-            <aside
-              className="w-80 shrink-0 overflow-y-auto scrollbar-hide rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 pointer-events-auto"
-              data-testid="desk-column"
-            >
-              <RideStrip
-                settings={settings}
-                keys={rideKeys}
-                onChange={updateSettings}
-                onKeys={setRideKeys}
-              />
-            </aside>
-            </div>
-          </div>
-        </div>
+        <PerformDesk
+          cues={cues}
+          liveId={activePresetId}
+          nextId={cued?.id ?? null}
+          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          onCue={cueLook}
+          onCueNow={(id) => goLookNow(id)}
+          onGo={() => goLook()}
+          onBack={previousLook.current ? revertLook : null}
+          onBlackout={toggleBlackout}
+          blackout={blackout}
+          fade={fadeSeconds}
+          onFade={setFadeSeconds}
+          settings={settings}
+          onSetting={updateSettings}
+          ccFor={ccFor}
+          rideKeys={rideKeys}
+          onRideKeys={setRideKeys}
+          midiName={midi.activeInputName ?? null}
+          layer={activeLayer}
+          layers={Math.max(1, settings.layerCount)}
+          onLayer={setActiveLayer}
+          tool={activeTool}
+          onTool={(t) => setActiveTool(t as typeof activeTool)}
+          dyes={trayDyes}
+          dye={selectedLiquid?.color ?? null}
+          onDye={(hex) => {
+            const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
+            if (!bottle) return;
+            setSelectedLiquidId(bottle.id);
+            setActiveTool('dropper');
+          }}
+          plateRef={preview.ref}
+          status={{
+            audio: audioSource === 'none' ? 'silent'
+              : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`,
+            engine: engineStatus?.label ?? '',
+            sequence: sequencer.status.running
+              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
+              : null,
+            phone: remoteLink.status === 'connected',
+            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+          }}
+          dots={{
+            mic: audioSource !== 'none',
+            wall: isCasting,
+            midi: midi.enabled,
+            phone: remoteLink.status === 'connected',
+            rec: recorder.recording ? String(recorder.seconds) : null,
+          }}
+          onSearch={() => setShowPalette(true)}
+          mode={showSequencer ? 'sequence' : 'perform'}
+          onMode={(m) => {
+            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          breadcrumb={
+            <>
+              <span className="text-muted">Show</span>
+              <span className="text-faint">/</span>
+              <span>{liveLookName ?? 'Untitled'}</span>
+            </>
+          }
+          onFreeze={() => setIsActive(v => !v)}
+          frozen={!isActive}
+          onDrain={() => setDrainTrigger(v => v + 1)}
+        />
+      )}
+
+      {/* ── ⌘K ─────────────────────────────────────────────────── */}
+      {showPalette && (
+        <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
       )}
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
-        {(cued || fading > 0 || previousLook.current) && (
+        {!performing && (cued || fading > 0 || previousLook.current) && (
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -2326,7 +2500,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && (
+      {isActive && audioData && !isMinimized && !performing && (
         <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },

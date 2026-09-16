@@ -287,7 +287,31 @@ function CastReceiver() {
         </div>
       )}
 
+      {/*
+        A black projector is ambiguous: blacked out on purpose, or a dead
+        link? The caption says which, quietly, and only for the first few
+        seconds after it goes dark — long enough for the operator who just
+        pressed B, gone before an audience can read anything off the wall.
+      */}
+      <BlackoutCaption on={(settings.dimmer ?? 1) <= 0.02} />
+
       <CastHint isFullscreen={isFullscreen} />
+    </div>
+  );
+}
+
+function BlackoutCaption({ on }: { on: boolean }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!on) { setShow(false); return; }
+    setShow(true);
+    const timer = setTimeout(() => setShow(false), 3000);
+    return () => clearTimeout(timer);
+  }, [on]);
+  if (!show) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center" data-testid="wall-blackout">
+      <span className="font-mono text-[11px] tracking-widest" style={{ color: '#3F3F46' }}>blackout</span>
     </div>
   );
 }

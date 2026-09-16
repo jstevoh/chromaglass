@@ -403,6 +403,14 @@ try {
   // pixels actually rendered — must not change when the box it is shown in
   // does. (It cannot: `frame` does not appear anywhere in the visualizer's
   // `resize`. This is the check that keeps it that way.)
+  //
+  // The desk now owns the whole window rather than floating over the plate.
+  // The first build shared the screen with the bottle rail and the toolbar,
+  // and the two surfaces put Sound Drive on screen twice. So the clash checks
+  // that used to measure "does the desk sit under the toolbar" are replaced by
+  // a stronger one: while the desk is up, the old chrome is not rendered at
+  // all. A check that passes because neither element exists is measuring
+  // nothing, so it names the elements it looked for.
   {
     // Back to a laptop first: the small-screen check above leaves the window
     // at phone width, and the desk deliberately does not lay out there.
@@ -417,34 +425,52 @@ try {
     await firstVisible('desk-mode-button').click();
     await settle(1800);
     const perform = await size();
-    check('Perform shows the desk', (await page.getByTestId('desk').count()) === 1);
+    check('Perform shows the desk', (await page.getByTestId('perform-desk').count()) === 1);
     check('and makes the plate a preview',
       perform.boxW < design.boxW * 0.85, `${design.boxW}px wide → ${perform.boxW}px`);
     check('and costs the render not one pixel',
       perform.w === design.w && perform.h === design.h,
       `${design.w}×${design.h} → ${perform.w}×${perform.h}`);
-    // The desk takes the space the floating controls leave. Its first build
-    // sat underneath the toolbar, which was only visible in a screenshot.
-    const clash = await page.evaluate(() => {
-      const col = document.querySelector('[data-testid="desk-column"]')?.getBoundingClientRect();
-      const bar = document.querySelector('[data-testid="midi-button"]')?.closest('div')?.getBoundingClientRect();
-      if (!col || !bar) return null;
-      return (col.right < bar.left || col.left > bar.right) ? null
-        : `desk ${Math.round(col.left)}–${Math.round(col.right)} under toolbar ${Math.round(bar.left)}–${Math.round(bar.right)}`;
+
+    // One control surface, not two.
+    const legacy = ['liquid-water', 'midi-button', 'desk-mode-button', 'preset-title-button', 'guide-button'];
+    const stillUp = [];
+    for (const id of legacy) if (await page.getByTestId(id).count() > 0) stillUp.push(id);
+    check('and the old chrome is not drawn underneath it',
+      stillUp.length === 0, stillUp.length ? stillUp.join(', ') : `none of ${legacy.join(', ')}`);
+
+    // Its own three columns must not overlap the hole the plate is painted
+    // over — a preview with a slider on top of it is worse than no preview.
+    const overlap = await page.evaluate(() => {
+      const box = (id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect() ?? null;
+      const hole = box('desk-preview'), cues = box('cue-list'), rides = box('rides');
+      if (!hole || !cues || !rides) return 'a column is missing';
+      const bad = [];
+      if (cues.right > hole.left + 1) bad.push(`cues reach ${Math.round(cues.right)}, plate starts at ${Math.round(hole.left)}`);
+      if (rides.left < hole.right - 1) bad.push(`rides start at ${Math.round(rides.left)}, plate ends at ${Math.round(hole.right)}`);
+      return bad.length ? bad.join('; ') : null;
     });
-    check('and does not sit underneath the toolbar', clash === null, clash ?? '');
-    // Same on the other side: enlarging the dye swatches for legibility made
-    // the bottles column wider, and it grew over the preview's left edge.
-    const leftClash = await page.evaluate(() => {
-      const hole = document.querySelector('[data-testid="desk-preview"]')?.getBoundingClientRect();
-      const dye = document.querySelector('[data-testid="liquid-water"]')?.closest('div')?.parentElement?.getBoundingClientRect();
-      if (!hole || !dye) return null;
-      return dye.right <= hole.left + 1 ? null
-        : `bottles reach ${Math.round(dye.right)}, preview starts at ${Math.round(hole.left)}`;
-    });
-    check('nor over the bottles on the left', leftClash === null, leftClash ?? '');
+    check('and its columns clear the plate', overlap === null, overlap ?? '');
+
+    // Go must name where it is going, or it is a button you press and hope.
+    await firstVisible('cue-oil-on-water').click();
+    await settle(400);
+    const goLabel = (await page.getByTestId('go-button').innerText()).trim();
+    check('and Go names the look it will send', /Oil on Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
+
+    // ⌘K reaches what the desk deliberately does not show.
+    await page.keyboard.press('Control+k');
+    await settle(300);
+    const palette = await page.getByTestId('command-palette').count();
+    await page.getByTestId('palette-input').fill('lacing');
+    await settle(200);
+    const hit = await page.getByTestId('palette-list').locator('button').first().innerText();
+    await page.keyboard.press('Escape');
+    await settle(300);
+    check('and ⌘K finds a look by name', palette === 1 && /lacing/i.test(hit), `“${hit.replace(/\s+/g, ' ')}”`);
+
     await noteDuplicates();
-    await firstVisible('desk-mode-button').click();
+    await firstVisible('mode-segmented-design').click();
     await settle(1200);
     const back = await size();
     check('and Design gives the plate the window back',
