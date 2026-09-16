@@ -680,11 +680,11 @@ export default function RemoteControl() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
         data-testid="remote-transport"
       >
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
           <button
             onClick={() => action('blackout-toggle')}
             disabled={!connected}
-            className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 ${
+            className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 md:w-[140px] md:flex-none ${
               state?.blackout ? 'border-red-400 bg-red-500 text-black' : 'border-red-400/30 bg-red-500/10 text-red-200'
             }`}
             data-testid="remote-blackout"
@@ -692,10 +692,45 @@ export default function RemoteControl() {
             <Lightbulb size={16} />
             {state?.blackout ? 'Blacked out' : 'Blackout'}
           </button>
+          {/*
+            The cue rail, on a tablet.
+
+            A phone has no room for it and scrolls to the list below; an iPad
+            has 1180 points across and nothing to put in the middle of the
+            transport. Tapping a card arms the look — the same thing the list
+            does — so the whole change of look happens without leaving the
+            bar your thumbs are already on: pick, then Go.
+          */}
+          <div className="hidden min-w-0 flex-1 gap-2 overflow-x-auto scrollbar-hide md:flex" data-testid="remote-cue-rail">
+            {(state?.presets ?? []).map((preset) => {
+              const live = state?.activePresetId === preset.id;
+              const next = state?.cuedPresetId === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => send({ type: 'cue', presetId: preset.id })}
+                  disabled={!connected}
+                  className={`flex h-14 w-[170px] shrink-0 flex-col justify-center rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                    live ? 'border-red-400/60 bg-red-500/10'
+                    : next ? 'border-violet-400/60 bg-violet-500/10'
+                    : 'border-white/10 bg-white/5'
+                  }`}
+                  data-testid={`remote-cue-${preset.id}`}
+                >
+                  <span className="truncate text-[13px] font-semibold text-white/85">{preset.name}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                    live ? 'text-red-300' : next ? 'text-violet-300' : 'text-white/30'
+                  }`}>
+                    {live ? 'live' : next ? 'next' : preset.user ? 'yours' : preset.macro ? 'closeup' : 'look'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <button
             onClick={() => action('go')}
             disabled={!connected || !state?.cuedPresetId}
-            className="flex h-14 flex-[2] flex-col items-center justify-center rounded-2xl bg-white text-black transition-transform active:scale-95 disabled:bg-white/15 disabled:text-white/40"
+            className="flex h-14 flex-[2] flex-col items-center justify-center rounded-2xl bg-white px-4 text-black transition-transform active:scale-95 disabled:bg-white/15 disabled:text-white/40 md:w-[220px] md:flex-none"
             data-testid="remote-go"
           >
             <span className="text-sm font-bold">

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { Info } from './Info';
+import { Sheet } from './ui';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
@@ -112,20 +112,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /** Which half of the panel is showing. Perform first: it is what a show needs. */
   const [tab, setTab] = useState<'perform' | 'setup'>('perform');
 
+  /*
+    A sheet, not a drawer.
+
+    This used to be a 320px column pinned to the right edge with 112px of top
+    padding to clear a title bar that no longer exists — under a desk it sat
+    over the rides and wasted a seventh of its own height on nothing. The
+    sheet is centred, 720 wide, and fills the screen on a phone, so one shell
+    serves every size the app runs at.
+  */
   return (
-    <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-80 h-full bg-black/80 backdrop-blur-xl border-l border-white/10 z-40 overflow-y-auto p-8 pt-28 scrollbar-hide"
-    >
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-xl font-bold tracking-tighter italic">Projector <span className="not-italic">Settings</span></h2>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-          <X size={20} />
-        </button>
-      </div>
+    <Sheet title="Settings" onClose={onClose} testId="settings-panel">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
 
       {/*
         Two tabs, because eight screens of scroll is not a control surface.
@@ -1428,6 +1426,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           "The Squish Plate effect was the hallmark of American light shows... simulating pressing two glass clock faces together."
         </p>
       </div>
-    </motion.div>
+      </div>
+    </Sheet>
   );
 };

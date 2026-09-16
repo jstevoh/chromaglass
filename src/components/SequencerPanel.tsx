@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { X, Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
+import { Sheet } from './ui';
+import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence } from '../lib/sequencer';
@@ -134,21 +134,12 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
     setEditIndex(0);
   };
 
+  // A sheet, like Settings and MIDI. Sequence is one of the desk's three
+  // modes, so it opens in the middle of the screen rather than sliding in
+  // over the cue list it is about to drive.
   return (
-    <motion.div
-      initial={{ x: '-100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '-100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed top-0 left-0 w-80 h-full bg-black/80 backdrop-blur-xl border-r border-white/10 z-40 overflow-y-auto p-8 pt-28 scrollbar-hide"
-      data-testid="sequencer-panel"
-    >
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold tracking-tighter flex items-center gap-2"><Clapperboard size={18} /> Show Sequencer</h2>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close sequencer">
-          <X size={20} />
-        </button>
-      </div>
+    <Sheet title={<><Clapperboard size={16} /> Sequence</>} onClose={onClose} testId="sequencer-panel">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
       <p className="text-[10px] leading-relaxed opacity-40 mb-5">
         A script for the show instead of dice: stages that change the plate over a song or a set, each gliding into the next on a clock or when the song moves to a new section.
       </p>
@@ -340,6 +331,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
           )}
         </section>
       )}
-    </motion.div>
+      </div>
+    </Sheet>
   );
 };

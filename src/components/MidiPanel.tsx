@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { X, Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid } from 'lucide-react';
+import { Sheet } from './ui';
+import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel, type MidiAction, type MidiTarget } from '../lib/midi';
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
@@ -52,24 +52,15 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
     );
   };
 
+  // A sheet rather than a left-edge drawer: under a desk the drawer covered
+  // the cue list, which is the one column you need while teaching a pad to
+  // fire cues.
   return (
-    <motion.div
-      initial={{ x: '-100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '-100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed top-0 left-0 w-80 h-full bg-black/80 backdrop-blur-xl border-r border-white/10 z-40 overflow-y-auto p-8 pt-28 scrollbar-hide text-white"
-      data-testid="midi-panel"
-    >
+    <Sheet title={<><Sliders size={16} /> MIDI</>} onClose={onClose} testId="midi-panel">
       {showSurface && (
         <ControllerSurface midi={midi} presets={presets} surface={surface} onClose={() => setShowSurface(false)} />
       )}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold tracking-tighter flex items-center gap-2"><Sliders size={18} /> MIDI</h2>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close MIDI">
-          <X size={20} />
-        </button>
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
       <p className="text-[10px] leading-relaxed opacity-40 mb-4">
         Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Pick a factory map or teach your controller: choose what a control should do, then touch it.
       </p>
@@ -184,6 +175,7 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
           </div>
         ))}
       </div>
-    </motion.div>
+      </div>
+    </Sheet>
   );
 }
