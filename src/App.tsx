@@ -5,9 +5,12 @@ import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
+import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
-import { RideStrip, DEFAULT_RIDE } from './components/RideStrip';
-import { StatusLine } from './components/StatusLine';
+import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
+import { CommandPalette, type Command } from './components/desk/CommandPalette';
+import { DesignDesk } from './components/desk/DesignDesk';
+import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -66,6 +69,11 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
+/** The letter printed on each tool, and the tool it picks. */
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press',
+};
+
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
 /** Which controls are on the desk's faders. A property of this desk, like the mode. */
 const RIDE_KEYS_KEY = 'chromaglass-ride-keys';
@@ -164,8 +172,8 @@ export default function App() {
   const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(RIDE_KEYS_KEY) ?? 'null');
-      return Array.isArray(saved) ? saved : DEFAULT_RIDE;
-    } catch { return DEFAULT_RIDE; }
+      return Array.isArray(saved) ? saved : DEFAULT_RIDES;
+    } catch { return DEFAULT_RIDES; }
   });
   useEffect(() => { try { localStorage.setItem(RIDE_KEYS_KEY, JSON.stringify(rideKeys)); } catch { /* private window */ } }, [rideKeys]);
   /**
@@ -251,10 +259,26 @@ export default function App() {
         setOverlaysVisible(true);
         return;
       }
-      // With the overlays up, Esc closes whatever panel is open.
+      /*
+        With the overlays up, Esc closes whatever panel is open — all of
+        them, which this list did not used to be.
+
+        MIDI and the sequencer were missing, left over from when they were
+        drawers with a close button of their own. As sheets they each carry
+        an Esc listener, but Settings was being closed by *this* handler
+        rather than by its own, and MIDI — with nothing here covering it —
+        stayed open. Measured in Perform: Settings `afterEscape=0`, MIDI
+        `afterEscape=1`, same run, same sequence.
+
+        One list, every panel, so Esc means the same thing everywhere.
+      */
       setShowSettings(false);
       setShowHelp(false);
       setShowTrackPanel(false);
+      setShowMidi(false);
+      setShowSequencer(false);
+      setShowSave(false);
+      setShowPalette(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -736,10 +760,20 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const performing = deskMode === 'perform' && roomForDesk;
+  const designing = deskMode === 'design' && roomForDesk;
 
-  // The hole in the desk layout the plate is painted over. In Design there is
-  // no hole and the plate fills the window, as it always has.
-  const preview = usePreviewFrame(performing);
+  /*
+    Below that width neither desk lays out, and the floating overlay UI — the
+    bottle rail, the toolbar, the title bar — is what the app shows instead.
+    It is not legacy so much as the narrow-screen surface: a phone already has
+    a control surface of its own in the remote, and a small laptop window gets
+    the one that does not need three columns.
+  */
+  const deskUp = roomForDesk;
+
+  // The hole in the desk layout the plate is painted over. Both desks leave
+  // one; without a desk the plate fills the window, as it always has.
+  const preview = usePreviewFrame(deskUp);
 
   /**
    * How long the look on the wall has been up.
@@ -758,6 +792,44 @@ export default function App() {
     return () => clearInterval(id);
   }, [deskMode]);
 
+  /** A look that has drifted from the preset it was pinned to. */
+  const lookEdited = pinnedPresetId != null && activePresetId == null;
+  const pinnedLookName = useMemo(() => {
+    if (!pinnedPresetId) return null;
+    return allPresets.find(p => p.id === pinnedPresetId)?.name ?? null;
+  }, [allPresets, pinnedPresetId]);
+
+  /**
+   * The cue list: the looks, in order, each carrying two of its own dyes so a
+   * row is recognisable without reading it. The live one is what is on the
+   * wall; the next one is whatever is armed.
+   */
+  const cues = useMemo<Cue[]>(() => allPresets.map(pr => {
+    const contract = isUserPresetId(pr.id)
+      ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
+      : PRESET_CONTRACTS[pr.id];
+    const [a, b] = contract && contract.length
+      ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
+      : ['#52525B', '#27272A'];
+    return { id: pr.id, name: pr.name, swatch: `linear-gradient(135deg, ${a}, ${b})`, fade: fadeSeconds };
+  }), [allPresets, fadeSeconds]);
+
+  /**
+   * The controller, reachable from above where it is created.
+   *
+   * The desk prints the CC each ride is learned to, and the MIDI hook is built
+   * further down the file than the desk's props are assembled. A ref rather
+   * than a reorder: the hook's inputs depend on half the app.
+   */
+  const midiRef = useRef<{ map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] } } | null>(null);
+
+  /** Which CC a ride is learned to, so the desk and the controller agree. */
+  const ccFor = useCallback((key: keyof VisualizerSettings): number | null => {
+    const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);
+    return b && b.source.kind === 'cc' ? b.source.number : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -770,10 +842,15 @@ export default function App() {
     if (settings) setCued({ id: presetId, name, settings });
   }, []);
 
-  /** Send the armed look to the stage. With no fade this is still not a clear. */
-  const goLook = useCallback((seconds = fadeSeconds) => {
-    const next = cued;
-    if (!next) return;
+  /**
+   * Send a look to the stage, over `seconds`. With no fade this is still not
+   * a clear: `adoptPreset` takes the new dyes without wiping the plate.
+   *
+   * Taking the look as an argument rather than reading `cued` is what lets
+   * ⇧⏎ in the palette send one that was never armed — arming it first and
+   * then calling Go would read a `cued` that this render does not have yet.
+   */
+  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
     if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
 
     const from = settingsRef.current;
@@ -801,7 +878,21 @@ export default function App() {
       setFading(t);
     }, 33);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cued, fadeSeconds, pinnedPresetId, adoptPreset]);
+  }, [pinnedPresetId, adoptPreset]);
+
+  /** Go: the armed look, at the chosen fade. */
+  const goLook = useCallback((seconds = fadeSeconds) => {
+    if (cued) sendLook(cued, seconds);
+  }, [cued, fadeSeconds, sendLook]);
+
+  /** The same, for a look that was never armed — the palette's ⇧⏎. */
+  const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
+    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
+    const built = PRESETS.find(p => p.id === presetId);
+    const look = up ? { id: presetId, name: up.name, settings: up.settings }
+      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+    if (look) sendLook(look, seconds);
+  }, [fadeSeconds, sendLook]);
 
   /** One step back, at the same fade. The fastest fix mid-show is undo. */
   const revertLook = useCallback(() => {
@@ -1196,7 +1287,10 @@ export default function App() {
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
     blackout,
     recording: recorder.recording ? recorder.seconds : null,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds]);
+    cuedPresetId: cued?.id ?? null,
+    cuedName: cued?.name ?? null,
+    fadeSeconds,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -1229,6 +1323,10 @@ export default function App() {
           break;
         case 'preset':
           cuePreset(message.presetId);
+          break;
+        case 'cue':
+          // Arm, do not apply: `preset` is the destructive one.
+          if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
         case 'dye':
           updateLiquidColor(selectedLiquidId, message.color);
@@ -1263,6 +1361,8 @@ export default function App() {
             case 'preset-prev':   stepPreset(-1); break;
             case 'blackout-toggle': toggleBlackout(); break;
             case 'record-toggle': toggleRecording(); break;
+            case 'go':            goLook(); break;
+            case 'back':          revertLook(); break;
           }
           break;
         case 'blow':
@@ -1306,6 +1406,7 @@ export default function App() {
     },
     allPresetIds,
   );
+  midiRef.current = midi as unknown as typeof midiRef.current;
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
     action: runAction,
@@ -1331,6 +1432,141 @@ export default function App() {
     const box = r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
     return { left: box.left + gamepad.cursor.x * box.width, top: box.top + (1 - gamepad.cursor.y) * box.height };
   }, [gamepad.cursor]);
+
+  // ── ⌘K, and the keys a hand finds in the dark ───────────────────
+  /*
+    The desk shows six rides and a cue list and nothing else, because those
+    are what a hand is on during a set. Everything else the app can do stays
+    one keystroke away instead of one more panel: ⌘K opens a box, you type
+    three letters, you press Enter.
+
+    The keys themselves are the same commands, without the box. They are
+    printed on the buttons that share them — a shortcut nobody can see is a
+    shortcut nobody uses.
+  */
+  const [showPalette, setShowPalette] = useState(false);
+
+  const paletteCommands = useMemo<Command[]>(() => {
+    const looks: Command[] = allPresets.map(pr => {
+      const contract = isUserPresetId(pr.id)
+        ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
+        : PRESET_CONTRACTS[pr.id];
+      const [a, b] = contract && contract.length
+        ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
+        : ['#52525B', '#27272A'];
+      return {
+        id: `look-${pr.id}`,
+        name: pr.name,
+        kind: 'Looks',
+        look: true,
+        hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
+        swatch: `linear-gradient(135deg, ${a}, ${b})`,
+        // In Perform a look is armed, not applied: the wall does not cut
+        // because someone searched. ⇧⏎ is the one that sends it.
+        run: () => { if (performing) cueLook(pr.id); else cuePreset(pr.id); },
+        runNow: () => { if (performing) goLookNow(pr.id); else cuePreset(pr.id); },
+      };
+    });
+
+    const doing: Command[] = [
+      { id: 'go',        name: 'Go — send the cued look',   kind: 'Actions', kbd: 'Space', run: () => goLook() },
+      { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: '⌫',    run: () => revertLook() },
+      { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: 'B', run: toggleBlackout },
+      { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
+      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
+      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
+      { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
+      { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
+      { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
+      { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'lucky',     name: 'Random look (replaces everything)', kind: 'Actions', run: triggerLucky },
+      { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
+    ];
+
+    const opening: Command[] = [
+      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setShowSettings(true); setShowHelp(false); } },
+      { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
+      { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
+      { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
+      { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
+      { id: 'open-design',   name: deskMode === 'perform' ? 'Design mode' : 'Perform mode', kind: 'Open',
+        run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
+    ];
+
+    return [...looks, ...doing, ...opening];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode,
+      cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+        || (e.target as HTMLElement | null)?.isContentEditable;
+
+      // ⌘K works everywhere, including out of a text field, because that is
+      // the one key whose whole job is to get you out of where you are.
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowPalette(v => !v);
+        return;
+      }
+      // The bench's two: save what you have made, send it to the wall.
+      if (designing && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        setShowSave(true);
+        return;
+      }
+      if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        void startCast('window');
+        return;
+      }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!deskUp) return;          // the narrow-screen UI has its own keys
+
+      // The tools are the same letters on both desks; Design has all seven.
+      const tool = TOOL_KEYS[e.key.toLowerCase()];
+      if (tool && (designing || tool === 'dropper' || tool === 'blow' || tool === 'press')) {
+        setActiveTool(tool);
+        return;
+      }
+      if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
+
+      // The rest are the show's, and only while the desk is up: on the bench
+      // Space should not fire a look change at a room.
+      if (!performing) return;
+      if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
+      if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
+      // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
+      // and Space sends it, which is how a lighting desk has always worked.
+      if (e.key >= '1' && e.key <= '9') {
+        const cue = allPresets[Number(e.key) - 1];
+        if (cue) cueLook(cue.id);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [performing, designing, deskUp, goLook, revertLook, cueLook, allPresets]);
+
+  /** The save sheet, opened from the bench and from ⌘S. */
+  const [showSave, setShowSave] = useState(false);
+
+  /** The lamps in both desks' headers, and the line along the bottom. */
+  const deskDots = useMemo(() => ({
+    mic: audioSource !== 'none',
+    wall: isCasting,
+    midi: midi.enabled,
+    phone: remoteLink.status === 'connected',
+    rec: recorder.recording ? String(recorder.seconds) : null,
+  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds]);
+
+  const deskAudioLine = audioSource === 'none' ? 'silent'
+    : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`;
+
+  /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
+  const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
 
   // Derive preset name for display
   const activePresetName = useMemo(() => {
@@ -1440,8 +1676,14 @@ export default function App() {
       <div hidden={!overlaysVisible} className="contents">
 
       {/* ── UI Overlay ─────────────────────────────────────────── */}
+      {/*
+        Not while the desk is up. The desk is a control surface in its own
+        right; drawing the bottle rail and the toolbar over it as well was
+        what put Sound Drive on screen twice, and a control that exists in
+        two places is a control you cannot trust.
+      */}
       <AnimatePresence>
-        {showControls && !showSettings && (
+        {showControls && !showSettings && !deskUp && (
           <>
             {/* ── Left Controls ───────────────────────────────── */}
             <motion.div
@@ -1906,6 +2148,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
+      {!deskUp && (
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
         <button
           onClick={() => setIsMinimized(!isMinimized)}
@@ -1924,6 +2167,7 @@ export default function App() {
           Clean Screen
         </button>
       </div>
+      )}
 
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
@@ -2049,6 +2293,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
+      {!deskUp && (
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
           <h1 className="text-2xl font-light tracking-tighter italic font-serif">
@@ -2119,44 +2364,79 @@ export default function App() {
                 role="menu"
                 data-testid="cast-menu"
               >
-                <button
-                  role="menuitem"
-                  onClick={() => { setCastMenu(false); startCast('window'); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
-                  data-testid="cast-window"
-                >
-                  <div className="text-xs font-semibold">Second display</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">A projector on HDMI: opens a window on the second screen showing this very canvas, rendered at the projector's own pixels, filling that screen with no title bar (with the permission; else the next click here fills it). This window keeps the controls and a scaled copy.</div>
-                </button>
-                <div className="px-3 py-2 rounded-lg" data-testid="cast-network">
+                {/*
+                  A line each, and the explanation behind an ⓘ. This menu is
+                  opened while a room waits: three paragraphs of prose is a
+                  thing to read, not a thing to pick from. The one piece of
+                  text that is not prose — the address a projector types in —
+                  stays where it can be copied.
+                */}
+                <div className="flex items-start gap-1">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setCastMenu(false); startCast('window'); }}
+                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
+                    data-testid="cast-window"
+                  >
+                    <div className="text-xs font-semibold">Second display</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">A projector on HDMI.</div>
+                  </button>
+                  <div className="pt-2 pr-1">
+                    <Info label="">
+                      Opens a window on the second screen showing this very canvas, rendered at
+                      the projector's own pixels, filling that screen with no title bar (with the
+                      permission; else the next click here fills it). This window keeps the
+                      controls and a scaled copy.
+                    </Info>
+                  </div>
+                </div>
+
+                <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
                   <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
                   {relay ? (
-                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">
-                      Open this on any browser — a projector, a TV, a tablet — and it shows the show. Same Wi-Fi:
+                    <>
+                      <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
                       {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-white/80 select-all mt-0.5">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
+                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       ))}
                       {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-                        <>
-                          <div className="mt-1">Through the tunnel, from anywhere:</div>
-                          <div className="font-mono text-white/80 select-all mt-0.5">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                        </>
+                        <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       )}
-                      <div className="mt-1">Across buildings or other access points: run <span className="font-mono">npm run tunnel</span> and use the https address it prints, with the same <span className="font-mono">?cast=true&amp;key=…</span>.</div>
-                    </div>
+                      <div className="mt-2">
+                        <Info label="">
+                          Open one of these on a projector, a TV or a tablet and it shows the
+                          show. Across buildings or other access points: run{' '}
+                          <span className="font-mono">npm run tunnel</span> and use the https
+                          address it prints, with the same{' '}
+                          <span className="font-mono">?cast=true&amp;key=…</span>.
+                        </Info>
+                      </div>
+                    </>
                   ) : (
-                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">Needs the show server: run <span className="font-mono">npm run remote</span> and open the show from there, then this lists the address.</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">
+                      Needs the show server: run <span className="font-mono">npm run remote</span>.
+                    </div>
                   )}
                 </div>
-                <button
-                  role="menuitem"
-                  onClick={() => { setCastMenu(false); startCast('device'); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
-                  data-testid="cast-device"
-                >
-                  <div className="text-xs font-semibold">Chromecast</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Chrome's device picker. Nest displays take the show directly. A Google TV that does not appear or connect here: open Second display, then Chrome's menu → Cast → the TV → Cast tab, on that window.</div>
-                </button>
+
+                <div className="flex items-start gap-1">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setCastMenu(false); startCast('device'); }}
+                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
+                    data-testid="cast-device"
+                  >
+                    <div className="text-xs font-semibold">Chromecast</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">Chrome's device picker.</div>
+                  </button>
+                  <div className="pt-2 pr-1">
+                    <Info label="">
+                      Nest displays take the show directly. A Google TV that does not appear or
+                      connect here: open Second display, then Chrome's menu → Cast → the TV →
+                      Cast tab, on that window.
+                    </Info>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2172,65 +2452,159 @@ export default function App() {
           </button>
         </div>
       </div>
+      )}
 
       {/* ── The desk ───────────────────────────────────────────── */}
       {/*
         A layout with a hole in it. The plate is a `position: fixed` canvas
         that must never be re-parented — a remount takes the WebGL context and
-        the show restarts — so the desk lays out normally around an empty box,
-        and the canvas is painted over that box's rectangle.
+        the show restarts, mid-song — so the desk lays out normally around an
+        empty box and the canvas is painted over that box's rectangle.
 
-        The left inset clears the bottles and tools that already float there,
-        so nothing has to move house to make room for this.
+        The desk owns the whole window rather than floating over the plate.
+        The first version shared the screen with the bottle rail and the
+        toolbar, which is how Sound Drive ended up on screen twice; a control
+        that exists in two places is a control you cannot trust mid-set.
       */}
       {performing && overlaysVisible && (
-        <div className="fixed inset-0 z-[5] pointer-events-none" data-testid="desk">
-          {/*
-            The insets clear what already floats over the plate: the bottles
-            and dye swatches on the left, the toolbar on the right, the title
-            above and the Hide UI / Clean Screen row below. Nothing has to move
-            house to make room for the desk — it takes the space that was left.
-          */}
-          <div className="h-full flex flex-col gap-3 pt-24 pb-28 pl-[18.5rem] pr-[11rem]">
-            <StatusLine
-              lookName={liveLookName}
-              lookFor={lookFor}
-              sequence={{
-                running: sequencer.status.running,
-                name: sequencer.status.name,
-                stageName: sequencer.status.stageName,
-                progress: sequencer.status.progress,
-              }}
-              audioSource={audioSource === 'none' ? 'silent' : audioSource === 'simulated' ? 'band' : audioSource}
-              level={audioData ? Math.min(1, audioData.volume / 70) : 0}
-              engine={engineStatus?.label ?? ''}
-              casting={isCasting}
-              midiOn={midi.enabled}
-              cameraOn={scene.state.active}
-              recordingFor={recorder.recording ? recorder.seconds : null}
-              blackout={blackout}
-            />
-            <div className="flex-1 flex items-stretch gap-4 min-h-0">
-            <div ref={preview.ref} className="flex-1 min-w-0" data-testid="desk-preview" />
-            <aside
-              className="w-80 shrink-0 overflow-y-auto scrollbar-hide rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 pointer-events-auto"
-              data-testid="desk-column"
-            >
-              <RideStrip
-                settings={settings}
-                keys={rideKeys}
-                onChange={updateSettings}
-                onKeys={setRideKeys}
-              />
-            </aside>
-            </div>
-          </div>
-        </div>
+        <PerformDesk
+          cues={cues}
+          liveId={activePresetId}
+          nextId={cued?.id ?? null}
+          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          onCue={cueLook}
+          onCueNow={(id) => goLookNow(id)}
+          onGo={() => goLook()}
+          onBack={previousLook.current ? revertLook : null}
+          onBlackout={toggleBlackout}
+          blackout={blackout}
+          fade={fadeSeconds}
+          onFade={setFadeSeconds}
+          settings={settings}
+          onSetting={updateSettings}
+          ccFor={ccFor}
+          rideKeys={rideKeys}
+          onRideKeys={setRideKeys}
+          midiName={midi.activeInputName ?? null}
+          layer={activeLayer}
+          layers={Math.max(1, settings.layerCount)}
+          onLayer={setActiveLayer}
+          tool={activeTool}
+          onTool={(t) => setActiveTool(t as typeof activeTool)}
+          dyes={trayDyes}
+          dye={selectedLiquid?.color ?? null}
+          onDye={(hex) => {
+            const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
+            if (!bottle) return;
+            setSelectedLiquidId(bottle.id);
+            setActiveTool('dropper');
+          }}
+          plateRef={preview.ref}
+          status={{
+            audio: deskAudioLine,
+            engine: engineStatus?.label ?? '',
+            sequence: sequencer.status.running
+              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
+              : null,
+            phone: remoteLink.status === 'connected',
+            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+          }}
+          dots={deskDots}
+          onSearch={() => setShowPalette(true)}
+          mode={showSequencer ? 'sequence' : 'perform'}
+          onMode={(m) => {
+            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          breadcrumb={
+            <>
+              <span className="text-muted">Show</span>
+              <span className="text-faint">/</span>
+              <span>{liveLookName ?? 'Untitled'}</span>
+            </>
+          }
+          onFreeze={() => setIsActive(v => !v)}
+          frozen={!isActive}
+          onDrain={() => setDrainTrigger(v => v + 1)}
+        />
+      )}
+
+      {/* ── The bench ──────────────────────────────────────────── */}
+      {/*
+        Design is the same three columns holding the other half of the job:
+        what a look is made of rather than when it goes out. Its plate is a
+        preview and says "not on wall", because the most expensive mistake in
+        this app is building a look on what you think is a rehearsal and
+        finding out a room was watching.
+      */}
+      {designing && overlaysVisible && (
+        <DesignDesk
+          dyeBottles={liquidTypes.filter(l => !l.behaviour)}
+          behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
+          bottleId={selectedLiquidId}
+          onBottle={(id) => { setSelectedLiquidId(id); setActiveTool('dropper'); }}
+          swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
+          dye={selectedLiquid?.color ?? null}
+          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); setActiveTool('dropper'); }}
+          palettes={COLOR_HARMONIES.map((h, i) => ({
+            name: COLOR_HARMONY_NAMES[i],
+            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
+          }))}
+          paletteLock={paletteLock}
+          onPalette={selectPalette}
+          onImageDye={() => fileInputRef.current?.click()}
+          tool={activeTool}
+          onTool={(t) => setActiveTool(t as typeof activeTool)}
+          layer={activeLayer}
+          layers={Math.max(1, settings.layerCount)}
+          onLayer={setActiveLayer}
+          onAddLayer={() => updateSettings({ layerCount: Math.min(3, (settings.layerCount ?? 1) + 1) })}
+          settings={settings}
+          onSetting={updateSettings}
+          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
+          randomiseArmed={luckyArmed}
+          plateRef={preview.ref}
+          lookName={pinnedLookName}
+          edited={lookEdited}
+          onSave={() => setShowSave(true)}
+          onSendToWall={() => { void startCast('window'); }}
+          mode={showSequencer ? 'sequence' : 'design'}
+          onMode={(m) => {
+            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          dots={deskDots}
+          midiName={midi.activeInputName ?? null}
+          onSearch={() => setShowPalette(true)}
+          status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
+        />
+      )}
+
+      {/* The file input the bench's Image dye button reaches for. It lives
+          in the narrow-screen toolbar, which is not rendered under a desk. */}
+      {deskUp && (
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      )}
+
+      {showSave && (
+        <SaveLookSheet
+          suggested={pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          songName={musicIntel.state.track?.title ?? null}
+          onSave={saveCurrentPreset}
+          onClose={() => setShowSave(false)}
+        />
+      )}
+
+      {/* ── ⌘K ─────────────────────────────────────────────────── */}
+      {showPalette && (
+        <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
       )}
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
-        {(cued || fading > 0 || previousLook.current) && (
+        {!deskUp && (cued || fading > 0 || previousLook.current) && (
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -2257,7 +2631,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && (
+      {isActive && audioData && !isMinimized && !deskUp && (
         <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },

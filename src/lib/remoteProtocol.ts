@@ -48,6 +48,15 @@ export type RemoteAction =
   | 'preset-prev'
   /** The house lights: fade to black and back. */
   | 'blackout-toggle'
+  /**
+   * The desk's Go and Back, from a hand that is not at the desk.
+   *
+   * These are not `preset-next`: stepping the list applies a preset, which
+   * clears the plate and reseeds. Go crossfades to whatever is armed, which
+   * is the whole reason the cue list exists.
+   */
+  | 'go'
+  | 'back'
   /** Record the show to a video file / stop. */
   | 'record-toggle';
 
@@ -82,6 +91,11 @@ export interface RemoteState {
   blackout?: boolean;
   /** A recording is running, and for how many seconds. */
   recording?: number | null;
+  /** What is armed but not yet sent, so the remote's Go can name it. */
+  cuedPresetId?: string | null;
+  cuedName?: string | null;
+  /** Seconds the next Go will take, so the remote can print it on the button. */
+  fadeSeconds?: number;
 }
 
 export type RemoteMessage =
@@ -102,6 +116,14 @@ export type RemoteMessage =
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
   | { type: 'preset'; presetId: string }
+  /**
+   * Arm a look without sending it. `null` disarms.
+   *
+   * Separate from `preset` on purpose: `preset` applies, which cuts the plate
+   * to clean glass, and a phone in a pocket should not be able to do that to
+   * a room by accident. Arm, then Go.
+   */
+  | { type: 'cue'; presetId: string | null }
   | { type: 'action'; action: RemoteAction }
   /**
    * The phone as a projectionist: a finger on its pad blows air or drops dye

@@ -1,4 +1,85 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap");
+
+/* Chromaglass · Modern tool UI · design tokens
+   Drop into src/index.css after `@import "tailwindcss";`.
+   Tailwind v4 reads @theme variables as utilities: bg-surface, text-muted, rounded-md, font-mono… */
+
+@theme {
+  /* Ground and surfaces (step up one for hover, two for active) */
+  --color-bg:        #0A0A0B;
+  --color-surface:   #111113;
+  --color-elevated:  #18181B;
+  --color-hover:     #1F1F23;
+  --color-active:    #27272A;
+  --color-track:     #27272A;   /* slider/toggle off track */
+  --color-knob-off:  #3F3F46;
+
+  /* Hairlines */
+  --color-border:        rgba(255,255,255,.08);
+  --color-border-strong: rgba(255,255,255,.14);
+
+  /* Text */
+  --color-text:    #FAFAFA;
+  --color-text-2:  #D4D4D8;
+  --color-muted:   #A1A1AA;
+  --color-dim:     #71717A;
+  --color-faint:   #52525B;
+
+  /* Semantic. Violet = cued / next / selected / ride. Red = live / destructive. Green = connected. */
+  --color-accent:        #8B5CF6;
+  --color-accent-text:   #C4B5FD;
+  --color-accent-bg:     rgba(139,92,246,.20);
+  --color-accent-border: rgba(139,92,246,.50);
+  --color-live:          #F87171;
+  --color-live-bg:       rgba(248,113,113,.15);
+  --color-live-border:   rgba(248,113,113,.40);
+  --color-ok:            #4ADE80;
+  --color-warn:          #FBBF24;
+
+  /* Primary button: white on black */
+  --color-primary:    #FAFAFA;
+  --color-on-primary: #0A0A0B;
+
+  /* Type */
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --text-display: 22px;  --text-display--font-weight: 600;
+  --text-title:   16px;  --text-title--font-weight: 500;
+  --text-body:    14px;  --text-body--line-height: 1.5;
+  --text-label:   13px;  --text-label--font-weight: 500;
+  --text-meta:    12px;
+  --text-value:   12px;  /* mono, 500 */
+  --text-kbd:     11px;  /* mono, 500 */
+
+  /* Radius */
+  --radius-xs: 4px;   /* tags, kbd */
+  --radius-sm: 6px;   /* small buttons, thumbnails, segmented items */
+  --radius-md: 8px;   /* buttons, rows, inputs, segmented shell */
+  --radius-lg: 10px;  /* popovers, plate, touch buttons */
+  --radius-xl: 12px;  /* sheets, palette, window frames */
+
+  /* Spacing: 4 · 8 · 12 · 16 · 24 · 32 */
+
+  /* Elevation (only popovers, palettes, toasts cast shadow) */
+  --shadow-popover: 0 12px 40px rgba(0,0,0,.6);
+  --shadow-palette: 0 20px 60px rgba(0,0,0,.6);
+  --shadow-knob:    0 1px 3px rgba(0,0,0,.6);
+
+  /* Motion */
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --duration-fast: 120ms;
+  --duration-fade: 200ms;
+}
+
+/* Sizing rules (not tokens, but contractual):
+   desktop control height   32px (toolbar) · 36px (segmented, tools) · 40px (buttons) · 48px (primary Go, list rows)
+   touch control height     48px min; Go/Blackout 56–64px; slider handle 32px
+   slider                   track 8px desktop / 12px touch; handle 22px desktop / 32px touch, white
+   dye swatch               36px desktop · 44px iPad · flexible ≥40px phone
+   focus ring               0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent)
+*/
 
 /* Clean screen: nothing over the liquid, not even the pointer. */
 .overlays-hidden canvas {
@@ -102,4 +183,62 @@
   border-radius: 9999px;
   background: #fff;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.6);
+}
+
+/*
+ * The ride slider, to the design system's spec: 8px track, 22px white handle,
+ * violet fill — except the Dimmer, which fills white because it is the one
+ * that means "the house lights", not "a parameter". Touch doubles the track
+ * and handle, because a thumb on an iPad is not a mouse.
+ */
+/*
+  The grab strip is taller than the handle it draws.
+
+  The handle is 22px and the element used to be 22px with it, which made the
+  six controls a hand rides in a dark room 22px of target — under the 24px
+  floor the legibility gate sets, and caught by it. The strip the desk
+  replaced gave them 44. The visible design does not change: an 8px track and
+  a 22px handle, centred in 32px you can actually hit.
+*/
+.ride-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 32px;
+  width: 100%;
+}
+.ride-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right,
+    var(--color-accent) 0, var(--color-accent) var(--fill, 0%),
+    var(--color-track) var(--fill, 0%), var(--color-track) 100%);
+}
+.ride-slider.is-white::-webkit-slider-runnable-track {
+  background: linear-gradient(to right,
+    #FAFAFA 0, #FAFAFA var(--fill, 0%),
+    var(--color-track) var(--fill, 0%), var(--color-track) 100%);
+}
+.ride-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px; width: 22px;
+  margin-top: -7px;   /* centres the 22px handle on the 8px track */
+  border-radius: 9999px;
+  background: #FAFAFA;
+  box-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.ride-slider.is-touch { height: 32px; }
+.ride-slider.is-touch::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; }
+.ride-slider.is-touch::-webkit-slider-thumb { height: 32px; width: 32px; margin-top: -10px; }
+.ride-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.ride-slider::-moz-range-track { height: 8px; border-radius: 4px; background: var(--color-track); }
+.ride-slider::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--color-accent); }
+.ride-slider.is-white::-moz-range-progress { background: #FAFAFA; }
+.ride-slider::-moz-range-thumb {
+  height: 22px; width: 22px; border: 0; border-radius: 9999px;
+  background: #FAFAFA; box-shadow: 0 1px 3px rgba(0,0,0,.6);
 }

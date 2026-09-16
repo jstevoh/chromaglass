@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, Info as InfoIcon } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
+import { Info } from './Info';
+import { Sheet } from './ui';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
@@ -97,42 +98,6 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-/**
- * The long explanation, folded away until it is asked for.
- *
- * Every one of these sections used to open with a paragraph. They are worth
- * keeping — several carry the one fact that stops a control being used wrongly,
- * like pointing the room camera at the floor rather than at the screen — but
- * together they were 722 words sitting permanently between a projectionist and
- * the sliders, and they are most of why the panel ran to eight screens. The
- * Room's was 198 words, directly above a fader someone wants during a song.
- *
- * So the prose stays and the ⓘ is how you ask for it.
- */
-function Info({ children, label = 'What this does' }: { children: React.ReactNode; label?: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mb-3">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5 min-h-[28px] text-[11px] transition-colors ${
-          open ? 'text-white/70' : 'text-white/35 hover:text-white/70'
-        }`}
-        aria-expanded={open}
-        data-info="toggle"
-      >
-        <InfoIcon size={13} />
-        <span className="uppercase tracking-wider font-semibold">{label}</span>
-      </button>
-      {open && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55" data-info="body">
-          {children}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
@@ -147,20 +112,31 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /** Which half of the panel is showing. Perform first: it is what a show needs. */
   const [tab, setTab] = useState<'perform' | 'setup'>('perform');
 
+  /*
+    A sheet, not a drawer.
+
+    This used to be a 320px column pinned to the right edge with 112px of top
+    padding to clear a title bar that no longer exists — under a desk it sat
+    over the rides and wasted a seventh of its own height on nothing. The
+    sheet is centred, 720 wide, and fills the screen on a phone, so one shell
+    serves every size the app runs at.
+  */
   return (
-    <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-80 h-full bg-black/80 backdrop-blur-xl border-l border-white/10 z-40 overflow-y-auto p-8 pt-28 scrollbar-hide"
-    >
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-xl font-bold tracking-tighter italic">Projector <span className="not-italic">Settings</span></h2>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-          <X size={20} />
-        </button>
-      </div>
+    <Sheet title="Settings" onClose={onClose} height={860} testId="settings-panel">
+      {/*
+        Taller than the other two sheets.
+
+        Settings is the one with eighty controls in it, and moving it from a
+        full-height drawer into a 640px sheet made its Perform tab four
+        screens deep where it had been under three — caught by the harness
+        the same day. The obvious fix was to use the width the sheet gained
+        and run the sections in two columns; measurement killed that outright.
+        In a vertically scrolling box, `columns: 2` lays the content out
+        *horizontally*: 4208px of scrollWidth in a 718px box with overflow-x
+        hidden, which is most of the panel simply gone. So it gets the height
+        back instead, and the other sheets stay at the handoff's 640.
+      */}
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
 
       {/*
         Two tabs, because eight screens of scroll is not a control surface.
@@ -1463,6 +1439,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           "The Squish Plate effect was the hallmark of American light shows... simulating pressing two glass clock faces together."
         </p>
       </div>
-    </motion.div>
+      </div>
+    </Sheet>
   );
 };

@@ -426,7 +426,7 @@ export default function RemoteControl() {
       className="min-h-screen bg-[#0a0a0a] text-white"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',   // clear of the fixed transport bar
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
         touchAction: 'manipulation',
@@ -624,7 +624,7 @@ export default function RemoteControl() {
 
           {/* Presets */}
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Presets</h2>
+            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Looks — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
               <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
               <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
@@ -636,18 +636,27 @@ export default function RemoteControl() {
               <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
                 {presets.map((preset) => {
                   const isActive = state?.activePresetId === preset.id;
+                  const isCued = state?.cuedPresetId === preset.id;
                   return (
                     <button
                       key={preset.id}
-                      onClick={() => send({ type: 'preset', presetId: preset.id })}
+                      onClick={() => send({ type: 'cue', presetId: preset.id })}
                       disabled={!connected}
                       className={`rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-30 ${
-                        isActive ? 'border-white/50 bg-white/15' : 'border-white/10 bg-white/5'
+                        isActive ? 'border-white/50 bg-white/15'
+                        : isCued ? 'border-violet-400/60 bg-violet-500/10'
+                        : 'border-white/10 bg-white/5'
                       }`}
+                      data-testid={`remote-preset-${preset.id}`}
                     >
                       <span className={`block text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white/75'}`}>
                         {preset.name}
                       </span>
+                      {(isActive || isCued) && (
+                        <span className={`mt-1 block text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-red-300' : 'text-violet-300'}`}>
+                          {isActive ? 'live' : 'next'}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -656,6 +665,94 @@ export default function RemoteControl() {
           ))}
         </section>
       </main>
+
+      {/*
+        The transport, always under the thumb.
+
+        Everything above this bar scrolls; Go and Blackout do not. A phone in
+        a dark room is held one-handed and the two things you must be able to
+        hit without looking are the look change and the lights, so they live
+        at the bottom edge where the thumb already is — and Go names what it
+        will send, because a button you press and hope is not a transport.
+      */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#0a0a0a]/95 px-4 pt-3 backdrop-blur"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
+        data-testid="remote-transport"
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <button
+            onClick={() => action('blackout-toggle')}
+            disabled={!connected}
+            className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 md:w-[140px] md:flex-none ${
+              state?.blackout ? 'border-red-400 bg-red-500 text-black' : 'border-red-400/30 bg-red-500/10 text-red-200'
+            }`}
+            data-testid="remote-blackout"
+          >
+            <Lightbulb size={16} />
+            {state?.blackout ? 'Blacked out' : 'Blackout'}
+          </button>
+          {/*
+            The cue rail, on a tablet.
+
+            A phone has no room for it and scrolls to the list below; an iPad
+            has 1180 points across and nothing to put in the middle of the
+            transport. Tapping a card arms the look — the same thing the list
+            does — so the whole change of look happens without leaving the
+            bar your thumbs are already on: pick, then Go.
+          */}
+          <div className="hidden min-w-0 flex-1 gap-2 overflow-x-auto scrollbar-hide md:flex" data-testid="remote-cue-rail">
+            {(state?.presets ?? []).map((preset) => {
+              const live = state?.activePresetId === preset.id;
+              const next = state?.cuedPresetId === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => send({ type: 'cue', presetId: preset.id })}
+                  disabled={!connected}
+                  className={`flex h-14 w-[170px] shrink-0 flex-col justify-center rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                    live ? 'border-red-400/60 bg-red-500/10'
+                    : next ? 'border-violet-400/60 bg-violet-500/10'
+                    : 'border-white/10 bg-white/5'
+                  }`}
+                  data-testid={`remote-cue-${preset.id}`}
+                >
+                  <span className="truncate text-[13px] font-semibold text-white/85">{preset.name}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                    live ? 'text-red-300' : next ? 'text-violet-300' : 'text-white/30'
+                  }`}>
+                    {live ? 'live' : next ? 'next' : preset.user ? 'yours' : preset.macro ? 'closeup' : 'look'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => action('go')}
+            disabled={!connected || !state?.cuedPresetId}
+            className="flex h-14 flex-[2] flex-col items-center justify-center rounded-2xl bg-white px-4 text-black transition-transform active:scale-95 disabled:bg-white/15 disabled:text-white/40 md:w-[220px] md:flex-none"
+            data-testid="remote-go"
+          >
+            <span className="text-sm font-bold">
+              {state?.cuedName ? `Go to ${state.cuedName}` : 'Nothing armed'}
+            </span>
+            {state?.cuedName && (
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
+                {state.fadeSeconds ? `${state.fadeSeconds}s fade` : 'cut'}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => action('back')}
+            disabled={!connected}
+            className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 text-white/70 active:scale-95 disabled:opacity-30"
+            aria-label="Back — undo the last look"
+            data-testid="remote-back"
+          >
+            <SkipBack size={18} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

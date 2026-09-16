@@ -88,7 +88,30 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   check('every liquid with physics in it is used by some preset', unused.length === 0, unused.join(', '));
 }
 
-// ── 5. The audit ─────────────────────────────────────────────────────
+// ── 5. Every bottle lays enough dye to show the colour you picked ────
+//
+// Each liquid carries a colour swatch and a colour picker, so choosing a dye
+// is a statement of intent and the drop has to show it. Soap and silicone
+// were set at 0.12 and 0.05 — physically right for a surfactant, and a trap:
+// on a live plate (density around 2) a drop that small is overwhelmed by
+// what is already there, so picking Cherry Red with Silicone selected painted
+// the plate's own colour back at you. It read as "red is broken".
+{
+  const ab = (v) => -Math.log(Math.max(0.002, v));
+  const YELLOW = [1, 0.92, 0], RED = [1, 0, 0];
+  /** Cherry Red dropped into a plate of yellow at this density: does it read red? */
+  const showsUp = (amount, plate = 2.0) => {
+    const d = plate + amount;
+    const c = [0, 1, 2].map(i => Math.exp(-(plate * ab(YELLOW[i]) + amount * ab(RED[i])) / d));
+    return c[0] > c[1] * 1.5 && c[0] > c[2] * 1.5;
+  };
+  const invisible = DEFAULT_LIQUID_TYPES.filter(l => !showsUp(l.injectAmount ?? 0));
+  check('every bottle lays enough dye to show the colour you picked',
+    invisible.length === 0,
+    invisible.map(l => `${l.id} at ${l.injectAmount}`).join(', '));
+}
+
+// ── 6. The audit ─────────────────────────────────────────────────────
 console.log('');
 console.log('     what is on each plate:');
 let withPhysics = 0;
