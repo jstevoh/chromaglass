@@ -1980,6 +1980,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const dprRef = useRef(1);
   /** The mirrored display's pixel size, when one is attached. */
   const stageRef = useRef<{ width: number; height: number } | null>(null);
+  /** The desk's preview hole, for the handlers that run outside the render. */
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
   const resizeRef = useRef<() => void>(() => {});
   const [staged, setStaged] = useState(false);
   const lastMacroOnRef = useRef(false);
@@ -3812,7 +3815,12 @@ void main() {
     // stage is attached and the canvas is letterboxed inside it.
     const drawnRect = (): DOMRect => {
       const box = canvas.getBoundingClientRect();
-      if (!stageRef.current || canvas.width === 0 || canvas.height === 0) return box;
+      // `objectFit: contain` is set for a stage *and* for the desk's preview,
+      // so both letterbox and both need the same correction. Only the stage
+      // used to get it, which put the brush wherever the letterbox bars moved
+      // it to — on a 1200x800 buffer shown in a 582x606 hole that is 109px of
+      // vertical error and a 2x scale error.
+      if ((!stageRef.current && !frameRef.current) || canvas.width === 0 || canvas.height === 0) return box;
       const s = Math.min(box.width / canvas.width, box.height / canvas.height);
       const w = canvas.width * s, h = canvas.height * s;
       return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
@@ -5273,7 +5281,20 @@ void main() {
       // snapped it to the right place instantly. Whatever stalls it, the
       // failure mode is the entire control surface covered by the plate, and
       // that is a bad trade for a third of a second of decoration.
-      className={`fixed bg-black overflow-hidden ${frame ? 'rounded-xl border border-white/10' : 'inset-0 w-full h-full'}`}
+      //
+      // z-20 while framed, because the desk is `fixed z-10` and the preview is
+      // a transparent hole in it: without this the plate shows through but the
+      // desk is still the topmost element there, so every mousedown lands on
+      // the hole and the canvas's own listeners never fire. The plate looked
+      // painted on and was not — the bottles, the dyes and all seven tools did
+      // nothing on either desk, and what the eye read as "my red came out
+      // blue" was the preset's own automation carrying on untouched.
+      //
+      // Raising it is safe precisely because a framed plate is clipped to the
+      // hole it was measured into: it covers the preview and nothing else, and
+      // stays under the sheets (z-50) and the palette (z-80). Unframed it is
+      // the whole window with no desk above it, so it stays where it was.
+      className={`fixed bg-black overflow-hidden ${frame ? 'z-20 rounded-xl border border-white/10' : 'inset-0 w-full h-full'}`}
       style={frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : undefined}
       data-testid="plate-frame"
     >

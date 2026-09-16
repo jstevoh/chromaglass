@@ -439,15 +439,48 @@ try {
     (await band.getAttribute('class')).includes('fuchsia'));
 
   // ── Tools and the plate ───────────────────────────────────────────
+  //
+  // This used to be `check('the plate takes a drag without throwing', true)`
+  // — a condition that is the literal true, which is how painting could stop
+  // working on both desks without a single check going red. A drag that
+  // throws nothing and paints nothing is the failure, not the success.
+  //
+  // So: freeze the plate, drag, and look at what the brush actually put
+  // there. Frozen, the solver never steps and so never flushes the deltas,
+  // and `density` holds the injection alone. Manual injection is gated on the
+  // drain, not on isActive, so the brush still works while the liquid is
+  // still.
   const plate = page.locator('canvas').first();
   const box = await plate.boundingBox();
   if (box) {
-    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    const mid = { x: box.x + box.width * 0.5, y: box.y + box.height * 0.5 };
+    const topmost = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return { ok: el === document.getElementById('liquid-canvas'),
+               what: el?.dataset?.testid || el?.id || el?.tagName || 'nothing' };
+    }, [mid.x, mid.y]);
+    check('the plate is what the cursor is over', topmost.ok, `the cursor is over ${topmost.what}`);
+
+    await page.keyboard.press('f');                 // still the liquid
+    await settle(900);
+    const before = await page.evaluate(() => {
+      const f = window.chromaglassDebug?.().fluids?.[0];
+      return f ? f.density.reduce((a, b) => a + b, 0) : null;
+    });
+    await page.mouse.move(mid.x, mid.y);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.55, { steps: 6 });
     await page.mouse.up();
     await settle(700);
-    check('the plate takes a drag without throwing', true);
+    const after = await page.evaluate(() => {
+      const f = window.chromaglassDebug?.().fluids?.[0];
+      return f ? f.density.reduce((a, b) => a + b, 0) : null;
+    });
+    await page.keyboard.press('f');                 // and let it run again
+    await settle(400);
+    check('and a drag across it lays down dye',
+      before !== null && after !== null && after - before > 1,
+      before === null ? 'no debug hook — run with ?debug' : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
   }
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
@@ -578,6 +611,22 @@ try {
       return bad.length ? bad.join('; ') : null;
     });
     check('and its columns clear the plate', overlap === null, overlap ?? '');
+
+    // Clearing the hole is not the same as letting the pointer reach it. The
+    // desk is `fixed z-10` and the preview is a transparent gap in it, so for
+    // a while the plate showed through while the desk stayed the topmost
+    // element there: every mousedown landed on the gap, the canvas's own
+    // listeners never fired, and the bottles, the dyes and all seven tools
+    // did nothing. Nothing about the layout looked wrong, which is why this
+    // asks the question hit-testing answers rather than the one geometry does.
+    const throughTheHole = await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="desk-preview"]').getBoundingClientRect();
+      const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { ok: el === document.getElementById('liquid-canvas'),
+               what: el?.dataset?.testid || el?.id || el?.tagName || 'nothing' };
+    });
+    check('and the plate, not the hole, takes the pointer',
+      throughTheHole.ok, `the cursor is over ${throughTheHole.what}`);
 
     // Go must name where it is going, or it is a button you press and hope.
     await clickOn('cue-oil-on-water');
