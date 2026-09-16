@@ -25,6 +25,7 @@
  */
 
 import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 
 const PORT = 4178;
@@ -96,11 +97,7 @@ function stopServer(proc) {
 }
 
 const server = await serve();
-const browser = await chromium.launch({
-  headless: !HEADED,
-  executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--enable-unsafe-swiftshader'],
-});
+const browser = await launchChromium(chromium, { headless: !HEADED });
 
 const errors = [];
 /*
@@ -226,6 +223,34 @@ try {
 
   const title = await page.title();
   check('the page has a title', !!title && title.length > 0, title);
+
+  // ── The first five seconds ────────────────────────────────────────
+  // A stranger's first visit has to *show* what this is, and what this is is a
+  // light show played by music. It used to land on a plate with nothing
+  // driving it until the visitor found a button. The band is silent and opens
+  // no device, so it costs a permission prompt of nothing — but the browser
+  // will not run audio before a gesture, so the earliest it can start is the
+  // first click anywhere, which is what this checks.
+  {
+    const heard = () => page.evaluate(() => window.chromaglassCastState?.().audio?.volume ?? null);
+    check('nothing is listening before the first gesture', (await heard()) === null);
+    await page.mouse.click(5, 5);
+    // The analyser has to open and the room calibration has to learn a floor
+    // before a level means anything, which takes seconds by design (and more
+    // of them under software rasterisation). This waits for a reading rather
+    // than for a fixed delay.
+    let playing = null;
+    for (let i = 0; i < 20 && !(playing > 0); i++) {
+      await settle(1000);
+      playing = await heard();
+    }
+    check('a first visit is driven by the band after one click',
+      playing > 0,
+      playing === null ? 'no audio reaching the show at all' : `volume ${Number(playing).toFixed(1)}`);
+    check('and it still opened no device to do it',
+      (await page.evaluate(() => window.__media.length)) === 0,
+      JSON.stringify(await page.evaluate(() => window.__media)));
+  }
 
   // Which solver did this run actually measure? A suite that is green on the
   // CPU fallback has said nothing about the GPU shaders, and the line above
@@ -450,14 +475,24 @@ try {
   // ── The band, and the audio sources ───────────────────────────────
   await page.keyboard.press('Escape');
   await settle(500);
+  //
+  // The band is already playing by now — a first visit starts it on the first
+  // gesture — so this checks the button *toggles*, which is the thing that can
+  // break, rather than assuming it starts from off. Clicking it once must stop
+  // the band, and clicking it again must start it, and neither may open a
+  // device.
   const band = firstVisible('simulated-audio-button');
   const beforeBand = await page.evaluate(() => window.__media.length);
+  const bandLit = async () => (await band.getAttribute('class')).includes('fuchsia');
+  const wasLit = await bandLit();
+  await clickOn(band);
+  await settle(2000);
+  check('the band button turns it off', (await bandLit()) !== wasLit, wasLit ? 'was on' : 'was off');
   await clickOn(band);
   await settle(3000);
   check('the band plays without opening a device',
     (await page.evaluate(() => window.__media.length)) === beforeBand);
-  check('the band reports itself as playing',
-    (await band.getAttribute('class')).includes('fuchsia'));
+  check('the band reports itself as playing', await bandLit());
 
   // ── Tools and the plate ───────────────────────────────────────────
   //

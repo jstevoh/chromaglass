@@ -28,6 +28,7 @@
  */
 
 import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 
@@ -80,10 +81,7 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(
 
 await new Promise(r => setTimeout(r, 2500));
 
-const browser = await chromium.launch({
-  executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
-});
+const browser = await launchChromium(chromium);
 
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });

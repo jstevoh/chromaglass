@@ -1,8 +1,12 @@
 name: Deploy to Firebase Hosting
 
-# Every push to main is typechecked, built and published to the live channel.
-# Run it by hand from the Actions tab with "Run workflow" when you want to
-# redeploy without a code change.
+# Every push to main is checked, built and published to the live channel. Run
+# it by hand from the Actions tab with "Run workflow" when you want to redeploy
+# without a code change.
+#
+# "Checked" means `checks.yml`: the numeric harnesses, the projector's
+# geometry, the flash guard, and a browser walked through a show night. Nothing
+# is published until they are green.
 #
 # FIREBASE_SERVICE_ACCOUNT is set, and deploys are live. These are the steps
 # that created it, kept for rotating the key or standing the project up again:
@@ -31,8 +35,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Nothing reaches the live site until the app has been measured and driven.
+  # `npm run show` pulls main on show night, so what is on main is what turns
+  # up at the venue; a deploy gated only on the typechecker was a deploy gated
+  # on nothing that an audience can see.
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+
   deploy:
     name: Build and deploy
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,9 +59,6 @@ jobs:
 
       - name: Install
         run: npm ci
-
-      - name: Typecheck
-        run: npm run lint
 
       - name: Build
         run: npm run build

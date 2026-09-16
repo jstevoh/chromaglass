@@ -38,6 +38,7 @@
     "show": "npm run update && npm run remote",
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
+    "shots": "npm run build && node scripts/shots.mjs",
     "desk": "esbuild scripts/desk.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/desk.mjs && node node_modules/.cache/desk.mjs",
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "dye": "npm run build && node scripts/dye.mjs",

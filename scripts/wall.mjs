@@ -31,6 +31,7 @@
  */
 
 import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { FlashGuard } from '../src/lib/flashGuard.ts';
@@ -197,10 +198,7 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(
 
 await new Promise(r => setTimeout(r, 2500));
 
-const browser = await chromium.launch({
-  executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
-});
+const browser = await launchChromium(chromium);
 
 const IDENTITY = [0, 0, 1, 0, 1, 1, 0, 1];
 const BASE = {
@@ -417,7 +415,52 @@ try {
   check('output gamma darkens the mid-tones', gamma.it < gamma.base * 0.95,
     `${gamma.base.toFixed(3)} -> ${gamma.it.toFixed(3)}`);
 
-  // ── 6. Back to nothing ─────────────────────────────────────────────
+  // ── 6. The flash guard's eyes ──────────────────────────────────────
+  //
+  // The guard's arithmetic is checked exhaustively above, on traces, because
+  // that is where it can be. What cannot be checked there is the half that
+  // lives in the driver: a blit of the default framebuffer into a 16x16
+  // texture, a read behind a fence, and the luminance that comes back. So
+  // that is what is checked here — that the number the guard is handed is
+  // really a measurement of the frame that went to the screen, and not a
+  // reading that never lands (a fence that is never flushed simply never
+  // signals, and a guard with no reading is a guard that silently does
+  // nothing).
+  //
+  // Not a strobe: this page renders a handful of frames a second under
+  // software rasterisation, so a six-hertz square is past what the harness
+  // could even produce. Making the frame brighter and darker and watching the
+  // reading follow is the part that needs a browser.
+  const lumNow = async () => {
+    // A couple of frames for the read to land, then whatever the probe has.
+    await page.evaluate(() => new Promise((done) => {
+      let n = 0;
+      const tick = () => (++n >= 6 ? done() : requestAnimationFrame(tick));
+      requestAnimationFrame(tick);
+    }));
+    return page.evaluate(() => window.chromaglassDebug?.().flash?.()?.luminance ?? null);
+  };
+  await withOutput({});
+  const midLum = await lumNow();
+  check('the guard is being handed a reading of the real frame', midLum !== null && midLum > 0,
+    midLum === null ? 'no reading ever landed' : `luminance ${midLum.toFixed(3)}`);
+
+  if (midLum !== null && midLum > 0) {
+    await withOutput({ gain: 0.3 });
+    const dark = await lumNow();
+    await withOutput({ gain: 2.4 });
+    const bright = await lumNow();
+    await withOutput({});
+    console.log(`  the probe, through the grade  ${dark?.toFixed(3)} dim / ${midLum.toFixed(3)} plain / ${bright?.toFixed(3)} lifted`);
+    check('and the reading follows what the wall actually gets',
+      dark !== null && bright !== null && dark < midLum && bright > midLum,
+      `${dark?.toFixed(3)} < ${midLum.toFixed(3)} < ${bright?.toFixed(3)}`);
+  }
+
+  const guardOn = await page.evaluate(() => !!window.chromaglassDebug?.().flash?.());
+  check('the guard is on without anyone asking for it', guardOn === true, guardOn ? 'on' : 'absent');
+
+  // ── 7. Back to nothing ─────────────────────────────────────────────
   await withOutput({});
   const goneAgain = await page.evaluate(() => !!window.chromaglassDebug?.().outputPass);
   check('resetting drops the pass again', goneAgain === false, goneAgain ? 'still built' : 'gone');

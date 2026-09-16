@@ -90,6 +90,20 @@ function rememberedSource(): AudioSource {
   return 'none';
 }
 
+/**
+ * Has anyone ever told this browser where to listen?
+ *
+ * Not the same question as `rememberedSource() === 'none'`, which is also the
+ * answer for someone who turned the microphone off on purpose. This one
+ * separates a first visit from a considered silence, and it is the difference
+ * between a stranger's first five seconds being the thing the project is —
+ * a plate moving to music — and being a plate sitting still while they look
+ * for the button that makes it do something.
+ */
+function everChoseSource(): boolean {
+  try { return localStorage.getItem(AUDIO_SOURCE_KEY) !== null; } catch { return true; }
+}
+
 /** True only if the browser will hand over the microphone without asking. */
 async function micAlreadyAllowed(): Promise<boolean> {
   try {
@@ -185,7 +199,21 @@ export default function App() {
     (window as unknown as { chromaglassOutput?: unknown }).chromaglassOutput =
       (patch: Partial<OutputConfig>) => { setOutput(prev => normalizeOutput({ ...prev, ...patch })); };
   }, [setOutput]);
+
+  // `npm run shots` photographs the plate at 16:9, which is wider than the
+  // width the overlay's preset menu exists at — above 1024px the desk owns the
+  // window. Rather than photograph a narrow app, it applies presets through
+  // this. The picture is what that harness is about; `npm run qa` is the one
+  // that drives the menu a hand would use.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassApplyPreset?: unknown }).chromaglassApplyPreset =
+      (id: string) => { cuePresetRef.current?.(id); };
+  }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
+  /** For the first-gesture handler, which is installed once and must not close over a stale value. */
+  const audioSourceRef = useRef(audioSource);
+  audioSourceRef.current = audioSource;
   // ── The input the show listens to ──
   // A USB interface fed from the desk beats the laptop's own microphone in
   // any room with a crowd in it. The choice is remembered; the list of
@@ -541,14 +569,31 @@ export default function App() {
 
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
+  //
+  // The same gesture starts the band for anyone who has never chosen a source
+  // at all. A first visit used to land on a plate with nothing driving it:
+  // the fluid moved, but the thing the project *is* — a light show played by
+  // the music — needed the visitor to find a button first. The band is
+  // synthesised, silent and opens no device, so it needs no permission and
+  // asks for nothing; it is the demo this app already had and never showed
+  // anybody. It is written to storage like any other choice, so this happens
+  // once per browser and the microphone is still one click away.
   useEffect(() => {
-    const wake = () => { void simulatedRef.current?.resume(); };
+    const wake = () => {
+      void simulatedRef.current?.resume();
+      // After the click has been handled: if the visitor's first gesture was
+      // the Mic button, that choice is already recorded and this does nothing.
+      setTimeout(() => {
+        if (audioSourceRef.current === 'none' && !everChoseSource()) void handleSourceChange('simulated');
+      }, 0);
+    };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
     return () => {
       window.removeEventListener('pointerdown', wake);
       window.removeEventListener('keydown', wake);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1312,6 +1357,10 @@ export default function App() {
     const next = allPresets[((i < 0 ? 0 : i + dir) + allPresets.length) % allPresets.length];
     if (next) cueLook(next.id);
   };
+  /** For the debug hook, which is installed once and above the callback it calls. */
+  const cuePresetRef = useRef<((id: string) => void) | null>(null);
+  cuePresetRef.current = cuePreset;
+
   const stepPreset = (dir: 1 | -1) => {
     if (allPresets.length === 0) return;
     const i = allPresets.findIndex(p => p.id === activePresetId);

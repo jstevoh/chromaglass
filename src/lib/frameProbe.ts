@@ -95,6 +95,10 @@ export class FrameProbe {
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     if (cur.fence) gl.deleteSync(cur.fence);
     cur.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    // A fence is not guaranteed ever to signal unless the commands before it
+    // have been flushed, so without this the read can simply never land — and
+    // a guard that never gets a reading is a guard that silently does nothing.
+    gl.flush();
 
     if (other.fence) {
       const status = gl.clientWaitSync(other.fence, 0, 0);
