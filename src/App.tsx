@@ -259,10 +259,26 @@ export default function App() {
         setOverlaysVisible(true);
         return;
       }
-      // With the overlays up, Esc closes whatever panel is open.
+      /*
+        With the overlays up, Esc closes whatever panel is open — all of
+        them, which this list did not used to be.
+
+        MIDI and the sequencer were missing, left over from when they were
+        drawers with a close button of their own. As sheets they each carry
+        an Esc listener, but Settings was being closed by *this* handler
+        rather than by its own, and MIDI — with nothing here covering it —
+        stayed open. Measured in Perform: Settings `afterEscape=0`, MIDI
+        `afterEscape=1`, same run, same sequence.
+
+        One list, every panel, so Esc means the same thing everywhere.
+      */
       setShowSettings(false);
       setShowHelp(false);
       setShowTrackPanel(false);
+      setShowMidi(false);
+      setShowSequencer(false);
+      setShowSave(false);
+      setShowPalette(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
