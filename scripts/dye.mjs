@@ -188,16 +188,36 @@ try {
     await page.mouse.up();
   };
 
-  /** What hue did the pixels that changed end up? */
+  /*
+    What hue did the *stroke* end up, as distinct from the plate it landed on?
+
+    The first version counted every pixel that differed between a before and
+    an after shot. On a quiet look that is the stroke; on a busy one it is the
+    whole plate. Galaxy runs at automateRate 0.14 with thin viscosity and
+    fragmenting filaments, and it reported 362,366 of 583,000 pixels
+    "changed" and their average hue as 248° — which is the colour of Galaxy,
+    not of the dye. Water measured 248° too, on the same plate, which is what
+    gave it away: a real dye bug would not treat both bottles alike.
+
+    So the stroke is bracketed, the way the bubble harness learned to do it.
+    Two bare shots a paint-duration apart say how much the plate moves on its
+    own; a pixel counts only where those two agree — the liquid did not move
+    there — and the after-paint shot differs from both. Everything the plate
+    did by itself is excluded by construction rather than by threshold.
+  */
   const paintedHue = () => page.evaluate(() => {
-    const A = window.__dye.before.data, B = window.__dye.after.data;
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let i = 0; i < A.length; i += 4) {
-      const d = Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]);
-      if (d < 30) continue;                       // unchanged
+    const P = window.__dye.before.data;     // before, and
+    const Q = window.__dye.drift.data;      // a paint-duration later, unpainted
+    const B = window.__dye.after.data;      // and after the stroke
+    const d3 = (X, Y, i) =>
+      Math.abs(X[i] - Y[i]) + Math.abs(X[i + 1] - Y[i + 1]) + Math.abs(X[i + 2] - Y[i + 2]);
+    let r = 0, g = 0, b = 0, n = 0, drifted = 0;
+    for (let i = 0; i < P.length; i += 4) {
+      if (d3(P, Q, i) > 24) { drifted++; continue; }   // the plate moved here: not evidence
+      if (Math.min(d3(B, P, i), d3(B, Q, i)) < 30) continue;
       r += B[i]; g += B[i + 1]; b += B[i + 2]; n++;
     }
-    return n ? { n, rgb: [r / n / 255, g / n / 255, b / n / 255] } : { n: 0, rgb: null };
+    return n ? { n, drifted, rgb: [r / n / 255, g / n / 255, b / n / 255] } : { n: 0, drifted, rgb: null };
   });
 
   const run = async (bottleId, label) => {
@@ -216,12 +236,17 @@ try {
 
     const ground = await groundHue();
     await grab('before');
+    // A paint-duration of nothing at all, so the plate's own motion is on
+    // record before the stroke is added to it.
+    await page.waitForTimeout(5200);
+    await grab('drift');
     await paint();
     await page.waitForTimeout(4000);
     await grab('after');
     const out = await paintedHue();
 
-    check(`${label}: it actually painted something`, out.n > 1500, `${out.n} pixels changed`);
+    check(`${label}: it actually painted something`, out.n > 1500,
+      `${out.n} pixels are the stroke (${out.drifted} excluded as the plate's own drift)`);
     if (out.n > 1500) {
       const h = hueOf(...out.rgb);
       const gh = hueOf(...ground);
