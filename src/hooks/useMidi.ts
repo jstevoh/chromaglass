@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
-  saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
-  MIDI_FILE_EXT, MIDI_FORMAT,
-  type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiSource, type MidiTarget,
+  parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
+  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT,
+  type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
@@ -55,7 +55,15 @@ const hasWebMidi = () => typeof navigator !== 'undefined' && typeof (navigator a
 
 const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
 
-export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[]) {
+/**
+ * The tempo, if the desk is sending it.
+ *
+ * Clock arrives on the same port as everything else and is handed straight
+ * out: what it means is the tempo source's business, not this hook's.
+ */
+export type MidiClockHandler = (kind: MidiRealtime, at: number) => void;
+
+export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[], onClock?: MidiClockHandler) {
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +76,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const [learning, setLearning] = useState<{ target: MidiTarget; mode: 'absolute' | 'relative' } | null>(null);
   const [lastEvent, setLastEvent] = useState<{ source: MidiSource; value: number; at: number } | null>(null);
   const [softTakeover, setSoftTakeoverOn] = useState(true);
+  /**
+   * The live shift layer.
+   *
+   * Not persisted: a show starts on bank 1 whatever the last one ended on,
+   * because the one thing worse than not reaching a control is reaching a
+   * different one than the label says.
+   */
+  const [bank, setBankState] = useState(0);
 
   const accessRef = useRef<MidiAccessLike | null>(null);
   const hostRef = useRef(host); hostRef.current = host;
@@ -75,10 +91,24 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const learningRef = useRef(learning); learningRef.current = learning;
   const portsRef = useRef(ports); portsRef.current = ports;
   const softRef = useRef(softTakeover); softRef.current = softTakeover;
+  const bankRef = useRef(bank); bankRef.current = bank;
   const takeover = useRef(new SoftTakeover()).current;
   /** The last value each absolute binding wrote, so a change made elsewhere is noticed. */
   const lastApplied = useRef(new Map<string, number>()).current;
   const eventTick = useRef(0);
+  const clockRef = useRef(onClock); clockRef.current = onClock;
+  /** Whether clock has been seen on this port lately, for the panel to report. */
+  const [clocked, setClocked] = useState(false);
+  const clockSeenAt = useRef(-Infinity);
+
+  // Whether clock is arriving, sampled rather than counted: setting React
+  // state from the message handler would re-render the app twenty-four times
+  // a beat for a lamp.
+  useEffect(() => {
+    if (!enabled) { setClocked(false); return; }
+    const timer = setInterval(() => setClocked(performance.now() - clockSeenAt.current < 1000), 500);
+    return () => clearInterval(timer);
+  }, [enabled]);
 
   const setMap = useCallback((next: MidiMap | ((prev: MidiMap) => MidiMap)) => {
     setMapState(prev => {
@@ -97,9 +127,20 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const learn = learningRef.current;
     if (learn && e.kind !== 'noteoff') {
       const key = sourceKey(src);
+      // Learn onto the layer that is live. Bank 1 is the base layer and its
+      // bindings are always live (`bank: undefined`), so a map made by
+      // someone who never touches banks is exactly the map they would have
+      // had before banks existed.
+      const onto = bankRef.current === 0 ? undefined : bankRef.current;
       setMap(prev => ({
         ...prev,
-        bindings: [...prev.bindings.filter(b => sourceKey(b.source) !== key), { id: newId(), source: src, target: learn.target, mode: learn.mode }],
+        // Replace only what this control already does *on this layer*: the
+        // whole point of a shift layer is that one fader means four things,
+        // so learning on bank 3 must not wipe what it does on bank 1.
+        bindings: [
+          ...prev.bindings.filter(b => sourceKey(b.source) !== key || b.bank !== onto),
+          { id: newId(), source: src, target: learn.target, mode: learn.mode, bank: onto },
+        ],
       }));
       setLearning(null);
       return;
@@ -109,6 +150,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const key = sourceKey(src);
     for (const b of mapRef.current.bindings) {
       if (sourceKey(b.source) !== key) continue;
+      // A binding that names a bank only answers on that one. A binding that
+      // names none is always live.
+      if (b.bank !== undefined && b.bank !== bankRef.current) continue;
       const t = b.target;
       const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
       switch (t.kind) {
@@ -160,7 +204,20 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const want = portsRef.current.input;
     for (const input of a.inputs.values()) {
       input.onmidimessage = (want === 'all' || input.id === want)
-        ? (m) => { const ev = parseMidi(m.data); if (ev) handleRef.current(ev); }
+        ? (m) => {
+            // Realtime first: a clock byte is one byte and `parseMidi` wants
+            // two, so these used to fall on the floor. Twenty-four a beat is a
+            // lot of messages, so nothing here allocates or sets state.
+            const rt = parseMidiRealtime(m.data);
+            if (rt) {
+              const at = performance.now();
+              clockSeenAt.current = at;
+              clockRef.current?.(rt, at);
+              return;
+            }
+            const ev = parseMidi(m.data);
+            if (ev) handleRef.current(ev);
+          }
         : null;
     }
   }, []);
@@ -196,6 +253,24 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
   useEffect(() => { wireInputs(); }, [ports.input, wireInputs]);
 
+  /**
+   * Change the shift layer.
+   *
+   * Every fader is dropped out of soft takeover on the way. A fader sitting
+   * at 80% that has just been handed a different setting must pass through
+   * that setting's value before it does anything — otherwise switching bank
+   * slams four parameters to wherever the hardware happens to be standing,
+   * which on a stage is the whole look gone in one button press.
+   */
+  const setBank = useCallback((next: number) => {
+    setBankState(prev => {
+      const b = ((next % MIDI_BANKS) + MIDI_BANKS) % MIDI_BANKS;
+      if (b !== prev) { takeover.reset(); lastApplied.clear(); }
+      return b;
+    });
+  }, [takeover, lastApplied]);
+  const stepBank = useCallback((dir: 1 | -1) => setBank(bankRef.current + dir), [setBank]);
+
   const enable = useCallback(() => { setError(null); setEnabled(true); try { localStorage.setItem(ENABLED_KEY, '1'); } catch { /* private */ } }, []);
   const disable = useCallback(() => { setEnabled(false); setLearning(null); try { localStorage.setItem(ENABLED_KEY, '0'); } catch { /* private */ } }, []);
   const choosePorts = useCallback((next: Partial<{ input: string; output: string }>) => {
@@ -224,6 +299,16 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     if (!out) return;
     const f = feedbackRef.current;
     for (const b of mapRef.current.bindings) {
+      // A pad on another layer is not doing anything, so it must not be lit as
+      // though it were: an LED that says "this cues Deep Ocean" while the
+      // layer says otherwise is worse than an LED that is off.
+      if (b.bank !== undefined && b.bank !== bankRef.current) {
+        try {
+          if (b.source.kind === 'note') out.send([0x90 | (b.source.channel & 0x0f), b.source.number & 0x7f, 0]);
+          else out.send([0xb0 | (b.source.channel & 0x0f), b.source.number & 0x7f, 0]);
+        } catch { /* the port went away */ }
+        continue;
+      }
       const t = b.target;
       let level: number | null = null;
       if (t.kind === 'preset') {
@@ -245,7 +330,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     }
   }, [outputFor]);
 
-  const fbKey = `${feedback.activePresetId}|${feedback.dyeIndex}|${Object.values(feedback.toggles).map(Number).join('')}`;
+  const fbKey = `${feedback.activePresetId}|${feedback.dyeIndex}|${Object.values(feedback.toggles).map(Number).join('')}|${bank}`;
   useEffect(() => {
     if (!enabled) return;
     const t = setTimeout(sendFeedback, 60);
@@ -257,6 +342,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const cancelLearn = useCallback(() => setLearning(null), []);
   const removeBinding = useCallback((id: string) => setMap(prev => ({ ...prev, bindings: prev.bindings.filter(b => b.id !== id) })), [setMap]);
   const setBindingMode = useCallback((id: string, mode: 'absolute' | 'relative') => setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, mode } : b) })), [setMap]);
+  /** Move a binding onto a shift layer, or (undefined) back to always-live. */
+  const setBindingBank = useCallback((id: string, bankIndex: number | undefined) =>
+    setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, bank: bankIndex } : b) })), [setMap]);
   const clearMap = useCallback(() => setMap(prev => ({ ...prev, bindings: [] })), [setMap]);
   const rename = useCallback((name: string) => setMap(prev => ({ ...prev, name })), [setMap]);
   const loadFactory = useCallback((which: 'apc-mini-mk2' | 'nanokontrol2' | 'apc40-mk2' | 'launchpad' | 'launch-control-xl') => {
@@ -292,9 +380,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     supported, enabled, enable, disable, error,
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
-    learning, learn, cancelLearn, removeBinding, setBindingMode, addBinding,
+    learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding,
     softTakeover, setSoftTakeover: setSoftTakeoverOn,
     lastEvent,
+    clocked,
+    bank, setBank, stepBank, banks: MIDI_BANKS,
   };
 }
 

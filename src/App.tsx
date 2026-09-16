@@ -33,6 +33,7 @@ import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
+import { TempoSource, bpmOf } from './lib/tempo';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -150,6 +151,30 @@ export default function App() {
     });
   }, []);
   const resetOutput = useCallback(() => setOutput({ ...DEFAULT_OUTPUT }), [setOutput]);
+
+  // ── Where the tempo comes from ──────────────────────────────────
+  // The microphone, unless something better is offering: a MIDI clock from
+  // the desk, four taps, or a number off the setlist. A ref because the
+  // render loop reads it once a frame and nothing else does; `tempoLabel`
+  // is the only part the UI needs, sampled rather than watched.
+  const tempoRef = useRef<TempoSource | null>(null);
+  if (!tempoRef.current) tempoRef.current = new TempoSource();
+  const [tempoLabel, setTempoLabel] = useState<{ source: string | null; bpm: number; taps: number }>({ source: null, bpm: 0, taps: 0 });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const t = tempoRef.current;
+      if (!t) return;
+      t.read(performance.now());        // lets a stopped MIDI clock lapse
+      setTempoLabel(prev => {
+        const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount };
+        return prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps ? prev : next;
+      });
+    }, 250);
+    return () => clearInterval(timer);
+  }, []);
+  const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
+  const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
+  const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
 
   // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
   // drives this to set a corner pin or a mask on a plate that is already
@@ -762,6 +787,9 @@ export default function App() {
   // whole fade and checks the stage never darkens; today's clearing path is
   // the control, and it fails that check by a mile.
   const [cued, setCued] = useState<{ id: string; name: string; settings: Partial<VisualizerSettings> } | null>(null);
+  /** The armed look, for the action handlers that are defined above the state they read. */
+  const cuedRef = useRef(cued);
+  cuedRef.current = cued;
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
   const [fading, setFading] = useState(0);        // 0..1 while a Go is running
   // On a timer rather than requestAnimationFrame, for the same reason the
@@ -856,7 +884,11 @@ export default function App() {
    * further down the file than the desk's props are assembled. A ref rather
    * than a reorder: the hook's inputs depend on half the app.
    */
-  const midiRef = useRef<{ map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] } } | null>(null);
+  const midiRef = useRef<{
+    map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] };
+    /** The shift layer, so a pad can step it — the actions run above the hook too. */
+    stepBank: (dir: 1 | -1) => void;
+  } | null>(null);
 
   /** Which CC a ride is learned to, so the desk and the controller agree. */
   const ccFor = useCallback((key: keyof VisualizerSettings): number | null => {
@@ -1265,6 +1297,21 @@ export default function App() {
     if (preset) applyPreset(preset.id, preset.settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /**
+   * Step what is *armed*, not what is live.
+   *
+   * The desk's whole safety story is that a look is chosen, looked at, and
+   * then sent — so the pad that walks the list must move the cue and leave
+   * the wall alone. Nothing cued yet: start from what is playing, so the
+   * first press arms its neighbour rather than jumping to the top of the list.
+   */
+  const stepCue = (dir: 1 | -1) => {
+    if (allPresets.length === 0) return;
+    const from = cuedRef.current?.id ?? activePresetId;
+    const i = allPresets.findIndex(p => p.id === from);
+    const next = allPresets[((i < 0 ? 0 : i + dir) + allPresets.length) % allPresets.length];
+    if (next) cueLook(next.id);
+  };
   const stepPreset = (dir: 1 | -1) => {
     if (allPresets.length === 0) return;
     const i = allPresets.findIndex(p => p.id === activePresetId);
@@ -1290,6 +1337,17 @@ export default function App() {
       case 'blackout-toggle': toggleBlackout(); break;
       case 'scene-toggle':    toggleScene(!sceneOn); break;
       case 'record-toggle':   toggleRecording(); break;
+      // Cue and Go, from a pad. `go` is the whole reason the desk's look
+      // change is safe in front of a room, and until now it was reachable
+      // only from this laptop's keyboard.
+      case 'go':              goLook(); break;
+      case 'revert':          revertLook(); break;
+      case 'cue-next':        stepCue(1); break;
+      case 'cue-prev':        stepCue(-1); break;
+      case 'tap-tempo':       tapTempo(); break;
+      case 'tempo-clear':     clearTempo(); break;
+      case 'bank-next':       midiRef.current?.stepBank(1); break;
+      case 'bank-prev':       midiRef.current?.stepBank(-1); break;
     }
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. */
@@ -1441,6 +1499,15 @@ export default function App() {
       toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording },
     },
     allPresetIds,
+    // The tempo, if the desk is sending it. Straight into the tempo source:
+    // twenty-four messages a beat has no business going through React.
+    useCallback((kind: 'clock' | 'start' | 'continue' | 'stop', at: number) => {
+      const t = tempoRef.current;
+      if (!t) return;
+      if (kind === 'clock') t.clockPulse(at);
+      else if (kind === 'stop') t.clockStop();
+      else t.clockStart(at);
+    }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
   const gamepad = useGamepad({
@@ -1620,6 +1687,7 @@ export default function App() {
         sceneRef={scene.reading}
         frame={preview.frame}
         output={output}
+        tempoRef={tempoRef}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -2228,6 +2296,11 @@ export default function App() {
             onOutput={setOutput}
             onOutputReset={resetOutput}
             wakeLock={wakeLock}
+            tempo={tempoLabel}
+            onTap={tapTempo}
+            onTempoClear={clearTempo}
+            onTempoBpm={setTempoBpm}
+            midiClocked={midi.clocked}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
             sceneState={scene.state}

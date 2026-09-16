@@ -6,6 +6,7 @@ import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, 
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
+import type { TempoSource } from '../lib/tempo';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
@@ -103,6 +104,13 @@ interface LiquidVisualizerProps {
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
+  /**
+   * Where the tempo comes from when it is not the microphone: a MIDI clock,
+   * a tapped tempo, a typed one. A ref for the same reason the room's reading
+   * is one — it is read once a frame by the render loop and by nothing else,
+   * so putting it in state would re-render the app around it for nothing.
+   */
+  tempoRef?: React.MutableRefObject<TempoSource | null>;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -1883,7 +1891,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT,
+  output = DEFAULT_OUTPUT, tempoRef,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4028,9 +4036,14 @@ void main() {
         // onset as heard. Every reaction below reads this instead of its own
         // threshold crossing, so they all land together.
         {
+          const nowMs = performance.now();
           const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          kickRef.current = beatClockRef.current.update(performance.now(), bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+          // A clock from the desk, a tapped tempo or a typed one, if there is
+          // one. Handed over every frame — the reading carries its own
+          // sequence number, so the clock can tell a new beat from a held one.
+          beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
+          kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
         }
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)

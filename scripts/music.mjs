@@ -22,6 +22,8 @@
 import { extractPeakHashes, buildIndex, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
 import { RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SongBoundary, roomIsQuiet, DEFAULT_BOUNDARY } from '../src/lib/songBoundary.ts';
+import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
+import { BeatClock } from '../src/lib/beatClock.ts';
 
 const HZ = 20;
 const DT = 1 / HZ;
@@ -239,6 +241,131 @@ for (const { name, index } of library) {
   checks.push([`${name}: and knows where in it`, offErr.length === 6 && Math.max(...offErr) < 1.0]);
   checks.push([`${name}: says nothing about six tracks it has not heard`, named(strangers, false) === 0]);
   checks.push([`${name}: says nothing about noise`, noise === null]);
+}
+
+// ── Taking the tempo from somewhere that knows ──────────────────────
+//
+// Onset detection is a guess, and there are rooms where the guess is hard.
+// A MIDI clock, a tap or a typed number is not a guess, and the thing that
+// matters about all three is the *phase*: a clock with the right tempo and
+// the wrong bar puts every kick half a beat late, which is worse than not
+// being locked at all. So each of these checks where the beats land, not
+// just how far apart they are.
+
+console.log('\nTelling the show the tempo rather than making it work it out:\n');
+{
+  const FRAME = 1000 / 60;
+
+  /** Run the clock for `seconds`, driven by `tempo`, and collect when it fired. */
+  const runClock = ({ seconds, tempo, bass = () => 0, feed = () => {}, lead = 0 }) => {
+    const clock = new BeatClock();
+    const fired = [];
+    for (let t = 0; t < seconds * 1000; t += FRAME) {
+      feed(t, tempo);
+      clock.setExternal(t, tempo ? tempo.read(t) : null);
+      const tick = clock.update(t, bass(t), 0, lead);
+      if (tick.kick) fired.push(t);
+    }
+    return { clock, fired };
+  };
+
+  /** Intervals between fired beats, ignoring the first (the clock settling). */
+  const spacing = (fired) => {
+    const ivs = [];
+    for (let i = 2; i < fired.length; i++) ivs.push(fired[i] - fired[i - 1]);
+    return ivs;
+  };
+  const mean = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
+  const worst = (a, want) => (a.length ? Math.max(...a.map(v => Math.abs(v - want))) : Infinity);
+
+  // A desk sending clock at 128 bpm: twenty-four pulses a beat, forever.
+  {
+    const PERIOD = 60000 / 128;
+    const tempo = new TempoSource();
+    let nextPulse = 0;
+    const { clock, fired } = runClock({
+      seconds: 12,
+      tempo,
+      feed: (t, tp) => { while (nextPulse <= t) { tp.clockPulse(nextPulse); nextPulse += PERIOD / 24; } },
+    });
+    const ivs = spacing(fired);
+    const err = worst(ivs, PERIOD);
+    console.log(`  midi clock, 128 bpm      locked ${bpmOf(clock.period).toFixed(1)} bpm, ${fired.length} beats, worst spacing error ${err.toFixed(1)} ms`);
+    // One frame of slop: the clock can only fire on a frame boundary.
+    checks.push(['a MIDI clock sets the tempo', Math.abs(bpmOf(clock.period) - 128) < 0.5]);
+    checks.push(['and every beat lands where the clock says', err <= FRAME + 1]);
+  }
+
+  // The clock stops. The show must hand back rather than coast on a tempo
+  // nobody is playing any more.
+  {
+    const PERIOD = 60000 / 128;
+    const tempo = new TempoSource();
+    let nextPulse = 0;
+    const { clock } = runClock({
+      seconds: 10,
+      tempo,
+      // Pulses for five seconds, then the cable comes out.
+      feed: (t, tp) => { while (nextPulse <= t && nextPulse < 5000) { tp.clockPulse(nextPulse); nextPulse += PERIOD / 24; } },
+    });
+    const stillDriven = clock.driven(10000);
+    console.log(`  the cable comes out      still driven after five seconds of nothing: ${stillDriven ? 'yes' : 'no'}`);
+    checks.push(['a stopped MIDI clock hands back to the microphone', !stillDriven]);
+  }
+
+  // Four taps at 100 bpm. The tempo must come out right, and — the part that
+  // matters — the beats must land on the taps, not somewhere between them.
+  {
+    const PERIOD = 600;                       // 100 bpm
+    const tempo = new TempoSource();
+    const taps = [2000, 2600, 3200, 3800];
+    let next = 0;
+    const { clock, fired } = runClock({
+      seconds: 12,
+      tempo,
+      feed: (t, tp) => { while (next < taps.length && taps[next] <= t) tp.tap(taps[next++]); },
+    });
+    const after = fired.filter(t => t > 4200);
+    // How far each fired beat is from the grid the taps set up.
+    const offGrid = after.map(t => {
+      const k = Math.round((t - taps[3]) / PERIOD);
+      return Math.abs(t - (taps[3] + k * PERIOD));
+    });
+    const phaseErr = offGrid.length ? Math.max(...offGrid) : Infinity;
+    console.log(`  four taps, 100 bpm       ${bpmOf(clock.period).toFixed(1)} bpm, ${after.length} beats, worst distance off the tapped grid ${phaseErr.toFixed(1)} ms`);
+    checks.push(['four taps set the tempo', Math.abs(bpmOf(clock.period) - 100) < 1]);
+    checks.push(['and the bar lands on the hand that tapped it', phaseErr <= FRAME + 1]);
+  }
+
+  // A typed number: the tempo, and nothing said about the bar.
+  {
+    const tempo = new TempoSource();
+    tempo.setBpm(140);
+    const { clock, fired } = runClock({ seconds: 10, tempo });
+    const err = worst(spacing(fired), 60000 / 140);
+    console.log(`  a typed 140 bpm          ${bpmOf(clock.period).toFixed(1)} bpm, worst spacing error ${err.toFixed(1)} ms`);
+    checks.push(['a typed tempo drives the clock', Math.abs(bpmOf(clock.period) - 140) < 0.5 && err <= FRAME + 1]);
+  }
+
+  // A loud room, off the grid. This is the whole reason to plug a clock in:
+  // onsets that disagree with the desk must not drag the tempo around.
+  {
+    const PERIOD = 60000 / 128;
+    const tempo = new TempoSource();
+    let nextPulse = 0;
+    // Bass that peaks on a *different* tempo entirely — a crowd, a monitor,
+    // the previous song bleeding through the wall.
+    const bass = (t) => (Math.sin((t / 1000) * 2 * Math.PI * 1.7) > 0.9 ? 1 : 0);
+    const { clock } = runClock({
+      seconds: 20,
+      tempo,
+      bass,
+      feed: (t, tp) => { while (nextPulse <= t) { tp.clockPulse(nextPulse); nextPulse += PERIOD / 24; } },
+    });
+    const drift = Math.abs(bpmOf(clock.period) - 128);
+    console.log(`  clock against a loud room ${bpmOf(clock.period).toFixed(1)} bpm after twenty seconds of onsets at 102 bpm (drift ${drift.toFixed(2)})`);
+    checks.push(['onsets cannot drag a clocked tempo off the desk\'s', drift < 0.5]);
+  }
 }
 
 console.log('');

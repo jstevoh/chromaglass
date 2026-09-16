@@ -138,6 +138,37 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
         <p className="text-[9px] text-white/40 mt-2" data-testid="midi-binding-count">{midi.map.bindings.length} bindings{midi.map.device ? ` · made on ${midi.map.device}` : ''}</p>
       </div>
 
+      {/* The shift layer */}
+      {midi.enabled && (
+        <div className="mb-4">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[9px] uppercase tracking-widest text-white/50">Bank</span>
+            <span className="font-mono text-[9px] text-white/35" data-testid="midi-bank-count">
+              {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {Array.from({ length: midi.banks }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => midi.setBank(i)}
+                data-testid={`midi-bank-${i}`}
+                title={i === 0 ? 'The base layer: bindings here are live on every bank' : `Shift layer ${i + 1}`}
+                className={`${chip(midi.bank === i)} min-h-9`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[9px] leading-relaxed text-white/40">
+            Nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
+            learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where presets, dyes and the transport belong.
+            Put <span className="text-white/60">Bank +</span> on a button to step them in the dark.
+            Changing layer drops every fader out of soft takeover, so nothing jumps to where the hardware happens to be standing.
+          </p>
+        </div>
+      )}
+
       {/* Fader manners */}
       <div className="flex items-center gap-2 mb-4 text-[10px]">
         <label className="flex items-center gap-1.5 flex-1"><input type="checkbox" checked={midi.softTakeover} onChange={e => midi.setSoftTakeover(e.target.checked)} data-testid="midi-soft" /> Soft takeover</label>
@@ -165,12 +196,19 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
       <div data-testid="midi-bindings">
         {midi.map.bindings.length === 0 && <p className="text-[10px] text-white/40">None yet.</p>}
         {midi.map.bindings.map(b => (
-          <div key={b.id} className="flex items-center gap-2 py-1 border-b border-white/5 text-[10px]" data-testid="midi-binding">
+          <div key={b.id} className={`flex items-center gap-2 py-1 border-b border-white/5 text-[10px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding">
             <span className="font-mono text-white/50 w-24 shrink-0">{sourceLabel(b.source)}</span>
             <span className="flex-1 truncate">{targetLabel(b.target, presetName)}</span>
             {b.target.kind === 'setting' && b.source.kind === 'cc' && (
               <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[8px] uppercase text-white/40 hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
             )}
+            <button
+              onClick={() => midi.setBindingBank(b.id, b.bank === undefined ? 1 : b.bank + 1 >= midi.banks ? undefined : b.bank + 1)}
+              className="w-8 shrink-0 text-[8px] uppercase text-white/40 hover:text-white"
+              title="Which shift layer this binding answers on — 'all' is every one"
+            >
+              {b.bank === undefined ? 'all' : `bk${b.bank + 1}`}
+            </button>
             <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
           </div>
         ))}

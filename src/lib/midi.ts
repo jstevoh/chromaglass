@@ -28,7 +28,30 @@ export type MidiAction =
   /** Record the show to a video file / stop recording. */
   | 'record-toggle'
   /** Open or close the camera that watches the room. */
-  | 'scene-toggle';
+  | 'scene-toggle'
+  /**
+   * Cue and Go, on a pad.
+   *
+   * The desk's safe way to change a look in front of a room — arm it, then
+   * send it as a crossfade rather than a cut through black — could only be
+   * driven from the laptop, in the dark, with a trackpad. These are the same
+   * three moves the desk has: arm the next look, send it, take it back.
+   */
+  | 'cue-next' | 'cue-prev' | 'go' | 'revert'
+  /**
+   * The tempo, by hand. Four taps on a pad is what every VJ reaches for when
+   * the room is fighting the microphone.
+   */
+  | 'tap-tempo' | 'tempo-clear'
+  /**
+   * The bank, stepped.
+   *
+   * Nine faders cannot reach forty settings, and the answer every controller
+   * has used since the eighties is a shift layer. A binding may name a bank;
+   * one that does not is always live, which is where presets, dyes and the
+   * transport belong.
+   */
+  | 'bank-next' | 'bank-prev';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -44,6 +67,17 @@ export interface MidiBinding {
   target: MidiTarget;
   /** 'relative' for endless encoders (two's-complement nudges); 'absolute' for faders and knobs with a stop. */
   mode: 'absolute' | 'relative';
+  /**
+   * Which shift layer this binding belongs to, or undefined for one that is
+   * always live.
+   *
+   * Undefined is the default and the right answer for most of a map: a preset
+   * pad, a dye, blackout and the transport should do the same thing whatever
+   * layer the faders are on, because hunting for the right bank is not
+   * something to be doing when the band stops. Banks are for the controls
+   * there are more of than there are faders.
+   */
+  bank?: number;
 }
 
 export interface MidiMap {
@@ -78,7 +112,19 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record',
   'scene-toggle': 'Watch the Room',
+  'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
+  'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',
+  'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
 };
+
+/**
+ * How many shift layers a map has.
+ *
+ * Four, because that is what an eight-fader controller needs to reach every
+ * learnable setting with room left over, and because more than four is more
+ * than anyone remembers in the dark.
+ */
+export const MIDI_BANKS = 4;
 
 /** The settings worth a fader, with their travel. */
 export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number }[] = [
@@ -134,6 +180,26 @@ export interface MidiEvent {
   number: number;
   /** 0..127 */
   value: number;
+}
+
+/**
+ * System realtime: the tempo, on the same cable as the faders.
+ *
+ * These are single bytes with no channel and no data, interleaved with
+ * everything else — which is why `parseMidi` never saw them: it wants at
+ * least two bytes. A desk sending clock sends 0xF8 twenty-four times a
+ * quarter note, all night, whether or not anything is listening.
+ */
+export type MidiRealtime = 'clock' | 'start' | 'continue' | 'stop';
+
+export function parseMidiRealtime(data: Uint8Array | number[]): MidiRealtime | null {
+  switch (data[0]) {
+    case 0xf8: return 'clock';
+    case 0xfa: return 'start';
+    case 0xfb: return 'continue';
+    case 0xfc: return 'stop';
+    default: return null;
+  }
 }
 
 export function parseMidi(data: Uint8Array | number[]): MidiEvent | null {
@@ -253,7 +319,15 @@ export function parseMidiMap(text: string): MidiMap {
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
     (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
-    .map(b => ({ ...b, id: typeof b.id === 'string' ? b.id : `b-${Math.random().toString(36).slice(2, 8)}`, mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'] }));
+    .map(b => ({
+      ...b,
+      id: typeof b.id === 'string' ? b.id : `b-${Math.random().toString(36).slice(2, 8)}`,
+      mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'],
+      // A map written before banks existed has none, and every binding in it
+      // is always live — which is exactly what `undefined` means, so old maps
+      // keep working without being migrated.
+      bank: Number.isInteger(b.bank) && (b.bank as number) >= 0 && (b.bank as number) < MIDI_BANKS ? b.bank : undefined,
+    }));
   return { format: MIDI_FORMAT, version: 1, name: typeof o.name === 'string' ? o.name : 'MIDI map', device: typeof o.device === 'string' ? o.device : undefined, bindings };
 }
 
@@ -364,15 +438,32 @@ export function apc40Mk2Map(presetIds: string[]): MidiMap {
   b.push(bind(note(80), { kind: 'action', action: 'drain' }));
   b.push(bind(note(81), { kind: 'action', action: 'clear' }));
   // Clip stop buttons (note 52 on channels 1–8): Seed and the toggles.
-  const stops: MidiAction[] = ['seed', 'automate-toggle', 'macro-toggle', 'overlays-toggle'];
+  const stops: MidiAction[] = ['seed', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'revert'];
   stops.forEach((a, ch) => b.push(bind(note(52, ch), { kind: 'action', action: a })));
   b.push(bind(note(91), { kind: 'action', action: 'play-toggle' }));     // play
   b.push(bind(note(92), { kind: 'action', action: 'blackout-toggle' })); // stop
   b.push(bind(note(93), { kind: 'action', action: 'record-toggle' }));   // record
-  // The arrows either side of the transport step the preset, which is what a
-  // hand reaches for between songs.
-  b.push(bind(note(97), { kind: 'action', action: 'preset-prev' }));     // left
-  b.push(bind(note(96), { kind: 'action', action: 'preset-next' }));     // right
+  // The arrows either side of the transport arm the next look rather than
+  // sending it: on this controller there is a Go, so stepping should be the
+  // safe half of the pair. (The up/down arrows keep stepping the live preset,
+  // for building a look rather than playing one.)
+  b.push(bind(note(97), { kind: 'action', action: 'cue-prev' }));        // left
+  b.push(bind(note(96), { kind: 'action', action: 'cue-next' }));        // right
+  b.push(bind(note(94), { kind: 'action', action: 'preset-next' }));     // up
+  b.push(bind(note(95), { kind: 'action', action: 'preset-prev' }));     // down
+  // Tap Tempo is a button Akai put on the panel and this app has drawn on the
+  // controller picture since the picture existed, with nothing behind it.
+  b.push(bind(note(0x63), { kind: 'action', action: 'tap-tempo' }));
+  b.push(bind(note(0x5A), { kind: 'action', action: 'tempo-clear' }));   // metronome
+  // Shift is the obvious bank key and cycles one way; Nudge +/- step both
+  // ways for anyone who would rather not wrap. Sixteen knobs, forty settings.
+  b.push(bind(note(0x62), { kind: 'action', action: 'bank-next' }));     // shift
+  b.push(bind(note(0x65), { kind: 'action', action: 'bank-next' }));     // nudge +
+  b.push(bind(note(0x64), { kind: 'action', action: 'bank-prev' }));     // nudge -
+  // Session Rec is the big unassigned button on this panel, and Go is the
+  // move that most deserves one. (Back sits on the fifth clip-stop button,
+  // above.)
+  b.push(bind(note(0x66), { kind: 'action', action: 'go' }));
   return { format: MIDI_FORMAT, version: 1, name: 'APC40 mkII', device: 'APC40 mkII', bindings: b };
 }
 

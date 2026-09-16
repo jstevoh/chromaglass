@@ -46,6 +46,13 @@ interface SettingsPanelProps {
   onOutputReset?: () => void;
   /** Whether this machine is keeping its screen awake, and whether it can. */
   wakeLock?: { supported: boolean; held: boolean };
+  /** Where the tempo is coming from, and the three ways to say it by hand. */
+  tempo?: { source: string | null; bpm: number; taps: number };
+  onTap?: () => void;
+  onTempoClear?: () => void;
+  onTempoBpm?: (bpm: number) => void;
+  /** Whether MIDI clock is arriving on the open port, for the note that says so. */
+  midiClocked?: boolean;
   /** What to do when a second screen is connected. */
   projectorMode?: 'ask' | 'auto' | 'off';
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
@@ -106,7 +113,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
@@ -273,6 +280,70 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <Info>
           A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
         </Info>
+
+        {/* Somewhere to get the tempo from besides the microphone */}
+        {onTap && (
+          <div className="mb-4 mt-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest opacity-70">Tempo</span>
+              <span className="font-mono text-[10px] opacity-50" data-testid="tempo-readout">
+                {tempo?.source
+                  ? `${tempo.bpm} bpm \u00b7 ${tempo.source === 'clock' ? 'midi clock' : tempo.source === 'tap' ? 'tapped' : 'set'}`
+                  : 'listening'}
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                onClick={onTap}
+                data-testid="tempo-tap"
+                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
+                className="min-h-11 flex-1 rounded-lg border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest transition-all hover:bg-white/10"
+              >
+                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
+              </button>
+              <button
+                onClick={onTempoClear}
+                disabled={!tempo?.source}
+                data-testid="tempo-listen"
+                title="Back to working the tempo out from what it can hear"
+                className={`min-h-11 flex-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
+                }`}
+              >
+                Listen
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={60}
+                max={200}
+                step={1}
+                placeholder="bpm"
+                aria-label="Tempo in beats per minute"
+                data-testid="tempo-bpm"
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  const v = parseFloat((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                className="min-h-11 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-white/30"
+              />
+              <span className="text-[10px] uppercase tracking-widest opacity-30">off the setlist</span>
+            </div>
+            <Info>
+              The beat clock works the tempo out from what it hears, which is the right answer on a clean feed from the desk and a hard one in a loud room. Three ways to tell it instead.
+              {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
+              {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
+              {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
+              {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
+            </Info>
+          </div>
+        )}
 
         {/* A new song, a new look */}
         <div className="flex flex-col gap-2 mb-4 mt-2">
