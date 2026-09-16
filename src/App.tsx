@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
-import { SettingsPanel } from './components/SettingsPanel';
+import { SettingsPanel, SETTINGS_SECTIONS } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
@@ -242,6 +242,8 @@ export default function App() {
   const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  /** Which section the panel should open at, when it was opened from a ⌘K row. */
+  const [settingsSection, setSettingsSection] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   /**
    * Perform, or Design.
@@ -1635,8 +1637,24 @@ export default function App() {
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];
 
+    /*
+      Every settings section, one row each.
+
+      A single "Settings" row put sixteen sections and eighty controls behind a
+      word that describes none of them — and the panel then opened on the half
+      that did not contain the room camera, the projectors, the solver or the
+      physics. Typing "room" or "keystone" or "people" now lands on the section
+      itself rather than on the top of a panel that has it somewhere.
+    */
+    const sections: Command[] = SETTINGS_SECTIONS.map(sec => ({
+      id: `settings-${sec.id}`,
+      name: `Settings: ${sec.name}`,
+      kind: 'Open',
+      run: () => { setSettingsSection(sec.id); setShowSettings(true); setShowHelp(false); },
+    }));
+
     const opening: Command[] = [
-      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setShowSettings(true); setShowHelp(false); } },
+      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); } },
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
       { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
@@ -1645,7 +1663,7 @@ export default function App() {
         run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
     ];
 
-    return [...looks, ...doing, ...opening];
+    return [...looks, ...doing, ...opening, ...sections];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode,
       cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
@@ -2129,7 +2147,7 @@ export default function App() {
 
                 {/* Settings */}
                 <button
-                  onClick={() => { setShowSettings(!showSettings); setShowHelp(false); }}
+                  onClick={() => { setSettingsSection(null); setShowSettings(!showSettings); setShowHelp(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
                     showSettings ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
@@ -2350,6 +2368,10 @@ export default function App() {
             onTempoClear={clearTempo}
             onTempoBpm={setTempoBpm}
             midiClocked={midi.clocked}
+            // Design is where a look is built, and a look is built from every
+            // one of these — not from the six a hand rides between songs.
+            defaultTab={designing ? 'all' : 'perform'}
+            focusSection={settingsSection}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
             sceneState={scene.state}
@@ -2361,7 +2383,7 @@ export default function App() {
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
             onFilmClear={clearFilm}
-            onClose={() => setShowSettings(false)}
+            onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />
         )}
       </AnimatePresence>
@@ -2703,6 +2725,7 @@ export default function App() {
       */}
       {designing && overlaysVisible && (
         <DesignDesk
+          onOpenSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}

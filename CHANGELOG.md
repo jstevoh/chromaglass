@@ -52,6 +52,40 @@ shows, and against what a projectionist actually does on a show night.
   Go, Back, cue stepping and Tap Tempo as actions, so the desk's safe way to
   change a look in front of a room is finally something a pad can do
 
+### Fixed — ten of the sixteen settings groups could not be found
+- The settings sheet splits into Perform and Setup so that eight screens of
+  scrolling is not what you meet mid-show. What it also did was hide ten of the
+  sixteen groups behind a tab nothing gave anyone a reason to press, on a panel
+  that opened on the other one — so the room camera, the projectors and the
+  wall, the solver and the physics were all there and none of them could be
+  reached. On the desk, which owns the window above 1024px, the only way in at
+  all was ⌘K, which you have to already know about
+- Three ways in now, all of them checked. **Design → All settings…** is a
+  pinned button on the bench, because a bench that cannot reach the whole of
+  what it is building is not a bench — and opened from Design the sheet starts
+  on everything, since a look is built from all of it and not from the eight a
+  hand rides between songs. The sheet has an **All** tab. And ⌘K carries one
+  row per group, so "the room" lands on the room rather than on the top of a
+  panel that has it somewhere
+- A **search box** that matches what a group is *about* rather than only what
+  it is called: "camera", "video", "people" and "crowd" all find The Room, and
+  none of those words is in its heading
+- The first version of the button was at the end of the recipe column, which
+  scrolls — so the one control whose entire job is to be findable was itself
+  below the fold. The harness checks that it is on screen, not that it exists
+
+### Fixed — the mode switch moved when you used it
+- Design carries Save and Send to wall in the header and Perform carries
+  nothing, and the header was laid out with `justify-between` — so the middle
+  group slid sideways by the width of two buttons, measured at 137px, every
+  time you switched. The one control whose whole job is to be in the same place
+  every time was the one that moved when you pressed it
+- Pinning it with a three-column grid fixed the movement and clipped Design's
+  status dots instead, because at 1440 the right-hand cluster needs more than
+  half of what is left over. It is out of the flow now: centred on the header
+  itself, sides at their natural width. Measured at 1280, 1440 and 1920 —
+  exactly centred, identical in both modes, nothing clipped
+
 ### Fixed — what a review of the above found
 - **A keystone on a photographic preset was a black wall.** The output pass's
   own target was allocated only on the branch where no camera pass existed, so

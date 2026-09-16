@@ -368,43 +368,12 @@ try {
     return da > 0 && db > 0 ? num / Math.sqrt(da * db) : 0;
   };
 
-  // Paint the plate lopsided first.
+  // The keystone, before anything repaints the plate.
   //
-  // A flip can only be seen against something that is not already symmetric,
-  // and whether a liquid plate happens to be is luck: one run measured an
-  // asymmetry of 0.02 and the gate correctly refused to certify a flip it
-  // could not see — which is the right behaviour for the check and useless
-  // behaviour for a gate, since it fails on the plate's mood rather than on a
-  // defect. So the condition is made rather than waited for, by reaching
-  // through the debug hook and putting dye down one side of the plate. A back
-  // door, deliberately: it is setting up the test, not performing it.
-  await page.evaluate(() => {
-    const fluid = window.chromaglassDebug?.().fluids?.[0];
-    if (!fluid) return;
-    for (let i = 0; i < 400; i++) {
-      const x = 12 + Math.random() * 60;          // the left third of a 192 grid
-      const y = 20 + Math.random() * 150;
-      fluid.addDensity(Math.floor(x), Math.floor(y), 2.5, 1, 0.2, 0.1);
-    }
-  });
-  await withOutput({ corners: pinnedLeft });
-  const pinnedAgain = await gridOf();
-
-  await withOutput({ corners: pinnedLeft, flipX: true });
-  const flipped = await gridOf();
-  const flippedOutside = meanOver(flipped, x => x > 0.56);
-  check('rear projection leaves the pinned quad where it was', flippedOutside < 0.004, `mean ${flippedOutside.toFixed(4)}`);
-
-  const A = profileOf(pinnedAgain, 0.02, 0.48);
-  const B = profileOf(flipped, 0.02, 0.48);
-  const asym = 1 - corr(A, A.slice().reverse());
-  const direct = corr(A, B);
-  const reversed = corr(A, B.slice().reverse());
-  check('the plate is lopsided enough to tell a flip from no flip', asym >= 0.15,
-    `asymmetry ${asym.toFixed(3)}`);
-  check('rear projection reverses the picture inside it', reversed > direct,
-    `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
-
+  // This one asks that the middle of the frame stays lit, so it has to run on
+  // a full plate — and the flip check below deliberately empties it down to a
+  // stripe. Measured in the other order, the keystone "emptied the middle"
+  // because the flip test had already emptied it.
   // A keystone: the top edge pulled in on both sides. The corners themselves
   // must go dark while the middle of the frame does not.
   await withOutput({ corners: [0.3, 0, 0.7, 0, 1, 1, 0, 1] });
@@ -413,6 +382,69 @@ try {
   const middle = meanOver(keyed, (x, y) => x > 0.35 && x < 0.65 && y > 0.4 && y < 0.9);
   check('a keystone empties the corners it pulled in from', topCorners < 0.004, `mean ${topCorners.toFixed(4)}`);
   check('a keystone keeps the middle of the frame', middle > LIT, `mean ${middle.toFixed(3)}`);
+
+
+  // Paint the plate lopsided first, and check that it worked.
+  //
+  // A flip can only be seen against something that is not already symmetric,
+  // and whether a liquid plate happens to be is luck: one run measured an
+  // asymmetry of 0.02 and the gate correctly refused to certify a flip it
+  // could not see — right for the check, useless for a gate, since it then
+  // fails on the plate's mood rather than on a defect. So the condition is
+  // made rather than waited for, by reaching through the debug hook and
+  // putting dye down one side of the plate. A back door, deliberately: it is
+  // setting the test up, not performing it.
+  //
+  // Which side is not obvious from here. The fluid grid reaches the canvas
+  // through a rotation and a scale, so a stripe down one edge of the grid can
+  // arrive as a stripe across the *top* of the screen — left-right symmetric,
+  // and a flip gate measuring columns then means nothing all over again
+  // (measured: 0.007). Rather than encode that mapping here, where it would
+  // quietly rot the first time the renderer changed, both stripes are tried
+  // and whichever actually makes the picture lopsided is the one used.
+  const lopsidedness = (g) => {
+    const prof = profileOf(g, 0.02, 0.48);
+    return 1 - corr(prof, prof.slice().reverse());
+  };
+  const stripe = async (axis) => {
+    await page.evaluate((which) => {
+      const fluid = window.chromaglassDebug?.().fluids?.[0];
+      if (!fluid) return;
+      fluid.clearAll();
+      for (let i = 0; i < 900; i++) {
+        const near = 12 + Math.random() * 70;     // one end of the grid
+        const along = 12 + Math.random() * 168;   // the whole of the other axis
+        const x = which === 'x' ? near : along;
+        const y = which === 'x' ? along : near;
+        fluid.addDensity(Math.floor(x), Math.floor(y), 3, 1, 0.25, 0.1);
+      }
+    }, axis);
+    await withOutput({ corners: pinnedLeft });
+    return gridOf();
+  };
+
+  let pinnedAgain = null;
+  let asym = 0;
+  for (const axis of ['x', 'y']) {
+    const g = await stripe(axis);
+    const a = lopsidedness(g);
+    if (a > asym) { asym = a; pinnedAgain = g; }
+    if (asym >= 0.15) break;
+  }
+  check('the plate can be made lopsided enough to tell a flip from no flip', asym >= 0.15,
+    `asymmetry ${asym.toFixed(3)}`);
+
+  await withOutput({ corners: pinnedLeft, flipX: true });
+  const flipped = await gridOf();
+  const flippedOutside = meanOver(flipped, x => x > 0.56);
+  check('rear projection leaves the pinned quad where it was', flippedOutside < 0.004, `mean ${flippedOutside.toFixed(4)}`);
+
+  const A = profileOf(pinnedAgain, 0.02, 0.48);
+  const B = profileOf(flipped, 0.02, 0.48);
+  const direct = corr(A, B);
+  const reversed = corr(A, B.slice().reverse());
+  check('rear projection reverses the picture inside it', reversed > direct,
+    `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
 
   // ── 5. Grade ───────────────────────────────────────────────────────
   // The plate drifts while this runs, so each graded reading is bracketed by

@@ -709,6 +709,125 @@ try {
       perform.w === bench.w && perform.h === bench.h,
       `${bench.w}×${bench.h} → ${perform.w}×${perform.h}`);
 
+    // ── The mode switch stays where it is ──────────────────────────
+    //
+    // Design carries Save and Send to wall on the right and Perform carries
+    // nothing, so a header laid out with `justify-between` slid the middle
+    // group by the width of two buttons every time you used it — measured at
+    // 137px. The one control whose whole job is to be in the same place every
+    // time was the one that moved when you pressed it.
+    {
+      const at = () => page.evaluate(() => {
+        const r = document.querySelector('[data-testid="mode-segmented"]')?.getBoundingClientRect();
+        return r ? Math.round(r.x) : null;
+      });
+      const inPerform = await at();
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+      const inDesign = await at();
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+      const back = await at();
+      const drift = Math.max(Math.abs(inDesign - inPerform), Math.abs(back - inPerform));
+      check('the mode switch does not move when you use it', drift <= 1,
+        `perform ${inPerform}, design ${inDesign}, back ${back} — ${drift}px`);
+    }
+
+    // ── Every setting is reachable ─────────────────────────────────
+    //
+    // Ten of the sixteen sections used to sit behind a tab that nothing gave
+    // anyone a reason to press, on a panel that opened on the other one — so
+    // the room camera, the projectors, the solver and the physics were all
+    // there and none of them could be found. Three ways in, all checked: the
+    // All tab, the search box, and a command-palette row per section.
+    {
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+
+      // The bench's own way in, and it has to be *on screen*. The first
+      // version of this button sat at the end of the recipe, which scrolls —
+      // so the one control whose entire job is to be findable was itself
+      // below the fold. It is in the pinned footer now, and this checks the
+      // property rather than the existence.
+      const entry = await page.evaluate(() => {
+        const el = document.querySelector('[data-testid="open-all-settings"]');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { onScreen: r.top >= 0 && r.bottom <= window.innerHeight && r.width > 40, top: Math.round(r.top) };
+      });
+      check('the bench has a visible way into every setting',
+        !!entry && entry.onScreen, entry ? `at y=${entry.top} of ${900}` : 'no button');
+
+      await clickOn('open-all-settings');
+      await settle(1200);
+      const viaButton = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        if (!pane) return null;
+        const all = [...pane.querySelectorAll('section[data-section]')];
+        return { total: all.length, visible: all.filter(x => !x.classList.contains('hidden')).length };
+      });
+      check('and it opens on all of them',
+        !!viaButton && viaButton.total >= 16 && viaButton.total === viaButton.visible,
+        viaButton ? `${viaButton.visible} of ${viaButton.total}` : 'no panel');
+      await page.keyboard.press('Escape');
+      await settle(700);
+
+      await page.keyboard.press('Meta+k');
+      await settle(700);
+      await page.keyboard.type('Settings: The Room');
+      await settle(600);
+      await page.keyboard.press('Enter');
+      await settle(1500);
+
+      const panel = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        if (!pane) return null;
+        const all = [...pane.querySelectorAll('section[data-section]')];
+        const room = pane.querySelector('[data-section="room"]');
+        const watch = pane.querySelector('[data-testid="scene-toggle"], [data-section="room"] button');
+        return {
+          total: all.length,
+          visible: all.filter(x => !x.classList.contains('hidden')).length,
+          roomVisible: !!room && !room.classList.contains('hidden'),
+          reachedRoom: !!watch,
+          tab: [...pane.querySelectorAll('[role="tab"]')]
+            .find(t => t.getAttribute('aria-selected') === 'true')?.textContent?.trim(),
+        };
+      });
+      check('a palette row opens Settings at the section it names', !!panel && panel.roomVisible,
+        panel ? `tab ${panel.tab}, room ${panel.roomVisible}` : 'no settings panel');
+      check('and every section is on screen, not ten of them behind a tab',
+        !!panel && panel.total === panel.visible && panel.total >= 16,
+        panel ? `${panel.visible} of ${panel.total} showing` : '');
+      check('and the room camera is among them', !!panel && panel.reachedRoom);
+
+      // The search reaches a section by what it is about, not by its heading:
+      // "people" is the word someone types, and it is nowhere in "The Room".
+      const found = await page.evaluate(() => {
+        const input = document.querySelector('[data-testid="settings-search"]');
+        if (!input) return null;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'people');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      });
+      await settle(600);
+      const afterSearch = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        const all = [...pane.querySelectorAll('section[data-section]')];
+        const vis = all.filter(x => !x.classList.contains('hidden'));
+        return { n: vis.length, ids: vis.map(x => x.dataset.section) };
+      });
+      check('searching what a section is about finds it', found && afterSearch.ids.includes('room'),
+        `"people" → ${afterSearch.ids.join(', ') || 'nothing'}`);
+      check('and searching narrows rather than showing everything',
+        afterSearch.n > 0 && afterSearch.n < 16, `${afterSearch.n} sections`);
+
+      await page.keyboard.press('Escape');
+      await settle(800);
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+    }
+
     // One control surface, not two. A check that passes because neither
     // element exists is measuring nothing, so it names what it looked for.
     const legacy = ['liquid-water', 'midi-button', 'desk-mode-button', 'preset-title-button', 'guide-button'];

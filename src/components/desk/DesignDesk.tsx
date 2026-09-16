@@ -77,6 +77,8 @@ export interface DesignDeskProps {
   dots: DeskDots;
   midiName: string | null;
   onSearch: () => void;
+  /** Open the settings sheet showing everything — the bench's way to the rest. */
+  onOpenSettings: () => void;
   status: { audio: string; engine: string };
 }
 
@@ -254,8 +256,28 @@ export function DesignDesk(p: DesignDeskProps) {
               testId="toggle-evolve"
             />
           </div>
+
         </div>
-        <div className="flex shrink-0 gap-2 border-t border-border p-3">
+        {/*
+          The way in to the other seventy, pinned.
+
+          The recipe is the eight a look is actually built from, and that is
+          still the right eight to have out. But it was also the *only* eight
+          the bench admitted existed: everything else — the room camera, the
+          projectors, the solver, the physics — was behind ⌘K, which is a thing
+          you have to already know about. A bench that cannot be used to reach
+          the whole of what it is building is not a bench.
+
+          In the pinned footer and not at the end of the recipe, because the
+          recipe scrolls: put there, the one control whose job is to be found
+          was itself below the fold.
+        */}
+        <div className="shrink-0 border-t border-border px-3 pt-3">
+          <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings">
+            All settings…
+          </Button>
+        </div>
+        <div className="flex shrink-0 gap-2 p-3">
           <Button
             full height={40}
             onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
