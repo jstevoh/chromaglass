@@ -122,7 +122,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     serves every size the app runs at.
   */
   return (
-    <Sheet title="Settings" onClose={onClose} testId="settings-panel">
+    <Sheet title="Settings" onClose={onClose} height={860} testId="settings-panel">
+      {/*
+        Taller than the other two sheets.
+
+        Settings is the one with eighty controls in it, and moving it from a
+        full-height drawer into a 640px sheet made its Perform tab four
+        screens deep where it had been under three — caught by the harness
+        the same day. The obvious fix was to use the width the sheet gained
+        and run the sections in two columns; measurement killed that outright.
+        In a vertically scrolling box, `columns: 2` lays the content out
+        *horizontally*: 4208px of scrollWidth in a 718px box with overflow-x
+        hidden, which is most of the panel simply gone. So it gets the height
+        back instead, and the other sheets stay at the handoff's 640.
+      */}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
 
       {/*

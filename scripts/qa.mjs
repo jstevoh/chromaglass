@@ -262,19 +262,42 @@ try {
   // Perform must show fewer sections than the panel has, and must be the
   // shorter scroll of the two, or the tab has stopped earning itself.
   {
+    /*
+      The scrolling pane is found by name, not by hunting for the first div
+      that happens to overflow.
+
+      The old finder looked for any div with a `section h3` in it whose
+      scrollHeight exceeded its clientHeight. When a layout change stopped it
+      overflowing vertically it found nothing, returned 0 over 1, and the
+      "fits in about three screens" gate passed on a panel whose content had
+      gone sideways off the edge. A check that reports zero when it cannot
+      measure is worse than one that fails.
+    */
     const measure = async () => page.evaluate(() => {
       const vis = [...document.querySelectorAll('section')].filter(s => s.offsetParent !== null);
-      const panel = [...document.querySelectorAll('div')].find(d => d.querySelector('section h3') && d.scrollHeight > d.clientHeight + 4);
-      return { n: vis.length, scroll: panel ? panel.scrollHeight : 0, client: panel ? panel.clientHeight : 1 };
+      const pane = document.querySelector('[data-testid="settings-panel"] .overflow-y-auto');
+      if (!pane) return null;
+      return {
+        n: vis.length,
+        scroll: pane.scrollHeight, client: pane.clientHeight,
+        wide: pane.scrollWidth - pane.clientWidth,
+      };
     });
-    await firstVisible('settings-tab-perform').click();
-    await settle(600);
+    await clickOn('settings-tab-perform');
+    await settle(700);
     const perform = await measure();
-    await firstVisible('settings-tab-setup').click();
-    await settle(600);
+    await clickOn('settings-tab-setup');
+    await settle(700);
     const setup = await measure();
-    await firstVisible('settings-tab-perform').click();
-    await settle(600);
+    await clickOn('settings-tab-perform');
+    await settle(700);
+    check('the settings panel has a pane that can be measured',
+      !!perform && !!setup, perform && setup ? '' : 'no scrolling pane inside the sheet');
+    if (!perform || !setup) throw new Error('settings pane not found — the checks below would be measuring nothing');
+    // The width failure this replaced: content flowing into horizontal columns
+    // inside a box whose overflow-x is hidden, so most of it is off the edge.
+    check('and nothing in it runs off the side',
+      perform.wide <= 2 && setup.wide <= 2, `${perform.wide}px perform, ${setup.wide}px setup`);
     check('the settings panel is split in two',
       perform.n > 0 && setup.n > 0 && perform.n + setup.n === headings.length,
       `${perform.n} perform + ${setup.n} setup = ${headings.length}`);
