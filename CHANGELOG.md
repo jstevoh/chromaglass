@@ -223,6 +223,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.7 → 3.3 against 6.5–7.2. Structure at 4 and 8 px barely moves, which is as expected:
   a speckle is not mid-scale structure, and that gap is what lacing and drops are for.
 
+### Fixed — a thread is a few pixels wide, on a rim or on a fifty-cell ramp
+- Width as a fraction of the whole change reads right at a boundary and turns into a pale
+  bar a fifth of the band across on a wide one, because the change is spread over that
+  many pixels — measured on the projector, a rim got a 3 px thread and a fifty-cell ramp a
+  15–20 px smear. That is what replaced the stacks rather than removing them. The width is
+  set in pixels now and only then capped by the change, which keeps a narrow band's thread
+  inside its own boundary
+- **The walk stops on a fraction of a step, not a whole one.** Stopping on a cell made the
+  reach, the middle and the width piecewise constant over patches of the plate, so the
+  threads carried cell-sized stair-steps along their edges and broke into dashes where the
+  patches were small. Blending the last step by how far the colour got through it makes
+  all three continuous, for no extra samples
+
 ### Changed — one thread, found by walking the boundary out
 - A wide *steep* band still stacked four or five threads, at the default and not only at
   full strength, and no threshold closed it without taking the real boundaries too: the
