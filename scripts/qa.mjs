@@ -328,6 +328,48 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('nothing spills off a phone-width screen', overflow <= 2, `${overflow}px of overflow`);
 
+  // ── The desk ──────────────────────────────────────────────────────
+  //
+  // Perform makes the plate a preview so the controls can have the room. The
+  // thing that would make that a bad trade is if it cost the audience
+  // resolution, so that is what is checked: the canvas's *backing store* — the
+  // pixels actually rendered — must not change when the box it is shown in
+  // does. (It cannot: `frame` does not appear anywhere in the visualizer's
+  // `resize`. This is the check that keeps it that way.)
+  {
+    const size = () => page.evaluate(() => {
+      const c = document.getElementById('liquid-canvas');
+      const r = document.querySelector('[data-testid="plate-frame"]').getBoundingClientRect();
+      return { w: c.width, h: c.height, boxW: Math.round(r.width), boxH: Math.round(r.height) };
+    });
+    const design = await size();
+    await firstVisible('desk-mode-button').click();
+    await settle(1800);
+    const perform = await size();
+    check('Perform shows the desk', (await page.getByTestId('desk').count()) === 1);
+    check('and makes the plate a preview',
+      perform.boxW < design.boxW * 0.85, `${design.boxW}px wide → ${perform.boxW}px`);
+    check('and costs the render not one pixel',
+      perform.w === design.w && perform.h === design.h,
+      `${design.w}×${design.h} → ${perform.w}×${perform.h}`);
+    // The desk takes the space the floating controls leave. Its first build
+    // sat underneath the toolbar, which was only visible in a screenshot.
+    const clash = await page.evaluate(() => {
+      const col = document.querySelector('[data-testid="desk-column"]')?.getBoundingClientRect();
+      const bar = document.querySelector('[data-testid="midi-button"]')?.closest('div')?.getBoundingClientRect();
+      if (!col || !bar) return null;
+      return (col.right < bar.left || col.left > bar.right) ? null
+        : `desk ${Math.round(col.left)}–${Math.round(col.right)} under toolbar ${Math.round(bar.left)}–${Math.round(bar.right)}`;
+    });
+    check('and does not sit underneath the toolbar', clash === null, clash ?? '');
+    await noteDuplicates();
+    await firstVisible('desk-mode-button').click();
+    await settle(1200);
+    const back = await size();
+    check('and Design gives the plate the window back',
+      back.boxW > perform.boxW * 1.2, `${perform.boxW}px → ${back.boxW}px`);
+  }
+
   // ── Nothing is on the screen twice ────────────────────────────────
   //
   // The Band button was in the sound picker twice — the same markup pasted

@@ -5,6 +5,7 @@ import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
+import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -62,6 +63,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
  * appears), and anything else waits for a click.
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
+/** Perform or Design. A property of this desk, not of the look, so not a setting. */
+const DESK_MODE_KEY = 'chromaglass-desk-mode';
 
 function rememberedSource(): AudioSource {
   try {
@@ -140,6 +143,20 @@ export default function App() {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  /**
+   * Perform, or Design.
+   *
+   * Design is what this has always been: the plate fills the window, which is
+   * the right shape for *building* a look. Perform is the desk — the plate
+   * becomes a preview and the controls get the room, because during a show the
+   * plate is already on a wall behind you, larger, and the thing you cannot
+   * see is the desk. Nothing is taken away; it is a different arrangement of
+   * the same controls, and the toggle is one click.
+   */
+  const [deskMode, setDeskMode] = useState<'design' | 'perform'>(() => {
+    try { return localStorage.getItem(DESK_MODE_KEY) === 'perform' ? 'perform' : 'design'; } catch { return 'design'; }
+  });
+  useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
   /**
    * The preset last applied by hand. Which preset is *active* is derived from
    * the settings below rather than stored: it only ever differed from them
@@ -689,6 +706,10 @@ export default function App() {
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   /** What the desk should say is on stage. */
+  // The hole in the desk layout the plate is painted over. In Design there is
+  // no hole and the plate fills the window, as it always has.
+  const preview = usePreviewFrame(deskMode === 'perform');
+
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -1262,6 +1283,7 @@ export default function App() {
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
+        frame={preview.frame}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -1640,6 +1662,21 @@ export default function App() {
                 >
                   <Settings size={16} className={showSettings ? '' : 'opacity-60 group-hover:opacity-100'} />
                   <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
+                </button>
+
+                {/* Perform or Design */}
+                <button
+                  onClick={() => setDeskMode(m => (m === 'perform' ? 'design' : 'perform'))}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
+                    deskMode === 'perform' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title={deskMode === 'perform'
+                    ? 'Perform: the plate is a preview and the controls have the room. Click for Design.'
+                    : 'Design: the plate fills the window, for building a look. Click for Perform.'}
+                  data-testid="desk-mode-button"
+                >
+                  <LayoutGrid size={16} className={deskMode === 'perform' ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">{deskMode === 'perform' ? 'Perform' : 'Design'}</span>
                 </button>
 
                 {/* Show sequencer */}
@@ -2045,6 +2082,40 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* ── The desk ───────────────────────────────────────────── */}
+      {/*
+        A layout with a hole in it. The plate is a `position: fixed` canvas
+        that must never be re-parented — a remount takes the WebGL context and
+        the show restarts — so the desk lays out normally around an empty box,
+        and the canvas is painted over that box's rectangle.
+
+        The left inset clears the bottles and tools that already float there,
+        so nothing has to move house to make room for this.
+      */}
+      {deskMode === 'perform' && overlaysVisible && (
+        <div className="fixed inset-0 z-[5] pointer-events-none" data-testid="desk">
+          {/*
+            The insets clear what already floats over the plate: the bottles
+            and dye swatches on the left, the toolbar on the right, the title
+            above and the Hide UI / Clean Screen row below. Nothing has to move
+            house to make room for the desk — it takes the space that was left.
+          */}
+          <div className="h-full flex items-stretch gap-4 pt-24 pb-28 pl-[15rem] pr-[11rem]">
+            <div ref={preview.ref} className="flex-1 min-w-0" data-testid="desk-preview" />
+            <aside
+              className="w-80 shrink-0 overflow-y-auto scrollbar-hide rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 pointer-events-auto"
+              data-testid="desk-column"
+            >
+              <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/35 mb-3">The desk</h2>
+              <p className="text-[11px] leading-relaxed text-white/45">
+                The plate is on the wall; this is where it is played from. Cue a look
+                from the title, then Go.
+              </p>
+            </aside>
+          </div>
+        </div>
+      )}
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>

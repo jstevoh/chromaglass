@@ -69,6 +69,21 @@ interface LiquidVisualizerProps {
   settings: VisualizerSettings;
   seedCount?: number;
   selectedLiquid?: LiquidType;
+  /**
+   * Where the plate is drawn on this screen, in CSS pixels.
+   *
+   * The desk needs the plate to be a preview in the corner of a control
+   * surface rather than the whole window, and the canvas cannot simply be
+   * moved to a different place in the tree to achieve that — a remount takes
+   * the WebGL context with it and the show restarts. So the canvas stays
+   * exactly where it is and this moves the box it is painted in.
+   *
+   * It does not change what is rendered. With a projector attached the render
+   * size comes from the projector (see `resize`), and with none it comes from
+   * the window — neither is this box. Shrinking the preview costs the audience
+   * nothing, which is the whole reason the desk is affordable.
+   */
+  frame?: { top: number; left: number; width: number; height: number } | null;
   activeLayer?: number;
   clearTrigger?: number;
   drainTrigger?: number;
@@ -1855,7 +1870,7 @@ interface GLResources {
 // ─── React Component ─────────────────────────────────────────────────
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, selectedLiquid,
+  audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
 }, ref) => {
@@ -5218,11 +5233,17 @@ void main() {
   }, [noise2D, seedCount]);
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-black overflow-hidden">
+    <div
+      className={`fixed bg-black overflow-hidden ${frame ? 'rounded-xl border border-white/10 transition-[top,left,width,height] duration-300' : 'inset-0 w-full h-full'}`}
+      style={frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : undefined}
+      data-testid="plate-frame"
+    >
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
-        style={staged ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
+        // Letterboxed whenever the box it is shown in is not the shape it was
+        // rendered at — with a projector attached, and in the desk's preview.
+        style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
     </div>
