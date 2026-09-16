@@ -133,9 +133,7 @@ export function StatusDot({ on, label, tone = 'ok', testId }: {
 
 // ── Ride slider ──────────────────────────────────────────────────────
 
-export function Slider({
-  label, value, min, max, step, onChange, display, cc, white, touch, testId,
-}: {
+export interface SliderProps extends Keyed {
   label: string;
   value: number; min: number; max: number; step?: number;
   onChange: (v: number) => void;
@@ -147,7 +145,9 @@ export function Slider({
   white?: boolean;
   touch?: boolean;
   testId?: string;
-}) {
+}
+
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
     <div className="mb-5" data-testid={testId}>
@@ -200,9 +200,17 @@ export function Toggle({ label, on, onChange, testId }: {
 
 // ── Cue row ──────────────────────────────────────────────────────────
 
-export function CueRow({
-  index, name, swatch, state, trailing, onClick, onContextMenu, testId,
-}: {
+/**
+ * This project has no `@types/react`, so JSX does not add React's own
+ * `key` to a component's props the way it would otherwise — every `key` in
+ * the codebase before now sat on a DOM element, where the DOM typings supply
+ * it. Declaring it here is what lets these be rendered from a list. React
+ * consumes `key` itself and never passes it down, so no component ever reads
+ * the value; it is here for the type checker alone.
+ */
+export interface Keyed { key?: string | number }
+
+export interface CueRowProps extends Keyed {
   index: number;
   name: string;
   /** A two-colour smear standing in for the look, from its palette contract. */
@@ -212,7 +220,9 @@ export function CueRow({
   onClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
   testId?: string;
-}) {
+}
+
+export function CueRow({ index, name, swatch, state, trailing, onClick, onContextMenu, testId }: CueRowProps) {
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
     : 'border-transparent hover:bg-hover';

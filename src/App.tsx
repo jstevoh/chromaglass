@@ -8,6 +8,7 @@ import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { RideStrip, DEFAULT_RIDE } from './components/RideStrip';
+import { PerformDesk, RIDES, type Cue } from './components/desk/PerformDesk';
 import { StatusLine } from './components/StatusLine';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
@@ -759,6 +760,37 @@ export default function App() {
     return () => clearInterval(id);
   }, [deskMode]);
 
+  /**
+   * The cue list: the looks, in order, each carrying two of its own dyes so a
+   * row is recognisable without reading it. The live one is what is on the
+   * wall; the next one is whatever is armed.
+   */
+  const cues = useMemo<Cue[]>(() => allPresets.map(pr => {
+    const contract = isUserPresetId(pr.id)
+      ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
+      : PRESET_CONTRACTS[pr.id];
+    const [a, b] = contract && contract.length
+      ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
+      : ['#52525B', '#27272A'];
+    return { id: pr.id, name: pr.name, swatch: `linear-gradient(135deg, ${a}, ${b})`, fade: fadeSeconds };
+  }), [allPresets, fadeSeconds]);
+
+  /**
+   * The controller, reachable from above where it is created.
+   *
+   * The desk prints the CC each ride is learned to, and the MIDI hook is built
+   * further down the file than the desk's props are assembled. A ref rather
+   * than a reorder: the hook's inputs depend on half the app.
+   */
+  const midiRef = useRef<{ map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] } } | null>(null);
+
+  /** Which CC a ride is learned to, so the desk and the controller agree. */
+  const ccFor = useCallback((key: keyof VisualizerSettings): number | null => {
+    const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);
+    return b && b.source.kind === 'cc' ? b.source.number : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -1307,6 +1339,7 @@ export default function App() {
     },
     allPresetIds,
   );
+  midiRef.current = midi as unknown as typeof midiRef.current;
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
     action: runAction,
