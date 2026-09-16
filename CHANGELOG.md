@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the plate took no brush at all
+- The desk is `fixed z-10` and its preview is a transparent hole in it; the plate was
+  `fixed` with no z-index. So the plate showed *through* the hole while the desk stayed
+  the topmost element over it, and every mousedown landed on the hole. The canvas's own
+  listeners never fired: **the bottles, the dyes and all seven tools did nothing on
+  either desk**
+- From the room that reads as the preset carrying on untouched — which on a blue look
+  is a red bottle "coming out blue". It is the user report this was chased for, and it
+  was never the dye. Frozen, so nothing advects and nothing mixes, the dropper injects
+  **(1, 0.002, 0.002)** for Cherry Red and **(0.224, 1, 0.078)** for Limpid Green on the
+  GPU solver — the `PALETTE` entries to three places. The absorption store, the
+  renderer, the subtractive mix and the bottle are all exonerated
+- Raising the framed plate to `z-20` is safe because a framed plate is clipped to the
+  hole it was measured into: it covers the preview and nothing else, and stays under the
+  sheets (z-50) and the palette (z-80)
+- Behind it, a second fault: `drawnRect()` corrected for letterboxing only when a
+  projector stage was attached, but `objectFit: contain` is set for the desk's preview
+  too. A 1200×800 buffer shown in a 582×606 hole is **109px of vertical error and a 2×
+  scale error** — so even with the pointer reaching the canvas the brush would have
+  landed somewhere else
+
+### Changed — the desk, rebuilt to the design
+- **Perform and Design share one frame**: `272px 1fr 312px` by `48px 1fr 28px`, a common
+  header with the breadcrumb, the mode switch, the status dots and the ⌘K chip. The
+  plate is a hole in the middle that the WebGL canvas is painted over and never
+  re-parented into — a remount would lose the context
+- **⌘K replaces the preset menu.** Looks, tools, actions and panels in one list with
+  subsequence matching; `⏎` arms a look, `⇧⏎` sends it now. Most of the app is reachable
+  only this way under a desk, which is the point: the desk shows what a hand needs
+  mid-show and the palette holds the rest
+- **The bench**: Design gets the same three columns — bottles, the dye grid and palettes
+  on the left, the plate labelled *not on wall* in the middle with all seven tools, the
+  recipe on the right, and Macro plus a guarded Randomise along the bottom
+- **Settings, MIDI and Sequence are sheets** rather than floating panels
+- **The rides** are assignable from `LEARNABLE_SETTINGS`, the same list MIDI learn
+  offers, and move live when a controller moves them
+- **The remotes**: a tap on the phone *arms* a look rather than firing it, with a fixed
+  transport bar; the iPad gets a cue rail of its own. The wall captions a blackout so a
+  dark screen is never ambiguous
+- **Hit targets**: the ride sliders had a 22px grab strip over an 8px track. 32px now,
+  with a 22px thumb
+
+### Changed — bubbles belong to the liquid now
+- They read as stickers over the plate rather than air in it. Each one is now tinted by
+  the film underneath it and fades with that film's thickness, so a bubble on thin
+  liquid is barely there and one on a thick dye carries its colour
+- And there are fewer: the default drops from **0.5 to 0.2**, every preset's value is
+  halved, and the room and spawn chances come down with it. Count and per-bubble
+  strength are set on separate curves — scaling both by the same number was how a
+  "stronger" setting could put twelve bubbles on the plate and change zero pixels
+
+### Fixed — Esc closed three panels out of seven
+- The handler listed Settings, Help and the track panel. MIDI, the sequencer, Save and
+  the command palette stayed up
+
+### Changed — harnesses that can tell one dye from another
+- `npm run qa` is 57 checks. Two of them used to be `check(..., true)` — a condition
+  that is the literal `true`, which is how painting could die on both desks without a
+  single check going red. The plate one now freezes the liquid, drags, and reads what
+  the brush laid down
+- `npm run dye` was rewritten around the same freeze. Photographing the plate before and
+  after a stroke measures the dye only on a plate that is otherwise still; on Galaxy it
+  read **362,366 of 583,000 pixels** as "changed". Bracketing against the plate's own
+  drift did not save it either — a still brush still showed 2,549 cells gaining density
+  where the dropper reaches 69, and it returned the same 219° for a red bottle and a
+  green one. It paints a control colour as well as red now, because a check that cannot
+  tell red from green is not measuring dye whatever number it prints
+- Its engine check was vacuous too: it read the label once at startup, and the governor
+  steps the solver *down* mid-run. A run that opened on `GPU · 384²` was measured on
+  `CPU · 192²` forty seconds later. The grid is pinned with `?sim=384` and the engine is
+  read at each measurement
+- Both suites now ask the question hit-testing answers rather than the one geometry
+  does: the desk's columns clearing the preview hole says nothing about whether the
+  pointer can reach the plate through it
+
+
 ### Changed — the settings panel is a control surface, not a document
 - The panel was **eight screens** of vertical scroll (7309px in a 900px window) with
   **722 words** of prose in it. One paragraph ran to 198 words directly above a fader
