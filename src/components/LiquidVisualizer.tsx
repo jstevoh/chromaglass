@@ -7,6 +7,8 @@ import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pi
 import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
 import type { TempoSource } from '../lib/tempo';
+import { FlashGuard } from '../lib/flashGuard';
+import { FrameProbe } from '../lib/frameProbe';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
@@ -1930,6 +1932,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const cameraRef = useRef<CameraPass | null>(null);
   /** The output pass: the projector's geometry and grade. Built only if it would change a pixel. */
   const outputRef = useRef<OutputPass | null>(null);
+  /**
+   * Three flashes a second, and no more.
+   *
+   * The probe reads back what actually reached the screen; the guard counts
+   * the flashes in it and, only once there are too many, hands back a gain
+   * that rides the master dimmer. Nothing in this app was built to strobe, but
+   * any audio band can be mapped onto any setting including `dimmer`, and a
+   * bass-driven master brightness at 150 bpm is a 2.5 Hz full-field flash that
+   * nobody chose. See `lib/flashGuard.ts`.
+   */
+  const probeRef = useRef<FrameProbe | null>(null);
+  const flashRef = useRef(new FlashGuard());
+  /** The gain the guard asked for last frame, applied to this one's dimmer. */
+  const flashGainRef = useRef(1);
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
@@ -2367,6 +2383,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       webGLRef.current = null;
       cameraRef.current = null;
       outputRef.current = null;
+      probeRef.current = null;
+      flashRef.current.reset();
+      flashGainRef.current = 1;
       governorRef.current = null;
     };
     const restored = () => {
@@ -5161,7 +5180,14 @@ void main() {
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
           glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-          glCtx.uniform1f(uLocs['u_dimmer'], Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)));
+          // The dimmer, with the flash guard's correction folded in. Riding the
+          // dimmer rather than adding a pass is what lets one implementation
+          // cover the laptop, the projector, a network display and the
+          // recorder: every material is already lit through this number.
+          glCtx.uniform1f(
+            uLocs['u_dimmer'],
+            Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
+          );
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
@@ -5318,6 +5344,23 @@ void main() {
             }, out ? out.fbo : null);
           }
           if (out) out.draw(canvas.width, canvas.height, outCfg);
+
+          // ── What the audience just saw ─────────────────────────
+          // Last, with the finished frame still in the default framebuffer.
+          // The read is one frame behind, which does not matter for a question
+          // about the last second.
+          if (outCfg.flashGuard) {
+            if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
+            const probe = probeRef.current;
+            probe.measure(canvas.width, canvas.height);
+            const lum = probe.luminance;
+            if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
+          } else if (probeRef.current) {
+            probeRef.current.dispose();
+            probeRef.current = null;
+            flashRef.current.reset();
+            flashGainRef.current = 1;
+          }
         }
       }
 
@@ -5352,6 +5395,7 @@ void main() {
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputPass: outputRef.current,
         outputConfig: outputCfgRef.current,
+        flash: () => ({ ...flashRef.current.state, luminance: probeRef.current?.luminance ?? null }),
         glLost: glLostRef.current,
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
@@ -5392,6 +5436,8 @@ void main() {
         cameraRef.current = null;
         outputRef.current?.dispose();
         outputRef.current = null;
+        probeRef.current?.dispose();
+        probeRef.current = null;
         webGLRef.current = null;
       }
     };

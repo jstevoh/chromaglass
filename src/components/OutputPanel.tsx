@@ -172,7 +172,9 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
   wakeLock?: { supported: boolean; held: boolean };
 }) {
   const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
-  const identity = outputIsIdentity(output);
+  // Reset puts the guard back on as well as squaring the geometry, so it has
+  // something to do even when the geometry is already square.
+  const identity = outputIsIdentity(output) && output.flashGuard;
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="output-panel">
@@ -232,12 +234,23 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
       <Row label="Output Gain"  value={output.gain}  min={0.2} max={3}   step={0.05} onChange={v => set({ gain: v })}  format={v => `${v.toFixed(2)}x`} />
       <Row label="Output Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} onChange={v => set({ gamma: v })} />
 
+      <div className="mb-3 mt-1 flex gap-1.5">
+        <Switch
+          label={output.flashGuard ? 'Flash Limit On' : 'Flash Limit Off'}
+          on={output.flashGuard}
+          onChange={v => set({ flashGuard: v })}
+          hint="Hold the whole screen below three flashes a second"
+          testId="output-flash-guard"
+        />
+      </div>
+
       <Info>
         Set this once, at load-in, with the projector on and from where the audience will be — none of it belongs to a look, so nothing here is saved into a preset and no fader can reach it mid-song.
         {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
         {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
         {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
         {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
+        {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and it is here, not in the settings, because no preset should be able to switch off a safety and no fader should be able to knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
         {wakeLock && (
           wakeLock.supported
             ? ` The screen is being kept awake${wakeLock.held ? '' : ' while the plate is running'}, so nothing dims or sleeps mid-set.`

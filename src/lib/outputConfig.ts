@@ -60,6 +60,15 @@ export interface OutputConfig {
   gain: number;
   /** Output gamma. Under 1 lifts the mid-tones for a washed-out room; over 1 deepens them. */
   gamma: number;
+  /**
+   * Hold the whole field below three flashes a second (`lib/flashGuard.ts`).
+   *
+   * On unless somebody turns it off, and here rather than in the settings for
+   * the same reason as everything else in this file plus one more: a preset
+   * must not be able to switch off a safety, and a fader must not be able to
+   * knock it off in the dark.
+   */
+  flashGuard: boolean;
 }
 
 export const IDENTITY_CORNERS: OutputConfig['corners'] = [0, 0, 1, 0, 1, 1, 0, 1];
@@ -75,6 +84,7 @@ export const DEFAULT_OUTPUT: OutputConfig = {
   maskFeather: 0.02,
   gain: 1,
   gamma: 1,
+  flashGuard: true,
 };
 
 export const OUTPUT_KEY = 'chromaglass-output';
@@ -82,12 +92,16 @@ export const OUTPUT_KEY = 'chromaglass-output';
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-4;
 
 /**
- * True when the config would change a single pixel.
+ * True when the config's *geometry and grade* would change a single pixel.
  *
  * The pass costs a full-screen texture and a second draw, so when nothing is
  * set — which is every machine that has never been pointed at a projector —
  * it is not built at all and the plate goes straight to the screen as it
  * always did.
+ *
+ * The flash guard is deliberately not part of this question. It rides the
+ * master dimmer, which every path multiplies through already, so it needs no
+ * pass of its own and must not drag one into existence on every machine.
  */
 export function outputIsIdentity(o: OutputConfig): boolean {
   if (o.flipX || o.flipY) return false;
@@ -118,6 +132,7 @@ export function normalizeOutput(raw: unknown): OutputConfig {
     maskFeather: clamp(o.maskFeather === undefined ? DEFAULT_OUTPUT.maskFeather : Number(o.maskFeather) || 0, 0, 0.25),
     gain: clamp(o.gain === undefined ? 1 : Number(o.gain) || 1, 0.2, 3),
     gamma: clamp(o.gamma === undefined ? 1 : Number(o.gamma) || 1, 0.5, 2.5),
+    flashGuard: o.flashGuard !== false,
   };
 }
 
