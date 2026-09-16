@@ -94,8 +94,17 @@ try {
     const n = await page.getByTestId(id).count();
     const w = n ? await page.evaluate((i) => Math.round(document.querySelector(`[data-testid="${i}"]`).getBoundingClientRect().width), id) : 0;
     check(`and ⌘K opens ${query} as a sheet`, n === 1 && w <= 720 && w > 300, n ? `${w}px wide` : 'did not open');
+    // Escape, then *prove* it closed. A sheet's scrim covers the desk and
+    // takes any click meant for it, so a sheet left open turns the next
+    // check into "the click went to the scrim" — which reads as the app
+    // failing to switch modes.
     await page.keyboard.press('Escape');
-    await settle(500);
+    let gone = false;
+    for (let i = 0; i < 20 && !gone; i++) {
+      gone = (await page.getByTestId(id).count()) === 0;
+      if (!gone) await settle(300);
+    }
+    check(`and ${query} closes again`, gone, gone ? '' : 'still open — the next check would be clicking its scrim');
   }
 
   await clickOn('mode-segmented-design');
