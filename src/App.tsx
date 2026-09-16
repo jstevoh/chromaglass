@@ -31,6 +31,8 @@ import { useSceneCamera } from './hooks/useSceneCamera';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
+import { useWakeLock } from './hooks/useWakeLock';
+import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -125,6 +127,39 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+
+  // The laptop driving the projector must not dim, sleep or screensave: what
+  // it does, the wall does. Held while the plate is running and dropped the
+  // moment it is paused, so a machine left on the desk overnight is not kept
+  // awake by a stopped show. Needs a secure context, so it is live on the
+  // hosted site and on `localhost` — which is where the show is run — and
+  // absent on a plain-http LAN address.
+  const wakeLock = useWakeLock(isActive);
+
+  // ── The projector's geometry and grade ──────────────────────────
+  // Rear-projection flip, corner pin, edge blanking, output grade. Kept on
+  // this machine rather than in the settings, because it describes the room
+  // and not the look: a preset file must not carry a venue's keystone to
+  // whoever opens it next. See `lib/outputConfig.ts`.
+  const [output, setOutputState] = useState<OutputConfig>(loadOutput);
+  const setOutput = useCallback((next: OutputConfig | ((prev: OutputConfig) => OutputConfig)) => {
+    setOutputState(prev => {
+      const value = typeof next === 'function' ? (next as (p: OutputConfig) => OutputConfig)(prev) : next;
+      saveOutput(value);
+      return value;
+    });
+  }, []);
+  const resetOutput = useCallback(() => setOutput({ ...DEFAULT_OUTPUT }), [setOutput]);
+
+  // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
+  // drives this to set a corner pin or a mask on a plate that is already
+  // running, so the before and the after are the same look half a second
+  // apart rather than two different plates from two page loads.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassOutput?: unknown }).chromaglassOutput =
+      (patch: Partial<OutputConfig>) => { setOutput(prev => normalizeOutput({ ...prev, ...patch })); };
+  }, [setOutput]);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   // ── The input the show listens to ──
   // A USB interface fed from the desk beats the laptop's own microphone in
@@ -1117,7 +1152,8 @@ export default function App() {
     presetId: activePresetId,
     presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock]);
+    output,
+  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   const sendCastState = useCallback(() => {
     castSend({ type: 'state', state: castState });
@@ -1583,6 +1619,7 @@ export default function App() {
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
         frame={preview.frame}
+        output={output}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -2187,6 +2224,10 @@ export default function App() {
             projectorMode={projector.mode}
             onProjectorMode={projector.setMode}
             projectorName={projector.projector?.label ?? null}
+            output={output}
+            onOutput={setOutput}
+            onOutputReset={resetOutput}
+            wakeLock={wakeLock}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
             sceneState={scene.state}

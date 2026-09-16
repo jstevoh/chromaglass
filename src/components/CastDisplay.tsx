@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from '../types';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProtocol';
 import { useRemoteLink } from '../hooks/useRemoteLink';
+import { useWakeLock } from '../hooks/useWakeLock';
 
 /**
  * The cast receiver: the show on the second screen.
@@ -70,6 +71,8 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
   const [gone, setGone] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const isFullscreen = useFullscreen();
+  // This window *is* the projector. Nothing it does is worth a screensaver.
+  useWakeLock(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -152,6 +155,10 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
 /** A receiver with no show window to mirror: runs the show itself, fed by messages. */
 function CastReceiver() {
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
+  // Same again for a network display or a Chromecast tab: it exists to be
+  // looked at. (A LAN address is not a secure context, so the lock is simply
+  // unavailable there and the hook says so rather than pretending.)
+  useWakeLock(true);
   const [state, setState] = useState<CastState | null>(null);
   const [audio, setAudio] = useState<AudioData | null>(null);
   const [linked, setLinked] = useState(false);
@@ -270,6 +277,7 @@ function CastReceiver() {
         ref={visualizerRef}
         audioData={audio}
         settings={settings}
+        output={state?.output}
         seedCount={state?.seedCount ?? 0}
         clearTrigger={state?.clearTrigger ?? 0}
         drainTrigger={state?.drainTrigger ?? 0}

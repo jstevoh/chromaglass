@@ -3,6 +3,8 @@ import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { Info } from './Info';
+import { OutputPanel } from './OutputPanel';
+import type { OutputConfig } from '../lib/outputConfig';
 import { Sheet } from './ui';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -38,6 +40,12 @@ interface SettingsPanelProps {
   /** The house lights. */
   blackout?: boolean;
   onBlackout?: () => void;
+  /** The projector's geometry and grade, and how to change it. */
+  output?: OutputConfig;
+  onOutput?: (next: OutputConfig) => void;
+  onOutputReset?: () => void;
+  /** Whether this machine is keeping its screen awake, and whether it can. */
+  wakeLock?: { supported: boolean; held: boolean };
   /** What to do when a second screen is connected. */
   projectorMode?: 'ask' | 'auto' | 'off';
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
@@ -98,7 +106,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
@@ -910,6 +918,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               A projector on HDMI is a second screen. <span className="text-white/70">Ask</span> offers to send the show there; <span className="text-white/70">Automatic</span> sends it the moment the projector is connected, on your next click or key press (the browser needs one), fullscreen with nothing but the plate on it, and the laptop keeps the controls.{projectorName ? ` Connected now: ${projectorName}.` : ' Chrome asks once for permission to see your screens.'}
             </Info>
           </div>
+        )}
+        {output && onOutput && onOutputReset && (
+          <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} />
         )}
         <Info>
           The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.

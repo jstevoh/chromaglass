@@ -7,6 +7,7 @@ import { DEFAULT_LIQUID_TYPES } from '../types';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
+import { useWakeLock } from '../hooks/useWakeLock';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -175,18 +176,8 @@ export default function RemoteControl() {
   const sliderProps = { onDrag: onSliderDrag, onChange: onSliderChange };
 
   // ── Keep the screen on while linked ──────────────────────────────
-  // A tablet that sleeps mid-song is a dark pad. The wake lock is released
-  // by the OS whenever the page hides; it is asked for again on return.
-  useEffect(() => {
-    if (!connected) return;
-    let lock: { release: () => Promise<void> } | null = null;
-    const wl = (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock;
-    if (!wl) return;
-    const acquire = () => { if (document.visibilityState === 'visible') wl.request('screen').then(l => { lock = l; }).catch(() => {}); };
-    acquire();
-    document.addEventListener('visibilitychange', acquire);
-    return () => { document.removeEventListener('visibilitychange', acquire); lock?.release().catch(() => {}); };
-  }, [connected]);
+  // A tablet that sleeps mid-song is a dark pad.
+  useWakeLock(connected);
 
   // ── The projectionist's pad ──────────────────────────────────────
   // A finger on the pad is a finger on the plate: dragging blows air along

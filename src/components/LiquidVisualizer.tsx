@@ -5,6 +5,8 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
+import { OutputPass } from '../lib/outputPass';
+import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
@@ -101,6 +103,14 @@ interface LiquidVisualizerProps {
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
+  /**
+   * The projector's geometry and grade: flip, corner pin, edge blanking and
+   * output grade. A property of the room rather than of the look, so it
+   * arrives as its own prop instead of riding in `settings` where a preset
+   * file would pick it up and carry someone else's keystone across the
+   * country. Omitted, or identity, and the pass is never built.
+   */
+  output?: OutputConfig;
 }
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
@@ -1873,6 +1883,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
+  output = DEFAULT_OUTPUT,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -1909,6 +1920,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** The camera pass, built the first time a frame asks for it. */
   const cameraRef = useRef<CameraPass | null>(null);
+  /** The output pass: the projector's geometry and grade. Built only if it would change a pixel. */
+  const outputRef = useRef<OutputPass | null>(null);
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
@@ -1945,6 +1958,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
+  /**
+   * The GL context, lost and got back.
+   *
+   * A projector plugged into a running laptop, a Mac switching between its
+   * integrated and discrete GPU, a driver that resets under load: the browser
+   * takes the context away and every texture, buffer and program with it. The
+   * default behaviour is that the canvas stays black for good and only a
+   * reload brings it back — which mid-set also loses the plate, the cue list
+   * and the sequencer's place. So the loss is caught instead: the GPU half of
+   * the solver is dropped without a readback (`dropGpu`, which exists for
+   * exactly this), and because the dye field lives in the CPU arrays as well,
+   * the plate survives. `glEpoch` then rebuilds every GL object against the
+   * new context and the show carries on where it was.
+   */
+  const glLostRef = useRef(false);
+  const [glLost, setGlLost] = useState(false);
+  const [glEpoch, setGlEpoch] = useState(0);
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -1973,6 +2003,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
+  const outputCfgRef = useRef(output);
+  outputCfgRef.current = output;
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
   const engineStatusRef = useRef<EngineStatus | null>(null);
   const engineStatusAtRef = useRef(0);
@@ -2306,6 +2338,45 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
     }
   }, [settings.layerCount]);
+
+  // The context, lost and restored. This effect owns only the listeners, so
+  // it outlives the rebuild it triggers: attaching them inside the setup
+  // effect would tear the 'restored' listener down in the same tick that
+  // handles it.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const lost = (e: Event) => {
+      // Without preventDefault the browser never sends 'webglcontextrestored',
+      // and there is nothing to recover from.
+      e.preventDefault();
+      glLostRef.current = true;
+      setGlLost(true);
+      // Every GL object died with the context. Dropping rather than detaching
+      // skips the readback (which would read from a dead context) and leaves
+      // the CPU arrays — the plate itself — untouched.
+      for (const fluid of fluidsRef.current) fluid.dropGpu();
+      webGLRef.current = null;
+      cameraRef.current = null;
+      outputRef.current = null;
+      governorRef.current = null;
+    };
+    const restored = () => {
+      glLostRef.current = false;
+      setGlLost(false);
+      // The context may come back on different hardware — a Mac that has just
+      // switched GPUs is one of the ways it is lost in the first place — so
+      // the float-render-target probe is run again rather than trusted.
+      gpuSupportedRef.current = null;
+      setGlEpoch(n => n + 1);
+    };
+    canvas.addEventListener('webglcontextlost', lost as EventListener);
+    canvas.addEventListener('webglcontextrestored', restored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', lost as EventListener);
+      canvas.removeEventListener('webglcontextrestored', restored);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3930,6 +4001,9 @@ void main() {
     let animationFrameId: number;
 
     const render = () => {
+      // The context is gone and not back yet. Keep the loop alive but touch
+      // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
+      if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
       const workStart = performance.now();
       let frameS = 0;
       const currentAudioData = audioDataRef.current;
@@ -5190,6 +5264,17 @@ void main() {
           const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
           if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
           const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
+
+          // ── The projector, last ────────────────────────────────
+          // Flip, corner pin, blanking and grade. Built the first frame it
+          // would change anything, and dropped again when the operator resets
+          // it, so the common case — no projector, nothing set — never pays
+          // for the extra target or the extra draw.
+          const outCfg = outputCfgRef.current;
+          const wantOut = !outputIsIdentity(outCfg);
+          if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
+          else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
+          const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
           glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
           glCtx.uniform1f(uLocs['u_grainMix'], fluidsRef.current[0]?.gpu?.grainMix ?? 0);
           glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
@@ -5197,6 +5282,8 @@ void main() {
           glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
           if (cam) {
             cam.bindTarget(canvas.width, canvas.height);
+          } else if (out) {
+            out.bindTarget(canvas.width, canvas.height);
           } else {
             glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
             glCtx.viewport(0, 0, canvas.width, canvas.height);
@@ -5215,8 +5302,9 @@ void main() {
               filmic: 1,
               vignette: 0.6,
               grain: 0.6,
-            });
+            }, out ? out.fbo : null);
           }
+          if (out) out.draw(canvas.width, canvas.height, outCfg);
         }
       }
 
@@ -5248,6 +5336,10 @@ void main() {
         film: filmRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
+        /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
+        outputPass: outputRef.current,
+        outputConfig: outputCfgRef.current,
+        glLost: glLostRef.current,
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
@@ -5270,9 +5362,11 @@ void main() {
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
 
-      // Clean up WebGL resources
+      // Clean up WebGL resources. A context that is already lost took them
+      // all with it, so there is nothing to delete and the calls would be
+      // no-ops at best; `webGLRef` is nulled by the loss handler either way.
       const glr = webGLRef.current;
-      if (glr) {
+      if (glr && !glr.gl.isContextLost()) {
         const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs, velTextures: velTexs } = glr;
         for (const fluid of fluidsRef.current) fluid.detachGpu();
         for (const fbo of glr.packFbos.values()) glCtx.deleteFramebuffer(fbo);
@@ -5283,10 +5377,12 @@ void main() {
         glCtx.deleteProgram(prog);
         cameraRef.current?.dispose();
         cameraRef.current = null;
+        outputRef.current?.dispose();
+        outputRef.current = null;
         webGLRef.current = null;
       }
     };
-  }, [noise2D, seedCount]);
+  }, [noise2D, seedCount, glEpoch]);
 
   return (
     <div
@@ -5324,6 +5420,17 @@ void main() {
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
+      {/*
+        A caption rather than a black rectangle. The recovery is automatic and
+        usually takes well under a second, but a projector that goes dark with
+        no explanation is the worst thing that can happen to an operator in
+        front of a room: this says the machine knows, and is coming back.
+      */}
+      {glLost && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="gl-lost">
+          <span className="font-mono text-[11px] tracking-widest text-white/40">rebuilding the plate…</span>
+        </div>
+      )}
     </div>
   );
 });

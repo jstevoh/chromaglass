@@ -12,6 +12,7 @@
  */
 
 import type { VisualizerSettings } from '../types';
+import type { OutputConfig } from './outputConfig';
 
 /** The BroadcastChannel a popup receiver listens on (same origin, same machine). */
 export const CAST_CHANNEL = 'chromaglass-cast';
@@ -41,6 +42,16 @@ export interface CastState {
   presetSeq: number;
   /** The user's palette lock as palette indices, or null. */
   harmonyLock: number[] | null;
+  /**
+   * The projector's geometry and grade.
+   *
+   * A network display or a Chromecast runs its own copy of the solver and
+   * draws its own frames, so the corner pin the operator set on the laptop
+   * has to travel with the rest of the state or that screen alone comes out
+   * unsquared. (The HDMI path needs none of this: it mirrors a canvas that
+   * has already been through the output pass.)
+   */
+  output?: OutputConfig;
 }
 
 export type CastMessage =
