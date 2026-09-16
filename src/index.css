@@ -191,11 +191,20 @@
  * that means "the house lights", not "a parameter". Touch doubles the track
  * and handle, because a thumb on an iPad is not a mouse.
  */
+/*
+  The grab strip is taller than the handle it draws.
+
+  The handle is 22px and the element used to be 22px with it, which made the
+  six controls a hand rides in a dark room 22px of target — under the 24px
+  floor the legibility gate sets, and caught by it. The strip the desk
+  replaced gave them 44. The visible design does not change: an 8px track and
+  a 22px handle, centred in 32px you can actually hit.
+*/
 .ride-slider {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  height: 22px;
+  height: 32px;
   width: 100%;
 }
 .ride-slider::-webkit-slider-runnable-track {
@@ -214,7 +223,7 @@
   -webkit-appearance: none;
   appearance: none;
   height: 22px; width: 22px;
-  margin-top: -7px;
+  margin-top: -7px;   /* centres the 22px handle on the 8px track */
   border-radius: 9999px;
   background: #FAFAFA;
   box-shadow: 0 1px 3px rgba(0,0,0,.6);
