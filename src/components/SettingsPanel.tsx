@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, Info as InfoIcon } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -97,6 +97,42 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
+/**
+ * The long explanation, folded away until it is asked for.
+ *
+ * Every one of these sections used to open with a paragraph. They are worth
+ * keeping — several carry the one fact that stops a control being used wrongly,
+ * like pointing the room camera at the floor rather than at the screen — but
+ * together they were 722 words sitting permanently between a projectionist and
+ * the sliders, and they are most of why the panel ran to eight screens. The
+ * Room's was 198 words, directly above a fader someone wants during a song.
+ *
+ * So the prose stays and the ⓘ is how you ask for it.
+ */
+function Info({ children, label = 'What this does' }: { children: React.ReactNode; label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5 min-h-[28px] text-[11px] transition-colors ${
+          open ? 'text-white/70' : 'text-white/35 hover:text-white/70'
+        }`}
+        aria-expanded={open}
+        data-info="toggle"
+      >
+        <InfoIcon size={13} />
+        <span className="uppercase tracking-wider font-semibold">{label}</span>
+      </button>
+      {open && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55" data-info="body">
+          {children}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
@@ -108,6 +144,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     return () => clearInterval(id);
   }, [getLiveEngineStatus]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
+  /** Which half of the panel is showing. Perform first: it is what a show needs. */
+  const [tab, setTab] = useState<'perform' | 'setup'>('perform');
 
   return (
     <motion.div
@@ -124,12 +162,35 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </button>
       </div>
 
+      {/*
+        Two tabs, because eight screens of scroll is not a control surface.
+        Perform holds what a hand reaches for between songs; Setup holds what
+        is decided once — the audio device, the room camera, the solver grid,
+        the physics that define a look rather than ride it.
+      */}
+      <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/10" role="tablist">
+        {([['perform', 'Perform'], ['setup', 'Setup']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`flex-1 rounded-lg py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
+              tab === id ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+            data-testid={`settings-tab-${id}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* The presets live on the title, not here. One menu opened from the
           plate's own name is where a projectionist already looks for them,
           and it carries saving and loading too; a second copy buried in a
           scrolling panel was one more place to keep in step. */}
       {/* Sound Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Input
         </h3>
@@ -171,9 +232,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               <option value="">Default microphone</option>
               {audioInputs.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
-            <p className="text-[10px] leading-relaxed opacity-40">
+            <Info>
               On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
-            </p>
+            </Info>
           </div>
         )}
 
@@ -225,9 +286,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={5}
           onChange={(v: number) => onUpdate({ beatLead: v })}
         />
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+        <Info>
           A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
-        </p>
+        </Info>
 
         {/* A new song, a new look */}
         <div className="flex flex-col gap-2 mb-4 mt-2">
@@ -247,9 +308,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </button>
             ))}
           </div>
-          <p className="text-[10px] leading-relaxed opacity-40">
+          <Info>
             A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
-          </p>
+          </Info>
         </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
@@ -284,7 +345,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Audio Mappings Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Mappings
         </h3>
@@ -313,7 +374,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Light Show Look Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Palette size={12} /> Light Show Look
         </h3>
@@ -450,13 +511,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Show Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Clapperboard size={12} /> Show
         </h3>
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+        <Info>
           How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the mirror rig and round dish of the projected clock face. The Show Sequencer scripts these over a song.
-        </p>
+        </Info>
         <Slider
           label="Hue Journey (min/step)"
           value={settings.hueJourney ?? 0}
@@ -481,9 +542,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ fingering: v })}
         />
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+        <Info>
           A press (the tool, the pad, a kick with Beat Squeeze) breaks into radial fingers instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
-        </p>
+        </Info>
         <Slider
           label="Oil Beads"
           value={settings.beads ?? 0}
@@ -542,19 +603,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ dishSpread: v })}
         />
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4 -mt-2">
+        <Info>
           Each layer its own dish, spread apart on a black screen the way two or three projectors overlap: the lead plate large and right of centre, the second smaller at the left.
-        </p>
+        </Info>
       </section>
 
       {/* Camera Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Aperture size={12} /> Camera
         </h3>
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+        <Info>
           The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
-        </p>
+        </Info>
         <div className="flex flex-col gap-2 mb-4">
           <div className="text-xs font-bold uppercase tracking-widest opacity-70">Render Style</div>
           <div className="grid grid-cols-2 gap-1">
@@ -599,13 +660,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Lamp Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Lightbulb size={12} /> Lamp
         </h3>
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+        <Info>
           One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
-        </p>
+        </Info>
         <Slider
           label="Light Play"
           value={settings.lightPlay ?? 0}
@@ -649,13 +710,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* The Room Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Video size={12} /> The Room
         </h3>
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+        <Info>
           The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
-        </p>
+        </Info>
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => onSceneToggle?.(!sceneOn)}
@@ -769,9 +830,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             </button>
           </div>
           {(settings.sceneMappings ?? []).length === 0 ? (
-            <p className="text-[10px] leading-relaxed opacity-40">
+            <Info>
               Nothing yet. A row is a feature of the room, a control, and how far it moves it — a floor filling up can open the turbulence, a crowd going still can slow the plate, someone crossing left to right can walk the lamp across with them.
-            </p>
+            </Info>
           ) : (
             <div className="flex flex-col gap-2">
               {(settings.sceneMappings ?? []).map((m, i) => (
@@ -844,13 +905,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ sceneImpact: v })}
           disabled={!sceneOn ? 'off' : (settings.sceneMappings ?? []).length === 0 && 'no rows'}
         />
-        <p className="text-[10px] leading-relaxed opacity-40">
+        <Info>
           <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Mirror</span> for a camera facing the room, so a hand moved left moves the dye left.
-        </p>
+        </Info>
       </section>
 
       {/* Projectors Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Projector size={12} /> Projectors
         </h3>
@@ -869,14 +930,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 </button>
               ))}
             </div>
-            <p className="text-[10px] leading-relaxed opacity-40">
+            <Info>
               A projector on HDMI is a second screen. <span className="text-white/70">Ask</span> offers to send the show there; <span className="text-white/70">Automatic</span> sends it the moment the projector is connected, on your next click or key press (the browser needs one), fullscreen with nothing but the plate on it, and the laptop keeps the controls.{projectorName ? ` Connected now: ${projectorName}.` : ' Chrome asks once for permission to see your screens.'}
-            </p>
+            </Info>
           </div>
         )}
-        <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+        <Info>
           The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.
-        </p>
+        </Info>
         <Slider
           label="Lumia"
           value={settings.lumia ?? 0}
@@ -986,7 +1047,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Simulation Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation
         </h3>
@@ -1015,17 +1076,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="768">GPU · 768² (heavy)</option>
             <option value="cpu">CPU · 192²</option>
           </select>
-          <p className="text-[10px] leading-relaxed opacity-40">
+          <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
             Auto measures the frame rate and picks the largest grid this machine holds at 60 fps
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
-          </p>
+          </Info>
         </div>
       </section>
 
       {/* Macro Closeup Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -1126,7 +1187,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Squish Plate Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sliders size={12} /> Squish Plate
         </h3>
@@ -1181,7 +1242,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Heat Slide Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Thermometer size={12} /> Heat Slide
         </h3>
@@ -1220,7 +1281,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Manual Interaction Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -1243,7 +1304,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Fluid Physics Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
@@ -1282,7 +1343,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Automation Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sparkles size={12} /> Automation
         </h3>
@@ -1297,7 +1358,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Mixer Section */}
-      <section className="mb-8">
+      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Layers size={12} /> Multi-Layer Mixer
         </h3>
