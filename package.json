@@ -40,6 +40,7 @@
     "desk": "esbuild scripts/desk.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/desk.mjs && node node_modules/.cache/desk.mjs",
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "dye": "npm run build && node scripts/dye.mjs",
+    "sw": "npm run build && node scripts/sw.mjs",
     "qa:gpu": "QA_GPU=mid npm run qa"
   },
   "dependencies": {

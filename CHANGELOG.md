@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a blank screen on the live site after a deploy
+- The build itself was fine: it rendered the whole desk in a clean browser at every
+  width from 390px to 2560px. What was not fine was what a *returning* browser had
+  stored — and no harness had ever looked at that, because every harness runs in a
+  fresh context where no service worker exists
+- Firebase Hosting rewrites anything that does not match a file to `/index.html`, which
+  is what makes deep links work. It applies to `/assets/` too, so a chunk from a
+  previous deploy does not 404 after the next one — measured against the live site,
+  `GET /assets/App-DOESNOTEXIST.js` returns **200, `text/html`, 1320 bytes**
+- The service worker cached `/assets/**` cache-first and stored anything with `res.ok`,
+  so a stale page asking for its old chunk wrote **HTML under a `.js` URL**. The cache
+  name was a constant unchanged since the worker landed, and `activate` only deletes
+  caches whose *name* differs, so that entry was permanent. Reproduced against the
+  deployed worker before changing anything
+- The app is one lazy import behind a `<Suspense>` whose fallback is a black rectangle
+  the size of the window, and **nothing caught a rejected import**. So: black screen,
+  every reload, for good
+- A 200 of HTML under a script URL is a file that is gone. It is never cached now, and
+  never served from the cache if an older worker left one there; the cache name is
+  bumped so v1's contents are dropped on activate
+- And a boot failure is no longer silent. A chunk that will not load clears the caches,
+  unregisters the worker and reloads once; if a clean copy still cannot start, the page
+  says what went wrong and offers a button rather than staying black. A chunk that
+  simply never arrives turns into the same button after eight seconds
+
+### Added — `npm run sw`, which would have caught it
+- Serves the build behind a stand-in for Firebase — static files, everything else
+  rewritten to index.html with 200, which is the one property of the host that matters
+  here — then checks that a rewritten page is never written to the cache under a script
+  URL, and that a chunk which is genuinely gone puts a readable message and a way out on
+  the screen instead of the black fallback
+
+
 ### Fixed — the plate took no brush at all
 - The desk is `fixed z-10` and its preview is a transparent hole in it; the plate was
   `fixed` with no z-index. So the plate showed *through* the hole while the desk stayed
