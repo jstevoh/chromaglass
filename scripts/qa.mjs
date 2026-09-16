@@ -155,6 +155,12 @@ const firstVisible = (testId) => page.getByTestId(testId).first();
   inside the MIDI sheet, where it ended a run at 25 of 27 with a 60-second
   timeout. Three sightings is a property of the environment, not of three
   controls, so every click here goes through this.
+
+  Both branches scroll first, which the locator branch did not at first. That
+  is the one thing `locator.click()` was doing for free, and dropping it cost
+  two checks: a control below the fold in a scrolling sheet had its
+  coordinates taken where it actually sat, well outside the visible box, and
+  the click landed on whatever was at that point instead.
 */
 const clickOn = async (target) => {
   const box = typeof target === 'string'
@@ -170,7 +176,9 @@ const clickOn = async (target) => {
         const r = el.getBoundingClientRect();
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
       }, target)
-    : await target.boundingBox().then(b => (b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : null));
+    : await target.scrollIntoViewIfNeeded()
+        .then(() => target.boundingBox())
+        .then(b => (b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : null));
   if (!box) throw new Error(`nothing to click: ${typeof target === 'string' ? target : 'locator'}`);
   await page.mouse.click(box.x, box.y);
 };
