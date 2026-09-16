@@ -157,13 +157,30 @@ try {
   check('the preset menu can still save and load a look',
     /save/i.test(menuText) && /load/i.test(menuText));
   // Apply one and make sure the app survives having its whole look replaced.
+  //
+  // Picking from the menu only *cues* a look now: it waits in the cue bar as
+  // CUED against ON STAGE and reaches the plate on Go, over a crossfade. That
+  // is right for a desk and a trap for a script, so this drives the cue the way
+  // a projectionist does — set the fade to a cut, press Go — and then reads the
+  // settings back. Checking that the click happened is not checking that the
+  // look landed: before this, a preset that never reached the glass passed.
   const crowd = menu.locator('button', { hasText: /Crowd Plate/i }).first();
   if (await crowd.count()) {
     await crowd.click();
-    await settle(2000);
-    check('a preset can be applied', true);
+    await settle(600);
+    const cued = await firstVisible('cue-armed').count();
+    if (cued) {
+      await firstVisible('cue-fade').selectOption('0');
+      await firstVisible('cue-go').click();
+    }
+    await settle(2500);
+    // The name on the title is the app's own answer to "what is on the plate",
+    // so it is what the check reads — not the fact that a click happened.
+    const nowOn = await firstVisible('preset-title-button').innerText().catch(() => '');
+    check('a preset reaches the plate', /crowd plate/i.test(nowOn),
+      `${cued ? 'cued, then Go' : 'applied straight'} → ${nowOn.replace(/\s+/g, ' ').trim() || '(no name on the title)'}`);
   } else {
-    check('a preset can be applied', false, 'Crowd Plate not in the menu');
+    check('a preset reaches the plate', false, 'Crowd Plate not in the menu');
   }
   await page.keyboard.press('Escape');
   await settle(400);
