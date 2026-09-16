@@ -368,23 +368,42 @@ try {
     return da > 0 && db > 0 ? num / Math.sqrt(da * db) : 0;
   };
 
+  // Paint the plate lopsided first.
+  //
+  // A flip can only be seen against something that is not already symmetric,
+  // and whether a liquid plate happens to be is luck: one run measured an
+  // asymmetry of 0.02 and the gate correctly refused to certify a flip it
+  // could not see — which is the right behaviour for the check and useless
+  // behaviour for a gate, since it fails on the plate's mood rather than on a
+  // defect. So the condition is made rather than waited for, by reaching
+  // through the debug hook and putting dye down one side of the plate. A back
+  // door, deliberately: it is setting up the test, not performing it.
+  await page.evaluate(() => {
+    const fluid = window.chromaglassDebug?.().fluids?.[0];
+    if (!fluid) return;
+    for (let i = 0; i < 400; i++) {
+      const x = 12 + Math.random() * 60;          // the left third of a 192 grid
+      const y = 20 + Math.random() * 150;
+      fluid.addDensity(Math.floor(x), Math.floor(y), 2.5, 1, 0.2, 0.1);
+    }
+  });
+  await withOutput({ corners: pinnedLeft });
+  const pinnedAgain = await gridOf();
+
   await withOutput({ corners: pinnedLeft, flipX: true });
   const flipped = await gridOf();
   const flippedOutside = meanOver(flipped, x => x > 0.56);
   check('rear projection leaves the pinned quad where it was', flippedOutside < 0.004, `mean ${flippedOutside.toFixed(4)}`);
 
-  const A = profileOf(pinned, 0.02, 0.48);
+  const A = profileOf(pinnedAgain, 0.02, 0.48);
   const B = profileOf(flipped, 0.02, 0.48);
   const asym = 1 - corr(A, A.slice().reverse());
   const direct = corr(A, B);
   const reversed = corr(A, B.slice().reverse());
-  if (asym < 0.15) {
-    check('the plate is asymmetric enough to tell a flip from no flip', false,
-      `asymmetry ${asym.toFixed(3)} — the profiles are near-symmetric, so the flip gate would mean nothing`);
-  } else {
-    check('rear projection reverses the picture inside it', reversed > direct,
-      `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
-  }
+  check('the plate is lopsided enough to tell a flip from no flip', asym >= 0.15,
+    `asymmetry ${asym.toFixed(3)}`);
+  check('rear projection reverses the picture inside it', reversed > direct,
+    `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
 
   // A keystone: the top edge pulled in on both sides. The corners themselves
   // must go dark while the middle of the frame does not.

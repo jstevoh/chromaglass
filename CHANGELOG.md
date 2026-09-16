@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the wall, and the things that stop a show going dark on it
+
+Six findings from reading the app against the history and craft of liquid light
+shows, and against what a projectionist actually does on a show night.
+
+- **A lost GPU comes back.** Plugging a projector into a running laptop, a Mac
+  switching between its integrated and discrete GPU, a driver resetting under
+  load: the browser takes the WebGL context away and everything in it, and
+  nothing was listening. The canvas stayed black for good and the only fix was
+  a reload, which mid-set also loses the plate, the cue list and the
+  sequencer's place. Now caught and rebuilt, with the look laid again on the
+  other side. The first version restored the machinery onto an empty plate —
+  with the GPU solver the dye lives in GPU textures and `dropGpu` throws it
+  away rather than stall on a dead context — which on a wall is the same black
+  rectangle as not recovering at all. `npm run qa` takes the context away with
+  `WEBGL_lose_context` and checks the only thing an audience can see
+- **Nothing dims, sleeps or screensaves.** The phone remote held a wake lock;
+  the laptop actually driving the projector did not, and the README's answer
+  was to turn off sleep by hand. It needs a secure context, so the panel says
+  plainly when an address cannot have one rather than promising something that
+  never happened
+- **The Wall** (Settings → Projectors) — rear-projection mirror, a four-corner
+  keystone, feathered edge blanking, and an output gain and gamma for the room.
+  Load-in work that every liquid light show has done since 1965, and the one
+  part of the craft the app had no answer for except "capture the window in OBS
+  and fix it in Resolume". It is a property of the venue, not of a look: kept
+  on the machine, never written into a preset, and out of reach of every fader.
+  `npm run wall` measures it — every gate a statement about which pixels are
+  black, so they hold whatever the plate happens to be doing
+- **Three flashes a second, and no more.** Nothing here was built to strobe and
+  the code says so in several places, but that was a habit rather than a
+  guarantee: any audio band can be mapped onto any setting, `dimmer` is one of
+  them, and a bass-driven master brightness at 150 bpm is a 2.5 Hz full-field
+  flash nobody decided on. A probe reads back what actually reached the screen;
+  the guard counts flashes by the clinical rule and scales the master dimmer
+  only when there are too many. Counting rather than smoothing is the design: a
+  single hard hit on a kick is left completely alone
+- **A tempo that is not a guess** — MIDI clock on the port the faders are
+  already on (0xF8 is one byte and `parseMidi` wanted two, so clock had been
+  falling on the floor all along), four taps, or a typed bpm. Each sets the bar
+  as well as the tempo, which is the half that matters
+- **Shift layers on the controller**, so nine faders reach forty settings; and
+  Go, Back, cue stepping and Tap Tempo as actions, so the desk's safe way to
+  change a look in front of a room is finally something a pad can do
+
+### Added — a first visit that shows what this is
+- `audioSource` started at `'none'` and nothing opened on its own — a good
+  decision about permissions with the side effect of landing every stranger on
+  a plate with nothing driving it. The synthesised band now starts on the first
+  gesture: silent, no device, no permission. "Never chosen" is now a different
+  question from "chose silence", which is what makes that safe
+
+### Added — checks before a deploy, and pictures in the README
+- The deploy workflow ran `tsc` and `vite build` and nothing else, so the six
+  numeric harnesses and the browser walkthrough were run by nobody but a person
+  remembering to. Since `npm run show` pulls main on show night, that added up
+  to: an untested main is what turns up at the venue. `checks.yml` now runs
+  them on every pull request and gates every deploy
+- They could not have run there as they were: each hard-coded the sandbox's
+  Chromium path, so anywhere else the launch failed rather than falling back to
+  the browser Playwright had just downloaded
+- `npm run shots` drives the app and reads its canvas (a screenshot never
+  resolves over a canvas that repaints sixty times a second) and writes the
+  frames the README had never had
+
+
 ### Fixed — a blank screen on the live site after a deploy
 - The build itself was fine: it rendered the whole desk in a clean browser at every
   width from 390px to 2560px. What was not fine was what a *returning* browser had
