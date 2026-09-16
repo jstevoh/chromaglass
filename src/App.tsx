@@ -706,9 +706,29 @@ export default function App() {
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   /** What the desk should say is on stage. */
+  /**
+   * Is there room for a desk?
+   *
+   * Perform puts a preview and a control column side by side, which needs a
+   * laptop's width. On a narrow window the two columns leave the plate a few
+   * pixels and the whole thing is unusable — found by the QA harness, which
+   * happened to run the desk check at phone width after the small-screen
+   * check had resized the window, and reported a 420px preview in a 420px
+   * page. Below this, Perform quietly behaves as Design; a phone already has
+   * a control surface of its own in the remote.
+   */
+  const [roomForDesk, setRoomForDesk] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 1024));
+  useEffect(() => {
+    const onResize = () => setRoomForDesk(window.innerWidth >= 1024);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const performing = deskMode === 'perform' && roomForDesk;
+
   // The hole in the desk layout the plate is painted over. In Design there is
   // no hole and the plate fills the window, as it always has.
-  const preview = usePreviewFrame(deskMode === 'perform');
+  const preview = usePreviewFrame(performing);
 
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
@@ -1671,7 +1691,9 @@ export default function App() {
                     deskMode === 'perform' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={deskMode === 'perform'
-                    ? 'Perform: the plate is a preview and the controls have the room. Click for Design.'
+                    ? (roomForDesk
+                      ? 'Perform: the plate is a preview and the controls have the room. Click for Design.'
+                      : 'Perform needs a wider window — showing Design until there is room for both columns.')
                     : 'Design: the plate fills the window, for building a look. Click for Perform.'}
                   data-testid="desk-mode-button"
                 >
@@ -2093,7 +2115,7 @@ export default function App() {
         The left inset clears the bottles and tools that already float there,
         so nothing has to move house to make room for this.
       */}
-      {deskMode === 'perform' && overlaysVisible && (
+      {performing && overlaysVisible && (
         <div className="fixed inset-0 z-[5] pointer-events-none" data-testid="desk">
           {/*
             The insets clear what already floats over the plate: the bottles

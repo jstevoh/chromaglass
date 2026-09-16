@@ -337,6 +337,10 @@ try {
   // does. (It cannot: `frame` does not appear anywhere in the visualizer's
   // `resize`. This is the check that keeps it that way.)
   {
+    // Back to a laptop first: the small-screen check above leaves the window
+    // at phone width, and the desk deliberately does not lay out there.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await settle(1200);
     const size = () => page.evaluate(() => {
       const c = document.getElementById('liquid-canvas');
       const r = document.querySelector('[data-testid="plate-frame"]').getBoundingClientRect();
