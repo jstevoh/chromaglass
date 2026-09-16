@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Check, SlidersHorizontal } from 'lucide-react';
-import { Button, CueRow, Segmented, Slider, StatusDot, Tag, Toggle } from '../ui';
+import { Button, CueRow, Segmented, Slider, Tag, Toggle } from '../ui';
+import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
 import { LEARNABLE_SETTINGS } from '../../lib/midi';
@@ -92,10 +93,10 @@ interface PerformDeskProps {
   plateRef: Ref<HTMLDivElement>;
   /** The line along the bottom: what it hears, what it runs on, what it is doing. */
   status: { audio: string; engine: string; sequence: string | null; phone: boolean; rec: string | null };
-  dots: { mic: boolean; wall: boolean; midi: boolean; phone: boolean; rec: string | null };
+  dots: DeskDots;
   onSearch: () => void;
-  mode: 'perform' | 'design' | 'sequence';
-  onMode: (m: 'perform' | 'design' | 'sequence') => void;
+  mode: DeskMode;
+  onMode: (m: DeskMode) => void;
   breadcrumb: ReactNode;
   onFreeze: () => void;
   /** Whether the solver is already stopped, so the button can say so. */
@@ -115,31 +116,14 @@ export function PerformDesk(p: PerformDeskProps) {
       style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
       data-testid="perform-desk">
 
-      {/* ── Top bar ─────────────────────────────────────────── */}
-      <header className="col-span-3 flex items-center justify-between border-b border-border px-4">
-        <div className="flex items-center gap-2 text-[13px] font-medium">{p.breadcrumb}</div>
-        <Segmented
-          value={p.mode}
-          options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Sequence']] as const}
-          onChange={p.onMode}
-          height={32}
-          testId="mode-segmented"
-        />
-        <div className="flex items-center gap-3">
-          <StatusDot on={p.dots.mic} label="Mic" testId="dot-mic" />
-          <StatusDot on={p.dots.wall} label="Wall" testId="dot-wall" />
-          <StatusDot on={p.dots.midi} label={p.midiName ?? 'MIDI'} testId="dot-midi" />
-          <StatusDot on={p.dots.phone} label="Phone" testId="dot-phone" />
-          {p.dots.rec && <StatusDot on tone="live" label={`Rec ${p.dots.rec}`} testId="dot-rec" />}
-          <button
-            onClick={p.onSearch}
-            className="ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong px-3 text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
-            data-testid="search-chip"
-          >
-            Search <span className="font-mono text-[11px] text-faint">⌘K</span>
-          </button>
-        </div>
-      </header>
+      <DeskHeader
+        breadcrumb={p.breadcrumb}
+        mode={p.mode}
+        onMode={p.onMode}
+        dots={p.dots}
+        midiName={p.midiName}
+        onSearch={p.onSearch}
+      />
 
       {/* ── Cues ────────────────────────────────────────────── */}
       <aside className="flex min-h-0 flex-col border-r border-border" data-testid="cue-list">

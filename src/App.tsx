@@ -9,6 +9,8 @@ import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
+import { DesignDesk } from './components/desk/DesignDesk';
+import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -67,6 +69,11 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
+/** The letter printed on each tool, and the tool it picks. */
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press',
+};
+
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
 /** Which controls are on the desk's faders. A property of this desk, like the mode. */
 const RIDE_KEYS_KEY = 'chromaglass-ride-keys';
@@ -737,10 +744,20 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const performing = deskMode === 'perform' && roomForDesk;
+  const designing = deskMode === 'design' && roomForDesk;
 
-  // The hole in the desk layout the plate is painted over. In Design there is
-  // no hole and the plate fills the window, as it always has.
-  const preview = usePreviewFrame(performing);
+  /*
+    Below that width neither desk lays out, and the floating overlay UI — the
+    bottle rail, the toolbar, the title bar — is what the app shows instead.
+    It is not legacy so much as the narrow-screen surface: a phone already has
+    a control surface of its own in the remote, and a small laptop window gets
+    the one that does not need three columns.
+  */
+  const deskUp = roomForDesk;
+
+  // The hole in the desk layout the plate is painted over. Both desks leave
+  // one; without a desk the plate fills the window, as it always has.
+  const preview = usePreviewFrame(deskUp);
 
   /**
    * How long the look on the wall has been up.
@@ -758,6 +775,13 @@ export default function App() {
     const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
     return () => clearInterval(id);
   }, [deskMode]);
+
+  /** A look that has drifted from the preset it was pinned to. */
+  const lookEdited = pinnedPresetId != null && activePresetId == null;
+  const pinnedLookName = useMemo(() => {
+    if (!pinnedPresetId) return null;
+    return allPresets.find(p => p.id === pinnedPresetId)?.name ?? null;
+  }, [allPresets, pinnedPresetId]);
 
   /**
    * The cue list: the looks, in order, each carrying two of its own dyes so a
@@ -1471,18 +1495,33 @@ export default function App() {
         setShowPalette(v => !v);
         return;
       }
+      // The bench's two: save what you have made, send it to the wall.
+      if (designing && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        setShowSave(true);
+        return;
+      }
+      if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        void startCast('window');
+        return;
+      }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!deskUp) return;          // the narrow-screen UI has its own keys
 
-      // The rest are the desk's, and only while the desk is up: in Design the
-      // plate has the window and Space should not fire a look change.
+      // The tools are the same letters on both desks; Design has all seven.
+      const tool = TOOL_KEYS[e.key.toLowerCase()];
+      if (tool && (designing || tool === 'dropper' || tool === 'blow' || tool === 'press')) {
+        setActiveTool(tool);
+        return;
+      }
+      if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
+
+      // The rest are the show's, and only while the desk is up: on the bench
+      // Space should not fire a look change at a room.
       if (!performing) return;
-
       if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
       if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
-      if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
-      if (e.key === 'd' || e.key === 'D') { setActiveTool('dropper'); return; }
-      if (e.key === 'w' || e.key === 'W') { setActiveTool('blow'); return; }
-      if (e.key === 'p' || e.key === 'P') { setActiveTool('press'); return; }
       // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
       // and Space sends it, which is how a lighting desk has always worked.
       if (e.key >= '1' && e.key <= '9') {
@@ -1492,7 +1531,23 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [performing, goLook, revertLook, cueLook, allPresets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [performing, designing, deskUp, goLook, revertLook, cueLook, allPresets]);
+
+  /** The save sheet, opened from the bench and from ⌘S. */
+  const [showSave, setShowSave] = useState(false);
+
+  /** The lamps in both desks' headers, and the line along the bottom. */
+  const deskDots = useMemo(() => ({
+    mic: audioSource !== 'none',
+    wall: isCasting,
+    midi: midi.enabled,
+    phone: remoteLink.status === 'connected',
+    rec: recorder.recording ? String(recorder.seconds) : null,
+  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds]);
+
+  const deskAudioLine = audioSource === 'none' ? 'silent'
+    : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`;
 
   /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
   const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
@@ -1612,7 +1667,7 @@ export default function App() {
         two places is a control you cannot trust.
       */}
       <AnimatePresence>
-        {showControls && !showSettings && !performing && (
+        {showControls && !showSettings && !deskUp && (
           <>
             {/* ── Left Controls ───────────────────────────────── */}
             <motion.div
@@ -2077,7 +2132,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
-      {!performing && (
+      {!deskUp && (
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
         <button
           onClick={() => setIsMinimized(!isMinimized)}
@@ -2222,7 +2277,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
-      {!performing && (
+      {!deskUp && (
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
           <h1 className="text-2xl font-light tracking-tighter italic font-serif">
@@ -2430,8 +2485,7 @@ export default function App() {
           }}
           plateRef={preview.ref}
           status={{
-            audio: audioSource === 'none' ? 'silent'
-              : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`,
+            audio: deskAudioLine,
             engine: engineStatus?.label ?? '',
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
@@ -2439,13 +2493,7 @@ export default function App() {
             phone: remoteLink.status === 'connected',
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
           }}
-          dots={{
-            mic: audioSource !== 'none',
-            wall: isCasting,
-            midi: midi.enabled,
-            phone: remoteLink.status === 'connected',
-            rec: recorder.recording ? String(recorder.seconds) : null,
-          }}
+          dots={deskDots}
           onSearch={() => setShowPalette(true)}
           mode={showSequencer ? 'sequence' : 'perform'}
           onMode={(m) => {
@@ -2466,6 +2514,73 @@ export default function App() {
         />
       )}
 
+      {/* ── The bench ──────────────────────────────────────────── */}
+      {/*
+        Design is the same three columns holding the other half of the job:
+        what a look is made of rather than when it goes out. Its plate is a
+        preview and says "not on wall", because the most expensive mistake in
+        this app is building a look on what you think is a rehearsal and
+        finding out a room was watching.
+      */}
+      {designing && overlaysVisible && (
+        <DesignDesk
+          dyeBottles={liquidTypes.filter(l => !l.behaviour)}
+          behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
+          bottleId={selectedLiquidId}
+          onBottle={(id) => { setSelectedLiquidId(id); setActiveTool('dropper'); }}
+          swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
+          dye={selectedLiquid?.color ?? null}
+          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); setActiveTool('dropper'); }}
+          palettes={COLOR_HARMONIES.map((h, i) => ({
+            name: COLOR_HARMONY_NAMES[i],
+            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
+          }))}
+          paletteLock={paletteLock}
+          onPalette={selectPalette}
+          onImageDye={() => fileInputRef.current?.click()}
+          tool={activeTool}
+          onTool={(t) => setActiveTool(t as typeof activeTool)}
+          layer={activeLayer}
+          layers={Math.max(1, settings.layerCount)}
+          onLayer={setActiveLayer}
+          onAddLayer={() => updateSettings({ layerCount: Math.min(3, (settings.layerCount ?? 1) + 1) })}
+          settings={settings}
+          onSetting={updateSettings}
+          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
+          randomiseArmed={luckyArmed}
+          plateRef={preview.ref}
+          lookName={pinnedLookName}
+          edited={lookEdited}
+          onSave={() => setShowSave(true)}
+          onSendToWall={() => { void startCast('window'); }}
+          mode={showSequencer ? 'sequence' : 'design'}
+          onMode={(m) => {
+            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          dots={deskDots}
+          midiName={midi.activeInputName ?? null}
+          onSearch={() => setShowPalette(true)}
+          status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
+        />
+      )}
+
+      {/* The file input the bench's Image dye button reaches for. It lives
+          in the narrow-screen toolbar, which is not rendered under a desk. */}
+      {deskUp && (
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      )}
+
+      {showSave && (
+        <SaveLookSheet
+          suggested={pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          songName={musicIntel.state.track?.title ?? null}
+          onSave={saveCurrentPreset}
+          onClose={() => setShowSave(false)}
+        />
+      )}
+
       {/* ── ⌘K ─────────────────────────────────────────────────── */}
       {showPalette && (
         <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
@@ -2473,7 +2588,7 @@ export default function App() {
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
-        {!performing && (cued || fading > 0 || previousLook.current) && (
+        {!deskUp && (cued || fading > 0 || previousLook.current) && (
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -2500,7 +2615,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && !performing && (
+      {isActive && audioData && !isMinimized && !deskUp && (
         <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },
