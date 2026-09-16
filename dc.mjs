@@ -15,6 +15,7 @@ try {
     const b = await page.evaluate((i) => {
       const el = document.querySelector(`[data-testid="${i}"]`);
       if (!el) return null;
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
       const r = el.getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }, id);

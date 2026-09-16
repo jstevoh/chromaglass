@@ -161,6 +161,12 @@ const clickOn = async (target) => {
     ? await page.evaluate((id) => {
         const el = document.querySelector(`[data-testid="${id}"]`);
         if (!el) return null;
+        // Into view first: a cue list is thirty-two rows in a column that
+        // holds fourteen, so a row's coordinates can be well outside the
+        // visible box and a click there lands on whatever is actually at
+        // that point. "Go names the look it will send" failed on exactly
+        // that, and read as an app bug.
+        el.scrollIntoView({ block: 'center', behavior: 'instant' });
         const r = el.getBoundingClientRect();
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
       }, target)

@@ -5264,7 +5264,16 @@ void main() {
 
   return (
     <div
-      className={`fixed bg-black overflow-hidden ${frame ? 'rounded-xl border border-white/10 transition-[top,left,width,height] duration-300' : 'inset-0 w-full h-full'}`}
+      // No transition on the box.
+      //
+      // It used to glide over 300ms when the plate became a preview, and the
+      // glide does not always run: measured headless, the plate sat at
+      // 0,0,1440,900 — the whole window, over the desk — while its own inline
+      // style already said 288,104,824,708, and turning the transition off
+      // snapped it to the right place instantly. Whatever stalls it, the
+      // failure mode is the entire control surface covered by the plate, and
+      // that is a bad trade for a third of a second of decoration.
+      className={`fixed bg-black overflow-hidden ${frame ? 'rounded-xl border border-white/10' : 'inset-0 w-full h-full'}`}
       style={frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : undefined}
       data-testid="plate-frame"
     >
