@@ -28,7 +28,25 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 
 const PORT = 4178;
-const URL = `http://localhost:${PORT}/`;
+/*
+  The whole suite, on the GPU solver:  QA_GPU=mid npm run qa
+
+  Without it every check here exercises the CPU fallback, because
+  `classifyGpu()` maps SwiftShader and llvmpipe to 'software' and
+  `qualityLadder()` gives that class a ladder with only the CPU rung on it.
+  That is the right policy for a real machine — emulated float render targets
+  are slower than the JavaScript solver — but it means a headless suite tests
+  a renderer nobody runs, which is how four hypotheses about a dye bug were
+  chased on the wrong code path.
+
+  The override is deliberately not the default. Under software rasterisation
+  a 384² plate renders at about six frames a second and every step here
+  queues behind the render loop, so a run that takes minutes on a machine
+  with a GPU takes the best part of an hour without one. Set it where there
+  is a GPU; leave it unset in a sandbox.
+*/
+const GPU = process.env.QA_GPU ?? '';
+const URL = `http://localhost:${PORT}/?debug${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
@@ -187,6 +205,18 @@ try {
 
   const title = await page.title();
   check('the page has a title', !!title && title.length > 0, title);
+
+  // Which solver did this run actually measure? A suite that is green on the
+  // CPU fallback has said nothing about the GPU shaders, and the line above
+  // it would look identical either way.
+  {
+    const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    if (GPU) {
+      check('the GPU solver is the one being measured', /^GPU/.test(engine ?? ''), engine ?? 'no debug hook');
+    } else {
+      console.log(`     solver: ${engine ?? 'unknown'} — set QA_GPU=mid to run this suite on the GPU path`);
+    }
+  }
 
   // ── The toolbar ───────────────────────────────────────────────────
   const buttons = await page.locator('button:visible').count();
