@@ -601,6 +601,53 @@ try {
     }
   }
 
+  // ── The GPU, taken away and given back ────────────────────────────
+  //
+  // A projector plugged into a running laptop, a Mac switching between its
+  // integrated and discrete GPU, a driver resetting under load: the browser
+  // takes the context away and every texture, buffer and program with it. The
+  // default outcome is a canvas that stays black for good, and the only fix a
+  // reload — which mid-set also loses the plate, the cue list and the
+  // sequencer's place.
+  //
+  // `WEBGL_lose_context` is the same event the driver sends, so this is the
+  // real path and not a simulation of it. What is checked is what an audience
+  // would see: the wall is lit before, and it is lit again afterwards.
+  {
+    const litness = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      if (!c) return null;
+      const o = document.createElement('canvas');
+      o.width = 16; o.height = 9;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, 16, 9);
+      const d = x.getImageData(0, 0, 16, 9).data;
+      let sum = 0;
+      for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+      return sum / (16 * 9 * 255);
+    });
+    const before = await litness();
+    check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
+
+    await page.evaluate(() => {
+      const gl = document.querySelector('#liquid-canvas').getContext('webgl2');
+      window.__lose = gl.getExtension('WEBGL_lose_context');
+      window.__lose?.loseContext();
+    });
+    await settle(1500);
+    check('a lost context is noticed and said so',
+      (await page.locator('[data-testid="gl-lost"]').count()) === 1);
+
+    await page.evaluate(() => window.__lose?.restoreContext());
+    // Generous: the rebuild is a whole GL setup and then a plate laid again,
+    // on a machine rasterising in software.
+    let after = 0;
+    for (let i = 0; i < 20 && !(after > 0.01); i++) { await settle(1500); after = await litness(); }
+    check('and the show comes back by itself', after > 0.01, `luminance ${after?.toFixed(3)}`);
+    check('and says nothing is wrong any more',
+      (await page.locator('[data-testid="gl-lost"]').count()) === 0);
+  }
+
   // ── A reload keeps what it should and asks for nothing ────────────
   await page.reload({ waitUntil: 'networkidle' });
   await settle(2500);

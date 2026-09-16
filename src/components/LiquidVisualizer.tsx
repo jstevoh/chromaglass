@@ -1999,6 +1999,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const glLostRef = useRef(false);
   const [glLost, setGlLost] = useState(false);
   const [glEpoch, setGlEpoch] = useState(0);
+  /** The look that is on the plate, so a rebuild can put the same one back. */
+  const livePresetRef = useRef('classic');
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -2122,6 +2124,49 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }
   };
 
+  /**
+   * Clear the plate and lay a preset's look on it: its dye, its liquids, its
+   * palette.
+   *
+   * Pulled out of `applyPreset` because a lost GL context needs exactly this
+   * and nothing else. The registration of a user preset's dyes belongs to
+   * `applyPreset` (it is what the caller is telling us); laying the plate is
+   * the part that has to be repeatable from inside.
+   */
+  const layPlate = (presetId: string) => {
+    for (const fluid of fluidsRef.current) fluid.clearAll();
+    bubblesRef.current.clear();
+    chemRef.current.reset();
+    rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
+    journeyRef.current = { lead: 0, lastAt: -1 };
+    const fluid = fluidsRef.current[0];
+    if (fluid) {
+      const seeded = fluid.seedPreset(presetId, noise2D);
+      const contract = presetContractRef.current;
+      harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
+    }
+    // The Fillmore look is two projectors: the second plate starts with its own wash.
+    if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
+    injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+    plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
+    // The plate is laid with its liquids as well as its dye, rather than
+    // waiting a minute for the automation to dose its way there. Because
+    // `doseLiquid` picks uniformly from the list, the inert entries thin
+    // this out on their own: a plate of `['water', 'water', 'soap']` gets
+    // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
+    if (fluid) for (let i = 0; i < 15; i++) {
+      doseLiquid(fluid, plateLiquidsRef.current,
+        10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+    }
+    drainFrameRef.current = 0;
+    macroCamRef.current.reset();
+    livePresetRef.current = presetId;
+  };
+  /** Through a ref, because the context-loss listener is installed once, above this. */
+  const layPlateRef = useRef(layPlate);
+  layPlateRef.current = layPlate;
+
   useImperativeHandle(ref, () => ({
     drawnRect: () => drawnRectRef.current?.() ?? null,
     injectImage: (imageData: ImageData) => {
@@ -2135,33 +2180,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       else if (extras && !extras.contract) delete PRESET_CONTRACTS[presetId];
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
-      for (const fluid of fluidsRef.current) fluid.clearAll();
-      bubblesRef.current.clear();
-      chemRef.current.reset();
-      rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
-      presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
-      journeyRef.current = { lead: 0, lastAt: -1 };
-      const fluid = fluidsRef.current[0];
-      if (fluid) {
-        const seeded = fluid.seedPreset(presetId, noise2D);
-        const contract = presetContractRef.current;
-        harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
-      }
-      // The Fillmore look is two projectors: the second plate starts with its own wash.
-      if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
-      injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
-      plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
-      // The plate is laid with its liquids as well as its dye, rather than
-      // waiting a minute for the automation to dose its way there. Because
-      // `doseLiquid` picks uniformly from the list, the inert entries thin
-      // this out on their own: a plate of `['water', 'water', 'soap']` gets
-      // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
-      if (fluid) for (let i = 0; i < 15; i++) {
-        doseLiquid(fluid, plateLiquidsRef.current,
-          10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
-      }
-      drainFrameRef.current = 0;
-      macroCamRef.current.reset();
+      layPlateRef.current(presetId);
     },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
@@ -2170,7 +2189,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }),
     adoptPreset: (presetId: string, extras) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
-      // new dyes and injection style take over from here.
+      // new dyes and injection style take over from here. It is still the look
+      // that is live, so a rebuild after a lost context puts this one back and
+      // not the one that was clear-seeded three songs ago.
+      livePresetRef.current = presetId;
       if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
@@ -2386,7 +2408,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       probeRef.current = null;
       flashRef.current.reset();
       flashGainRef.current = 1;
-      governorRef.current = null;
+      // The governor is deliberately *not* dropped. It holds no GL objects, and
+      // the frame between the restore and the rebuild belongs to the render
+      // loop of the effect that is about to be torn down — which reads
+      // `governorRef.current!` and threw "Cannot read properties of null
+      // (reading 'rung')" into the console of a show that had otherwise just
+      // recovered cleanly. The new setup replaces it a moment later anyway.
     };
     const restored = () => {
       glLostRef.current = false;
@@ -2395,6 +2422,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // switched GPUs is one of the ways it is lost in the first place — so
       // the float-render-target probe is run again rather than trusted.
       gpuSupportedRef.current = null;
+      // The plate itself did not survive, and pretending otherwise is how this
+      // shipped nearly broken: with the GPU solver the dye lives in GPU
+      // textures, the CPU arrays are only a downsampled readback of the
+      // *density*, and `dropGpu` throws even that away rather than stall on a
+      // dead context. Measured, the machinery all came back — context, solver,
+      // render loop, no errors — onto a plate with nothing on it, which on a
+      // wall is the same black rectangle as not recovering at all.
+      //
+      // So the look is laid again. It is not the identical plate, and it
+      // cannot be; it is the same look, back within a second, which for
+      // something whose whole claim is that no two shows are the same is the
+      // right kind of loss.
+      layPlateRef.current(livePresetRef.current);
       setGlEpoch(n => n + 1);
     };
     canvas.addEventListener('webglcontextlost', lost as EventListener);

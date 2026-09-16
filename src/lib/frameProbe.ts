@@ -32,7 +32,6 @@ export class FrameProbe {
   private readonly fbo: WebGLFramebuffer;
   private readonly tex: WebGLTexture;
   private readonly slots: { pbo: WebGLBuffer; fence: WebGLSync | null }[];
-  private slot = 0;
   private readonly pixels = new Uint8Array(N * N * 4);
   /** The last mean that came back, 0..1. */
   private lum = 0;
@@ -79,8 +78,36 @@ export class FrameProbe {
   measure(width: number, height: number): void {
     if (!this.ok || width <= 0 || height <= 0) return;
     const gl = this.gl;
-    const cur = this.slots[this.slot];
-    const other = this.slots[this.slot ^ 1];
+
+    // Collect anything the GPU has finished with, first.
+    for (const s of this.slots) {
+      if (!s.fence) continue;
+      const status = gl.clientWaitSync(s.fence, 0, 0);
+      if (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED) continue;
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, s.pbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.pixels);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.deleteSync(s.fence);
+      s.fence = null;
+      let sum = 0;
+      for (let i = 0; i < N * N; i++) {
+        sum += 0.2126 * this.pixels[i * 4] + 0.7152 * this.pixels[i * 4 + 1] + 0.0722 * this.pixels[i * 4 + 2];
+      }
+      this.lum = sum / (N * N * 255);
+      this.everRead = true;
+    }
+
+    // Then start a new read, but only into a buffer nobody is waiting on.
+    //
+    // Writing into a slot whose last read has not come back yet throws that
+    // read away — and the driver says so, loudly, once a frame: "READ-usage
+    // buffer was written, then fenced, but written again before being read
+    // back". On a machine where the reads lag (which is every machine where
+    // the frames are expensive, so exactly the ones that matter) that was most
+    // of them. Skipping a frame costs nothing: this is a question about the
+    // last second, not about this frame in particular.
+    const free = this.slots.find(s => !s.fence);
+    if (!free) return;
 
     // The canvas, reduced to 16x16 by the driver.
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
@@ -89,36 +116,15 @@ export class FrameProbe {
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
 
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, cur.pbo);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, free.pbo);
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-    if (cur.fence) gl.deleteSync(cur.fence);
-    cur.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    free.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     // A fence is not guaranteed ever to signal unless the commands before it
     // have been flushed, so without this the read can simply never land — and
     // a guard that never gets a reading is a guard that silently does nothing.
     gl.flush();
-
-    if (other.fence) {
-      const status = gl.clientWaitSync(other.fence, 0, 0);
-      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, other.pbo);
-        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.pixels);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        gl.deleteSync(other.fence);
-        other.fence = null;
-        let sum = 0;
-        for (let i = 0; i < N * N; i++) {
-          sum += 0.2126 * this.pixels[i * 4] + 0.7152 * this.pixels[i * 4 + 1] + 0.0722 * this.pixels[i * 4 + 2];
-        }
-        this.lum = sum / (N * N * 255);
-        this.everRead = true;
-        this.slot ^= 1;
-      }
-    } else {
-      this.slot ^= 1;
-    }
   }
 
   dispose(): void {
