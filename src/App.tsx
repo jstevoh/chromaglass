@@ -5,6 +5,7 @@ import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
+import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { RideStrip, DEFAULT_RIDE } from './components/RideStrip';
 import { StatusLine } from './components/StatusLine';
@@ -2119,44 +2120,79 @@ export default function App() {
                 role="menu"
                 data-testid="cast-menu"
               >
-                <button
-                  role="menuitem"
-                  onClick={() => { setCastMenu(false); startCast('window'); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
-                  data-testid="cast-window"
-                >
-                  <div className="text-xs font-semibold">Second display</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">A projector on HDMI: opens a window on the second screen showing this very canvas, rendered at the projector's own pixels, filling that screen with no title bar (with the permission; else the next click here fills it). This window keeps the controls and a scaled copy.</div>
-                </button>
-                <div className="px-3 py-2 rounded-lg" data-testid="cast-network">
+                {/*
+                  A line each, and the explanation behind an ⓘ. This menu is
+                  opened while a room waits: three paragraphs of prose is a
+                  thing to read, not a thing to pick from. The one piece of
+                  text that is not prose — the address a projector types in —
+                  stays where it can be copied.
+                */}
+                <div className="flex items-start gap-1">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setCastMenu(false); startCast('window'); }}
+                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
+                    data-testid="cast-window"
+                  >
+                    <div className="text-xs font-semibold">Second display</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">A projector on HDMI.</div>
+                  </button>
+                  <div className="pt-2 pr-1">
+                    <Info label="">
+                      Opens a window on the second screen showing this very canvas, rendered at
+                      the projector's own pixels, filling that screen with no title bar (with the
+                      permission; else the next click here fills it). This window keeps the
+                      controls and a scaled copy.
+                    </Info>
+                  </div>
+                </div>
+
+                <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
                   <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
                   {relay ? (
-                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">
-                      Open this on any browser — a projector, a TV, a tablet — and it shows the show. Same Wi-Fi:
+                    <>
+                      <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
                       {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-white/80 select-all mt-0.5">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
+                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       ))}
                       {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-                        <>
-                          <div className="mt-1">Through the tunnel, from anywhere:</div>
-                          <div className="font-mono text-white/80 select-all mt-0.5">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                        </>
+                        <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       )}
-                      <div className="mt-1">Across buildings or other access points: run <span className="font-mono">npm run tunnel</span> and use the https address it prints, with the same <span className="font-mono">?cast=true&amp;key=…</span>.</div>
-                    </div>
+                      <div className="mt-2">
+                        <Info label="">
+                          Open one of these on a projector, a TV or a tablet and it shows the
+                          show. Across buildings or other access points: run{' '}
+                          <span className="font-mono">npm run tunnel</span> and use the https
+                          address it prints, with the same{' '}
+                          <span className="font-mono">?cast=true&amp;key=…</span>.
+                        </Info>
+                      </div>
+                    </>
                   ) : (
-                    <div className="text-[10px] opacity-50 leading-snug mt-0.5">Needs the show server: run <span className="font-mono">npm run remote</span> and open the show from there, then this lists the address.</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">
+                      Needs the show server: run <span className="font-mono">npm run remote</span>.
+                    </div>
                   )}
                 </div>
-                <button
-                  role="menuitem"
-                  onClick={() => { setCastMenu(false); startCast('device'); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10"
-                  data-testid="cast-device"
-                >
-                  <div className="text-xs font-semibold">Chromecast</div>
-                  <div className="text-[10px] opacity-50 leading-snug mt-0.5">Chrome's device picker. Nest displays take the show directly. A Google TV that does not appear or connect here: open Second display, then Chrome's menu → Cast → the TV → Cast tab, on that window.</div>
-                </button>
+
+                <div className="flex items-start gap-1">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setCastMenu(false); startCast('device'); }}
+                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
+                    data-testid="cast-device"
+                  >
+                    <div className="text-xs font-semibold">Chromecast</div>
+                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">Chrome's device picker.</div>
+                  </button>
+                  <div className="pt-2 pr-1">
+                    <Info label="">
+                      Nest displays take the show directly. A Google TV that does not appear or
+                      connect here: open Second display, then Chrome's menu → Cast → the TV →
+                      Cast tab, on that window.
+                    </Info>
+                  </div>
+                </div>
               </div>
             )}
           </div>

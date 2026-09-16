@@ -356,6 +356,22 @@ try {
       await settle(1200);
       const navs = await page.locator('[data-testid^="guide-nav-"]').count();
       check('the manual opens with its sections', navs > 8, `${navs} sections`);
+      // The contents column follows the reading, not just the clicking. It
+      // used to move only when a heading was clicked, so scrolling from
+      // Liquids into Physics left the nav still claiming Liquids — which is
+      // the one thing a contents column exists to get right.
+      const lit = () => page.evaluate(() =>
+        document.querySelector('[data-testid^="guide-nav-"][aria-current]')?.getAttribute('data-testid')?.replace('guide-nav-', '') ?? null);
+      const top = await lit();
+      const followed = [];
+      for (let i = 1; i <= 8; i++) {
+        await page.evaluate(f => { const a = document.querySelector('[data-testid="guide-body"]'); a.scrollTop = a.scrollHeight * f; }, i / 9);
+        await settle(350);
+        const now = await lit();
+        if (now && followed[followed.length - 1] !== now) followed.push(now);
+      }
+      check('and the contents follows the scrolling', followed.length > 3 && followed[followed.length - 1] !== top,
+        `${top} → ${followed.join(' → ')}`);
       await noteDuplicates();
       await page.keyboard.press('Escape');
       await settle(500);

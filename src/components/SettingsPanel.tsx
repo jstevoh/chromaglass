@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, Info as InfoIcon } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
+import { Info } from './Info';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
@@ -96,42 +97,6 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
     </div>
   );
 };
-
-/**
- * The long explanation, folded away until it is asked for.
- *
- * Every one of these sections used to open with a paragraph. They are worth
- * keeping — several carry the one fact that stops a control being used wrongly,
- * like pointing the room camera at the floor rather than at the screen — but
- * together they were 722 words sitting permanently between a projectionist and
- * the sliders, and they are most of why the panel ran to eight screens. The
- * Room's was 198 words, directly above a fader someone wants during a song.
- *
- * So the prose stays and the ⓘ is how you ask for it.
- */
-function Info({ children, label = 'What this does' }: { children: React.ReactNode; label?: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mb-3">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5 min-h-[28px] text-[11px] transition-colors ${
-          open ? 'text-white/70' : 'text-white/35 hover:text-white/70'
-        }`}
-        aria-expanded={open}
-        data-info="toggle"
-      >
-        <InfoIcon size={13} />
-        <span className="uppercase tracking-wider font-semibold">{label}</span>
-      </button>
-      {open && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55" data-info="body">
-          {children}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);

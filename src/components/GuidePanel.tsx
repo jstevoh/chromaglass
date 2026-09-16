@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import {
   X, BookOpen, Play, Layers, Droplets, Palette, Activity, Aperture,
@@ -92,19 +92,33 @@ const SECTIONS: Section[] = [
           ['3. Pick a look', <>Click the name under the ChromaGlass title. Thirty-two presets in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
           ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
-        <H>Then, for a room</H>
+        <H>Your first show, in order</H>
         <P>
-          <Em>Clean Screen</Em> hides every overlay and the cursor — Esc, or a finger held
-          still on a touch screen, brings them back. <Em>Cast</Em> puts the show on a
-          projector, a second display, a TV on the Wi-Fi or a Chromecast. <Em>Record</Em>,
-          the red button beside it, writes the show and its music to a <C>.webm</C> file.
+          The order matters more than it looks: each step is hard to undo once a room is
+          watching, and easy before.
         </P>
-        <Note>
-          If nothing is moving, check three things in order: the plate is playing, the
-          show can hear something (the level meter in Settings → Audio Input), and the
-          Dimmer is not down. <C>B</C> on the keyboard is blackout, and it is easy to
-          leave on.
-        </Note>
+        <Rows items={[
+          ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Setup → Audio Input). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
+          ['2. Then the projector', <>Cast → <Em>Second display</Em>. Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
+          ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save current</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
+          ['4. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
+          ['5. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
+        ]} />
+        <P>
+          <Em>Record</Em>, the red button beside Cast, writes the show and its music to a{' '}
+          <C>.webm</C> file. <C>B</C> is blackout — the thing to hit when something goes
+          wrong, because it fades rather than cuts.
+        </P>
+        <H>When something is wrong</H>
+        <Rows items={[
+          ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Setup → Audio Input); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
+          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Setup → Audio Mappings.</>],
+          ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
+          ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
+          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and Thin Film are photograph-only — they do nothing in the light-show render.</>],
+          ['The wall went dark on a look change', <>You used Load rather than Cue and Go. Load clears the plate on purpose; Go never does.</>],
+          ['It got slow', <>The status line names the rung the engine settled on. Set <Em>Sim Resolution</Em> to a fixed number rather than auto if a look depends on a particular grid, and expect the frame-time governor to step auto back down on a machine that cannot hold it.</>],
+        ]} />
       </>
     ),
   },
@@ -452,6 +466,27 @@ const SECTIONS: Section[] = [
           ['Multi-Layer Mixer', <>Up to five fluid layers, each its own plate, composited with screen, lighter, exclusion, multiply or overlay. <Em>Layer Scale Variety</Em> gives each one its own magnification, which is what two projectors at different throws actually look like.</>],
           ['Music intelligence', <>The first listen to a song is recorded and analysed offline into a map — verse and chorus structure, pitch and energy curves — cached locally. On every later listen the show is driven by known structure rather than by the last half-second: choruses surge, intros and outros calm. Lyrics come from LRCLIB, with themed word triggers and a per-section sentiment arc.</>],
         ]} />
+        <H>Changing look mid-song, step by step</H>
+        <P>
+          This is the one sequence worth having in your fingers, because it is what the
+          desk is for and it is not obvious from the buttons alone.
+        </P>
+        <Rows items={[
+          ['Arm it', <>Click the plate's name at the top left and pick a look. Nothing happens on the wall. The bar at the bottom now reads <Em>On stage</Em> → <Em>Cued</Em>.</>],
+          ['Set the fade', <>The timer on that bar: cut, 1, 2, 4 or 8 seconds. Two is a good default; eight is a scene change; cut is for when you mean it.</>],
+          ['Go', <>The new look crossfades in and the plate is never wiped. The Go button fills as it travels, so you can see how far through it is without watching the wall.</>],
+          ['Undo', <>The arrow beside Go returns to the look before the last Go, at the same fade. It also undoes <Em>Lucky</Em> — that is why Lucky is safe to press.</>],
+        ]} />
+
+        <H>The keyboard</H>
+        <Rows items={[
+          ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
+          ['+ / −', <>Macro zoom, 1× to 16×. <C>+</C> with the closeup off turns it on gently at 2×; <C>−</C> never turns it off.</>],
+          ['?', <>This manual.</>],
+          ['Esc', <>Brings the overlays back after Clean Screen; with them up, closes whatever panel is open.</>],
+          ['Wheel over the plate', <>Zooms the closeup while it is running. It will not turn it on — a trackpad brush must not become a camera cut.</>],
+        ]} />
+
         <H>Out of the laptop</H>
         <P>
           <Em>Second display</Em> opens a window on a projector that mirrors this canvas pixel
@@ -691,11 +726,59 @@ const SECTIONS: Section[] = [
 
 export function GuidePanel({ onClose }: GuidePanelProps) {
   const [active, setActive] = useState(SECTIONS[0].id);
+  const bodyRef = useRef<HTMLElement | null>(null);
+  /**
+   * While a click-scroll is in flight the observer would light up every
+   * section the view passes through on the way, so the nav flickers down the
+   * list and lands on the right one. This holds it to the section that was
+   * asked for until the scrolling stops.
+   */
+  const jumpingTo = useRef<string | null>(null);
 
   const go = (id: string) => {
     setActive(id);
+    jumpingTo.current = id;
     document.getElementById(`guide-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  /**
+   * The nav follows the reading, not just the clicking.
+   *
+   * Without this the highlight only ever moved when a heading was clicked, so
+   * scrolling from Liquids down into Physics left the nav still claiming
+   * Liquids — the one thing a contents column is for is saying where you are.
+   *
+   * The band is the top third of the view: a section counts as the one being
+   * read once its heading reaches there, which is how a person would answer
+   * the question themselves.
+   */
+  useEffect(() => {
+    const root = bodyRef.current;
+    if (!root) return;
+    const seen = new Map<string, number>();
+    const io = new IntersectionObserver(
+      entries => {
+        for (const e of entries) seen.set(e.target.id.replace('guide-', ''), e.intersectionRatio);
+        // The topmost section that is meaningfully in view wins, so a long
+        // section stays lit while it is being read rather than handing over
+        // to whatever is peeking in at the bottom.
+        const inView = SECTIONS.map(s => s.id).filter(id => (seen.get(id) ?? 0) > 0);
+        const next = inView[0];
+        if (!next) return;
+        if (jumpingTo.current) {
+          if (next === jumpingTo.current) jumpingTo.current = null;   // arrived
+          return;
+        }
+        setActive(next);
+      },
+      { root, rootMargin: '0px 0px -67% 0px', threshold: [0, 0.01] },
+    );
+    for (const s of SECTIONS) {
+      const el = document.getElementById(`guide-${s.id}`);
+      if (el) io.observe(el);
+    }
+    return () => io.disconnect();
+  }, []);
 
   return (
     <motion.div
@@ -740,8 +823,12 @@ export function GuidePanel({ onClose }: GuidePanelProps) {
               <button
                 key={s.id}
                 onClick={() => go(s.id)}
-                className={`w-full flex items-center gap-2.5 px-5 py-2 text-[11px] text-left transition-colors ${
-                  active === s.id ? 'text-white bg-white/10' : 'text-white/45 hover:text-white/80 hover:bg-white/5'
+                ref={el => { if (el && active === s.id) el.scrollIntoView({ block: 'nearest' }); }}
+                aria-current={active === s.id ? 'true' : undefined}
+                className={`w-full flex items-center gap-2.5 border-l-2 px-5 py-2 text-[11px] text-left transition-colors ${
+                  active === s.id
+                    ? 'text-white bg-white/10 border-white'
+                    : 'text-white/45 border-transparent hover:text-white/80 hover:bg-white/5'
                 }`}
                 data-testid={`guide-nav-${s.id}`}
               >
@@ -767,7 +854,11 @@ export function GuidePanel({ onClose }: GuidePanelProps) {
             </div>
 
             {/* Body */}
-            <article className="flex-1 overflow-y-auto scrollbar-hide px-5 sm:px-10 py-7" data-testid="guide-body">
+            <article
+              ref={bodyRef}
+              className="flex-1 overflow-y-auto scrollbar-hide px-5 sm:px-10 py-7"
+              data-testid="guide-body"
+            >
               {SECTIONS.map(s => (
                 <section key={s.id} id={`guide-${s.id}`} className="mb-12 scroll-mt-4">
                   <h3 className="text-[13px] font-bold uppercase tracking-[0.25em] text-white flex items-center gap-2 mb-4 pb-2 border-b border-white/10">
