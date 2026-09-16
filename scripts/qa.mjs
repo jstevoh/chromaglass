@@ -614,12 +614,25 @@ try {
 
     await noteDuplicates();
 
-    // Design is the bench: the other half of the job, same grid.
+    /*
+      Design is the bench: the other half of the job, same grid.
+
+      Polled, not asserted after a fixed wait. This check failed once and read
+      as the app refusing to switch back; driving the two modes directly,
+      four switches in a row landed correctly every time, and both sheets
+      close on Escape. What was actually wrong was a 1500ms wait on a machine
+      rendering at six frames a second. A fixed delay is a guess about a
+      machine's speed, and this one guessed wrong about its own.
+    */
     await clickOn('mode-segmented-design');
-    await settle(1500);
-    const benchUp = await page.getByTestId('design-desk').count();
-    const bottles = await page.getByTestId('bottle-silicone').count();
-    const cuesGone = await page.getByTestId('cue-list').count();
+    let benchUp = 0, bottles = 0, cuesGone = 1;
+    for (let i = 0; i < 20; i++) {
+      benchUp = await page.getByTestId('design-desk').count();
+      bottles = await page.getByTestId('bottle-silicone').count();
+      cuesGone = await page.getByTestId('cue-list').count();
+      if (benchUp === 1 && bottles === 1 && cuesGone === 0) break;
+      await settle(400);
+    }
     check('and Design shows the bench instead of the cue list',
       benchUp === 1 && bottles === 1 && cuesGone === 0,
       `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
