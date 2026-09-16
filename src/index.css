@@ -59,3 +59,47 @@
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/*
+ * The desk's faders.
+ *
+ * Bigger than the panel's, because they are ridden with your eyes on the wall
+ * rather than on the laptop: a 12px track and a 26px thumb inside a 44px
+ * grabbable row. The track shows its own fill so the position reads at a
+ * glance in a dark room, where a thin line on a dark ground does not.
+ */
+.ride-fader {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.ride-fader::-webkit-slider-runnable-track {
+  height: 12px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.14);
+}
+.ride-fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -7px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.6);
+}
+.ride-fader:focus-visible::-webkit-slider-thumb { outline: 2px solid #fbbf24; outline-offset: 2px; }
+.ride-fader::-moz-range-track {
+  height: 12px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.14);
+}
+.ride-fader::-moz-range-progress { height: 12px; border-radius: 9999px; background: #fff; }
+.ride-fader::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.6);
+}

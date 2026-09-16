@@ -380,6 +380,77 @@ and one dye for 30 s of ordinary movement.
 analysed in the page and never leave it, nothing is recorded, and the panel says so
 where the camera is switched on.
 
+### 8. The desk: the laptop is a control surface, not the show
+
+`src/App.tsx`, `src/components/PerformDesk.tsx` (new), `src/lib/lookFade.ts` (new),
+`src/components/SettingsPanel.tsx`, `scripts/desk.mjs` (new)
+
+The laptop screen is about ninety per cent canvas, and the canvas is the one thing the
+operator does not need to look at — it is on the wall behind them, larger. Everything
+they *do* need is either in a panel that has to be opened and scrolled, or not shown at
+all. That was the right shape when the browser window was the show. It stopped being
+the right shape the day the projector window arrived.
+
+Two facts from the code decide how this is built.
+
+**The render is already decoupled.** When a projector window opens it announces its
+pixel size and the show window renders *that many* pixels (`setStage`); the laptop
+displays that canvas scaled by CSS. So shrinking the laptop's canvas to a preview costs
+the audience nothing — not one pixel. The desk is a layout change, not a rendering one.
+This is the fact that makes the whole batch cheap, and it was not obvious: the obvious
+reading of "mirror the canvas" is that the laptop's size is the stage's size.
+
+**A look change is destructive.** `applyPreset` calls `clearAll()` on every layer and
+reseeds. On a projector, mid-song, that is a hard cut through near-black. The
+non-destructive path already exists — `adoptPreset` takes on the new dyes, styles and
+liquids without wiping the plate, and the sequencer has been using it all along. What is
+missing is a timed interpolation of the ~80 settings between the two looks. So the
+single most valuable change here is not layout at all.
+
+The order below is by what a show night would miss most, not by what is most visible.
+
+**8a. Cue and Go.** Arm a preset; nothing reaches the audience until Go. Go crossfades
+over a set time by interpolating the settings and adopting the dyes, never clearing.
+The clearing path stays, as the thing you use when *building* a look. Plus one-step
+revert to the previous look, because the fastest fix mid-show is undo.
+
+> **Gate:** driving the app through a preset change, the stage's mean luminance never
+> falls below 60% of where it started, at any frame, over a two-second fade. Today's
+> `applyPreset` is the control: it should fail this, and by a lot.
+
+**8b. Perform and Design.** Perform: a preview of the stage, and the controls around it.
+Design: today's full-bleed canvas, for building looks. Perform is the default once a
+projector is attached.
+
+> **Gate:** with a stage attached, the canvas's backing store is the same size in both
+> modes. If Perform costs the projector resolution, it is wrong.
+
+**8c. The ride strip.** Six to eight controls always out, with hit targets a hand can
+find in the dark, chosen by the user from `LEARNABLE_SETTINGS` — the same list MIDI
+learn uses, so the desk and the controller map cannot disagree about what is rideable.
+
+**8d. A status line that tells the truth.** What is live and how long it has been up,
+the sequencer's stage and time to the next, the audio source and its level, the engine's
+rung, and whether the projector, MIDI, camera and recorder are connected. Nearly all of
+this is already computed and simply never shown.
+
+**8e. Guard what cannot be undone.** *Lucky* replaces all ~80 settings from one
+unguarded click, next to controls used mid-show. It gets a confirm, or a revert, or it
+leaves Perform.
+
+**8f. Legibility in a dark room.** The UI leans on `text-white/30` and 7–10px uppercase.
+That reads well in a screenshot and badly at arm's length with eyes adapted to a
+projection.
+
+> **Gate:** measured over the rendered app, no actionable control below 11px or below
+> 0.6 effective contrast against its background, and no hit target under 44px. Measure
+> the current state first and record it, so the claim is a number rather than a taste.
+
+**The risk worth naming.** This moves controls that someone has muscle memory for, and
+muscle memory is most of what playing an instrument is. Design mode exists so nothing
+is *taken away*, and the desk is judged on whether a show can be played from it, not on
+whether it is tidier.
+
 ## Not doing
 
 - **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.

@@ -69,6 +69,21 @@ interface LiquidVisualizerProps {
   settings: VisualizerSettings;
   seedCount?: number;
   selectedLiquid?: LiquidType;
+  /**
+   * Where the plate is drawn on this screen, in CSS pixels.
+   *
+   * The desk needs the plate to be a preview in the corner of a control
+   * surface rather than the whole window, and the canvas cannot simply be
+   * moved to a different place in the tree to achieve that — a remount takes
+   * the WebGL context with it and the show restarts. So the canvas stays
+   * exactly where it is and this moves the box it is painted in.
+   *
+   * It does not change what is rendered. With a projector attached the render
+   * size comes from the projector (see `resize`), and with none it comes from
+   * the window — neither is this box. Shrinking the preview costs the audience
+   * nothing, which is the whole reason the desk is affordable.
+   */
+  frame?: { top: number; left: number; width: number; height: number } | null;
   activeLayer?: number;
   clearTrigger?: number;
   drainTrigger?: number;
@@ -157,8 +172,17 @@ export interface LiquidVisualizerHandle {
   applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
-  /** Take on a preset's dyes, injection style and liquids without clearing the plate — the sequencer's way of changing stage. */
-  adoptPreset: (presetId: string) => void;
+  /**
+   * Take on a preset's dyes, injection style and liquids without clearing the
+   * plate — the sequencer's way of changing stage, and the desk's Go.
+   *
+   * `extras` is how a user preset gets adopted. Its dyes are not in the maps
+   * here (they live in the saved file), so before this took them the only way
+   * to register them was `applyPreset` — which clears. A sequence that
+   * changed to one of your own looks cut the plate to black; the built-ins
+   * next to it did not.
+   */
+  adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -1846,7 +1870,7 @@ interface GLResources {
 // ─── React Component ─────────────────────────────────────────────────
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, selectedLiquid,
+  audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
 }, ref) => {
@@ -2083,9 +2107,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       injectStyles: [...injectStyleRef.current],
       liquids: [...plateLiquidsRef.current],
     }),
-    adoptPreset: (presetId: string) => {
+    adoptPreset: (presetId: string, extras) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
       // new dyes and injection style take over from here.
+      if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
+      if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
+      if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
       presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
       journeyRef.current = { lead: 0, lastAt: -1 };
       injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -5206,11 +5233,17 @@ void main() {
   }, [noise2D, seedCount]);
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-black overflow-hidden">
+    <div
+      className={`fixed bg-black overflow-hidden ${frame ? 'rounded-xl border border-white/10 transition-[top,left,width,height] duration-300' : 'inset-0 w-full h-full'}`}
+      style={frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : undefined}
+      data-testid="plate-frame"
+    >
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-crosshair"
-        style={staged ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
+        // Letterboxed whenever the box it is shown in is not the shape it was
+        // rendered at — with a projector attached, and in the desk's preview.
+        style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
     </div>
