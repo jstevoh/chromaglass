@@ -142,23 +142,30 @@ const settle = (ms = 900) => page.waitForTimeout(ms);
 const firstVisible = (testId) => page.getByTestId(testId).first();
 
 /*
-  Raw coordinates for the desk's controls.
+  Raw coordinates for every click in the suite.
 
-  `locator.click()` stalls on them: its call log stops at "locator resolved to
+  `locator.click()` stalls in this environment: its call log stops at "locator resolved to
   <button …>" and never reports an actionability verdict, while a mouse click
   at the same point works and the control visibly takes the selection. The
   element is stable (traced over twenty animation frames: one bounding box)
   and hit-testable (elementFromPoint returns the button itself), so that is
   Playwright's machinery queueing behind the render loop, not the app.
+
+  It was first seen on the desk, then on the overlay's Settings button, then
+  inside the MIDI sheet, where it ended a run at 25 of 27 with a 60-second
+  timeout. Three sightings is a property of the environment, not of three
+  controls, so every click here goes through this.
 */
-const clickOn = async (testId) => {
-  const box = await page.evaluate((id) => {
-    const el = document.querySelector(`[data-testid="${id}"]`);
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  }, testId);
-  if (!box) throw new Error(`no element [data-testid="${testId}"]`);
+const clickOn = async (target) => {
+  const box = typeof target === 'string'
+    ? await page.evaluate((id) => {
+        const el = document.querySelector(`[data-testid="${id}"]`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      }, target)
+    : await target.boundingBox().then(b => (b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : null));
+  if (!box) throw new Error(`nothing to click: ${typeof target === 'string' ? target : 'locator'}`);
   await page.mouse.click(box.x, box.y);
 };
 
@@ -223,7 +230,7 @@ try {
   check('the toolbar is there', buttons > 8, `${buttons} buttons`);
 
   // ── Presets ───────────────────────────────────────────────────────
-  await firstVisible('preset-title-button').click();
+  await clickOn('preset-title-button');
   await settle();
   const menu = firstVisible('preset-menu');
   const entries = await menu.locator('button').count();
@@ -239,7 +246,7 @@ try {
   // Apply one and make sure the app survives having its whole look replaced.
   const crowd = menu.locator('button', { hasText: /Crowd Plate/i }).first();
   if (await crowd.count()) {
-    await crowd.click();
+    await clickOn(crowd);
     await settle(2000);
     check('a preset can be applied', true);
   } else {
@@ -249,7 +256,7 @@ try {
   await settle(400);
 
   // ── Settings, and every section of it ─────────────────────────────
-  await page.locator('button[title*="Settings" i]').first().click();
+  await clickOn(page.locator('button[title*="Settings" i]').first());
   await settle();
   const headings = await page.locator('section h3').allInnerTexts();
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
@@ -377,11 +384,11 @@ try {
   // reaches for during a show and what is decided once, and a room camera's
   // device and mappings are decided once. Without this the harness reached
   // for a control on the hidden half and sat there until it timed out.
-  await firstVisible('settings-tab-setup').click();
+  await clickOn('settings-tab-setup');
   await settle(700);
   const roomToggle = firstVisible('scene-toggle');
   await roomToggle.scrollIntoViewIfNeeded();
-  await roomToggle.click();
+  await clickOn(roomToggle);
   await settle(2500);
   check('switching the room camera on opens exactly one camera',
     (await page.evaluate(() => window.__media.length)) === 1,
@@ -391,7 +398,7 @@ try {
     // Counted rather than assumed: a preset can arrive with mappings of its
     // own, and Crowd Plate — applied earlier in this run — ships with three.
     const before = await page.locator('select[aria-label="Room feature"]').count();
-    await mapAdd.click();
+    await clickOn(mapAdd);
     await settle(700);
     const rows = await page.locator('select[aria-label="Room feature"]').count();
     check('a room mapping can be added and targeted', rows === before + 1, `${before} → ${rows}`);
@@ -402,7 +409,7 @@ try {
       check('and choosing a feature and a control does not throw', true);
     }
   }
-  await roomToggle.click();   // and off again
+  await clickOn(roomToggle);   // and off again
   await settle(600);
 
   // ── The band, and the audio sources ───────────────────────────────
@@ -410,7 +417,7 @@ try {
   await settle(500);
   const band = firstVisible('simulated-audio-button');
   const beforeBand = await page.evaluate(() => window.__media.length);
-  await band.click();
+  await clickOn(band);
   await settle(3000);
   check('the band plays without opening a device',
     (await page.evaluate(() => window.__media.length)) === beforeBand);
@@ -440,7 +447,7 @@ try {
   for (const [title, what] of [['MIDI', 'the MIDI panel'], ['Sequence', 'the sequencer'], ['Track', 'the track panel']]) {
     const b = page.locator(`button[title*="${title}" i]`).first();
     if (await b.count()) {
-      await b.click();
+      await clickOn(b);
       await settle(800);
       check(`${what} opens`, true);
       await noteDuplicates();
@@ -455,7 +462,7 @@ try {
   {
     const b = page.getByTestId('guide-button');
     if (await b.count()) {
-      await b.first().click();
+      await clickOn(b.first());
       await settle(1200);
       const navs = await page.locator('[data-testid^="guide-nav-"]').count();
       check('the manual opens with its sections', navs > 8, `${navs} sections`);
