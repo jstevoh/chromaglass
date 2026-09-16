@@ -626,7 +626,15 @@ try {
       for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
       return sum / (16 * 9 * 255);
     });
-    const before = await litness();
+    // Lay a known plate first. By this point the suite has blacked out,
+    // drained, cleared, zoomed and dragged its way through fifty checks, and
+    // the plate it leaves behind is whatever fell out of that — one run
+    // measured it at pure black, which made the recovery check below a
+    // comparison of nothing with nothing. The Fillmore look seeds bright and
+    // immediately, so it is a plate that is definitely on.
+    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    let before = 0;
+    for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
     check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
 
     await page.evaluate(() => {
