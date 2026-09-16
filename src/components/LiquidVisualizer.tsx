@@ -2785,6 +2785,13 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   // stacked a wide steep band: its ends fall inside the change, the spacing
   // comes from part of it, and the level then repeats four or five times across
   // the one boundary. Walking ends that by construction — there is one middle.
+  //
+  // The step it stops on is fractional, not whole: a walk that could only stop
+  // on a cell made the reach, the middle and the width piecewise constant over
+  // patches of the plate, which put cell-sized stair-steps along a thread's
+  // edges and broke it into dashes where the patches were small. Blending the
+  // last step by how far the colour got through it makes all three continuous
+  // for nothing.
   float fP = fC, fM = fC;
   float step = al * 0.35;                       // still changing at a boundary's rate
   bool goP = true, goM = true;
@@ -2793,11 +2800,15 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
     vec2 o = n * e * 2.0 * float(i);
     if (goP) {
       vec3 cp = decodeFluid(tex, fuv + o, 0.0, false).rgb;
-      if (length(cp - prevP) < step) goP = false; else { fP = dot(cp, axis); prevP = cp; }
+      float d = length(cp - prevP);
+      if (d < step) { fP = mix(fP, dot(cp, axis), d / max(step, 1e-5)); goP = false; }
+      else { fP = dot(cp, axis); prevP = cp; }
     }
     if (goM) {
       vec3 cm = decodeFluid(tex, fuv - o, 0.0, false).rgb;
-      if (length(cm - prevM) < step) goM = false; else { fM = dot(cm, axis); prevM = cm; }
+      float d = length(cm - prevM);
+      if (d < step) { fM = mix(fM, dot(cm, axis), d / max(step, 1e-5)); goM = false; }
+      else { fM = dot(cm, axis); prevM = cm; }
     }
   }
   float reach = abs(fP - fM);                   // the whole change, in colour
@@ -2809,9 +2820,16 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   // Never thinner than the pixel it is drawn on, or a thread samples as a row
   // of broken dots — which is what the plate drawn small in a second dish was
   // showing.
-  // One thread carries what a stack of them used to, so it is drawn bolder than
-  // any one line of that stack was.
-  float wide = max(mix(0.10, 0.30, fold) * reach, fwidth(fC) * 0.75);
+  // A thread is a few pixels wide, on a rim or on a fifty-cell ramp alike. Width
+  // as a fraction of the change looks the same at a boundary and turns into a
+  // pale bar a fifth of the band across on a wide one, because the change is
+  // spread over that many pixels — which is what replaced the stacks rather
+  // than removing them. So the width is set in pixels and only then capped by
+  // the change, which keeps a narrow band's thread inside its own boundary.
+  float px = max(fwidth(fuv.x), fwidth(fuv.y)) + 1e-6;
+  float perPixel = al * px / e;                 // colour change per screen pixel
+  float wide = min(max(mix(1.6, 4.5, fold) * perPixel, fwidth(fC) * 0.75),
+                   mix(0.10, 0.30, fold) * reach);
   float line = 1.0 - smoothstep(0.0, wide, lvl);
   float thread = line * band * mix(0.55, 1.0, fold);
   vec3 pale = mix(vec3(1.0), color, 0.18) * mix(0.85, 1.2, fold);
