@@ -165,6 +165,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   { key: 'beatLead',        label: 'Beat Lead (ms)',   min: 0, max: 250 },
+  // The film as a force rather than a slide. Worth a fader for the same
+  // reason Room Drive is: how hard the reel pushes the plate is something you
+  // ride between a verse and a chorus.
+  { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
+  { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
   // The room. Worth a fader more than most: how hard the crowd drives the
   // plate is the thing you ride between a verse and a chorus.
   { key: 'sceneDrive',      label: 'Room Drive',       min: 0, max: 1 },

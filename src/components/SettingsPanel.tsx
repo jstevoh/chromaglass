@@ -145,11 +145,14 @@ const SCENE_FEATURES: [SceneFeature, string][] = [
 ];
 
 /**
- * What a room feature may be put on: the same list a MIDI fader can learn,
- * less the room's own controls. Letting the room ride how hard it rides itself
- * is a loop nobody asked for.
+ * What a feature may be put on: the same list a MIDI fader can learn, less the
+ * controls that decide how hard the sources ride. Letting a source ride how
+ * hard it rides itself is a loop nobody asked for — and since one mapping list
+ * now serves both the room and the film, the film's two dials are out for the
+ * same reason the room's are.
  */
-const sceneTargets = LEARNABLE_SETTINGS.filter(s => !String(s.key).startsWith('scene'));
+const sceneTargets = LEARNABLE_SETTINGS.filter(s =>
+  !String(s.key).startsWith('scene') && s.key !== 'filmDrive' && s.key !== 'filmImpact');
 
 /**
  * A labelled range. Lives outside the panel: defined inside it, it was a new
@@ -1525,6 +1528,53 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ filmKey: v })}
           settingKey="filmKey"
         />
+        {/*
+          The film as a force, not only a light.
+
+          Film Mix and Film Key decide how the reel *shows*. These two decide
+          what it *does*: the same analysis that reads the room camera reads
+          the film, so a pan drags the dye, a cut hits it, and a busy sequence
+          can ride whatever the room's mappings ride. Both at zero — the
+          default, and what every look saved before this does — and the
+          projector is the slide it always was, with the sensor not even
+          running.
+        */}
+        <Slider
+          label="Film Drive"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          value={settings.filmDrive ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          icon={Wind}
+          onChange={(v: number) => onUpdate({ filmDrive: v })}
+          settingKey="filmDrive"
+        />
+        <Slider
+          label="Film Impact"
+          disabled={(filmSource ?? 'none') === 'none'
+            ? 'needs a loop, the camera or a window'
+            : (settings.sceneMappings?.length ?? 0) === 0 && 'add a mapping under The Room first'}
+          value={settings.filmImpact ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmImpact: v })}
+          settingKey="filmImpact"
+        />
+        {filmSource !== 'none' && (
+          <Info>
+            <span className="text-white/60">Film Drive</span> puts the film's own motion into the
+            liquid: a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot
+            does nothing at all — which is right, because nothing is moving.
+            <span className="text-white/60"> Film Impact</span> reads the same mappings The Room
+            uses, so "how busy → Turbulence" works off the reel as well as off the floor. One
+            warning worth having: capture this app's own window with Film Drive up and you have
+            built a feedback loop. It saturates rather than runs away — the stir is capped per cell
+            — but a plate stirred by a picture of itself is a plate being stirred by nothing in
+            particular.
+          </Info>
+        )}
       </section>
 
       {/* Simulation Section */}

@@ -78,6 +78,8 @@ const SECTION_OF: Record<string, string> = {
   chemistry: 'projectors',
   gelWheel: 'projectors',
   beatLead: 'audio-input',
+  filmDrive: 'projectors',
+  filmImpact: 'projectors',
   sceneDrive: 'room',
   sceneHands: 'room',
   sceneImpact: 'room',};

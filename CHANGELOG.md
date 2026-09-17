@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the film drives the plate
+
+The film projector was a slide. A loop, a camera or a captured window went
+through the dye and contributed light and nothing else, while the room camera
+had been read back as a *sensor* since it was built — flow into the liquid,
+features onto settings. The film now gets the same treatment, because there was
+never a reason it should not: the analysis is a pure function over a pixel
+buffer and the stir takes a reading, not a camera.
+
+- **Film Drive** puts the reel's own motion into the liquid. A pan drags the
+  dye the way it pans, a crowd scene stirs it, a locked-off shot does nothing —
+  which is correct, because nothing is moving.
+- **Film Impact** reads the same mappings The Room uses. Deliberately not a
+  second list: "how busy → Turbulence" means the same thing whether the
+  busyness is a crowd or a chase sequence, and an operator who had to build the
+  mapping twice would build it once and wonder why the other source was silent.
+  With both masters up the offsets add, and the clamp to each setting's own
+  travel is what stops that running away.
+- Both default to zero and the sensor does not run at all until one is turned
+  up, so a projector used the way it always was costs exactly what it always
+  did, and a look saved before this shows the same picture and moves the same
+  way.
+
+Three things the film is deliberately not given: no people tracking (the
+tracker is for a room with dancers in it; on a film it would read a face in
+close-up as someone standing still and press the plate with it, and skipping it
+is a third cheaper), no mirror (a film is already the way round it was shot),
+and no analysis while paused (a still frame is twenty readings of nothing a
+second, at a real cost).
+
+`videoSense.ts` is new and holds the part both sources share — the square crop,
+the small canvas, the read-back. The square crop especially: the fluid grid is
+square, so taking the middle square means a movement travels across the plate
+at the speed it travelled across the frame instead of being stretched, and a
+film is 16:9 or 4:3 or 2.39:1 — exactly the case a second copy would have got
+wrong. The room camera's hook now goes through it, and `npm run scene` still
+passes all seventeen of its original checks.
+
+`sceneMap.ts` is new for the same reason: the mapping fold stopped being
+single-source, and summing two sources while holding each one's staleness and
+clamping to a setting's travel is three chances to be subtly wrong in a way
+that looks like "that's a bit much" rather than like a bug. It takes its clock
+as an argument so staleness can be tested without waiting, and `scene.mjs` has
+seven new checks over it — verified by breaking the summation and watching
+`two sources add` go red.
+
 ### Added — a film that is not on your laptop
 
 The film projector could be fed by a video file or by the camera, and both need

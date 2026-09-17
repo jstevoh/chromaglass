@@ -30,7 +30,9 @@
  */
 
 import { SceneSense } from '../src/lib/sceneSense.ts';
-import { RoomStir } from '../src/lib/roomStir.ts';
+import { RoomStir, ROOM_STALE_MS } from '../src/lib/roomStir.ts';
+import { applySceneMappings } from '../src/lib/sceneMap.ts';
+import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const N = 96;
 const FRAMES = 40;
@@ -275,6 +277,55 @@ const checks = [
   ['and presses once they stand still', stop.stillFrames > 8],
   ['keeping the id, and the dye, across the stop', stop.ids === 1 && stop.idChanges === 0],
 ];
+
+/*
+  ── Two sources on one mapping list ─────────────────────────────────
+
+  The room was the only thing that could ride a setting; the film projector can
+  now do it too, through the same mappings, each source with its own master
+  depth. That is three new ways to be wrong — a source that should not count
+  counting, two that should both count adding up wrong, and a result that walks
+  past the end of a setting's travel — and none of them would look like a bug
+  on a plate. They would look like "that's a bit much".
+
+  So the arithmetic is checked against readings made up here. `applySceneMappings`
+  takes its clock as an argument for exactly this: staleness is a rule about
+  time and a test should not have to wait.
+*/
+const reading = (energy, at) => ({
+  lattice: 1,
+  flowX: new Float32Array(1), flowY: new Float32Array(1), motion: new Float32Array(1),
+  energy, raw: energy,
+  centroidX: 0.5, centroidY: 0.5, dirX: 0, dirY: 0, spread: 0,
+  brightness: 0.5, hue: 0, chroma: 0,
+  people: [], crowd: 0,
+  at, ms: 0, ready: true,
+});
+
+const map = { feature: 'motion', setting: 'turbulenceScale', depth: 1 };
+const base = { ...DEFAULT_SETTINGS, turbulenceScale: 0, sceneMappings: [map] };
+const T = 1000;                                   // the clock every case is read at
+const ride = (sources) => applySceneMappings(base, sources, { ...base }, T).turbulenceScale;
+
+const roomOnly = ride([{ reading: reading(0.4, T), impact: 1 }]);
+const filmOnly = ride([{ reading: reading(0.4, T), impact: 0 }, { reading: reading(0.4, T), impact: 1 }]);
+const bothUp = ride([{ reading: reading(0.4, T), impact: 1 }, { reading: reading(0.4, T), impact: 1 }]);
+const noneUp = ride([{ reading: reading(0.9, T), impact: 0 }, { reading: reading(0.9, T), impact: 0 }]);
+const stale = ride([{ reading: reading(0.9, T - ROOM_STALE_MS - 1), impact: 1 }]);
+const halfDepth = ride([{ reading: reading(0.4, T), impact: 0.5 }]);
+// Turbulence travels 0..1, so two sources at full energy must stop at the top
+// rather than sailing past it.
+const clamped = ride([{ reading: reading(1, T), impact: 1 }, { reading: reading(1, T), impact: 1 }]);
+
+checks.push(
+  ['the room alone rides a mapping', roomOnly > 0.05],
+  ['the film alone rides the same mapping', Math.abs(filmOnly - roomOnly) < 1e-6],
+  ['two sources add', Math.abs(bothUp - roomOnly * 2) < 1e-6],
+  ['and half the depth moves half as far', Math.abs(halfDepth - roomOnly / 2) < 1e-6],
+  ['a source at zero impact is not read', noneUp === 0],
+  ['a reading that stopped arriving is not read', stale === 0],
+  ['and two sources cannot push past the travel', clamped <= 1 + 1e-9 && clamped > 0.9],
+);
 
 console.log('');
 let failed = 0;

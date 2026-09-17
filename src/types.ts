@@ -179,6 +179,8 @@ export interface VisualizerSettings {
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
+  filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
+  filmImpact: number;         // master depth over every mapping, read from the film instead of the room
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press breaks into radial fingers (Saffman–Taylor) instead of a smooth ring
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -332,6 +334,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   gelSpeed: 0.5,
   filmMix: 0.7,
   filmKey: 0.18,
+  // A film is a slide until it is asked to be a force: a look saved before
+  // this existed shows the same picture and moves the same way.
+  filmDrive: 0,
+  filmImpact: 0,
   lampWarmth: 0,
   dimmer: 1,
   fingering: 0,

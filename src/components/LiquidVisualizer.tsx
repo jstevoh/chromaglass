@@ -19,47 +19,10 @@ import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
-import { SCENE_LATTICE, getSceneValue, type SceneReading } from '../lib/sceneSense';
+import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
+import { applySceneMappings } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
-
-/**
- * How far each setting the room may ride can travel. Shared with the MIDI
- * faders on purpose: a scene mapping and a knob move a control over the same
- * range, so "half depth" means the same thing whichever hand is on it.
- */
-const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: number; max: number }>> =
-  Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, { min: s.min, max: s.max }]));
-
-/**
- * The scene mappings folded into a settings object.
- *
- * Returns `base` untouched when there is nothing to fold in, so the ordinary
- * case — no camera, or no mappings — costs one comparison and no copying.
- */
-function applySceneMappings(
-  base: VisualizerSettings,
-  reading: SceneReading | null,
-  into: VisualizerSettings,
-): VisualizerSettings {
-  const maps = base.sceneMappings;
-  const impact = base.sceneImpact ?? 0;
-  if (!reading || !reading.ready || !maps || maps.length === 0 || impact <= 0) return base;
-  if (performance.now() - reading.at > ROOM_STALE_MS) return base;
-
-  Object.assign(into, base);
-  for (const m of maps) {
-    if (!m || m.feature === 'none' || !m.depth) continue;
-    const travel = SETTING_TRAVEL[m.setting];
-    if (!travel) continue;
-    const current = base[m.setting];
-    if (typeof current !== 'number') continue;
-    const moved = current + getSceneValue(reading, m.feature) * m.depth * impact * (travel.max - travel.min);
-    (into as unknown as Record<string, number>)[m.setting] =
-      moved < travel.min ? travel.min : moved > travel.max ? travel.max : moved;
-  }
-  return into;
-}
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -102,6 +65,12 @@ interface LiquidVisualizerProps {
    * app around it for nothing.
    */
   sceneRef?: React.MutableRefObject<SceneReading | null>;
+  /**
+   * What the film projector's own picture is doing, when anything is reading
+   * it. The same shape as the room's reading, because it is the same analysis
+   * over a different video — see `useFilmSense`.
+   */
+  filmSenseRef?: React.MutableRefObject<SceneReading | null>;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
@@ -239,6 +208,15 @@ export interface LiquidVisualizerHandle {
    */
   startFilmWindow: (onEnded?: () => void) => Promise<void>;
   clearFilm: () => void;
+  /**
+   * The element the film is playing in, so it can be read back as a sensor
+   * as well as shown through the dye. Null when nothing is loaded.
+   *
+   * Handed out rather than copied: there is one film, and a second video
+   * element decoding the same source would double the cost and still drift a
+   * frame from what is on the plate.
+   */
+  filmVideoEl: () => HTMLVideoElement | null;
   /**
    * A second display mirrors this canvas pixel for pixel: render at its size
    * (the projector's pixels) and letterbox it here. Null returns to the window.
@@ -1901,7 +1879,7 @@ interface GLResources {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
+  isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1965,6 +1943,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * does not turn the plate into an oscillator.
    */
   const roomStirRef = useRef(new RoomStir(SCENE_LATTICE));
+  /**
+   * The film's own stir, with its own learned baseline.
+   *
+   * Not the room's instance. `RoomStir` learns the steady part of the field it
+   * is given and subtracts it, and a locked-off shot and a room with a fan in
+   * the corner have nothing to say to each other — sharing one would have each
+   * source cancelling the other's background.
+   */
+  const filmStirRef = useRef(new RoomStir(SCENE_LATTICE));
   /** The reading the room's hands last acted on, so each one acts once. */
   const lastHandsAtRef = useRef(-1);
   /** The settings with the room's mappings folded in, rewritten each frame. */
@@ -2323,6 +2310,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       try { await v.play(); } catch { /* as above */ }
     },
     clearFilm: () => stopFilm(),
+    filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
       if (indices) harmonyRef.current = indices;
@@ -4144,7 +4132,10 @@ void main() {
       //
       // One object, reused: a copy per frame of a hundred-key settings object
       // is sixty allocations a second for a show that runs for hours.
-      const currentSettings = applySceneMappings(settingsRef.current, sceneRef?.current ?? null, sceneModRef.current);
+      const currentSettings = applySceneMappings(settingsRef.current, [
+        { reading: sceneRef?.current ?? null, impact: settingsRef.current.sceneImpact ?? 0 },
+        { reading: filmSenseRef?.current ?? null, impact: settingsRef.current.filmImpact ?? 0 },
+      ], sceneModRef.current, performance.now());
       const glr = webGLRef.current;
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
@@ -4370,6 +4361,27 @@ void main() {
         })();
         const roomReading = roomDrive > 0 ? roomFresh : null;
 
+        /*
+          The film, as a force.
+
+          Until now the projector was a slide: light through the dye and
+          nothing else. A film has motion in it — a pan, a crowd, a cut — and
+          the same analysis that reads a room reads a reel, so the same stir
+          puts it in the liquid.
+
+          Read once a frame, like the room's, and only when something is
+          asking for it: with Film Drive at zero the sensor is not even
+          running, so a film that is only a slide costs exactly what it
+          always did.
+        */
+        const filmDrive = Math.max(0, Math.min(1, currentSettings.filmDrive ?? 0));
+        const filmReading = (() => {
+          if (filmDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
+          const r = filmSenseRef?.current ?? null;
+          if (!r || !r.ready) return null;
+          return performance.now() - r.at < ROOM_STALE_MS ? r : null;
+        })();
+
         // ── The room's hands ───────────────────────────────────
         // Everyone the sensor is holding is a projectionist. Standing still is
         // a palm on the top glass, so the film thins and fingering breaks it
@@ -4414,10 +4426,15 @@ void main() {
           // The room stirs the lead plate: it is ambient, not a tool, so it
           // goes where the show is rather than onto whichever layer happens to
           // be selected.
-          if (roomReading) {
+          if (roomReading || filmReading) {
             const lead = fluidsRef.current[0];
             if (lead) {
-              roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP);
+              // Both, if both are asked for. They are separate fields with
+              // separate baselines and the per-cell cap is per stir, so two
+              // sources can add more than one — which is the point of turning
+              // the second one up.
+              if (roomReading) roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP);
+              if (filmReading) filmStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, filmReading, filmDrive, SIM_STEP);
               lead.markDirty();
             }
           }
