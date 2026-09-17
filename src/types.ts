@@ -92,12 +92,40 @@ export type SceneFeature =
   /** The room's light and its colour. */
   | 'brightness' | 'sceneHue';
 
+/**
+ * Where a patch takes its reading from.
+ *
+ * `room` and `film` are the same analysis over different pixels; `sound` is
+ * the microphone or whatever is plugged into it. Absent means `room`, because
+ * every mapping written before there was a choice was a room mapping.
+ */
+export type PatchSource = 'room' | 'film' | 'sound';
+
+/**
+ * One patch cord: a thing that changes, on a thing it changes.
+ *
+ * `source` and `layer` are optional so that a look saved before either existed
+ * loads as exactly what it was — a room mapping on every plate — with no
+ * migration step to get wrong. Read them as `?? 'room'` and `?? 'all'` and the
+ * old shape is a special case of the new one rather than a thing to convert.
+ */
 export interface SceneMapping {
-  feature: SceneFeature;
+  /** Absent on anything saved before there was more than one source. */
+  source?: PatchSource;
+  /** A room/film feature or an audio one, depending on the source. */
+  feature: SceneFeature | AudioFeature;
   /** Any numeric setting — the same list a MIDI fader can learn. */
   setting: keyof VisualizerSettings;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */
   depth: number;
+  /**
+   * Which plate it lands on, or every one of them.
+   *
+   * Only meaningful for the settings the solver reads — how a layer moves and
+   * evolves. A setting that describes the finished picture is global whatever
+   * you aim it at, which is why the panel will not let you aim one.
+   */
+  layer?: number | 'all';
 }
 
 export interface VisualizerSettings {
@@ -233,7 +261,8 @@ export interface VisualizerSettings {
   // sensor existed is the same look after it.
   sceneDrive: number;         // how hard the room's motion stirs the liquid (0 = off)
   sceneHands: number;         // how strongly the people the sensor holds press and blow on the plate (0 = off)
-  sceneImpact: number;        // master depth over every scene → setting mapping
+  sceneImpact: number;        // master depth over every patch whose source is the room
+  soundImpact: number;        // master depth over every patch whose source is the sound
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -360,7 +389,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroRelief: 0.7,
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,
-  sceneImpact: 0.5,         // the depth mappings are read at once any are added
+  sceneImpact: 0.5,         // the depth room patches are read at once any are added
+  // Sound starts at full, unlike the room's half and the film's nothing. Those
+  // two are held back to protect looks that were saved before they existed; no
+  // look has ever carried a sound patch, so there is nothing to protect — and a
+  // source whose master starts at zero makes a patch you just made look broken.
+  soundImpact: 1,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

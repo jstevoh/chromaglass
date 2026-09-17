@@ -487,13 +487,17 @@ try {
   if (await mapAdd.count()) {
     // Counted rather than assumed: a preset can arrive with mappings of its
     // own, and Crowd Plate — applied earlier in this run — ships with three.
-    const before = await page.locator('select[aria-label="Room feature"]').count();
+    // Counted by test id, not by the label. The label used to say "Room
+    // feature" and a patch now names its own source, so the label changed and
+    // this counted zero of zero — a check that passes nothing and fails loudly,
+    // which is the good version of that mistake.
+    const before = await page.locator('[data-testid^="patch-feature-"]').count();
     await clickOn(mapAdd);
     await settle(700);
-    const rows = await page.locator('select[aria-label="Room feature"]').count();
+    const rows = await page.locator('[data-testid^="patch-feature-"]').count();
     check('a room mapping can be added and targeted', rows === before + 1, `${before} → ${rows}`);
     if (rows) {
-      await page.locator('select[aria-label="Room feature"]').first().selectOption('crowd');
+      await page.locator('[data-testid^="patch-feature-"]').first().selectOption('crowd');
       await page.locator('select[aria-label="Control"]').first().selectOption('dyeBudget');
       await settle(600);
       check('and choosing a feature and a control does not throw', true);
@@ -1016,13 +1020,90 @@ try {
         !!film && film.inRow && film.between && /window|tab|screen/i.test(film.title),
         film ? `in row ${film.inRow}, between ${film.between}, “${film.title.slice(0, 40)}…”` : '');
       /*
+        ── The patch bay ───────────────────────────────────────────
+
+        A patch is a source, a feature of it, a control it moves, how far, and
+        which plate it lands on. The first three existed; source and plate are
+        new, and both are dropdowns that would be easy to ship pointing at
+        nothing. What is checked here is that adding a patch gives you all five
+        and that the plate selector refuses the settings it cannot move —
+        `PER_LAYER` is checked against the solver's own source by `npm run
+        panel`, and this is the other half: that the panel honours it.
+      */
+      await clickOn('settings-nav-room');
+      await settle(500);
+      const addBtn = page.getByTestId('scene-map-add');
+      if (await addBtn.count()) {
+        await clickOn(addBtn);
+        await settle(500);
+        const patch = await page.evaluate(() => {
+          const src = document.querySelector('[data-testid="patch-source-0"]');
+          const feat = document.querySelector('[data-testid="patch-feature-0"]');
+          const layer = document.querySelector('[data-testid="patch-layer-0"]');
+          if (!src || !feat || !layer) return null;
+          const opts = (el) => [...el.options].map(o => o.value);
+          return {
+            sources: opts(src),
+            features: opts(feat).length,
+            layers: opts(layer),
+            layerEnabled: !layer.disabled,
+          };
+        });
+        check('a patch names the source it listens to',
+          !!patch && ['room', 'film', 'sound'].every(x => patch.sources.includes(x)),
+          patch ? patch.sources.join(', ') : 'no source select');
+        check('and the plate it lands on',
+          !!patch && patch.layers.includes('all') && patch.layers.length > 1,
+          patch ? patch.layers.join(', ') : '');
+
+        // Switching to the sound has to change the feature list with it: a
+        // microphone cannot tell you how many people are in the room, and a
+        // patch left pointing at a feature its source does not have would read
+        // zero for ever without saying so.
+        const swapped = await page.evaluate(() => {
+          const src = document.querySelector('[data-testid="patch-source-0"]');
+          const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+          set.call(src, 'sound');
+          src.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        });
+        await settle(500);
+        const after = await page.evaluate(() => {
+          const feat = document.querySelector('[data-testid="patch-feature-0"]');
+          return feat ? { value: feat.value, options: [...feat.options].map(o => o.value) } : null;
+        });
+        check('and choosing the sound offers the sound\'s own features',
+          swapped && !!after && after.options.includes('bass') && !after.options.includes('crowd'),
+          after ? after.options.join(', ') : 'no feature select');
+        check('and moves the patch onto one of them',
+          !!after && after.options.includes(after.value),
+          after ? `${after.value}` : '');
+      } else {
+        check('a patch names the source it listens to', false, 'no Add button in The Room');
+      }
+      await page.keyboard.press('Escape');
+      await settle(800);
+
+      /*
         The film as a force, not only a light.
 
         Film Mix and Film Key decide how the reel shows; Film Drive and Film
         Impact decide what it does to the liquid. Both are greyed with a reason
         until there is a film to read, which is the check — a control that
         silently does nothing is the thing this panel keeps being fixed for.
+
+        Opens the panel for itself rather than inheriting whatever the block
+        above left behind. It used to lean on the film-window checks having
+        just been on Projectors, and the moment a block was added between them
+        that went to The Room and closed the panel, this looked for two
+        controls in a panel that was not on screen and reported them missing.
+        A check that depends on the one before it is a check that fails for a
+        reason that has nothing to do with what it is testing.
       */
+      await clickOn('open-all-settings');
+      await settle(1200);
+      await clickOn('settings-nav-projectors');
+      await settle(500);
       const force = await page.evaluate(() => {
         const of = (key) => {
           const el = [...document.querySelectorAll('[data-testid^="pins-"]')]
