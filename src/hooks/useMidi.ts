@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
-  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT,
+  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, settingLed,
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
@@ -93,6 +93,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const hostRef = useRef(host); hostRef.current = host;
   const mapRef = useRef(map); mapRef.current = map;
   const learningRef = useRef(learning); learningRef.current = learning;
+  /** What each control was last told to show, so nothing is sent twice. */
+  const ledRef = useRef(new Map<string, number>());
   /** The surface being learned, or null when nothing is listening for one. */
   const watchRef = useRef<SurfaceWatcher | null>(null);
   const tallyTick = useRef(0);
@@ -229,7 +231,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         that is a fader moving, which is exactly when you want to see which
         one you have hold of.
       */
-      if (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed) touch(touchKey(t));
+      if (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed) {
+        // The value goes with it, so the activity view can say where a fader
+        // landed without reading the setting back and racing the update.
+        touch(touchKey(t), t.kind === 'setting' ? hostRef.current.getSetting(t.key) : undefined);
+      }
     }
   }, [setMap, takeover, lastApplied]);
   const handleRef = useRef(handle); handleRef.current = handle;
@@ -342,6 +348,28 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const out = outputFor();
     if (!out) return;
     const f = feedbackRef.current;
+    const sent = ledRef.current;
+    /*
+      Nothing is sent twice.
+
+      This used to run only when a preset, a dye, a toggle or the bank changed
+      — a handful of times a minute — so writing every control each time cost
+      nothing. It now also runs on a timer, because a knob's LED ring has to
+      follow a setting the *screen* changed, and a setting has no event to hang
+      off. Forty controls ten times a second is four hundred messages a second
+      down a cable that also carries the clock, so each control is written only
+      when what it should show has actually changed. In the steady state that
+      is no traffic at all.
+    */
+    const write = (src: MidiSource, level: number) => {
+      const k = sourceKey(src);
+      if (sent.get(k) === level) return;
+      sent.set(k, level);
+      try {
+        if (src.kind === 'note') out.send([0x90 | (src.channel & 0x0f), src.number & 0x7f, level & 0x7f]);
+        else out.send([0xb0 | (src.channel & 0x0f), src.number & 0x7f, level & 0x7f]);
+      } catch { /* the port went away */ }
+    };
     // One decision per control, not one per binding.
     //
     // A pad on another layer is not doing anything, so it must not be lit as
@@ -363,11 +391,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       const b = (onThisBank.length ? onThisBank : group.filter(x => x.bank === undefined))[0];
       if (!b) {
         // Bound, but not on this layer: dark.
-        const src = group[0].source;
-        try {
-          if (src.kind === 'note') out.send([0x90 | (src.channel & 0x0f), src.number & 0x7f, 0]);
-          else out.send([0xb0 | (src.channel & 0x0f), src.number & 0x7f, 0]);
-        } catch { /* the port went away */ }
+        write(group[0].source, 0);
         continue;
       }
       const t = b.target;
@@ -382,12 +406,26 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         const on = toggleState(t.action, f.toggles);
         const lit = on === null ? true : on;           // one-shots stay lit so they can be found in the dark
         level = b.source.kind === 'cc' ? (lit ? 127 : 0) : (lit ? 1 : 0);
+      } else if (t.kind === 'setting' && b.source.kind === 'cc' && b.mode !== 'relative') {
+        /*
+          A knob's LED ring, showing where the setting actually is.
+
+          This was the one target kind feedback skipped, so a controller with
+          rings round its knobs showed nothing at all — and worse, showed
+          nothing *differently* from the truth the moment a preset loaded and
+          moved forty settings the hardware knew nothing about. Load Crowd
+          Plate and the rings now follow it.
+
+          Only for absolute controls. An endless encoder has no position to
+          show, and a motorised fader would be driven to the value — which is
+          right, and is what a motorised fader is for.
+        */
+        const cur = hostRef.current.getSetting(t.key);
+        if (cur === undefined) continue;
+        level = settingLed(cur, t.min, t.max);
       }
       if (level === null) continue;
-      try {
-        if (b.source.kind === 'note') out.send([0x90 | (b.source.channel & 0x0f), b.source.number & 0x7f, level & 0x7f]);
-        else out.send([0xb0 | (b.source.channel & 0x0f), b.source.number & 0x7f, level & 0x7f]);
-      } catch { /* the port went away */ }
+      write(b.source, level);
     }
   }, [outputFor]);
 
@@ -397,6 +435,33 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const t = setTimeout(sendFeedback, 60);
     return () => clearTimeout(t);
   }, [enabled, fbKey, map, outputs, ports.output, sendFeedback]);
+
+  /*
+    A different port, or MIDI coming back, is a controller that knows nothing.
+
+    The cache above is what it was told last, and a controller that was just
+    plugged in was told none of it — so the cache has to be forgotten or every
+    LED stays dark until something happens to change it.
+  */
+  useEffect(() => { ledRef.current.clear(); }, [enabled, ports.output, map.name]);
+
+  /*
+    Settings have no event to hang feedback off.
+
+    A preset load moves forty of them at once, a fader on screen moves one, and
+    the sequencer moves them over minutes — none of which is a React update
+    this hook can watch without re-rendering on every frame of it. So the rings
+    are brought up to date on a timer instead. Ten times a second is under the
+    eye's threshold for a knob you are not touching, and costs nothing because
+    `sendFeedback` only writes what changed.
+  */
+  useEffect(() => {
+    if (!enabled) return;
+    const ticking = mapRef.current.bindings.some(b => b.target.kind === 'setting' && b.source.kind === 'cc');
+    if (!ticking) return;
+    const id = setInterval(sendFeedback, 100);
+    return () => clearInterval(id);
+  }, [enabled, map, ports.output, sendFeedback]);
 
   // ── Learn, edit, files ──────────────────────────────────────────
   const learn = useCallback((target: MidiTarget, mode: 'absolute' | 'relative' = 'absolute') => setLearning({ target, mode }), []);

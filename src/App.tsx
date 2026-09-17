@@ -27,6 +27,7 @@ import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
 import { MidiPanel } from './components/MidiPanel';
+import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
@@ -82,6 +83,7 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
+const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
   try {
@@ -221,7 +223,7 @@ export default function App() {
       the flash and the timer are the real ones.
     */
     (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
-      (key: string) => { touch(key); };
+      (key: string, value?: number) => { touch(key, value); };
   }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   /** For the first-gesture handler, which is installed once and must not close over a stale value. */
@@ -735,6 +737,20 @@ export default function App() {
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [showMidi, setShowMidi] = useState(false);
+  /*
+    The controller's own readout, and whether it is up.
+
+    A property of this desk rather than of a look: whether you want to see what
+    the hardware is doing depends on how well you know the map, not on which
+    preset is loaded. Remembered, because someone who wants it wants it all
+    night and someone who does not should not have to hide it every time.
+  */
+  const [showActivity, setShowActivity] = useState<boolean>(() => {
+    try { return localStorage.getItem(MIDI_ACTIVITY_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(MIDI_ACTIVITY_KEY, showActivity ? '1' : '0'); } catch { /* private window */ }
+  }, [showActivity]);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title'>('none');
   const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
@@ -1728,6 +1744,8 @@ export default function App() {
     const opening: Command[] = [
       { id: 'open-settings', name: 'Settings',        kind: 'Open', run: openAllSettings },
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
+      { id: 'midi-activity', name: showActivity ? 'Hide what the controller is doing' : 'Show what the controller is doing',
+        kind: 'Open', run: () => setShowActivity(v => !v) },
       { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
@@ -2470,8 +2488,20 @@ export default function App() {
 
       {/* ── MIDI ───────────────────────────────────────────────── */}
       <AnimatePresence>
+        {showActivity && overlaysVisible && (
+          <MidiActivity
+            presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
+            onHide={() => setShowActivity(false)}
+          />
+        )}
         {showMidi && (
-          <MidiPanel midi={midi} presets={allPresets.map(p => ({ id: p.id, name: p.name }))} onClose={() => setShowMidi(false)} />
+          <MidiPanel
+            midi={midi}
+            presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
+            activity={showActivity}
+            onActivity={setShowActivity}
+            onClose={() => setShowMidi(false)}
+          />
         )}
       </AnimatePresence>
 

@@ -15,13 +15,16 @@ import { SURFACES, surfaceFor } from '../lib/controllerSurface';
 interface MidiPanelProps {
   midi: MidiController;
   presets: { id: string; name: string }[];
+  /** Whether the controller's own readout is up on the desk, and how to change it. */
+  activity: boolean;
+  onActivity: (on: boolean) => void;
   onClose: () => void;
 }
 
 const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40';
 const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
 
-export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
+export function MidiPanel({ midi, presets, activity, onActivity, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
   // The controller drawn to scale: the fastest way to make a map, and the
   // cheat sheet to read during a show. Falls back to the first surface we
@@ -240,6 +243,19 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
           </p>
         </div>
       )}
+
+      {/*
+        What the controller is doing, on the desk.
+
+        The desk shows six rides, and a controller can reach ninety settings —
+        so riding one of the other eighty-four meant either spending a ride
+        slot on it or riding blind. This puts a running list of what changed
+        and where it landed in the corner instead.
+      */}
+      <label className="mb-3 flex items-center gap-2 text-[10px]" data-testid="midi-activity-toggle">
+        <input type="checkbox" checked={activity} onChange={e => onActivity(e.target.checked)} />
+        Show what the controller is doing, on the desk
+      </label>
 
       {/* Fader manners */}
       <div className="flex items-center gap-2 mb-4 text-[10px]">

@@ -30,7 +30,25 @@ import type { MidiTarget } from './midi';
 
 type Listener = (at: number) => void;
 
+/** One thing the controller did, for anything watching the lot of it. */
+export interface TouchEvent {
+  key: string;
+  at: number;
+  /** Where the setting landed, for a fader. Absent for a pad: it has no level. */
+  value?: number;
+}
+
 const listeners = new Map<string, Set<Listener>>();
+/**
+ * Watchers of everything, for the activity view.
+ *
+ * Separate from the per-key listeners because they want opposite things: a cue
+ * row wants to be woken only by its own preset and nothing else, while the
+ * activity view wants the lot and does its own coalescing. Sending everything
+ * to every per-key listener to serve one reader would have made a fader sweep
+ * re-render forty rows.
+ */
+const watchers = new Set<(e: TouchEvent) => void>();
 
 /** A stable name for a thing the controller can hit. */
 export function touchKey(t: MidiTarget): string {
@@ -46,13 +64,21 @@ export function touchKey(t: MidiTarget): string {
  * Something was hit. Called from the MIDI handler and from anywhere else that
  * fires the same targets, so the screen agrees whichever hand did it.
  */
-export function touch(key: string, at: number = performance.now()): void {
+export function touch(key: string, value?: number, at: number = performance.now()): void {
   const set = listeners.get(key);
-  if (!set) return;
   // Copied before iterating: a listener that unsubscribes itself while being
   // told — a row unmounting because the cue list just changed under it — would
   // otherwise mutate the set mid-loop.
-  for (const fn of [...set]) fn(at);
+  if (set) for (const fn of [...set]) fn(at);
+  if (watchers.size === 0) return;
+  const e: TouchEvent = value === undefined ? { key, at } : { key, at, value };
+  for (const fn of [...watchers]) fn(e);
+}
+
+/** Tell me about everything. For the activity view, which shows the lot. */
+export function subscribeAllTouches(fn: (e: TouchEvent) => void): () => void {
+  watchers.add(fn);
+  return () => { watchers.delete(fn); };
 }
 
 /** Tell me when this is hit. Returns the way to stop being told. */
@@ -76,4 +102,5 @@ export const touchKeysWatched = (): number => listeners.size;
 /** Forget everything. Only for tests: the app never stops listening. */
 export function resetTouch(): void {
   listeners.clear();
+  watchers.clear();
 }
