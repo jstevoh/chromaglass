@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
-import { Button, CueRow, Segmented, Slider, Tag, Toggle } from '../ui';
+import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
+import { PALETTE } from '../../constants';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
@@ -112,6 +113,17 @@ interface PerformDeskProps {
 
 const TOOLS = [['dropper', 'Drop', 'D'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P']] as const;
 
+/**
+ * A dye pad fires by palette index, and the tray holds hexes — so the tray has
+ * to find its own index to know which pad lights it. Null for a dye that is not
+ * in the palette (an image dye, a colour picked by hand), which no pad can
+ * reach and so should never flash.
+ */
+const dyeKey = (hex: string): string | null => {
+  const i = PALETTE.findIndex(c => c.hex.toLowerCase() === hex.toLowerCase());
+  return i < 0 ? null : `dye:${i}`;
+};
+
 export function PerformDesk(p: PerformDeskProps) {
   const [picking, setPicking] = useState(false);
   const next = p.cues.find(c => c.id === p.nextId) ?? null;
@@ -153,6 +165,7 @@ export function PerformDesk(p: PerformDeskProps) {
               }
               onClick={() => p.onCue(c.id)}
               onDoubleClick={() => p.onCueNow(c.id)}
+              midiKey={`preset:${c.id}`}
               testId={`cue-${c.id}`}
             />
           ))}
@@ -172,18 +185,20 @@ export function PerformDesk(p: PerformDeskProps) {
             variant="primary" full height={48} kbd="Space"
             onClick={p.onGo}
             disabled={!next}
+            midiKey="action:go"
             testId="go-button"
           >
             {next ? `Go to ${next.name}` : 'Nothing cued'}
           </Button>
           <div className="mt-2 flex gap-2">
-            <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} testId="back-button">Back</Button>
+            <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} midiKey="action:revert" testId="back-button">Back</Button>
             {/* Inverted while it is on: a blacked-out room is exactly when
                 you need the button to say so without reading it. */}
             <Button
               full height={40} kbd="B"
               variant={p.blackout ? 'primary' : 'danger'}
               onClick={p.onBlackout}
+              midiKey="action:blackout-toggle"
               testId="blackout-button"
             >
               {p.blackout ? 'Blacked out' : 'Blackout'}
@@ -219,17 +234,16 @@ export function PerformDesk(p: PerformDeskProps) {
           />
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
-              <button
+              <Swatch
                 key={hex}
+                hex={hex}
+                selected={p.dye?.toLowerCase() === hex.toLowerCase()}
                 onClick={() => p.onDye(hex)}
-                className="h-9 w-9 rounded-md transition-transform active:scale-95"
-                style={{
-                  background: hex,
-                  boxShadow: p.dye?.toLowerCase() === hex.toLowerCase()
-                    ? '0 0 0 2px var(--color-elevated), 0 0 0 3px #FAFAFA' : undefined,
-                }}
-                aria-label={hex}
-                data-testid={`dye-${hex.replace('#','')}`}
+                midiKey={dyeKey(hex)}
+                className="h-9 w-9"
+                gap="var(--color-elevated)"
+                title={hex}
+                testId={`dye-${hex.replace('#','')}`}
               />
             ))}
           </div>
@@ -277,6 +291,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 cc={p.ccFor(key)}
                 white={WHITE.has(String(key))}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                midiKey={`setting:${String(key)}`}
                 testId={`ride-${String(key)}`}
               />
             );
@@ -316,8 +331,8 @@ export function PerformDesk(p: PerformDeskProps) {
           </Button>
         </div>
         <div className="flex shrink-0 gap-2 p-3">
-          <Button full height={40} kbd="F" onClick={p.onFreeze} testId="freeze-button">{p.frozen ? 'Thaw' : 'Freeze'}</Button>
-          <Button full height={40} onClick={p.onDrain} testId="drain-button">Drain</Button>
+          <Button full height={40} kbd="F" onClick={p.onFreeze} midiKey="action:play-toggle" testId="freeze-button">{p.frozen ? 'Thaw' : 'Freeze'}</Button>
+          <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
         </div>
       </aside>
 

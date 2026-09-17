@@ -31,6 +31,7 @@ import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
 import { useFilmSense } from './hooks/useFilmSense';
+import { touch } from './lib/midiTouch';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
@@ -210,6 +211,17 @@ export default function App() {
     if (!new URLSearchParams(window.location.search).has('debug')) return;
     (window as unknown as { chromaglassApplyPreset?: unknown }).chromaglassApplyPreset =
       (id: string) => { cuePresetRef.current?.(id); };
+    /*
+      Fire the controller's "this was hit" signal by hand.
+
+      For the harness only, and it exists because the browser it drives has no
+      Web MIDI at all — so the one thing a check could not otherwise do is
+      prove that a pad press reaches the screen. This is the same call the MIDI
+      handler makes and nothing else about the path is faked: the subscription,
+      the flash and the timer are the real ones.
+    */
+    (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
+      (key: string) => { touch(key); };
   }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   /** For the first-gesture handler, which is installed once and must not close over a stale value. */

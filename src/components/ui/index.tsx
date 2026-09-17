@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import { useMidiTouch } from '../../hooks/useMidiTouch';
 
 /**
  * The desk's vocabulary.
@@ -41,7 +42,7 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
 };
 
 export function Button({
-  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon,
+  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon, midiKey,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -54,17 +55,21 @@ export function Button({
   disabled?: boolean;
   testId?: string;
   icon?: ReactNode;
+  /** What a controller hits to press this, so the button lights when it does. */
+  midiKey?: string | null;
 }) {
+  const hit = useMidiTouch(midiKey ?? null);
   return (
     <button
       onClick={onClick}
       title={title}
       disabled={disabled}
       data-testid={testId}
+      data-midi-hit={hit ? 'true' : undefined}
       style={{ height }}
       className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-40 ${
         full ? 'w-full' : ''
-      } ${BUTTON_VARIANT[variant]}`}
+      } ${BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
     >
       {icon}
       <span className={`${variant === 'primary' ? 'text-[14px]' : 'text-[13px]'} font-medium`}>{children}</span>
@@ -113,6 +118,61 @@ export function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?
     : tone === 'next' ? 'bg-accent-bg text-accent-text'
     : 'bg-active text-muted';
   return <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+}
+
+// ── Touched by the controller ────────────────────────────────────────
+
+/*
+  What a control looks like the moment a pad fires it.
+
+  White, not a colour. The design system gives each of its three chromatic
+  colours exactly one meaning — violet is cued, red is live, green is connected
+  — and a fourth meaning painted in one of them would make that one stop
+  reading. White is the system's "this is the thing", and a ring is the one
+  decoration that does not move anything: a row that grew or shifted on every
+  pad press would make a cue list jump around under a hand reaching for it.
+
+  Sized to be seen across a room rather than admired up close. It is on for
+  about a quarter of a second, which is long enough to catch out of the corner
+  of an eye and short enough that four pads in a bar do not smear into one.
+*/
+export const MIDI_HIT = 'ring-2 ring-text ring-offset-1 ring-offset-bg';
+
+/**
+ * A dye, as a square you can press — and that lights when a pad presses it.
+ *
+ * One component for the desk's tray and the bench's grid, which draw the same
+ * thing at different sizes, because the flash has to be identical in both: an
+ * operator learning which pad is which should not have to learn it twice.
+ */
+export interface SwatchProps extends Keyed {
+  hex: string;
+  selected: boolean;
+  onClick: () => void;
+  midiKey?: string | null;
+  className?: string;
+  /** The colour of the ring's inner gap, so the selection reads on either background. */
+  gap?: string;
+  title?: string;
+  testId?: string;
+}
+
+export function Swatch({ hex, selected, onClick, midiKey, className = '', gap = 'var(--color-bg)', title, testId }: SwatchProps) {
+  const hit = useMidiTouch(midiKey ?? null);
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title ?? hex}
+      data-testid={testId}
+      data-midi-hit={hit ? 'true' : undefined}
+      className={`rounded-md transition-transform active:scale-95 ${className} ${hit ? MIDI_HIT : ''}`}
+      style={{
+        background: hex,
+        boxShadow: selected ? `0 0 0 2px ${gap}, 0 0 0 3px #FAFAFA` : undefined,
+      }}
+    />
+  );
 }
 
 // ── Status dot ───────────────────────────────────────────────────────
@@ -169,16 +229,30 @@ export interface SliderProps extends Keyed {
   white?: boolean;
   touch?: boolean;
   testId?: string;
+  /** The setting a controller moves to reach this, so its CC lights when one does. */
+  midiKey?: string | null;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
+  /*
+    A fader already moves this bar — both go through the same number. What it
+    does not show is *which* of ten rides the hand is on, which is the question
+    when a strip is full and a knob is unlabelled. So the CC chip lights while
+    the control is being moved, and the bar is left alone: a strip where every
+    ride jumped on every message would be unreadable.
+  */
+  const hit = useMidiTouch(midiKey ?? null);
   return (
-    <div className="mb-5" data-testid={testId}>
+    <div className="mb-5" data-testid={testId} data-midi-hit={hit ? 'true' : undefined}>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <span className="text-[13px] font-medium text-text">{label}</span>
         <span className="flex items-center gap-2">
-          {cc != null && <span className="font-mono text-[11px] text-faint">CC {cc}</span>}
+          {cc != null && (
+            <span className={`rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+              hit ? 'bg-text text-bg' : 'text-faint'
+            }`}>CC {cc}</span>
+          )}
           <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
         </span>
       </div>
@@ -246,9 +320,12 @@ export interface CueRowProps extends Keyed {
   onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
   testId?: string;
+  /** The preset a controller fires to reach this row, so it lights when one does. */
+  midiKey?: string | null;
 }
 
-export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId }: CueRowProps) {
+export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
+  const hit = useMidiTouch(midiKey ?? null);
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
     : 'border-transparent hover:bg-hover';
@@ -259,7 +336,8 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       onContextMenu={onContextMenu}
       data-testid={testId}
       data-state={state}
-      className={`flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell}`}
+      data-midi-hit={hit ? 'true' : undefined}
+      className={`flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />

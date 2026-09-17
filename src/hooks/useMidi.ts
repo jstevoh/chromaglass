@@ -8,6 +8,7 @@ import {
 } from '../lib/midi';
 import { SurfaceWatcher, buildAutoMap } from '../lib/autoMap';
 import { PALETTE } from '../constants';
+import { touch, touchKey } from '../lib/midiTouch';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
 
@@ -219,6 +220,16 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         case 'preset': if (pressed) h.applyPreset(t.presetId); break;
         case 'dye':    if (pressed) h.selectDye(t.paletteIndex); break;
       }
+      /*
+        Say on screen that this was hit.
+
+        Only for what actually fired: a pad held down past its note-on, or a
+        fader the soft takeover is still ignoring, has not done anything and
+        should not claim to have. A setting says so on every message because
+        that is a fader moving, which is exactly when you want to see which
+        one you have hold of.
+      */
+      if (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed) touch(touchKey(t));
     }
   }, [setMap, takeover, lastApplied]);
   const handleRef = useRef(handle); handleRef.current = handle;
