@@ -25,6 +25,7 @@
  */
 
 import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 
 const PORT = 4178;
@@ -96,11 +97,7 @@ function stopServer(proc) {
 }
 
 const server = await serve();
-const browser = await chromium.launch({
-  headless: !HEADED,
-  executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--enable-unsafe-swiftshader'],
-});
+const browser = await launchChromium(chromium, { headless: !HEADED });
 
 const errors = [];
 /*
@@ -133,6 +130,29 @@ await page.addInitScript(() => {
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
+
+/**
+ * Press Escape and wait for a panel to actually be gone.
+ *
+ * Not `settle(n)` and then look. A panel closing is a React state change
+ * followed by an unmount, on a page whose main thread is also running a fluid
+ * solver — so how long it takes is a property of the machine, not of the app.
+ * Measured here: about 600ms on a laptop and past four seconds on a loaded
+ * runner rasterising in software, which is how a 500ms window passed five
+ * times locally and failed the first time CI ever ran it.
+ *
+ * The assertion is unchanged — the panel must close — and only the accidental
+ * one, that it closes inside one arbitrary window, is gone. A panel that never
+ * closes still fails, six seconds later.
+ */
+const escapeCloses = async (testId) => {
+  await page.keyboard.press('Escape');
+  for (let i = 0; i < 20; i++) {
+    if ((await page.getByTestId(testId).count()) === 0) return true;
+    await settle(300);
+  }
+  return false;
+};
 /**
  * `.first()`, because a panel may legitimately carry a control the toolbar
  * also has. It is deliberately forgiving — which is why the duplicate check
@@ -226,6 +246,34 @@ try {
 
   const title = await page.title();
   check('the page has a title', !!title && title.length > 0, title);
+
+  // ── The first five seconds ────────────────────────────────────────
+  // A stranger's first visit has to *show* what this is, and what this is is a
+  // light show played by music. It used to land on a plate with nothing
+  // driving it until the visitor found a button. The band is silent and opens
+  // no device, so it costs a permission prompt of nothing — but the browser
+  // will not run audio before a gesture, so the earliest it can start is the
+  // first click anywhere, which is what this checks.
+  {
+    const heard = () => page.evaluate(() => window.chromaglassCastState?.().audio?.volume ?? null);
+    check('nothing is listening before the first gesture', (await heard()) === null);
+    await page.mouse.click(5, 5);
+    // The analyser has to open and the room calibration has to learn a floor
+    // before a level means anything, which takes seconds by design (and more
+    // of them under software rasterisation). This waits for a reading rather
+    // than for a fixed delay.
+    let playing = null;
+    for (let i = 0; i < 20 && !(playing > 0); i++) {
+      await settle(1000);
+      playing = await heard();
+    }
+    check('a first visit is driven by the band after one click',
+      playing > 0,
+      playing === null ? 'no audio reaching the show at all' : `volume ${Number(playing).toFixed(1)}`);
+    check('and it still opened no device to do it',
+      (await page.evaluate(() => window.__media.length)) === 0,
+      JSON.stringify(await page.evaluate(() => window.__media)));
+  }
 
   // Which solver did this run actually measure? A suite that is green on the
   // CPU fallback has said nothing about the GPU shaders, and the line above
@@ -450,14 +498,24 @@ try {
   // ── The band, and the audio sources ───────────────────────────────
   await page.keyboard.press('Escape');
   await settle(500);
+  //
+  // The band is already playing by now — a first visit starts it on the first
+  // gesture — so this checks the button *toggles*, which is the thing that can
+  // break, rather than assuming it starts from off. Clicking it once must stop
+  // the band, and clicking it again must start it, and neither may open a
+  // device.
   const band = firstVisible('simulated-audio-button');
   const beforeBand = await page.evaluate(() => window.__media.length);
+  const bandLit = async () => (await band.getAttribute('class')).includes('fuchsia');
+  const wasLit = await bandLit();
+  await clickOn(band);
+  await settle(2000);
+  check('the band button turns it off', (await bandLit()) !== wasLit, wasLit ? 'was on' : 'was off');
   await clickOn(band);
   await settle(3000);
   check('the band plays without opening a device',
     (await page.evaluate(() => window.__media.length)) === beforeBand);
-  check('the band reports itself as playing',
-    (await band.getAttribute('class')).includes('fuchsia'));
+  check('the band reports itself as playing', await bandLit());
 
   // ── Tools and the plate ───────────────────────────────────────────
   //
@@ -558,12 +616,66 @@ try {
       check('and the contents follows the scrolling', followed.length > 3 && followed[followed.length - 1] !== top,
         `${top} → ${followed.join(' → ')}`);
       await noteDuplicates();
-      await page.keyboard.press('Escape');
-      await settle(500);
-      check('and closes again', (await page.getByTestId('guide-panel').count()) === 0);
+      const closed = await escapeCloses('guide-panel');
+      check('and closes again', closed, closed ? '' : 'still open after six seconds');
     } else {
       check('the manual opens with its sections', false, 'no ? button');
     }
+  }
+
+  // ── The GPU, taken away and given back ────────────────────────────
+  //
+  // A projector plugged into a running laptop, a Mac switching between its
+  // integrated and discrete GPU, a driver resetting under load: the browser
+  // takes the context away and every texture, buffer and program with it. The
+  // default outcome is a canvas that stays black for good, and the only fix a
+  // reload — which mid-set also loses the plate, the cue list and the
+  // sequencer's place.
+  //
+  // `WEBGL_lose_context` is the same event the driver sends, so this is the
+  // real path and not a simulation of it. What is checked is what an audience
+  // would see: the wall is lit before, and it is lit again afterwards.
+  {
+    const litness = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      if (!c) return null;
+      const o = document.createElement('canvas');
+      o.width = 16; o.height = 9;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, 16, 9);
+      const d = x.getImageData(0, 0, 16, 9).data;
+      let sum = 0;
+      for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+      return sum / (16 * 9 * 255);
+    });
+    // Lay a known plate first. By this point the suite has blacked out,
+    // drained, cleared, zoomed and dragged its way through fifty checks, and
+    // the plate it leaves behind is whatever fell out of that — one run
+    // measured it at pure black, which made the recovery check below a
+    // comparison of nothing with nothing. The Fillmore look seeds bright and
+    // immediately, so it is a plate that is definitely on.
+    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    let before = 0;
+    for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
+    check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
+
+    await page.evaluate(() => {
+      const gl = document.querySelector('#liquid-canvas').getContext('webgl2');
+      window.__lose = gl.getExtension('WEBGL_lose_context');
+      window.__lose?.loseContext();
+    });
+    await settle(1500);
+    check('a lost context is noticed and said so',
+      (await page.locator('[data-testid="gl-lost"]').count()) === 1);
+
+    await page.evaluate(() => window.__lose?.restoreContext());
+    // Generous: the rebuild is a whole GL setup and then a plate laid again,
+    // on a machine rasterising in software.
+    let after = 0;
+    for (let i = 0; i < 20 && !(after > 0.01); i++) { await settle(1500); after = await litness(); }
+    check('and the show comes back by itself', after > 0.01, `luminance ${after?.toFixed(3)}`);
+    check('and says nothing is wrong any more',
+      (await page.locator('[data-testid="gl-lost"]').count()) === 0);
   }
 
   // ── A reload keeps what it should and asks for nothing ────────────
@@ -618,6 +730,156 @@ try {
     check('and costs the render not one pixel',
       perform.w === bench.w && perform.h === bench.h,
       `${bench.w}×${bench.h} → ${perform.w}×${perform.h}`);
+
+    // ── The mode switch stays where it is ──────────────────────────
+    //
+    // Design carries Save and Send to wall on the right and Perform carries
+    // nothing, so a header laid out with `justify-between` slid the middle
+    // group by the width of two buttons every time you used it — measured at
+    // 137px. The one control whose whole job is to be in the same place every
+    // time was the one that moved when you pressed it.
+    {
+      const at = () => page.evaluate(() => {
+        const r = document.querySelector('[data-testid="mode-segmented"]')?.getBoundingClientRect();
+        return r ? Math.round(r.x) : null;
+      });
+      const inPerform = await at();
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+      const inDesign = await at();
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+      const back = await at();
+      const drift = Math.max(Math.abs(inDesign - inPerform), Math.abs(back - inPerform));
+      check('the mode switch does not move when you use it', drift <= 1,
+        `perform ${inPerform}, design ${inDesign}, back ${back} — ${drift}px`);
+    }
+
+    // ── Every setting is reachable ─────────────────────────────────
+    //
+    // Ten of the sixteen sections used to sit behind a tab that nothing gave
+    // anyone a reason to press, on a panel that opened on the other one — so
+    // the room camera, the projectors, the solver and the physics were all
+    // there and none of them could be found. Three ways in, all checked: the
+    // All tab, the search box, and a command-palette row per section.
+    {
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+
+      // Both desks' own way in, and it has to be *on screen*. The first
+      // version of this button sat at the end of the recipe, which scrolls —
+      // so the one control whose entire job is to be findable was itself
+      // below the fold. It is in the pinned footer of each now, and this
+      // checks the property rather than the existence.
+      //
+      // And it has to open on *all* of them, from either desk. A button that
+      // says "All settings…" and lands you on six of the sixteen groups is the
+      // same trap through a different door — which is exactly what happened
+      // when Perform grew this button while the sheet still defaulted to the
+      // Perform half there.
+      const entryOn = async (deskLabel) => {
+        const el = await page.evaluate(() => {
+          const e = document.querySelector('[data-testid="open-all-settings"]');
+          if (!e) return null;
+          const r = e.getBoundingClientRect();
+          return { onScreen: r.top >= 0 && r.bottom <= window.innerHeight && r.width > 40, top: Math.round(r.top) };
+        });
+        check(`${deskLabel} has a visible way into every setting`,
+          !!el && el.onScreen, el ? `at y=${el.top}` : 'no button');
+        if (!el?.onScreen) return;
+        await clickOn('open-all-settings');
+        await settle(1200);
+        const opened = await page.evaluate(() => {
+          const pane = document.querySelector('[data-testid="settings-panel"]');
+          if (!pane) return null;
+          const all = [...pane.querySelectorAll('section[data-section]')];
+          const room = pane.querySelector('[data-section="room"]');
+          return {
+            total: all.length,
+            visible: all.filter(x => !x.classList.contains('hidden')).length,
+            room: !!room && !room.classList.contains('hidden'),
+          };
+        });
+        check(`and from ${deskLabel} it opens on all of them`,
+          !!opened && opened.total >= 16 && opened.total === opened.visible && opened.room,
+          opened ? `${opened.visible} of ${opened.total}, room ${opened.room}` : 'no panel');
+
+        // The split is still there as a filter you pick, which is the whole
+        // reason it is allowed to exist.
+        await clickOn('settings-tab-perform');
+        await settle(600);
+        const filtered = await page.evaluate(() => {
+          const pane = document.querySelector('[data-testid="settings-panel"]');
+          const all = [...pane.querySelectorAll('section[data-section]')];
+          return all.filter(x => !x.classList.contains('hidden')).length;
+        });
+        check(`and the halves still narrow it from ${deskLabel}`,
+          filtered > 0 && filtered < 16, `Perform shows ${filtered} of 16`);
+        await page.keyboard.press('Escape');
+        await settle(700);
+      };
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+      await entryOn('the desk');
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+      await entryOn('the bench');
+
+      await page.keyboard.press('Meta+k');
+      await settle(700);
+      await page.keyboard.type('Settings: The Room');
+      await settle(600);
+      await page.keyboard.press('Enter');
+      await settle(1500);
+
+      const panel = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        if (!pane) return null;
+        const all = [...pane.querySelectorAll('section[data-section]')];
+        const room = pane.querySelector('[data-section="room"]');
+        const watch = pane.querySelector('[data-testid="scene-toggle"], [data-section="room"] button');
+        return {
+          total: all.length,
+          visible: all.filter(x => !x.classList.contains('hidden')).length,
+          roomVisible: !!room && !room.classList.contains('hidden'),
+          reachedRoom: !!watch,
+          tab: [...pane.querySelectorAll('[role="tab"]')]
+            .find(t => t.getAttribute('aria-selected') === 'true')?.textContent?.trim(),
+        };
+      });
+      check('a palette row opens Settings at the section it names', !!panel && panel.roomVisible,
+        panel ? `tab ${panel.tab}, room ${panel.roomVisible}` : 'no settings panel');
+      check('and every section is on screen, not ten of them behind a tab',
+        !!panel && panel.total === panel.visible && panel.total >= 16,
+        panel ? `${panel.visible} of ${panel.total} showing` : '');
+      check('and the room camera is among them', !!panel && panel.reachedRoom);
+
+      // The search reaches a section by what it is about, not by its heading:
+      // "people" is the word someone types, and it is nowhere in "The Room".
+      const found = await page.evaluate(() => {
+        const input = document.querySelector('[data-testid="settings-search"]');
+        if (!input) return null;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'people');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      });
+      await settle(600);
+      const afterSearch = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        const all = [...pane.querySelectorAll('section[data-section]')];
+        const vis = all.filter(x => !x.classList.contains('hidden'));
+        return { n: vis.length, ids: vis.map(x => x.dataset.section) };
+      });
+      check('searching what a section is about finds it', found && afterSearch.ids.includes('room'),
+        `"people" → ${afterSearch.ids.join(', ') || 'nothing'}`);
+      check('and searching narrows rather than showing everything',
+        afterSearch.n > 0 && afterSearch.n < 16, `${afterSearch.n} sections`);
+
+      await page.keyboard.press('Escape');
+      await settle(800);
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+    }
 
     // One control surface, not two. A check that passes because neither
     // element exists is measuring nothing, so it names what it looked for.
@@ -688,12 +950,7 @@ try {
       // takes any click meant for it, so one left open turns the next check
       // into "the click went to the scrim" — which reads as the app failing
       // to do whatever that click asked for.
-      await page.keyboard.press('Escape');
-      let gone = false;
-      for (let i = 0; i < 20 && !gone; i++) {
-        gone = (await page.getByTestId(id).count()) === 0;
-        if (!gone) await settle(300);
-      }
+      const gone = await escapeCloses(id);
       check(`and ${query} closes again`, gone, gone ? '' : 'still open — the next check would be clicking its scrim');
     }
 

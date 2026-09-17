@@ -245,10 +245,19 @@ export class CameraPass {
     gl.viewport(0, 0, width, height);
   }
 
-  /** Look at the drawn plate through the camera, onto the screen. */
-  draw(width: number, height: number, u: CameraUniforms): void {
+  /**
+   * Look at the drawn plate through the camera.
+   *
+   * Onto the screen, or into `target` when something downstream still has to
+   * happen to the frame — the output pass, which squares and masks it for the
+   * projector, is the only such thing today.
+   */
+  draw(width: number, height: number, u: CameraUniforms, target: WebGLFramebuffer | null = null): void {
     const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+    // Draw-buffer state belongs to the framebuffer object, so the default one
+    // needs nothing here — and would reject an attachment name if it got it.
+    if (target) gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
     gl.viewport(0, 0, width, height);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);

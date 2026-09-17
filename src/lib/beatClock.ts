@@ -44,6 +44,24 @@ export class BeatClock {
   private firedPrediction = false;
   private lastLevel = 0;
   private lastOnsetAt = -Infinity;
+  /**
+   * Until when an outside tempo is driving.
+   *
+   * A MIDI clock, a tap or a typed number does not have to be worked out from
+   * onsets, so while one is speaking the onsets stop re-timing anything: they
+   * are still absorbed (so a heard kick and a clocked one are not two kicks)
+   * but they cannot drag the period around, which is the whole point of
+   * plugging a clock in. Refreshed every frame by whoever is driving; a beat
+   * or two after they stop, the microphone has it back.
+   */
+  private externalUntil = 0;
+  /** The last outside beat taken, so the same one is not re-phased every frame. */
+  private externalSeq = -1;
+
+  /** True while something outside is setting the tempo. */
+  driven(now: number): boolean {
+    return now < this.externalUntil;
+  }
 
   reset(): void {
     this.period = 0;
@@ -54,6 +72,52 @@ export class BeatClock {
     this.firedPrediction = false;
     this.lastLevel = 0;
     this.lastOnsetAt = -Infinity;
+    this.externalUntil = 0;
+    this.externalSeq = -1;
+  }
+
+  /**
+   * Take the tempo from outside.
+   *
+   * Call every frame with whatever the tempo source is reading, and with null
+   * when it is reading nothing. `beatAt` is when a beat actually fell, and is
+   * the half that matters: a clock with the right period and the wrong phase
+   * puts every kick half a beat late, which is worse than not being locked at
+   * all. A source with no phase of its own (a typed bpm) passes null and the
+   * clock keeps the bar it is already on.
+   *
+   * The phase is only re-snapped when `seq` says a *new* beat arrived, so a
+   * held reading does not reset the prediction sixty times a second and stop
+   * it ever firing.
+   */
+  setExternal(now: number, reading: { period: number; beatAt: number | null; seq: number } | null): void {
+    if (!reading || !(reading.period > 0)) {
+      this.externalSeq = -1;
+      return;                      // externalUntil simply lapses
+    }
+    this.externalUntil = now + 250;
+    this.period = Math.max(MIN_PERIOD, Math.min(MAX_PERIOD, reading.period));
+    this.confidence = 1;
+    if (reading.seq !== this.externalSeq) {
+      this.externalSeq = reading.seq;
+      if (reading.beatAt !== null) {
+        // The beat that just arrived *is* the beat, so the prediction is put
+        // on it and not on the next one. Aiming at `beatAt + period` looks
+        // right and never fires: a MIDI clock sends a beat every beat, so the
+        // target was pushed another period into the future a frame before the
+        // clock could reach it, every time, for ever. (Measured: locked to
+        // 128.0 bpm and fired nothing in twelve seconds.)
+        //
+        // Absorbed the same way a heard onset is: if the run-ahead already
+        // fired for this beat — which is exactly what a non-zero lead makes it
+        // do — then it stays fired and this is not a second kick.
+        const already = this.firedPrediction
+          && Math.abs(reading.beatAt - this.predictedAt) < this.period * 0.3;
+        this.lastBeat = reading.beatAt;
+        this.predictedAt = reading.beatAt;
+        this.firedPrediction = already;
+      }
+    }
   }
 
   /** The next beat the clock expects, in ms, or 0 while it has no beat. */
@@ -78,7 +142,12 @@ export class BeatClock {
       this.confidence = Math.max(0, this.confidence - 0.02);
     }
 
-    const locked = this.period > 0 && this.confidence * trust >= 0.5;
+    // A tempo that was told to the show rather than worked out from the room
+    // locks whatever `trust` says: Beat Prediction is a judgement about how far
+    // to run ahead of a *microphone*, and there is no microphone in a cable
+    // from the desk or a hand on a tap button.
+    const driven = this.driven(now);
+    const locked = this.period > 0 && (driven || this.confidence * trust >= 0.5);
 
     if (onset) {
       this.lastOnsetAt = now;
@@ -87,13 +156,18 @@ export class BeatClock {
       // A heard beat the clock already fired for is the same beat: absorb it.
       // (Judged before the onset re-times the clock.)
       const sameBeat = locked && this.firedPrediction && Math.abs(now - this.predictedAt) < this.period * 0.3;
-      this.hear(now);
+      // Driven from outside, an onset is only ever a thing to absorb. Letting
+      // `hear` run would let a loud crowd or a bass note off the grid pull the
+      // period away from the clock that is telling the truth.
+      if (!driven) this.hear(now);
       if (!sameBeat) kick = true;
     }
 
     if (this.period > 0) {
-      // Missed: the prediction came and went with no onset near it.
-      if (this.firedPrediction && now > this.predictedAt + this.period * 0.35) {
+      // Missed: the prediction came and went with no onset near it. Not while
+      // driven — a clock is right about the beat whether or not anything in
+      // the room happened to be loud on it.
+      if (!driven && this.firedPrediction && now > this.predictedAt + this.period * 0.35) {
         this.confidence = Math.max(0, this.confidence - 0.2);
         this.lastBeat = this.predictedAt;               // coast on the clock's own time
         this.predictedAt += this.period;

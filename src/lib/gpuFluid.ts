@@ -577,8 +577,9 @@ export class GpuFluid {
    * so the CPU never waits on the GPU — the field it sees is one frame old,
    * which the bead camera and the dye regulator cannot tell.
    */
-  private pbo: { dye: WebGLBuffer; vel: WebGLBuffer; fence: WebGLSync | null }[] = [];
-  private pboSlot = 0;
+  private pbo: { dye: WebGLBuffer; vel: WebGLBuffer; fence: WebGLSync | null; seq: number }[] = [];
+  /** Which read each slot is holding, so the newest one that has landed is the one taken. */
+  private pboSeq = 0;
   private disposed = false;
   /** Pigment coordinates: .rg is one phase, .ba the other. Null without float render targets. */
   private grain: PingPong | null = null;
@@ -625,7 +626,7 @@ export class GpuFluid {
         gl.bufferData(gl.PIXEL_PACK_BUFFER, logicalSize * logicalSize * 16, gl.STREAM_READ);
         return b;
       };
-      this.pbo.push({ dye: make(), vel: make(), fence: null });
+      this.pbo.push({ dye: make(), vel: make(), fence: null, seq: 0 });
     }
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
 
@@ -912,44 +913,66 @@ export class GpuFluid {
    */
   readbackAsync(): boolean {
     const gl = this.gl;
-    const slot = this.pbo[this.pboSlot];
-    const other = this.pbo[this.pboSlot ^ 1];
-    // Kick off this frame's read into the current slot: two downsample passes,
-    // each read straight into its pack buffer without waiting.
+
+    // ── Collect whatever has landed ──────────────────────────────────
+    // In seq order, so after a stall that signals both slots at once the newer
+    // one is read last and wins. Every landed slot is read, not just the
+    // winner: freeing one without reading it is precisely what the driver
+    // warns about ("written, then fenced, but written again before being read
+    // back"), and skipping the copy to save it only moved the warning from the
+    // frame that wrote the buffer to the frame that reused it. Both slots
+    // landing in the same frame is rare enough that the spare copy costs less
+    // than the discarded read did.
+    const landed = this.pbo.filter(s => {
+      if (!s.fence) return false;
+      const status = gl.clientWaitSync(s.fence, 0, 0);
+      return status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED;
+    }).sort((a, b) => a.seq - b.seq);
+    let fresh = false;
+    for (const s of landed) {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, s.dye);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbDye);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, s.vel);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbVel);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.deleteSync(s.fence!);
+      s.fence = null;
+      fresh = true;
+    }
+
+    // ── Start a new read, into a slot nobody is waiting on ───────────
+    //
+    // Writing a pack buffer whose previous read has not come back yet throws
+    // that read away, and the driver says so once a frame: "READ-usage buffer
+    // was written, then fenced, but written again before being read back. This
+    // discarded the shadow copy that was created to accelerate readback."
+    // Measured at about six a second on a machine rasterising in software —
+    // and each one of them cost two full downsample passes and two readPixels
+    // for a result nothing would ever look at, on exactly the machines least
+    // able to afford it.
+    //
+    // Skipping a frame costs nothing. Everything downstream of this — the bead
+    // camera, the dye regulator — already reads a field one frame old and
+    // cannot tell; two frames old is the same kind of not being able to tell.
+    const free = this.pbo.find(s => !s.fence);
+    if (!free) return fresh;
+
     this.run('downsample', this.readbackTarget, (u) => {
       this.bind(u, 'u_src', this.dye.read.tex, 0);
     }, this.L);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.dye);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, free.dye);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
     this.run('downsample', this.readbackTarget, (u) => {
       this.bind(u, 'u_src', this.vel.read.tex, 0);
     }, this.L);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.vel);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, free.vel);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    if (slot.fence) gl.deleteSync(slot.fence);
-    slot.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    free.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    free.seq = ++this.pboSeq;
     gl.flush();
 
-    // Collect the other slot if its work is done; otherwise leave it for next frame.
-    let fresh = false;
-    if (other.fence) {
-      const status = gl.clientWaitSync(other.fence, 0, 0);
-      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, other.dye);
-        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbDye);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, other.vel);
-        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rbVel);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        gl.deleteSync(other.fence);
-        other.fence = null;
-        fresh = true;
-        this.pboSlot ^= 1;
-      }
-    } else {
-      this.pboSlot ^= 1;
-    }
     return fresh;
   }
 

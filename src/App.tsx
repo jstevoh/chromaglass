@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
-import { SettingsPanel } from './components/SettingsPanel';
+import { SettingsPanel, SETTINGS_SECTIONS } from './components/SettingsPanel';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
@@ -31,6 +31,9 @@ import { useSceneCamera } from './hooks/useSceneCamera';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
+import { useWakeLock } from './hooks/useWakeLock';
+import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
+import { TempoSource, bpmOf } from './lib/tempo';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -87,6 +90,20 @@ function rememberedSource(): AudioSource {
   return 'none';
 }
 
+/**
+ * Has anyone ever told this browser where to listen?
+ *
+ * Not the same question as `rememberedSource() === 'none'`, which is also the
+ * answer for someone who turned the microphone off on purpose. This one
+ * separates a first visit from a considered silence, and it is the difference
+ * between a stranger's first five seconds being the thing the project is —
+ * a plate moving to music — and being a plate sitting still while they look
+ * for the button that makes it do something.
+ */
+function everChoseSource(): boolean {
+  try { return localStorage.getItem(AUDIO_SOURCE_KEY) !== null; } catch { return true; }
+}
+
 /** True only if the browser will hand over the microphone without asking. */
 async function micAlreadyAllowed(): Promise<boolean> {
   try {
@@ -125,7 +142,78 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+
+  // The laptop driving the projector must not dim, sleep or screensave: what
+  // it does, the wall does. Held while the plate is running and dropped the
+  // moment it is paused, so a machine left on the desk overnight is not kept
+  // awake by a stopped show. Needs a secure context, so it is live on the
+  // hosted site and on `localhost` — which is where the show is run — and
+  // absent on a plain-http LAN address.
+  const wakeLock = useWakeLock(isActive);
+
+  // ── The projector's geometry and grade ──────────────────────────
+  // Rear-projection flip, corner pin, edge blanking, output grade. Kept on
+  // this machine rather than in the settings, because it describes the room
+  // and not the look: a preset file must not carry a venue's keystone to
+  // whoever opens it next. See `lib/outputConfig.ts`.
+  const [output, setOutputState] = useState<OutputConfig>(loadOutput);
+  const setOutput = useCallback((next: OutputConfig | ((prev: OutputConfig) => OutputConfig)) => {
+    setOutputState(prev => {
+      const value = typeof next === 'function' ? (next as (p: OutputConfig) => OutputConfig)(prev) : next;
+      saveOutput(value);
+      return value;
+    });
+  }, []);
+  const resetOutput = useCallback(() => setOutput({ ...DEFAULT_OUTPUT }), [setOutput]);
+
+  // ── Where the tempo comes from ──────────────────────────────────
+  // The microphone, unless something better is offering: a MIDI clock from
+  // the desk, four taps, or a number off the setlist. A ref because the
+  // render loop reads it once a frame and nothing else does; `tempoLabel`
+  // is the only part the UI needs, sampled rather than watched.
+  const tempoRef = useRef<TempoSource | null>(null);
+  if (!tempoRef.current) tempoRef.current = new TempoSource();
+  const [tempoLabel, setTempoLabel] = useState<{ source: string | null; bpm: number; taps: number }>({ source: null, bpm: 0, taps: 0 });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const t = tempoRef.current;
+      if (!t) return;
+      t.read(performance.now());        // lets a stopped MIDI clock lapse
+      setTempoLabel(prev => {
+        const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount };
+        return prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps ? prev : next;
+      });
+    }, 250);
+    return () => clearInterval(timer);
+  }, []);
+  const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
+  const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
+  const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
+
+  // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
+  // drives this to set a corner pin or a mask on a plate that is already
+  // running, so the before and the after are the same look half a second
+  // apart rather than two different plates from two page loads.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassOutput?: unknown }).chromaglassOutput =
+      (patch: Partial<OutputConfig>) => { setOutput(prev => normalizeOutput({ ...prev, ...patch })); };
+  }, [setOutput]);
+
+  // `npm run shots` photographs the plate at 16:9, which is wider than the
+  // width the overlay's preset menu exists at — above 1024px the desk owns the
+  // window. Rather than photograph a narrow app, it applies presets through
+  // this. The picture is what that harness is about; `npm run qa` is the one
+  // that drives the menu a hand would use.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassApplyPreset?: unknown }).chromaglassApplyPreset =
+      (id: string) => { cuePresetRef.current?.(id); };
+  }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
+  /** For the first-gesture handler, which is installed once and must not close over a stale value. */
+  const audioSourceRef = useRef(audioSource);
+  audioSourceRef.current = audioSource;
   // ── The input the show listens to ──
   // A USB interface fed from the desk beats the laptop's own microphone in
   // any room with a crowd in it. The choice is remembered; the list of
@@ -154,6 +242,14 @@ export default function App() {
   const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  /** Which section the panel should open at, when it was opened from a ⌘K row. */
+  const [settingsSection, setSettingsSection] = useState<string | null>(null);
+  /** Open the settings sheet at the top: both desks' "All settings…" and ⌘K's plain row. */
+  const openAllSettings = useCallback(() => {
+    setSettingsSection(null);
+    setShowSettings(true);
+    setShowHelp(false);
+  }, []);
   const [showHelp, setShowHelp] = useState(false);
   /**
    * Perform, or Design.
@@ -481,14 +577,31 @@ export default function App() {
 
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
+  //
+  // The same gesture starts the band for anyone who has never chosen a source
+  // at all. A first visit used to land on a plate with nothing driving it:
+  // the fluid moved, but the thing the project *is* — a light show played by
+  // the music — needed the visitor to find a button first. The band is
+  // synthesised, silent and opens no device, so it needs no permission and
+  // asks for nothing; it is the demo this app already had and never showed
+  // anybody. It is written to storage like any other choice, so this happens
+  // once per browser and the microphone is still one click away.
   useEffect(() => {
-    const wake = () => { void simulatedRef.current?.resume(); };
+    const wake = () => {
+      void simulatedRef.current?.resume();
+      // After the click has been handled: if the visitor's first gesture was
+      // the Mic button, that choice is already recorded and this does nothing.
+      setTimeout(() => {
+        if (audioSourceRef.current === 'none' && !everChoseSource()) void handleSourceChange('simulated');
+      }, 0);
+    };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
     return () => {
       window.removeEventListener('pointerdown', wake);
       window.removeEventListener('keydown', wake);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -727,6 +840,9 @@ export default function App() {
   // whole fade and checks the stage never darkens; today's clearing path is
   // the control, and it fails that check by a mile.
   const [cued, setCued] = useState<{ id: string; name: string; settings: Partial<VisualizerSettings> } | null>(null);
+  /** The armed look, for the action handlers that are defined above the state they read. */
+  const cuedRef = useRef(cued);
+  cuedRef.current = cued;
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
   const [fading, setFading] = useState(0);        // 0..1 while a Go is running
   // On a timer rather than requestAnimationFrame, for the same reason the
@@ -821,7 +937,11 @@ export default function App() {
    * further down the file than the desk's props are assembled. A ref rather
    * than a reorder: the hook's inputs depend on half the app.
    */
-  const midiRef = useRef<{ map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] } } | null>(null);
+  const midiRef = useRef<{
+    map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] };
+    /** The shift layer, so a pad can step it — the actions run above the hook too. */
+    stepBank: (dir: 1 | -1) => void;
+  } | null>(null);
 
   /** Which CC a ride is learned to, so the desk and the controller agree. */
   const ccFor = useCallback((key: keyof VisualizerSettings): number | null => {
@@ -1117,7 +1237,8 @@ export default function App() {
     presetId: activePresetId,
     presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock]);
+    output,
+  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   const sendCastState = useCallback(() => {
     castSend({ type: 'state', state: castState });
@@ -1229,6 +1350,25 @@ export default function App() {
     if (preset) applyPreset(preset.id, preset.settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /**
+   * Step what is *armed*, not what is live.
+   *
+   * The desk's whole safety story is that a look is chosen, looked at, and
+   * then sent — so the pad that walks the list must move the cue and leave
+   * the wall alone. Nothing cued yet: start from what is playing, so the
+   * first press arms its neighbour rather than jumping to the top of the list.
+   */
+  const stepCue = (dir: 1 | -1) => {
+    if (allPresets.length === 0) return;
+    const from = cuedRef.current?.id ?? activePresetId;
+    const i = allPresets.findIndex(p => p.id === from);
+    const next = allPresets[((i < 0 ? 0 : i + dir) + allPresets.length) % allPresets.length];
+    if (next) cueLook(next.id);
+  };
+  /** For the debug hook, which is installed once and above the callback it calls. */
+  const cuePresetRef = useRef<((id: string) => void) | null>(null);
+  cuePresetRef.current = cuePreset;
+
   const stepPreset = (dir: 1 | -1) => {
     if (allPresets.length === 0) return;
     const i = allPresets.findIndex(p => p.id === activePresetId);
@@ -1254,6 +1394,17 @@ export default function App() {
       case 'blackout-toggle': toggleBlackout(); break;
       case 'scene-toggle':    toggleScene(!sceneOn); break;
       case 'record-toggle':   toggleRecording(); break;
+      // Cue and Go, from a pad. `go` is the whole reason the desk's look
+      // change is safe in front of a room, and until now it was reachable
+      // only from this laptop's keyboard.
+      case 'go':              goLook(); break;
+      case 'revert':          revertLook(); break;
+      case 'cue-next':        stepCue(1); break;
+      case 'cue-prev':        stepCue(-1); break;
+      case 'tap-tempo':       tapTempo(); break;
+      case 'tempo-clear':     clearTempo(); break;
+      case 'bank-next':       midiRef.current?.stepBank(1); break;
+      case 'bank-prev':       midiRef.current?.stepBank(-1); break;
     }
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. */
@@ -1405,6 +1556,15 @@ export default function App() {
       toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording },
     },
     allPresetIds,
+    // The tempo, if the desk is sending it. Straight into the tempo source:
+    // twenty-four messages a beat has no business going through React.
+    useCallback((kind: 'clock' | 'start' | 'continue' | 'stop', at: number) => {
+      const t = tempoRef.current;
+      if (!t) return;
+      if (kind === 'clock') t.clockPulse(at);
+      else if (kind === 'stop') t.clockStop();
+      else t.clockStart(at);
+    }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
   const gamepad = useGamepad({
@@ -1483,8 +1643,24 @@ export default function App() {
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];
 
+    /*
+      Every settings section, one row each.
+
+      A single "Settings" row put sixteen sections and eighty controls behind a
+      word that describes none of them — and the panel then opened on the half
+      that did not contain the room camera, the projectors, the solver or the
+      physics. Typing "room" or "keystone" or "people" now lands on the section
+      itself rather than on the top of a panel that has it somewhere.
+    */
+    const sections: Command[] = SETTINGS_SECTIONS.map(sec => ({
+      id: `settings-${sec.id}`,
+      name: `Settings: ${sec.name}`,
+      kind: 'Open',
+      run: () => { setSettingsSection(sec.id); setShowSettings(true); setShowHelp(false); },
+    }));
+
     const opening: Command[] = [
-      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setShowSettings(true); setShowHelp(false); } },
+      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: openAllSettings },
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
       { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
@@ -1493,7 +1669,7 @@ export default function App() {
         run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
     ];
 
-    return [...looks, ...doing, ...opening];
+    return [...looks, ...doing, ...opening, ...sections];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode,
       cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
@@ -1583,6 +1759,8 @@ export default function App() {
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
         frame={preview.frame}
+        output={output}
+        tempoRef={tempoRef}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
@@ -1975,7 +2153,7 @@ export default function App() {
 
                 {/* Settings */}
                 <button
-                  onClick={() => { setShowSettings(!showSettings); setShowHelp(false); }}
+                  onClick={() => { setSettingsSection(null); setShowSettings(!showSettings); setShowHelp(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
                     showSettings ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
@@ -2187,6 +2365,28 @@ export default function App() {
             projectorMode={projector.mode}
             onProjectorMode={projector.setMode}
             projectorName={projector.projector?.label ?? null}
+            output={output}
+            onOutput={setOutput}
+            onOutputReset={resetOutput}
+            wakeLock={wakeLock}
+            tempo={tempoLabel}
+            onTap={tapTempo}
+            onTempoClear={clearTempo}
+            onTempoBpm={setTempoBpm}
+            midiClocked={midi.clocked}
+            /*
+              Everything, whichever door you came through.
+
+              This was `designing ? 'all' : 'perform'`, and then Perform grew
+              the same "All settings…" button — which opened on six of the
+              sixteen groups, so a button with that name was lying about what
+              it did. The split is worth keeping as a *filter* you pick (eight
+              screens of scrolling is not a control surface mid-show), but not
+              as a default that hides ten groups from someone who has just
+              asked for all of them. Nothing hides now unless you say so.
+            */
+            defaultTab="all"
+            focusSection={settingsSection}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
             sceneState={scene.state}
@@ -2198,7 +2398,7 @@ export default function App() {
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
             onFilmClear={clearFilm}
-            onClose={() => setShowSettings(false)}
+            onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />
         )}
       </AnimatePresence>
@@ -2468,6 +2668,7 @@ export default function App() {
       */}
       {performing && overlaysVisible && (
         <PerformDesk
+          onOpenSettings={openAllSettings}
           cues={cues}
           liveId={activePresetId}
           nextId={cued?.id ?? null}
@@ -2540,6 +2741,7 @@ export default function App() {
       */}
       {designing && overlaysVisible && (
         <DesignDesk
+          onOpenSettings={openAllSettings}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}

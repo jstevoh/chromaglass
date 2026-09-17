@@ -43,6 +43,7 @@
  */
 
 import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -92,10 +93,7 @@ const appChunk = fs.readdirSync(path.join(BROKEN, 'assets')).find(f => /^App-.*\
 if (!appChunk) { console.error('no App chunk in dist — run the build first'); process.exit(2); }
 fs.rmSync(path.join(BROKEN, 'assets', appChunk));
 
-const browser = await chromium.launch({
-  executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
-});
+const browser = await launchChromium(chromium);
 
 let server;
 try {

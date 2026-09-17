@@ -3,9 +3,39 @@ import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { Info } from './Info';
+import { OutputPanel } from './OutputPanel';
+import type { OutputConfig } from '../lib/outputConfig';
 import { Sheet } from './ui';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
+
+/**
+ * Which half of the panel is showing.
+ *
+ * `all` is the third: the one that exists because ten of the sixteen sections
+ * were behind a tab nobody had reason to press.
+ */
+export type SettingsTab = 'perform' | 'setup' | 'all';
+
+/** Every section, for the command palette to offer one row each. */
+export const SETTINGS_SECTIONS: { id: string; name: string }[] = [
+  { id: 'audio-input', name: 'Sound' },
+  { id: 'audio-mappings', name: 'Audio Mappings' },
+  { id: 'look', name: 'Light Show Look' },
+  { id: 'show', name: 'Show' },
+  { id: 'camera', name: 'Camera' },
+  { id: 'lamp', name: 'Lamp' },
+  { id: 'room', name: 'The Room' },
+  { id: 'projectors', name: 'Projectors' },
+  { id: 'simulation', name: 'Simulation' },
+  { id: 'macro', name: 'Macro Closeup' },
+  { id: 'squish', name: 'Squish Plate' },
+  { id: 'heat', name: 'Heat Slide' },
+  { id: 'interaction', name: 'Manual Interaction' },
+  { id: 'physics', name: 'Fluid Physics' },
+  { id: 'automation', name: 'Automation' },
+  { id: 'layers', name: 'Multi-Layer Mixer' },
+];
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
@@ -38,6 +68,30 @@ interface SettingsPanelProps {
   /** The house lights. */
   blackout?: boolean;
   onBlackout?: () => void;
+  /** The projector's geometry and grade, and how to change it. */
+  output?: OutputConfig;
+  onOutput?: (next: OutputConfig) => void;
+  onOutputReset?: () => void;
+  /** Whether this machine is keeping its screen awake, and whether it can. */
+  wakeLock?: { supported: boolean; held: boolean };
+  /**
+   * Which half to open on. Design passes `all`, because a look is built from
+   * every one of these and not from the six a hand rides between songs.
+   */
+  defaultTab?: SettingsTab;
+  /**
+   * Open showing this section, scrolled to and briefly outlined. This is what
+   * the command palette's per-section rows use, so "the room" typed into ⌘K
+   * lands on the room rather than on the top of a panel with sixteen of them.
+   */
+  focusSection?: string | null;
+  /** Where the tempo is coming from, and the three ways to say it by hand. */
+  tempo?: { source: string | null; bpm: number; taps: number };
+  onTap?: () => void;
+  onTempoClear?: () => void;
+  onTempoBpm?: (bpm: number) => void;
+  /** Whether MIDI clock is arriving on the open port, for the note that says so. */
+  midiClocked?: boolean;
   /** What to do when a second screen is connected. */
   projectorMode?: 'ask' | 'auto' | 'off';
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
@@ -98,7 +152,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, defaultTab = 'perform', focusSection = null, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
@@ -110,7 +164,57 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   }, [getLiveEngineStatus]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
   /** Which half of the panel is showing. Perform first: it is what a show needs. */
-  const [tab, setTab] = useState<'perform' | 'setup'>('perform');
+  /**
+   * Which half of the panel is showing — or `all`, which is both.
+   *
+   * The split exists because eight screens of scrolling is not a control
+   * surface mid-show. What it also did was hide ten of the sixteen sections
+   * behind a tab nobody had reason to press: the room camera, the projectors,
+   * the solver, the physics. Opened from Design — the mode whose entire job is
+   * building a look — the panel now starts on everything.
+   */
+  const [tab, setTab] = useState<SettingsTab>(defaultTab);
+  useEffect(() => { setTab(defaultTab); }, [defaultTab]);
+
+  /** Typing here searches every section, whichever tab is showing. */
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+
+  /**
+   * Is this section on screen right now?
+   *
+   * A search beats the tab: someone who typed "room" wants the room whether or
+   * not they are looking at the half it lives in. `terms` is what the section
+   * is *about* rather than only what it is called — "camera", "people" and
+   * "video" all have to find The Room, because the heading alone is the one
+   * word nobody searches for.
+   */
+  const shown = (group: 'perform' | 'setup', title: string, terms = ''): boolean => {
+    if (q) return `${title} ${terms}`.toLowerCase().includes(q);
+    return tab === 'all' || tab === group;
+  };
+  /** So a search that finds nothing says so rather than showing an empty panel. */
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const [visibleCount, setVisibleCount] = useState(1);
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    setVisibleCount(pane.querySelectorAll('section[data-section]:not(.hidden)').length);
+  }, [q, tab]);
+
+  // Opened at a section (from the command palette): show everything, then put
+  // that section under the eye. A tab that hid it would make the row a lie.
+  useEffect(() => {
+    if (!focusSection) return;
+    setTab('all');
+    setQuery('');
+    const id = requestAnimationFrame(() => {
+      paneRef.current
+        ?.querySelector(`[data-section="${focusSection}"]`)
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [focusSection]);
 
   /*
     A sheet, not a drawer.
@@ -136,7 +240,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         hidden, which is most of the panel simply gone. So it gets the height
         back instead, and the other sheets stay at the handoff's 640.
       */}
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
+      <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
 
       {/*
         Two tabs, because eight screens of scroll is not a control surface.
@@ -144,15 +248,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         is decided once — the audio device, the room camera, the solver grid,
         the physics that define a look rather than ride it.
       */}
-      <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/10" role="tablist">
-        {([['perform', 'Perform'], ['setup', 'Setup']] as const).map(([id, label]) => (
+      <div className="flex gap-1 mb-3 p-1 rounded-xl bg-white/5 border border-white/10" role="tablist">
+        {([['perform', 'Perform'], ['setup', 'Setup'], ['all', 'All']] as const).map(([id, label]) => (
           <button
             key={id}
             role="tab"
             aria-selected={tab === id}
-            onClick={() => setTab(id)}
+            onClick={() => { setTab(id); setQuery(''); }}
             className={`flex-1 rounded-lg py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
-              tab === id ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/5'
+              tab === id && !q ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/5'
             }`}
             data-testid={`settings-tab-${id}`}
           >
@@ -161,12 +265,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         ))}
       </div>
 
+      {/*
+        A box to type into.
+
+        Sixteen sections and eighty controls is past what anyone browses, and
+        the tabs made that worse rather than better: ten sections lived behind
+        the one nobody pressed. A search is the answer to "where is the thing
+        that turns the camera on", and it searches what each section is *about*
+        rather than only what it is called — "video", "people" and "crowd" all
+        find The Room, none of which is in its heading.
+      */}
+      <div className="relative mb-6">
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search every setting — try “camera”, “people”, “keystone”"
+          aria-label="Search settings"
+          data-testid="settings-search"
+          className="h-10 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
+        />
+        {q && (
+          <button
+            onClick={() => setQuery('')}
+            aria-label="Clear the search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[10px] uppercase tracking-widest text-white/40 hover:text-white"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {q && visibleCount === 0 && (
+        <p className="mb-6 text-[12px] text-white/40" data-testid="settings-no-match">
+          Nothing here matches “{query}”.
+        </p>
+      )}
+
       {/* The presets live on the title, not here. One menu opened from the
           plate's own name is where a projectionist already looks for them,
           and it carries saving and loading too; a second copy buried in a
           scrolling panel was one more place to keep in step. */}
       {/* Sound Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('setup', 'Audio Input', 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration song') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Input
         </h3>
@@ -266,6 +406,70 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
         </Info>
 
+        {/* Somewhere to get the tempo from besides the microphone */}
+        {onTap && (
+          <div className="mb-4 mt-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest opacity-70">Tempo</span>
+              <span className="font-mono text-[10px] opacity-50" data-testid="tempo-readout">
+                {tempo?.source
+                  ? `${tempo.bpm} bpm \u00b7 ${tempo.source === 'clock' ? 'midi clock' : tempo.source === 'tap' ? 'tapped' : 'set'}`
+                  : 'listening'}
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                onClick={onTap}
+                data-testid="tempo-tap"
+                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
+                className="min-h-11 flex-1 rounded-lg border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest transition-all hover:bg-white/10"
+              >
+                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
+              </button>
+              <button
+                onClick={onTempoClear}
+                disabled={!tempo?.source}
+                data-testid="tempo-listen"
+                title="Back to working the tempo out from what it can hear"
+                className={`min-h-11 flex-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
+                }`}
+              >
+                Listen
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={60}
+                max={200}
+                step={1}
+                placeholder="bpm"
+                aria-label="Tempo in beats per minute"
+                data-testid="tempo-bpm"
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  const v = parseFloat((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                className="min-h-11 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-white/30"
+              />
+              <span className="text-[10px] uppercase tracking-widest opacity-30">off the setlist</span>
+            </div>
+            <Info>
+              The beat clock works the tempo out from what it hears, which is the right answer on a clean feed from the desk and a hard one in a loud room. Three ways to tell it instead.
+              {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
+              {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
+              {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
+              {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
+            </Info>
+          </div>
+        )}
+
         {/* A new song, a new look */}
         <div className="flex flex-col gap-2 mb-4 mt-2">
           <div className="text-xs font-bold uppercase tracking-widest opacity-70">On a New Song</div>
@@ -321,7 +525,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Audio Mappings Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('setup', 'Audio Mappings', 'sound bass mid treble energy timbre map drive reactive band') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Mappings
         </h3>
@@ -350,7 +554,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Light Show Look Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-look" className={`mb-8 scroll-mt-4 ${shown('perform', 'Light Show Look', 'turbulence blobs glow relief bubbles rock saturation gloss blur look') ? '' : 'hidden'} ${focusSection === 'look' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="look">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Palette size={12} /> Light Show Look
         </h3>
@@ -487,7 +691,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Show Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-show" className={`mb-8 scroll-mt-4 ${shown('perform', 'Show', 'hue journey beat squeeze background loop kaleidoscope dish vignette projectors beads cells') ? '' : 'hidden'} ${focusSection === 'show' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="show">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Clapperboard size={12} /> Show
         </h3>
@@ -585,7 +789,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Camera Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-camera" className={`mb-8 scroll-mt-4 ${shown('setup', 'Camera', 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field') ? '' : 'hidden'} ${focusSection === 'camera' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="camera">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Aperture size={12} /> Camera
         </h3>
@@ -636,7 +840,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Lamp Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('perform', 'Lamp', 'light play motion hotspot second lamp iridescence projector bulb') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Lightbulb size={12} /> Lamp
         </h3>
@@ -686,7 +890,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* The Room Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-room" className={`mb-8 scroll-mt-4 ${shown('setup', 'The Room', 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror presence') ? '' : 'hidden'} ${focusSection === 'room' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="room">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Video size={12} /> The Room
         </h3>
@@ -887,7 +1091,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Projectors Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('setup', 'Projectors', 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Projector size={12} /> Projectors
         </h3>
@@ -910,6 +1114,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               A projector on HDMI is a second screen. <span className="text-white/70">Ask</span> offers to send the show there; <span className="text-white/70">Automatic</span> sends it the moment the projector is connected, on your next click or key press (the browser needs one), fullscreen with nothing but the plate on it, and the laptop keeps the controls.{projectorName ? ` Connected now: ${projectorName}.` : ' Chrome asks once for permission to see your screens.'}
             </Info>
           </div>
+        )}
+        {output && onOutput && onOutputReset && (
+          <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} />
         )}
         <Info>
           The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.
@@ -1023,7 +1230,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Simulation Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('setup', 'Simulation', 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation
         </h3>
@@ -1062,7 +1269,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Macro Closeup Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-macro" className={`mb-8 scroll-mt-4 ${shown('perform', 'Macro Closeup', 'zoom bead chase magnify closeup detail cells lacing depth relief') ? '' : 'hidden'} ${focusSection === 'macro' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="macro">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -1163,7 +1370,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Squish Plate Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-squish" className={`mb-8 scroll-mt-4 ${shown('setup', 'Squish Plate', 'plate pressure squeeze film hele-shaw gap thickness') ? '' : 'hidden'} ${focusSection === 'squish' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="squish">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sliders size={12} /> Squish Plate
         </h3>
@@ -1218,7 +1425,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Heat Slide Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-heat" className={`mb-8 scroll-mt-4 ${shown('setup', 'Heat Slide', 'temperature buoyancy convection lamp warmth slide') ? '' : 'hidden'} ${focusSection === 'heat' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="heat">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Thermometer size={12} /> Heat Slide
         </h3>
@@ -1257,7 +1464,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Manual Interaction Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-interaction" className={`mb-8 scroll-mt-4 ${shown('setup', 'Manual Interaction', 'brush dropper blow press tools mouse touch radius strength') ? '' : 'hidden'} ${focusSection === 'interaction' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="interaction">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -1280,7 +1487,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Fluid Physics Section */}
-      <section className={`mb-8 ${tab === 'setup' ? '' : 'hidden'}`} data-group="setup">
+      <section id="settings-physics" className={`mb-8 scroll-mt-4 ${shown('setup', 'Fluid Physics', 'viscosity diffusion vorticity immiscibility fingering surface tension advection') ? '' : 'hidden'} ${focusSection === 'physics' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="physics">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
@@ -1319,7 +1526,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Automation Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-automation" className={`mb-8 scroll-mt-4 ${shown('perform', 'Automation', 'evolve random drops air bursts rate dye budget') ? '' : 'hidden'} ${focusSection === 'automation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="automation">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sparkles size={12} /> Automation
         </h3>
@@ -1334,7 +1541,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Mixer Section */}
-      <section className={`mb-8 ${tab === 'perform' ? '' : 'hidden'}`} data-group="perform">
+      <section id="settings-layers" className={`mb-8 scroll-mt-4 ${shown('perform', 'Multi-Layer Mixer', 'layer blend mode screen multiply overlay exclusion count mixer led platform') ? '' : 'hidden'} ${focusSection === 'layers' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="layers">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Layers size={12} /> Multi-Layer Mixer
         </h3>

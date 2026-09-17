@@ -2,6 +2,20 @@
 
 A psychedelic liquid light show visualizer that reacts to your microphone or system audio in real time. Inspired by 1960s overhead projector light shows — colored oils squeezed between glass plates, heated from below, and projected onto a wall.
 
+**[Open it →](https://chromaglass.web.app)** — it needs no microphone and no permission to show you what it is: a synthesised band plays itself into the show on your first click.
+
+| | |
+|---|---|
+| ![The Fillmore East, 1969 preset](docs/shots/fillmore-east-1969.jpg) | ![The Oil on Water preset](docs/shots/oil-on-water.jpg) |
+| *Fillmore East, 1969* — each layer its own dish on a black screen, pressed into a sunburst on every kick | *Oil on Water* — the photographic render: domes with dark menisci, satellite droplets, a camera pass with real depth of field |
+| ![The Macro Bead preset](docs/shots/macro-bead.jpg) | ![The Lumia preset](docs/shots/lumia.jpg) |
+| *Macro Bead* — a tracking camera chasing a single bead at high magnification | *Lumia* — Thomas Wilfred's slow folded sheets of light, under the plate |
+
+Frames from the app itself, written by `npm run shots`. These were made on a
+machine rasterising in software, so they undersell what a real GPU draws;
+re-run it anywhere with a graphics card and they will be replaced with better
+ones.
+
 ## Features
 
 - **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
@@ -24,6 +38,10 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
 - **Liquids that stay liquids** — the dropper's nine bottles are not nine colours. Water, oil, alcohol, ink and syrup put dye on the glass; **soap**, **milk**, **silicone** and **glycerine** also write themselves into a field the plate carries and keeps acting on for the next half-minute: soap breaks the film so colour runs away from it and curls into filaments, glycerine crawls where it lands while the plate flows past, milk holds its own edge instead of feathering out, silicone shoulders colour aside into a ring. Every preset names what is in its dish, and the automation pours from that — mostly water with a drop of soap now and then for *Classic Light Show*, nothing but soap and silicone for *Lacing Run*. Measured by `npm run liquids`
 - **Automation mode** — Auto-generates dye drops and air bursts driven by audio energy
+- **The wall, not the look** — rear-projection mirror, a four-corner keystone, feathered edge masks that stop the light before a face or a ceiling, and an output gain and gamma for the room. Kept on the machine rather than in the preset, because it describes the venue; measured by `npm run wall`
+- **Three flashes a second, and no more** — a probe reads back what actually reached the screen and holds the whole field under the clinical limit for photosensitive seizures, by counting flashes rather than smoothing fast changes, so a single hard hit on a kick is untouched
+- **A tempo you can hand it** — MIDI clock from the desk on the port the faders are already on, four taps, or a typed bpm; each sets the bar as well as the tempo, and the microphone can no longer drag it around while one of them is driving
+- **Shift layers on the controller** — four banks, so nine faders reach forty settings; a binding on the base layer stays live on all of them, and changing layer drops every fader out of soft takeover so nothing jumps
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
 - **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
 - **Bubbles in the dye, not over it** — a bubble is air between the plates: a standing squeeze on its footprint keeps the dye pumping out to its rim so the field flows round it, dye dropped on a bubble bursts it into satellites, and dye or air landing nearby shoves the bubbles along the spreading front, from the dropper, the phone pad, replayed performances and automation alike
@@ -98,12 +116,17 @@ Playing the visuals for a band is a different job from running them in a living 
 - **A clean feed, not a microphone.** Ask the sound desk for an aux send or matrix out into a USB audio interface (a Scarlett 2i2 is plenty) and pick it under Settings → Sound → **Input**. Ask for a mix heavy on kick, snare and bass. The choice is remembered.
 - **A music file, played here.** The **File** button under the Mic and System buttons plays an MP3, WAV, FLAC or OGG through the speakers and drives the show from it: the straightest signal there is, for rehearsing a set to the studio recordings.
 - **The dimmer and blackout.** `dimmer` is the house lights for the plate; ride it from a fader (it is the master fader on the APC40 mkII and Launch Control XL factory maps). **B** on the keyboard, the Blackout button on the phone and in Settings → Sound, or the *Blackout* action from any controller fades the plate to black in a second and back again when the band comes in.
+- **A tempo that is not a guess.** The beat clock works the tempo out from what it hears, which is right on a clean aux send and hard in a loud bar or under a DJ set whose low end never stops. Three ways to tell it instead, in Settings → Sound → **Tempo**: **MIDI clock** on the port the faders are already on (nothing to set up — if the desk is sending it, the show locks to it), **Tap** (four taps; it sets the bar as well as the tempo, so tap on the downbeats and the plate is pressed on the downbeats, and one tap on its own re-phases a tempo that is already running), and a typed **bpm** off the setlist. While one of them is driving, what the microphone hears is still used to fire beats but can no longer drag the tempo around. **Listen** hands back; a MIDI clock that stops sending hands back by itself.
 - **Pressing the plate.** The **Press** tool, the pad's *press* mode on a tablet, the left trigger on a game controller, or `/chromaglass/press` over OSC: a hand on the top glass. The film thins under it and the dye spreads out in a ring, the way the Joshua Light Show worked its rhythm plate; **Beat Squeeze** (Settings → Show) does the same on every kick. With **Fingering** up, the press breaks into radial spokes instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
 - **The Fillmore look.** The *Fillmore East, 1969* preset (and the *Fillmore East* sequence) is the Joshua Light Show behind the Mothers: **Projectors** (Settings → Show) spreads the layers into their own dishes on a black screen, each dish a whole plate, the lead large and right of centre and the second smaller at the left; **Oil Beads** fills the dye with hundreds of small dark-rimmed droplets that ride the flow and merge; **Plate Cells** lays the fine cell network in the dish core; fingering and beat squeeze press the big dish into a sunburst on every kick.
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
 - **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
-- **Masks.** Front-projecting onto the band means light on faces. A browser cannot output Syphon or NDI directly; to mask, capture the projector window with OBS (Window Capture → NDI or Syphon plugin) into Resolume, HeavyM or MadMapper, or rear-project onto a gauze and avoid the problem.
+- **The wall, squared and masked.** Settings → Projectors → **The Wall** is load-in: **Rear** mirrors the picture for projection through a screen or a gauze from behind (which is how most of these shows were rigged, and the surest way to keep the light off the band's faces), the four **corners** pull a projector that could not be hung on axis back into a rectangle, and the **masks** are tape on the light — pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, with **Mask Edge** deciding whether that stop is a hard line or a fade. **Output Gain** and **Gamma** are for the room, so **Dimmer** stays free for riding the song. None of it is saved into a preset and no fader can reach it: it describes the venue, not the look, and nothing here should move during a song.
+- **Nothing dims, sleeps or screensaves.** The show window holds a screen wake lock while the plate is running, and the projector window always. (It needs a secure context, so it works from the hosted site and from `localhost` — where the show is run — and the panel says plainly when an address cannot have it.)
+- **A lost GPU comes back by itself.** Plugging a projector into a running laptop, a Mac switching between its integrated and discrete GPU, a driver resetting under load: the browser takes the WebGL context away and everything in it. The app catches that, keeps the plate (the dye lives in the CPU arrays too), rebuilds against the new context and carries on — rather than going black until someone reloads and loses the cue list and the sequencer's place with it.
+- **Three flashes a second, and no more.** A probe reads back what actually reached the screen and holds the whole field under the clinical limit for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left completely alone and only a sustained strobe is pulled back. On by default, in Settings → Projectors → The Wall, and out of reach of every preset and every fader — because no look should be able to switch off a safety.
+- **Someone else's rig.** A browser cannot output Syphon, NDI or Spout, but the projector window is a plain window: **Cast → Second display**, then capture it in OBS (Window Capture) and send it on with the NDI or Syphon plugin into Resolume, HeavyM, MadMapper or whatever the house runs. A **network display** address (`?cast=true&key=…`) is the same picture in any browser on the network, which some capture cards and media servers will take directly.
 - **Fewer things to go wrong.** Install the app (below), turn off sleep and updates on the laptop, run the show from `npm run remote`, and put the phone or the controller in charge so nobody has to reach for the trackpad in the dark.
 
 ### Which controller
@@ -139,7 +162,9 @@ The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox
 
 - **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets with the bottom row of pads the dye palette, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, crossfader Sharpness and the cue encoder Granulation, arrows step presets, transport play / blackout / record, and Drain and Clear alone under the scene column, away from Seed), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
 - **The controller, drawn.** The **APC40 mkII picture** button in the MIDI panel opens the whole panel to scale: forty clip pads, the five button rows under the grid, nine faders, sixteen knobs, the crossfader and the transport, every one carrying the MIDI address it really sends (taken from Akai's Communications Protocol v1.2). Touch a control on the desk and the picture selects it; pick what it should do from the list beside it and it is bound. Every control shows what it does, coloured by what kind of thing that is, with dyes in their own colour. Labels are measured against the type they are drawn in, so they shrink and wrap to fit rather than being cut short, and a colour that would disappear into the panel is lifted or dropped until it reads. **On paper** turns the whole sheet — picture and list — to black on white, and **Save PNG** writes it out at twice size, so the same picture that made the map is the cheat sheet on the phone or taped to the desk. It works before the hardware arrives, and Escape closes it.
-- **MIDI learn**: pick what a control should do in the panel (any of thirty settings, every action, every preset, every dye), then touch the control. Tick *Endless encoder* first for a knob with no stop (relative "two's-complement" nudges); the binding list flips any CC between `abs` and `enc` later.
+- **Banks.** Nine faders cannot reach forty settings, so a binding may name one of four shift layers. A binding learned on bank **1** is live on every layer, which is where presets, dyes and the transport belong; learn a fader on bank 2, 3 or 4 and it belongs to that layer. Put **Bank +** on a button (it is on Shift and the Nudge pair in the APC40 map) to step them in the dark. Changing layer drops every fader out of soft takeover, so nothing jumps to wherever the hardware happens to be standing, and a pad on a layer that is not live is unlit rather than lying about what it does.
+- **Cue and Go, and the tempo, on a pad.** *Go*, *Back* and stepping the **armed** look are actions, so the desk's safe way to change a look in front of a room is finally something a controller can do — as are *Tap Tempo* and *Tempo: Listen Again*. On the APC40 map Go is Session Rec, the left and right arrows arm the next look (the up and down arrows still step the live one, for building), Tap Tempo is the button Akai printed *Tap Tempo* on, and Back is the fifth clip-stop button.
+- **MIDI learn**: pick what a control should do in the panel (any of forty settings, every action, every preset, every dye), then touch the control. Tick *Endless encoder* first for a knob with no stop (relative "two's-complement" nudges); the binding list flips any CC between `abs` and `enc` later.
 - **Soft takeover**: a fader that disagrees with the app is ignored until it passes through the app's value, so a slider dragged on the phone does not jump back the moment a fader twitches. Turn it off for a controller with motorised faders.
 - **LED feedback**: preset pads light in the preset's lead dye (dim until it is the active one), dye pads in their colour, toggle buttons on or off, on the APC mini mk2 / Launchpad velocity palette; CC-driven LEDs get 127/0. *LEDs: Auto* picks the output that shares a name with the input.
 - **Maps are files**: **Save file** writes a `.chromaglass-midi.json` next to your presets and sequences; **Load file** reads one in. The map also lives in the browser, and MIDI comes back on by itself on the next visit.
@@ -292,10 +317,12 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
 | The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
 | Band | A synthesised band played silently into the show — no microphone, no permission |
-| Projectors | Settings → Projectors: lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
+| Projectors | Settings → Projectors: **The Wall** (rear-projection flip, corner pin, edge masks, output grade, flash limit), then lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
+| Tempo | Settings → Sound: MIDI clock from the desk, four taps, or a typed bpm, instead of working it out from the microphone |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
 | Camera | Settings → Camera: light show or photograph, paper colours, camera, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
+| All settings | Every one of the sixteen groups, in one sheet. **All settings…** sits under the rides on Perform and under the recipe on Design, and ⌘K reaches a group by name ("the room", "projectors", "physics") and scrolls to it. The sheet's search box finds a group by what it is *about* — "camera", "people" and "crowd" all reach The Room, and none of those words is in its heading. It always opens on everything; **Perform** and **Setup** are a filter you pick, because eight screens of scrolling is not a control surface mid-show |
 | About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |
@@ -306,8 +333,9 @@ still keeps up with wall-clock time, and `?debug` exposes
 
 ## Judging it by numbers
 
-Six harnesses, so a change to any of this is judged the same way every time
-rather than by watching a plate and forming an impression.
+Eight harnesses, so a change to any of this is judged the same way every time
+rather than by watching a plate and forming an impression. Every push to main
+runs them before anything reaches the live site (`.github/workflows/checks.yml`).
 
 | | |
 |---|---|
@@ -316,7 +344,9 @@ rather than by watching a plate and forming an impression.
 | `npm run plate` | What is on every preset's plate: that its dyes, injection styles and liquids all name things that exist, and an audit of which presets use which liquid |
 | `npm run scene` | The room sensor: painted rooms through the real analysis, plus a closed feedback loop and a person who walks in and stops |
 | `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |
+| `npm run wall` | The projector: which pixels the flip, the corner pin and the masks leave black, and how many times a second the whole screen is allowed to change |
 | `npm run qa` | The app itself — it builds, serves, and walks a browser through a show night, watching the console |
+| `npm run shots` | Pictures of the plate, for the README. Run it on a machine with a real GPU: it says which engine drew them |
 
 `qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes
 `PW_CHROMIUM` for anywhere else. `npm run qa -- --head` watches it happen.
@@ -346,11 +376,17 @@ src/
     useMidi.ts                 # Web MIDI: devices, bindings, learn, soft takeover, LED feedback
     useGamepad.ts              # Gamepad API: cursor, blow, drop, press, buttons
     useRecorder.ts             # MediaRecorder: the canvas and the music to a video file
+    useWakeLock.ts             # Nothing dims, sleeps or screensaves while a show is running
   lib/
     musicTypes.ts              # Music intelligence interfaces
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
     gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
+    outputConfig.ts            # The projector and the wall: flip, corner pin, masks, grade — per machine, never in a preset
+    outputPass.ts              # The last pass before the light: the corner-pin warp, the blanking and the grade
+    frameProbe.ts              # What the frame that just went to the wall actually looked like
+    flashGuard.ts              # Three flashes a second, and no more
+    tempo.ts                   # MIDI clock, tap and a typed bpm, for when the microphone is not the best source
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye
@@ -375,6 +411,7 @@ src/
     MidiPanel.tsx              # MIDI: devices, factory maps, learn, bindings, files
     ControllerSurface.tsx      # The controller drawn to scale: assign by touching, and the cheat sheet
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
+    OutputPanel.tsx            # Load-in: drag the corners square, pull the masks in, grade for the room
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in (npm run remote)

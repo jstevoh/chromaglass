@@ -5,6 +5,11 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
+import { OutputPass } from '../lib/outputPass';
+import type { TempoSource } from '../lib/tempo';
+import { FlashGuard } from '../lib/flashGuard';
+import { FrameProbe } from '../lib/frameProbe';
+import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
@@ -101,6 +106,21 @@ interface LiquidVisualizerProps {
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
+  /**
+   * Where the tempo comes from when it is not the microphone: a MIDI clock,
+   * a tapped tempo, a typed one. A ref for the same reason the room's reading
+   * is one — it is read once a frame by the render loop and by nothing else,
+   * so putting it in state would re-render the app around it for nothing.
+   */
+  tempoRef?: React.MutableRefObject<TempoSource | null>;
+  /**
+   * The projector's geometry and grade: flip, corner pin, edge blanking and
+   * output grade. A property of the room rather than of the look, so it
+   * arrives as its own prop instead of riding in `settings` where a preset
+   * file would pick it up and carry someone else's keystone across the
+   * country. Omitted, or identity, and the pass is never built.
+   */
+  output?: OutputConfig;
 }
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
@@ -1873,6 +1893,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, onManualGesture, onEngineStatus,
+  output = DEFAULT_OUTPUT, tempoRef,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -1909,6 +1930,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** The camera pass, built the first time a frame asks for it. */
   const cameraRef = useRef<CameraPass | null>(null);
+  /** The output pass: the projector's geometry and grade. Built only if it would change a pixel. */
+  const outputRef = useRef<OutputPass | null>(null);
+  /**
+   * Three flashes a second, and no more.
+   *
+   * The probe reads back what actually reached the screen; the guard counts
+   * the flashes in it and, only once there are too many, hands back a gain
+   * that rides the master dimmer. Nothing in this app was built to strobe, but
+   * any audio band can be mapped onto any setting including `dimmer`, and a
+   * bass-driven master brightness at 150 bpm is a 2.5 Hz full-field flash that
+   * nobody chose. See `lib/flashGuard.ts`.
+   */
+  const probeRef = useRef<FrameProbe | null>(null);
+  const flashRef = useRef(new FlashGuard());
+  /** The gain the guard asked for last frame, applied to this one's dimmer. */
+  const flashGainRef = useRef(1);
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
@@ -1945,6 +1982,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
   const webGLRef = useRef<GLResources | null>(null);
+  /**
+   * The GL context, lost and got back.
+   *
+   * A projector plugged into a running laptop, a Mac switching between its
+   * integrated and discrete GPU, a driver that resets under load: the browser
+   * takes the context away and every texture, buffer and program with it. The
+   * default behaviour is that the canvas stays black for good and only a
+   * reload brings it back — which mid-set also loses the plate, the cue list
+   * and the sequencer's place. So the loss is caught instead: the GPU half of
+   * the solver is dropped without a readback (`dropGpu`, which exists for
+   * exactly this), and because the dye field lives in the CPU arrays as well,
+   * the plate survives. `glEpoch` then rebuilds every GL object against the
+   * new context and the show carries on where it was.
+   */
+  const glLostRef = useRef(false);
+  const [glLost, setGlLost] = useState(false);
+  const [glEpoch, setGlEpoch] = useState(0);
+  /** The look that is on the plate, so a rebuild can put the same one back. */
+  const livePresetRef = useRef('classic');
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -1973,6 +2029,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
+  const outputCfgRef = useRef(output);
+  outputCfgRef.current = output;
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
   const engineStatusRef = useRef<EngineStatus | null>(null);
   const engineStatusAtRef = useRef(0);
@@ -2066,6 +2124,49 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }
   };
 
+  /**
+   * Clear the plate and lay a preset's look on it: its dye, its liquids, its
+   * palette.
+   *
+   * Pulled out of `applyPreset` because a lost GL context needs exactly this
+   * and nothing else. The registration of a user preset's dyes belongs to
+   * `applyPreset` (it is what the caller is telling us); laying the plate is
+   * the part that has to be repeatable from inside.
+   */
+  const layPlate = (presetId: string) => {
+    for (const fluid of fluidsRef.current) fluid.clearAll();
+    bubblesRef.current.clear();
+    chemRef.current.reset();
+    rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
+    journeyRef.current = { lead: 0, lastAt: -1 };
+    const fluid = fluidsRef.current[0];
+    if (fluid) {
+      const seeded = fluid.seedPreset(presetId, noise2D);
+      const contract = presetContractRef.current;
+      harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
+    }
+    // The Fillmore look is two projectors: the second plate starts with its own wash.
+    if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
+    injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
+    plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
+    // The plate is laid with its liquids as well as its dye, rather than
+    // waiting a minute for the automation to dose its way there. Because
+    // `doseLiquid` picks uniformly from the list, the inert entries thin
+    // this out on their own: a plate of `['water', 'water', 'soap']` gets
+    // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
+    if (fluid) for (let i = 0; i < 15; i++) {
+      doseLiquid(fluid, plateLiquidsRef.current,
+        10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+    }
+    drainFrameRef.current = 0;
+    macroCamRef.current.reset();
+    livePresetRef.current = presetId;
+  };
+  /** Through a ref, because the context-loss listener is installed once, above this. */
+  const layPlateRef = useRef(layPlate);
+  layPlateRef.current = layPlate;
+
   useImperativeHandle(ref, () => ({
     drawnRect: () => drawnRectRef.current?.() ?? null,
     injectImage: (imageData: ImageData) => {
@@ -2079,33 +2180,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       else if (extras && !extras.contract) delete PRESET_CONTRACTS[presetId];
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
-      for (const fluid of fluidsRef.current) fluid.clearAll();
-      bubblesRef.current.clear();
-      chemRef.current.reset();
-      rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
-      presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
-      journeyRef.current = { lead: 0, lastAt: -1 };
-      const fluid = fluidsRef.current[0];
-      if (fluid) {
-        const seeded = fluid.seedPreset(presetId, noise2D);
-        const contract = presetContractRef.current;
-        harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
-      }
-      // The Fillmore look is two projectors: the second plate starts with its own wash.
-      if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
-      injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
-      plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
-      // The plate is laid with its liquids as well as its dye, rather than
-      // waiting a minute for the automation to dose its way there. Because
-      // `doseLiquid` picks uniformly from the list, the inert entries thin
-      // this out on their own: a plate of `['water', 'water', 'soap']` gets
-      // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
-      if (fluid) for (let i = 0; i < 15; i++) {
-        doseLiquid(fluid, plateLiquidsRef.current,
-          10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
-      }
-      drainFrameRef.current = 0;
-      macroCamRef.current.reset();
+      layPlateRef.current(presetId);
     },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
@@ -2114,7 +2189,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }),
     adoptPreset: (presetId: string, extras) => {
       // The sequencer changing stage: the plate keeps what is on it, and the
-      // new dyes and injection style take over from here.
+      // new dyes and injection style take over from here. It is still the look
+      // that is live, so a rebuild after a lost context puts this one back and
+      // not the one that was clear-seeded three songs ago.
+      livePresetRef.current = presetId;
       if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
@@ -2306,6 +2384,66 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
     }
   }, [settings.layerCount]);
+
+  // The context, lost and restored. This effect owns only the listeners, so
+  // it outlives the rebuild it triggers: attaching them inside the setup
+  // effect would tear the 'restored' listener down in the same tick that
+  // handles it.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const lost = (e: Event) => {
+      // Without preventDefault the browser never sends 'webglcontextrestored',
+      // and there is nothing to recover from.
+      e.preventDefault();
+      glLostRef.current = true;
+      setGlLost(true);
+      // Every GL object died with the context. Dropping rather than detaching
+      // skips the readback (which would read from a dead context) and leaves
+      // the CPU arrays — the plate itself — untouched.
+      for (const fluid of fluidsRef.current) fluid.dropGpu();
+      webGLRef.current = null;
+      cameraRef.current = null;
+      outputRef.current = null;
+      probeRef.current = null;
+      flashRef.current.reset();
+      flashGainRef.current = 1;
+      // The governor is deliberately *not* dropped. It holds no GL objects, and
+      // the frame between the restore and the rebuild belongs to the render
+      // loop of the effect that is about to be torn down — which reads
+      // `governorRef.current!` and threw "Cannot read properties of null
+      // (reading 'rung')" into the console of a show that had otherwise just
+      // recovered cleanly. The new setup replaces it a moment later anyway.
+    };
+    const restored = () => {
+      glLostRef.current = false;
+      setGlLost(false);
+      // The context may come back on different hardware — a Mac that has just
+      // switched GPUs is one of the ways it is lost in the first place — so
+      // the float-render-target probe is run again rather than trusted.
+      gpuSupportedRef.current = null;
+      // The plate itself did not survive, and pretending otherwise is how this
+      // shipped nearly broken: with the GPU solver the dye lives in GPU
+      // textures, the CPU arrays are only a downsampled readback of the
+      // *density*, and `dropGpu` throws even that away rather than stall on a
+      // dead context. Measured, the machinery all came back — context, solver,
+      // render loop, no errors — onto a plate with nothing on it, which on a
+      // wall is the same black rectangle as not recovering at all.
+      //
+      // So the look is laid again. It is not the identical plate, and it
+      // cannot be; it is the same look, back within a second, which for
+      // something whose whole claim is that no two shows are the same is the
+      // right kind of loss.
+      layPlateRef.current(livePresetRef.current);
+      setGlEpoch(n => n + 1);
+    };
+    canvas.addEventListener('webglcontextlost', lost as EventListener);
+    canvas.addEventListener('webglcontextrestored', restored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', lost as EventListener);
+      canvas.removeEventListener('webglcontextrestored', restored);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3930,6 +4068,9 @@ void main() {
     let animationFrameId: number;
 
     const render = () => {
+      // The context is gone and not back yet. Keep the loop alive but touch
+      // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
+      if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
       const workStart = performance.now();
       let frameS = 0;
       const currentAudioData = audioDataRef.current;
@@ -3954,9 +4095,14 @@ void main() {
         // onset as heard. Every reaction below reads this instead of its own
         // threshold crossing, so they all land together.
         {
+          const nowMs = performance.now();
           const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          kickRef.current = beatClockRef.current.update(performance.now(), bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+          // A clock from the desk, a tapped tempo or a typed one, if there is
+          // one. Handed over every frame — the reading carries its own
+          // sequence number, so the clock can tell a new beat from a held one.
+          beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
+          kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
         }
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
@@ -5074,7 +5220,14 @@ void main() {
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
           glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-          glCtx.uniform1f(uLocs['u_dimmer'], Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)));
+          // The dimmer, with the flash guard's correction folded in. Riding the
+          // dimmer rather than adding a pass is what lets one implementation
+          // cover the laptop, the projector, a network display and the
+          // recorder: every material is already lit through this number.
+          glCtx.uniform1f(
+            uLocs['u_dimmer'],
+            Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
+          );
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
@@ -5190,14 +5343,34 @@ void main() {
           const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
           if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
           const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
+
+          // ── The projector, last ────────────────────────────────
+          // Flip, corner pin, blanking and grade. Built the first frame it
+          // would change anything, and dropped again when the operator resets
+          // it, so the common case — no projector, nothing set — never pays
+          // for the extra target or the extra draw.
+          const outCfg = outputCfgRef.current;
+          const wantOut = !outputIsIdentity(outCfg);
+          if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
+          else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
+          const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
           glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
           glCtx.uniform1f(uLocs['u_grainMix'], fluidsRef.current[0]?.gpu?.grainMix ?? 0);
           glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
           glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
           glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
+          // The output pass is prepared whenever it exists, even when the
+          // camera is the thing the plate draws into — the camera renders
+          // *through* it, so its texture has to be allocated and attached
+          // first. Preparing it only in the `else` branch meant that with a
+          // camera on (which is every photographic preset: Oil on Water,
+          // Colorful Cosmos, Sunny Side Up) the camera drew into a framebuffer
+          // with nothing attached and the output pass then sampled a texture
+          // with no storage. A keystone on those presets was a black wall.
+          if (out) out.bindTarget(canvas.width, canvas.height);
           if (cam) {
             cam.bindTarget(canvas.width, canvas.height);
-          } else {
+          } else if (!out) {
             glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
             glCtx.viewport(0, 0, canvas.width, canvas.height);
           }
@@ -5215,7 +5388,25 @@ void main() {
               filmic: 1,
               vignette: 0.6,
               grain: 0.6,
-            });
+            }, out ? out.fbo : null);
+          }
+          if (out) out.draw(canvas.width, canvas.height, outCfg);
+
+          // ── What the audience just saw ─────────────────────────
+          // Last, with the finished frame still in the default framebuffer.
+          // The read is one frame behind, which does not matter for a question
+          // about the last second.
+          if (outCfg.flashGuard) {
+            if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
+            const probe = probeRef.current;
+            probe.measure(canvas.width, canvas.height);
+            const lum = probe.luminance;
+            if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
+          } else if (probeRef.current) {
+            probeRef.current.dispose();
+            probeRef.current = null;
+            flashRef.current.reset();
+            flashGainRef.current = 1;
           }
         }
       }
@@ -5248,6 +5439,11 @@ void main() {
         film: filmRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
+        /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
+        outputPass: outputRef.current,
+        outputConfig: outputCfgRef.current,
+        flash: () => ({ ...flashRef.current.state, luminance: probeRef.current?.luminance ?? null }),
+        glLost: glLostRef.current,
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
@@ -5270,9 +5466,11 @@ void main() {
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
 
-      // Clean up WebGL resources
+      // Clean up WebGL resources. A context that is already lost took them
+      // all with it, so there is nothing to delete and the calls would be
+      // no-ops at best; `webGLRef` is nulled by the loss handler either way.
       const glr = webGLRef.current;
-      if (glr) {
+      if (glr && !glr.gl.isContextLost()) {
         const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs, velTextures: velTexs } = glr;
         for (const fluid of fluidsRef.current) fluid.detachGpu();
         for (const fbo of glr.packFbos.values()) glCtx.deleteFramebuffer(fbo);
@@ -5283,10 +5481,14 @@ void main() {
         glCtx.deleteProgram(prog);
         cameraRef.current?.dispose();
         cameraRef.current = null;
+        outputRef.current?.dispose();
+        outputRef.current = null;
+        probeRef.current?.dispose();
+        probeRef.current = null;
         webGLRef.current = null;
       }
     };
-  }, [noise2D, seedCount]);
+  }, [noise2D, seedCount, glEpoch]);
 
   return (
     <div
@@ -5324,6 +5526,17 @@ void main() {
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
+      {/*
+        A caption rather than a black rectangle. The recovery is automatic and
+        usually takes well under a second, but a projector that goes dark with
+        no explanation is the worst thing that can happen to an operator in
+        front of a room: this says the machine knows, and is coming back.
+      */}
+      {glLost && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="gl-lost">
+          <span className="font-mono text-[11px] tracking-widest text-white/40">rebuilding the plate…</span>
+        </div>
+      )}
     </div>
   );
 });
