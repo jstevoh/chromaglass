@@ -13,7 +13,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outp
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
-import { classifyGpu, detectTier, devicePixels, qualityLadder, type EngineStatus } from '../lib/platform';
+import { classifyGpu, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
@@ -4214,7 +4214,10 @@ void main() {
         // stays as the fallback for contexts without float render targets.
         const governor = governorRef.current!;
         const governed = currentSettings.simResolution === undefined || currentSettings.simResolution === 'auto';
-        const wantDpr = governed ? governor.rung.dpr : 1;
+        // `renderScale()` is the `?dpr=` diagnostic override and 1 on every
+        // real visit. It multiplies the rung rather than replacing it so the
+        // governor keeps choosing, and keeps reporting what it chose.
+        const wantDpr = (governed ? governor.rung.dpr : 1) * renderScale();
         if (wantDpr !== dprRef.current) {
           dprRef.current = wantDpr;
           resize();

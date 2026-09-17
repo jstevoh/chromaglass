@@ -57,6 +57,34 @@ export function classifyGpu(renderer: string): GpuClass {
 export const devicePixels = (): number => Math.max(1, Math.min(3, window.devicePixelRatio || 1));
 
 /**
+ * `?dpr=` — render the plate at a fraction of the window's pixels.
+ *
+ * A diagnostic knob, like `?sim=` and `?tier=`, and the only one of them that
+ * exists for a machine with no GPU at all. On a CI runner WebGL goes through
+ * SwiftShader, and measuring that showed where the browser suite's time
+ * actually went: the GPU process sat at 309% CPU — three of four cores — doing
+ * nothing but shading fragments, while the renderer process running React and
+ * the fluid solver used nine. Every step of the harness was queueing behind a
+ * saturated compositor.
+ *
+ * Fragment cost is the pixel count, so it falls with the square of this: at
+ * 0.5 the shader does a quarter of the work. Nothing the harness measures
+ * changes — layout is CSS, geometry is CSS, luminance is a mean over whatever
+ * resolution the canvas happens to be — only the sharpness of a picture that,
+ * in a run with no screen, nobody is looking at.
+ *
+ * It is never read from anything but the query string, so no preset, fader or
+ * saved look can reach it, and a plain visit renders at full resolution.
+ */
+export function renderScale(): number {
+  const raw = override('dpr');
+  if (raw === null) return 1;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.max(0.2, Math.min(1, n));
+}
+
+/**
  * The quality ladder for a tier, best rung first, plus where to start on it.
  *
  * Hosted caps at 384² and never renders above 1.5x pixels: a page someone is

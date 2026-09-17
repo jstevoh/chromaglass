@@ -28,7 +28,9 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 
-const PORT = 4178;
+// Overridable so two runs can share a machine — measuring a change to this
+// suite means running it twice, and a hard-coded port makes that serial.
+const PORT = Number(process.env.QA_PORT ?? 4178);
 /*
   The whole suite, on the GPU solver:  QA_GPU=mid npm run qa
 
@@ -60,9 +62,25 @@ const IGNORED = [
 ];
 
 const results = [];
+/*
+  Every line carries the second it was reached, and how long it cost.
+
+  This suite is the slowest thing in the repository by a long way — most of an
+  hour on a runner with no GPU — and for a long time the only thing anyone knew
+  about that number was the number. Which check is expensive is not something
+  you can reason about from the source: half of them wait on a renderer running
+  at a few frames a second, and the wait is invisible until it is printed.
+*/
+const started = Date.now();
+let lastAt = started;
 const check = (name, ok, detail = '') => {
-  results.push({ name, ok: !!ok, detail });
-  console.log(`${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  const now = Date.now();
+  const at = (now - started) / 1000;
+  const took = (now - lastAt) / 1000;
+  lastAt = now;
+  results.push({ name, ok: !!ok, detail, at, took });
+  const clock = `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(Math.floor(at % 60)).padStart(2, '0')}`;
+  console.log(`${ok ? ' ok ' : 'FAIL'}  ${clock} ${took >= 1 ? `+${took.toFixed(0)}s` : '    '}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
 /** Anything the preview server said on stderr, so a startup failure explains itself. */
@@ -1129,7 +1147,15 @@ try {
 }
 
 const failed = results.filter(r => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+console.log(`\n${results.length - failed.length}/${results.length} checks passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+
+// Where the time went, so the next person shortening this suite starts from a
+// measurement rather than from the source.
+const dear = [...results].sort((a, b) => b.took - a.took).slice(0, 8).filter(r => r.took >= 5);
+if (dear.length) {
+  console.log('\nslowest checks:');
+  for (const r of dear) console.log(`  ${r.took.toFixed(0)}s  ${r.name}`);
+}
 if (errors.length) {
   console.log(`\nconsole output the app should not have produced (${errors.length}):`);
   for (const e of errors.slice(0, 20)) console.log('  ', e.slice(0, 300));
