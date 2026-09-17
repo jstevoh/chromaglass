@@ -1173,7 +1173,8 @@ try {
         and the device picker are both checked for, not just the heading.
       */
       await clickOn('dot-mic');
-      await settle(1000);
+      await appears('settings-panel');
+      await settle(400);
       const micDot = await page.evaluate(() => {
         const pane = document.querySelector('[data-testid="settings-panel"]');
         if (!pane) return null;
@@ -1188,26 +1189,35 @@ try {
       check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
       check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
       check('and which device it listens on', !!micDot?.device);
-      await page.keyboard.press('Escape');
-      await settle(700);
+      /*
+        `escapeCloses`, not Escape and a fixed wait.
+
+        These three blocks each open a panel over the plate and the block after
+        them clicks into Settings, so a panel still closing is a click that
+        lands on nothing. Which is exactly what CI reported — `nothing to
+        click: settings-nav-midi`, because 700ms is a laptop's number and this
+        runner rasterises in software. The helper right above the suite exists
+        for this and I should have reached for it the first time.
+      */
+      await escapeCloses('settings-panel');
 
       await clickOn('dot-wall');
-      await settle(1000);
+      await appears('settings-panel');
+      await settle(400);
       const wallDot = await page.evaluate(() => {
         const pane = document.querySelector('[data-testid="settings-panel"]');
         const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return at?.textContent?.trim() ?? null;
       });
       check('the Wall dot opens the projector settings', /projector/i.test(wallDot ?? ''), wallDot ?? 'no panel');
-      await page.keyboard.press('Escape');
-      await settle(700);
+      await escapeCloses('settings-panel');
 
       await clickOn('dot-phone');
-      await settle(1000);
+      await appears('guide-panel');
       check('the Phone dot says what a phone can do',
         await page.getByTestId('guide-panel').count() > 0 || await page.locator('text=Playing it live').count() > 0);
-      await page.keyboard.press('Escape');
-      await settle(700);
+      const guideGone = await escapeCloses('guide-panel');
+      check('and the guide gets out of the way again', guideGone, guideGone ? '' : 'still open after six seconds');
       await clickOn('open-all-settings');
       await settle(1200);
       await clickOn('settings-nav-midi');
@@ -1349,14 +1359,29 @@ try {
         return real.call(this, kind, ...rest);
       };
     });
-    for (let i = 0; i < 4; i++) await viaPalette('seed the plate');
+    /*
+      The seeds have to be proved to have happened, or a zero means nothing.
+
+      This check counts something *not* happening, which is the shape that
+      passes for the wrong reason: if the presses silently stopped landing,
+      the count would be zero and the check would go green with the bug in
+      place. The palette is the guard — `fire` returns early when nothing
+      matches, so the palette only closes if a command actually ran, and
+      "seed the plate" matches exactly one. Four closes, four seeds.
+    */
+    let seedsLanded = 0;
+    for (let i = 0; i < 4; i++) {
+      await viaPalette('seed the plate');
+      if ((await page.getByTestId('palette-input').count()) === 0) seedsLanded++;
+    }
     await settle(600);
     const glGrabs = await page.evaluate(() => {
       HTMLCanvasElement.prototype.getContext = window.__realGetContext;
       return window.__glGrabs;
     });
-    check('seeding the plate does not rebuild the renderer',
-      glGrabs === 0, `${glGrabs} context build(s) across 4 seeds`);
+    check('four presses of Seed reach the plate', seedsLanded === 4, `${seedsLanded} of 4 ran`);
+    check('and seeding does not rebuild the renderer',
+      seedsLanded === 4 && glGrabs === 0, `${glGrabs} context build(s) across ${seedsLanded} seeds`);
 
     check('the controller readout is not up uninvited',
       (await page.getByTestId('midi-activity').count()) === 0);
