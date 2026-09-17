@@ -31,7 +31,7 @@
 
 import { SceneSense } from '../src/lib/sceneSense.ts';
 import { RoomStir, ROOM_STALE_MS } from '../src/lib/roomStir.ts';
-import { applySceneMappings } from '../src/lib/sceneMap.ts';
+import { PatchBay } from '../src/lib/sceneMap.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const N = 96;
@@ -279,18 +279,19 @@ const checks = [
 ];
 
 /*
-  ── Two sources on one mapping list ─────────────────────────────────
+  ── The patch bay ───────────────────────────────────────────────────
 
-  The room was the only thing that could ride a setting; the film projector can
-  now do it too, through the same mappings, each source with its own master
-  depth. That is three new ways to be wrong — a source that should not count
-  counting, two that should both count adding up wrong, and a result that walks
-  past the end of a setting's travel — and none of them would look like a bug
-  on a plate. They would look like "that's a bit much".
+  Three sources — room, film, sound — and any numeric setting to land on, per
+  patch, per plate. Every one of those axes is a way to be quietly wrong: a
+  source that should not count counting, two that should both count adding up
+  wrong, a patch aimed at one plate reaching the others, a patch aimed at a
+  plate that is not on stage tonight throwing, or a result walking past the end
+  of a setting's travel. None of them would look like a bug on a plate. They
+  would look like "that's a bit much".
 
-  So the arithmetic is checked against readings made up here. `applySceneMappings`
-  takes its clock as an argument for exactly this: staleness is a rule about
-  time and a test should not have to wait.
+  So the arithmetic is driven with readings made up here. `PatchBay.fold` takes
+  its clock as an argument for exactly this: staleness is a rule about time and
+  a test should not have to wait for it.
 */
 const reading = (energy, at) => ({
   lattice: 1,
@@ -301,30 +302,89 @@ const reading = (energy, at) => ({
   people: [], crowd: 0,
   at, ms: 0, ready: true,
 });
+/** What the analyser hands over. `bass` is 0..100 there and 0..1 by the time a patch sees it. */
+const heard = (bass) => ({ volume: 0, bass, mid: 0, treble: 0, energy: 0, timbre: 0, complexity: 0 });
 
-const map = { feature: 'motion', setting: 'turbulenceScale', depth: 1 };
-const base = { ...DEFAULT_SETTINGS, turbulenceScale: 0, sceneMappings: [map] };
 const T = 1000;                                   // the clock every case is read at
-const ride = (sources) => applySceneMappings(base, sources, { ...base }, T).turbulenceScale;
+const ctx = (over = {}) => ({
+  room: null, film: null, sound: null,
+  roomImpact: 1, filmImpact: 1, soundImpact: 1,
+  ...over,
+});
 
-const roomOnly = ride([{ reading: reading(0.4, T), impact: 1 }]);
-const filmOnly = ride([{ reading: reading(0.4, T), impact: 0 }, { reading: reading(0.4, T), impact: 1 }]);
-const bothUp = ride([{ reading: reading(0.4, T), impact: 1 }, { reading: reading(0.4, T), impact: 1 }]);
-const noneUp = ride([{ reading: reading(0.9, T), impact: 0 }, { reading: reading(0.9, T), impact: 0 }]);
-const stale = ride([{ reading: reading(0.9, T - ROOM_STALE_MS - 1), impact: 1 }]);
-const halfDepth = ride([{ reading: reading(0.4, T), impact: 0.5 }]);
-// Turbulence travels 0..1, so two sources at full energy must stop at the top
-// rather than sailing past it.
-const clamped = ride([{ reading: reading(1, T), impact: 1 }, { reading: reading(1, T), impact: 1 }]);
+/** Fold one patch list and read `turbulenceScale` off the picture and each plate. */
+function fold(patches, c, layers = 2) {
+  const base = { ...DEFAULT_SETTINGS, turbulenceScale: 0, layerCount: layers, sceneMappings: patches };
+  const bay = new PatchBay(base);
+  bay.fold(base, c, layers, T);
+  return {
+    global: bay.global.turbulenceScale,
+    layer: (i) => bay.layer(i).turbulenceScale,
+    /** Whether a fold happened at all: an untouched plate is `base` itself. */
+    copied: bay.global !== base,
+  };
+}
+
+const P = (over) => ({ source: 'room', feature: 'motion', setting: 'turbulenceScale', depth: 1, layer: 'all', ...over });
+
+// ── Sources ──
+const roomOnly = fold([P({ source: 'room' })], ctx({ room: reading(0.4, T) })).global;
+const filmOnly = fold([P({ source: 'film' })], ctx({ film: reading(0.4, T) })).global;
+const soundOnly = fold([P({ source: 'sound', feature: 'bass' })], ctx({ sound: heard(40) })).global;
+// A room patch must not read the film's reading, which is the whole point of
+// naming a source: before this, every source drove every patch.
+const crossed = fold([P({ source: 'room' })], ctx({ film: reading(0.9, T) })).global;
+const bothUp = fold(
+  [P({ source: 'room' }), P({ source: 'film' })],
+  ctx({ room: reading(0.4, T), film: reading(0.4, T) }),
+).global;
+const masterDown = fold([P({ source: 'film' })], ctx({ film: reading(0.4, T), filmImpact: 0 })).global;
+const stale = fold([P({ source: 'room' })], ctx({ room: reading(0.9, T - ROOM_STALE_MS - 1) })).global;
+const halfDepth = fold([P({ depth: 0.5 })], ctx({ room: reading(0.4, T) })).global;
+// Turbulence travels 0..1, so two sources at full energy stop at the top.
+const clamped = fold(
+  [P({ source: 'room' }), P({ source: 'film' })],
+  ctx({ room: reading(1, T), film: reading(1, T) }),
+).global;
+const idle = fold([P()], ctx());
+
+// ── Plates ──
+// The case the whole tier is for: a reel on one layer, the bass on another.
+// Deliberately different numbers on the two plates. With both at 0.4 the check
+// below could not tell "each plate got its own patch" from "both plates got
+// both patches", which is exactly the failure it is here to catch.
+const split = fold(
+  [P({ source: 'film', layer: 0 }), P({ source: 'sound', feature: 'bass', layer: 1 })],
+  ctx({ film: reading(0.4, T), sound: heard(80) }),
+);
+const onAll = fold([P({ layer: 'all' })], ctx({ room: reading(0.4, T) }));
+// A patch aimed at layer 3 on a one-layer look is not applied, and does not throw.
+const offstage = fold([P({ layer: 2 })], ctx({ room: reading(0.9, T) }), 1);
+// "All" and "this plate" stack: the plate starts from the picture.
+const stacked = fold(
+  [P({ source: 'room', layer: 'all' }), P({ source: 'film', layer: 0 })],
+  ctx({ room: reading(0.4, T), film: reading(0.4, T) }),
+);
 
 checks.push(
-  ['the room alone rides a mapping', roomOnly > 0.05],
-  ['the film alone rides the same mapping', Math.abs(filmOnly - roomOnly) < 1e-6],
-  ['two sources add', Math.abs(bothUp - roomOnly * 2) < 1e-6],
-  ['and half the depth moves half as far', Math.abs(halfDepth - roomOnly / 2) < 1e-6],
-  ['a source at zero impact is not read', noneUp === 0],
+  ['a room patch reads the room', roomOnly > 0.05],
+  ['a film patch reads the film', Math.abs(filmOnly - roomOnly) < 1e-6],
+  ['a sound patch reads the sound', Math.abs(soundOnly - roomOnly) < 1e-6],
+  ['and a patch reads only the source it names', crossed === 0],
+  ['two patches add', Math.abs(bothUp - roomOnly * 2) < 1e-6],
+  ['half the depth moves half as far', Math.abs(halfDepth - roomOnly / 2) < 1e-6],
+  ["a source's master pulls its patches down", masterDown === 0],
   ['a reading that stopped arriving is not read', stale === 0],
-  ['and two sources cannot push past the travel', clamped <= 1 + 1e-9 && clamped > 0.9],
+  ['two patches cannot push past the travel', clamped <= 1 + 1e-9 && clamped > 0.9],
+  ['nothing plugged in copies nothing', idle.global === 0 && idle.copied === false],
+
+  ['a patch on one plate moves that plate', Math.abs(split.layer(0) - roomOnly) < 1e-6],
+  ['and leaves the other alone', Math.abs(split.layer(0) - 0.4) < 1e-6 && Math.abs(split.layer(1) - 0.8) < 1e-6],
+  ['and leaves the picture alone', split.global === 0],
+  ['a patch on all plates reaches every one', Math.abs(onAll.layer(0) - onAll.layer(1)) < 1e-6 && onAll.layer(0) > 0.05],
+  ['a patch aimed at a plate that is not there does nothing', offstage.global === 0 && offstage.layer(0) === 0],
+  ['and a plate stacks its own patch on top of the picture',
+    Math.abs(stacked.layer(0) - roomOnly * 2) < 1e-6 && Math.abs(stacked.layer(1) - roomOnly) < 1e-6],
 );
 
 console.log('');

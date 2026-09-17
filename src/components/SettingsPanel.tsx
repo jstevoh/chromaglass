@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay } from 'lucide-react';
-import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
+import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
+import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
@@ -144,15 +145,40 @@ const SCENE_FEATURES: [SceneFeature, string][] = [
   ['sceneHue', 'What colour'],
 ];
 
+/** What the sound can be read for. The same features the four fixed selects use. */
+const AUDIO_FEATURES: [AudioFeature, string][] = [
+  ['volume', 'How loud'],
+  ['bass', 'Bass'],
+  ['mid', 'Mid'],
+  ['treble', 'Treble'],
+  ['energy', 'Energy'],
+  ['timbre', 'Timbre'],
+  ['complexity', 'Complexity'],
+];
+
+/** The three things a patch can listen to, and what each one is called. */
+const PATCH_SOURCES: [PatchSource, string][] = [
+  ['room', 'Room'],
+  ['film', 'Film'],
+  ['sound', 'Sound'],
+];
+
 /**
- * What a feature may be put on: the same list a MIDI fader can learn, less the
- * controls that decide how hard the sources ride. Letting a source ride how
- * hard it rides itself is a loop nobody asked for — and since one mapping list
- * now serves both the room and the film, the film's two dials are out for the
- * same reason the room's are.
+ * The features a source offers.
+ *
+ * The room and the film are the same analysis over different pixels, so they
+ * offer the same nine. The sound offers its own seven, and switching between
+ * them has to change the list — "how many people" is not something a microphone
+ * can tell you.
  */
-const sceneTargets = LEARNABLE_SETTINGS.filter(s =>
-  !String(s.key).startsWith('scene') && s.key !== 'filmDrive' && s.key !== 'filmImpact');
+const featuresFor = (source: PatchSource): [string, string][] =>
+  source === 'sound' ? AUDIO_FEATURES : SCENE_FEATURES;
+
+/**
+ * What a patch may be plugged into. One list, in `sceneMap`, so the dropdown
+ * and the fold cannot come to disagree about what is patchable.
+ */
+const sceneTargets = PATCH_TARGETS;
 
 /**
  * A labelled range. Lives outside the panel: defined inside it, it was a new
@@ -625,6 +651,26 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           icon={Activity}
           onChange={(v: number) => onUpdate({ audioImpact: v })}
           settingKey="audioImpact"
+        />
+        {/*
+          The master over every patch whose source is the sound.
+
+          The four selects below are the old fixed wiring — which audio band
+          drives velocity, density, colour and rotation — and they stay,
+          because they are what the solver reads directly. This is the other
+          way in: a patch under The Room can take *any* audio feature to *any*
+          setting, and this is the one fader that pulls all of that down at
+          once, the way Room Impact does for the camera.
+        */}
+        <Slider
+          label="Sound Impact"
+          disabled={(settings.sceneMappings?.length ?? 0) === 0 && 'add a patch under The Room first'}
+          value={settings.soundImpact ?? 1}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ soundImpact: v })}
+          settingKey="soundImpact"
         />
         
         {['velocity', 'density', 'color', 'rotation'].map((param) => (
@@ -1146,9 +1192,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </div>
         <div className="mt-5 mb-3">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold uppercase tracking-widest opacity-70">On the controls</div>
+            <div className="text-xs font-bold uppercase tracking-widest opacity-70">Patches</div>
             <button
-              onClick={() => onUpdate({ sceneMappings: [...(settings.sceneMappings ?? []), { feature: 'motion', setting: 'turbulenceScale', depth: 0.5 }] })}
+              onClick={() => onUpdate({ sceneMappings: [...(settings.sceneMappings ?? []), { source: 'room', feature: 'motion', setting: 'turbulenceScale', depth: 0.5, layer: 'all' }] })}
               className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"
               data-testid="scene-map-add"
             >
@@ -1157,24 +1203,55 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </div>
           {(settings.sceneMappings ?? []).length === 0 ? (
             <Info>
-              Nothing yet. A row is a feature of the room, a control, and how far it moves it — a floor filling up can open the turbulence, a crowd going still can slow the plate, someone crossing left to right can walk the lamp across with them.
+              Nothing yet. A patch is a <span className="text-white/60">source</span>, something that
+              changes in it, a control it moves, and how far — a floor filling up opening the
+              turbulence, a crowd going still slowing the plate, someone crossing left to right
+              walking the lamp across with them. The source can be this camera, the film projector
+              or the sound, and a patch can land on every plate or on one of them, so a reel can
+              drive layer 1 while the bass drives layer 2.
             </Info>
           ) : (
             <div className="flex flex-col gap-2">
               {(settings.sceneMappings ?? []).map((m, i) => (
                 <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
                   <div className="flex items-center gap-1">
+                    {/*
+                      Which source this patch listens to. Changing it has to
+                      change the feature too: "how many people" is not
+                      something the sound can tell you, and a patch left
+                      pointing at a feature its source does not have would
+                      quietly read zero for ever.
+                    */}
+                    <select
+                      value={m.source ?? 'room'}
+                      aria-label="Source"
+                      onChange={(e) => {
+                        const source = e.target.value as PatchSource;
+                        const options = featuresFor(source);
+                        const keep = options.some(([v]) => v === m.feature);
+                        const next = [...(settings.sceneMappings ?? [])];
+                        next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
+                        onUpdate({ sceneMappings: next });
+                      }}
+                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                      data-testid={`patch-source-${i}`}
+                    >
+                      {PATCH_SOURCES.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
                     <select
                       value={m.feature}
-                      aria-label="Room feature"
+                      aria-label="Feature"
                       onChange={(e) => {
                         const next = [...(settings.sceneMappings ?? [])];
-                        next[i] = { ...m, feature: e.target.value as SceneFeature };
+                        next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
                       className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                      data-testid={`patch-feature-${i}`}
                     >
-                      {SCENE_FEATURES.map(([value, label]) => (
+                      {featuresFor(m.source ?? 'room').map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
@@ -1201,6 +1278,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </button>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
+                    {/*
+                      Which plate it lands on.
+
+                      Only the settings the solver reads can differ between
+                      plates — how a layer moves and evolves. Bloom is done
+                      once over the finished picture, so aiming it at layer 2
+                      would do nothing at all, and a dropdown that offers a
+                      choice doing nothing is worse than one that does not
+                      offer it. `PER_LAYER` is that list and the harness checks
+                      it against the solver's own source.
+                    */}
+                    <select
+                      value={String(m.layer ?? 'all')}
+                      aria-label="Plate"
+                      disabled={!PER_LAYER.has(String(m.setting))}
+                      title={PER_LAYER.has(String(m.setting))
+                        ? 'Which plate this patch moves'
+                        : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const next = [...(settings.sceneMappings ?? [])];
+                        next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
+                        onUpdate({ sceneMappings: next });
+                      }}
+                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none disabled:opacity-30"
+                      data-testid={`patch-layer-${i}`}
+                    >
+                      <option value="all">All plates</option>
+                      {Array.from({ length: Math.max(1, settings.layerCount ?? 1) }, (_, n) => (
+                        <option key={n} value={String(n)}>Layer {n + 1}</option>
+                      ))}
+                    </select>
                     <input
                       type="range"
                       min={-1}

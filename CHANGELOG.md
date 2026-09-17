@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a patch bay
+
+The room camera could ride a setting. Then the film could too, but only in
+lockstep with the room, through one master each. Each time the missing thing
+was not a feature but a *routing*, so this is the routing: a patch is a source,
+a feature of it, a control it moves, how far, and which plate it lands on.
+
+- **Three sources.** The room's camera, the film projector and the sound. The
+  first two are the same analysis over different pixels and offer the same nine
+  features; the sound offers its own seven, and switching source moves the patch
+  onto a feature the new source actually has — a microphone cannot tell you how
+  many people are in the room, and a patch left pointing at a feature its source
+  does not have would read zero for ever without saying so.
+- **Sound is a source at last.** It was wired to exactly four destinations —
+  velocity, density, colour, rotation — and could reach nothing else. Those four
+  stay, because the solver reads them directly; the patch bay is the other way
+  in, and it reaches everything.
+- **Eighty-one destinations, up from forty-two.** Patches could only aim at what
+  a MIDI fader can learn, which left out most of the physics: viscosity's
+  damping, buoyancy, advection, diffusion, surface tension. They now draw from
+  the same registry the desk's pin chips use, which already had to exist.
+- **Twenty-two of them can be aimed at one plate.** A reel driving layer 1 while
+  the bass drives layer 2. That number is not a choice — it is whatever
+  `FluidSimulation.step` reads off the settings object it is handed, because
+  that object is the only thing about a layer that can differ. Everything else
+  is done once over the finished picture or read from the global fold, so the
+  plate selector greys out instead of offering a choice that does nothing.
+- **Old looks load unchanged.** `source` and `layer` are optional: absent means
+  room, and every plate — which is exactly what every mapping written before
+  there was a choice meant. No migration step to get wrong.
+
+Two things the checks caught that review would not have:
+
+**Patches on the same control overwrote each other.** The fold read each
+patch's starting value from the *original* settings rather than from the
+running total, so two patches aimed at one control silently became whichever
+was last in the list. `two patches add` in `scripts/scene.mjs` is the only
+thing that could see it.
+
+**`PER_LAYER` was written from memory and was wrong six ways.** It named
+heatIntensity, boilingPoint, fingering, beatSqueeze, rotationSpeed and plateRock
+as per-plate; the solver reads none of them — three are read in the render loop
+and one is passed as a parameter. It also left off fifteen the solver does read.
+`scripts/panel.mjs` now reads the solver's own source and checks the list in
+both directions: nothing offered that the solver ignores, nothing it reads left
+off. A dropdown that offers a choice doing nothing is worse than one that does
+not offer it.
+
+`scripts/scene.mjs` grew from 24 checks to 33, over source routing, per-plate
+routing, masters, staleness, clamping, and that a patch aimed at a plate which
+is not on stage tonight is skipped rather than throwing.
+
 ### Added — the film drives the plate
 
 The film projector was a slide. A loop, a camera or a captured window went

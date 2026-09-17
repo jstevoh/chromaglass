@@ -24,6 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
+import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -33,6 +34,7 @@ import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 // the cache directory rather than at the source it is here to read.
 const root = process.env.INIT_CWD ?? process.cwd();
 const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -165,6 +167,41 @@ check('and nothing is recognised as two different controllers',
 check('and every factory map has a pattern that finds it',
   FACTORY_MAPS.every(f => factoryFor(f.name)?.id === f.id),
   FACTORY_MAPS.filter(f => factoryFor(f.name)?.id !== f.id).map(f => f.name).join(', '));
+
+// ── What a patch may aim at one plate ───────────────────────────────
+//
+// A patch can be aimed at a single layer, and the panel offers that choice only
+// for settings the *solver* reads — those are the only ones that can mean
+// something different on one plate than on another. Bloom is done once over the
+// finished picture; aiming it at layer 2 would do nothing at all, and a
+// dropdown offering a choice that does nothing is worse than one that does not
+// offer it.
+//
+// `PER_LAYER` is a written list, because it decides what a dropdown shows. This
+// is what stops it becoming a lie: the solver's own source is read and every
+// name on the list has to appear in it.
+const cls = panel0.indexOf('class FluidSimulation {');
+const solver = cls < 0 ? '' : panel0.slice(cls, (() => {
+  // The class ends at the first line that closes at column zero.
+  const end = panel0.indexOf('\n}', cls);
+  return end < 0 ? panel0.length : end;
+})());
+check('the solver can be found to read', solver.length > 2000, `${solver.length} characters`);
+
+const readsInSolver = new Set([...solver.matchAll(/settings\.([A-Za-z0-9_]+)/g)].map(m => m[1]));
+const phantom = [...PER_LAYER].filter(k => !readsInSolver.has(k));
+check('every per-plate setting is one the solver actually reads', phantom.length === 0,
+  phantom.length
+    ? `${phantom.join(', ')} — the panel offers a plate for these and the solver never looks at them`
+    : `${PER_LAYER.size} of them`);
+
+// Against what a patch can actually aim at, not against everything pinnable:
+// a setting no patch can name could not be aimed at a plate either, so counting
+// it as "left off" is a check failing over something it cannot cause.
+const targetable = new Set(PATCH_TARGETS.map(s => String(s.key)));
+const missed = [...readsInSolver].filter(k => targetable.has(k) && !PER_LAYER.has(k));
+check('and nothing the solver reads is left off the list', missed.length === 0,
+  missed.length ? `${missed.join(', ')} — could be aimed at one plate and is not offered` : 'none');
 
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));

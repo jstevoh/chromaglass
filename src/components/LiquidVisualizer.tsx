@@ -20,7 +20,7 @@ import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
-import { applySceneMappings } from '../lib/sceneMap';
+import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 
@@ -1955,7 +1955,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The reading the room's hands last acted on, so each one acts once. */
   const lastHandsAtRef = useRef(-1);
   /** The settings with the room's mappings folded in, rewritten each frame. */
-  const sceneModRef = useRef<VisualizerSettings>({ ...settings });
+  /**
+   * The patch bay, and the scratch it folds into.
+   *
+   * One per visualizer, built once: folding makes a settings object for the
+   * picture and one per plate, and allocating those sixty times a second to
+   * throw them away shows up as a stutter long before it shows up as a bug.
+   */
+  const patchRef = useRef<PatchBay | null>(null);
+  if (!patchRef.current) patchRef.current = new PatchBay(settings);
   const gelAngleRef = useRef(0);
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -4132,10 +4140,20 @@ void main() {
       //
       // One object, reused: a copy per frame of a hundred-key settings object
       // is sixty allocations a second for a show that runs for hours.
-      const currentSettings = applySceneMappings(settingsRef.current, [
-        { reading: sceneRef?.current ?? null, impact: settingsRef.current.sceneImpact ?? 0 },
-        { reading: filmSenseRef?.current ?? null, impact: settingsRef.current.filmImpact ?? 0 },
-      ], sceneModRef.current, performance.now());
+      const patch = patchRef.current!;
+      patch.fold(settingsRef.current, {
+        room: sceneRef?.current ?? null,
+        film: filmSenseRef?.current ?? null,
+        sound: currentAudioData,
+        roomImpact: settingsRef.current.sceneImpact ?? 0,
+        filmImpact: settingsRef.current.filmImpact ?? 0,
+        soundImpact: settingsRef.current.soundImpact ?? 1,
+      }, settingsRef.current.layerCount ?? 1, performance.now());
+      // The picture. Everything aimed at one plate reaches it through
+      // `patch.layer(i)` where the solver is stepped, and nowhere else: a
+      // setting the render pass reads is global whatever it was aimed at,
+      // which is why the panel will not let you aim one at a layer.
+      const currentSettings = patch.global;
       const glr = webGLRef.current;
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
@@ -4960,7 +4978,11 @@ void main() {
             // does not ask for them.
             const disp = SIM_STEP * (currentSettings.advection ?? 0.45) * (GRID_SIZE - 2);
             for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, disp);
-            for (const fluid of fluidsRef.current) fluid.step(currentSettings, currentAudioData, time, noise2D);
+            // Each plate takes its own fold: a patch aimed at layer 1 changes
+            // how layer 1 moves and leaves the others exactly as they were.
+            for (let li = 0; li < fluidsRef.current.length; li++) {
+              fluidsRef.current[li].step(patch.layer(li), currentAudioData, time, noise2D);
+            }
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;
           }

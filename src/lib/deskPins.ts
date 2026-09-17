@@ -80,6 +80,7 @@ const SECTION_OF: Record<string, string> = {
   beatLead: 'audio-input',
   filmDrive: 'projectors',
   filmImpact: 'projectors',
+  soundImpact: 'audio-mappings',
   sceneDrive: 'room',
   sceneHands: 'room',
   sceneImpact: 'room',};

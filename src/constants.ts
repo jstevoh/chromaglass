@@ -1,4 +1,5 @@
 import type { AudioData } from './hooks/useAudioAnalyzer';
+import type { AudioFeature } from './types';
 
 // Canonical color palette — single source of truth for the entire app.
 // RGB values are 0-1 floats for the fluid simulation.
@@ -77,7 +78,16 @@ export function harmonyCycle(harmony: number[], t: number): { r: number; g: numb
 
 // ── Audio helpers ──────────────────────────────────────────────────────
 
-export type AudioFeatureKey = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
+/**
+ * The audio features, as one list.
+ *
+ * This was a second copy of `AudioFeature` from `types.ts`, written out
+ * identically. Two identical unions maintained apart is a feature added to one
+ * of them and silently unreachable through the other — which is exactly the
+ * trap now that a patch can send any audio feature to any setting rather than
+ * only to the four the mappings object names.
+ */
+export type AudioFeatureKey = AudioFeature;
 
 /**
  * Normalised audio value for a given feature (0-1 range, clamped).
