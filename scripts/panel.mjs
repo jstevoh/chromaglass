@@ -605,6 +605,20 @@ check('and Clear the same way',
 check('and both refs are kept up to date',
   /drainTriggerRef\.current = drainTrigger/.test(panel0)
   && /clearTriggerRef\.current = clearTrigger/.test(panel0));
+/*
+  And Seed, which is why the other two went unnoticed: it is the same kind of
+  counter, and it worked — because it was in the effect's dependency list. So
+  every press was rebuilding the whole GL context to deliver one integer. The
+  behavioural side of this is counted in qa (context acquisitions across four
+  presses); here the dependency list itself is checked, because that is the
+  part that would quietly come back the next time somebody needed a value in
+  the loop and reached for the nearest tool.
+*/
+check('Seed reaches the render loop through a ref too',
+  /seedCountRef\.current > lastSeedCount\.current/.test(panel0)
+  && /seedCountRef\.current = seedCount/.test(panel0));
+check('and nothing but a lost context rebuilds the renderer',
+  /\}, \[noise2D, glEpoch\]\);/.test(panel0) && !/\[noise2D, seedCount, glEpoch\]/.test(panel0));
 
 // ── Every status dot goes somewhere ─────────────────────────────────
 /*

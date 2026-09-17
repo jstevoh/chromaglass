@@ -1908,8 +1908,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   const drainTriggerRef = useRef(drainTrigger);
   const clearTriggerRef = useRef(clearTrigger);
+  /*
+    And Seed, which is the reason the other two went unnoticed for so long.
+
+    Seed is the same kind of counter, and it worked — but only because it was
+    in that dependency list. Which means every press of Seed was tearing down
+    and rebuilding the entire GL context: compiling every shader, reallocating
+    every framebuffer, rebuilding the simulations. A button people press
+    repeatedly while building a look was the most expensive thing in the app,
+    and the plate blinked each time.
+
+    Nothing in the effect's setup reads `seedCount` — the seeding itself
+    happens inside the render loop, from this comparison — so the rebuild was
+    never doing the work. It was only delivering the news.
+  */
+  const seedCountRef = useRef(seedCount);
   useEffect(() => { drainTriggerRef.current = drainTrigger; }, [drainTrigger]);
   useEffect(() => { clearTriggerRef.current = clearTrigger; }, [clearTrigger]);
+  useEffect(() => { seedCountRef.current = seedCount; }, [seedCount]);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   const harmonyRef = useRef(pickHarmony());
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
@@ -4679,8 +4695,8 @@ void main() {
           }
 
           // ── Seed trigger ───────────────────────────────────────
-          if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
-            lastSeedCount.current = seedCount;
+          if (seedCountRef.current > lastSeedCount.current && drainFrameRef.current === 0) {
+            lastSeedCount.current = seedCountRef.current;
             macroCamRef.current.reset();
             harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
             const styles = injectStyleRef.current;
@@ -5614,7 +5630,15 @@ void main() {
         webGLRef.current = null;
       }
     };
-  }, [noise2D, seedCount, glEpoch]);
+    /*
+      What legitimately rebuilds the GL context, and nothing else.
+
+      `noise2D` never changes, and `glEpoch` is a context loss or a resolution
+      change — both of which really do mean building everything again. A
+      control that merely tells the loop something belongs in a ref, and every
+      one of them now is.
+    */
+  }, [noise2D, glEpoch]);
 
   return (
     <div

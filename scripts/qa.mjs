@@ -203,6 +203,28 @@ const escapeCloses = async (testId) => {
   return false;
 };
 /**
+ * Wait for something to turn up: the counterpart of `escapeCloses`, and the
+ * same lesson.
+ *
+ * `poke` is re-run before each look, because some of what this waits for is a
+ * *moment* rather than a state. The activity readout keeps an event for four
+ * seconds and then drops it, and the comment above measured this runner
+ * stalling the main thread for longer than that — so a fixed wait is wrong in
+ * both directions at once: too early to have seen the event, and late enough
+ * that it has already expired. Re-firing is not a workaround for the app, it
+ * is what the hardware does: a fader on a desk sends continuously.
+ *
+ * The assertion is unchanged. Something that never turns up still fails.
+ */
+const appears = async (testId, poke) => {
+  for (let i = 0; i < 20; i++) {
+    if (poke) await poke();
+    if ((await page.getByTestId(testId).count()) > 0) return true;
+    await settle(300);
+  }
+  return false;
+};
+/**
  * `.first()`, because a panel may legitimately carry a control the toolbar
  * also has. It is deliberately forgiving — which is why the duplicate check
  * below exists: without it, this helper silently drives one of two buttons and
@@ -1300,6 +1322,42 @@ try {
       that it is *hideable* and stays hidden — an overlay in the corner of a
       show screen that cannot be got rid of is worse than no overlay.
     */
+    /*
+      ── Seeding must not rebuild the machine ─────────────────────
+
+      Seed is a counter the render loop compares against what it last acted
+      on, exactly like Drain and Clear — but unlike them it *worked*, because
+      it was in the dependency list of the effect that owns WebGL. Which meant
+      every press tore the context down and built it again: every shader
+      compiled, every framebuffer reallocated, every simulation rebuilt, on a
+      button people press repeatedly while building a look. Nothing in that
+      setup reads the counter — the seeding happens in the loop — so the
+      rebuild was never doing the work, only delivering the news.
+
+      Counted rather than asserted, by watching for a WebGL2 context being
+      taken out. The same canvas handing back the same context does not count:
+      `getContext` is only called again when the effect runs again, which is
+      the thing being measured. Four presses, because one could be a fluke of
+      ordering and four cannot.
+    */
+    await page.evaluate(() => {
+      window.__glGrabs = 0;
+      const real = HTMLCanvasElement.prototype.getContext;
+      window.__realGetContext = real;
+      HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+        if (kind === 'webgl2') window.__glGrabs++;
+        return real.call(this, kind, ...rest);
+      };
+    });
+    for (let i = 0; i < 4; i++) await viaPalette('seed the plate');
+    await settle(600);
+    const glGrabs = await page.evaluate(() => {
+      HTMLCanvasElement.prototype.getContext = window.__realGetContext;
+      return window.__glGrabs;
+    });
+    check('seeding the plate does not rebuild the renderer',
+      glGrabs === 0, `${glGrabs} context build(s) across 4 seeds`);
+
     check('the controller readout is not up uninvited',
       (await page.getByTestId('midi-activity').count()) === 0);
     await viaPalette('what the controller is doing');
@@ -1307,9 +1365,9 @@ try {
     check('and the palette puts it up',
       (await page.getByTestId('midi-activity').count()) === 1);
 
-    await page.evaluate(() => window.chromaglassTouch?.('setting:dimmer', 0.42));
-    await settle(400);
-    const said = await page.evaluate(() => {
+    const rideDimmer = () => page.evaluate(() => window.chromaglassTouch?.('setting:dimmer', 0.42));
+    const showed = await appears('midi-activity-setting:dimmer', rideDimmer);
+    const said = !showed ? null : await page.evaluate(() => {
       const el = document.querySelector('[data-testid="midi-activity-setting:dimmer"]');
       return el ? el.textContent.replace(/\s+/g, ' ').trim() : null;
     });
