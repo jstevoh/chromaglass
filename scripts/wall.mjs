@@ -36,7 +36,27 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { FlashGuard } from '../src/lib/flashGuard.ts';
 
-const PORT = 4324;
+const PORT = Number(process.env.WALL_PORT ?? 4324);
+
+/*
+  How many pixels the plate is drawn into, as a fraction of the window.
+
+  The same `?dpr=` override the show-night suite uses, and for the same reason:
+  with no GPU, WebGL goes through SwiftShader and the browser's GPU process
+  spends three of four cores shading fragments while every step here queues
+  behind it. This harness was measured at 9.8 minutes on a runner.
+
+  Safe here because every claim it makes is *normalised*. `gridOf` reduces the
+  canvas to a 32x18 grid of block means and `at()` addresses that grid in
+  fractions of the picture, so "the left third is black" is the same statement
+  at any resolution. Half rather than the show night's 0.35, because this is
+  the harness that makes precise claims about geometry — a corner pin and a
+  feathered mask edge — and at 0.5 each grid cell is still an average over
+  sixteen by twenty source pixels, far more than an edge's softening.
+
+  WALL_DPR=1 runs it at the window's own resolution.
+*/
+const DPR = process.env.WALL_DPR ?? '0.5';
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
@@ -212,7 +232,7 @@ let failed = 0;
 
 try {
   page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
   // Long enough for the governor to settle and the plate to have something on
   // it: a bare plate is black everywhere and every gate below would pass for
   // the wrong reason.

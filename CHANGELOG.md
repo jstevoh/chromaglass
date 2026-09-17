@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the gate no longer costs most of an hour
+
+A deploy waited forty-six minutes to publish a build that takes fifty seconds,
+and nobody had measured which part of that was expensive. From the run that
+published the previous commit: the seven pure-logic harnesses 0.5 min, the wall
+9.8 min, the show night 34.3 min, the publish itself 0.8 min.
+
+- **The wall and the show night are parallel jobs.** They were two steps of
+  one, so the gate cost both added together and the ten minutes were pure
+  latency on top of the thirty-four. They share nothing but the build.
+- **Superseded pull request runs are cancelled.** A second push left three
+  runners grinding on a commit nobody was waiting for, one of them for most of
+  an hour. Deploys are exempt — `deploy.yml` holds its own concurrency group on
+  the live channel.
+- **Every check in `qa` prints when it was reached and what it cost**, with a
+  slowest-checks table at the end. Which check is expensive is not something
+  that can be read off the source: half of them wait on a renderer running at a
+  few frames a second. The first profile found single clicks costing 133 and 54
+  seconds — and the fixed waits, the obvious suspect, accounting for 69 seconds
+  across all seventy-three of them.
+- **`?dpr=`, and what it was for.** `ps` during a run: the browser's GPU process
+  at 309% CPU shading fragments through SwiftShader, the process running React
+  and the fluid solver at 9%. Three of four cores, and every step of the harness
+  queueing behind them. So the lever is the pixel count, and fragment cost falls
+  with its square — measured, for one round trip to the page at 1440×900:
+
+  | `?dpr=` | canvas | one `page.evaluate` |
+  |---|---|---|
+  | 1 | 1440×900 | 2831 ms |
+  | 0.5 | 720×450 | 789 ms |
+  | 0.35 | 504×315 | 446 ms |
+  | 0.25 | 360×225 | 293 ms |
+  | 0.2 | 288×180 | 228 ms |
+
+  It flattens below 0.35 as the cost that is not the canvas takes over. The show
+  night runs at 0.35 and the wall at 0.5 — the wall more conservatively, since
+  it is the harness that makes precise claims about geometry, and even there
+  each of its 32×18 grid cells is still a mean over sixteen by twenty source
+  pixels. Nothing either of them asserts depends on resolution: layout and
+  geometry are CSS, and both reduce the canvas to a coarse grid addressed in
+  fractions of the picture. `QA_DPR=1` and `WALL_DPR=1` run them at full size.
+  The override is query-string only, so no preset, fader or saved look can reach
+  it, and a plain visit renders at full resolution.
+
 ### Changed — a settings screen you can find something in twice
 
 The panel held sixteen sections and eighty-six controls in one scrolling column

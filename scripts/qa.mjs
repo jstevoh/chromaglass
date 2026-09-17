@@ -49,7 +49,38 @@ const PORT = Number(process.env.QA_PORT ?? 4178);
   is a GPU; leave it unset in a sandbox.
 */
 const GPU = process.env.QA_GPU ?? '';
-const URL = `http://localhost:${PORT}/?debug${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
+
+/*
+  How many pixels the plate is drawn into, as a fraction of the window.
+
+  This suite took 34.3 minutes on a runner, and until it was measured the only
+  theory about that was the fixed waits — which turned out to be 69 seconds
+  across all seventy-three of them. `ps` during a run found where the rest of
+  it went:
+
+    chrome --type=gpu-process --use-angle=swiftshader-webgl   309% CPU
+    chrome --type=renderer  (React, the fluid solver)           9% CPU
+
+  Three of four cores shading fragments in software, and every step here
+  queueing behind them. One `page.evaluate` at 1440x900, measured:
+
+    dpr 1     1440x900   2831ms
+    dpr 0.5    720x450    789ms
+    dpr 0.35   504x315    433ms
+
+  Fragment cost is the pixel count, so it falls with the square of this. What
+  the suite asks is resolution-independent — does it load, do the controls
+  work, does the console stay clean, does it come back from a lost context,
+  where is a column laid out — because layout and geometry are CSS and the
+  luminance checks take a mean over a 16x9 reduction of whatever size the
+  canvas happens to be. The one harness that makes precise claims about
+  individual pixels is `wall`, and that one is deliberately left at full
+  resolution.
+
+  QA_DPR=1 runs it the slow way, for anything that needs the real thing.
+*/
+const DPR = process.env.QA_DPR ?? '0.35';
+const URL = `http://localhost:${PORT}/?debug&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
