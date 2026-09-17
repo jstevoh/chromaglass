@@ -1091,7 +1091,19 @@ try {
         Impact decide what it does to the liquid. Both are greyed with a reason
         until there is a film to read, which is the check — a control that
         silently does nothing is the thing this panel keeps being fixed for.
+
+        Opens the panel for itself rather than inheriting whatever the block
+        above left behind. It used to lean on the film-window checks having
+        just been on Projectors, and the moment a block was added between them
+        that went to The Room and closed the panel, this looked for two
+        controls in a panel that was not on screen and reported them missing.
+        A check that depends on the one before it is a check that fails for a
+        reason that has nothing to do with what it is testing.
       */
+      await clickOn('open-all-settings');
+      await settle(1200);
+      await clickOn('settings-nav-projectors');
+      await settle(500);
       const force = await page.evaluate(() => {
         const of = (key) => {
           const el = [...document.querySelectorAll('[data-testid^="pins-"]')]
