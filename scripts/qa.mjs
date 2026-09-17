@@ -203,6 +203,28 @@ const escapeCloses = async (testId) => {
   return false;
 };
 /**
+ * Wait for something to turn up: the counterpart of `escapeCloses`, and the
+ * same lesson.
+ *
+ * `poke` is re-run before each look, because some of what this waits for is a
+ * *moment* rather than a state. The activity readout keeps an event for four
+ * seconds and then drops it, and the comment above measured this runner
+ * stalling the main thread for longer than that — so a fixed wait is wrong in
+ * both directions at once: too early to have seen the event, and late enough
+ * that it has already expired. Re-firing is not a workaround for the app, it
+ * is what the hardware does: a fader on a desk sends continuously.
+ *
+ * The assertion is unchanged. Something that never turns up still fails.
+ */
+const appears = async (testId, poke) => {
+  for (let i = 0; i < 20; i++) {
+    if (poke) await poke();
+    if ((await page.getByTestId(testId).count()) > 0) return true;
+    await settle(300);
+  }
+  return false;
+};
+/**
  * `.first()`, because a panel may legitimately carry a control the toolbar
  * also has. It is deliberately forgiving — which is why the duplicate check
  * below exists: without it, this helper silently drives one of two buttons and
@@ -1139,6 +1161,63 @@ try {
         await page.getByTestId('midi-panel').count() > 0);
       await page.keyboard.press('Escape');
       await settle(800);
+
+      /*
+        ── Every dot lands somewhere that can change it ─────────────
+
+        The dots are the one place on either desk where the state of an input
+        is named, so they are where a hand goes when that input is the
+        problem — and the Mic dot reported "on" all evening with no way from
+        there to the question it raises, which is *which* microphone. The
+        section it opens has to be able to answer that, so the source chooser
+        and the device picker are both checked for, not just the heading.
+      */
+      await clickOn('dot-mic');
+      await appears('settings-panel');
+      await settle(400);
+      const micDot = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        if (!pane) return null;
+        const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
+        return {
+          at: at?.textContent?.trim() ?? null,
+          source: !!pane.querySelector('[data-testid="audio-source"]'),
+          device: !!pane.querySelector('[data-testid="audio-input"]'),
+          mic: !!pane.querySelector('[data-testid="audio-source-microphone"]'),
+        };
+      });
+      check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
+      check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
+      check('and which device it listens on', !!micDot?.device);
+      /*
+        `escapeCloses`, not Escape and a fixed wait.
+
+        These three blocks each open a panel over the plate and the block after
+        them clicks into Settings, so a panel still closing is a click that
+        lands on nothing. Which is exactly what CI reported — `nothing to
+        click: settings-nav-midi`, because 700ms is a laptop's number and this
+        runner rasterises in software. The helper right above the suite exists
+        for this and I should have reached for it the first time.
+      */
+      await escapeCloses('settings-panel');
+
+      await clickOn('dot-wall');
+      await appears('settings-panel');
+      await settle(400);
+      const wallDot = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
+        return at?.textContent?.trim() ?? null;
+      });
+      check('the Wall dot opens the projector settings', /projector/i.test(wallDot ?? ''), wallDot ?? 'no panel');
+      await escapeCloses('settings-panel');
+
+      await clickOn('dot-phone');
+      await appears('guide-panel');
+      check('the Phone dot says what a phone can do',
+        await page.getByTestId('guide-panel').count() > 0 || await page.locator('text=Playing it live').count() > 0);
+      const guideGone = await escapeCloses('guide-panel');
+      check('and the guide gets out of the way again', guideGone, guideGone ? '' : 'still open after six seconds');
       await clickOn('open-all-settings');
       await settle(1200);
       await clickOn('settings-nav-midi');
@@ -1253,6 +1332,57 @@ try {
       that it is *hideable* and stays hidden — an overlay in the corner of a
       show screen that cannot be got rid of is worse than no overlay.
     */
+    /*
+      ── Seeding must not rebuild the machine ─────────────────────
+
+      Seed is a counter the render loop compares against what it last acted
+      on, exactly like Drain and Clear — but unlike them it *worked*, because
+      it was in the dependency list of the effect that owns WebGL. Which meant
+      every press tore the context down and built it again: every shader
+      compiled, every framebuffer reallocated, every simulation rebuilt, on a
+      button people press repeatedly while building a look. Nothing in that
+      setup reads the counter — the seeding happens in the loop — so the
+      rebuild was never doing the work, only delivering the news.
+
+      Counted rather than asserted, by watching for a WebGL2 context being
+      taken out. The same canvas handing back the same context does not count:
+      `getContext` is only called again when the effect runs again, which is
+      the thing being measured. Four presses, because one could be a fluke of
+      ordering and four cannot.
+    */
+    await page.evaluate(() => {
+      window.__glGrabs = 0;
+      const real = HTMLCanvasElement.prototype.getContext;
+      window.__realGetContext = real;
+      HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+        if (kind === 'webgl2') window.__glGrabs++;
+        return real.call(this, kind, ...rest);
+      };
+    });
+    /*
+      The seeds have to be proved to have happened, or a zero means nothing.
+
+      This check counts something *not* happening, which is the shape that
+      passes for the wrong reason: if the presses silently stopped landing,
+      the count would be zero and the check would go green with the bug in
+      place. The palette is the guard — `fire` returns early when nothing
+      matches, so the palette only closes if a command actually ran, and
+      "seed the plate" matches exactly one. Four closes, four seeds.
+    */
+    let seedsLanded = 0;
+    for (let i = 0; i < 4; i++) {
+      await viaPalette('seed the plate');
+      if ((await page.getByTestId('palette-input').count()) === 0) seedsLanded++;
+    }
+    await settle(600);
+    const glGrabs = await page.evaluate(() => {
+      HTMLCanvasElement.prototype.getContext = window.__realGetContext;
+      return window.__glGrabs;
+    });
+    check('four presses of Seed reach the plate', seedsLanded === 4, `${seedsLanded} of 4 ran`);
+    check('and seeding does not rebuild the renderer',
+      seedsLanded === 4 && glGrabs === 0, `${glGrabs} context build(s) across ${seedsLanded} seeds`);
+
     check('the controller readout is not up uninvited',
       (await page.getByTestId('midi-activity').count()) === 0);
     await viaPalette('what the controller is doing');
@@ -1260,9 +1390,9 @@ try {
     check('and the palette puts it up',
       (await page.getByTestId('midi-activity').count()) === 1);
 
-    await page.evaluate(() => window.chromaglassTouch?.('setting:dimmer', 0.42));
-    await settle(400);
-    const said = await page.evaluate(() => {
+    const rideDimmer = () => page.evaluate(() => window.chromaglassTouch?.('setting:dimmer', 0.42));
+    const showed = await appears('midi-activity-setting:dimmer', rideDimmer);
+    const said = !showed ? null : await page.evaluate(() => {
       const el = document.querySelector('[data-testid="midi-activity-setting:dimmer"]');
       return el ? el.textContent.replace(/\s+/g, ' ').trim() : null;
     });

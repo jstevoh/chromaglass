@@ -38,6 +38,8 @@ interface Line {
   key: string;
   at: number;
   value?: number;
+  /** A fader soft takeover is holding back: a hand is on it, nothing moved. */
+  pickup?: boolean;
 }
 
 function labelFor(key: string, presets: { id: string; name: string }[]): { name: string; swatch?: string } {
@@ -74,7 +76,7 @@ export function MidiActivity({ presets, onHide }: {
     const off = subscribeAllTouches((e: TouchEvent) => {
       // Keyed, so a fader being swept is one line that keeps moving rather
       // than four hundred lines all saying the same control.
-      buffer.current.set(e.key, { key: e.key, at: e.at, value: e.value });
+      buffer.current.set(e.key, { key: e.key, at: e.at, value: e.value, pickup: e.kind === 'pickup' });
     });
     const id = setInterval(() => {
       const now = performance.now();
@@ -126,11 +128,23 @@ export function MidiActivity({ presets, onHide }: {
                     {swatch && <span className="h-2.5 w-2.5 shrink-0 rounded-xs" style={{ background: swatch }} />}
                     <span className="truncate text-[12px] font-medium text-text">{name}</span>
                   </span>
-                  {reading && <span className="shrink-0 font-mono text-[11px] text-text-2">{reading.text}</span>}
+                  {/*
+                    A held fader says what it is waiting for rather than a
+                    value it has not set. Soft takeover is right to hold it —
+                    a fader that has been handed a new setting must not slam it
+                    to wherever the hardware is standing — but in silence it is
+                    indistinguishable from MIDI not working, and the same
+                    reaction fixes only one of those.
+                  */}
+                  {reading && (
+                    <span className={`shrink-0 font-mono text-[11px] ${l.pickup ? 'text-dim' : 'text-text-2'}`}>
+                      {l.pickup ? `pick up at ${reading.text}` : reading.text}
+                    </span>
+                  )}
                 </div>
                 {reading && (
                   <div className="mt-1 h-[3px] w-full rounded-full bg-active">
-                    <div className="h-full rounded-full bg-text" style={{ width: `${reading.pct * 100}%` }} />
+                    <div className={`h-full rounded-full ${l.pickup ? 'bg-dim' : 'bg-text'}`} style={{ width: `${reading.pct * 100}%` }} />
                   </div>
                 )}
               </div>

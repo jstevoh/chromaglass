@@ -1888,6 +1888,44 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
   const lastDrainTrigger = useRef(drainTrigger);
+  /*
+    Drain and Clear, where the render loop can see them.
+
+    These are counters: the loop compares the prop against the last value it
+    acted on and runs the animation when it has gone up. But the loop lives
+    inside one very large effect whose dependencies are `[noise2D, seedCount,
+    glEpoch]`, so a press that raised `drainTrigger` did not re-run it and the
+    loop went on reading the value captured when the GL context was built.
+    Drain did nothing — until the next Seed or a resolution change happened to
+    rebuild the effect, at which point the loop woke up holding a counter that
+    had gone up while it was not looking and drained the plate *then*, one
+    press late and long after anyone had connected the two.
+
+    Seed works only by accident of being in that dependency list, which is
+    also why every seed rebuilds the whole GL context. Refs are how every
+    other live prop reaches this loop (`isActiveRef`, `settingsRef`), and they
+    are what these should have used.
+  */
+  const drainTriggerRef = useRef(drainTrigger);
+  const clearTriggerRef = useRef(clearTrigger);
+  /*
+    And Seed, which is the reason the other two went unnoticed for so long.
+
+    Seed is the same kind of counter, and it worked — but only because it was
+    in that dependency list. Which means every press of Seed was tearing down
+    and rebuilding the entire GL context: compiling every shader, reallocating
+    every framebuffer, rebuilding the simulations. A button people press
+    repeatedly while building a look was the most expensive thing in the app,
+    and the plate blinked each time.
+
+    Nothing in the effect's setup reads `seedCount` — the seeding itself
+    happens inside the render loop, from this comparison — so the rebuild was
+    never doing the work. It was only delivering the news.
+  */
+  const seedCountRef = useRef(seedCount);
+  useEffect(() => { drainTriggerRef.current = drainTrigger; }, [drainTrigger]);
+  useEffect(() => { clearTriggerRef.current = clearTrigger; }, [clearTrigger]);
+  useEffect(() => { seedCountRef.current = seedCount; }, [seedCount]);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   const harmonyRef = useRef(pickHarmony());
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
@@ -4201,8 +4239,8 @@ void main() {
         simAccumRef.current -= simSteps * SIM_STEP;
 
         // ── Drain animation ────────────────────────────────────
-        if (drainTrigger > lastDrainTrigger.current) {
-          lastDrainTrigger.current = drainTrigger;
+        if (drainTriggerRef.current > lastDrainTrigger.current) {
+          lastDrainTrigger.current = drainTriggerRef.current;
           drainFrameRef.current = 1;
           macroCamRef.current.reset();
           bubblesRef.current.clear();
@@ -4273,8 +4311,8 @@ void main() {
         }
 
         // ── Clear trigger ──────────────────────────────────────
-        if (clearTrigger > lastClearTrigger.current) {
-          lastClearTrigger.current = clearTrigger;
+        if (clearTriggerRef.current > lastClearTrigger.current) {
+          lastClearTrigger.current = clearTriggerRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
           if (af) af.clearAll();
           if (activeLayerRef.current === 0) bubblesRef.current.clear();
@@ -4657,8 +4695,8 @@ void main() {
           }
 
           // ── Seed trigger ───────────────────────────────────────
-          if (seedCount > lastSeedCount.current && drainFrameRef.current === 0) {
-            lastSeedCount.current = seedCount;
+          if (seedCountRef.current > lastSeedCount.current && drainFrameRef.current === 0) {
+            lastSeedCount.current = seedCountRef.current;
             macroCamRef.current.reset();
             harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
             const styles = injectStyleRef.current;
@@ -5592,7 +5630,15 @@ void main() {
         webGLRef.current = null;
       }
     };
-  }, [noise2D, seedCount, glEpoch]);
+    /*
+      What legitimately rebuilds the GL context, and nothing else.
+
+      `noise2D` never changes, and `glEpoch` is a context loss or a resolution
+      change — both of which really do mean building everything again. A
+      control that merely tells the loop something belongs in a ref, and every
+      one of them now is.
+    */
+  }, [noise2D, glEpoch]);
 
   return (
     <div

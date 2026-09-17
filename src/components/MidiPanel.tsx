@@ -259,7 +259,10 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
 
       {/* Fader manners */}
       <div className="flex items-center gap-2 mb-4 text-[10px]">
-        <label className="flex items-center gap-1.5 flex-1"><input type="checkbox" checked={midi.softTakeover} onChange={e => midi.setSoftTakeover(e.target.checked)} data-testid="midi-soft" /> Soft takeover</label>
+        <label
+          className="flex items-center gap-1.5 flex-1"
+          title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a preset loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
+        ><input type="checkbox" checked={midi.softTakeover} onChange={e => midi.setSoftTakeover(e.target.checked)} data-testid="midi-soft" /> Soft takeover</label>
         <label className="flex items-center gap-1.5 flex-1" title="Learn the next setting as an endless encoder (relative nudges)"><input type="checkbox" checked={encoder} onChange={e => setEncoder(e.target.checked)} data-testid="midi-encoder" /> <Zap size={10} /> Endless encoder</label>
       </div>
 

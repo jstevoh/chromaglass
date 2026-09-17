@@ -27,7 +27,8 @@ import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPi
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
-import { settingLed } from '../src/lib/midi.ts';
+import { settingLed, SoftTakeover } from '../src/lib/midi.ts';
+import { SettingRide } from '../src/lib/ride.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -437,6 +438,205 @@ const hook = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
 check('and listening can always be called off in the hook',
   /cancelAutoMap[\s\S]{0,200}watchRef\.current = null/.test(hook)
   && /finishAutoMap[\s\S]{0,300}watchRef\.current = null/.test(hook));
+
+// ── A hand on a fader ───────────────────────────────────────────────
+/*
+  The one that was reported from a stage rather than found here.
+
+  "The values on the screen don't track with the MIDI controls very well (if
+  at all)." The read-back was late: soft takeover compares the fader's
+  position against the setting's value and uses the same comparison to notice
+  somebody *else* moving the setting, and reading that out of React state
+  meant reading a value several messages old. So a fader moved at any speed
+  looked like an edit from elsewhere on every message — it dropped its pickup,
+  then refused to take it back, because the value it was asked to cross was
+  the stale one it had just been stranded at.
+
+  This drives a real sweep through the real classes and counts what lands. It
+  is the shape of check this repository wants: before the fix, `a swept fader
+  arrives where the fader is` reported 0.535 with the fader at 1.0.
+*/
+const sweep = (ride, { from = 64, to = 127, step, perFrame = 4 }) => {
+  const takeover = new SoftTakeover();
+  /*
+    What the app renders. The lag being modelled is *when* a render happens,
+    not what it contains: a MIDI callback is its own task, so React has
+    nothing to batch it with and renders when it gets round to it — but the
+    render it does do always carries every update already queued. So `live`
+    only moves on a frame boundary, and between boundaries the fader has
+    nothing but the ride's own word for where the setting is.
+  */
+  const live = { dimmer: 0.5 };
+  let landed = 0, total = 0, since = 0;
+  const frame = () => {
+    const patch = ride.drain();
+    if (patch) Object.assign(live, patch);
+    ride.observe(live);
+  };
+  for (let v = from; v <= to; v += step) {
+    total++;
+    const out = takeover.ride('b1', v / 127, ride.read('dimmer', live) ?? 0);
+    if (out !== null) { ride.write('dimmer', out); landed++; }
+    if (++since >= perFrame) { since = 0; frame(); }
+  }
+  frame();
+  // Where the fader actually finished, which for a step that does not divide
+  // the travel is not the top. Asserting 1.0 would be asserting the sweep's
+  // arithmetic rather than the ride's.
+  let last = from;
+  for (let v = from; v <= to; v += step) last = v;
+  return { landed, total, settled: live.dimmer, fader: last / 127 };
+};
+
+for (const step of [1, 4, 8]) {
+  const r = sweep(new SettingRide(), { step });
+  check(`a fader swept in steps of ${step} lands every message`,
+    r.landed === r.total, `${r.landed}/${r.total}`);
+  check(`and a sweep in steps of ${step} arrives where the fader is`,
+    Math.abs(r.settled - r.fader) < 0.001, `fader ${r.fader.toFixed(3)}, setting ${r.settled?.toFixed(3)}`);
+}
+
+// Soft takeover still does its job: a fader parked away from the value waits.
+{
+  const t = new SoftTakeover();
+  check('a fader parked away from the value is ignored until it crosses',
+    t.ride('b1', 0.9, 0.2) === null && t.ride('b1', 0.8, 0.2) === null);
+  check('and picks up when it gets there',
+    t.ride('b1', 0.1, 0.2) !== null);
+  check('and keeps riding once it has',
+    t.ride('b1', 0.05, 0.1) !== null && t.ride('b1', 0.0, 0.05) !== null);
+}
+// And the reason it exists: a preset moving the setting must drop the pickup,
+// or the next twitch of a fader left at the top slams the look back.
+{
+  const t = new SoftTakeover();
+  t.ride('b1', 0.5, 0.5);
+  check('a preset moving the setting takes the pickup away',
+    t.ride('b1', 0.52, 0.1) === null, 'fader at 0.52, preset put it at 0.1');
+}
+
+// The ride's shadow: late is not an edit, but an edit is.
+{
+  const ride = new SettingRide();
+  const live = { dimmer: 0.5 };
+  ride.write('dimmer', 0.8);
+  check('a write is readable before React has seen it', ride.read('dimmer', live) === 0.8);
+  ride.observe(live);            // a render for some other reason, before the frame
+  check('and survives a render that happens before the frame', ride.read('dimmer', live) === 0.8);
+  ride.drain();
+  Object.assign(live, { dimmer: 0.8 });
+  ride.observe(live);
+  check('and agrees once React has it', ride.read('dimmer', live) === 0.8);
+  live.dimmer = 0.2;             // a preset
+  ride.observe(live);
+  check('but gives way to something else moving it', ride.read('dimmer', live) === 0.2);
+}
+check('nothing to hand over is no React update at all', new SettingRide().drain() === null);
+{
+  const ride = new SettingRide();
+  ride.write('dimmer', 0.4);
+  ride.drain();
+  check('and a value written twice is only handed over once',
+    ride.write('dimmer', 0.4) === undefined && ride.drain() === null);
+}
+
+/*
+  An endless encoder had the same wound, from the other side.
+
+  A relative binding adds its nudge to the value it reads, so every message
+  that read a stale value added its step to a total that had already moved on
+  — and a fast spin, which is the only way anyone spins an encoder, threw
+  away most of its travel. Nothing about soft takeover involved: just the
+  read-back. Forty clicks of +1 on a 0..1 setting is 0.40, and it has to be
+  0.40 whether React rendered once in the middle or not at all.
+*/
+{
+  const ride = new SettingRide();
+  const live = { granulation: 0 };
+  const CLICKS = 40, PER_CLICK = 1 / 100;   // `relativeDelta` of 1, span of 1
+  for (let i = 0; i < CLICKS; i++) {
+    const cur = ride.read('granulation', live) ?? 0;
+    ride.write('granulation', Math.min(1, cur + PER_CLICK));
+    if (i % 7 === 6) { const p = ride.drain(); if (p) Object.assign(live, p); ride.observe(live); }
+  }
+  const p = ride.drain(); if (p) Object.assign(live, p); ride.observe(live);
+  check('an encoder spun fast keeps every click',
+    Math.abs(live.granulation - CLICKS * PER_CLICK) < 1e-9,
+    `${live.granulation.toFixed(3)} of ${(CLICKS * PER_CLICK).toFixed(2)}`);
+}
+
+/*
+  A held fader must not then report that it moved.
+
+  `break` inside the handler's switch leaves the switch, not the binding loop,
+  so the held branch fell straight through to the report at the bottom of that
+  loop — which reads the setting back and says where it landed. The readout
+  would have shown "pick up at 50%" and then immediately overwritten it with a
+  plain reading of a value the fader had not set, which is the one thing a
+  readout must never do. Checked in the source because the handler needs a
+  controller and a React tree to run at all.
+*/
+check('a held fader says it is waiting',
+  /touch\(touchKey\(t\), cur === undefined \? undefined : cur, now, 'pickup'\)/.test(hook));
+check('and does not then say it moved',
+  /if \(!held && \(t\.kind === 'setting'/.test(hook));
+// Feedback never argues with a hand on a control.
+check('and feedback does not talk back to a control being moved',
+  /heardRef\.current\.get\(k\)/.test(hook) && /HANDS_OFF_MS/.test(hook));
+
+// ── Drain and Clear reach the render loop ───────────────────────────
+/*
+  Also reported from a stage: "I'm not sure the drain button does anything."
+  It did not. Both are counters the render loop compares against what it last
+  acted on, but the loop lives inside one very large effect whose dependencies
+  are `[noise2D, seedCount, glEpoch]` — so a press that raised the counter did
+  not re-run it, and the loop went on reading the value captured when the GL
+  context was built. The plate drained on the *next* Seed, one press late.
+
+  A DOM check cannot see this: the button dispatches, the state changes, and
+  everything looks right from outside. So the loop's own read is checked here.
+*/
+check('the render loop reads Drain live, not from a closure',
+  /drainTriggerRef\.current > lastDrainTrigger\.current/.test(panel0)
+  && !/if \(drainTrigger > lastDrainTrigger\.current\)/.test(panel0));
+check('and Clear the same way',
+  /clearTriggerRef\.current > lastClearTrigger\.current/.test(panel0)
+  && !/if \(clearTrigger > lastClearTrigger\.current\)/.test(panel0));
+check('and both refs are kept up to date',
+  /drainTriggerRef\.current = drainTrigger/.test(panel0)
+  && /clearTriggerRef\.current = clearTrigger/.test(panel0));
+/*
+  And Seed, which is why the other two went unnoticed: it is the same kind of
+  counter, and it worked — because it was in the effect's dependency list. So
+  every press was rebuilding the whole GL context to deliver one integer. The
+  behavioural side of this is counted in qa (context acquisitions across four
+  presses); here the dependency list itself is checked, because that is the
+  part that would quietly come back the next time somebody needed a value in
+  the loop and reached for the nearest tool.
+*/
+check('Seed reaches the render loop through a ref too',
+  /seedCountRef\.current > lastSeedCount\.current/.test(panel0)
+  && /seedCountRef\.current = seedCount/.test(panel0));
+check('and nothing but a lost context rebuilds the renderer',
+  /\}, \[noise2D, glEpoch\]\);/.test(panel0) && !/\[noise2D, seedCount, glEpoch\]/.test(panel0));
+
+// ── Every status dot goes somewhere ─────────────────────────────────
+/*
+  A dot that reports an input and cannot be clicked is half a control: it is
+  the one place on either desk that names the state of the microphone, so it
+  is where a hand goes when the microphone is the problem.
+*/
+const header = readFileSync(join(root, 'src/components/desk/DeskHeader.tsx'), 'utf8');
+for (const [dot, handler] of [['mic', 'onMic'], ['wall', 'onWall'], ['midi', 'onMidi'], ['phone', 'onPhone']]) {
+  check(`the ${dot} dot opens something`,
+    new RegExp(`dots\\.${dot}[\\s\\S]{0,240}onClick=\\{${handler}\\}`).test(header)
+    || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
+}
+// And the place the mic dot opens has to be able to change the mic.
+check('and the Sound section can choose the source, not just the device',
+  panel.includes('testId="audio-source"') && panel.includes('data-testid="audio-input"'));
+check('and the sections the dots aim at exist',
+  ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));

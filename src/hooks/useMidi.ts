@@ -46,6 +46,13 @@ export interface MidiFeedback {
 
 export interface MidiDevice { id: string; name: string; }
 
+/**
+ * How long after a control last sent something it is considered to still have
+ * a hand on it. Longer than the gap between messages in a slow, careful move
+ * of a fader; short enough that a ring is right again before anyone looks.
+ */
+const HANDS_OFF_MS = 400;
+
 const ENABLED_KEY = 'chromaglass-midi-enabled';
 const PORTS_KEY = 'chromaglass-midi-ports';
 
@@ -95,6 +102,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const learningRef = useRef(learning); learningRef.current = learning;
   /** What each control was last told to show, so nothing is sent twice. */
   const ledRef = useRef(new Map<string, number>());
+  /**
+   * When each control last sent us something, so feedback never talks back to
+   * a control with a hand on it. See `sendFeedback`.
+   */
+  const heardRef = useRef(new Map<string, number>());
   /** The surface being learned, or null when nothing is listening for one. */
   const watchRef = useRef<SurfaceWatcher | null>(null);
   const tallyTick = useRef(0);
@@ -103,8 +115,6 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const softRef = useRef(softTakeover); softRef.current = softTakeover;
   const bankRef = useRef(bank); bankRef.current = bank;
   const takeover = useRef(new SoftTakeover()).current;
-  /** The last value each absolute binding wrote, so a change made elsewhere is noticed. */
-  const lastApplied = useRef(new Map<string, number>()).current;
   const eventTick = useRef(0);
   const clockRef = useRef(onClock); clockRef.current = onClock;
   /** Whether clock has been seen on this port lately, for the panel to report. */
@@ -132,6 +142,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const handle = useCallback((e: MidiEvent) => {
     const src = eventSource(e);
     const now = performance.now();
+    heardRef.current.set(sourceKey(src), now);
     if (now - eventTick.current > 80) { eventTick.current = now; setLastEvent({ source: src, value: e.value, at: now }); }
 
     /*
@@ -191,6 +202,12 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     for (const b of live) {
       const t = b.target;
       const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
+      /**
+       * Set when soft takeover held this fader back, so the report below does
+       * not go on to claim it moved. `break` inside the switch leaves the
+       * switch, not the loop.
+       */
+      let held = false;
       switch (t.kind) {
         case 'setting': {
           if (e.kind === 'noteoff') break;
@@ -207,14 +224,22 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           let in01 = e.value / 127;
           if (e.kind === 'noteon') in01 = 1;
           if (softRef.current) {
-            const last = lastApplied.get(b.id);
-            if (last !== undefined && Math.abs(last - cur01) > 0.02) takeover.drop(b.id);
-            const v = takeover.apply(b.id, in01, cur01);
-            if (v === null) break;
-            takeover.markPicked(b.id);
+            const v = takeover.ride(b.id, in01, cur01);
+            if (v === null) {
+              /*
+                Held back until the fader passes through the app's value.
+
+                This is the right thing to do and the wrong thing to do in
+                silence: a fader that does nothing is indistinguishable from
+                MIDI not working, and the answer to both is to move the fader,
+                which only fixes one of them. So say what it is waiting for.
+              */
+              touch(touchKey(t), cur === undefined ? undefined : cur, now, 'pickup');
+              held = true;
+              break;
+            }
             in01 = v;
           }
-          lastApplied.set(b.id, in01);
           h.setSetting(t.key, t.min + in01 * span);
           break;
         }
@@ -231,13 +256,13 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         that is a fader moving, which is exactly when you want to see which
         one you have hold of.
       */
-      if (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed) {
+      if (!held && (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed)) {
         // The value goes with it, so the activity view can say where a fader
         // landed without reading the setting back and racing the update.
         touch(touchKey(t), t.kind === 'setting' ? hostRef.current.getSetting(t.key) : undefined);
       }
     }
-  }, [setMap, takeover, lastApplied]);
+  }, [setMap, takeover]);
   const handleRef = useRef(handle); handleRef.current = handle;
 
   // ── Devices ────────────────────────────────────────────────────
@@ -315,10 +340,10 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const setBank = useCallback((next: number) => {
     setBankState(prev => {
       const b = ((next % MIDI_BANKS) + MIDI_BANKS) % MIDI_BANKS;
-      if (b !== prev) { takeover.reset(); lastApplied.clear(); }
+      if (b !== prev) { takeover.reset(); }
       return b;
     });
-  }, [takeover, lastApplied]);
+  }, [takeover]);
   const stepBank = useCallback((dir: 1 | -1) => setBank(bankRef.current + dir), [setBank]);
 
   const enable = useCallback(() => { setError(null); setEnabled(true); try { localStorage.setItem(ENABLED_KEY, '1'); } catch { /* private */ } }, []);
@@ -363,6 +388,20 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     */
     const write = (src: MidiSource, level: number) => {
       const k = sourceKey(src);
+      /*
+        Never talk back to a control with a hand on it.
+
+        A fader's ring is worth setting when a preset moves the setting
+        underneath it. While the *fader* is what is moving the setting,
+        sending the value back is at best telling the hardware what it just
+        told us, ten times a second, on a cable already carrying the clock —
+        and on a rig where the output finds its way back to the input, it is
+        the app arguing with the operator's hand. The cache entry is dropped
+        rather than updated, so the control is brought up to date once the
+        hand comes off.
+      */
+      const heard = heardRef.current.get(k);
+      if (heard !== undefined && performance.now() - heard < HANDS_OFF_MS) { sent.delete(k); return; }
       if (sent.get(k) === level) return;
       sent.set(k, level);
       try {
@@ -481,8 +520,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       : which === 'launch-control-xl' ? launchControlXlMap()
       : nanoKontrol2Map(),
     );
-    takeover.reset(); lastApplied.clear();
-  }, [presetIds, setMap, takeover, lastApplied]);
+    takeover.reset();
+  }, [presetIds, setMap, takeover]);
   /*
     Auto-map: start listening, stop listening, keep what was heard.
 
@@ -513,9 +552,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     if (controls.length === 0) return null;
     const { map, summary } = buildAutoMap(controls, presetIds, PALETTE.length, deviceName ?? null);
     setMap(map);
-    takeover.reset(); lastApplied.clear();
+    takeover.reset();
     return summary;
-  }, [presetIds, setMap, takeover, lastApplied]);
+  }, [presetIds, setMap, takeover]);
 
   const exportMap = useCallback(() => {
     const m = mapRef.current;
@@ -525,8 +564,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const importFile = useCallback(async (file: File) => {
     const m = parseMidiMap(await file.text());
     setMap(m);
-    takeover.reset(); lastApplied.clear();
-  }, [setMap, takeover, lastApplied]);
+    takeover.reset();
+  }, [setMap, takeover]);
   /** A binding written by hand (the panel's "add" without touching the controller). */
   const addBinding = useCallback((b: Omit<MidiBinding, 'id'>) => setMap(prev => ({ ...prev, bindings: [...prev.bindings.filter(x => sourceKey(x.source) !== sourceKey(b.source)), { ...b, id: newId() }] })), [setMap]);
 

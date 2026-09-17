@@ -24,6 +24,8 @@ import {
  */
 
 interface GuidePanelProps {
+  /** A section id to open at, for anything that sends you here to read one thing. */
+  focus?: string | null;
   onClose: () => void;
 }
 
@@ -724,8 +726,11 @@ const SECTIONS: Section[] = [
   },
 ];
 
-export function GuidePanel({ onClose }: GuidePanelProps) {
-  const [active, setActive] = useState(SECTIONS[0].id);
+export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
+  // Opened at a topic when something sent you here to read one thing — the
+  // Phone dot, for instance. The guide is fifteen sections long and landing at
+  // the top of it is landing nowhere.
+  const [active, setActive] = useState(focus ?? SECTIONS[0].id);
   const bodyRef = useRef<HTMLElement | null>(null);
   /**
    * While a click-scroll is in flight the observer would light up every
@@ -740,6 +745,20 @@ export function GuidePanel({ onClose }: GuidePanelProps) {
     jumpingTo.current = id;
     document.getElementById(`guide-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  /*
+    Land on the topic, not just light it in the nav.
+
+    `useState(focus)` alone highlighted the right row and left the reader at
+    the top of the document, which is the same as not having been sent
+    anywhere. Without smooth scrolling, because there is nothing to follow —
+    the panel was not on screen a moment ago.
+  */
+  useEffect(() => {
+    if (!focus) return;
+    document.getElementById(`guide-${focus}`)?.scrollIntoView({ block: 'start' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * The nav follows the reading, not just the clicking.

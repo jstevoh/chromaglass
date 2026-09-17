@@ -86,7 +86,10 @@ export interface DesignDeskProps {
   dots: DeskDots;
   midiName: string | null;
   /** The controller panel, from the header's MIDI dot. */
+  onMic: () => void;
+  onWall: () => void;
   onMidi: () => void;
+  onPhone: () => void;
   onSearch: () => void;
   /** Open the settings sheet showing everything — the bench's way to the rest. */
   onOpenSettings: () => void;
@@ -113,7 +116,10 @@ export function DesignDesk(p: DesignDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
+        onMic={p.onMic}
+        onWall={p.onWall}
         onMidi={p.onMidi}
+        onPhone={p.onPhone}
         onSearch={p.onSearch}
         trailing={
           <>

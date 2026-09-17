@@ -85,7 +85,10 @@ interface PerformDeskProps {
   onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   midiName: string | null;
   /** The controller panel, from the header's MIDI dot. */
+  onMic: () => void;
+  onWall: () => void;
   onMidi: () => void;
+  onPhone: () => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -140,7 +143,10 @@ export function PerformDesk(p: PerformDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
+        onMic={p.onMic}
+        onWall={p.onWall}
         onMidi={p.onMidi}
+        onPhone={p.onPhone}
         onSearch={p.onSearch}
       />
 
