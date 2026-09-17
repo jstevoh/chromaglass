@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
-import { SettingsPanel, SETTINGS_SECTIONS } from './components/SettingsPanel';
+import { SettingsPanel } from './components/SettingsPanel';
+import { SETTINGS_SECTIONS } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
+import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
@@ -78,8 +80,6 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
-/** Which controls are on the desk's faders. A property of this desk, like the mode. */
-const RIDE_KEYS_KEY = 'chromaglass-ride-keys';
 
 function rememberedSource(): AudioSource {
   try {
@@ -265,13 +265,25 @@ export default function App() {
     try { return localStorage.getItem(DESK_MODE_KEY) === 'perform' ? 'perform' : 'design'; } catch { return 'design'; }
   });
   useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
-  const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(RIDE_KEYS_KEY) ?? 'null');
-      return Array.isArray(saved) ? saved : DEFAULT_RIDES;
-    } catch { return DEFAULT_RIDES; }
-  });
-  useEffect(() => { try { localStorage.setItem(RIDE_KEYS_KEY, JSON.stringify(rideKeys)); } catch { /* private window */ } }, [rideKeys]);
+  /*
+    What is out on each surface.
+
+    A property of this desk rather than of a look: two rooms with the same
+    presets want different things under the hand, and a saved look that
+    rearranged your faders would be unusable. Both lists come from the one
+    registry in `deskPins`, so a control the settings panel draws can be put on
+    either surface — which is the thing that could not be done before, and the
+    reason the panel was the only place most of the app existed.
+  */
+  const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('perform', DEFAULT_RIDES));
+  useEffect(() => { savePins('perform', rideKeys); }, [rideKeys]);
+  const [recipeKeys, setRecipeKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('design', DEFAULT_RECIPE));
+  useEffect(() => { savePins('design', recipeKeys); }, [recipeKeys]);
+  /** Put a control on a surface, or take it off, from the settings panel. */
+  const pinSetting = useCallback((desk: DeskSurface, key: keyof VisualizerSettings, on: boolean) => {
+    const set = desk === 'perform' ? setRideKeys : setRecipeKeys;
+    set(prev => togglePin(prev, key, on));
+  }, []);
   /**
    * The preset last applied by hand. Which preset is *active* is derived from
    * the settings below rather than stored: it only ever differed from them
@@ -2374,19 +2386,16 @@ export default function App() {
             onTempoClear={clearTempo}
             onTempoBpm={setTempoBpm}
             midiClocked={midi.clocked}
-            /*
-              Everything, whichever door you came through.
-
-              This was `designing ? 'all' : 'perform'`, and then Perform grew
-              the same "All settings…" button — which opened on six of the
-              sixteen groups, so a button with that name was lying about what
-              it did. The split is worth keeping as a *filter* you pick (eight
-              screens of scrolling is not a control surface mid-show), but not
-              as a default that hides ten groups from someone who has just
-              asked for all of them. Nothing hides now unless you say so.
-            */
-            defaultTab="all"
             focusSection={settingsSection}
+            /*
+              The panel can put any of its controls on either desk, so it needs
+              to know what is already on them. One list per surface, shared with
+              the desks themselves, so a chip's filled state and the strip it
+              refers to cannot disagree.
+            */
+            pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
+            midi={midi}
+            onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
             sceneState={scene.state}
@@ -2687,6 +2696,7 @@ export default function App() {
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           midiName={midi.activeInputName ?? null}
+          onMidi={() => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); }}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
@@ -2764,6 +2774,8 @@ export default function App() {
           onAddLayer={() => updateSettings({ layerCount: Math.min(3, (settings.layerCount ?? 1) + 1) })}
           settings={settings}
           onSetting={updateSettings}
+          recipeKeys={recipeKeys}
+          onRecipeKeys={setRecipeKeys}
           onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
           randomiseArmed={luckyArmed}
           plateRef={preview.ref}
@@ -2779,6 +2791,7 @@ export default function App() {
           }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
+          onMidi={() => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); }}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />

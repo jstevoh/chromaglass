@@ -345,117 +345,77 @@ try {
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
   await noteDuplicates();
 
-  // ── The panel is two tabs, and Perform is the shorter one ─────────
+  // ── The panel is a rail and one section at a time ─────────────────
   //
-  // It used to be one column eight screens deep with 722 words of prose in
-  // it, which is not a control surface. What is checked is the split holding:
-  // Perform must show fewer sections than the panel has, and must be the
-  // shorter scroll of the two, or the tab has stopped earning itself.
+  // It used to be one column with a three-way filter on top, and at its
+  // widest setting that column was eight screens deep. Both shapes failed the
+  // same way — you could not find a control twice — and the complaint that
+  // replaced them was "a ton of settings are now hidden and I can't find
+  // them". What is checked is the shape that answers it: a row per section, a
+  // click lands on that section, and nothing else is in the pane with it.
   {
-    /*
-      The scrolling pane is found by name, not by hunting for the first div
-      that happens to overflow.
-
-      The old finder looked for any div with a `section h3` in it whose
-      scrollHeight exceeded its clientHeight. When a layout change stopped it
-      overflowing vertically it found nothing, returned 0 over 1, and the
-      "fits in about three screens" gate passed on a panel whose content had
-      gone sideways off the edge. A check that reports zero when it cannot
-      measure is worse than one that fails.
-    */
-    const measure = async () => page.evaluate(() => {
-      const vis = [...document.querySelectorAll('section')].filter(s => s.offsetParent !== null);
-      const pane = document.querySelector('[data-testid="settings-panel"] .overflow-y-auto');
+    const paneOf = () => page.evaluate(() => {
+      const pane = document.querySelector('[data-testid="settings-panel"] [data-testid="settings-rail"] + div')
+        ?? document.querySelector('[data-testid="settings-panel"] .overflow-y-auto');
       if (!pane) return null;
+      const all = [...document.querySelectorAll('[data-testid="settings-panel"] section[data-section]')];
+      const vis = all.filter(x => !x.classList.contains('hidden'));
       return {
-        n: vis.length,
+        total: all.length,
+        visible: vis.map(x => x.dataset.section),
         scroll: pane.scrollHeight, client: pane.clientHeight,
         wide: pane.scrollWidth - pane.clientWidth,
       };
     });
-    await clickOn('settings-tab-perform');
-    await settle(700);
-    const perform = await measure();
-    await clickOn('settings-tab-setup');
-    await settle(700);
-    const setup = await measure();
-    await clickOn('settings-tab-perform');
-    await settle(700);
-    check('the settings panel has a pane that can be measured',
-      !!perform && !!setup, perform && setup ? '' : 'no scrolling pane inside the sheet');
-    if (!perform || !setup) throw new Error('settings pane not found — the checks below would be measuring nothing');
+
+    const rail = await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="settings-rail"]');
+      if (!r) return null;
+      return {
+        rows: [...r.querySelectorAll('[data-testid^="settings-nav-"]')].map(b => b.dataset.testid.replace('settings-nav-', '')),
+        groups: [...r.querySelectorAll('[data-testid^="rail-group-"]')].length,
+      };
+    });
+    check('settings has a rail of places to go', !!rail && rail.rows.length >= 16,
+      rail ? `${rail.rows.length} rows in ${rail.groups} groups` : 'no rail');
+    if (!rail) throw new Error('no settings rail — the checks below would be measuring nothing');
+
+    const first = await paneOf();
+    check('and the pane can be measured', !!first, first ? '' : 'no scrolling pane inside the sheet');
+    if (!first) throw new Error('settings pane not found');
+    check('and every section it lists has markup', first.total >= 16 && first.total >= rail.rows.length,
+      `${first.total} sections, ${rail.rows.length} rows`);
     // The width failure this replaced: content flowing into horizontal columns
     // inside a box whose overflow-x is hidden, so most of it is off the edge.
-    check('and nothing in it runs off the side',
-      perform.wide <= 2 && setup.wide <= 2, `${perform.wide}px perform, ${setup.wide}px setup`);
-    check('the settings panel is split in two',
-      perform.n > 0 && setup.n > 0 && perform.n + setup.n === headings.length,
-      `${perform.n} perform + ${setup.n} setup = ${headings.length}`);
-    check('and Perform is the shorter half',
-      perform.scroll < setup.scroll,
-      `${(perform.scroll / perform.client).toFixed(1)} screens vs ${(setup.scroll / setup.client).toFixed(1)}`);
-    check('and Perform fits in about three screens',
-      perform.scroll / perform.client < 3.5, `${(perform.scroll / perform.client).toFixed(1)} screens`);
-  }
+    check('and nothing in it runs off the side', first.wide <= 2, `${first.wide}px`);
+    check('and one section is in the pane, not all of them',
+      first.visible.length === 1, `${first.visible.length}: ${first.visible.join(', ')}`);
 
-  // ── The long explanations are folded away ─────────────────────────
-  {
-    const toggles = await page.locator('[data-info="toggle"]').count();
-    const open = await page.locator('[data-info="body"]').count();
-    check('the explanations are behind an info toggle', toggles > 8, `${toggles} of them`);
-    check('and none of them is open until it is asked for', open === 0, `${open} open`);
-    if (toggles) {
-      await page.evaluate(() => document.querySelector('[data-info="toggle"]').click());
-      await settle(400);
-      check('and clicking one opens it', (await page.locator('[data-info="body"]').count()) === 1);
-      await page.evaluate(() => document.querySelector('[data-info="toggle"]').click());
-      await settle(300);
-    }
-  }
-
-  const sliders = page.locator('input[type="range"]:visible');
-  const sliderCount = await sliders.count();
-  check('settings has sliders', sliderCount > 20, `${sliderCount}`);
-
-  // The presets belong on the title and nowhere else.
-  check('settings does not carry a second copy of the presets',
-    !headings.some(h => /^presets$/i.test(h.trim())), headings.join(', '));
-
-  // Ride every one of them, to a value its own min/max/step allows, one per
-  // animation frame — which is how a hand on a slider, a MIDI fader and the
-  // sequencer's glide all deliver changes. Driving all of them inside a single
-  // tick instead does trip React's nested-update ceiling, but nothing in the
-  // app or on a controller writes settings in a loop without yielding, so that
-  // says more about the harness than the show.
-  const rode = await page.evaluate(() => new Promise(done => {
-    const set = (el, v) => {
-      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, String(v));
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-    const els = [...document.querySelectorAll('input[type="range"]')];
-    const skipped = [];
-    let i = 0, moved = 0;
-    const step = () => {
-      if (i >= els.length) return done({ moved, skipped });
-      const el = els[i++];
-      const min = Number(el.min === '' ? 0 : el.min);
-      const max = Number(el.max === '' ? 100 : el.max);
-      const stepSize = Number(el.step === '' || el.step === 'any' ? (max - min) / 100 : el.step);
-      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
-        skipped.push(el.getAttribute('aria-label'));
-      } else {
-        const target = min + Math.round(((max - min) * 0.65) / stepSize) * stepSize;
-        set(el, Math.min(max, Math.max(min, target)));
-        moved++;
+    // Every row, not a sample: the failure this is for is one section that
+    // cannot be reached, and a sample is exactly how that survives.
+    const unreachable = [];
+    let deepest = 0;
+    for (const id of rail.rows) {
+      await clickOn(`settings-nav-${id}`);
+      await settle(160);
+      const now = await paneOf();
+      if (!now || now.visible.length !== 1 || now.visible[0] !== id) {
+        unreachable.push(`${id} → ${now ? now.visible.join(', ') || 'nothing' : 'no pane'}`);
       }
-      requestAnimationFrame(step);
-    };
-    step();
-  }));
-  await settle(3000);
-  check('every slider takes a value from its own range', rode.moved > 20 && rode.skipped.length === 0,
-    `${rode.moved} moved${rode.skipped.length ? `, skipped ${rode.skipped.join(', ')}` : ''}`);
+      if (now) deepest = Math.max(deepest, now.scroll / now.client);
+    }
+    check('every row on the rail opens the section it names',
+      unreachable.length === 0, unreachable.length ? unreachable.join(' · ') : `all ${rail.rows.length}`);
+    // The number the old panel could not hold: with everything on screen at
+    // once it was eight screens deep, and "All" was the default.
+    check('and no section is more than three screens deep',
+      deepest < 3, `deepest is ${deepest.toFixed(1)} screens`);
+
+    // The room camera has a row of its own now, which is the specific thing
+    // that could not be found: "turn on the video and track people".
+    check('the room camera is one of those rows', rail.rows.includes('room'), rail.rows.join(', '));
+    check('and so is the controller', rail.rows.includes('midi'));
+  }
 
   // ── Every labelled slider has a label the screen reader can read ───
   const unlabelled = await page.evaluate(() =>
@@ -463,12 +423,10 @@ try {
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
 
   // ── The room camera ───────────────────────────────────────────────
-  // It lives on the Setup tab now: the panel is split between what a hand
-  // reaches for during a show and what is decided once, and a room camera's
-  // device and mappings are decided once. Without this the harness reached
-  // for a control on the hidden half and sat there until it timed out.
-  await clickOn('settings-tab-setup');
-  await settle(700);
+  // One click on the rail, which is the whole point of the rail: the thing
+  // that turns the video on and tracks people has a row with its own name.
+  await clickOn('settings-nav-room');
+  await settle(500);
   const roomToggle = firstVisible('scene-toggle');
   await roomToggle.scrollIntoViewIfNeeded();
   await clickOn(roomToggle);
@@ -792,29 +750,31 @@ try {
         const opened = await page.evaluate(() => {
           const pane = document.querySelector('[data-testid="settings-panel"]');
           if (!pane) return null;
-          const all = [...pane.querySelectorAll('section[data-section]')];
-          const room = pane.querySelector('[data-section="room"]');
+          const rail = pane.querySelector('[data-testid="settings-rail"]');
+          const room = rail?.querySelector('[data-testid="settings-nav-room"]');
+          const midi = rail?.querySelector('[data-testid="settings-nav-midi"]');
+          const r = room?.getBoundingClientRect();
           return {
-            total: all.length,
-            visible: all.filter(x => !x.classList.contains('hidden')).length,
-            room: !!room && !room.classList.contains('hidden'),
+            rows: rail ? rail.querySelectorAll('[data-testid^="settings-nav-"]').length : 0,
+            roomOnScreen: !!r && r.width > 20 && r.bottom > 0 && r.top < window.innerHeight,
+            midiRow: !!midi,
           };
         });
-        check(`and from ${deskLabel} it opens on all of them`,
-          !!opened && opened.total >= 16 && opened.total === opened.visible && opened.room,
-          opened ? `${opened.visible} of ${opened.total}, room ${opened.room}` : 'no panel');
+        check(`and from ${deskLabel} every section is one click away`,
+          !!opened && opened.rows >= 16 && opened.roomOnScreen && opened.midiRow,
+          opened ? `${opened.rows} rows, room on screen ${opened.roomOnScreen}, controller ${opened.midiRow}` : 'no panel');
 
-        // The split is still there as a filter you pick, which is the whole
-        // reason it is allowed to exist.
-        await clickOn('settings-tab-perform');
-        await settle(600);
-        const filtered = await page.evaluate(() => {
+        // The room camera reached from the desk, by name, in two clicks.
+        await clickOn('settings-nav-room');
+        await settle(500);
+        const reached = await page.evaluate(() => {
           const pane = document.querySelector('[data-testid="settings-panel"]');
-          const all = [...pane.querySelectorAll('section[data-section]')];
-          return all.filter(x => !x.classList.contains('hidden')).length;
+          const vis = [...pane.querySelectorAll('section[data-section]')].filter(x => !x.classList.contains('hidden'));
+          return { ids: vis.map(x => x.dataset.section), watch: !!pane.querySelector('[data-testid="scene-toggle"]') };
         });
-        check(`and the halves still narrow it from ${deskLabel}`,
-          filtered > 0 && filtered < 16, `Perform shows ${filtered} of 16`);
+        check(`and from ${deskLabel} the room camera is two clicks away`,
+          reached.ids.length === 1 && reached.ids[0] === 'room' && reached.watch,
+          `${reached.ids.join(', ') || 'nothing'}, toggle ${reached.watch}`);
         await page.keyboard.press('Escape');
         await settle(700);
       };
@@ -836,23 +796,21 @@ try {
         const pane = document.querySelector('[data-testid="settings-panel"]');
         if (!pane) return null;
         const all = [...pane.querySelectorAll('section[data-section]')];
-        const room = pane.querySelector('[data-section="room"]');
-        const watch = pane.querySelector('[data-testid="scene-toggle"], [data-section="room"] button');
+        const vis = all.filter(x => !x.classList.contains('hidden'));
+        const current = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return {
           total: all.length,
-          visible: all.filter(x => !x.classList.contains('hidden')).length,
-          roomVisible: !!room && !room.classList.contains('hidden'),
-          reachedRoom: !!watch,
-          tab: [...pane.querySelectorAll('[role="tab"]')]
-            .find(t => t.getAttribute('aria-selected') === 'true')?.textContent?.trim(),
+          visible: vis.map(x => x.dataset.section),
+          reachedRoom: !!pane.querySelector('[data-testid="scene-toggle"]'),
+          railSays: current?.textContent?.trim() ?? null,
         };
       });
-      check('a palette row opens Settings at the section it names', !!panel && panel.roomVisible,
-        panel ? `tab ${panel.tab}, room ${panel.roomVisible}` : 'no settings panel');
-      check('and every section is on screen, not ten of them behind a tab',
-        !!panel && panel.total === panel.visible && panel.total >= 16,
-        panel ? `${panel.visible} of ${panel.total} showing` : '');
-      check('and the room camera is among them', !!panel && panel.reachedRoom);
+      check('a palette row opens Settings at the section it names',
+        !!panel && panel.visible.length === 1 && panel.visible[0] === 'room',
+        panel ? `showing ${panel.visible.join(', ') || 'nothing'}` : 'no settings panel');
+      check('and the rail says where you are',
+        !!panel && panel.railSays === 'The Room', panel ? String(panel.railSays) : '');
+      check('and the room camera is on it', !!panel && panel.reachedRoom);
 
       // The search reaches a section by what it is about, not by its heading:
       // "people" is the word someone types, and it is nowhere in "The Room".
@@ -875,8 +833,136 @@ try {
       check('and searching narrows rather than showing everything',
         afterSearch.n > 0 && afterSearch.n < 16, `${afterSearch.n} sections`);
 
+      // The rail narrows with it, so it reads as a result list rather than a
+      // menu whose rows mostly lead nowhere.
+      const railAfter = await page.evaluate(() => {
+        const r = document.querySelector('[data-testid="settings-rail"]');
+        return [...r.querySelectorAll('[data-testid^="settings-nav-"]')].map(b => b.dataset.testid.replace('settings-nav-', ''));
+      });
+      check('and the rail narrows to the same sections',
+        railAfter.length === afterSearch.n && railAfter.includes('room'),
+        `rail ${railAfter.join(', ') || 'empty'} vs pane ${afterSearch.ids.join(', ')}`);
+
       await page.keyboard.press('Escape');
       await settle(800);
+
+      /*
+        ── Putting a control on a desk ─────────────────────────────
+
+        The other half of the same complaint: the settings a show is played
+        on were reachable only through a panel, so anything not among the six
+        rides or the eight recipe slots meant opening the panel again every
+        time you wanted it. Every slider now carries two chips — P and D —
+        and this follows one the whole way: pin it, close the panel, and
+        check the strip it was pinned to actually grew it.
+      */
+      await clickOn('mode-segmented-perform');
+      await settle(1200);
+      const ridesBefore = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid="rides"] [data-testid^="ride-"]')]
+          .map(e => e.dataset.testid).filter(t => t.startsWith('ride-') && !t.startsWith('ride-pick')));
+      await clickOn('open-all-settings');
+      await settle(1200);
+      await clickOn('settings-nav-physics');
+      await settle(500);
+      const chip = page.getByTestId('pin-perform-buoyancy');
+      check('a setting deep in the panel offers to go on the desk',
+        await chip.count() > 0 && await chip.isVisible(), `${await chip.count()} chip`);
+      if (await chip.count()) {
+        await clickOn(chip);
+        await settle(400);
+        const pressed = await chip.getAttribute('aria-pressed');
+        check('and says so once it is on', pressed === 'true', `aria-pressed=${pressed}`);
+        await page.keyboard.press('Escape');
+        await settle(900);
+        const ridesAfter = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-testid="rides"] [data-testid^="ride-"]')]
+            .map(e => e.dataset.testid).filter(t => t.startsWith('ride-') && !t.startsWith('ride-pick')));
+        check('and it is on the desk when the panel closes',
+          ridesAfter.includes('ride-buoyancy') && ridesAfter.length === ridesBefore.length + 1,
+          `${ridesBefore.length} → ${ridesAfter.length}: ${ridesAfter.join(', ')}`);
+
+        // And back off again, so the desk is not a one-way tray.
+        await clickOn('open-all-settings');
+        await settle(1200);
+        await clickOn('settings-nav-physics');
+        await settle(500);
+        await clickOn('pin-perform-buoyancy');
+        await settle(400);
+        await page.keyboard.press('Escape');
+        await settle(900);
+        const ridesBack = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-testid="rides"] [data-testid^="ride-"]')]
+            .map(e => e.dataset.testid).filter(t => t.startsWith('ride-') && !t.startsWith('ride-pick')));
+        check('and comes off again', !ridesBack.includes('ride-buoyancy'), ridesBack.join(', '));
+      }
+
+      // The bench's recipe was a constant in a file: eight controls, and no
+      // way to make it nine. Its Choose is the desk's picker over the same
+      // list, so this only has to prove the door opens and works.
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+      const recipeBefore = await page.evaluate(() =>
+        document.querySelectorAll('[data-testid="recipe"] [data-testid^="recipe-"]').length);
+      await clickOn('recipe-pick');
+      await settle(500);
+      const picker = page.getByTestId('recipe-picker');
+      check('the bench can be told what is on its recipe', await picker.count() > 0);
+      if (await picker.count()) {
+        await clickOn('recipe-picker-refraction');
+        await settle(300);
+        await clickOn('recipe-pick');
+        await settle(500);
+        const recipeAfter = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-testid="recipe"] [data-testid^="recipe-"]')]
+            .map(e => e.dataset.testid));
+        check('and what you chose is on it',
+          recipeAfter.includes('recipe-refraction'),
+          `${recipeBefore} → ${recipeAfter.filter(t => t !== 'recipe-pick' && t !== 'recipe-picker').length}`);
+      }
+
+      /*
+        ── The controller ──────────────────────────────────────────
+
+        Five factory maps, learn, banks, LED feedback and a picture of the
+        hardware, all of it reachable on a desktop only through ⌘K, because
+        the button that opened it lived in the narrow-screen toolbar the
+        desks replaced. Two ways in now, and both are checked: the status dot
+        that was already reporting MIDI, and a rail row of its own.
+      */
+      await clickOn('dot-midi');
+      await settle(900);
+      check('the MIDI dot opens the controller panel',
+        await page.getByTestId('midi-panel').count() > 0);
+      await page.keyboard.press('Escape');
+      await settle(800);
+      await clickOn('open-all-settings');
+      await settle(1200);
+      await clickOn('settings-nav-midi');
+      await settle(500);
+      const midiSection = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        const vis = [...pane.querySelectorAll('section[data-section]')].filter(x => !x.classList.contains('hidden'));
+        return {
+          ids: vis.map(x => x.dataset.section),
+          // Web MIDI is absent in this browser build, so the section's job
+          // here is to say so rather than to show an enable button that
+          // could never work. Either is a section that exists and explains
+          // itself; neither is what was there before, which was nothing.
+          enable: !!pane.querySelector('[data-testid="settings-midi-enable"]'),
+          unsupported: !!pane.querySelector('[data-testid="settings-midi-unsupported"]'),
+          open: !!pane.querySelector('[data-testid="settings-midi-open"]'),
+        };
+      });
+      check('and settings has a controller section of its own',
+        midiSection.ids.length === 1 && midiSection.ids[0] === 'midi',
+        midiSection.ids.join(', ') || 'nothing');
+      check('and it either sets the controller up or says why it cannot',
+        midiSection.enable || midiSection.unsupported,
+        `enable ${midiSection.enable}, unsupported ${midiSection.unsupported}`);
+      await page.keyboard.press('Escape');
+      await settle(800);
+
       await clickOn('mode-segmented-perform');
       await settle(1200);
     }

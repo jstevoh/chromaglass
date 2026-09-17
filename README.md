@@ -158,7 +158,9 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 
 ## MIDI and game controllers
 
-The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox have no Web MIDI) turns a controller on the desk into the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer.
+A controller on the desk becomes the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer. Chrome, Edge or Opera — Safari and Firefox have no Web MIDI.
+
+**Setting one up.** Plug it in by USB, then either click the **MIDI** dot in the top-right of Perform or Design, or open **Settings → Inputs → Controller**. Turn MIDI on, and if the port is one of the five below the section offers its map as a single button — *Set up the APC40 mkII* — so a new controller is two clicks from playing the show. Everything past that (learn, shift banks, the bindings list, the controller drawn to scale) is in the MIDI panel behind **Learn controls, banks and bindings…**.
 
 - **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets with the bottom row of pads the dye palette, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, crossfader Sharpness and the cue encoder Granulation, arrows step presets, transport play / blackout / record, and Drain and Clear alone under the scene column, away from Seed), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
 - **The controller, drawn.** The **APC40 mkII picture** button in the MIDI panel opens the whole panel to scale: forty clip pads, the five button rows under the grid, nine faders, sixteen knobs, the crossfader and the transport, every one carrying the MIDI address it really sends (taken from Akai's Communications Protocol v1.2). Touch a control on the desk and the picture selects it; pick what it should do from the list beside it and it is bound. Every control shows what it does, coloured by what kind of thing that is, with dyes in their own colour. Labels are measured against the type they are drawn in, so they shrink and wrap to fit rather than being cut short, and a colour that would disappear into the panel is lifted or dropped until it reads. **On paper** turns the whole sheet — picture and list — to black on white, and **Save PNG** writes it out at twice size, so the same picture that made the map is the cheat sheet on the phone or taped to the desk. It works before the hardware arrives, and Escape closes it.
@@ -330,10 +332,12 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Sequence files | In the Show Sequencer, **Save file** writes the selected sequence to a `.chromaglass-sequence.json` file (with any of your presets it uses); **Load file** reads one in |
 | Cast | A menu: **Second display** (a projector on HDMI) opens a window on the second screen that mirrors this very canvas pixel for pixel — one render, at the projector's own resolution, every stroke on the laptop on the wall the same frame, the laptop keeping all the controls and a scaled copy (click the window once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
+| All settings… | On both desks, under the rides and under the recipe: the whole panel, on a rail of named sections rather than one long scroll |
+| MIDI dot | The status dot in the header opens the controller panel — lit when one is connected |
 
 ## Judging it by numbers
 
-Eight harnesses, so a change to any of this is judged the same way every time
+Ten harnesses, so a change to any of this is judged the same way every time
 rather than by watching a plate and forming an impression. Every push to main
 runs them before anything reaches the live site (`.github/workflows/checks.yml`).
 
@@ -341,6 +345,8 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 |---|---|
 | `npm run detail` | How much structure a frame carries, and at what scale — the plate against filmed liquid |
 | `npm run liquids` | Soap, milk, silicone and glycerine, each measured on the thing it is for — and first that an empty plate is left completely alone |
+| `npm run desk` | That changing the look never cuts the plate to black in front of a room: a real fade through the real blend, watched for a sag below both ends |
+| `npm run panel` | That every control the settings panel draws can be put on a desk, that every row on its rail has a section behind it, and that the words people search for reach the section that answers them |
 | `npm run plate` | What is on every preset's plate: that its dyes, injection styles and liquids all name things that exist, and an audit of which presets use which liquid |
 | `npm run scene` | The room sensor: painted rooms through the real analysis, plus a closed feedback loop and a person who walks in and stops |
 | `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |

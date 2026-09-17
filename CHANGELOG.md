@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — a settings screen you can find something in twice
+
+The panel held sixteen sections and eighty-six controls in one scrolling column
+with a three-way filter on top, and neither half of that worked. The filter hid
+ten sections behind a tab nobody had reason to press; setting it to *All* — which
+is what both desks did — made the column eight screens deep. Either way the
+answer to "where is the thing that turns the video on and tracks people" was to
+scroll and hope.
+
+- **A rail and one section at a time.** Seventeen named places in four groups —
+  Inputs, Look, Plate, Stage — and a click puts you in one of them. The search
+  box still spans everything and searches what a section is *about* rather than
+  what it is called, and while a query is in it the rail narrows to the hits, so
+  it reads as a result list rather than a menu whose rows mostly lead nowhere.
+  `npm run qa` clicks every row on the rail and checks it lands where it says,
+  with nothing else in the pane and no section more than three screens deep
+- **Any control can go on a desk.** Every slider in the panel carries two chips,
+  **P** and **D**: put me on the Perform desk, put me on the Design bench. Both
+  strips now draw from one registry (`src/lib/deskPins.ts`) covering all
+  eighty-seven controls rather than the forty MIDI knows, and Design's recipe —
+  which was a hard-coded eight, so the one screen whose job is building a look
+  could only build it out of eight of the ninety things a look is made of — has
+  the same Choose picker the rides have had. Both lists persist per machine.
+  `npm run panel` is new: it reads the panel's own source and fails if a slider
+  appears there with no entry in the registry, because two lists that must agree
+  and cannot be derived from each other is the shape that drifts in silence.
+  `npm run desk`, which has existed since the desk was built and had never run
+  in CI, is now in the gate alongside it
+- **Sound Drive is in Settings.** The headline ride — the first fader on every
+  factory map — existed only in the narrow-screen toolbar, which a desktop never
+  draws. The panel that claims to hold every setting did not hold the most
+  important one
+
+### Added — the controller, back where it can be found
+
+Factory maps for five controllers, MIDI learn, soft takeover, shift banks, LED
+feedback and a picture of the hardware drawn to scale had all been in the app for
+a long time. On a desktop none of it was reachable except through ⌘K, because the
+button that opened it lived in the narrow-screen toolbar the desks replaced.
+
+- **Settings → Inputs → Controller**: turn MIDI on, pick the port, and — if the
+  port's own name is one we recognise — take its factory map as a single button,
+  *Set up the APC40 mkII*. Everything past that is still the MIDI panel, one
+  click away
+- **The MIDI status dot opens it.** It was already in the header of both desks,
+  reporting all evening that no controller was connected, with no way from there
+  to the screen that would connect one
+- **One list of controllers.** The settings section and the MIDI panel draw their
+  factory-map buttons from the same list in `src/lib/midi.ts`, which also carries
+  the patterns that recognise the hardware, so they cannot come to disagree about
+  which devices are supported
+
 ### Added — the wall, and the things that stop a show going dark on it
 
 Six findings from reading the app against the history and craft of liquid light

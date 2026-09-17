@@ -510,3 +510,36 @@ export function launchControlXlMap(): MidiMap {
   [73, 74, 75, 76, 89, 90, 91, 92].forEach((n, i) => b.push(bind(note(n), { kind: 'action', action: control[i] })));
   return { format: MIDI_FORMAT, version: 1, name: 'Launch Control XL', device: 'Launch Control XL', bindings: b };
 }
+
+/**
+ * The factory maps, and how to recognise the hardware they are for.
+ *
+ * Plugging an APC40 in and being told nothing is the state this list exists to
+ * end. Every one of these maps was already here and already good; what was
+ * missing was anything that said "that is the thing you have, press this".
+ *
+ * The patterns match what the OS calls the port, which is not the same as what
+ * is printed on the box: a mk2 APC mini reports "APC mini mk2" on macOS and
+ * "APC mini mk2 APC mini mk2 Contro" on Windows, and a Launchpad reports any
+ * of half a dozen model names (Mini MK3, X, Pro). So they are loose enough to
+ * survive that, and specific enough not to overlap — no bare `apc`, which
+ * would match both Akai boards and hand back whichever happened to be first.
+ * `factoryFor` takes the first hit, so if two ever did overlap the one higher
+ * in this list wins.
+ */
+export type FactoryMapId = 'apc-mini-mk2' | 'nanokontrol2' | 'apc40-mk2' | 'launchpad' | 'launch-control-xl';
+
+export const FACTORY_MAPS: { id: FactoryMapId; name: string; match: RegExp }[] = [
+  { id: 'apc40-mk2',        name: 'APC40 mkII',       match: /apc\s*40/i },
+  { id: 'apc-mini-mk2',     name: 'APC mini mk2',     match: /apc\s*mini/i },
+  { id: 'launch-control-xl', name: 'Launch Control XL', match: /launch\s*control/i },
+  { id: 'launchpad',        name: 'Launchpad',        match: /launchpad/i },
+  { id: 'nanokontrol2',     name: 'nanoKONTROL2',     match: /nano\s*kontrol/i },
+];
+
+/** Which factory map is for this port, or null when we do not know the device. */
+export function factoryFor(inputName: string | null | undefined): { id: FactoryMapId; name: string } | null {
+  if (!inputName) return null;
+  const hit = FACTORY_MAPS.find(f => f.match.test(inputName));
+  return hit ? { id: hit.id, name: hit.name } : null;
+}

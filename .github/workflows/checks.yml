@@ -50,6 +50,15 @@ jobs:
       - name: The plate
         run: npm run plate
 
+      # That a look change never cuts the plate to black in front of a room.
+      - name: The desk
+        run: npm run desk
+
+      # The two lists that have to agree about what a control is: the settings
+      # panel's own markup, and the registry the desks pin from.
+      - name: The panel
+        run: npm run panel
+
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.

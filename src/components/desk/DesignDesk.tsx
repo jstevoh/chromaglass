@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { Button, Segmented, Slider, Tag, Toggle } from '../ui';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
-import { LEARNABLE_SETTINGS } from '../../lib/midi';
+import { PIN_RANGE } from '../../lib/deskPins';
+import { PickList } from './PickList';
 import type { LiquidType, VisualizerSettings } from '../../types';
 
 /**
@@ -18,19 +20,23 @@ import type { LiquidType, VisualizerSettings } from '../../types';
  * app is thinking it is. Send to wall is a deliberate, separate act.
  */
 
-const RANGE = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));
+const RANGE = PIN_RANGE;
 
-/** The eight a look is actually built from, in the order you reach for them. */
-const RECIPE: { key: keyof VisualizerSettings; label: string; read?: (v: number) => string }[] = [
-  { key: 'globalSpeed',     label: 'Speed',      read: v => v.toFixed(3) },
-  { key: 'turbulenceScale', label: 'Turbulence' },
-  { key: 'audioImpact',     label: 'Sound drive' },
-  { key: 'beatSqueeze',     label: 'Beat kick' },
-  { key: 'bloom',           label: 'Bloom' },
-  { key: 'granulation',     label: 'Grain' },
-  { key: 'macroZoom',       label: 'Zoom',       read: v => `${v.toFixed(2)}×` },
-  { key: 'automateRate',    label: 'Evolve speed' },
-];
+/**
+ * How a few of them read better than a bare percentage.
+ *
+ * Keyed by setting rather than listed with the recipe, because the recipe is
+ * now whatever the operator put on it — there is no fixed eight to hang a
+ * formatter off any more.
+ */
+const READS: Partial<Record<string, (v: number) => string>> = {
+  globalSpeed: v => v.toFixed(3),
+  macroZoom:   v => `${v.toFixed(2)}x`,
+  grainScale:  v => `${Math.round(v)}`,
+  macroHold:   v => `${v.toFixed(1)}s`,
+  beatLead:    v => `${Math.round(v)}ms`,
+  gelSpeed:    v => `${v.toFixed(2)} rpm`,
+};
 
 /** All seven, with the letter that picks each one. */
 const TOOLS = [
@@ -63,6 +69,9 @@ export interface DesignDeskProps {
 
   settings: VisualizerSettings;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
+  /** What is on the recipe, and the bench's right to change it. */
+  recipeKeys: (keyof VisualizerSettings)[];
+  onRecipeKeys: (keys: (keyof VisualizerSettings)[]) => void;
   onRandomise: () => void;
   randomiseArmed: boolean;
 
@@ -76,6 +85,8 @@ export interface DesignDeskProps {
   onMode: (m: DeskMode) => void;
   dots: DeskDots;
   midiName: string | null;
+  /** The controller panel, from the header's MIDI dot. */
+  onMidi: () => void;
   onSearch: () => void;
   /** Open the settings sheet showing everything — the bench's way to the rest. */
   onOpenSettings: () => void;
@@ -83,6 +94,7 @@ export interface DesignDeskProps {
 }
 
 export function DesignDesk(p: DesignDeskProps) {
+  const [picking, setPicking] = useState(false);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
@@ -101,6 +113,7 @@ export function DesignDesk(p: DesignDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
+        onMidi={p.onMidi}
         onSearch={p.onSearch}
         trailing={
           <>
@@ -226,25 +239,54 @@ export function DesignDesk(p: DesignDeskProps) {
 
       {/* ── The recipe ───────────────────────────────────────── */}
       <aside className="flex min-h-0 flex-col border-l border-border" data-testid="recipe">
-        <div className="flex h-11 shrink-0 items-center px-4">
+        <div className="flex h-11 shrink-0 items-center justify-between px-4">
           <span className="text-[13px] font-medium">Recipe</span>
+          {/*
+            The bench could not be changed.
+
+            Its eight were a constant in this file, so the one screen whose
+            whole job is building a look could only build it out of eight of
+            the ninety things a look is made of. Everything else meant opening
+            Settings, finding the control, moving it, and finding it again the
+            next time. Choose is the same picker the desk's rides use, over the
+            same list, so whatever can ride there can sit here.
+          */}
+          <button
+            onClick={() => setPicking(v => !v)}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+              picking ? 'bg-text text-bg' : 'text-dim hover:bg-hover hover:text-text'
+            }`}
+            title="Choose which controls are on the recipe"
+            data-testid="recipe-pick"
+          >
+            <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+          </button>
         </div>
+        {picking ? (
+          <PickList chosen={p.recipeKeys} onChange={p.onRecipeKeys} testId="recipe-picker" />
+        ) : (
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-4">
-          {RECIPE.map(r => {
-            const spec = RANGE.get(r.key);
-            if (!spec) return null;
-            const raw = p.settings[r.key];
+          {p.recipeKeys.length === 0 && (
+            <p className="py-3 text-[13px] leading-relaxed text-dim">
+              Nothing on the recipe. <span className="text-text">Choose</span> picks what is here.
+            </p>
+          )}
+          {p.recipeKeys.map(key => {
+            const spec = RANGE.get(String(key));
+            if (!spec) return null;          // a key saved by an older build
+            const raw = p.settings[key];
             const v = typeof raw === 'number' ? raw : spec.min;
+            const read = READS[String(key)];
             return (
               <Slider
-                key={String(r.key)}
-                label={r.label}
+                key={String(key)}
+                label={spec.label}
                 value={v}
                 min={spec.min}
                 max={spec.max}
-                display={r.read ? r.read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
-                onChange={n => p.onSetting({ [r.key]: n } as Partial<VisualizerSettings>)}
-                testId={`recipe-${String(r.key)}`}
+                display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
+                onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                testId={`recipe-${String(key)}`}
               />
             );
           })}
@@ -258,15 +300,15 @@ export function DesignDesk(p: DesignDeskProps) {
           </div>
 
         </div>
+        )}
         {/*
-          The way in to the other seventy, pinned.
+          The way in to the rest, pinned.
 
-          The recipe is the eight a look is actually built from, and that is
-          still the right eight to have out. But it was also the *only* eight
-          the bench admitted existed: everything else — the room camera, the
-          projectors, the solver, the physics — was behind ⌘K, which is a thing
-          you have to already know about. A bench that cannot be used to reach
-          the whole of what it is building is not a bench.
+          The recipe is what you chose to have out. Everything else — the room
+          camera, the projectors, the solver, the physics — is still a panel
+          away, and that panel used to be reachable only through ⌘K, which is a
+          thing you have to already know about. A bench that cannot be used to
+          reach the whole of what it is building is not a bench.
 
           In the pinned footer and not at the end of the recipe, because the
           recipe scrolls: put there, the one control whose job is to be found

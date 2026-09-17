@@ -98,7 +98,7 @@ const SECTIONS: Section[] = [
           watching, and easy before.
         </P>
         <Rows items={[
-          ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Setup → Audio Input). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
+          ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Inputs → Sound). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
           ['2. Then the projector', <>Cast → <Em>Second display</Em>. Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
           ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save current</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
           ['4. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
@@ -111,8 +111,8 @@ const SECTIONS: Section[] = [
         </P>
         <H>When something is wrong</H>
         <Rows items={[
-          ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Setup → Audio Input); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
-          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Setup → Audio Mappings.</>],
+          ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Inputs → Sound); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
+          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Inputs → Audio Mappings.</>],
           ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
           ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and Thin Film are photograph-only — they do nothing in the light-show render.</>],
@@ -254,7 +254,7 @@ const SECTIONS: Section[] = [
       <>
         <H>Where it listens</H>
         <Rows items={[
-          ['Mic', <>The microphone, or whichever input is chosen in Settings → Audio Input. The app never opens it on load — it only comes back where the browser already says granted.</>],
+          ['Mic', <>The microphone, or whichever input is chosen in Settings → Inputs → Sound. The app never opens it on load — it only comes back where the browser already says granted.</>],
           ['System', <>System audio, for music playing on this machine.</>],
           ['File', <>A music file played here, with its own small player.</>],
           ['Band', <>A synthesised band — kick, snare, hats, bass and pad in verses and choruses at 122 bpm — played silently into the analyser. It is a real audio stream, so the analyser, the room calibration, the beat clock's tempo lock and every mapping run exactly as they do on a microphone.</>],
@@ -454,7 +454,7 @@ const SECTIONS: Section[] = [
       <>
         <H>Hands</H>
         <Rows items={[
-          ['MIDI', <>Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
+          ['MIDI', <>Plug the controller in and click the <Em>MIDI</Em> dot in the header, or open Settings → Inputs → Controller: if we recognise the port, its factory map is one button. Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
           ['Game controller', <>Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons fire the one-shots.</>],
           ['Phone / iPad', <>A projectionist's pad: drag to blow, tap to drop, pick a dye, pick which plate you are working, tilt the device to rock the plate. On an iPad it is two columns — the pad on the left, the dials and sequencer on the right. A pen's pressure sets how much dye and its lean sets which way the air goes.</>],
           ['OSC', <>Addresses like <C>/chromaglass/dye</C> for a lighting desk or a laptop running a show-control app.</>],
