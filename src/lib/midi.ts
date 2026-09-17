@@ -94,6 +94,24 @@ export const MIDI_FILE_EXT = '.chromaglass-midi.json';
 export const MIDI_MAP_KEY = 'chromaglass-midi-map';
 
 export const sourceKey = (s: MidiSource): string => `${s.kind}:${s.channel}:${s.number}`;
+
+/**
+ * Where a setting sits, as a controller's LED ring shows it: 0–127.
+ *
+ * The inverse of what the message handler does on the way in, and it has to
+ * be, or a knob swept to its stop would light a ring at 126 and a preset
+ * loading the same value would light it at 127 — a difference nobody can see
+ * but which makes the ring flicker every time both happen.
+ *
+ * Clamped, because a preset may carry a value outside the range a binding was
+ * learned over: a fader taught across 0–1 and a look that sets 1.4 would
+ * otherwise send 178, which is not a MIDI value at all.
+ */
+export function settingLed(value: number, min: number, max: number): number {
+  const span = max - min || 1;
+  const at = Math.round(((value - min) / span) * 127);
+  return at < 0 ? 0 : at > 127 ? 127 : at;
+}
 export const sourceLabel = (s: MidiSource): string => `${s.kind === 'cc' ? 'CC' : 'Note'} ${s.number} ch ${s.channel + 1}`;
 
 export function targetLabel(t: MidiTarget, presetName?: (id: string) => string | undefined): string {

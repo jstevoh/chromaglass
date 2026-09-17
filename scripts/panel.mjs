@@ -26,7 +26,8 @@ import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
-import { touch, touchKey, subscribeTouch, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
+import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
+import { settingLed } from '../src/lib/midi.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -365,6 +366,52 @@ check('and nothing the solver reads is left off the list', missed.length === 0,
   resetTouch();
   touch('action:go');
   check('and firing at nobody is harmless', touchKeysWatched() === 0);
+
+  // The activity view watches everything rather than one key, and wants the
+  // value with it: a fader that landed somewhere has to say where, and reading
+  // the setting back afterwards would race the update that caused it.
+  resetTouch();
+  const seen = [];
+  const offAll = subscribeAllTouches(e => seen.push(e));
+  touch('setting:dimmer', 0.4);
+  touch('preset:classic');
+  check('a watcher hears every kind of touch', seen.length === 2, `${seen.length} of 2`);
+  check('and a fader carries where it landed',
+    seen[0]?.value === 0.4 && seen[1]?.value === undefined,
+    `${seen[0]?.value}, ${seen[1]?.value}`);
+  offAll();
+  touch('preset:classic');
+  check('and a watcher stops when it lets go', seen.length === 2, `${seen.length} after unsubscribing`);
+  resetTouch();
+}
+
+// ── A knob's LED ring ───────────────────────────────────────────────
+//
+// Feedback skipped settings entirely, so a controller with rings round its
+// knobs showed nothing — and showed nothing *differently* from the truth the
+// moment a preset moved forty settings the hardware knew nothing about.
+//
+// The arithmetic is the inverse of what the message handler does on the way
+// in, and it has to be: a knob swept to its stop lighting 126 while a preset
+// setting the same value lights 127 is a difference nobody can see but which
+// makes the ring flicker whenever both happen.
+{
+  check('a setting at the bottom of its travel lights nothing', settingLed(0, 0, 1) === 0);
+  check('and at the top lights the lot', settingLed(1, 0, 1) === 127);
+  check('and halfway is halfway', settingLed(0.5, 0, 1) === 64, String(settingLed(0.5, 0, 1)));
+  check('a travel that does not start at zero still reads right',
+    settingLed(1, 1, 12) === 0 && settingLed(12, 1, 12) === 127,
+    `${settingLed(1, 1, 12)}, ${settingLed(12, 1, 12)}`);
+  // A preset may carry a value outside the range a fader was learned over.
+  check('and a value past the end is clamped, not wrapped',
+    settingLed(1.4, 0, 1) === 127 && settingLed(-3, 0, 1) === 0,
+    `${settingLed(1.4, 0, 1)}, ${settingLed(-3, 0, 1)}`);
+  check('a range of nothing does not divide by it', Number.isFinite(settingLed(5, 5, 5)));
+  // What the handler does on the way in, back out again: a full sweep of a
+  // controller's 128 steps has to survive the round trip unchanged.
+  const roundTrip = [0, 1, 40, 63, 64, 100, 126, 127]
+    .filter(v => settingLed(0 + (v / 127) * 1, 0, 1) !== v);
+  check('and what came in comes back out the same', roundTrip.length === 0, roundTrip.join(', '));
 }
 
 // ── The way in ──────────────────────────────────────────────────────

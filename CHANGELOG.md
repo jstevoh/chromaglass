@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the controller shows the show, and says what it is doing
+
+**Knob LED rings follow the settings.** Feedback handled presets, dyes and
+actions and ended with `if (level === null) continue` — settings were the one
+target kind it skipped, so a controller with rings round its knobs showed
+nothing at all. Worse, it showed nothing *differently* from the truth the
+moment a preset loaded and moved forty settings the hardware knew nothing
+about. Load Crowd Plate and the rings now follow it.
+
+Three things that decides:
+
+- **Absolute controls only.** An endless encoder has no position to show. A
+  motorised fader is driven to the value, which is what a motorised fader is
+  for.
+- **Nothing is sent twice.** Feedback used to run only when a preset, a dye, a
+  toggle or the bank changed — a handful of times a minute — so writing every
+  control each time cost nothing. It now also runs on a timer, because a
+  setting has no event to hang off: a preset moves forty at once, a fader on
+  screen moves one, the sequencer moves them over minutes. Forty controls ten
+  times a second is four hundred messages a second down a cable that also
+  carries the clock, so each control is written only when what it should show
+  has actually changed. In the steady state that is no traffic at all.
+- **A new port is a controller that knows nothing.** The cache of what each
+  control was last told is dropped when the output changes or MIDI comes back,
+  or every LED would stay dark until something happened to change it.
+
+**A hideable readout of what the controller is doing.** ⌘K → *Show what the
+controller is doing*, or the checkbox in the MIDI panel. The desk shows six
+rides and a controller can reach ninety settings, so riding one of the other
+eighty-four meant either spending a ride slot on it or riding blind. This is
+the third option: a running list of what was just changed and where it landed.
+
+Nothing in it can be clicked except the button that hides it — a thing that
+reports the controller should never become a second place to argue with it. It
+buffers rather than rendering per message: a fader sweep is a hundred messages
+a second, and setting React state on each would re-render the list a hundred
+times a second to show a number nobody can read at that rate. Events land in a
+ref and the list is rebuilt ten times a second.
+
+`settingLed` came out of the hook so it could be checked: that a sweep survives
+the round trip unchanged (a knob at its stop lighting 126 while a preset at the
+same value lights 127 is invisible but makes the ring flicker whenever both
+happen), that a travel not starting at zero still reads right, that a preset
+carrying a value past the end of a binding's range is clamped rather than
+wrapped into a number that is not a MIDI value at all, and that a range of
+nothing does not divide by it.
+
 ### Added — the screen says what the controller hit
 
 A fader always showed itself: the ride's bar and the hardware go through the

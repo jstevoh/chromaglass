@@ -1244,6 +1244,36 @@ try {
     await settle(700);
     check('and the light goes out again', (await lit()) === 0, `${await lit()} still lit`);
 
+    /*
+      ── What the controller is doing, without the controls on screen ──
+
+      The desk shows six rides and a controller can reach ninety settings, so
+      riding one of the other eighty-four meant spending a ride slot on it or
+      riding blind. The readout is the third option, and the thing to check is
+      that it is *hideable* and stays hidden — an overlay in the corner of a
+      show screen that cannot be got rid of is worse than no overlay.
+    */
+    check('the controller readout is not up uninvited',
+      (await page.getByTestId('midi-activity').count()) === 0);
+    await viaPalette('what the controller is doing');
+    await settle(600);
+    check('and the palette puts it up',
+      (await page.getByTestId('midi-activity').count()) === 1);
+
+    await page.evaluate(() => window.chromaglassTouch?.('setting:dimmer', 0.42));
+    await settle(400);
+    const said = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="midi-activity-setting:dimmer"]');
+      return el ? el.textContent.replace(/\s+/g, ' ').trim() : null;
+    });
+    check('and it names what moved and where it landed',
+      !!said && /dimmer/i.test(said) && /42%/.test(said), said ?? 'no line');
+
+    await clickOn('midi-activity-hide');
+    await settle(500);
+    check('and it can be got rid of',
+      (await page.getByTestId('midi-activity').count()) === 0);
+
     // ⌘K reaches what the desk deliberately does not show.
     await page.keyboard.press('Control+k');
     await settle(500);
