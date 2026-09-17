@@ -244,6 +244,12 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
   const [settingsSection, setSettingsSection] = useState<string | null>(null);
+  /** Open the settings sheet at the top: both desks' "All settings…" and ⌘K's plain row. */
+  const openAllSettings = useCallback(() => {
+    setSettingsSection(null);
+    setShowSettings(true);
+    setShowHelp(false);
+  }, []);
   const [showHelp, setShowHelp] = useState(false);
   /**
    * Perform, or Design.
@@ -1654,7 +1660,7 @@ export default function App() {
     }));
 
     const opening: Command[] = [
-      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: () => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); } },
+      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: openAllSettings },
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
       { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
@@ -2368,9 +2374,18 @@ export default function App() {
             onTempoClear={clearTempo}
             onTempoBpm={setTempoBpm}
             midiClocked={midi.clocked}
-            // Design is where a look is built, and a look is built from every
-            // one of these — not from the six a hand rides between songs.
-            defaultTab={designing ? 'all' : 'perform'}
+            /*
+              Everything, whichever door you came through.
+
+              This was `designing ? 'all' : 'perform'`, and then Perform grew
+              the same "All settings…" button — which opened on six of the
+              sixteen groups, so a button with that name was lying about what
+              it did. The split is worth keeping as a *filter* you pick (eight
+              screens of scrolling is not a control surface mid-show), but not
+              as a default that hides ten groups from someone who has just
+              asked for all of them. Nothing hides now unless you say so.
+            */
+            defaultTab="all"
             focusSection={settingsSection}
             sceneOn={sceneOn}
             onSceneToggle={toggleScene}
@@ -2653,6 +2668,7 @@ export default function App() {
       */}
       {performing && overlaysVisible && (
         <PerformDesk
+          onOpenSettings={openAllSettings}
           cues={cues}
           liveId={activePresetId}
           nextId={cued?.id ?? null}
@@ -2725,7 +2741,7 @@ export default function App() {
       */}
       {designing && overlaysVisible && (
         <DesignDesk
-          onOpenSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
+          onOpenSettings={openAllSettings}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}

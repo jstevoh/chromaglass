@@ -95,6 +95,8 @@ interface PerformDeskProps {
   status: { audio: string; engine: string; sequence: string | null; phone: boolean; rec: string | null };
   dots: DeskDots;
   onSearch: () => void;
+  /** Open the settings sheet — the desk's way to everything the six rides are not. */
+  onOpenSettings: () => void;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
   breadcrumb: ReactNode;
@@ -316,7 +318,22 @@ export function PerformDesk(p: PerformDeskProps) {
           </p>
         </div>
         )}
-        <div className="flex shrink-0 gap-2 border-t border-border p-3">
+        {/*
+          The same way in as the bench has.
+
+          Perform is deliberately six rides and a cue list, and that is still
+          what it should be — but "deliberately few" and "no way to reach the
+          rest" are different things, and until now the only route to the room
+          camera or the projector's keystone from here was ⌘K, which you have
+          to already know about. One line, under the rides, in the pinned part
+          so it is never below the fold.
+        */}
+        <div className="shrink-0 border-t border-border px-3 pt-3">
+          <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings">
+            All settings…
+          </Button>
+        </div>
+        <div className="flex shrink-0 gap-2 p-3">
           <Button full height={40} kbd="F" onClick={p.onFreeze} testId="freeze-button">{p.frozen ? 'Thaw' : 'Freeze'}</Button>
           <Button full height={40} onClick={p.onDrain} testId="drain-button">Drain</Button>
         </div>

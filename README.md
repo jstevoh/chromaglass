@@ -322,7 +322,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
 | Camera | Settings → Camera: light show or photograph, paper colours, camera, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
-| All settings | Every one of the sixteen groups, in one sheet: **Design → All settings…**, or ⌘K and the name of the group ("the room", "projectors", "physics"). The sheet's **All** tab shows the lot and its search box finds a group by what it is *about* — "camera", "people" and "crowd" all reach The Room. **Perform** and **Setup** are still there as a filter, because eight screens of scrolling is not a control surface mid-show |
+| All settings | Every one of the sixteen groups, in one sheet. **All settings…** sits under the rides on Perform and under the recipe on Design, and ⌘K reaches a group by name ("the room", "projectors", "physics") and scrolls to it. The sheet's search box finds a group by what it is *about* — "camera", "people" and "crowd" all reach The Room, and none of those words is in its heading. It always opens on everything; **Perform** and **Setup** are a filter you pick, because eight screens of scrolling is not a control surface mid-show |
 | About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |
 | Eye toggle | Minimize/maximize the UI |
 | Clean Screen | Hide every overlay and the cursor for a projected show; **Esc** (or a finger held still on a touch screen) brings them back. Also on the phone remote |

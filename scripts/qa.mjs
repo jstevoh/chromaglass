@@ -744,33 +744,64 @@ try {
       await clickOn('mode-segmented-design');
       await settle(1200);
 
-      // The bench's own way in, and it has to be *on screen*. The first
+      // Both desks' own way in, and it has to be *on screen*. The first
       // version of this button sat at the end of the recipe, which scrolls —
       // so the one control whose entire job is to be findable was itself
-      // below the fold. It is in the pinned footer now, and this checks the
-      // property rather than the existence.
-      const entry = await page.evaluate(() => {
-        const el = document.querySelector('[data-testid="open-all-settings"]');
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
-        return { onScreen: r.top >= 0 && r.bottom <= window.innerHeight && r.width > 40, top: Math.round(r.top) };
-      });
-      check('the bench has a visible way into every setting',
-        !!entry && entry.onScreen, entry ? `at y=${entry.top} of ${900}` : 'no button');
+      // below the fold. It is in the pinned footer of each now, and this
+      // checks the property rather than the existence.
+      //
+      // And it has to open on *all* of them, from either desk. A button that
+      // says "All settings…" and lands you on six of the sixteen groups is the
+      // same trap through a different door — which is exactly what happened
+      // when Perform grew this button while the sheet still defaulted to the
+      // Perform half there.
+      const entryOn = async (deskLabel) => {
+        const el = await page.evaluate(() => {
+          const e = document.querySelector('[data-testid="open-all-settings"]');
+          if (!e) return null;
+          const r = e.getBoundingClientRect();
+          return { onScreen: r.top >= 0 && r.bottom <= window.innerHeight && r.width > 40, top: Math.round(r.top) };
+        });
+        check(`${deskLabel} has a visible way into every setting`,
+          !!el && el.onScreen, el ? `at y=${el.top}` : 'no button');
+        if (!el?.onScreen) return;
+        await clickOn('open-all-settings');
+        await settle(1200);
+        const opened = await page.evaluate(() => {
+          const pane = document.querySelector('[data-testid="settings-panel"]');
+          if (!pane) return null;
+          const all = [...pane.querySelectorAll('section[data-section]')];
+          const room = pane.querySelector('[data-section="room"]');
+          return {
+            total: all.length,
+            visible: all.filter(x => !x.classList.contains('hidden')).length,
+            room: !!room && !room.classList.contains('hidden'),
+          };
+        });
+        check(`and from ${deskLabel} it opens on all of them`,
+          !!opened && opened.total >= 16 && opened.total === opened.visible && opened.room,
+          opened ? `${opened.visible} of ${opened.total}, room ${opened.room}` : 'no panel');
 
-      await clickOn('open-all-settings');
+        // The split is still there as a filter you pick, which is the whole
+        // reason it is allowed to exist.
+        await clickOn('settings-tab-perform');
+        await settle(600);
+        const filtered = await page.evaluate(() => {
+          const pane = document.querySelector('[data-testid="settings-panel"]');
+          const all = [...pane.querySelectorAll('section[data-section]')];
+          return all.filter(x => !x.classList.contains('hidden')).length;
+        });
+        check(`and the halves still narrow it from ${deskLabel}`,
+          filtered > 0 && filtered < 16, `Perform shows ${filtered} of 16`);
+        await page.keyboard.press('Escape');
+        await settle(700);
+      };
+      await clickOn('mode-segmented-perform');
       await settle(1200);
-      const viaButton = await page.evaluate(() => {
-        const pane = document.querySelector('[data-testid="settings-panel"]');
-        if (!pane) return null;
-        const all = [...pane.querySelectorAll('section[data-section]')];
-        return { total: all.length, visible: all.filter(x => !x.classList.contains('hidden')).length };
-      });
-      check('and it opens on all of them',
-        !!viaButton && viaButton.total >= 16 && viaButton.total === viaButton.visible,
-        viaButton ? `${viaButton.visible} of ${viaButton.total}` : 'no panel');
-      await page.keyboard.press('Escape');
-      await settle(700);
+      await entryOn('the desk');
+      await clickOn('mode-segmented-design');
+      await settle(1200);
+      await entryOn('the bench');
 
       await page.keyboard.press('Meta+k');
       await settle(700);

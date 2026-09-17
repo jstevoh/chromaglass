@@ -60,13 +60,18 @@ shows, and against what a projectionist actually does on a show night.
   wall, the solver and the physics were all there and none of them could be
   reached. On the desk, which owns the window above 1024px, the only way in at
   all was ⌘K, which you have to already know about
-- Three ways in now, all of them checked. **Design → All settings…** is a
-  pinned button on the bench, because a bench that cannot reach the whole of
-  what it is building is not a bench — and opened from Design the sheet starts
-  on everything, since a look is built from all of it and not from the eight a
-  hand rides between songs. The sheet has an **All** tab. And ⌘K carries one
-  row per group, so "the room" lands on the room rather than on the top of a
-  panel that has it somewhere
+- Three ways in now, all of them checked. **All settings…** is a pinned button
+  on both desks — under the recipe on the bench, under the rides on the desk —
+  because a surface that cannot reach the whole of what it is running is not a
+  control surface, however deliberately few controls it shows. The sheet has an
+  **All** tab and opens on it whichever door you came through. And ⌘K carries
+  one row per group, so "the room" lands on the room rather than on the top of
+  a panel that has it somewhere
+- Opening on All is a rule rather than a mode: it was first `design ? all :
+  perform`, and then Perform grew the same button — which landed you on six of
+  the sixteen groups, so a button named "All settings…" was lying about what it
+  did. The Perform and Setup halves are a filter you pick now, never a default
+  that hides ten groups from someone who just asked for all of them
 - A **search box** that matches what a group is *about* rather than only what
   it is called: "camera", "video", "people" and "crowd" all find The Room, and
   none of those words is in its heading
