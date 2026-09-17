@@ -6,6 +6,8 @@ import {
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
+import { SurfaceWatcher, buildAutoMap } from '../lib/autoMap';
+import { PALETTE } from '../constants';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
 
@@ -90,6 +92,10 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const hostRef = useRef(host); hostRef.current = host;
   const mapRef = useRef(map); mapRef.current = map;
   const learningRef = useRef(learning); learningRef.current = learning;
+  /** The surface being learned, or null when nothing is listening for one. */
+  const watchRef = useRef<SurfaceWatcher | null>(null);
+  const tallyTick = useRef(0);
+  const [watched, setWatched] = useState<{ continuous: number; encoder: number; button: number } | null>(null);
   const portsRef = useRef(ports); portsRef.current = ports;
   const softRef = useRef(softTakeover); softRef.current = softTakeover;
   const bankRef = useRef(bank); bankRef.current = bank;
@@ -124,6 +130,24 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const src = eventSource(e);
     const now = performance.now();
     if (now - eventTick.current > 80) { eventTick.current = now; setLastEvent({ source: src, value: e.value, at: now }); }
+
+    /*
+      Learning the surface swallows everything.
+
+      Auto-map asks you to sweep every fader and press every pad, and if the
+      map underneath were still live that would mean dragging the dimmer to
+      zero, firing four presets and blacking the room out on the way to
+      building a map. So while it is watching, nothing else sees a message.
+    */
+    if (watchRef.current) {
+      watchRef.current.observe(e);
+      const t = watchRef.current.tally;
+      if (now - tallyTick.current > 120) {
+        tallyTick.current = now;
+        setWatched({ ...t });
+      }
+      return;
+    }
 
     const learn = learningRef.current;
     if (learn && e.kind !== 'noteoff') {
@@ -383,6 +407,40 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     );
     takeover.reset(); lastApplied.clear();
   }, [presetIds, setMap, takeover, lastApplied]);
+  /*
+    Auto-map: start listening, stop listening, keep what was heard.
+
+    Three calls rather than one, because the operator decides when they have
+    finished touching things. A timer would either cut them off mid-sweep or
+    make them wait after the last pad, and both feel like the app is not paying
+    attention.
+  */
+  const startAutoMap = useCallback(() => {
+    watchRef.current = new SurfaceWatcher();
+    setWatched({ continuous: 0, encoder: 0, button: 0 });
+  }, []);
+  const cancelAutoMap = useCallback(() => {
+    watchRef.current = null;
+    setWatched(null);
+  }, []);
+  /**
+   * Build the map from what was heard, and keep it. Returns what it decided so
+   * the panel can say so in words, or null when nothing was touched — which
+   * must not wipe a map somebody already had.
+   */
+  const finishAutoMap = useCallback((deviceName?: string | null) => {
+    const watch = watchRef.current;
+    watchRef.current = null;
+    setWatched(null);
+    if (!watch) return null;
+    const controls = watch.controls();
+    if (controls.length === 0) return null;
+    const { map, summary } = buildAutoMap(controls, presetIds, PALETTE.length, deviceName ?? null);
+    setMap(map);
+    takeover.reset(); lastApplied.clear();
+    return summary;
+  }, [presetIds, setMap, takeover, lastApplied]);
+
   const exportMap = useCallback(() => {
     const m = mapRef.current;
     const slug = m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'midi';
@@ -411,6 +469,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     lastEvent,
     clocked,
     bank, setBank, stepBank, banks: MIDI_BANKS,
+    startAutoMap, cancelAutoMap, finishAutoMap, watched,
   };
 }
 

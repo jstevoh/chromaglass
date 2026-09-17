@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
+import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -202,6 +203,143 @@ const targetable = new Set(PATCH_TARGETS.map(s => String(s.key)));
 const missed = [...readsInSolver].filter(k => targetable.has(k) && !PER_LAYER.has(k));
 check('and nothing the solver reads is left off the list', missed.length === 0,
   missed.length ? `${missed.join(', ')} — could be aimed at one plate and is not offered` : 'none');
+
+// ── Auto-map ────────────────────────────────────────────────────────
+//
+// Five controllers have factory maps; everything else is learned by watching
+// what it sends. That is a guess about hardware nobody here has, made from the
+// shape of the messages alone, so it is driven with surfaces made up on the
+// spot: a fader box, a pad grid, an endless encoder, a button wired to a CC,
+// and the awkward ones — a single knob, and more settings than there are
+// faders to put them on.
+{
+  const sweep = (watch, number, channel = 0) => {
+    // A fader dragged end to end: many values, and plenty in the middle.
+    for (let v = 0; v <= 127; v += 7) watch.observe({ kind: 'cc', channel, number, value: v });
+  };
+  const twist = (watch, number, channel = 0) => {
+    // An endless encoder: nudges only, always at the ends, never in between.
+    for (let i = 0; i < 12; i++) watch.observe({ kind: 'cc', channel, number, value: i % 2 ? 1 : 127 });
+  };
+  const press = (watch, number, channel = 0) => {
+    watch.observe({ kind: 'noteon', channel, number, value: 100 });
+    watch.observe({ kind: 'noteoff', channel, number, value: 0 });
+  };
+  const flick = (watch, number, channel = 0) => {
+    // A button wired to a CC: 0 and 127 and nothing else.
+    for (let i = 0; i < 6; i++) watch.observe({ kind: 'cc', channel, number, value: i % 2 ? 127 : 0 });
+  };
+  const PRESETS = Array.from({ length: 40 }, (_, i) => `p${i}`);
+  const kindsOf = (w) => w.controls().map(c => c.kind);
+  const targetOn = (map, kind, number) => map.bindings
+    .find(b => b.source.kind === kind && b.source.number === number)?.target;
+
+  // A nine-fader desk.
+  const faders = new SurfaceWatcher();
+  for (let n = 48; n <= 56; n++) sweep(faders, n);
+  const fk = kindsOf(faders);
+  check('a swept fader reads as a fader',
+    fk.length === 9 && fk.every(k => k === 'continuous'), fk.join(', ') || 'nothing');
+  const fMap = buildAutoMap(faders.controls(), PRESETS, 16, 'Fader Box').map;
+  check('and the rightmost one becomes the dimmer',
+    targetOn(fMap, 'cc', 56)?.key === MASTER_RIDE, String(targetOn(fMap, 'cc', 56)?.key));
+  check('and the leftmost takes the first ride',
+    targetOn(fMap, 'cc', 48)?.key === RIDE_ORDER[0], String(targetOn(fMap, 'cc', 48)?.key));
+
+  // An endless encoder must not be bound as a fader: one click would slam the
+  // setting to an end.
+  const enc = new SurfaceWatcher();
+  twist(enc, 20);
+  check('an endless encoder is not mistaken for a fader',
+    kindsOf(enc).join() === 'encoder', kindsOf(enc).join() || 'nothing');
+  const eMap = buildAutoMap(enc.controls(), PRESETS, 16).map;
+  check('and is bound as one', eMap.bindings[0]?.mode === 'relative', eMap.bindings[0]?.mode);
+
+  // The other encoder convention: 63 down, 65 up. It has middle values, so the
+  // ends-only test cannot see it, and its travel is two counts, so the
+  // continuous test would throw it away and the control would simply vanish.
+  const centred = new SurfaceWatcher();
+  for (let i = 0; i < 10; i++) centred.observe({ kind: 'cc', channel: 0, number: 21, value: i % 2 ? 65 : 63 });
+  check('a centred encoder is an encoder too, not nothing at all',
+    kindsOf(centred).join() === 'encoder', kindsOf(centred).join() || 'nothing');
+
+  // A button that sends CC rather than a note is still a button.
+  const sw = new SurfaceWatcher();
+  flick(sw, 64);
+  check('a CC that only ever sends 0 and 127 is a button', kindsOf(sw).join() === 'button', kindsOf(sw).join());
+
+  // A grid of pads, with a couple of transport keys off to the side.
+  const pads = new SurfaceWatcher();
+  for (let n = 0; n < 32; n++) press(pads, n);
+  press(pads, 90); press(pads, 91);
+  const pMap = buildAutoMap(pads.controls(), PRESETS, 16, 'Pad Grid');
+  check('a block of pads becomes the preset grid',
+    pMap.summary.presets >= 20, `${pMap.summary.presets} presets`);
+  check('and its last row becomes dyes', pMap.summary.dyes === 8, `${pMap.summary.dyes} dyes`);
+  check('and the strays become the transport, Go first',
+    targetOn(pMap.map, 'note', 90)?.action === 'go', String(targetOn(pMap.map, 'note', 90)?.action));
+
+  // One knob. There is no master to speak of, so it rides rather than dims.
+  const one = new SurfaceWatcher();
+  sweep(one, 7);
+  const oneMap = buildAutoMap(one.controls(), PRESETS, 16).map;
+  check('a single knob rides the show rather than dimming it',
+    targetOn(oneMap, 'cc', 7)?.key === RIDE_ORDER[0], String(targetOn(oneMap, 'cc', 7)?.key));
+
+  // More settings than faders: the rest go onto shift layers, and something
+  // has to be able to reach them.
+  const few = new SurfaceWatcher();
+  for (let n = 1; n <= 4; n++) sweep(few, n);
+  for (let n = 60; n < 63; n++) press(few, n);
+  const fewMap = buildAutoMap(few.controls(), PRESETS, 16);
+  check('more settings than faders spill onto shift layers',
+    fewMap.summary.banks >= 1, `${fewMap.summary.banks} layers deep`);
+  check('and a button is given Bank + to reach them',
+    fewMap.map.bindings.some(b => b.target.kind === 'action' && b.target.action === 'bank-next'));
+  check('while the always-live faders stay always live',
+    fewMap.map.bindings.filter(b => b.target.kind === 'setting' && b.bank === undefined).length >= 3,
+    `${fewMap.map.bindings.filter(b => b.target.kind === 'setting' && b.bank === undefined).length} with no bank`);
+
+  // A stray message from a controller's handshake is not a control.
+  const stray = new SurfaceWatcher();
+  stray.observe({ kind: 'cc', channel: 0, number: 121, value: 0 });
+  stray.observe({ kind: 'cc', channel: 0, number: 121, value: 0 });
+  check('a stray message is not mistaken for a control', stray.controls().length === 0,
+    `${stray.controls().length} found`);
+
+  // Nothing touched at all must not produce a map that wipes the old one.
+  const nothing = buildAutoMap([], PRESETS, 16);
+  check('and nothing touched maps nothing', nothing.map.bindings.length === 0);
+
+  // Two controls must never end up on one binding, whatever the surface.
+  const dupes = fMap.bindings.map(b => `${b.source.kind}:${b.source.channel}:${b.source.number}:${b.bank ?? 'all'}`)
+    .filter((k, i, a) => a.indexOf(k) !== i);
+  check('no control is bound twice on one layer', dupes.length === 0, dupes.join(', '));
+}
+
+// ── The way in ──────────────────────────────────────────────────────
+//
+// Auto-map's logic is checked above with surfaces made up on the spot, but a
+// perfect mapper nobody can reach is not a feature. The browser suite cannot
+// check the buttons: they only appear once MIDI is on, and the headless
+// Chromium the suite drives has no Web MIDI at all, so a DOM check there would
+// pass because neither branch existed. So the source is read instead, which is
+// a check that can actually fail.
+const midiPanel = readFileSync(join(root, 'src/components/MidiPanel.tsx'), 'utf8');
+for (const [where, src, id] of [
+  ['the MIDI panel', midiPanel, 'midi-auto-start'],
+  ['the settings section', panel, 'settings-midi-auto'],
+]) {
+  check(`${where} offers auto-map`, src.includes(id), src.includes(id) ? '' : `no ${id}`);
+}
+check('and both can be stopped once started',
+  midiPanel.includes('midi-auto-cancel') && panel.includes('settings-midi-auto-cancel'));
+// A watcher that swallows every message and is never turned off is a
+// controller that has stopped working, with nothing on screen to say why.
+const hook = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
+check('and listening can always be called off in the hook',
+  /cancelAutoMap[\s\S]{0,200}watchRef\.current = null/.test(hook)
+  && /finishAutoMap[\s\S]{0,300}watchRef\.current = null/.test(hook));
 
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));
