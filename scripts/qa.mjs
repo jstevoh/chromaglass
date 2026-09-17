@@ -130,6 +130,29 @@ await page.addInitScript(() => {
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
+
+/**
+ * Press Escape and wait for a panel to actually be gone.
+ *
+ * Not `settle(n)` and then look. A panel closing is a React state change
+ * followed by an unmount, on a page whose main thread is also running a fluid
+ * solver — so how long it takes is a property of the machine, not of the app.
+ * Measured here: about 600ms on a laptop and past four seconds on a loaded
+ * runner rasterising in software, which is how a 500ms window passed five
+ * times locally and failed the first time CI ever ran it.
+ *
+ * The assertion is unchanged — the panel must close — and only the accidental
+ * one, that it closes inside one arbitrary window, is gone. A panel that never
+ * closes still fails, six seconds later.
+ */
+const escapeCloses = async (testId) => {
+  await page.keyboard.press('Escape');
+  for (let i = 0; i < 20; i++) {
+    if ((await page.getByTestId(testId).count()) === 0) return true;
+    await settle(300);
+  }
+  return false;
+};
 /**
  * `.first()`, because a panel may legitimately carry a control the toolbar
  * also has. It is deliberately forgiving — which is why the duplicate check
@@ -593,9 +616,8 @@ try {
       check('and the contents follows the scrolling', followed.length > 3 && followed[followed.length - 1] !== top,
         `${top} → ${followed.join(' → ')}`);
       await noteDuplicates();
-      await page.keyboard.press('Escape');
-      await settle(500);
-      check('and closes again', (await page.getByTestId('guide-panel').count()) === 0);
+      const closed = await escapeCloses('guide-panel');
+      check('and closes again', closed, closed ? '' : 'still open after six seconds');
     } else {
       check('the manual opens with its sections', false, 'no ? button');
     }
@@ -928,12 +950,7 @@ try {
       // takes any click meant for it, so one left open turns the next check
       // into "the click went to the scrim" — which reads as the app failing
       // to do whatever that click asked for.
-      await page.keyboard.press('Escape');
-      let gone = false;
-      for (let i = 0; i < 20 && !gone; i++) {
-        gone = (await page.getByTestId(id).count()) === 0;
-        if (!gone) await settle(300);
-      }
+      const gone = await escapeCloses(id);
       check(`and ${query} closes again`, gone, gone ? '' : 'still open — the next check would be clicking its scrim');
     }
 
