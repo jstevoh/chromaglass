@@ -1080,7 +1080,16 @@ try {
       await viaPalette(query);
       const up = await page.getByTestId(id).count();
       const w = up ? await page.evaluate((i) => Math.round(document.querySelector(`[data-testid="${i}"]`).getBoundingClientRect().width), id) : 0;
-      check(`and ⌘K opens ${query} as a sheet`, up === 1 && w <= 720 && w > 300, up ? `${w}px wide` : 'did not open');
+      // A fraction of the window, not a hard 720.
+      //
+      // "A sheet" means centred over the desk with the desk still visible
+      // round it, and the number that says so is a share of the window. 720
+      // was not that number; it was the width every sheet happened to have,
+      // and the first sheet that legitimately needed more — Settings, once it
+      // grew a rail beside its pane — failed a check that was never about it.
+      const share = w / 1600;
+      check(`and ⌘K opens ${query} as a sheet`, up === 1 && share <= 0.8 && w > 300,
+        up ? `${w}px wide, ${Math.round(share * 100)}% of the window` : 'did not open');
       // Escape, then prove it closed. A sheet's scrim covers the desk and
       // takes any click meant for it, so one left open turns the next check
       // into "the click went to the scrim" — which reads as the app failing
