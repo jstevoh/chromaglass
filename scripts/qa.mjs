@@ -1015,6 +1015,31 @@ try {
       check('and it sits in the row with the other two sources',
         !!film && film.inRow && film.between && /window|tab|screen/i.test(film.title),
         film ? `in row ${film.inRow}, between ${film.between}, “${film.title.slice(0, 40)}…”` : '');
+      /*
+        The film as a force, not only a light.
+
+        Film Mix and Film Key decide how the reel shows; Film Drive and Film
+        Impact decide what it does to the liquid. Both are greyed with a reason
+        until there is a film to read, which is the check — a control that
+        silently does nothing is the thing this panel keeps being fixed for.
+      */
+      const force = await page.evaluate(() => {
+        const of = (key) => {
+          const el = [...document.querySelectorAll('[data-testid^="pins-"]')]
+            .find(e => e.dataset.testid === `pins-${key}`);
+          const row = el?.closest('div.flex.flex-col');
+          const range = row?.querySelector('input[type="range"]');
+          return row ? { there: true, disabled: !!range?.disabled, why: row.getAttribute('title') ?? '' } : null;
+        };
+        return { drive: of('filmDrive'), impact: of('filmImpact') };
+      });
+      check('the film can drive the plate as well as light it',
+        !!force.drive && !!force.impact,
+        `drive ${!!force.drive}, impact ${!!force.impact}`);
+      check('and both say why they are greyed with no film loaded',
+        !!force.drive?.disabled && /loop|camera|window/i.test(force.drive.why ?? ''),
+        force.drive ? `disabled ${force.drive.disabled}, “${(force.drive.why ?? '').slice(0, 40)}”` : '');
+
       await page.keyboard.press('Escape');
       await settle(800);
 

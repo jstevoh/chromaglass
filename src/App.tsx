@@ -30,6 +30,7 @@ import { MidiPanel } from './components/MidiPanel';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
+import { useFilmSense } from './hooks/useFilmSense';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
@@ -691,6 +692,25 @@ export default function App() {
     smooth: settings.sceneSmooth ?? 0.35,
     people: settings.scenePeople !== false,
     preview: scenePreviewRef,
+  });
+
+  /*
+    The film, read back as well as shown.
+
+    Only while something is asking for it. With Film Drive and Film Impact
+    both at zero the sensor is not running at all, so a projector used the way
+    it always was — a slide through the dye — costs exactly what it always
+    did. It shares the room's deadzone and smoothing: those describe how
+    twitchy a reading should be, which is a property of the plate rather than
+    of where the pixels came from.
+  */
+  const filmDriving = filmSource !== 'none'
+    && ((settings.filmDrive ?? 0) > 0 || (settings.filmImpact ?? 0) > 0);
+  const filmSense = useFilmSense({
+    enabled: filmDriving,
+    getVideo: () => visualizerRef.current?.filmVideoEl() ?? null,
+    deadzone: settings.sceneDeadzone ?? 0.25,
+    smooth: settings.sceneSmooth ?? 0.35,
   });
 
   const audioData = useAudioAnalyzer(
@@ -1792,6 +1812,7 @@ export default function App() {
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
+        filmSenseRef={filmSense.reading}
         frame={preview.frame}
         output={output}
         tempoRef={tempoRef}

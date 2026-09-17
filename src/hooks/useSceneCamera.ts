@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SceneSense, type SceneReading, type SceneSenseOptions } from '../lib/sceneSense';
+import { type SceneReading, type SceneSenseOptions } from '../lib/sceneSense';
+import { VideoSampler, SENSE_FRAME } from '../lib/videoSense';
 
 /**
  * The camera that watches the room.
@@ -31,8 +32,8 @@ import { SceneSense, type SceneReading, type SceneSenseOptions } from '../lib/sc
  * Frames are analysed in the page and never leave it. Nothing is recorded.
  */
 
-/** The analysis frame's edge. 96² is 9,216 pixels — a millisecond of work. */
-const FRAME = 96;
+/** The analysis frame's edge, shared with every other source. */
+const FRAME = SENSE_FRAME;
 /** Default analysis rate. The camera itself rarely beats 30 fps. */
 const DEFAULT_HZ = 20;
 
@@ -112,11 +113,10 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
     let timer: ReturnType<typeof setInterval> | null = null;
     let video: HTMLVideoElement | null = null;
     let local: MediaStream | null = null;
-    const sense = new SceneSense();
-    const canvas = document.createElement('canvas');
-    canvas.width = FRAME;
-    canvas.height = FRAME;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    // The crop, the mirror, the small canvas and the read-back live in
+    // `videoSense` now, because the film projector needs exactly the same
+    // middle out of a video that is 16:9 rather than 4:3.
+    const sampler = new VideoSampler(FRAME);
 
     const start = async () => {
       // A camera is not opened behind anyone's back. `enabled` means somebody
@@ -187,27 +187,20 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
         const dt = (now - last) / 1000;
         last = now;
         const v = video;
-        if (!ctx || !v || v.readyState < 2 || v.videoWidth === 0) return;
+        if (!v) return;
 
-        // The middle square of the frame, so the room maps onto the square
-        // grid without a stretch.
-        const side = Math.min(v.videoWidth, v.videoHeight);
-        const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
         const o = optsRef.current;
-        ctx.save();
-        if (o.mirror) { ctx.translate(FRAME, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(v, sx, sy, side, side, 0, 0, FRAME, FRAME);
-        ctx.restore();
-
-        const frame = ctx.getImageData(0, 0, FRAME, FRAME);
-        const r = sense.push(frame.data, FRAME, FRAME, dt, now, {
+        const got = sampler.sample(v, dt, now, {
           deadzone: o.deadzone,
           smooth: o.smooth,
           people: o.people,
+          mirror: o.mirror,
         });
+        if (!got) return;
+        const r = got.reading;
         reading.current = r.ready ? r : null;
 
-        if (o.preview?.current) drawPreview(o.preview.current, frame, r);
+        if (o.preview?.current) drawPreview(o.preview.current, got.pixels, r);
 
         // The panel gets a figure it can read, not one per analysis.
         if (now - uiAt > 120) {
