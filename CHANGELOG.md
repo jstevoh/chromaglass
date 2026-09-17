@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a film that is not on your laptop
+
+The film projector could be fed by a video file or by the camera, and both need
+the footage to already be on the machine. The third source is **Window**: press
+it, pick a tab or a screen from the browser's own chooser, and whatever is
+playing there goes through the dye.
+
+This is the only way that can work, which is worth writing down because the
+obvious alternative looks easy and is not. A cross-origin video will play in a
+page, but the moment WebGL reads it back into a texture the texture is tainted
+and the call throws; setting `crossOrigin` does not help, it only makes the load
+fail earlier. It needs a CORS header on the media response, and the Internet
+Archive does not send one — checked: none on `/download/`, none on the data node
+it redirects to, and `OPTIONS` there answers 405, so there is no preflight
+either. Their search and metadata APIs *are* open (`access-control-allow-origin:
+*`, no key), so finding a film from inside the app is easy; it is only the
+pixels that cannot be fetched. A captured window has no origin, so it sidesteps
+all of it — and reaches a media player, a slide deck or another copy of this app
+at the same time.
+
+The Archive's Prelinger collection is thousands of public-domain reels from
+exactly the era these shows come from, which is the pairing this was built for.
+
+Nothing is requested until the button is pressed, the browser's picker decides
+what is shared, and a capture stopped from the browser's side puts the panel
+back to "off" rather than leaving it claiming a window that has gone.
+
 ### Changed — the gate no longer costs most of an hour
 
 A deploy waited forty-six minutes to publish a build that takes fifty seconds,

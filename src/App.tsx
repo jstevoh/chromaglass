@@ -625,7 +625,7 @@ export default function App() {
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
-  const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera'>('none');
+  const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   const loadFilm = async (file: File) => {
     await visualizerRef.current?.loadFilmFile(file);
     setFilmSource('file');
@@ -637,6 +637,28 @@ export default function App() {
     } catch (err) {
       console.warn('ChromaGlass: camera unavailable for the film projector.', err);
       setFilmSource('none');
+    }
+  };
+  /*
+    Film from a window.
+
+    The projector fed by another tab, window or screen: a film off the
+    Internet Archive, a media player, a slide deck. It reaches what a URL
+    cannot — a cross-origin video plays in a page but cannot be read back into
+    a WebGL texture, and the Archive's own file responses carry no header that
+    would allow it — because a captured window has no origin, only pixels.
+
+    The browser's picker decides what is shared, and the cancel case is a
+    deliberate no-op rather than an error: closing the picker means "not
+    that", not "something went wrong".
+  */
+  const startFilmWindow = async () => {
+    try {
+      await visualizerRef.current?.startFilmWindow(() => setFilmSource('none'));
+      setFilmSource('window');
+    } catch (err) {
+      if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
+      console.warn('ChromaGlass: could not capture a window for the film projector.', err);
     }
   };
   const clearFilm = () => {
@@ -2406,6 +2428,7 @@ export default function App() {
             filmSource={filmSource}
             onFilmFile={loadFilm}
             onFilmCamera={startFilmCamera}
+            onFilmWindow={startFilmWindow}
             onFilmClear={clearFilm}
             onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />

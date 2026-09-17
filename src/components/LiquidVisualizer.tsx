@@ -226,9 +226,18 @@ export interface LiquidVisualizerHandle {
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
   drawnRect: () => DOMRect | null;
-  /** Film projector: a video file or the camera, shown through the dye. */
+  /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
+  /**
+   * A window, a tab or a screen, picked from the browser's own chooser.
+   *
+   * `onEnded` fires if the capture stops from the browser's side — the Stop
+   * sharing button, or the tab being closed — which is the one way a film
+   * source can go away without the app asking. Without it the panel goes on
+   * saying "window live" over a projector showing nothing.
+   */
+  startFilmWindow: (onEnded?: () => void) => Promise<void>;
   clearFilm: () => void;
   /**
    * A second display mirrors this canvas pixel for pixel: render at its size
@@ -1961,7 +1970,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The settings with the room's mappings folded in, rewritten each frame. */
   const sceneModRef = useRef<VisualizerSettings>({ ...settings });
   const gelAngleRef = useRef(0);
-  const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
+  const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
     if (!f.video) {
@@ -1973,11 +1982,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   const stopFilm = () => {
     const f = filmRef.current;
+    // Drop the listener before stopping the tracks. `stop()` does not fire
+    // `ended` by specification, but a stream taken away underneath us and one
+    // we put down deliberately must not run the same callback: the second
+    // would tell the panel a source had failed when it had merely been
+    // switched off.
+    filmEndedRef.current = null;
     if (f.stream) { f.stream.getTracks().forEach(t => t.stop()); f.stream = null; }
     if (f.url) { URL.revokeObjectURL(f.url); f.url = null; }
     if (f.video) { f.video.pause(); f.video.removeAttribute('src'); f.video.srcObject = null; }
     f.kind = 'none';
   };
+  /** Told when a captured window is taken away from the browser's side. */
+  const filmEndedRef = useRef<(() => void) | null>(null);
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
@@ -2249,6 +2266,51 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       v.src = f.url;
       f.kind = 'file';
       try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
+    },
+    /*
+      Film from a window.
+
+      The same projector, fed by whatever else is on this machine: a browser
+      tab playing a film off the Internet Archive, a media player, a slide
+      deck, another copy of this app. The frames arrive through the browser's
+      own capture, which is why this reaches things a URL cannot — a
+      cross-origin video can be played in a page but not read back into a
+      WebGL texture, and almost nothing on the web sends the header that would
+      allow it. A window has no origin.
+
+      Nothing is requested until the button is pressed, and the browser's
+      picker, not this app, decides what is shared.
+    */
+    startFilmWindow: async (onEnded?: () => void) => {
+      const media = navigator.mediaDevices as MediaDevices & {
+        getDisplayMedia?: (c: DisplayMediaStreamOptions) => Promise<MediaStream>;
+      };
+      if (!media?.getDisplayMedia) throw new Error('This browser cannot capture a window.');
+      // Asked for before `stopFilm`, so a picker the operator cancels leaves
+      // whatever was already playing alone rather than putting the projector
+      // out on the way to a dialog they changed their mind about.
+      const stream = await media.getDisplayMedia({
+        video: { frameRate: { ideal: 30 } },
+        // The plate is driven by the room's sound, not by the captured window,
+        // and asking for audio makes the picker offer a checkbox that does
+        // nothing here.
+        audio: false,
+      });
+      stopFilm();
+      const f = filmRef.current;
+      const v = filmVideo();
+      f.stream = stream;
+      v.srcObject = stream;
+      f.kind = 'window';
+      filmEndedRef.current = onEnded ?? null;
+      for (const t of stream.getVideoTracks()) {
+        t.addEventListener('ended', () => {
+          const cb = filmEndedRef.current;
+          stopFilm();
+          cb?.();
+        });
+      }
+      try { await v.play(); } catch { /* as above */ }
     },
     startFilmCamera: async () => {
       stopFilm();

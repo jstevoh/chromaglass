@@ -971,6 +971,44 @@ try {
       }
 
       /*
+        ── The film projector's third source ───────────────────────
+
+        A video file and a camera were the only two ways to get moving
+        pictures through the dye, and both need the film to already be on the
+        machine. A window reaches everything else — a tab playing a reel off
+        the Internet Archive, a media player — and is the only way that can
+        work: a cross-origin video plays in a page but taints the texture the
+        moment WebGL reads it, and the Archive's file responses carry no CORS
+        header (checked: none on /download/, none on the data node, OPTIONS
+        405). A captured window has no origin.
+
+        The picker cannot be driven from a harness, so what is checked is that
+        the way in exists, says what it is for, and does not throw — the rest
+        is the browser's own dialog.
+      */
+      await clickOn('open-all-settings');
+      await settle(1200);
+      await clickOn('settings-nav-projectors');
+      await settle(500);
+      const film = await page.evaluate(() => {
+        const b = document.querySelector('[data-testid="film-window"]');
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        return {
+          onScreen: r.width > 20 && r.bottom > 0 && r.top < window.innerHeight,
+          title: b.getAttribute('title') ?? '',
+          siblings: ['film-camera', 'film-off'].filter(id => document.querySelector(`[data-testid="${id}"]`)).length,
+        };
+      });
+      check('the film projector can be fed from a window',
+        !!film && film.siblings === 2, film ? `${film.siblings + 1} sources` : 'no window button');
+      check('and it is on screen with the other two',
+        !!film && film.onScreen && /window|tab|screen/i.test(film.title),
+        film ? `“${film.title.slice(0, 48)}…”` : '');
+      await page.keyboard.press('Escape');
+      await settle(800);
+
+      /*
         ── The controller ──────────────────────────────────────────
 
         Five factory maps, learn, banks, LED feedback and a picture of the

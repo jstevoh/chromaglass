@@ -77,7 +77,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'brush dropper blow press tools mouse touch radius strength' },
 
   { id: 'projectors', name: 'Projectors', category: 'stage',
-    terms: 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop' },
+    terms: 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop video window tab screen capture share archive internet archive prelinger movie footage' },
   { id: 'layers', name: 'Multi-Layer Mixer', category: 'stage',
     terms: 'layer blend mode screen multiply overlay exclusion count mixer led platform' },
   { id: 'simulation', name: 'Simulation', category: 'stage',

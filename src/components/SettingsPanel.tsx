@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
@@ -86,9 +86,11 @@ interface SettingsPanelProps {
   /** Where the sensor draws what it sees, so the camera can be aimed. */
   scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
-  filmSource?: 'none' | 'file' | 'camera';
+  filmSource?: 'none' | 'file' | 'camera' | 'window';
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
+  /** Another tab, window or screen, through the browser's own picker. */
+  onFilmWindow?: () => void;
   onFilmClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
   audioInputs?: { id: string; label: string }[];
@@ -185,8 +187,11 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  /** Whether this browser can capture a window at all. Every phone cannot. */
+  const canCaptureWindow = typeof navigator !== 'undefined'
+    && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
     if (!getLiveEngineStatus) return;
@@ -1435,7 +1440,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">Film Projector</span>
             <span className="text-[10px] font-mono opacity-50">
-              {filmSource === 'file' ? 'loop playing' : filmSource === 'camera' ? 'camera live' : 'off'}
+              {filmSource === 'file' ? 'loop playing'
+                : filmSource === 'camera' ? 'camera live'
+                : filmSource === 'window' ? 'window live'
+                : 'off'}
             </span>
           </div>
           <div className="flex gap-2">
@@ -1458,21 +1466,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onClick={() => onFilmCamera?.()}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
               title="Point a camera at a real dish of oil and composite it through the solver"
+              data-testid="film-camera"
             >
               <Camera size={13} /> Camera
+            </button>
+            {/*
+              Disabled rather than silently doing nothing where the browser
+              has no screen capture — which is every phone. A button that
+              looks pressable and answers with a console warning is the kind
+              of control that makes someone doubt the rest of the panel.
+            */}
+            <button
+              onClick={() => onFilmWindow?.()}
+              disabled={!canCaptureWindow}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              title={canCaptureWindow
+                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
+              data-testid="film-window"
+            >
+              <MonitorPlay size={13} /> Window
             </button>
             <button
               onClick={() => onFilmClear?.()}
               disabled={filmSource === 'none'}
               className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:opacity-30"
+              data-testid="film-off"
             >
               Off
             </button>
           </div>
+          <Info>
+            <span className="text-white/60">Window</span> is the way to a film you did not download.
+            Open one in another tab — the Internet Archive's Prelinger collection is thousands of
+            public-domain reels of exactly this era — press Window, and pick that tab. It reaches what a
+            link cannot: a video from another site plays in a page but cannot be read back into the
+            plate, and almost nothing on the web sends the header that would allow it. A window has no
+            origin, only pixels. Mute the tab and let the room's own sound drive the plate.
+          </Info>
         </div>
         <Slider
           label="Film Mix"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
           value={settings.filmMix ?? 0.7}
           min={0}
           max={1.0}
@@ -1482,7 +1517,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Film Key"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
           value={settings.filmKey ?? 0.18}
           min={0}
           max={0.9}
