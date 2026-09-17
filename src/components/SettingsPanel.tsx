@@ -1437,6 +1437,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     ))}
                   </div>
                 </div>
+                {/*
+                  Auto-map, for the controller nobody wrote a factory map for —
+                  which is most of them. The full flow lives in the MIDI panel;
+                  this is the same button where someone setting a controller up
+                  is already standing.
+                */}
+                {midi.watched ? (
+                  <div className="mb-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Listening</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-amber-100/80">
+                      Sweep every fader and knob, then press each pad and button. Nothing reaches the show meanwhile.
+                    </p>
+                    <p className="mt-1.5 font-mono text-[11px] text-amber-100" data-testid="settings-midi-auto-tally">
+                      {midi.watched.continuous} faders · {midi.watched.encoder} encoders · {midi.watched.button} buttons
+                    </p>
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        onClick={() => midi.finishAutoMap(midi.activeInputName)}
+                        className="flex-1 rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-black"
+                        data-testid="settings-midi-auto-finish"
+                      >
+                        Map them
+                      </button>
+                      <button
+                        onClick={() => midi.cancelAutoMap()}
+                        className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70"
+                        data-testid="settings-midi-auto-cancel"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => midi.startAutoMap()}
+                    className="mb-3 w-full rounded-lg border border-white/15 bg-white/5 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors hover:bg-white/10"
+                    title="Watch what this controller sends and build a map from it — for hardware with no factory map, which is most of it"
+                    data-testid="settings-midi-auto"
+                  >
+                    Auto-map this controller…
+                  </button>
+                )}
                 <p className="mb-3 text-[10px] text-white/40" data-testid="settings-midi-state">
                   {midi.map.bindings.length} bindings · {midi.activeInputName ?? 'no device'}
                   {midi.clocked ? ' · clock arriving' : ''}

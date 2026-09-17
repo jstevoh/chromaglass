@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — auto-map any controller
+
+Five controllers had factory maps. They are still the right answer when you own
+one, because a person read the manual and they know which pads are a grid and
+where the master fader is. Everything else — and everything else is most of
+what gets carried to a gig — meant MIDI learn, one control at a time, forty
+times, in a venue, before doors.
+
+**Auto-map this controller** watches what the hardware sends and works the
+surface out from the shape of the messages alone. No device list, nothing to
+keep up to date:
+
+- a **fader or knob** sends many distinct values spread across its range;
+- an **endless encoder** has no stop, so it reports nudges that huddle at the
+  two ends and never sit in the middle — bound as an absolute fader it would
+  slam the setting to one end on the first click;
+- a **pad** sends a note;
+- a **button wired to a CC** sends 0 and 127 and nothing between.
+
+Then it assigns for a show rather than in address order. The **rightmost**
+continuous control becomes the dimmer — the master fader's place since the
+seventies, and the one control that takes the room down should be where a hand
+finds it without looking. The rest ride Sound Drive first (the one that makes
+the plate look like it is listening), then Speed, Evolve, Turbulence, the beat
+kick, the zoom. A block of pads becomes the preset grid, with its last row kept
+for dyes when the block can spare them. Stray buttons become the transport, Go
+first. More settings than faders spill onto shift layers, and a spare button is
+given Bank + to reach them.
+
+Nothing reaches the show while it is listening. Sweeping the dimmer to build a
+map should not black the room out on the way.
+
+The classification is arithmetic over a list of messages, so `scripts/panel.mjs`
+drives it with surfaces made up on the spot — a nine-fader desk, a pad grid with
+transport keys beside it, both encoder conventions, a button on a CC, a single
+lonely knob, a four-fader box with more settings than it can hold, and a stray
+handshake message that is not a control at all.
+
+One of those found a real bug before any hardware did: a CC button sending
+0 and 127 was classified as an encoder, because it also never sends a middle
+value. The thing that tells them apart is zero — a button sends 0 for "off",
+and an encoder never does, because on an encoder 0 would mean "no change". Left
+alone, every transport button on a cheap controller would have come out as a
+knob.
+
 ### Added — a patch bay
 
 The room camera could ride a setting. Then the film could too, but only in
