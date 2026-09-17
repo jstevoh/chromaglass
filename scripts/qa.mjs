@@ -991,20 +991,30 @@ try {
       await clickOn('settings-nav-projectors');
       await settle(500);
       const film = await page.evaluate(() => {
-        const b = document.querySelector('[data-testid="film-window"]');
-        if (!b) return null;
-        const r = b.getBoundingClientRect();
+        const box = (id) => {
+          const el = document.querySelector(`[data-testid="${id}"]`);
+          return el ? { ...el.getBoundingClientRect().toJSON(), title: el.getAttribute('title') ?? '' } : null;
+        };
+        const w = box('film-window'), cam = box('film-camera'), off = box('film-off');
+        if (!w || !cam || !off) return null;
         return {
-          onScreen: r.width > 20 && r.bottom > 0 && r.top < window.innerHeight,
-          title: b.getAttribute('title') ?? '',
-          siblings: ['film-camera', 'film-off'].filter(id => document.querySelector(`[data-testid="${id}"]`)).length,
+          title: w.title,
+          width: Math.round(w.width),
+          // In the row with the other two, which is the claim that matters.
+          // Not "on screen without scrolling": this lives inside a section
+          // eight controls deep, and Load loop and Camera are just as far
+          // down it. The pinned way *into* settings has to be above the fold
+          // and is checked for that; a control inside a section does not.
+          inRow: Math.abs(w.top - cam.top) < 4 && Math.abs(w.top - off.top) < 4,
+          between: cam.right <= w.left + 1 && w.right <= off.left + 1,
+          wide: w.width > 40,
         };
       });
       check('the film projector can be fed from a window',
-        !!film && film.siblings === 2, film ? `${film.siblings + 1} sources` : 'no window button');
-      check('and it is on screen with the other two',
-        !!film && film.onScreen && /window|tab|screen/i.test(film.title),
-        film ? `“${film.title.slice(0, 48)}…”` : '');
+        !!film && film.wide, film ? `${film.width}px button` : 'no window button');
+      check('and it sits in the row with the other two sources',
+        !!film && film.inRow && film.between && /window|tab|screen/i.test(film.title),
+        film ? `in row ${film.inRow}, between ${film.between}, “${film.title.slice(0, 40)}…”` : '');
       await page.keyboard.press('Escape');
       await settle(800);
 
