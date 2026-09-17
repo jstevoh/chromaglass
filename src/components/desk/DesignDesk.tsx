@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
-import { Button, Segmented, Slider, Tag, Toggle } from '../ui';
+import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
@@ -144,19 +144,18 @@ export function DesignDesk(p: DesignDeskProps) {
 
         <Group title="Dye">
           <div className="grid grid-cols-6 gap-1.5">
-            {p.swatches.map(c => (
-              <button
+            {p.swatches.map((c, i) => (
+              <Swatch
                 key={c.hex}
+                hex={c.hex}
+                selected={p.dye?.toLowerCase() === c.hex.toLowerCase()}
                 onClick={() => p.onDye(c.hex)}
+                // The grid is the palette in order, so the index *is* the
+                // palette index a dye pad fires.
+                midiKey={`dye:${i}`}
+                className="h-8 w-full"
                 title={c.name}
-                aria-label={c.name}
-                className="h-8 w-full rounded-md transition-transform active:scale-95"
-                style={{
-                  background: c.hex,
-                  boxShadow: p.dye?.toLowerCase() === c.hex.toLowerCase()
-                    ? '0 0 0 2px var(--color-bg), 0 0 0 3px #FAFAFA' : undefined,
-                }}
-                data-testid={`swatch-${c.hex.replace('#', '')}`}
+                testId={`swatch-${c.hex.replace('#', '')}`}
               />
             ))}
           </div>
@@ -286,6 +285,7 @@ export function DesignDesk(p: DesignDeskProps) {
                 max={spec.max}
                 display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                midiKey={`setting:${String(key)}`}
                 testId={`recipe-${String(key)}`}
               />
             );
@@ -323,6 +323,7 @@ export function DesignDesk(p: DesignDeskProps) {
           <Button
             full height={40}
             onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
+            midiKey="action:macro-toggle"
             testId="macro-button"
           >
             {p.settings.macroMode ? 'Wide' : 'Macro'}
@@ -336,6 +337,7 @@ export function DesignDesk(p: DesignDeskProps) {
             full height={40}
             variant={p.randomiseArmed ? 'primary' : 'secondary'}
             onClick={p.onRandomise}
+            midiKey="action:lucky"
             testId="randomise-button"
           >
             {p.randomiseArmed ? 'Sure?' : 'Randomise'}

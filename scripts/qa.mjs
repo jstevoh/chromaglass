@@ -1213,6 +1213,37 @@ try {
     const goLabel = (await page.getByTestId('go-button').innerText()).trim();
     check('and Go names the look it will send', /Oil on Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
 
+    /*
+      ── The screen says what the controller hit ──────────────────
+
+      A fader already shows itself, because the bar and the hardware go
+      through the same number. A pad shows nothing: press a preset and the
+      look changes, but the row that preset lives on sits there exactly as it
+      did, which in a dark room reads as "did that work?".
+
+      This browser has no Web MIDI, so the press is fired through the debug
+      hook — the same call the MIDI handler makes. Everything after it is the
+      real path: the subscription, the class, and the timer that takes it off
+      again. That last part is the half worth checking, because a flash that
+      never clears is not feedback, it is a highlight stuck on the wrong row
+      for the rest of the night.
+    */
+    const lit = async () => page.evaluate(() =>
+      document.querySelectorAll('[data-midi-hit="true"]').length);
+    check('nothing is lit before anything is pressed', (await lit()) === 0, `${await lit()} lit`);
+    await page.evaluate(() => window.chromaglassTouch?.('preset:oil-on-water'));
+    await settle(120);
+    const onNow = await page.evaluate(() => {
+      const row = document.querySelector('[data-testid="cue-oil-on-water"]');
+      return { hit: row?.getAttribute('data-midi-hit') === 'true', any: document.querySelectorAll('[data-midi-hit="true"]').length };
+    });
+    check('a controller press lights the row it fired',
+      onNow.hit && onNow.any === 1, `row ${onNow.hit}, ${onNow.any} lit in total`);
+    // Long enough to be well past the flash, short enough that a stuck one
+    // still fails rather than the harness waiting it out.
+    await settle(700);
+    check('and the light goes out again', (await lit()) === 0, `${await lit()} still lit`);
+
     // ⌘K reaches what the desk deliberately does not show.
     await page.keyboard.press('Control+k');
     await settle(500);

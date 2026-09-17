@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the screen says what the controller hit
+
+A fader always showed itself: the ride's bar and the hardware go through the
+same number, so a hand on a fader moved the bar. A **pad** showed nothing.
+Press a preset and the look changes, but the row that preset lives on sits
+there exactly as it did — which in a dark room reads as "did that work?", and
+the answer arrives a second later when the plate crossfades. Long enough to
+press it again.
+
+Bindings now publish what they fired, and the matching control rings white for
+about a quarter of a second: the cue row for a preset, the swatch for a dye,
+the button for an action. A ride's **CC** chip lights while its fader is
+moving, which answers the other question a full strip raises — not *is it
+working* but *which one have I got hold of*.
+
+White rather than a colour. The design system gives each of its three chromatic
+colours exactly one meaning — violet is cued, red is live, green is connected —
+and a fourth meaning painted in one of them would make that one stop reading. A
+ring rather than a fill or a nudge, because a row that grew or shifted on every
+pad press would make a cue list jump under a hand reaching for it.
+
+Three things decided the shape of it:
+
+- **Not React state.** A fader sweep is a hundred messages a second and a MIDI
+  clock is twenty-four a beat. Through `useState` at the top of the app that
+  would re-render the desk, the cue list and the plate's wrapper on every one.
+  It is a plain map of listeners, so a preset press wakes exactly the one row
+  bound to that preset.
+- **Keyed by what was hit, not by what hit it.** The screen cares that *Crowd
+  Plate* fired, not that it was note 37 on channel 1.
+- **A moment, not a state.** There is no "untouch"; listeners are told when,
+  and decide how long to wear it.
+
+`scripts/panel.mjs` checks the bus itself — that a listener hears what it asked
+for and nothing else, that it stops when it lets go, that it leaves no key
+behind (at MIDI rate a listener map that only grows is a leak that shows up an
+hour into a set), and that a row unmounting mid-press does not silence the
+listeners after it. `npm run qa` fires a press through a debug hook, because
+the browser it drives has no Web MIDI, and checks that the right row lights,
+that only that row lights, and that the light goes out again — a flash that
+never clears is not feedback, it is a highlight stuck on the wrong row for the
+rest of the night.
+
+Found on the way: the project has no `@types/react`, which is why `ui/index.tsx`
+carries its own `Keyed` interface to put `key` back on a component's props. That
+is also the root cause of the settings-access gap noted in the patch bay work —
+`useRef` resolves as `any` in `LiquidVisualizer.tsx` for the same reason.
+
 ### Added — auto-map any controller
 
 Five controllers had factory maps. They are still the right answer when you own

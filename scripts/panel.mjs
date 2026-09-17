@@ -26,6 +26,7 @@ import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
+import { touch, touchKey, subscribeTouch, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -315,6 +316,55 @@ check('and nothing the solver reads is left off the list', missed.length === 0,
   const dupes = fMap.bindings.map(b => `${b.source.kind}:${b.source.channel}:${b.source.number}:${b.bank ?? 'all'}`)
     .filter((k, i, a) => a.indexOf(k) !== i);
   check('no control is bound twice on one layer', dupes.length === 0, dupes.join(', '));
+}
+
+// ── Saying on screen what the controller hit ────────────────────────
+//
+// A fader already shows itself: the bar and the hardware go through the same
+// number. A pad shows nothing, which in a dark room reads as "did that work?".
+// So bindings publish what they fired and the matching control lights.
+//
+// The part worth checking here is the bus, because it runs at MIDI rate — a
+// sweep is a hundred messages a second — and a listener map that grows and
+// never shrinks is a leak that would only show up after an hour of a set.
+{
+  resetTouch();
+  check('a target has a stable name',
+    touchKey({ kind: 'preset', presetId: 'classic' }) === 'preset:classic'
+    && touchKey({ kind: 'dye', paletteIndex: 3 }) === 'dye:3'
+    && touchKey({ kind: 'action', action: 'go' }) === 'action:go'
+    && touchKey({ kind: 'setting', key: 'dimmer', min: 0, max: 1 }) === 'setting:dimmer');
+
+  let heard = 0;
+  const off = subscribeTouch('preset:classic', () => { heard++; });
+  touch('preset:classic');
+  touch('preset:classic');
+  check('a listener hears what it asked for', heard === 2, `${heard} of 2`);
+
+  touch('preset:something-else');
+  check('and nothing it did not', heard === 2, `${heard} after a stray`);
+
+  off();
+  touch('preset:classic');
+  check('and stops when it lets go', heard === 2, `${heard} after unsubscribing`);
+  check('leaving nothing behind', touchKeysWatched() === 0, `${touchKeysWatched()} keys still watched`);
+
+  // A row that unmounts while being told — a cue list rebuilt under a press —
+  // must not break the loop for everyone after it.
+  let a = 0, b = 0;
+  let offA = () => {};
+  offA = subscribeTouch('preset:x', () => { a++; offA(); });
+  const offB = subscribeTouch('preset:x', () => { b++; });
+  touch('preset:x');
+  check('a listener that unsubscribes mid-flight does not silence the rest',
+    a === 1 && b === 1, `a ${a}, b ${b}`);
+  offB();
+
+  // Nobody listening is the common case — most keys are never bound — and it
+  // has to cost nothing rather than throw.
+  resetTouch();
+  touch('action:go');
+  check('and firing at nobody is harmless', touchKeysWatched() === 0);
 }
 
 // ── The way in ──────────────────────────────────────────────────────
