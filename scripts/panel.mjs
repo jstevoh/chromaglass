@@ -1,0 +1,185 @@
+#!/usr/bin/env node
+/**
+ * Can every control the settings panel draws be put on a desk?
+ *
+ *   npm run panel
+ *
+ * The panel and the desks keep separate lists of what a control *is*, and they
+ * have to. The panel's list is its own markup — eighty-seven sliders, each with
+ * a label and a range typed beside it. The desks' list is `PINNABLE` in
+ * `src/lib/deskPins.ts`, because a strip has to be able to name a control
+ * without rendering the panel, and because for the forty MIDI already knows the
+ * range a fader rides is deliberately not the range the panel shows.
+ *
+ * Two lists that must agree and cannot be derived from each other is exactly
+ * the shape that drifts, and drift here is silent in the worst way: a slider
+ * added to the panel simply has no pin chips, which looks like a design
+ * decision rather than an omission. So this reads the panel's own source and
+ * checks the two against each other.
+ *
+ * It also checks the map: every section a spec claims to live in has to be a
+ * section that exists, or a picker draws a heading for a place you cannot go.
+ */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
+import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
+import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
+import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
+
+// The repository root as npm hands it over. Not `import.meta.url`: this file
+// is bundled into node_modules/.cache before it runs, so its own url points at
+// the cache directory rather than at the source it is here to read.
+const root = process.env.INIT_CWD ?? process.cwd();
+const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+
+const checks = [];
+const check = (name, ok, detail = '') => {
+  checks.push({ name, ok: !!ok, detail });
+  console.log(`${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+};
+
+// ── What the panel actually draws ───────────────────────────────────
+//
+// Read from the source rather than from a rendered DOM on purpose: this has to
+// run in a couple of seconds with no browser, and the thing it is guarding
+// against is a line of markup, which is what it reads.
+const sliders = [];
+for (const block of panel.match(/<Slider\b[\s\S]*?\/>/g) ?? []) {
+  const key = block.match(/onUpdate\(\{\s*([A-Za-z0-9_]+):/)?.[1] ?? null;
+  const label = block.match(/label="([^"]+)"/)?.[1] ?? '?';
+  const pinned = block.match(/settingKey="([A-Za-z0-9_]+)"/)?.[1] ?? null;
+  sliders.push({ key, label, pinned });
+}
+
+check('the settings panel still has its sliders', sliders.length > 60, `${sliders.length} found`);
+if (sliders.length < 60) {
+  console.log('\nThe reader found almost nothing, so everything below would pass by accident.');
+  process.exit(1);
+}
+
+const noKey = sliders.filter(s => !s.key);
+check('every slider writes one named setting', noKey.length === 0,
+  noKey.length ? noKey.map(s => s.label).join(', ') : `${sliders.length} sliders`);
+
+// ── The chips ───────────────────────────────────────────────────────
+const unchipped = sliders.filter(s => s.key && !s.pinned);
+check('every slider offers to go on a desk', unchipped.length === 0,
+  unchipped.length ? unchipped.map(s => `${s.label} (${s.key})`).join(', ') : `${sliders.length} with pin chips`);
+
+const mislabelled = sliders.filter(s => s.key && s.pinned && s.key !== s.pinned);
+check('and each chip pins the setting its own slider moves', mislabelled.length === 0,
+  mislabelled.map(s => `${s.label}: moves ${s.key}, pins ${s.pinned}`).join(', '));
+
+// ── The registry ────────────────────────────────────────────────────
+const missing = sliders.filter(s => s.key && !PIN_RANGE.has(s.key));
+check('every control the panel draws is one a desk can hold', missing.length === 0,
+  missing.length
+    ? `${missing.map(s => `${s.label} (${s.key})`).join(', ')} — add to PINNABLE in src/lib/deskPins.ts`
+    : `${PINNABLE.length} in the registry`);
+
+// The other direction: a spec for a control nobody can see is a row in every
+// picker that leads nowhere. `audioImpact` and friends may legitimately appear
+// only as MIDI targets, so this names what it found rather than failing on it.
+const drawn = new Set(sliders.map(s => s.key));
+const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
+check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
+  ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');
+
+const badRange = PINNABLE.filter(s => !(s.max > s.min));
+check('every range has somewhere to travel', badRange.length === 0,
+  badRange.map(s => `${s.label} ${s.min}..${s.max}`).join(', '));
+
+const dupes = PINNABLE.map(s => String(s.key)).filter((k, i, a) => a.indexOf(k) !== i);
+check('and no control is in it twice', dupes.length === 0, dupes.join(', '));
+
+// ── The map ─────────────────────────────────────────────────────────
+const badSection = PINNABLE.filter(s => !SECTION_BY_ID.has(s.section));
+check('every control names a settings section that exists', badSection.length === 0,
+  badSection.map(s => `${s.label} → ${s.section}`).join(', '));
+
+const orphanCat = SETTINGS_SECTIONS.filter(s => !SETTINGS_CATEGORIES.some(c => c.id === s.category));
+check('every section is in a category the rail draws', orphanCat.length === 0,
+  orphanCat.map(s => `${s.name} → ${s.category}`).join(', '));
+
+const emptyCat = SETTINGS_CATEGORIES.filter(c => !SETTINGS_SECTIONS.some(s => s.category === c.id));
+check('and no category is empty', emptyCat.length === 0, emptyCat.map(c => c.name).join(', '));
+
+// Every section in the map has markup, and every piece of markup is in the map.
+const inMarkup = new Set([...panel.matchAll(/data-section="([a-z-]+)"/g)].map(m => m[1]));
+const unrendered = SETTINGS_SECTIONS.filter(s => !inMarkup.has(s.id));
+check('every row on the rail has a section behind it', unrendered.length === 0,
+  unrendered.map(s => `${s.name} (${s.id})`).join(', '));
+const unlisted = [...inMarkup].filter(id => !SECTION_BY_ID.has(id));
+check('and every section on screen has a row on the rail', unlisted.length === 0, unlisted.join(', '));
+
+// ── The search ──────────────────────────────────────────────────────
+//
+// The words that sent someone looking. Each one has to reach the section that
+// answers it — this is the check that would have caught "I cannot find how to
+// turn the video on", which is what the rail was built for.
+const MUST_FIND = [
+  ['video', 'room'], ['people', 'room'], ['camera', 'room'], ['crowd', 'room'],
+  ['midi', 'midi'], ['apc40', 'midi'], ['controller', 'midi'], ['fader', 'midi'],
+  ['keystone', 'projectors'], ['mask', 'projectors'], ['strobe', 'projectors'],
+  ['bpm', 'audio-input'], ['microphone', 'audio-input'],
+  ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
+];
+const misses = [];
+for (const [word, want] of MUST_FIND) {
+  const hits = SETTINGS_SECTIONS.filter(s => sectionMatches(s, word)).map(s => s.id);
+  if (!hits.includes(want)) misses.push(`"${word}" → ${hits.join(', ') || 'nothing'} (wanted ${want})`);
+}
+check('searching for what you came for finds it', misses.length === 0, misses.join(' · '));
+
+// ── The controller the section offers to set up ─────────────────────
+//
+// The Controller section's one button is only worth having if it names the
+// hardware that is actually plugged in, and what the browser hands us is the
+// port name the OS invented — which is not what is printed on the box. These
+// are the strings real ports report, so a pattern that stops matching one of
+// them fails here rather than on a stage.
+const PORTS = [
+  ['APC40 mkII', 'apc40-mk2'],
+  ['Akai APC40 mkII', 'apc40-mk2'],
+  ['APC MINI MK2', 'apc-mini-mk2'],
+  ['APC mini mk2 APC mini mk2 Contro', 'apc-mini-mk2'],
+  ['Launchpad Mini MK3 LPMiniMK3 MIDI Out', 'launchpad'],
+  ['Launchpad X LPX MIDI Out', 'launchpad'],
+  ['Launch Control XL', 'launch-control-xl'],
+  ['nanoKONTROL2 SLIDER/KNOB', 'nanokontrol2'],
+  // Not a controller. Offering it a fader map would be worse than offering
+  // nothing, because it would look like it had worked.
+  ['Scarlett 2i2 USB', null],
+  ['Built-in Microphone', null],
+];
+const wrong = PORTS
+  .map(([name, want]) => [name, want, factoryFor(name)?.id ?? null])
+  .filter(([, want, got]) => want !== got);
+check('a plugged-in controller is recognised by its port name', wrong.length === 0,
+  wrong.map(([n, want, got]) => `"${n}" → ${got ?? 'none'} (wanted ${want ?? 'none'})`).join(' · '));
+check('and nothing is recognised as two different controllers',
+  PORTS.every(([name]) => FACTORY_MAPS.filter(f => f.match.test(name)).length <= 1),
+  PORTS.filter(([name]) => FACTORY_MAPS.filter(f => f.match.test(name)).length > 1).map(([n]) => n).join(', '));
+check('and every factory map has a pattern that finds it',
+  FACTORY_MAPS.every(f => factoryFor(f.name)?.id === f.id),
+  FACTORY_MAPS.filter(f => factoryFor(f.name)?.id !== f.id).map(f => f.name).join(', '));
+
+// ── The defaults ────────────────────────────────────────────────────
+const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));
+check('the desk starts with controls that exist', badRides.length === 0, badRides.join(', '));
+const badRecipe = DEFAULT_RECIPE.filter(k => !PIN_RANGE.has(String(k)));
+check('the bench starts with controls that exist', badRecipe.length === 0, badRecipe.join(', '));
+check('and neither starts over the limit',
+  DEFAULT_RIDES.length <= MAX_PINS && DEFAULT_RECIPE.length <= MAX_PINS,
+  `${DEFAULT_RIDES.length} rides, ${DEFAULT_RECIPE.length} recipe, limit ${MAX_PINS}`);
+
+// ── Result ──────────────────────────────────────────────────────────
+const failed = checks.filter(c => !c.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+if (failed.length) {
+  console.log(`\n${failed.length} failed:`);
+  for (const f of failed) console.log(`  - ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  process.exit(1);
+}

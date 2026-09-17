@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { Check, SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Tag, Toggle } from '../ui';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
-import { LEARNABLE_SETTINGS } from '../../lib/midi';
+import { PIN_RANGE } from '../../lib/deskPins';
+import { PickList } from './PickList';
 
 /**
  * The desk, to the handoff's Perform screen.
@@ -38,9 +39,10 @@ export interface Cue {
 /**
  * What the strip starts with: the controls a light show is actually played on.
  *
- * Which six is the operator's choice, from `LEARNABLE_SETTINGS` — the same
- * list MIDI learn offers. That is deliberate rather than convenient: if the
- * desk drew from its own list, the strip and the controller map could
+ * Which six is the operator's choice, from `PINNABLE` — every control the
+ * settings panel draws, at the range MIDI rides it at where MIDI knows it.
+ * That is deliberate rather than convenient: if the desk drew from its own
+ * list, the strip, the settings panel's pin chips and the controller map could
  * disagree about what is rideable, and the first time anyone noticed would be
  * on stage.
  */
@@ -48,7 +50,7 @@ export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
   'dimmer', 'audioImpact', 'globalSpeed', 'automateRate', 'beatSqueeze', 'macroZoom',
 ];
 
-const RANGE = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));
+const RANGE = PIN_RANGE;
 
 /** How a few of them read better than a bare percentage. */
 const READS: Partial<Record<string, (v: number) => string>> = {
@@ -81,6 +83,8 @@ interface PerformDeskProps {
   rideKeys: (keyof VisualizerSettings)[];
   onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   midiName: string | null;
+  /** The controller panel, from the header's MIDI dot. */
+  onMidi: () => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -124,6 +128,7 @@ export function PerformDesk(p: PerformDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
+        onMidi={p.onMidi}
         onSearch={p.onSearch}
       />
 
@@ -247,30 +252,7 @@ export function PerformDesk(p: PerformDeskProps) {
           </button>
         </div>
         {picking ? (
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-2 pb-2" data-testid="ride-picker">
-            {LEARNABLE_SETTINGS.map(spec => {
-              const on = p.rideKeys.includes(spec.key);
-              return (
-                <button
-                  key={String(spec.key)}
-                  onClick={() => p.onRideKeys(on
-                    ? p.rideKeys.filter(k => k !== spec.key)
-                    : [...p.rideKeys, spec.key].slice(0, 10))}
-                  className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors ${
-                    on ? 'bg-hover text-text' : 'text-muted hover:bg-hover hover:text-text'
-                  }`}
-                  data-testid={`ride-pick-${String(spec.key)}`}
-                >
-                  <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                    on ? 'border-text bg-text text-bg' : 'border-border-strong'
-                  }`}>
-                    {on && <Check size={11} strokeWidth={3} />}
-                  </span>
-                  <span className="text-[13px]">{spec.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <PickList chosen={p.rideKeys} onChange={p.onRideKeys} testId="ride-picker" />
         ) : (
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-4">
           {p.rideKeys.length === 0 && (
@@ -279,7 +261,7 @@ export function PerformDesk(p: PerformDeskProps) {
             </p>
           )}
           {p.rideKeys.map(key => {
-            const spec = RANGE.get(key);
+            const spec = RANGE.get(String(key));
             if (!spec) return null;          // a key saved by an older build
             const raw = p.settings[key];
             const v = typeof raw === 'number' ? raw : spec.min;

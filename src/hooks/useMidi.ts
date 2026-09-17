@@ -3,6 +3,7 @@ import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
   MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT,
+  type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
 import { downloadText } from '../lib/userPresets';
@@ -372,7 +373,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, bank: bankIndex } : b) })), [setMap]);
   const clearMap = useCallback(() => setMap(prev => ({ ...prev, bindings: [] })), [setMap]);
   const rename = useCallback((name: string) => setMap(prev => ({ ...prev, name })), [setMap]);
-  const loadFactory = useCallback((which: 'apc-mini-mk2' | 'nanokontrol2' | 'apc40-mk2' | 'launchpad' | 'launch-control-xl') => {
+  const loadFactory = useCallback((which: FactoryMapId) => {
     setMap(
       which === 'apc-mini-mk2' ? apcMiniMk2Map(presetIds)
       : which === 'apc40-mk2' ? apc40Mk2Map(presetIds)

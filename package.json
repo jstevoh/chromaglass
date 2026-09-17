@@ -36,6 +36,7 @@
     "deploy": "npx firebase-tools deploy --only hosting",
     "ship": "npm run update && npm run deploy && npm run remote",
     "show": "npm run update && npm run remote",
+    "panel": "esbuild scripts/panel.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/panel.mjs && node node_modules/.cache/panel.mjs",
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "shots": "npm run build && node scripts/shots.mjs",

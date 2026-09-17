@@ -9,13 +9,18 @@ name: Checks
 # person remembering to. Since `npm run show` pulls `main` on show night, what
 # that added up to was: an untested `main` is what arrives at the venue.
 #
-# Two jobs, because they cost very different amounts of time and a fast red X
+# Three jobs, because they cost very different amounts of time and a fast red X
 # is worth more than a slow one:
 #
-#   measure   the pure-logic harnesses. A couple of minutes, no browser.
-#   drive     the ones that put a real browser in front of the real build.
-#             These run on software rasterisation at a few frames a second,
-#             so they are slow by nature rather than by accident.
+#   measure   the pure-logic harnesses. Half a minute, no browser.
+#   wall      the projector's geometry and the flash guard. Ten minutes.
+#   show      a browser walked through a show night. The long one.
+#
+# `wall` and `show` used to be two steps of one job, which meant the gate took
+# as long as both of them added together — measured at 9.8 + 34.3 minutes, so
+# the ten minutes were pure latency on top of the thirty-four. They share
+# nothing but the build, so they are two jobs now and the gate costs whatever
+# the slower one costs.
 #
 # Called by `deploy.yml` before it publishes, and run directly on every pull
 # request.
@@ -23,6 +28,15 @@ name: Checks
 on:
   workflow_call:
   pull_request:
+
+# A second push to a branch makes the first push's run pointless, and these are
+# expensive: three runners, one of them for most of an hour. Superseded pull
+# request runs are cancelled. Deploys are not — `deploy.yml` has its own
+# `cancel-in-progress: false` on the live channel, and a `workflow_call` run
+# inherits the caller's group rather than this one.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   measure:
@@ -50,6 +64,15 @@ jobs:
       - name: The plate
         run: npm run plate
 
+      # That a look change never cuts the plate to black in front of a room.
+      - name: The desk
+        run: npm run desk
+
+      # The two lists that have to agree about what a control is: the settings
+      # panel's own markup, and the registry the desks pin from.
+      - name: The panel
+        run: npm run panel
+
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
@@ -66,12 +89,33 @@ jobs:
       - name: The room
         run: npm run scene
 
-  drive:
-    name: Drive
+  # The projector's geometry and the flash guard: which pixels are black, and
+  # how many times a second the whole screen is allowed to change.
+  wall:
+    name: The wall
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `scripts/chromium.mjs` prefers PW_CHROMIUM, then the sandbox's fixed
+      # path, then whatever Playwright downloaded — which is this.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run wall
+
+  # The app itself: it builds, it serves, and a browser is walked through a
+  # show night with the console watched the whole way.
+  show:
+    name: A show night
     runs-on: ubuntu-latest
     # Generous on purpose. A GitHub runner has no GPU, so everything here runs
-    # through SwiftShader at a handful of frames a second; the harnesses wait
-    # on the renderer rather than on a timer for exactly that reason.
+    # through SwiftShader at a handful of frames a second; the harness waits on
+    # the renderer rather than on a timer for exactly that reason.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -80,18 +124,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-
-      # `scripts/chromium.mjs` prefers PW_CHROMIUM, then the sandbox's fixed
-      # path, then whatever Playwright downloaded — which is this.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
-      # The projector's geometry and the flash guard: which pixels are black,
-      # and how many times a second the whole screen is allowed to change.
-      - name: The wall
-        run: npm run wall
-
-      # The app itself: it builds, it serves, and a browser is walked through a
-      # show night with the console watched the whole way.
-      - name: A show night
-        run: npm run qa
+      - run: npm run qa

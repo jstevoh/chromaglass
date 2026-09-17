@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping } from '../types';
-import { LEARNABLE_SETTINGS } from '../lib/midi';
+import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
+import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
+import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
+import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
 import { OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
@@ -10,32 +13,58 @@ import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
 /**
- * Which half of the panel is showing.
+ * Pinning a control onto a desk.
  *
- * `all` is the third: the one that exists because ten of the sixteen sections
- * were behind a tab nobody had reason to press.
+ * Every slider in this panel offers two chips: put me on Perform, put me on
+ * Design. It is two buttons rather than a menu because in a dark room a menu
+ * is two clicks and a guess, and it is on the control itself rather than in a
+ * list somewhere because the moment you want a fader out where you can reach
+ * it is the moment you are looking at it.
+ *
+ * Passed through a context rather than a prop, because it has to reach
+ * eighty-six call sites and threading it would have meant eighty-six edits
+ * every time the shape changed.
  */
-export type SettingsTab = 'perform' | 'setup' | 'all';
+export interface PinApi {
+  perform: (keyof VisualizerSettings)[];
+  design: (keyof VisualizerSettings)[];
+  onPin: (desk: DeskSurface, key: keyof VisualizerSettings, on: boolean) => void;
+}
+const PinContext = React.createContext<PinApi | null>(null);
 
-/** Every section, for the command palette to offer one row each. */
-export const SETTINGS_SECTIONS: { id: string; name: string }[] = [
-  { id: 'audio-input', name: 'Sound' },
-  { id: 'audio-mappings', name: 'Audio Mappings' },
-  { id: 'look', name: 'Light Show Look' },
-  { id: 'show', name: 'Show' },
-  { id: 'camera', name: 'Camera' },
-  { id: 'lamp', name: 'Lamp' },
-  { id: 'room', name: 'The Room' },
-  { id: 'projectors', name: 'Projectors' },
-  { id: 'simulation', name: 'Simulation' },
-  { id: 'macro', name: 'Macro Closeup' },
-  { id: 'squish', name: 'Squish Plate' },
-  { id: 'heat', name: 'Heat Slide' },
-  { id: 'interaction', name: 'Manual Interaction' },
-  { id: 'physics', name: 'Fluid Physics' },
-  { id: 'automation', name: 'Automation' },
-  { id: 'layers', name: 'Multi-Layer Mixer' },
-];
+function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
+  const api = React.useContext(PinContext);
+  if (!api) return null;
+  // Only what a desk can actually draw. A chip on a control the strip would
+  // drop on the next reload is a button that lies.
+  if (!PIN_RANGE.has(String(settingKey))) return null;
+  const chip = (desk: DeskSurface, letter: string, name: string) => {
+    const on = (desk === 'perform' ? api.perform : api.design).includes(settingKey);
+    return (
+      <button
+        key={desk}
+        onClick={() => api.onPin(desk, settingKey, !on)}
+        aria-pressed={on}
+        title={on ? `On ${name}. Click to take it off.` : `Put this on ${name}`}
+        aria-label={`${on ? 'Remove from' : 'Add to'} ${name}`}
+        data-testid={`pin-${desk}-${String(settingKey)}`}
+        className={`h-[18px] w-[18px] shrink-0 rounded-[4px] border text-[9px] font-bold leading-none transition-colors ${
+          on
+            ? 'border-white bg-white text-black'
+            : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
+        }`}
+      >
+        {letter}
+      </button>
+    );
+  };
+  return (
+    <span className="flex items-center gap-1" data-testid={`pins-${String(settingKey)}`}>
+      {chip('perform', 'P', 'the Perform desk')}
+      {chip('design', 'D', 'the Design bench')}
+    </span>
+  );
+}
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
@@ -57,9 +86,11 @@ interface SettingsPanelProps {
   /** Where the sensor draws what it sees, so the camera can be aimed. */
   scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
-  filmSource?: 'none' | 'file' | 'camera';
+  filmSource?: 'none' | 'file' | 'camera' | 'window';
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
+  /** Another tab, window or screen, through the browser's own picker. */
+  onFilmWindow?: () => void;
   onFilmClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
   audioInputs?: { id: string; label: string }[];
@@ -75,16 +106,17 @@ interface SettingsPanelProps {
   /** Whether this machine is keeping its screen awake, and whether it can. */
   wakeLock?: { supported: boolean; held: boolean };
   /**
-   * Which half to open on. Design passes `all`, because a look is built from
-   * every one of these and not from the six a hand rides between songs.
-   */
-  defaultTab?: SettingsTab;
-  /**
-   * Open showing this section, scrolled to and briefly outlined. This is what
-   * the command palette's per-section rows use, so "the room" typed into ⌘K
-   * lands on the room rather than on the top of a panel with sixteen of them.
+   * Open showing this section. This is what the command palette's per-section
+   * rows use, so "the room" typed into ⌘K lands on the room rather than on the
+   * top of a panel with seventeen of them.
    */
   focusSection?: string | null;
+  /** What is already on each desk, and how to put something there. */
+  pins?: PinApi;
+  /** The controller, for the Controller section and its one-click setup. */
+  midi?: MidiController;
+  /** The full MIDI panel, for the things this panel's section does not hold. */
+  onOpenMidi?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
@@ -126,16 +158,19 @@ const sceneTargets = LEARNABLE_SETTINGS.filter(s => !String(s.key).startsWith('s
  * cannot do anything with the current settings; it is shown greyed with that
  * reason as its tooltip.
  */
-const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false }) => {
+const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, settingKey }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false; settingKey?: keyof VisualizerSettings }) => {
   const safeValue = value ?? 0;
   return (
     <div className={`flex flex-col gap-2 mb-4 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
           {Icon && <Icon size={14} />}
-          {label}
+          <span className="truncate">{label}</span>
         </div>
-        <span className="text-[10px] font-mono opacity-50">{disabled ? disabled : safeValue.toFixed(2)}</span>
+        <div className="flex shrink-0 items-center gap-2">
+          {settingKey && <PinChips settingKey={settingKey} />}
+          <span className="text-[10px] font-mono opacity-50">{disabled ? disabled : safeValue.toFixed(2)}</span>
+        </div>
       </div>
       <input
         type="range"
@@ -152,8 +187,11 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled }
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, defaultTab = 'perform', focusSection = null, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  /** Whether this browser can capture a window at all. Every phone cannot. */
+  const canCaptureWindow = typeof navigator !== 'undefined'
+    && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
   const [liveFps, setLiveFps] = useState<number | null>(null);
   useEffect(() => {
     if (!getLiveEngineStatus) return;
@@ -163,35 +201,37 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     return () => clearInterval(id);
   }, [getLiveEngineStatus]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
-  /** Which half of the panel is showing. Perform first: it is what a show needs. */
   /**
-   * Which half of the panel is showing — or `all`, which is both.
+   * Which section is in the pane.
    *
-   * The split exists because eight screens of scrolling is not a control
-   * surface mid-show. What it also did was hide ten of the sixteen sections
-   * behind a tab nobody had reason to press: the room camera, the projectors,
-   * the solver, the physics. Opened from Design — the mode whose entire job is
-   * building a look — the panel now starts on everything.
+   * It used to be a three-way filter — Perform, Setup, All — over one column
+   * that held every section at once. Both halves of that were wrong. The
+   * filter hid ten of the sixteen behind a tab nobody had reason to press, and
+   * "All" fixed that by making the column eight screens deep, which is not
+   * something you navigate, only something you scroll past. A settings screen
+   * is a list of places and one place at a time, and it has been for thirty
+   * years, because that is the shape that lets you find a thing twice.
    */
-  const [tab, setTab] = useState<SettingsTab>(defaultTab);
-  useEffect(() => { setTab(defaultTab); }, [defaultTab]);
+  const [section, setSection] = useState<string>(focusSection ?? FIRST_SECTION);
+  useEffect(() => { if (focusSection) setSection(focusSection); }, [focusSection]);
 
-  /** Typing here searches every section, whichever tab is showing. */
+  /** Typing here searches every section, whichever one is in the pane. */
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
 
   /**
    * Is this section on screen right now?
    *
-   * A search beats the tab: someone who typed "room" wants the room whether or
-   * not they are looking at the half it lives in. `terms` is what the section
-   * is *about* rather than only what it is called — "camera", "people" and
-   * "video" all have to find The Room, because the heading alone is the one
-   * word nobody searches for.
+   * A search beats the rail: someone who typed "room" wants the room whether
+   * or not they are standing in it. `terms` is what the section is *about*
+   * rather than only what it is called — "camera", "people" and "video" all
+   * have to find The Room, because the heading alone is the one word nobody
+   * searches for.
    */
-  const shown = (group: 'perform' | 'setup', title: string, terms = ''): boolean => {
-    if (q) return `${title} ${terms}`.toLowerCase().includes(q);
-    return tab === 'all' || tab === group;
+  const shown = (id: string): boolean => {
+    const sec = SECTION_BY_ID.get(id);
+    if (q) return !!sec && sectionMatches(sec, q);
+    return section === id;
   };
   /** So a search that finds nothing says so rather than showing an empty panel. */
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -200,21 +240,34 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     const pane = paneRef.current;
     if (!pane) return;
     setVisibleCount(pane.querySelectorAll('section[data-section]:not(.hidden)').length);
-  }, [q, tab]);
+  }, [q, section]);
 
-  // Opened at a section (from the command palette): show everything, then put
-  // that section under the eye. A tab that hid it would make the row a lie.
-  useEffect(() => {
-    if (!focusSection) return;
-    setTab('all');
-    setQuery('');
-    const id = requestAnimationFrame(() => {
-      paneRef.current
-        ?.querySelector(`[data-section="${focusSection}"]`)
-        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [focusSection]);
+  // A new place means the top of it, not wherever the last one was scrolled to.
+  useEffect(() => { paneRef.current?.scrollTo({ top: 0 }); }, [section, q]);
+
+  /**
+   * Which rail rows to draw: everything, or — while searching — only the
+   * sections that match, so the rail is a result list rather than a menu whose
+   * rows mostly do nothing.
+   */
+  /** Which factory map the plugged-in controller wants, if we recognise it. */
+  const detectedFactory = useMemo(() => {
+    if (!midi?.enabled) return null;
+    // Every open port, not just the chosen one: with "All devices" selected
+    // `activeInputName` reads "2 devices", which matches nothing.
+    for (const i of midi.inputs) {
+      const hit = factoryFor(i.name);
+      if (hit) return hit;
+    }
+    return null;
+  }, [midi?.enabled, midi?.inputs]);
+
+  const railGroups = useMemo(() => SETTINGS_CATEGORIES
+    .map(cat => ({
+      ...cat,
+      rows: SETTINGS_SECTIONS.filter(sec => sec.category === cat.id && (!q || sectionMatches(sec, q))),
+    }))
+    .filter(g => g.rows.length > 0), [q]);
 
   /*
     A sheet, not a drawer.
@@ -226,54 +279,69 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     serves every size the app runs at.
   */
   return (
-    <Sheet title="Settings" onClose={onClose} height={860} testId="settings-panel">
+    <Sheet title="Settings" onClose={onClose} width={1000} height={860} testId="settings-panel">
+      <PinContext.Provider value={pins ?? null}>
       {/*
-        Taller than the other two sheets.
+        A rail and a pane, and the sheet is wider than the other two to hold
+        them. Settings is the one sheet with ninety controls in it; the others
+        ask one question each and stay at the handoff's 720.
 
-        Settings is the one with eighty controls in it, and moving it from a
-        full-height drawer into a 640px sheet made its Perform tab four
-        screens deep where it had been under three — caught by the harness
-        the same day. The obvious fix was to use the width the sheet gained
-        and run the sections in two columns; measurement killed that outright.
-        In a vertically scrolling box, `columns: 2` lays the content out
-        *horizontally*: 4208px of scrollWidth in a 718px box with overflow-x
-        hidden, which is most of the panel simply gone. So it gets the height
-        back instead, and the other sheets stay at the handoff's 640.
+        On a phone the rail becomes a strip across the top: 1000px of sheet on
+        a 390px screen is the sheet's own `max-w-full`, and a 216px column
+        taken out of that leaves nothing to put a slider in.
       */}
-      <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
+      <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
 
-      {/*
-        Two tabs, because eight screens of scroll is not a control surface.
-        Perform holds what a hand reaches for between songs; Setup holds what
-        is decided once — the audio device, the room camera, the solver grid,
-        the physics that define a look rather than ride it.
-      */}
-      <div className="flex gap-1 mb-3 p-1 rounded-xl bg-white/5 border border-white/10" role="tablist">
-        {([['perform', 'Perform'], ['setup', 'Setup'], ['all', 'All']] as const).map(([id, label]) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => { setTab(id); setQuery(''); }}
-            className={`flex-1 rounded-lg py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
-              tab === id && !q ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
-            data-testid={`settings-tab-${id}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        {/* ── Where you are ─────────────────────────────────── */}
+        <nav
+          className="flex max-h-[38%] shrink-0 gap-1 overflow-x-auto overflow-y-auto border-b border-white/10 p-2 sm:max-h-none sm:w-[216px] sm:flex-col sm:border-b-0 sm:border-r"
+          aria-label="Settings sections"
+          data-testid="settings-rail"
+        >
+          {railGroups.length === 0 && (
+            <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
+          )}
+          {railGroups.map(group => (
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+              <div className="hidden px-2 pb-1 pt-3 text-[9px] uppercase tracking-[0.3em] text-white/25 sm:block">
+                {group.name}
+                <span className="ml-1.5 normal-case tracking-normal text-white/15">{group.hint}</span>
+              </div>
+              <div className="flex gap-1 sm:flex-col">
+                {group.rows.map(row => (
+                  <button
+                    key={row.id}
+                    onClick={() => { setSection(row.id); setQuery(''); }}
+                    aria-current={!q && section === row.id ? 'page' : undefined}
+                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors sm:whitespace-normal ${
+                      !q && section === row.id
+                        ? 'bg-white text-black'
+                        : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    }`}
+                    data-testid={`settings-nav-${row.id}`}
+                  >
+                    {row.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* ── What is in it ─────────────────────────────────── */}
+        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
 
       {/*
         A box to type into.
 
-        Sixteen sections and eighty controls is past what anyone browses, and
-        the tabs made that worse rather than better: ten sections lived behind
-        the one nobody pressed. A search is the answer to "where is the thing
-        that turns the camera on", and it searches what each section is *about*
-        rather than only what it is called — "video", "people" and "crowd" all
-        find The Room, none of which is in its heading.
+        Seventeen sections and ninety controls is past what anyone browses, and
+        a rail alone does not fix that: it tells you where things are once you
+        know what they are called. A search is the answer to "where is the
+        thing that turns the camera on", and it searches what each section is
+        *about* rather than only what it is called — "video", "people" and
+        "crowd" all find The Room, none of which is in its heading. While a
+        query is in the box the rail narrows to the hits and the pane shows all
+        of them at once, which is what a result list is.
       */}
       <div className="relative mb-6">
         <input
@@ -306,7 +374,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           and it carries saving and loading too; a second copy buried in a
           scrolling panel was one more place to keep in step. */}
       {/* Sound Section */}
-      <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('setup', 'Audio Input', 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration song') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
+      <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('audio-input') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Input
         </h3>
@@ -317,6 +385,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={3.0}
           step={0.1}
           onChange={(v: number) => onUpdate({ sensitivity: v })}
+          settingKey="sensitivity"
         />
         <Slider
           label="Bass Boost"
@@ -325,6 +394,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={3.0}
           step={0.1}
           onChange={(v: number) => onUpdate({ bassBoost: v })}
+          settingKey="bassBoost"
         />
         <Slider
           label="Global Speed"
@@ -333,6 +403,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.001}
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
+          settingKey="globalSpeed"
         />
 
         {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
@@ -362,6 +433,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1}
           step={0.01}
           onChange={(v: number) => onUpdate({ dimmer: v })}
+          settingKey="dimmer"
         />
         {onBlackout && (
           <button
@@ -393,6 +465,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ beatPrediction: v })}
+          settingKey="beatPrediction"
         />
         <Slider
           label="Beat Lead (ms)"
@@ -401,6 +474,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={250}
           step={5}
           onChange={(v: number) => onUpdate({ beatLead: v })}
+          settingKey="beatLead"
         />
         <Info>
           A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
@@ -525,10 +599,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Audio Mappings Section */}
-      <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('setup', 'Audio Mappings', 'sound bass mid treble energy timbre map drive reactive band') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
+      <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('audio-mappings') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Mappings
         </h3>
+
+        {/*
+          Sound Drive: how hard the music moves the plate at all.
+
+          It is the headline ride — the first fader on every factory map and
+          the one a hand is on through a chorus — and until now the only place
+          it existed was the narrow-screen toolbar, which a desktop never
+          draws. The panel that claims to hold every setting did not hold the
+          most important one.
+        */}
+        <Slider
+          label="Sound Drive"
+          value={settings.audioImpact}
+          min={0}
+          max={1}
+          step={0.01}
+          icon={Activity}
+          onChange={(v: number) => onUpdate({ audioImpact: v })}
+          settingKey="audioImpact"
+        />
         
         {['velocity', 'density', 'color', 'rotation'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
@@ -554,7 +648,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Light Show Look Section */}
-      <section id="settings-look" className={`mb-8 scroll-mt-4 ${shown('perform', 'Light Show Look', 'turbulence blobs glow relief bubbles rock saturation gloss blur look') ? '' : 'hidden'} ${focusSection === 'look' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="look">
+      <section id="settings-look" className={`mb-8 scroll-mt-4 ${shown('look') ? '' : 'hidden'} ${focusSection === 'look' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="look">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Palette size={12} /> Light Show Look
         </h3>
@@ -565,6 +659,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ turbulenceScale: v })}
+          settingKey="turbulenceScale"
         />
         <Slider
           label="Turbulence Detail"
@@ -573,6 +668,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={4}
           step={1}
           onChange={(v: number) => onUpdate({ turbulenceDetail: Math.round(v) })}
+          settingKey="turbulenceDetail"
         />
         <Slider
           label="Sharpness"
@@ -581,6 +677,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1}
           step={0.05}
           onChange={(v: number) => onUpdate({ sharpness: v })}
+          settingKey="sharpness"
         />
         <Slider
           label="Granulation"
@@ -589,6 +686,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1}
           step={0.05}
           onChange={(v: number) => onUpdate({ granulation: v })}
+          settingKey="granulation"
         />
         <Slider
           label="Grain Size"
@@ -598,6 +696,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={900}
           step={20}
           onChange={(v: number) => onUpdate({ grainScale: v })}
+          settingKey="grainScale"
         />
         <Slider
           label="Blob Surface Tension"
@@ -606,6 +705,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
+          settingKey="blobSurfaceTension"
         />
         <Slider
           label="Dye Budget"
@@ -614,6 +714,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.2}
           step={0.05}
           onChange={(v: number) => onUpdate({ dyeBudget: v })}
+          settingKey="dyeBudget"
         />
         <Slider
           label="Edge Relief"
@@ -622,6 +723,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ edgeRelief: v })}
+          settingKey="edgeRelief"
         />
         <Slider
           label="Lacing"
@@ -630,6 +732,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lacing: v })}
+          settingKey="lacing"
         />
         <Slider
           label="Bubbles"
@@ -638,6 +741,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ bubbles: v })}
+          settingKey="bubbles"
         />
         <Slider
           label="Plate Rock"
@@ -646,6 +750,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ plateRock: v })}
+          settingKey="plateRock"
         />
         <Slider
           label="Layer Scale Variety"
@@ -655,6 +760,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ layerScaleVariety: v })}
+          settingKey="layerScaleVariety"
         />
         <Slider
           label="Boundary Glow"
@@ -663,6 +769,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ boundaryContrast: v })}
+          settingKey="boundaryContrast"
         />
         <Slider
           label="Saturation"
@@ -671,6 +778,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={2.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ saturationBoost: v })}
+          settingKey="saturationBoost"
         />
         <Slider
           label="Glossiness"
@@ -679,6 +787,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ glossiness: v })}
+          settingKey="glossiness"
         />
         <Slider
           label="Post Blur"
@@ -687,11 +796,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.5}
           step={0.05}
           onChange={(v: number) => onUpdate({ postBlurRadius: v })}
+          settingKey="postBlurRadius"
         />
       </section>
 
       {/* Show Section */}
-      <section id="settings-show" className={`mb-8 scroll-mt-4 ${shown('perform', 'Show', 'hue journey beat squeeze background loop kaleidoscope dish vignette projectors beads cells') ? '' : 'hidden'} ${focusSection === 'show' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="show">
+      <section id="settings-show" className={`mb-8 scroll-mt-4 ${shown('show') ? '' : 'hidden'} ${focusSection === 'show' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="show">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Clapperboard size={12} /> Show
         </h3>
@@ -705,6 +815,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={10}
           step={0.5}
           onChange={(v: number) => onUpdate({ hueJourney: v })}
+          settingKey="hueJourney"
         />
         <Slider
           label="Beat Squeeze"
@@ -713,6 +824,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ beatSqueeze: v })}
+          settingKey="beatSqueeze"
         />
         <Slider
           label="Fingering"
@@ -721,6 +833,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ fingering: v })}
+          settingKey="fingering"
         />
         <Info>
           A press (the tool, the pad, a kick with Beat Squeeze) breaks into radial fingers instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
@@ -732,6 +845,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ beads: v })}
+          settingKey="beads"
         />
         <Slider
           label="Plate Cells"
@@ -740,6 +854,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ cells: v })}
+          settingKey="cells"
         />
         <Slider
           label="Background Loop"
@@ -749,6 +864,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
+          settingKey="backgroundLoop"
         />
         <div className="flex flex-col gap-2 mb-4">
           <div className="text-xs font-bold uppercase tracking-widest opacity-70">Kaleidoscope</div>
@@ -774,6 +890,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ dishVignette: v })}
+          settingKey="dishVignette"
         />
         <Slider
           label="Projectors"
@@ -782,6 +899,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ dishSpread: v })}
+          settingKey="dishSpread"
         />
         <Info>
           Each layer its own dish, spread apart on a black screen the way two or three projectors overlap: the lead plate large and right of centre, the second smaller at the left.
@@ -789,7 +907,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Camera Section */}
-      <section id="settings-camera" className={`mb-8 scroll-mt-4 ${shown('setup', 'Camera', 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field') ? '' : 'hidden'} ${focusSection === 'camera' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="camera">
+      <section id="settings-camera" className={`mb-8 scroll-mt-4 ${shown('camera') ? '' : 'hidden'} ${focusSection === 'camera' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="camera">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Aperture size={12} /> Camera
         </h3>
@@ -829,18 +947,34 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </div>
         )}
-        <Slider label="Camera" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })} />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })} />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })} />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })} />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })} />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })} />
-        <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })} />
-        <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })} />
+        <Slider label="Camera" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })}
+          settingKey="camera"
+        />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })}
+          settingKey="focus"
+        />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })}
+          settingKey="aperture"
+        />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })}
+          settingKey="bloom"
+        />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })}
+          settingKey="chromaticAberration"
+        />
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
+          settingKey="refraction"
+        />
+        <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })}
+          settingKey="microDroplets"
+        />
+        <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })}
+          settingKey="thinFilm"
+        />
       </section>
 
       {/* Lamp Section */}
-      <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('perform', 'Lamp', 'light play motion hotspot second lamp iridescence projector bulb') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
+      <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('lamp') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Lightbulb size={12} /> Lamp
         </h3>
@@ -854,6 +988,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lightPlay: v })}
+          settingKey="lightPlay"
         />
         <Slider
           label="Lamp Motion"
@@ -862,6 +997,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampMotion: v })}
+          settingKey="lampMotion"
         />
         <Slider
           label="Hot-Spot"
@@ -870,6 +1006,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampHotspot: v })}
+          settingKey="lampHotspot"
         />
         <Slider
           label="Second Lamp"
@@ -878,6 +1015,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ secondLamp: v })}
+          settingKey="secondLamp"
         />
         <Slider
           label="Iridescence"
@@ -886,11 +1024,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ iridescence: v })}
+          settingKey="iridescence"
         />
       </section>
 
       {/* The Room Section */}
-      <section id="settings-room" className={`mb-8 scroll-mt-4 ${shown('setup', 'The Room', 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror presence') ? '' : 'hidden'} ${focusSection === 'room' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="room">
+      <section id="settings-room" className={`mb-8 scroll-mt-4 ${shown('room') ? '' : 'hidden'} ${focusSection === 'room' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="room">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Video size={12} /> The Room
         </h3>
@@ -954,6 +1093,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sceneDrive: v })}
           disabled={!sceneOn && 'off'}
+          settingKey="sceneDrive"
         />
         <Slider
           label="Hands"
@@ -963,6 +1103,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sceneHands: v })}
           disabled={!sceneOn ? 'off' : settings.scenePeople === false && 'needs Hold people'}
+          settingKey="sceneHands"
         />
         <Slider
           label="Deadzone"
@@ -972,6 +1113,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sceneDeadzone: v })}
           disabled={!sceneOn && 'off'}
+          settingKey="sceneDeadzone"
         />
         <Slider
           label="Smoothing"
@@ -981,6 +1123,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sceneSmooth: v })}
           disabled={!sceneOn && 'off'}
+          settingKey="sceneSmooth"
         />
         <div className="flex items-center gap-2 mb-2">
           <button
@@ -1084,6 +1227,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sceneImpact: v })}
           disabled={!sceneOn ? 'off' : (settings.sceneMappings ?? []).length === 0 && 'no rows'}
+          settingKey="sceneImpact"
         />
         <Info>
           <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Mirror</span> for a camera facing the room, so a hand moved left moves the dye left.
@@ -1091,7 +1235,123 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Projectors Section */}
-      <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('setup', 'Projectors', 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
+      {/* ── Controller ───────────────────────────────────── */}
+      {/*
+        MIDI, back where it can be found.
+
+        The app has had factory maps for five controllers, a learn mode, soft
+        takeover, shift banks and LED feedback for a long time, and a picture
+        of your controller drawn to scale. On a desktop none of it was reachable
+        except through ⌘K, because the button that opened it lived in the
+        narrow-screen toolbar the desks replaced. The answer to "how do I set up
+        my APC40" was a keyboard shortcut you had to already know.
+
+        So: the three things that get a controller working — on, which port,
+        which map — are here, and the port's own name is used to offer the
+        right map as one button. Everything past that (learn, banks, bindings,
+        the picture) is still the panel, one click away.
+      */}
+      <section id="settings-midi" className={`mb-8 scroll-mt-4 ${shown('midi') ? '' : 'hidden'} ${focusSection === 'midi' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="midi">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Sliders size={12} /> Controller
+        </h3>
+        {!midi ? (
+          <p className="text-[11px] text-white/40">The controller is not available in this window.</p>
+        ) : !midi.supported ? (
+          <p className="text-[11px] leading-relaxed text-amber-200/80" data-testid="settings-midi-unsupported">
+            This browser has no Web MIDI. Chrome, Edge and Opera have it; Safari and Firefox do not.
+          </p>
+        ) : (
+          <>
+            <button
+              onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
+              className={`mb-3 w-full rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10 hover:bg-white/15'
+              }`}
+              data-testid="settings-midi-enable"
+            >
+              {midi.enabled ? 'MIDI is on' : 'Turn MIDI on'}
+            </button>
+            {midi.error && <p className="mb-3 text-[10px] text-red-300" data-testid="settings-midi-error">{midi.error}</p>}
+
+            {midi.enabled && (
+              <>
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-xs font-bold uppercase tracking-widest opacity-70">Controller</span>
+                  <select
+                    value={midi.ports.input}
+                    onChange={e => midi.choosePorts({ input: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+                    data-testid="settings-midi-input"
+                  >
+                    <option value="all">All devices</option>
+                    {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                  </select>
+                  {midi.inputs.length === 0 && (
+                    <p className="text-[10px] text-white/40" data-testid="settings-midi-none">
+                      Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
+                    </p>
+                  )}
+                </div>
+
+                {/*
+                  The one-click setup. `factoryFor` reads the port's own name,
+                  so an APC40 mkII offers the APC40 map and nothing else has to
+                  be known or guessed.
+                */}
+                {detectedFactory && (
+                  <button
+                    onClick={() => midi.loadFactory(detectedFactory.id)}
+                    className="mb-3 w-full rounded-lg border border-emerald-400/40 bg-emerald-500/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-emerald-100 transition-colors hover:bg-emerald-500/25"
+                    data-testid="settings-midi-setup"
+                  >
+                    Set up the {detectedFactory.name}
+                  </button>
+                )}
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-xs font-bold uppercase tracking-widest opacity-70">
+                    {detectedFactory ? 'Or another map' : 'Factory map'}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FACTORY_MAPS.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => midi.loadFactory(f.id as FactoryMapId)}
+                        className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70 transition-colors hover:bg-white/10"
+                        data-testid={`settings-midi-factory-${f.id}`}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mb-3 text-[10px] text-white/40" data-testid="settings-midi-state">
+                  {midi.map.bindings.length} bindings · {midi.activeInputName ?? 'no device'}
+                  {midi.clocked ? ' · clock arriving' : ''}
+                </p>
+              </>
+            )}
+
+            {onOpenMidi && (
+              <button
+                onClick={onOpenMidi}
+                className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors hover:bg-white/10"
+                title="Learn a control, shift banks, the bindings list, and your controller drawn to scale"
+                data-testid="settings-midi-open"
+              >
+                Learn controls, banks and bindings…
+              </button>
+            )}
+            <Info>
+              An APC40 mkII is the classic desk for this: nine faders ride the show, the 8×5 grid cues looks, and the
+              transport row fires the one-shots. Plug it in, turn MIDI on, take the setup button — then the panel above
+              to teach it anything else. Bank + on a button reaches the settings nine faders cannot.
+            </Info>
+          </>
+        )}
+      </section>
+
+      <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('projectors') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Projector size={12} /> Projectors
         </h3>
@@ -1128,6 +1388,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lumia: v })}
+          settingKey="lumia"
         />
         <Slider
           label="Chemistry"
@@ -1136,6 +1397,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ chemistry: v })}
+          settingKey="chemistry"
         />
         <Slider
           label="Gel Wheel"
@@ -1144,6 +1406,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ gelWheel: v })}
+          settingKey="gelWheel"
         />
         <Slider
           label="Gel Speed (rpm)"
@@ -1153,6 +1416,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={3}
           step={0.1}
           onChange={(v: number) => onUpdate({ gelSpeed: v })}
+          settingKey="gelSpeed"
         />
         <Slider
           label="Lamp Warmth"
@@ -1161,6 +1425,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
+          settingKey="lampWarmth"
         />
         <Slider
           label="Exposure"
@@ -1169,12 +1434,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ exposure: v })}
+          settingKey="exposure"
         />
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">Film Projector</span>
             <span className="text-[10px] font-mono opacity-50">
-              {filmSource === 'file' ? 'loop playing' : filmSource === 'camera' ? 'camera live' : 'off'}
+              {filmSource === 'file' ? 'loop playing'
+                : filmSource === 'camera' ? 'camera live'
+                : filmSource === 'window' ? 'window live'
+                : 'off'}
             </span>
           </div>
           <div className="flex gap-2">
@@ -1197,40 +1466,69 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onClick={() => onFilmCamera?.()}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
               title="Point a camera at a real dish of oil and composite it through the solver"
+              data-testid="film-camera"
             >
               <Camera size={13} /> Camera
+            </button>
+            {/*
+              Disabled rather than silently doing nothing where the browser
+              has no screen capture — which is every phone. A button that
+              looks pressable and answers with a console warning is the kind
+              of control that makes someone doubt the rest of the panel.
+            */}
+            <button
+              onClick={() => onFilmWindow?.()}
+              disabled={!canCaptureWindow}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              title={canCaptureWindow
+                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
+              data-testid="film-window"
+            >
+              <MonitorPlay size={13} /> Window
             </button>
             <button
               onClick={() => onFilmClear?.()}
               disabled={filmSource === 'none'}
               className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:opacity-30"
+              data-testid="film-off"
             >
               Off
             </button>
           </div>
+          <Info>
+            <span className="text-white/60">Window</span> is the way to a film you did not download.
+            Open one in another tab — the Internet Archive's Prelinger collection is thousands of
+            public-domain reels of exactly this era — press Window, and pick that tab. It reaches what a
+            link cannot: a video from another site plays in a page but cannot be read back into the
+            plate, and almost nothing on the web sends the header that would allow it. A window has no
+            origin, only pixels. Mute the tab and let the room's own sound drive the plate.
+          </Info>
         </div>
         <Slider
           label="Film Mix"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
           value={settings.filmMix ?? 0.7}
           min={0}
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ filmMix: v })}
+          settingKey="filmMix"
         />
         <Slider
           label="Film Key"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a film loop or the camera'}
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
           value={settings.filmKey ?? 0.18}
           min={0}
           max={0.9}
           step={0.02}
           onChange={(v: number) => onUpdate({ filmKey: v })}
+          settingKey="filmKey"
         />
       </section>
 
       {/* Simulation Section */}
-      <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('setup', 'Simulation', 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
+      <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('simulation') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation
         </h3>
@@ -1269,7 +1567,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Macro Closeup Section */}
-      <section id="settings-macro" className={`mb-8 scroll-mt-4 ${shown('perform', 'Macro Closeup', 'zoom bead chase magnify closeup detail cells lacing depth relief') ? '' : 'hidden'} ${focusSection === 'macro' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="macro">
+      <section id="settings-macro" className={`mb-8 scroll-mt-4 ${shown('macro') ? '' : 'hidden'} ${focusSection === 'macro' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="macro">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -1292,7 +1590,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={16}
               step={0.5}
               onChange={(v: number) => onUpdate({ macroZoom: v })}
-            />
+          settingKey="macroZoom"
+        />
             <Slider
               label="Chase Speed"
               value={settings.macroChase}
@@ -1300,7 +1599,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroChase: v })}
-            />
+          settingKey="macroChase"
+        />
             <Slider
               label="Shot Length"
               value={settings.macroHold}
@@ -1308,7 +1608,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={15}
               step={0.5}
               onChange={(v: number) => onUpdate({ macroHold: v })}
-            />
+          settingKey="macroHold"
+        />
             <Slider
               label="Music Sync"
               value={settings.macroSync ?? 0.6}
@@ -1316,7 +1617,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroSync: v })}
-            />
+          settingKey="macroSync"
+        />
             <Slider
               label="Paint Cells"
               value={settings.macroCells}
@@ -1324,7 +1626,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCells: v })}
-            />
+          settingKey="macroCells"
+        />
             <Slider
               label="Cell Size"
               value={settings.macroCellScale}
@@ -1332,7 +1635,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1.5}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCellScale: v })}
-            />
+          settingKey="macroCellScale"
+        />
             <Slider
               label="Lacing"
               value={settings.macroLacing}
@@ -1340,7 +1644,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroLacing: v })}
-            />
+          settingKey="macroLacing"
+        />
             <Slider
               label="Depth / Focus"
               value={settings.macroDepth}
@@ -1348,7 +1653,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroDepth: v })}
-            />
+          settingKey="macroDepth"
+        />
             <Slider
               label="Edge Detail"
               value={settings.macroEdgeDetail}
@@ -1356,7 +1662,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
-            />
+          settingKey="macroEdgeDetail"
+        />
             <Slider
               label="Relief / 3D"
               value={settings.macroRelief}
@@ -1364,13 +1671,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={1}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroRelief: v })}
-            />
+          settingKey="macroRelief"
+        />
           </>
         )}
       </section>
 
       {/* Squish Plate Section */}
-      <section id="settings-squish" className={`mb-8 scroll-mt-4 ${shown('setup', 'Squish Plate', 'plate pressure squeeze film hele-shaw gap thickness') ? '' : 'hidden'} ${focusSection === 'squish' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="squish">
+      <section id="settings-squish" className={`mb-8 scroll-mt-4 ${shown('squish') ? '' : 'hidden'} ${focusSection === 'squish' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="squish">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sliders size={12} /> Squish Plate
         </h3>
@@ -1381,6 +1689,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ platePressure: v })}
+          settingKey="platePressure"
         />
         <Slider
           label="Glass Smear"
@@ -1389,6 +1698,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ glassSmear: v })}
+          settingKey="glassSmear"
         />
         <Slider
           label="Rain Drip"
@@ -1397,6 +1707,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ rainDrip: v })}
+          settingKey="rainDrip"
         />
         <div className="flex flex-col gap-2 mb-4">
           <span className="text-xs font-bold uppercase tracking-widest opacity-70">Viscosity</span>
@@ -1421,11 +1732,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ polarity: v })}
+          settingKey="polarity"
         />
       </section>
 
       {/* Heat Slide Section */}
-      <section id="settings-heat" className={`mb-8 scroll-mt-4 ${shown('setup', 'Heat Slide', 'temperature buoyancy convection lamp warmth slide') ? '' : 'hidden'} ${focusSection === 'heat' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="heat">
+      <section id="settings-heat" className={`mb-8 scroll-mt-4 ${shown('heat') ? '' : 'hidden'} ${focusSection === 'heat' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="heat">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Thermometer size={12} /> Heat Slide
         </h3>
@@ -1436,6 +1748,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ heatIntensity: v })}
+          settingKey="heatIntensity"
         />
         <Slider
           label="Boiling Point"
@@ -1444,6 +1757,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ boilingPoint: v })}
+          settingKey="boilingPoint"
         />
         <Slider
           label="Evaporation Rate"
@@ -1452,6 +1766,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ evaporationRate: v })}
+          settingKey="evaporationRate"
         />
         <Slider
           label="Heat Decay"
@@ -1460,11 +1775,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.01}
           onChange={(v: number) => onUpdate({ heatDecay: v })}
+          settingKey="heatDecay"
         />
       </section>
 
       {/* Manual Interaction Section */}
-      <section id="settings-interaction" className={`mb-8 scroll-mt-4 ${shown('setup', 'Manual Interaction', 'brush dropper blow press tools mouse touch radius strength') ? '' : 'hidden'} ${focusSection === 'interaction' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="interaction">
+      <section id="settings-interaction" className={`mb-8 scroll-mt-4 ${shown('interaction') ? '' : 'hidden'} ${focusSection === 'interaction' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="interaction">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -1475,6 +1791,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ airVelocity: v })}
+          settingKey="airVelocity"
         />
         <Slider
           label="Vibration Freq"
@@ -1483,11 +1800,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ vibrationFrequency: v })}
+          settingKey="vibrationFrequency"
         />
       </section>
 
       {/* Fluid Physics Section */}
-      <section id="settings-physics" className={`mb-8 scroll-mt-4 ${shown('setup', 'Fluid Physics', 'viscosity diffusion vorticity immiscibility fingering surface tension advection') ? '' : 'hidden'} ${focusSection === 'physics' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="physics">
+      <section id="settings-physics" className={`mb-8 scroll-mt-4 ${shown('physics') ? '' : 'hidden'} ${focusSection === 'physics' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="physics">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
@@ -1498,6 +1816,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={0.001}
           step={0.00001}
           onChange={(v: number) => onUpdate({ diffusionRate: v })}
+          settingKey="diffusionRate"
         />
         <Slider
           label="Buoyancy"
@@ -1506,6 +1825,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={2.0}
           step={0.1}
           onChange={(v: number) => onUpdate({ buoyancy: v })}
+          settingKey="buoyancy"
         />
         <Slider
           label="Advection"
@@ -1514,6 +1834,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={2.0}
           step={0.1}
           onChange={(v: number) => onUpdate({ advection: v })}
+          settingKey="advection"
         />
         <Slider
           label="Damping (Friction)"
@@ -1522,11 +1843,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.01}
           onChange={(v: number) => onUpdate({ damping: v })}
+          settingKey="damping"
         />
       </section>
 
       {/* Automation Section */}
-      <section id="settings-automation" className={`mb-8 scroll-mt-4 ${shown('perform', 'Automation', 'evolve random drops air bursts rate dye budget') ? '' : 'hidden'} ${focusSection === 'automation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="automation">
+      <section id="settings-automation" className={`mb-8 scroll-mt-4 ${shown('automation') ? '' : 'hidden'} ${focusSection === 'automation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="automation">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sparkles size={12} /> Automation
         </h3>
@@ -1537,11 +1859,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ automateRate: v })}
+          settingKey="automateRate"
         />
       </section>
 
       {/* Mixer Section */}
-      <section id="settings-layers" className={`mb-8 scroll-mt-4 ${shown('perform', 'Multi-Layer Mixer', 'layer blend mode screen multiply overlay exclusion count mixer led platform') ? '' : 'hidden'} ${focusSection === 'layers' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="layers">
+      <section id="settings-layers" className={`mb-8 scroll-mt-4 ${shown('layers') ? '' : 'hidden'} ${focusSection === 'layers' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="layers">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Layers size={12} /> Multi-Layer Mixer
         </h3>
@@ -1552,6 +1875,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={2}
           step={1}
           onChange={(v: number) => onUpdate({ layerCount: Math.round(v) })}
+          settingKey="layerCount"
         />
         <Slider
           label="Rotation Speed"
@@ -1560,6 +1884,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ rotationSpeed: v })}
+          settingKey="rotationSpeed"
         />
         <div className="flex items-center justify-between mb-4 mt-4">
           <span className="text-xs font-bold uppercase tracking-widest opacity-70">LED Platform</span>
@@ -1606,7 +1931,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               max={2.0}
               step={0.05}
               onChange={(v: number) => onUpdate({ ledSpeed: v })}
-            />
+          settingKey="ledSpeed"
+        />
           </div>
         )}
         <Slider
@@ -1616,6 +1942,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ centerGravity: v })}
+          settingKey="centerGravity"
         />
         <Slider
           label="Gooey Blending"
@@ -1624,6 +1951,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           max={1.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ gooeyEffect: v })}
+          settingKey="gooeyEffect"
         />
         <div className="flex flex-col gap-2">
           <span className="text-xs font-bold uppercase tracking-widest opacity-70">Blend Mode</span>
@@ -1646,7 +1974,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           "The Squish Plate effect was the hallmark of American light shows... simulating pressing two glass clock faces together."
         </p>
       </div>
+        </div>
       </div>
+      </PinContext.Provider>
     </Sheet>
   );
 };

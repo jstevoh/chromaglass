@@ -122,6 +122,8 @@ Playing the visuals for a band is a different job from running them in a living 
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
 - **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
+- **A film that is not on your laptop.** The film projector's third source is **Window**: press it, pick a tab, and whatever is playing there goes through the dye. It reaches what a link cannot — a video from another site will play in a page but taints the texture the moment WebGL reads it back, and almost nothing on the web sends the header that would allow it (the Internet Archive does not: no CORS on `/download/`, none on its data nodes, and no preflight). A captured window has no origin, only pixels. The Archive's Prelinger collection is thousands of public-domain reels from exactly this era; open one in a tab, mute it, and let the room's own sound drive the plate.
+
 - **The wall, squared and masked.** Settings → Projectors → **The Wall** is load-in: **Rear** mirrors the picture for projection through a screen or a gauze from behind (which is how most of these shows were rigged, and the surest way to keep the light off the band's faces), the four **corners** pull a projector that could not be hung on axis back into a rectangle, and the **masks** are tape on the light — pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, with **Mask Edge** deciding whether that stop is a hard line or a fade. **Output Gain** and **Gamma** are for the room, so **Dimmer** stays free for riding the song. None of it is saved into a preset and no fader can reach it: it describes the venue, not the look, and nothing here should move during a song.
 - **Nothing dims, sleeps or screensaves.** The show window holds a screen wake lock while the plate is running, and the projector window always. (It needs a secure context, so it works from the hosted site and from `localhost` — where the show is run — and the panel says plainly when an address cannot have it.)
 - **A lost GPU comes back by itself.** Plugging a projector into a running laptop, a Mac switching between its integrated and discrete GPU, a driver resetting under load: the browser takes the WebGL context away and everything in it. The app catches that, keeps the plate (the dye lives in the CPU arrays too), rebuilds against the new context and carries on — rather than going black until someone reloads and loses the cue list and the sequencer's place with it.
@@ -158,7 +160,9 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 
 ## MIDI and game controllers
 
-The **MIDI** button in the toolbar (Chrome, Edge or Opera — Safari and Firefox have no Web MIDI) turns a controller on the desk into the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer.
+A controller on the desk becomes the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer. Chrome, Edge or Opera — Safari and Firefox have no Web MIDI.
+
+**Setting one up.** Plug it in by USB, then either click the **MIDI** dot in the top-right of Perform or Design, or open **Settings → Inputs → Controller**. Turn MIDI on, and if the port is one of the five below the section offers its map as a single button — *Set up the APC40 mkII* — so a new controller is two clicks from playing the show. Everything past that (learn, shift banks, the bindings list, the controller drawn to scale) is in the MIDI panel behind **Learn controls, banks and bindings…**.
 
 - **Factory maps** for the Akai APC mini mk2 (pads top-down are presets, the bottom two rows dyes, scene buttons run the sequencer and one-shots, faders ride Sound Drive / Evolve Speed / Speed / Dye Budget / Turbulence / Plate Rock / Bubbles / Saturation / Camera), the Akai APC40 mkII (clip grid presets with the bottom row of pads the dye palette, master fader the dimmer, device knobs the lamp and camera, track knobs the plate, crossfader Sharpness and the cue encoder Granulation, arrows step presets, transport play / blackout / record, and Drain and Clear alone under the scene column, away from Seed), the Novation Launchpad Mini mk3 and Launchpad X in programmer mode (pads presets and dyes, top row one-shots and sequencer, side column toggles), the Novation Launch Control XL (faders, three rows of knobs, two rows of buttons) and the Korg nanoKONTROL2 (faders and knobs, S buttons one-shots, M buttons toggles, transport keys the sequencer). Anything else is a few minutes of learn away.
 - **The controller, drawn.** The **APC40 mkII picture** button in the MIDI panel opens the whole panel to scale: forty clip pads, the five button rows under the grid, nine faders, sixteen knobs, the crossfader and the transport, every one carrying the MIDI address it really sends (taken from Akai's Communications Protocol v1.2). Touch a control on the desk and the picture selects it; pick what it should do from the list beside it and it is bound. Every control shows what it does, coloured by what kind of thing that is, with dyes in their own colour. Labels are measured against the type they are drawn in, so they shrink and wrap to fit rather than being cut short, and a colour that would disappear into the panel is lifted or dropped until it reads. **On paper** turns the whole sheet — picture and list — to black on white, and **Save PNG** writes it out at twice size, so the same picture that made the map is the cheat sheet on the phone or taped to the desk. It works before the hardware arrives, and Escape closes it.
@@ -317,7 +321,7 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Game controller | Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons are the one-shots |
 | The Room | Settings → The Room: a camera on the floor stirs the plate, people become hands carrying their own dye, and any feature of the room can ride any control |
 | Band | A synthesised band played silently into the show — no microphone, no permission |
-| Projectors | Settings → Projectors: **The Wall** (rear-projection flip, corner pin, edge masks, output grade, flash limit), then lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file or the camera |
+| Projectors | Settings → Projectors: **The Wall** (rear-projection flip, corner pin, edge masks, output grade, flash limit), then lumia, chemistry, gel wheel, lamp warmth, exposure, and a film projector fed by a video file, the camera, or another window |
 | Tempo | Settings → Sound: MIDI clock from the desk, four taps, or a typed bpm, instead of working it out from the microphone |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp | Settings → Lamp: light play, lamp motion, hot-spot, second lamp, iridescence |
@@ -330,10 +334,12 @@ still keeps up with wall-clock time, and `?debug` exposes
 | Sequence files | In the Show Sequencer, **Save file** writes the selected sequence to a `.chromaglass-sequence.json` file (with any of your presets it uses); **Load file** reads one in |
 | Cast | A menu: **Second display** (a projector on HDMI) opens a window on the second screen that mirrors this very canvas pixel for pixel — one render, at the projector's own resolution, every stroke on the laptop on the wall the same frame, the laptop keeping all the controls and a scaled copy (click the window once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
+| All settings… | On both desks, under the rides and under the recipe: the whole panel, on a rail of named sections rather than one long scroll |
+| MIDI dot | The status dot in the header opens the controller panel — lit when one is connected |
 
 ## Judging it by numbers
 
-Eight harnesses, so a change to any of this is judged the same way every time
+Ten harnesses, so a change to any of this is judged the same way every time
 rather than by watching a plate and forming an impression. Every push to main
 runs them before anything reaches the live site (`.github/workflows/checks.yml`).
 
@@ -341,11 +347,14 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 |---|---|
 | `npm run detail` | How much structure a frame carries, and at what scale — the plate against filmed liquid |
 | `npm run liquids` | Soap, milk, silicone and glycerine, each measured on the thing it is for — and first that an empty plate is left completely alone |
+| `npm run desk` | That changing the look never cuts the plate to black in front of a room: a real fade through the real blend, watched for a sag below both ends |
+| `npm run panel` | That every control the settings panel draws can be put on a desk, that every row on its rail has a section behind it, and that the words people search for reach the section that answers them |
 | `npm run plate` | What is on every preset's plate: that its dyes, injection styles and liquids all name things that exist, and an audit of which presets use which liquid |
 | `npm run scene` | The room sensor: painted rooms through the real analysis, plus a closed feedback loop and a person who walks in and stops |
 | `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |
 | `npm run wall` | The projector: which pixels the flip, the corner pin and the masks leave black, and how many times a second the whole screen is allowed to change |
 | `npm run qa` | The app itself — it builds, serves, and walks a browser through a show night, watching the console |
+| | Both browser harnesses render the plate at a fraction of the window (`?dpr=`), because with no GPU the browser spends three of four cores shading fragments and every step queues behind it. Everything they assert is resolution-independent. `QA_DPR=1` / `WALL_DPR=1` run them at full size |
 | `npm run shots` | Pictures of the plate, for the README. Run it on a machine with a real GPU: it says which engine drew them |
 
 `qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes

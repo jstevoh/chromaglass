@@ -20,12 +20,14 @@ export interface DeskDots {
   rec: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMidi, onSearch, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
   dots: DeskDots;
   midiName: string | null;
+  /** The controller panel. The dot is the only thing on either desk that names MIDI. */
+  onMidi?: () => void;
   onSearch: () => void;
   /** Design's Save and Send to wall; Perform has nothing here. */
   trailing?: ReactNode;
@@ -70,7 +72,13 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSearch,
       <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
         <StatusDot on={dots.mic} label="Mic" testId="dot-mic" />
         <StatusDot on={dots.wall} label="Wall" testId="dot-wall" />
-        <StatusDot on={dots.midi} label={midiName ?? 'MIDI'} testId="dot-midi" />
+        <StatusDot
+          on={dots.midi}
+          label={midiName ?? 'MIDI'}
+          onClick={onMidi}
+          title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
+          testId="dot-midi"
+        />
         <StatusDot on={dots.phone} label="Phone" testId="dot-phone" />
         {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} testId="dot-rec" />}
         <button

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid } from 'lucide-react';
-import { ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel, type MidiAction, type MidiTarget } from '../lib/midi';
+import { ACTION_LABELS, FACTORY_MAPS, factoryFor, LEARNABLE_SETTINGS, sourceLabel, targetLabel, type MidiAction, type MidiTarget } from '../lib/midi';
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { ControllerSurface } from './ControllerSurface';
@@ -32,6 +32,8 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const presetName = (id: string) => presets.find(p => p.id === id)?.name;
+  /** Which map the plugged-in hardware wants, so its chip can say so. */
+  const detected = midi.inputs.map(i => factoryFor(i.name)).find(Boolean) ?? null;
 
   const learnButton = (target: MidiTarget, label: string, key: string) => {
     const isLearning = midi.learning && JSON.stringify(midi.learning.target) === JSON.stringify(target);
@@ -108,11 +110,19 @@ export function MidiPanel({ midi, presets, onClose }: MidiPanelProps) {
       <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
         <input value={midi.map.name} onChange={e => midi.rename(e.target.value)} className={`${inputCls} mb-2`} placeholder="Map name" data-testid="midi-map-name" />
         <div className="flex flex-wrap gap-1.5 mb-2">
-          <button onClick={() => midi.loadFactory('apc-mini-mk2')} className={chip(false)} data-testid="midi-factory-apc">APC mini mk2</button>
-          <button onClick={() => midi.loadFactory('nanokontrol2')} className={chip(false)} data-testid="midi-factory-nano">nanoKONTROL2</button>
-          <button onClick={() => midi.loadFactory('apc40-mk2')} className={chip(false)} data-testid="midi-factory-apc40">APC40 mkII</button>
-          <button onClick={() => midi.loadFactory('launchpad')} className={chip(false)} data-testid="midi-factory-launchpad">Launchpad</button>
-          <button onClick={() => midi.loadFactory('launch-control-xl')} className={chip(false)} data-testid="midi-factory-lcxl">Launch Control XL</button>
+          {/* One list, in `midi.ts`, so the settings panel's chips and these
+              cannot come to hold different sets of controllers. */}
+          {FACTORY_MAPS.map(f => (
+            <button
+              key={f.id}
+              onClick={() => midi.loadFactory(f.id)}
+              className={chip(detected?.id === f.id)}
+              title={detected?.id === f.id ? `${f.name} is what is plugged in` : undefined}
+              data-testid={`midi-factory-${f.id}`}
+            >
+              {f.name}
+            </button>
+          ))}
           <button onClick={midi.clearMap} className={chip(false)} title="Remove every binding"><Trash2 size={11} className="inline -mt-0.5" /> Clear</button>
         </div>
         <div className="flex gap-1.5">

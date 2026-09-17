@@ -7,6 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a film that is not on your laptop
+
+The film projector could be fed by a video file or by the camera, and both need
+the footage to already be on the machine. The third source is **Window**: press
+it, pick a tab or a screen from the browser's own chooser, and whatever is
+playing there goes through the dye.
+
+This is the only way that can work, which is worth writing down because the
+obvious alternative looks easy and is not. A cross-origin video will play in a
+page, but the moment WebGL reads it back into a texture the texture is tainted
+and the call throws; setting `crossOrigin` does not help, it only makes the load
+fail earlier. It needs a CORS header on the media response, and the Internet
+Archive does not send one — checked: none on `/download/`, none on the data node
+it redirects to, and `OPTIONS` there answers 405, so there is no preflight
+either. Their search and metadata APIs *are* open (`access-control-allow-origin:
+*`, no key), so finding a film from inside the app is easy; it is only the
+pixels that cannot be fetched. A captured window has no origin, so it sidesteps
+all of it — and reaches a media player, a slide deck or another copy of this app
+at the same time.
+
+The Archive's Prelinger collection is thousands of public-domain reels from
+exactly the era these shows come from, which is the pairing this was built for.
+
+Nothing is requested until the button is pressed, the browser's picker decides
+what is shared, and a capture stopped from the browser's side puts the panel
+back to "off" rather than leaving it claiming a window that has gone.
+
+### Changed — the gate no longer costs most of an hour
+
+A deploy waited forty-six minutes to publish a build that takes fifty seconds,
+and nobody had measured which part of that was expensive. From the run that
+published the previous commit: the seven pure-logic harnesses 0.5 min, the wall
+9.8 min, the show night 34.3 min, the publish itself 0.8 min.
+
+- **The wall and the show night are parallel jobs.** They were two steps of
+  one, so the gate cost both added together and the ten minutes were pure
+  latency on top of the thirty-four. They share nothing but the build.
+- **Superseded pull request runs are cancelled.** A second push left three
+  runners grinding on a commit nobody was waiting for, one of them for most of
+  an hour. Deploys are exempt — `deploy.yml` holds its own concurrency group on
+  the live channel.
+- **Every check in `qa` prints when it was reached and what it cost**, with a
+  slowest-checks table at the end. Which check is expensive is not something
+  that can be read off the source: half of them wait on a renderer running at a
+  few frames a second. The first profile found single clicks costing 133 and 54
+  seconds — and the fixed waits, the obvious suspect, accounting for 69 seconds
+  across all seventy-three of them.
+- **`?dpr=`, and what it was for.** `ps` during a run: the browser's GPU process
+  at 309% CPU shading fragments through SwiftShader, the process running React
+  and the fluid solver at 9%. Three of four cores, and every step of the harness
+  queueing behind them. So the lever is the pixel count, and fragment cost falls
+  with its square — measured, for one round trip to the page at 1440×900:
+
+  | `?dpr=` | canvas | one `page.evaluate` |
+  |---|---|---|
+  | 1 | 1440×900 | 2831 ms |
+  | 0.5 | 720×450 | 789 ms |
+  | 0.35 | 504×315 | 446 ms |
+  | 0.25 | 360×225 | 293 ms |
+  | 0.2 | 288×180 | 228 ms |
+
+  It flattens below 0.35 as the cost that is not the canvas takes over. The show
+  night runs at 0.35 and the wall at 0.5 — the wall more conservatively, since
+  it is the harness that makes precise claims about geometry, and even there
+  each of its 32×18 grid cells is still a mean over sixteen by twenty source
+  pixels. Nothing either of them asserts depends on resolution: layout and
+  geometry are CSS, and both reduce the canvas to a coarse grid addressed in
+  fractions of the picture. `QA_DPR=1` and `WALL_DPR=1` run them at full size.
+  The override is query-string only, so no preset, fader or saved look can reach
+  it, and a plain visit renders at full resolution.
+
+### Changed — a settings screen you can find something in twice
+
+The panel held sixteen sections and eighty-six controls in one scrolling column
+with a three-way filter on top, and neither half of that worked. The filter hid
+ten sections behind a tab nobody had reason to press; setting it to *All* — which
+is what both desks did — made the column eight screens deep. Either way the
+answer to "where is the thing that turns the video on and tracks people" was to
+scroll and hope.
+
+- **A rail and one section at a time.** Seventeen named places in four groups —
+  Inputs, Look, Plate, Stage — and a click puts you in one of them. The search
+  box still spans everything and searches what a section is *about* rather than
+  what it is called, and while a query is in it the rail narrows to the hits, so
+  it reads as a result list rather than a menu whose rows mostly lead nowhere.
+  `npm run qa` clicks every row on the rail and checks it lands where it says,
+  with nothing else in the pane and no section more than three screens deep
+- **Any control can go on a desk.** Every slider in the panel carries two chips,
+  **P** and **D**: put me on the Perform desk, put me on the Design bench. Both
+  strips now draw from one registry (`src/lib/deskPins.ts`) covering all
+  eighty-seven controls rather than the forty MIDI knows, and Design's recipe —
+  which was a hard-coded eight, so the one screen whose job is building a look
+  could only build it out of eight of the ninety things a look is made of — has
+  the same Choose picker the rides have had. Both lists persist per machine.
+  `npm run panel` is new: it reads the panel's own source and fails if a slider
+  appears there with no entry in the registry, because two lists that must agree
+  and cannot be derived from each other is the shape that drifts in silence.
+  `npm run desk`, which has existed since the desk was built and had never run
+  in CI, is now in the gate alongside it
+- **Sound Drive is in Settings.** The headline ride — the first fader on every
+  factory map — existed only in the narrow-screen toolbar, which a desktop never
+  draws. The panel that claims to hold every setting did not hold the most
+  important one
+
+### Added — the controller, back where it can be found
+
+Factory maps for five controllers, MIDI learn, soft takeover, shift banks, LED
+feedback and a picture of the hardware drawn to scale had all been in the app for
+a long time. On a desktop none of it was reachable except through ⌘K, because the
+button that opened it lived in the narrow-screen toolbar the desks replaced.
+
+- **Settings → Inputs → Controller**: turn MIDI on, pick the port, and — if the
+  port's own name is one we recognise — take its factory map as a single button,
+  *Set up the APC40 mkII*. Everything past that is still the MIDI panel, one
+  click away
+- **The MIDI status dot opens it.** It was already in the header of both desks,
+  reporting all evening that no controller was connected, with no way from there
+  to the screen that would connect one
+- **One list of controllers.** The settings section and the MIDI panel draw their
+  factory-map buttons from the same list in `src/lib/midi.ts`, which also carries
+  the patterns that recognise the hardware, so they cannot come to disagree about
+  which devices are supported
+
 ### Added — the wall, and the things that stop a show going dark on it
 
 Six findings from reading the app against the history and craft of liquid light

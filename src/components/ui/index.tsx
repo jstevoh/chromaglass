@@ -117,17 +117,41 @@ export function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?
 
 // ── Status dot ───────────────────────────────────────────────────────
 
-export function StatusDot({ on, label, tone = 'ok', testId }: {
+export function StatusDot({ on, label, tone = 'ok', testId, onClick, title }: {
   on: boolean; label: string; tone?: 'ok' | 'live'; testId?: string;
+  /**
+   * What clicking it opens. A dot that reports a thing you cannot reach is
+   * half a control: the MIDI dot said "no controller" all evening with no way
+   * from there to the screen that would connect one.
+   */
+  onClick?: () => void;
+  title?: string;
 }) {
-  return (
-    <span className="inline-flex items-center gap-1.5" data-testid={testId} title={`${label}: ${on ? 'yes' : 'no'}`}>
+  const body = (
+    <>
       <span
         className="h-1.5 w-1.5 rounded-full"
         style={{ background: on ? (tone === 'live' ? 'var(--color-live)' : 'var(--color-ok)') : 'var(--color-knob-off)' }}
       />
       <span className={`text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
-    </span>
+    </>
+  );
+  const tip = title ?? `${label}: ${on ? 'yes' : 'no'}`;
+  if (!onClick) {
+    return (
+      <span className="inline-flex items-center gap-1.5" data-testid={testId} title={tip}>{body}</span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      title={tip}
+      className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 transition-colors hover:bg-hover"
+    >
+      {body}
+    </button>
   );
 }
 
