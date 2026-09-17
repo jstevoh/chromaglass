@@ -1888,6 +1888,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
   const lastDrainTrigger = useRef(drainTrigger);
+  /*
+    Drain and Clear, where the render loop can see them.
+
+    These are counters: the loop compares the prop against the last value it
+    acted on and runs the animation when it has gone up. But the loop lives
+    inside one very large effect whose dependencies are `[noise2D, seedCount,
+    glEpoch]`, so a press that raised `drainTrigger` did not re-run it and the
+    loop went on reading the value captured when the GL context was built.
+    Drain did nothing — until the next Seed or a resolution change happened to
+    rebuild the effect, at which point the loop woke up holding a counter that
+    had gone up while it was not looking and drained the plate *then*, one
+    press late and long after anyone had connected the two.
+
+    Seed works only by accident of being in that dependency list, which is
+    also why every seed rebuilds the whole GL context. Refs are how every
+    other live prop reaches this loop (`isActiveRef`, `settingsRef`), and they
+    are what these should have used.
+  */
+  const drainTriggerRef = useRef(drainTrigger);
+  const clearTriggerRef = useRef(clearTrigger);
+  useEffect(() => { drainTriggerRef.current = drainTrigger; }, [drainTrigger]);
+  useEffect(() => { clearTriggerRef.current = clearTrigger; }, [clearTrigger]);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   const harmonyRef = useRef(pickHarmony());
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
@@ -4201,8 +4223,8 @@ void main() {
         simAccumRef.current -= simSteps * SIM_STEP;
 
         // ── Drain animation ────────────────────────────────────
-        if (drainTrigger > lastDrainTrigger.current) {
-          lastDrainTrigger.current = drainTrigger;
+        if (drainTriggerRef.current > lastDrainTrigger.current) {
+          lastDrainTrigger.current = drainTriggerRef.current;
           drainFrameRef.current = 1;
           macroCamRef.current.reset();
           bubblesRef.current.clear();
@@ -4273,8 +4295,8 @@ void main() {
         }
 
         // ── Clear trigger ──────────────────────────────────────
-        if (clearTrigger > lastClearTrigger.current) {
-          lastClearTrigger.current = clearTrigger;
+        if (clearTriggerRef.current > lastClearTrigger.current) {
+          lastClearTrigger.current = clearTriggerRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
           if (af) af.clearAll();
           if (activeLayerRef.current === 0) bubblesRef.current.clear();

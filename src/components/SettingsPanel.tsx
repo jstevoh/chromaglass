@@ -9,7 +9,7 @@ import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
 import { OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
-import { Sheet } from './ui';
+import { Segmented, Sheet } from './ui';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
@@ -94,6 +94,19 @@ interface SettingsPanelProps {
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
+  /*
+    What is listening, and on which device.
+
+    The source buttons lived only in the old left-hand strip, so the section
+    called Sound under a category called Inputs could change the microphone's
+    *device* but not whether the microphone was the input at all. The Mic dot
+    on the desk now opens this section, and a dot that reports the input has
+    to land somewhere that can change it.
+  */
+  audioSource?: 'none' | 'microphone' | 'system' | 'file' | 'simulated';
+  onAudioSource?: (s: 'none' | 'microphone' | 'system' | 'simulated') => void;
+  /** The file picker, which cannot be opened from a value change. */
+  onAudioFile?: () => void;
   audioInputs?: { id: string; label: string }[];
   audioInputId?: string;
   onAudioInput?: (id: string) => void;
@@ -216,7 +229,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
@@ -434,6 +447,29 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
           settingKey="globalSpeed"
         />
+
+        {/* What is listening at all */}
+        {onAudioSource && (
+          <div className="flex flex-col gap-1.5 mb-4 mt-2">
+            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Source</span>
+            <Segmented
+              value={audioSource === 'file' ? 'file' : audioSource}
+              options={[
+                ['none', 'Off'],
+                ['microphone', 'Mic'],
+                ['system', 'System'],
+                ['file', 'File'],
+                ['simulated', 'Band'],
+              ] as const}
+              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
+              height={32}
+              testId="audio-source"
+            />
+            <Info>
+              <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
+            </Info>
+          </div>
+        )}
 
         {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
         {onAudioInput && (

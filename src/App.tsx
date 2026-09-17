@@ -14,6 +14,7 @@ import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
@@ -266,6 +267,8 @@ export default function App() {
     setShowHelp(false);
   }, []);
   const [showHelp, setShowHelp] = useState(false);
+  /** Which guide topic to open at, when something sent you there to read one. */
+  const [helpFocus, setHelpFocus] = useState<string | null>(null);
   /**
    * Perform, or Design.
    *
@@ -908,6 +911,34 @@ export default function App() {
   // slider, so the phone and the panel show the glide as it happens.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  /*
+    A hand on a hardware fader, answered at once and rendered once a frame.
+
+    See `lib/ride.ts` for why this is not just `setSettings`. `observe` runs
+    here, in the render body beside `settingsRef`, because what it needs to
+    know is what React actually rendered — that is how the ride tells its own
+    late writes from a preset moving the same setting underneath it.
+
+    A frame rather than a timer, so the rate matches the one thing that can
+    show the value. The cost is that a backgrounded tab stops flushing, which
+    is fine: a backgrounded tab has stopped drawing the plate too, so there is
+    no show to be riding, and a pending move lands on the frame after it comes
+    back.
+  */
+  const ride = useRef(new SettingRide()).current;
+  ride.observe(settings as unknown as Record<string, unknown>);
+  const rideFrame = useRef(0);
+  const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
+    ride.write(String(key), value);
+    if (rideFrame.current) return;
+    rideFrame.current = requestAnimationFrame(() => {
+      rideFrame.current = 0;
+      const patch = ride.drain();
+      if (patch) setSettings(prev => ({ ...prev, ...patch }));
+    });
+  }, [ride]);
+  useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
 
   // ── Cue and Go ────────────────────────────────────────────────────
   //
@@ -1620,8 +1651,8 @@ export default function App() {
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
   const midi = useMidi(
     {
-      getSetting: (key) => { const v = settings[key]; return typeof v === 'number' ? v : undefined; },
-      setSetting: (key, value) => updateSettings({ [key]: value } as Partial<VisualizerSettings>),
+      getSetting: (key) => ride.read(String(key), settingsRef.current as unknown as Record<string, unknown>),
+      setSetting: rideSetting,
       action: runAction,
       applyPreset: cuePreset,
       selectDye,
@@ -1821,6 +1852,31 @@ export default function App() {
     phone: remoteLink.status === 'connected',
     rec: recorder.recording ? String(recorder.seconds) : null,
   }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds]);
+
+  /*
+    Where each status dot goes.
+
+    One set of handlers rather than one per desk, for the same reason the
+    header itself is one component: Design and Perform must send you to the
+    same place from the same dot. Each closes whatever else is open, because
+    two panels over a plate is the state you cannot see the show through.
+  */
+  const openSettingsAt = useCallback((section: string) => {
+    setSettingsSection(section);
+    setShowSettings(true);
+    setShowMidi(false);
+    setShowSequencer(false);
+    setShowHelp(false);
+  }, []);
+  const deskOpen = useMemo(() => ({
+    mic: () => openSettingsAt('audio-input'),
+    wall: () => openSettingsAt('projectors'),
+    midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
+    // The phone has no setting to change — it either found the relay or it did
+    // not — so this goes to the part of the guide that says what it does and
+    // what has to be running for it to connect at all.
+    phone: () => { setHelpFocus('live'); setShowHelp(true); setShowSettings(false); setShowMidi(false); setShowSequencer(false); },
+  }), [openSettingsAt]);
 
   const deskAudioLine = audioSource === 'none' ? 'silent'
     : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`;
@@ -2442,6 +2498,9 @@ export default function App() {
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
             engineStatus={engineStatus}
             getLiveEngineStatus={() => engineStatusRef.current}
+            audioSource={audioSource}
+            onAudioSource={(src) => { void handleSourceChange(src); }}
+            onAudioFile={() => musicInputRef.current?.click()}
             audioInputs={audioInputs}
             audioInputId={audioInputId}
             onAudioInput={chooseAudioInput}
@@ -2782,7 +2841,10 @@ export default function App() {
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           midiName={midi.activeInputName ?? null}
-          onMidi={() => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); }}
+          onMic={deskOpen.mic}
+          onWall={deskOpen.wall}
+          onMidi={deskOpen.midi}
+          onPhone={deskOpen.phone}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
@@ -2877,7 +2939,10 @@ export default function App() {
           }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
-          onMidi={() => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); }}
+          onMic={deskOpen.mic}
+          onWall={deskOpen.wall}
+          onMidi={deskOpen.midi}
+          onPhone={deskOpen.phone}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />
@@ -2928,7 +2993,7 @@ export default function App() {
         group is at least somewhere the truth can be kept.
       */}
       <AnimatePresence>
-        {showHelp && <GuidePanel onClose={() => setShowHelp(false)} />}
+        {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}

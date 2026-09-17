@@ -1139,6 +1139,53 @@ try {
         await page.getByTestId('midi-panel').count() > 0);
       await page.keyboard.press('Escape');
       await settle(800);
+
+      /*
+        ── Every dot lands somewhere that can change it ─────────────
+
+        The dots are the one place on either desk where the state of an input
+        is named, so they are where a hand goes when that input is the
+        problem — and the Mic dot reported "on" all evening with no way from
+        there to the question it raises, which is *which* microphone. The
+        section it opens has to be able to answer that, so the source chooser
+        and the device picker are both checked for, not just the heading.
+      */
+      await clickOn('dot-mic');
+      await settle(1000);
+      const micDot = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        if (!pane) return null;
+        const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
+        return {
+          at: at?.textContent?.trim() ?? null,
+          source: !!pane.querySelector('[data-testid="audio-source"]'),
+          device: !!pane.querySelector('[data-testid="audio-input"]'),
+          mic: !!pane.querySelector('[data-testid="audio-source-microphone"]'),
+        };
+      });
+      check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
+      check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
+      check('and which device it listens on', !!micDot?.device);
+      await page.keyboard.press('Escape');
+      await settle(700);
+
+      await clickOn('dot-wall');
+      await settle(1000);
+      const wallDot = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="settings-panel"]');
+        const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
+        return at?.textContent?.trim() ?? null;
+      });
+      check('the Wall dot opens the projector settings', /projector/i.test(wallDot ?? ''), wallDot ?? 'no panel');
+      await page.keyboard.press('Escape');
+      await settle(700);
+
+      await clickOn('dot-phone');
+      await settle(1000);
+      check('the Phone dot says what a phone can do',
+        await page.getByTestId('guide-panel').count() > 0 || await page.locator('text=Playing it live').count() > 0);
+      await page.keyboard.press('Escape');
+      await settle(700);
       await clickOn('open-all-settings');
       await settle(1200);
       await clickOn('settings-nav-midi');

@@ -30,12 +30,23 @@ import type { MidiTarget } from './midi';
 
 type Listener = (at: number) => void;
 
+/**
+ * Whether the control actually did something.
+ *
+ * 'pickup' is a fader being held back by soft takeover: a hand is on it, so
+ * saying which one is still worth doing, but the setting has not moved and a
+ * readout that claimed it had would be lying about the one thing it is for.
+ */
+export type TouchKind = 'fired' | 'pickup';
+
 /** One thing the controller did, for anything watching the lot of it. */
 export interface TouchEvent {
   key: string;
   at: number;
   /** Where the setting landed, for a fader. Absent for a pad: it has no level. */
   value?: number;
+  /** Absent means 'fired'; the common case stays the cheap one. */
+  kind?: TouchKind;
 }
 
 const listeners = new Map<string, Set<Listener>>();
@@ -64,14 +75,20 @@ export function touchKey(t: MidiTarget): string {
  * Something was hit. Called from the MIDI handler and from anywhere else that
  * fires the same targets, so the screen agrees whichever hand did it.
  */
-export function touch(key: string, value?: number, at: number = performance.now()): void {
+export function touch(key: string, value?: number, at: number = performance.now(), kind: TouchKind = 'fired'): void {
   const set = listeners.get(key);
   // Copied before iterating: a listener that unsubscribes itself while being
   // told — a row unmounting because the cue list just changed under it — would
   // otherwise mutate the set mid-loop.
+  //
+  // A held fader tells them too. What a lit chip answers is "which one have I
+  // got hold of", and the answer is the same whether or not the fader has
+  // picked the value up yet.
   if (set) for (const fn of [...set]) fn(at);
   if (watchers.size === 0) return;
-  const e: TouchEvent = value === undefined ? { key, at } : { key, at, value };
+  const e: TouchEvent = { key, at };
+  if (value !== undefined) e.value = value;
+  if (kind !== 'fired') e.kind = kind;
   for (const fn of [...watchers]) fn(e);
 }
 

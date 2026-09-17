@@ -251,12 +251,50 @@ export function relativeDelta(value: number): number {
 }
 
 /**
+ * How far the app's value may sit from where this fader last put it before
+ * that counts as somebody else having moved it.
+ *
+ * Wider than a fader's own resolution (1/127, about 0.008) so that the
+ * rounding of a value on its way through a setting never reads as an edit,
+ * and far narrower than any move a hand or a preset makes.
+ */
+const MOVED_ELSEWHERE = 0.02;
+
+/**
  * Soft takeover: a fader whose position disagrees with the app is ignored
  * until it passes through the app's value, so a knob turned on the phone
  * does not jump back the moment a fader twitches.
  */
 export class SoftTakeover {
   private lastSeen = new Map<string, number>();
+  private picked = new Set<string>();
+  /** What each fader last wrote, to tell its own work from somebody else's. */
+  private wrote = new Map<string, number>();
+
+  /**
+   * What a fader should write, or null while it has not picked the value up.
+   *
+   * This is the whole decision, including noticing that something other than
+   * this fader moved the setting — which has to live here, with the pickup
+   * state it invalidates, rather than beside the call. Split across the two,
+   * each half could be true about a different message: the caller compared
+   * the reading against its own record of the last write while `apply` below
+   * compared it against the incoming position, and a reading that was merely
+   * *late* looked like an edit to the first and like a fader out of position
+   * to the second. Between them they dropped the pickup and then refused to
+   * re-take it, which on a desk is a fader that has stopped working.
+   *
+   * `incoming` and `current` are both 0..1.
+   */
+  ride(id: string, incoming: number, current: number): number | null {
+    const mine = this.wrote.get(id);
+    if (mine !== undefined && Math.abs(mine - current) > MOVED_ELSEWHERE) this.drop(id);
+    const v = this.apply(id, incoming, current);
+    if (v === null) return null;
+    this.picked.add(id);
+    this.wrote.set(id, v);
+    return v;
+  }
 
   /**
    * `incoming` and `current` are both 0..1. Returns the value to apply, or
@@ -273,12 +311,9 @@ export class SoftTakeover {
     if (Math.abs(incoming - prev) < 0.12 && this.picked.has(id)) return incoming;
     return null;
   }
-  private picked = new Set<string>();
-  /** Mark a control as in sync (after it applied a value). */
-  markPicked(id: string): void { this.picked.add(id); }
   /** The app changed the value by other means: the control must catch up again. */
-  drop(id: string): void { this.picked.delete(id); }
-  reset(): void { this.lastSeen.clear(); this.picked.clear(); }
+  drop(id: string): void { this.picked.delete(id); this.wrote.delete(id); }
+  reset(): void { this.lastSeen.clear(); this.picked.clear(); this.wrote.clear(); }
 }
 
 // ── Pad colours ─────────────────────────────────────────────────────
