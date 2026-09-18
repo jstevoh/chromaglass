@@ -324,15 +324,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
-  // Off. Measured on the projector's GPU it does nothing a viewer can see: at
-  // 512² and 384² it cannot be told from 0 on a fixed composition, and at 256²,
-  // the rung the governor falls to when the machine is busy, switching it on
-  // for hundreds of frames grows pale terraces and tears the lips of the
-  // tongues rather than narrowing an edge — on the same plate it moves the
-  // 10-90% edge width by less than the plate's own drift, even at full
-  // strength. The control stays for the CPU solver at low grids, where it does
-  // measurably steepen.
-  sharpness: 0,
+  // Half. This shipped at 0 on a measurement that was right about what it saw
+  // and wrong about why: switched on for hundreds of frames it could not be
+  // told from 0 on a fixed composition. The reason was a bug in the pass, not
+  // a fact about it — the gate that keeps it from carving holes was read per
+  // channel, so where one dye met another at the same thickness it read zero
+  // and cancelled the flux. Almost every boundary on a full plate is a colour
+  // boundary, so the pass was inert almost everywhere. With the gate read from
+  // the thickness instead, a two-cell colour boundary narrows by a third over
+  // a couple of hundred steps and a wash is still left alone.
+  //
+  // Half rather than full: the curve it maps through compresses the top, and
+  // above about this the terracing the old note describes starts to show on a
+  // shallow dish at the low grids the governor falls to.
+  sharpness: 0.5,
   granulation: 0.5,         // pigment texture between the boundaries, not just at them
   grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
@@ -389,7 +394,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampWarmth: 0,
   dimmer: 1,
   fingering: 0,
-  beads: 0,
+  // A few. The plate is oil on water and the reference for the whole look is a
+  // dish of it, which is hundreds of small dark-rimmed droplets — but this sat
+  // at zero, so thirty of the thirty-two presets had none and the only hard
+  // edges on those plates were the ones the dye happened to make. Low enough
+  // that a preset which wants a clean wash still reads as one; Fillmore asks
+  // for 0.8 when it wants a field of them.
+  beads: 0.18,
   dishSpread: 0,
   cells: 0,
   exposure: 0,

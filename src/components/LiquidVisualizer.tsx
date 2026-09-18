@@ -327,6 +327,8 @@ class FluidSimulation {
   private mcB: Float32Array;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
+  /** The thickness as the sharpening pass found it: every channel gates on this. */
+  private shpA: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
@@ -368,6 +370,7 @@ class FluidSimulation {
     this.mcA = new Float32Array(GRID_AREA);
     this.mcB = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
+    this.shpA = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -1739,9 +1742,15 @@ class FluidSimulation {
     if (k <= 0.0001) return;
     const N = this.size;
     // How much of an interface a pair of cells straddles: 1 where both hold
-    // comparable dye, 0 where one is empty. See the note in `sharpenDye` in
-    // gpuFluid.ts for why the pass carves holes without it.
+    // comparable liquid, 0 where one is empty. It is read from the thickness
+    // for every channel, never from the channel being sharpened — see the note
+    // in `sharpenDye` in gpuFluid.ts for why a per-channel gate cancels itself
+    // at exactly the boundaries this pass is for.
     const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
+    // The thickness as it stands before any channel is touched, including
+    // before the thickness itself is: the gate must not shift under the pass.
+    this.shpA.set(this.density);
+    const ga = this.shpA;
     for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
       this.shp.set(ch);
       const o = this.shp;
@@ -1752,8 +1761,9 @@ class FluidSimulation {
           const dl = o[i - N - 1], dr = o[i - N + 1], ul = o[i + N - 1], ur = o[i + N + 1];
           // The isotropic nine-point weights; see the note in gpuFluid.ts for
           // why the diagonals matter.
-          const f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
-                  + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
+          const a = ga[i];
+          const f = 0.20 * (gate(a, ga[i - 1]) * (c - l) + gate(a, ga[i + 1]) * (c - r) + gate(a, ga[i - N]) * (c - d) + gate(a, ga[i + N]) * (c - u))
+                  + 0.05 * (gate(a, ga[i - N - 1]) * (c - dl) + gate(a, ga[i - N + 1]) * (c - dr) + gate(a, ga[i + N - 1]) * (c - ul) + gate(a, ga[i + N + 1]) * (c - ur));
           const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
           const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
           // Curvature below a fraction of the local range is a wash, not an

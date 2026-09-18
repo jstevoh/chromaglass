@@ -24,7 +24,7 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
-import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
+import { DEFAULT_LIQUID_TYPES, DEFAULT_SETTINGS } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
 import fs from 'node:fs';
 
@@ -155,6 +155,92 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     check('a boundary comes back at least as hard as the texels that hold it',
       steepest > 1.0, `${steepest.toFixed(2)} per cell across a step (B-spline managed 0.75)`);
   }
+}
+
+// ── 5.6. A colour boundary is a boundary the sharpen pass can hold ────
+//
+// Both solvers run an anti-diffusion pass to walk back the smearing the rest
+// of the step applies, and the gate that stops it carving holes used to be
+// read per channel. Where red meets blue at the same thickness that gate is
+// zero on both channels — full on one side, empty on the other — so the pass
+// cancelled itself at exactly the boundary it exists for. On a plate with dye
+// everywhere that is nearly every boundary, which is why it measured as doing
+// nothing and shipped switched off for months.
+//
+// This runs the kernel here, on a red field meeting a blue one at equal
+// thickness, and asks for the two things that tell a fixed pass from the
+// broken one: a boundary a couple of cells wide has to narrow, and a smooth
+// wash has to be left alone, because growing a wash is what terraces a dish.
+{
+  const N = 48, FLOOR = 0.08, K = 0.135;          // K is the curve's value at sharpness 1
+  const at = (x, y) => x + y * N;
+  const smeared = (sm) => {
+    const f = { a: new Float32Array(N * N), r: new Float32Array(N * N), b: new Float32Array(N * N) };
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const t = 1 / (1 + Math.exp(-(x - N / 2) / sm));
+      f.a[at(x, y)] = 1; f.r[at(x, y)] = 1 - t; f.b[at(x, y)] = t;
+    }
+    return f;
+  };
+  const g = (p, q) => (p < q ? p / (q + 1e-4) : q / (p + 1e-4));
+  const sweep = (f) => {
+    const src = [f.a, f.r, f.b].map(c => Float32Array.from(c));
+    const ga = src[0];                             // the gate is the thickness, for every channel
+    [f.a, f.r, f.b].forEach((out, ci) => {
+      const o = src[ci];
+      for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+        const i = at(x, y);
+        const nb = [i - 1, i + 1, i - N, i + N, i - N - 1, i - N + 1, i + N - 1, i + N + 1];
+        const w = [0.2, 0.2, 0.2, 0.2, 0.05, 0.05, 0.05, 0.05];
+        let flux = 0, lo = o[i], hi = o[i];
+        for (let n = 0; n < 8; n++) {
+          flux += w[n] * g(ga[i], ga[nb[n]]) * (o[i] - o[nb[n]]);
+          lo = Math.min(lo, o[nb[n]]); hi = Math.max(hi, o[nb[n]]);
+        }
+        const q = Math.sign(flux) * Math.max(Math.abs(flux) - FLOOR * (hi - lo), 0);
+        out[i] = Math.max(0, Math.min(hi, Math.max(lo, o[i] + K * q)));
+      }
+    });
+  };
+  /** The 10-90% width of the red channel across the middle row, in cells. */
+  const width = (f) => {
+    const row = [];
+    for (let x = 0; x < N; x++) row.push(f.r[at(x, N >> 1)]);
+    const lo = Math.min(...row), hi = Math.max(...row);
+    const cross = (p) => {
+      const tgt = lo + (hi - lo) * p;
+      for (let x = 1; x < N; x++) if ((row[x - 1] - tgt) * (row[x] - tgt) <= 0)
+        return x - 1 + (row[x - 1] - tgt) / (row[x - 1] - row[x] + 1e-9);
+      return NaN;
+    };
+    return Math.abs(cross(0.1) - cross(0.9));
+  };
+  const run = (sm) => { const f = smeared(sm); const before = width(f);
+    for (let i = 0; i < 200; i++) sweep(f); return [before, width(f)]; };
+
+  const [edge0, edge1] = run(0.5);
+  check('a smeared colour boundary narrows instead of sitting there',
+    edge1 < edge0 * 0.85, `${edge0.toFixed(1)} → ${edge1.toFixed(1)} cells over 200 steps`);
+
+  const [wash0, wash1] = run(3);
+  check('a smooth wash is still left alone rather than grown into terraces',
+    Math.abs(wash1 - wash0) < 0.2, `${wash0.toFixed(1)} → ${wash1.toFixed(1)} cells over 200 steps`);
+
+  // The model above is a model. These two read the shipped solvers, so a gate
+  // quietly put back the way it was fails here rather than in a show.
+  const shader = fs.readFileSync(process.cwd() + '/src/lib/gpuFluid.ts', 'utf8');
+  const gpuGate = /float gate\(vec4 a, vec4 b\) \{ return min\(a\.a, b\.a\)/.test(shader);
+  check('the GPU solver reads its gate from the thickness, not from the channel',
+    gpuGate, gpuGate ? '' : 'gate() in gpuFluid.ts is back to per-channel');
+  const cpu = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
+  const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);
+  check('the CPU solver reads its gate from the thickness too',
+    cpuGate, cpuGate ? '' : 'sharpenDye in LiquidVisualizer.tsx is back to per-channel');
+
+  // And the pass has to be switched on, or none of the above reaches a plate.
+  check('the sharpening that counteracts the solver\'s own diffusion is on by default',
+    (DEFAULT_SETTINGS.sharpness ?? 0) > 0, `sharpness ${DEFAULT_SETTINGS.sharpness ?? 0}`);
 }
 
 // ── 6. The audit ─────────────────────────────────────────────────────

@@ -435,10 +435,25 @@ void main() {
 uniform sampler2D u_dye; uniform float u_sharp;
 #define SHARP_FLOOR 0.08
 // How much of an interface a pair of cells straddles: 1 where both hold
-// comparable dye, 0 where one of them is empty. Without it the pass keeps
+// comparable liquid, 0 where one of them is empty. Without it the pass keeps
 // pulling dye off the thin side of a boundary until a hole opens, which is
 // what unlimited anti-diffusion does to a field that has a void in it.
-vec4 gate(vec4 a, vec4 b) { return min(a, b) / (max(a, b) + 1e-4); }
+//
+// It reads the thickness in .a and nothing else, and that matters. It used to
+// be taken per channel, which sounds like the same idea and is not: where red
+// meets blue at the same thickness, the red channel is full on one side and
+// empty on the other, so a per-channel gate reads zero there and cancels the
+// whole flux — on both channels. A colour boundary is exactly the case this
+// pass exists for, and it was the one case it could not touch. On a plate with
+// dye everywhere almost every boundary is a colour boundary, so the pass was
+// inert nearly everywhere it mattered, which is what "it does nothing a viewer
+// can see" was really measuring.
+//
+// Thickness is also the right thing to ask: the hole it guards against is an
+// absence of liquid, not an absence of one dye. The neighbourhood clamp below
+// still holds each channel inside its own neighbours' range, so opening the
+// gate cannot invent colour that was not there.
+float gate(vec4 a, vec4 b) { return min(a.a, b.a) / (max(a.a, b.a) + 1e-4); }
 void main() {
   vec2 t = u_texel;
   vec4 c  = texture(u_dye, v_uv);
