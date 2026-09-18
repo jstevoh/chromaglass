@@ -693,7 +693,10 @@ export default function App() {
   */
   const startFilmWindow = async () => {
     try {
-      await visualizerRef.current?.startFilmWindow(() => setFilmSource('none'));
+      await visualizerRef.current?.startFilmWindow(
+        () => setFilmSource('none'),
+        () => setToast('That window is coming through black — share the tab instead'),
+      );
       setFilmSource('window');
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled

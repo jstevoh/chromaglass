@@ -206,7 +206,15 @@ export interface LiquidVisualizerHandle {
    * source can go away without the app asking. Without it the panel goes on
    * saying "window live" over a projector showing nothing.
    */
-  startFilmWindow: (onEnded?: () => void) => Promise<void>;
+  /**
+   * Capture a tab, window or screen as the film.
+   *
+   * `onBlank` fires when the capture yields nothing but black pixels, which a
+   * window playing hardware-accelerated video does — see the note at the
+   * implementation. The plate cannot tell that from a very dark film, so the
+   * operator is told.
+   */
+  startFilmWindow: (onEnded?: () => void, onBlank?: () => void) => Promise<void>;
   clearFilm: () => void;
   /**
    * The element the film is playing in, so it can be read back as a sensor
@@ -2314,7 +2322,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       Nothing is requested until the button is pressed, and the browser's
       picker, not this app, decides what is shared.
     */
-    startFilmWindow: async (onEnded?: () => void) => {
+    startFilmWindow: async (onEnded?: () => void, onBlank?: () => void) => {
       const media = navigator.mediaDevices as MediaDevices & {
         getDisplayMedia?: (c: DisplayMediaStreamOptions) => Promise<MediaStream>;
       };
@@ -2322,13 +2330,37 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Asked for before `stopFilm`, so a picker the operator cancels leaves
       // whatever was already playing alone rather than putting the projector
       // out on the way to a dialog they changed their mind about.
+      /*
+        What the picker is told, and why each part of it.
+
+        `displaySurface: 'browser'` opens the picker on its Tab list. It is a
+        hint, not a restriction — a whole window or a screen is still one
+        click away — and it is the right default for this feature twice over.
+        A film is usually a video playing in a tab, and capturing the *tab*
+        composites through the renderer, while capturing the *window* around
+        it does not always: a video handed to a hardware overlay plane is
+        drawn past the window's own surface, and window capture then yields
+        black frames with the audio and the controls coming through perfectly.
+        That is the most likely reading of a black plate from a playing movie,
+        and the tab is the capture that does not have the problem.
+
+        `selfBrowserSurface: 'exclude'` takes ChromaGlass out of the list.
+        Offering it invites capturing the plate into the plate, and it is the
+        one choice that can only ever be a mistake.
+
+        `surfaceSwitching: 'exclude'` drops the "Share this tab instead"
+        control Chrome otherwise puts up, which is a question about the app's
+        own tab asked in the middle of choosing a film.
+      */
       const stream = await media.getDisplayMedia({
-        video: { frameRate: { ideal: 30 } },
+        video: { frameRate: { ideal: 30 }, displaySurface: 'browser' },
         // The plate is driven by the room's sound, not by the captured window,
         // and asking for audio makes the picker offer a checkbox that does
         // nothing here.
         audio: false,
-      });
+        selfBrowserSurface: 'exclude',
+        surfaceSwitching: 'exclude',
+      } as DisplayMediaStreamOptions);
       stopFilm();
       const f = filmRef.current;
       const v = filmVideo();
@@ -2344,6 +2376,41 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         });
       }
       try { await v.play(); } catch { /* as above */ }
+
+      /*
+        Say so when the capture is coming through black.
+
+        A window that yields nothing but black pixels is indistinguishable, on
+        the plate, from a film that is simply very dark — and from the feature
+        being broken. So the frames are looked at: a few samples over a second
+        and a half, and if every pixel of every one of them is black the
+        operator is told, because the remedy (share the tab rather than the
+        window) is not something anybody would guess.
+
+        Sampled, not watched: one 32x32 read every 300ms, stopped as soon as
+        anything lights up, on a machine that is also running a fluid solver.
+      */
+      if (onBlank) {
+        const probe = document.createElement('canvas');
+        probe.width = 32; probe.height = 32;
+        const pctx = probe.getContext('2d', { willReadFrequently: true });
+        let looks = 0;
+        const timer = setInterval(() => {
+          looks++;
+          if (!pctx || filmRef.current.kind !== 'window' || v.readyState < 2) {
+            if (looks >= 5) clearInterval(timer);
+            return;
+          }
+          try {
+            pctx.drawImage(v, 0, 0, probe.width, probe.height);
+            const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) { clearInterval(timer); return; }
+            }
+          } catch { clearInterval(timer); return; }   // tainted: not ours to read, and not black either
+          if (looks >= 5) { clearInterval(timer); onBlank(); }
+        }, 300);
+      }
     },
     startFilmCamera: async () => {
       stopFilm();
