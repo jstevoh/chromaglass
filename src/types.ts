@@ -214,6 +214,11 @@ export interface VisualizerSettings {
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
   dishSpread: number;         // each layer its own dish, spread apart like three projectors on one screen
   cells: number;              // fine cell network on the lead plate, strongest in the dish core
+  /** A logo or title over the finished frame: opacity, where it sits and how big. */
+  markMix: number;            // 0 = no mark on the wall, 1 = fully opaque
+  markX: number;              // centre, 0..1 across the frame
+  markY: number;              // centre, 0..1 up the frame
+  markScale: number;          // width as a fraction of the frame; height follows the image's own aspect
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
@@ -411,6 +416,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   beads: 0.18,
   dishSpread: 0,
   cells: 0,
+  markMix: 1,
+  markX: 0.5,
+  markY: 0.12,              // low, where a logo goes, and out of the plate's busy middle
+  markScale: 0.22,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure

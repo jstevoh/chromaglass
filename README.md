@@ -162,6 +162,30 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 /chromaglass/dye #rrggbb               the dropper's colour
 ```
 
+## A logo that survives the plate
+
+Dropping an image into the liquid is the lovely thing to do with it — the dye
+takes the picture and the plate pulls it apart over about four seconds — and
+exactly the wrong thing to do with the mark of whoever is paying for the room.
+**Settings → Logo & Titles** loads a still that sits over the finished frame
+instead: opacity, size, and where it sits.
+
+A PNG with transparency is what you want; the plate shows through wherever the
+file is transparent.
+
+It is composited in the shader rather than as an element over the canvas, so it
+reaches everything that reads the canvas — the projector window, a cast to
+another screen, a recording, and another machine capturing this window — and
+not merely the laptop's own display. It sits below the house dimmer, so a
+blackout leaves the mark on the wall; its own opacity is the control for
+taking it off.
+
+## Run it as a box
+
+A Pi or a mini PC behind the screen, powered on, showing the plate: no laptop,
+nothing to click. Same build, two systemd units and a browser told to get out
+of the way. See [docs/appliance.md](docs/appliance.md).
+
 ## Art-Net: the room's lights follow the plate
 
 Every lighting box takes Art-Net *in* so a desk can drive the visuals. This does
@@ -480,6 +504,8 @@ server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)
   artnet.js                    # Art-Net packet and patch: the plate's colour out to the rig, a desk's faders in
+  chromaglass.service          # systemd: the show server on a box (docs/appliance.md)
+  chromaglass-kiosk.service    # systemd: the browser, full screen, on the box's HDMI
 public/
   manifest.webmanifest         # PWA manifest: installable, standalone window
   sw.js                        # Service worker: light cache, never the relay

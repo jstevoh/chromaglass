@@ -219,6 +219,20 @@ export interface LiquidVisualizerHandle {
   startFilmWindow: (onEnded?: () => void, onBlank?: () => void) => Promise<void>;
   clearFilm: () => void;
   /**
+   * A logo or title card laid over the finished frame.
+   *
+   * Not `injectImage`, which pours a picture into the plate as dye: that is
+   * the lovely thing to do with an image and the wrong thing to do with a
+   * client's mark, which has to stay readable for three hours. This one sits
+   * over the top and does not dissolve.
+   *
+   * Composited in the shader rather than as an element over the canvas, so it
+   * reaches everything that reads the canvas: the projector window, a cast to
+   * another screen, the recorder, and another machine capturing this window.
+   */
+  loadMark: (source: CanvasImageSource, width: number, height: number) => void;
+  clearMark: () => void;
+  /**
    * The element the film is playing in, so it can be read back as a sensor
    * as well as shown through the dye. Null when nothing is loaded.
    *
@@ -1904,6 +1918,7 @@ interface GLResources {
   maxTexture: number;
   /** The film projector's frame — a video file or the camera — uploaded each frame it plays. */
   filmTexture: WebGLTexture;
+  markTexture: WebGLTexture;
   beadTexture: WebGLTexture;
 }
 
@@ -2062,6 +2077,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const patchRef = useRef<PatchBay | null>(null);
   if (!patchRef.current) patchRef.current = new PatchBay(settings);
   const gelAngleRef = useRef(0);
+  /** The mark: a still over the finished frame, uploaded once and then left alone. */
+  const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
+
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
@@ -2494,6 +2512,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       try { await v.play(); } catch { /* as above */ }
     },
     clearFilm: () => stopFilm(),
+    loadMark: (source, width, height) => {
+      markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
+    },
+    clearMark: () => { markRef.current = null; },
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
@@ -2765,6 +2787,9 @@ uniform float u_kaleidoZoom;       // how much plate feeds each wedge
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
+uniform sampler2D u_mark;          // a still laid over the plate: a logo, a title card
+uniform float u_markOn;            // 1 when there is one loaded
+uniform vec4 u_markRect;           // where it sits: centre xy, half-size xy, all in screen uv
 uniform sampler2D u_grain0;         // pigment coordinates, lead plate: .rg one phase, .ba the other
 uniform sampler2D u_grain1;
 uniform float u_grainOn;           // 1 when the solver is carrying the coordinates
@@ -4088,6 +4113,31 @@ void main() {
   // upstream, the camera pass included, sees a darker plate.
   outColor *= u_dimmer;
 
+  // ── The mark ────────────────────────────────────────
+  //
+  // A logo or a title, laid over the finished frame rather than poured into
+  // the plate. Dropping an image into the liquid is the lovely thing to do
+  // with it and the wrong thing to do with a client's mark, which has to stay
+  // legible for three hours.
+  //
+  // It is composited here, in the shader, and not as an element over the
+  // canvas, because everything downstream reads the canvas: the projector
+  // window, a cast to another screen, the recorder, and another machine
+  // capturing this window. A mark that lived in the DOM would be on the
+  // laptop's screen and on none of them.
+  //
+  // Below the dimmer on purpose. The house dimmer is the lamp, and taking the
+  // lamp down should not take the sponsor's logo with it — a blackout with a
+  // mark still on the wall is a normal thing to want. Its own opacity is the
+  // control for that.
+  if (u_markOn > 0.5) {
+    vec2 m = (uvScreen - u_markRect.xy) / max(u_markRect.zw, vec2(1e-4)) * 0.5 + 0.5;
+    if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
+      vec4 mark = texture(u_mark, vec2(m.x, 1.0 - m.y));
+      outColor = mix(outColor, mark.rgb, mark.a * u_markOn);
+    }
+  }
+
   fragColor = vec4(outColor, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }`;
@@ -4175,6 +4225,7 @@ void main() {
       'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
+      'u_mark','u_markOn','u_markRect',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
       'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
@@ -4188,6 +4239,15 @@ void main() {
     const filmTexture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, filmTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // The mark: a logo or title laid over the finished frame. Transparent
+    // until one is loaded, so the shader's branch is the only cost.
+    const markTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, markTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -4206,6 +4266,7 @@ void main() {
       packFbos: new Map(), texSizes: new Map(),
       maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
       filmTexture,
+      markTexture,
       beadTexture,
     };
 
@@ -5478,6 +5539,39 @@ void main() {
             }
           }
 
+          // The mark, if one is loaded. Uploaded once, on the frame after it
+          // arrives, and then just bound: a logo does not change sixty times a
+          // second and re-uploading it would be the most expensive thing in
+          // the frame.
+          let markOn = 0;
+          const markRect = [0.5, 0.5, 0.5, 0.5];
+          {
+            const mk = markRef.current;
+            glCtx.activeTexture(glCtx.TEXTURE14);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
+            if (mk) {
+              if (mk.dirty) {
+                glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+                glCtx.pixelStorei(glCtx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, mk.source as TexImageSource);
+                mk.dirty = false;
+              }
+              const mix = Math.max(0, Math.min(1, currentSettings.markMix ?? 1));
+              if (mix > 0.002) {
+                markOn = mix;
+                // Width is the setting; height follows the image's own aspect
+                // against the frame's, so a wide logo is not stretched tall on
+                // a 16:9 wall and squat on a 4:3 one.
+                const halfW = Math.max(0.002, (currentSettings.markScale ?? 0.22)) * 0.5;
+                const frameAspect = canvas.width / Math.max(1, canvas.height);
+                markRect[0] = Math.max(0, Math.min(1, currentSettings.markX ?? 0.5));
+                markRect[1] = Math.max(0, Math.min(1, currentSettings.markY ?? 0.12));
+                markRect[2] = halfW;
+                markRect[3] = halfW * (frameAspect / Math.max(0.01, mk.aspect));
+              }
+            }
+          }
+
           // The film projector's frame, if one is playing.
           let filmOn = 0;
           let filmScaleX = 1, filmScaleY = 1;
@@ -5541,6 +5635,9 @@ void main() {
             Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
           );
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
+          glCtx.uniform1i(uLocs['u_mark'], 14);
+          glCtx.uniform1f(uLocs['u_markOn'], markOn);
+          glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
             glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);

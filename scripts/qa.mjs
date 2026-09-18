@@ -503,6 +503,69 @@ try {
     [...document.querySelectorAll('input[type="range"]')].filter(i => !i.getAttribute('aria-label')).length);
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
 
+  // ── The mark: a logo that survives the plate ──────────────────────
+  //
+  // The whole point of compositing it in the shader rather than putting an
+  // element over the canvas is that it reaches everything which reads the
+  // canvas — the projector window, a cast, the recorder, another machine
+  // capturing this one. So the check is on the canvas pixels, not on the DOM:
+  // a mark that is only in the DOM would pass a DOM check and be missing from
+  // every screen that matters.
+  {
+    await clickOn('settings-nav-mark');
+    await settle(300);
+    // Eight magenta pixels. Magenta because nothing the plate does on its own
+    // is full red and full blue with no green at all, so finding it on the
+    // canvas cannot be the liquid having a moment.
+    const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
+    const magentaShare = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      if (!c) return -1;
+      const o = document.createElement('canvas');
+      o.width = 160; o.height = 90;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, o.width, o.height);
+      const d = x.getImageData(0, 0, o.width, o.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
+      }
+      return n / (o.width * o.height);
+    });
+
+    const before = await magentaShare();
+    await page.setInputFiles('#mark-file', {
+      name: 'mark.png', mimeType: 'image/png', buffer: Buffer.from(MAGENTA_PNG, 'base64'),
+    });
+    await settle(900);
+    // Big enough that a share of the frame is unambiguous.
+    await page.evaluate(() => window.chromaglassSettings?.({ markScale: 0.8, markMix: 1, markX: 0.5, markY: 0.5 }));
+    await settle(700);
+    const after = await magentaShare();
+    check('a loaded mark reaches the canvas, not just the page',
+      before < 0.02 && after > 0.15, `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame`);
+
+    // The house dimmer is the lamp. Taking the lamp out should not take the
+    // sponsor's logo off the wall with it.
+    await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 0 }));
+    await settle(500);
+    const blacked = await magentaShare();
+    check('and a blackout leaves it on the wall', blacked > 0.15,
+      `${(blacked * 100).toFixed(1)}% with the dimmer at zero`);
+    await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 1 }));
+
+    // Its own opacity is the control for taking it off, and it has to reach 0.
+    await page.evaluate(() => window.chromaglassSettings?.({ markMix: 0 }));
+    await settle(500);
+    check('and its opacity takes it off', (await magentaShare()) < 0.02);
+    await page.evaluate(() => window.chromaglassSettings?.({ markMix: 1 }));
+    await settle(400);
+
+    await clickOn('mark-clear');
+    await settle(600);
+    check('and taking it off leaves nothing behind', (await magentaShare()) < 0.02);
+  }
+
   // ── The room camera ───────────────────────────────────────────────
   // One click on the rail, which is the whole point of the rail: the thing
   // that turns the video on and tracks people has a row with its own name.

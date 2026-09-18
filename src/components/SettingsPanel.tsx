@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
@@ -94,6 +94,10 @@ interface SettingsPanelProps {
   /** Another tab, window or screen, through the browser's own picker. */
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
+  /** The mark: a logo or title card over the finished frame, and whether one is loaded. */
+  markLoaded?: boolean;
+  onMarkFile?: (file: File) => void;
+  onMarkClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
   /*
     What is listening, and on which device.
@@ -247,8 +251,9 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
     && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
@@ -1825,6 +1830,61 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Simulation Section */}
+      {/*
+        Logo & Titles
+
+        The one thing on the wall that is not the plate. `injectImage` already
+        existed and pours a picture into the liquid as dye, which is the lovely
+        thing to do with an image and the wrong thing to do with the mark of
+        whoever is paying for the room: it dissolves in about four seconds.
+        This one sits over the top and stays put for three hours.
+      */}
+      <section id="settings-mark" className={`mb-8 scroll-mt-4 ${shown('mark') ? '' : 'hidden'} ${focusSection === 'mark' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="stage" data-section="mark">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Image size={12} /> Logo &amp; Titles
+        </h3>
+        <div className="flex gap-2 mb-5">
+          <input
+            ref={markInputRef}
+            id="mark-file"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
+          />
+          <button
+            onClick={() => markInputRef.current?.click()}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+            title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
+            data-testid="mark-load"
+          >
+            <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
+          </button>
+          <button
+            onClick={() => onMarkClear?.()}
+            disabled={!markLoaded}
+            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+            data-testid="mark-clear"
+          >
+            Take it off
+          </button>
+        </div>
+        <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
+          onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
+        <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
+          onChange={(v: number) => onUpdate({ markScale: v })} settingKey="markScale" />
+        <Slider label="Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
+          onChange={(v: number) => onUpdate({ markX: v })} settingKey="markX" />
+        <Slider label="Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
+          onChange={(v: number) => onUpdate({ markY: v })} settingKey="markY" />
+        <Info>
+          Laid over the finished frame, so it reaches the projector window, a cast to another screen, a recording and
+          another machine capturing this one — not just the laptop's own screen. A PNG with transparency is what you
+          want; the plate shows through wherever the file is transparent. It sits under nothing, including the house
+          dimmer, so a blackout leaves the mark on the wall. Its own opacity is the control for taking it off.
+        </Info>
+      </section>
+
       <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('simulation') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation

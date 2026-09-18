@@ -74,4 +74,14 @@ export type CastMessage =
   | { type: 'stage'; width: number; height: number }
   /** Sender → receiver. */
   | { type: 'state'; state: CastState }
-  | { type: 'audio'; audio: CastAudio | null };
+  | { type: 'audio'; audio: CastAudio | null }
+  /**
+   * The mark: a logo or title card, as a data URL, or null to take it off.
+   *
+   * The settings that place it travel in `state` like everything else, but the
+   * picture itself cannot — the receiver is a separate document running its
+   * own copy of the solver and has never seen the file. Sent once when it is
+   * loaded and again whenever a receiver says hello, which is the only time it
+   * is large; after that the mark costs nothing per frame.
+   */
+  | { type: 'mark'; dataUrl: string | null };

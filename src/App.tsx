@@ -664,6 +664,23 @@ export default function App() {
     };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
+    /*
+      `?kiosk=1`: there is nobody to click.
+
+      A box behind the screen boots into this with no keyboard and no mouse,
+      so the gesture the browser wants is never coming. Chromium is started
+      with --autoplay-policy=no-user-gesture-required for exactly this, which
+      makes the audio context start without one — but nothing in the app was
+      asking it to, so the plate ran and heard nothing. This does the asking.
+
+      Only from the query string, so a hosted visit is untouched: a page that
+      started making noise before anyone touched it would be a worse first
+      visit than a silent one, and on a normal browser the context would
+      refuse anyway and the click handler above would still be waiting.
+    */
+    let kiosk = false;
+    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
+    if (kiosk) wake();
     return () => {
       window.removeEventListener('pointerdown', wake);
       window.removeEventListener('keydown', wake);
@@ -1522,10 +1539,53 @@ export default function App() {
     output,
   }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
+  /**
+   * The mark, kept as a data URL so it can be sent to a receiver.
+   *
+   * A cast receiver and a network display are separate documents running their
+   * own copy of the solver; the settings that place the logo travel with
+   * everything else, but the picture has to be handed over once. Held here
+   * rather than only in the visualizer for that reason.
+   */
+  const markUrlRef = useRef<string | null>(null);
+  const [markLoaded, setMarkLoaded] = useState(false);
   const sendCastState = useCallback(() => {
     castSend({ type: 'state', state: castState });
-    if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+    // On the same call as the state, because the one moment a receiver needs
+    // the picture is the moment it says hello and gets its first state.
+    castSend({ type: 'mark', dataUrl: markUrlRef.current });
+    if (mirrorCount > 0) {
+      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+      relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+    }
   }, [castSend, castState, mirrorCount]);
+
+  const loadMark = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? '');
+      const img = new window.Image();
+      img.onload = () => {
+        visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
+        markUrlRef.current = url;
+        setMarkLoaded(true);
+        castSend({ type: 'mark', dataUrl: url });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        setToastRef.current?.('Mark on the wall');
+      };
+      img.onerror = () => setToastRef.current?.('That file would not open as a picture');
+      img.src = url;
+    };
+    reader.readAsDataURL(file);
+  }, [castSend]);
+
+  const clearMark = useCallback(() => {
+    visualizerRef.current?.clearMark?.();
+    markUrlRef.current = null;
+    setMarkLoaded(false);
+    castSend({ type: 'mark', dataUrl: null });
+    relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
+  }, [castSend]);
   castReadyRef.current = sendCastState;
   useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
   useEffect(() => {
@@ -2779,6 +2839,9 @@ export default function App() {
             onFilmCamera={startFilmCamera}
             onFilmWindow={startFilmWindow}
             onFilmClear={clearFilm}
+            markLoaded={markLoaded}
+            onMarkFile={loadMark}
+            onMarkClear={clearMark}
             onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />
         )}
