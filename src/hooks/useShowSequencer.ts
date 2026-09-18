@@ -30,6 +30,17 @@ export interface UseShowSequencerArgs {
   sectionLabel: string | null;
   /** Time-based stages only run while the show is running. */
   isActive: boolean;
+  /**
+   * Hold everything: the clock, the glide, the stage changes.
+   *
+   * A sequence is a performance instrument — it rewrites the settings on a
+   * clock — and Design is where those settings are being chosen by hand. With
+   * both live, a look being built is edited underneath the person building it
+   * every few seconds, by a stage they cannot see from that desk. So Design
+   * suspends it, exactly as a paused plate does, and Perform picks it up
+   * where it left off rather than losing the operator's place in the set.
+   */
+  suspended?: boolean;
   /** Every preset a stage may name: the built-ins and the user's own. */
   presets?: Preset[];
 }
@@ -206,6 +217,10 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       if (!seq || !stage) { runRef.current = null; publish(); return; }
       const a = argsRef.current;
       if (run.pausedAt !== null) return;
+      // Held: the stage clock is pushed forward by the tick it just skipped,
+      // so returning to Perform resumes where the set was rather than where
+      // it would have got to on its own.
+      if (a.suspended) { run.enteredAt += TICK_MS * 0.001; return; }
       if (!a.isActive) { run.enteredAt += TICK_MS * 0.001; return; }   // the show is paused: hold the stage clock
       const elapsed = now() - run.enteredAt;
 

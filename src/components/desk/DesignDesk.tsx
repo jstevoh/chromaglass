@@ -64,6 +64,10 @@ export interface DesignDeskProps {
   lookName: string | null;
   edited: boolean;
   onSave: () => void;
+  onSaveAs: () => void;
+  onNew: () => void;
+  /** Whether the look has unsaved changes, for the dot on Save. */
+  dirty: boolean;
   onSendToWall: () => void;
 
   mode: DeskMode;
@@ -108,8 +112,20 @@ export function DesignDesk(p: DesignDeskProps) {
         onSearch={p.onSearch}
         trailing={
           <>
+            {/*
+              New, Save, Save as — the three a document needs.
+
+              Save used to be the only one, and it made a new copy every time
+              and downloaded a file, so there was no way to save over what you
+              were working on and no way to begin from nothing. The dot on Save
+              is whether there is anything to save.
+            */}
+            <Button height={32} onClick={p.onNew} testId="new-look">New</Button>
             <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">Send to wall</Button>
-            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">Save</Button>
+            <Button height={32} kbd="⇧⌘S" onClick={p.onSaveAs} testId="save-look-as">Save as…</Button>
+            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
+              {p.dirty ? 'Save •' : 'Save'}
+            </Button>
           </>
         }
       />

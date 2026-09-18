@@ -28,11 +28,28 @@ export function useUserPresets() {
     });
   }, []);
 
-  /** Snapshot the current look as a new preset, keep it, and hand the file over. */
+  /**
+   * Snapshot the current look as a **new** saved look. Save as, in other words.
+   *
+   * No longer hands a file over as a side effect. Saving and exporting are two
+   * different intentions — one keeps your work where you can get back to it,
+   * the other produces something to send someone — and doing both on one
+   * button meant every save put a file in Downloads whether or not anybody
+   * wanted one, while there was no way at all to save over the look you were
+   * already working on. `exportPreset` is the file.
+   */
   const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null, song: SongRef | null = null): UserPreset => {
     const p = makeUserPreset(name, description, settings, contract, injectStyles, liquids, song);
     upsert(p);
-    downloadText(presetFileName(p), serializePreset(p));
+    return p;
+  }, [upsert]);
+
+  /** Save over a look that already exists, keeping its id, name and song. */
+  const saveOver = useCallback((id: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null): UserPreset | null => {
+    const existing = loadUserPresets().find(p => p.id === id);
+    if (!existing) return null;
+    const p: UserPreset = { ...existing, settings, contract, injectStyles, liquids };
+    upsert(p);
     return p;
   }, [upsert]);
 
@@ -48,7 +65,7 @@ export function useUserPresets() {
     setPresets((prev) => { const next = prev.filter((p) => p.id !== id); saveUserPresets(next); return next; });
   }, []);
 
-  return { presets, upsert, saveCurrent, exportPreset, importFile, remove, persist };
+  return { presets, upsert, saveCurrent, saveOver, exportPreset, importFile, remove, persist };
 }
 
 /** A user preset in the shape the menus and the sequencer already understand. */
