@@ -29,6 +29,7 @@
 import { ROOM_STALE_MS } from './roomStir';
 import { getSceneValue, type SceneReading } from './sceneSense';
 import { getAudioValue, type AudioFeatureKey } from '../constants';
+import type { ModulatorFeature, Modulators } from './modulators';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
 import { PINNABLE } from './deskPins';
@@ -96,10 +97,20 @@ export interface PatchContext {
   room: SceneReading | null;
   film: SceneReading | null;
   sound: AudioData | null;
+  /**
+   * The LFOs and envelopes.
+   *
+   * The odd one out here, and deliberately: room, film and sound all answer
+   * "what is happening out there", and this answers "what did you ask for".
+   * The bay does not care — a source is a source — which is the whole reason
+   * adding it was a day's work rather than a rewrite.
+   */
+  shape: Modulators | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
   soundImpact: number;
+  shapeImpact: number;
 }
 
 const sourceOf = (m: SceneMapping): PatchSource => m.source ?? 'room';
@@ -122,6 +133,12 @@ function liveValue(
   if (source === 'sound') {
     if (ctx.soundImpact <= 0 || !ctx.sound) return null;
     return { value: getAudioValue(ctx.sound, feature as AudioFeatureKey), impact: ctx.soundImpact };
+  }
+  // Shapes have no staleness: an LFO is never out of date, and an envelope
+  // that has not been fired reads zero, which is already "nothing to say".
+  if (source === 'shape') {
+    if (ctx.shapeImpact <= 0 || !ctx.shape) return null;
+    return { value: ctx.shape.value(feature as ModulatorFeature), impact: ctx.shapeImpact };
   }
   const reading = source === 'film' ? ctx.film : ctx.room;
   const impact = source === 'film' ? ctx.filmImpact : ctx.roomImpact;

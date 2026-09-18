@@ -30,6 +30,16 @@ export interface MidiHost {
   action: (action: MidiAction) => void;
   applyPreset: (presetId: string) => void;
   selectDye: (paletteIndex: number) => void;
+  /**
+   * A note was struck, with its velocity.
+   *
+   * Separate from the bindings on purpose: this fires for *every* note-on,
+   * whatever that note is also bound to, because an envelope is not a thing
+   * you assign a pad to — it is what the pad being hit feels like. A grid of
+   * preset pads therefore also plays the envelopes, which is the behaviour a
+   * synth has and the reason the envelopes are worth having at all.
+   */
+  noteStruck?: (velocity: number) => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -153,6 +163,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const src = eventSource(e);
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
+    // Ahead of the bindings, and regardless of them: see `noteStruck`.
+    if (e.kind === 'noteon') hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)));
     if (now - eventTick.current > 80) { eventTick.current = now; setLastEvent({ source: src, value: e.value, at: now }); }
 
     /*

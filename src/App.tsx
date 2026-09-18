@@ -1997,6 +1997,8 @@ export default function App() {
       action: runAction,
       applyPreset: cuePreset,
       selectDye,
+      // Every note plays the envelopes, whatever else that pad is for.
+      noteStruck: (velocity) => visualizerRef.current?.fireEnvelopes?.(velocity),
     },
     {
       activePresetId,

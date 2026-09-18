@@ -206,6 +206,40 @@ LTC over an audio input is not here. It is a different problem — a decoder
 rather than a parser — and worth doing only for rooms that have no MIDI to the
 desk at all.
 
+## Shapes: LFOs and envelopes
+
+The patch bay already routed a source onto any setting with a bipolar depth —
+it just had nothing to plug in that was not a sensor. The room, the film and the
+sound all answer "what is happening out there"; **Shapes** answers "what did you
+ask for".
+
+Four LFOs and two envelopes, in **Settings → Sound Mappings** alongside the rest:
+
+| | |
+|---|---|
+| LFO 1 | sine, eight bars |
+| LFO 2 | sine, two bars |
+| LFO 3 | triangle, one bar |
+| LFO 4 | stepped — a new value held flat, every beat |
+| Envelope 1 | snap: up in a frame, gone in a third of a second |
+| Envelope 2 | swell: up in a tenth, gone in a second and a half |
+
+**The LFOs run on bars, not on seconds.** A free-running LFO against music
+drifts in and out of time and everything it touches looks almost-but-not-quite
+deliberate. These are divisions of a bar and stay put against MIDI clock, a
+tapped tempo or the beat clock listening; with no tempo at all they run the same
+divisions at 120.
+
+**The envelopes are fired, not free.** Every MIDI note fires both, whatever else
+that pad is bound to — an envelope is not something you assign a pad to, it is
+what the pad being hit feels like. Velocity scales them, so a soft note is a
+small one. Without a controller they sit at zero, which is the honest answer.
+
+`npm run shapes` checks the arithmetic: that a one-bar LFO is back where it
+started one bar later and gets there twice as fast at twice the tempo, that the
+triangle climbs at one rate and the sine does not, that the stepped one holds
+and jumps, and that the snap is over while the swell is still going.
+
 ## Art-Net: the room's lights follow the plate
 
 Every lighting box takes Art-Net *in* so a desk can drive the visuals. This does
@@ -496,6 +530,7 @@ src/
     flashGuard.ts              # Three flashes a second, and no more
     tempo.ts                   # MIDI clock, tap and a typed bpm, for when the microphone is not the best source
     timecode.ts                # MIDI timecode: the desk's position, so the sequence follows the running order
+    modulators.ts              # LFOs on the bar and fired envelopes, as patch-bay sources
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye

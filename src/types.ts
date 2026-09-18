@@ -99,7 +99,14 @@ export type SceneFeature =
  * the microphone or whatever is plugged into it. Absent means `room`, because
  * every mapping written before there was a choice was a room mapping.
  */
-export type PatchSource = 'room' | 'film' | 'sound';
+/**
+ * What may drive a patch.
+ *
+ * The first three are sensors — the room, the film and the sound all report
+ * what is happening. `shape` is the LFOs and envelopes: what was asked for
+ * rather than what was noticed. See `lib/modulators.ts`.
+ */
+export type PatchSource = 'room' | 'film' | 'sound' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -293,7 +300,9 @@ export interface VisualizerSettings {
   sceneDrive: number;         // how hard the room's motion stirs the liquid (0 = off)
   sceneHands: number;         // how strongly the people the sensor holds press and blow on the plate (0 = off)
   sceneImpact: number;        // master depth over every patch whose source is the room
-  soundImpact: number;        // master depth over every patch whose source is the sound
+  soundImpact: number;
+  /** Master depth over every patch driven by an LFO or an envelope. */
+  shapeImpact: number;        // master depth over every patch whose source is the sound
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -460,6 +469,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // look has ever carried a sound patch, so there is nothing to protect — and a
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
+  shapeImpact: 1,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

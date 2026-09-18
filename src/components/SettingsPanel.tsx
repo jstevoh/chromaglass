@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
+import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
@@ -176,11 +177,14 @@ const AUDIO_FEATURES: [AudioFeature, string][] = [
   ['complexity', 'Complexity'],
 ];
 
-/** The three things a patch can listen to, and what each one is called. */
+/** What a patch can listen to, and what each one is called. */
 const PATCH_SOURCES: [PatchSource, string][] = [
   ['room', 'Room'],
   ['film', 'Film'],
   ['sound', 'Sound'],
+  // The odd one out, and last for that reason: the other three report what is
+  // happening in the room, and this one is a shape you asked for.
+  ['shape', 'Shapes'],
 ];
 
 /**
@@ -192,7 +196,9 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  * can tell you.
  */
 const featuresFor = (source: PatchSource): [string, string][] =>
-  source === 'sound' ? AUDIO_FEATURES : SCENE_FEATURES;
+  source === 'sound' ? AUDIO_FEATURES
+    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
+    : SCENE_FEATURES;
 
 /**
  * What a patch may be plugged into. One list, in `sceneMap`, so the dropdown

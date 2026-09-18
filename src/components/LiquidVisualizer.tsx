@@ -24,6 +24,7 @@ import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
+import { Modulators } from '../lib/modulators';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -247,6 +248,14 @@ export interface LiquidVisualizerHandle {
    */
   loadMark: (source: CanvasImageSource, width: number, height: number) => void;
   clearMark: () => void;
+  /**
+   * Fire the envelopes — a MIDI note, a pad, a finger on the phone.
+   *
+   * On the handle rather than reached through settings because it is an event,
+   * and because the thing firing it should not have to know what an envelope
+   * is. `velocity` scales how far they swing, so a hard note hits harder.
+   */
+  fireEnvelopes: (velocity?: number) => void;
   /**
    * The element the film is playing in, so it can be read back as a sensor
    * as well as shown through the dye. Null when nothing is loaded.
@@ -2136,6 +2145,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * picture and one per plate, and allocating those sixty times a second to
    * throw them away shows up as a stutter long before it shows up as a bug.
    */
+  /**
+   * The LFOs and envelopes, stepped here because this is where the frame is.
+   *
+   * Handed out on the visualizer's handle so a note, a pad or a phone tap can
+   * fire the envelopes without any of them needing to know what one is.
+   */
+  const modRef = useRef(new Modulators());
   const patchRef = useRef<PatchBay | null>(null);
   if (!patchRef.current) patchRef.current = new PatchBay(settings);
   const gelAngleRef = useRef(0);
@@ -2586,6 +2602,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
     },
     clearMark: () => { markRef.current = null; },
+    fireEnvelopes: (velocity = 1) => modRef.current.fire(velocity),
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
@@ -4502,9 +4519,11 @@ void main() {
         room: sceneRef?.current ?? null,
         film: filmSenseRef?.current ?? null,
         sound: currentAudioData,
+        shape: modRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
+        shapeImpact: settingsRef.current.shapeImpact ?? 1,
       }, settingsRef.current.layerCount ?? 1, performance.now());
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
@@ -4551,6 +4570,9 @@ void main() {
           about how far the liquid has been pushed. Paused, it holds where it
           is instead of running on in the dark and coming back somewhere else.
         */
+        // The LFOs, on the bar rather than on the second: see `modulators.ts`.
+        if (isActiveRef.current) modRef.current.step(realDt, tempoRef?.current?.bpm ?? 0);
+
         if (isActiveRef.current) {
           phraseRef.current = phrasingRef.current.step(
             realDt,
