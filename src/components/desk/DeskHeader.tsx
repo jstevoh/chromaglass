@@ -70,6 +70,30 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         clipped. Taking the switch out of the flow centres it exactly and leaves
         the sides their natural width.
       */}
+      {/*
+        Centred out of the flow only while there is room for it.
+
+        Taking the switch out of the flow centres it exactly, and at 1440 that
+        is right. But out of the flow it also stops pushing anything, so as the
+        window narrows the right-hand cluster slides straight underneath it —
+        measured at 1024, a laptop width: the switch was painted on top of the
+        Mic, Wall and MIDI dots. Those dots became clickable recently, so
+        reaching for Mic there did not merely miss, it switched the desk to
+        Design.
+
+        Putting it back into the flow below a width fixes the overlap and
+        brings back the thing taking it out of the flow was for: in the flow
+        its position depends on the two sides, so switching Perform to Design
+        — which adds Save and Send to wall on the right — slides it sideways,
+        and the one control whose job is to be in the same place every time
+        moves when you use it. Measured at 1280 it was still overlapping
+        anyway, because 1280 is not where it stops fitting.
+
+        So it stays pinned, and the *labels* on the status dots give way
+        instead. See `StatusDot`: they are most of the right-hand cluster's
+        width, and a dot without its word is still a dot you can see, click
+        and hover.
+      */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div className="pointer-events-auto">
           <Segmented

@@ -439,7 +439,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bassBoost"
         />
         <Slider
-          label="Global Speed"
+          label="Speed"
           value={settings.globalSpeed}
           min={0.0}
           max={1.0}
@@ -663,10 +663,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
       </section>
 
-      {/* Audio Mappings Section */}
+      {/* Sound Mappings Section */}
       <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('audio-mappings') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Activity size={12} /> Audio Mappings
+          <Activity size={12} /> Sound Mappings
         </h3>
 
         {/*
@@ -2206,11 +2206,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </div>
       </section>
 
-      <div className="mt-12 pt-8 border-t border-white/10">
-        <p className="text-[9px] leading-relaxed opacity-30 italic">
-          "The Squish Plate effect was the hallmark of American light shows... simulating pressing two glass clock faces together."
-        </p>
-      </div>
+      {/*
+        The panel used to be one long scroll and this was its footer: one line
+        of history at the bottom of everything. It is now seventeen sections
+        shown one at a time, so that footer sits under every one of them — a
+        note about the Squish Plate under Controller, under Sound, under
+        Projectors. A line of flavour in the wrong place reads as a mistake,
+        which is worse than no line at all, so it has gone rather than been
+        repeated seventeen times or guarded by a condition.
+      */}
         </div>
       </div>
       </PinContext.Provider>

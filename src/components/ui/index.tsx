@@ -193,7 +193,19 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title }: {
         className="h-1.5 w-1.5 rounded-full"
         style={{ background: on ? (tone === 'live' ? 'var(--color-live)' : 'var(--color-ok)') : 'var(--color-knob-off)' }}
       />
-      <span className={`text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
+      {/*
+        The label is what gives way when the header runs out of room.
+
+        These sit in the right-hand cluster of a header whose middle is a
+        switch pinned to the centre of the *window*, so the cluster's width is
+        the only thing deciding whether the two collide — and four labels
+        ("Mic", "Wall", "APC40 mkII", "Phone") are most of that width. Below
+        1400 they go and the dots remain: still coloured, still clickable,
+        still carrying the tooltip that says what they are and what clicking
+        does. A dot with no word beside it is worth more than a word painted
+        underneath a control.
+      */}
+      <span className={`hidden min-[1400px]:inline text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
     </>
   );
   const tip = title ?? `${label}: ${on ? 'yes' : 'no'}`;

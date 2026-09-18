@@ -1752,7 +1752,7 @@ export default function App() {
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
       { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
-      { id: 'lucky',     name: 'Random look (replaces everything)', kind: 'Actions', run: triggerLucky },
+      { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];
 
@@ -1773,7 +1773,10 @@ export default function App() {
     }));
 
     const opening: Command[] = [
-      { id: 'open-settings', name: 'Settings',        kind: 'Open', run: openAllSettings },
+      // Named for the words on the button that does the same thing. It read
+      // "Settings", so typing what the button says — "all settings" — matched
+      // nothing at all, out of sixty-eight commands.
+      { id: 'open-settings', name: 'All settings', kind: 'Open', run: openAllSettings },
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
       { id: 'midi-activity', name: showActivity ? 'Hide what the controller is doing' : 'Show what the controller is doing',
         kind: 'Open', run: () => setShowActivity(v => !v) },
@@ -1845,6 +1848,12 @@ export default function App() {
   const [showSave, setShowSave] = useState(false);
 
   /** The lamps in both desks' headers, and the line along the bottom. */
+  /**
+   * Whether the cue bar is occupying the bottom centre of a narrow screen.
+   * The minimise chips live there too and have to give way to it.
+   */
+  const cueBarUp = !deskUp && !!(cued || fading > 0 || previousLook.current);
+
   const deskDots = useMemo(() => ({
     mic: audioSource !== 'none',
     wall: isCasting,
@@ -2115,7 +2124,7 @@ export default function App() {
                       }`}
                     >
                       <span className="text-[11px] font-bold uppercase tracking-wider flex-1">Auto</span>
-                      <span className="text-[8px] opacity-50">follows music</span>
+                      <span className="text-[8px] opacity-50">the music picks</span>
                     </button>
                     {COLOR_HARMONIES.map((harmony, idx) => (
                       <button
@@ -2467,12 +2476,24 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
+      {/*
+        These share the bottom centre with the cue bar, which is the one thing
+        that turns up there unannounced: `fixed bottom-6 left-1/2` on both, and
+        the cue bar's higher z-index, so cueing a look on a narrow screen
+        painted it straight over Hide UI and Clean Screen and neither could be
+        pressed. Nobody saw it because it needs a cued look to happen at all —
+        which is why the check that found it runs after the suite has used the
+        app rather than on a page that has just loaded.
+
+        So they step up out of its way while it is there, rather than fight it
+        for the same six pixels.
+      */}
       {!deskUp && (
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+      <div className={`absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 transition-all duration-200 ${cueBarUp ? 'bottom-24' : 'bottom-6'}`}>
         <button
           onClick={() => setIsMinimized(!isMinimized)}
           className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[11px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
-          title={isMinimized ? "Show Controls" : "Hide Controls"}
+          title={isMinimized ? 'Bring the side panels back' : 'Slide the side panels out of the way. Clean Screen next to it hides everything, including the cursor.'}
         >
           {isMinimized ? <Eye size={14} /> : <EyeOff size={14} />}
           {isMinimized ? 'Show UI' : 'Hide UI'}
