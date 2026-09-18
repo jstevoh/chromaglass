@@ -18,13 +18,41 @@ place.
 
 ## What you need
 
-- A machine with a GPU worth the name. A Pi 5 will hold 384² and often 512²;
-  a Pi 4 will not, and the quality governor will spend the evening stepping
-  down. Any x86 mini PC of the last five years is more comfortable and no
-  larger.
+- **A GPU with float render targets.** This is the one hard requirement and it
+  is pass or fail: the solver needs `EXT_color_buffer_float` and a working
+  `RGBA32F` readback, and without them the app falls back to the 192²
+  JavaScript solver, which is not a show. Open the app with `?debug` and read
+  `chromaglassDebug().status` — `gpuUnavailable` says exactly this. A Pi 5's
+  VideoCore VII does OpenGL ES 3.1 and Vulkan 1.2, so WebGL2 is there; whether
+  Chromium's V3D path exposes that extension is a question for the board in
+  front of you, not for a spec sheet. **Test it before buying six of them.**
 - A USB audio input. The built-in analogue input on a Pi does not exist, and
   a cheap USB microphone is better than any of the alternatives.
 - Node 20 or newer, Chromium, and `git`.
+
+## How much machine
+
+Honestly: unmeasured on real hardware, so what follows is the shape of the
+problem rather than a promise.
+
+The solver runs about seventy full-grid passes per step per layer — two
+pressure projections at twenty-four Jacobi iterations each is fifty-two of them
+on their own — and that cost scales with the grid squared. The renderer is one
+very large fragment shader over the whole output, and that cost scales with the
+projector's pixels.
+
+Measured here, on a software rasteriser: going from 256² to 512² cost about
+2.3x the frame time, while cutting the rendered pixels by sixteen changed
+nothing outside the run-to-run noise. So on that machine the solver dominates.
+A tile-based mobile GPU has the opposite shape — cheap at many small passes,
+expensive at a long shader — so do not carry that conclusion onto a Pi. Measure
+it there; the app reports its own frame time in the same debug object.
+
+Two things help on a weak machine, and both are already there: the quality
+governor drops the solver grid on its own within seconds, and `?dpr=0.75`
+renders fewer pixels than the screen has. The second is a query-string
+diagnostic rather than something the governor can reach, which is the right
+call on a laptop and worth knowing about on a box wired to a 1080p projector.
 
 ## Install
 

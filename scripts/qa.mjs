@@ -511,49 +511,61 @@ try {
   // picture. A control that is drawn and does nothing is worse than one that
   // is missing, and nothing in the suite would have noticed.
   //
-  // Measured on the canvas, because "the zoom did something" is a claim about
-  // the frame. A magnified plate has larger features in it, so the variance
-  // surviving a wide blur rises: the same dye across fewer, bigger shapes.
+  // Measured as how far the frame has travelled from the plate-wide one, which
+  // is the claim: not that magnification looks like anything in particular,
+  // but that the zoom moves the picture and moves it *gradually*. The first
+  // version of this check asserted a direction — that a magnified frame has
+  // less neighbour contrast, because bigger shapes — and that was wrong twice
+  // over: pushing in also raises the closeup's exposure, which throws a hard
+  // silhouette against dark ground, and the contrast went up tenfold rather
+  // than down. The feature was right and the check was wrong.
   {
-    const coarse = () => page.evaluate(() => {
+    const frame = () => page.evaluate(() => {
       const c = document.querySelector('#liquid-canvas');
       const o = document.createElement('canvas');
       o.width = 96; o.height = 54;
       const x = o.getContext('2d', { willReadFrequently: true });
       x.drawImage(c, 0, 0, o.width, o.height);
-      const d = x.getImageData(0, 0, o.width, o.height).data;
-      // Mean absolute difference between neighbouring pixels: high when the
-      // frame is full of small detail, low when it is a few big shapes.
-      let sum = 0, n = 0;
-      for (let y = 0; y < o.height; y++) {
-        for (let xx = 1; xx < o.width; xx++) {
-          const i = (xx + y * o.width) * 4, j = i - 4;
-          sum += Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]);
-          n++;
-        }
-      }
-      return sum / n;
+      return [...x.getImageData(0, 0, o.width, o.height).data];
     });
+    /** Mean absolute difference per channel, 0 for identical frames. */
+    const apart = (a, b) => {
+      let sum = 0;
+      for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
+      return sum / (a.length * 0.75);
+    };
+    const at = async (zoom) => {
+      await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
+      await settle(1800);
+      return frame();
+    };
 
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
-    await settle(1500);
-    const wide = await coarse();
+    await settle(1800);
+    const plate = await frame();
 
-    // Straight to the zoom, with no toggle touched: this is exactly the path
-    // that used to do nothing.
-    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 9 }));
-    await settle(2500);
-    const close = await coarse();
-    check('the zoom alone magnifies the plate, with no switch thrown',
-      close < wide * 0.85, `neighbour contrast ${wide.toFixed(1)} wide → ${close.toFixed(1)} at 9×`);
+    // The plate goes on moving under all of this, so measure how far it
+    // wanders on its own first: nothing below counts unless it clears this.
+    await settle(1800);
+    const drift = apart(plate, await frame());
 
-    // And it is a travel rather than a cut: halfway along, the frame is
-    // between the two rather than at one end of them.
-    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1 }));
-    await settle(1500);
-    const backHome = await coarse();
-    check('and coming back down lands at the plate again',
-      Math.abs(backHome - wide) < wide * 0.35, `${wide.toFixed(1)} → ${backHome.toFixed(1)}`);
+    // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
+    const far = apart(plate, await at(9));
+    check('the zoom alone moves the picture, with no switch thrown',
+      far > Math.max(6, drift * 4), `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift`);
+
+    // And it is a travel rather than a cut: a little way in is a little way
+    // along, not already at the far end. A hard switch scores the same here as
+    // at nine times, which is what it used to be.
+    const near = apart(plate, await at(1.4));
+    check('and a little way in is a little way along, not all of it',
+      near > drift && near < far * 0.8,
+      `${near.toFixed(1)} at 1.4× against ${far.toFixed(1)} at 9×`);
+
+    // Back to the plate, not stranded in the closeup.
+    const home = apart(plate, await at(1));
+    check('and it comes back to the plate again',
+      home < far * 0.5, `${home.toFixed(1)} back at 1×`);
 
     // The readout follows the zoom, not the old flag.
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));
