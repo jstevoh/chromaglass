@@ -157,7 +157,9 @@ export function DesignDesk(p: DesignDeskProps) {
               were working on and no way to begin from nothing. The dot on Save
               is whether there is anything to save.
             */}
-            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">Send to wall</Button>
+            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
+              <span className="hidden xl:inline">Send to&nbsp;</span>wall
+            </Button>
             <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
               {p.dirty ? 'Save •' : 'Save'}
             </Button>
