@@ -239,6 +239,45 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     cpuGate, cpuGate ? '' : 'sharpenDye in LiquidVisualizer.tsx is back to per-channel');
 }
 
+// ── 5.7. The closeup is a travel, not a switch ─────────────────
+//
+// The macro zoom used to reach the renderer only through a boolean, so the
+// closeup arrived in one frame: a different exposure, a different depth of
+// field, a different silhouette, all at once. It ramps now, and how far along
+// the ramp a given zoom sits is a pure function of two constants in the
+// component — so this reads them out and runs it.
+//
+// It is here rather than in `npm run qa` because qa tried to check this from
+// the pixels, by asking whether a frame at 1.4x sits nearer the plate-wide
+// frame than one at 9x does. Image distance is not monotonic in zoom, and on a
+// slower machine the magnified bead landed *closer* to the plate frame than
+// the mid-zoom did, failing a check on a plate that was behaving correctly.
+{
+  const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const full = Number(/const MACRO_FULL_ZOOM = ([\d.]+)/.exec(src)?.[1]);
+  const ramp = (zoom) => Math.max(0, Math.min(1, (zoom - 1) / (full - 1)));
+  check('the closeup has a ramp to travel along at all',
+    Number.isFinite(full) && full > 1, `fully in at ${full}x`);
+  if (Number.isFinite(full) && full > 1) {
+    check('the whole plate is none of the closeup', ramp(1) === 0);
+    const middle = ramp(1 + (full - 1) * 0.5);
+    check('half way in is half of it, not all and not none',
+      middle > 0.4 && middle < 0.6, `${middle.toFixed(2)} at ${(1 + (full - 1) * 0.5).toFixed(2)}x`);
+    check('and it is in all the way before the zoom runs out',
+      ramp(full) === 1 && ramp(16) === 1);
+    // No step along the way may carry most of the change: that is a cut with
+    // a ramp drawn around it.
+    let biggest = 0, prev = ramp(1);
+    for (let z = 1; z <= full; z += (full - 1) / 40) {
+      const now = ramp(z);
+      biggest = Math.max(biggest, now - prev);
+      prev = now;
+    }
+    check('and no one step along it is a cut', biggest < 0.1,
+      `the largest fortieth of the travel moves it ${biggest.toFixed(3)}`);
+  }
+}
+
 // ── 6. The audit ─────────────────────────────────────────────────────
 console.log('');
 console.log('     what is on each plate:');

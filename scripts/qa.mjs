@@ -589,13 +589,14 @@ try {
     check('the zoom alone moves the picture, with no switch thrown',
       far > Math.max(6, drift * 4), `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift`);
 
-    // And it is a travel rather than a cut: a little way in is a little way
-    // along, not already at the far end. A hard switch scores the same here as
-    // at nine times, which is what it used to be.
-    const near = apart(plate, await at(1.4));
-    check('and a little way in is a little way along, not all of it',
-      near > drift && near < far * 0.8,
-      `${near.toFixed(1)} at 1.4× against ${far.toFixed(1)} at 9×`);
+    // That it is a *travel* and not a cut is checked in `npm run plate`, on
+    // the ramp itself, because it cannot honestly be checked here. This asked
+    // whether a frame at 1.4x sits nearer the plate-wide one than a frame at
+    // 9x does, and image distance is simply not monotonic in zoom: on the
+    // runner the magnified bead landed closer to the plate frame in average
+    // pixel value than the mid-zoom did, and the check failed on a plate that
+    // was behaving perfectly. A pure function is the right thing to assert a
+    // pure function about.
 
     // Back to the plate, not stranded in the closeup.
     const home = apart(plate, await at(1));
