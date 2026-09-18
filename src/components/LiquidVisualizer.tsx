@@ -2788,37 +2788,54 @@ uniform float u_filmGain;          // maps the density above that level onto ful
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
 
-// Catmull-Rom bicubic weights
-vec4 cubic(float v) {
-  vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
-  vec4 s = n * n * n;
-  float x = s.x;
-  float y = s.y - 4.0 * s.x;
-  float z = s.z - 4.0 * s.y + 6.0 * s.x;
-  float w = 6.0 - x - y - z;
-  return vec4(x, y, z, w) * (1.0 / 6.0);
-}
-
-// Bicubic texture sampling — smooth C1 upscaling, eliminates grid aliasing
+// Bicubic texture sampling — Catmull-Rom, which passes through its samples.
+//
+// This used to be the cubic B-spline basis under a comment that said
+// Catmull-Rom, and the difference is the whole of why the plate looked soft.
+// B-spline does not interpolate: at a texel centre its weights are
+// (1, 4, 1)/6, so every fetch returned a blurred neighbourhood rather than the
+// value that was there. That is a low-pass of about 0.6 of a cell applied to
+// every sample the renderer takes — the dye, the normals, the interface line,
+// the lacing — before anything else got a chance to soften it. At 384 cells on
+// a 1080p projector one cell is nearly three pixels, so it read as an eight
+// pixel smear over the whole plate.
+//
+// Catmull-Rom has the same support and the same cost bracket, and at a texel
+// centre its weights are (0, 1, 0): what is in the cell is what comes out.
+// Between centres it reconstructs with a mild negative lobe, which is what
+// gives a boundary its edge back.
+//
+// The nine taps of the full kernel collapse to five by dropping the corners,
+// whose combined weight is a couple of percent, and renormalising. The five
+// are bilinear fetches placed off-centre so hardware filtering does the inner
+// pair for free, which is the same trick the B-spline version used.
 vec4 textureBicubic(sampler2D tex, vec2 uv) {
   vec2 texSize = vec2(u_gridSize);
-  vec2 invTex = 1.0 / texSize;
-  uv = uv * texSize - 0.5;
-  vec2 fxy = fract(uv);
-  uv -= fxy;
-  vec4 xcubic = cubic(fxy.x);
-  vec4 ycubic = cubic(fxy.y);
-  vec4 c = uv.xxyy + vec2(-0.5, 1.5).xyxy;
-  vec4 s = vec4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
-  vec4 offset = c + vec4(xcubic.yw, ycubic.yw) / s;
-  offset *= invTex.xxyy;
-  vec4 s0 = texture(tex, offset.xz);
-  vec4 s1 = texture(tex, offset.yz);
-  vec4 s2 = texture(tex, offset.xw);
-  vec4 s3 = texture(tex, offset.yw);
-  float sx = s.x / (s.x + s.y);
-  float sy = s.z / (s.z + s.w);
-  return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy);
+  vec2 samplePos = uv * texSize;
+  vec2 texPos1 = floor(samplePos - 0.5) + 0.5;
+  vec2 f = samplePos - texPos1;
+
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-0.5 + 0.5 * f);
+  vec2 w12 = w1 + w2;
+  vec2 off12 = w2 / w12;
+
+  vec2 p0 = (texPos1 - 1.0) / texSize;
+  vec2 p3 = (texPos1 + 2.0) / texSize;
+  vec2 p12 = (texPos1 + off12) / texSize;
+
+  vec4 acc = texture(tex, vec2(p12.x, p0.y))  * (w12.x * w0.y)
+           + texture(tex, vec2(p0.x,  p12.y)) * (w0.x  * w12.y)
+           + texture(tex, vec2(p12.x, p12.y)) * (w12.x * w12.y)
+           + texture(tex, vec2(p3.x,  p12.y)) * (w3.x  * w12.y)
+           + texture(tex, vec2(p12.x, p3.y))  * (w12.x * w3.y);
+  float wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  // The negative lobe can undershoot past zero at a hard boundary. Every
+  // channel here is a density that is squared on decode, so a negative would
+  // come back as dye rather than as nothing: clamp before it can.
+  return max(acc / wsum, vec4(0.0));
 }
 
 // Hash-based film grain
@@ -2876,7 +2893,10 @@ float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
   for (int j = -2; j <= 2; j++) {
     for (int i = -2; i <= 2; i++) {
       vec2 offset = vec2(float(i), float(j)) * blurFluid;
-      float a = textureBicubic(tex, fuv + offset).a;
+      // Plain bilinear here, not the bicubic: this is twenty-five taps whose
+      // whole purpose is to blur, so reconstructing each one sharply first
+      // costs five fetches apiece to throw the sharpness away again.
+      float a = texture(tex, fuv + offset).a;
       result += a * w[(j + 2) * 5 + (i + 2)];
     }
   }

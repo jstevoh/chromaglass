@@ -26,3 +26,6 @@ coverage/
 
 # Unminified build used for profiling
 dist-dev/
+
+# Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
+scratch/

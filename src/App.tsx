@@ -246,6 +246,17 @@ export default function App() {
     */
     (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
       (key: string, value?: number) => { touch(key, value); };
+    /*
+      Set any setting from the harness.
+
+      `npm run detail` judges a frame by numbers, and the question it exists to
+      answer — how much of the softness is the solver and how much is the
+      renderer — needs the same plate photographed under several settings
+      rather than several plates. Driving the panel for that would mean a
+      different look each time; this changes one value on the running plate.
+    */
+    (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
+      (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
   }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   /** For the first-gesture handler, which is installed once and must not close over a stale value. */

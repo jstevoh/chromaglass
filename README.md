@@ -292,7 +292,7 @@ The same build serves three situations, and only the assumed headroom differs:
 
 | Tier | How it runs | Ladder |
 |---|---|---|
-| **Hosted** | chromaglass.web.app | up to 384² at 1.5x pixels — never stutters on a first visit |
+| **Hosted** | chromaglass.web.app | up to 512² at 1.5x pixels — starts low and climbs only if the machine holds it |
 | **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
 | **Native** | a desktop shell around `dist/` (not built yet) | as local |
 

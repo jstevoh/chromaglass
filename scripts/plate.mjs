@@ -26,6 +26,7 @@ import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
+import fs from 'node:fs';
 
 const STYLES = ['drop', 'pour', 'spray', 'splatter', 'streak'];
 /** Keys that are a plate but not a preset in the menu. */
@@ -109,6 +110,51 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   check('every bottle lays enough dye to show the colour you picked',
     invisible.length === 0,
     invisible.map(l => `${l.id} at ${l.injectAmount}`).join(', '));
+}
+
+// ── 5.5. The reconstruction filter is interpolating ─────────────
+//
+// Every sample the renderer takes of the dye goes through `textureBicubic`,
+// and for a long time that function was the cubic B-spline basis under a
+// comment that said Catmull-Rom. B-spline does not pass through its samples:
+// at a texel centre its weights are (1, 4, 1)/6, so each fetch returned a
+// blurred neighbourhood instead of the value that was there. Nothing failed,
+// no frame was wrong, the whole plate was simply soft — which is the kind of
+// bug that survives for months because it looks like a choice.
+//
+// This reads the four weight expressions out of the shipped shader and runs
+// them, so it tests the app rather than a copy of the maths. Two properties
+// tell the two families apart with no tuning in them at all: the weights at a
+// texel centre, and how steeply the kernel can reconstruct a step edge.
+{
+  const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const body = src.slice(src.indexOf('vec4 textureBicubic'));
+  const weights = [...body.slice(0, body.indexOf('vec2 w12')).matchAll(/vec2 w[0-3] = ([^;]+);/g)].map(m => m[1]);
+  check('the shader still has four reconstruction weights to read', weights.length === 4,
+    `found ${weights.length}`);
+  if (weights.length === 4) {
+    const at = (f) => weights.map(w => Function('f', `return ${w};`)(f));
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
+    const centre = at(0);
+    check('a sample at a texel centre returns that texel, not its neighbourhood',
+      Math.abs(centre[1] - 1) < 1e-6 && Math.abs(centre[0]) + Math.abs(centre[2]) + Math.abs(centre[3]) < 1e-6,
+      centre.map(v => v.toFixed(3)).join(' '));
+    const off = [0.25, 0.5, 0.75].map(f => sum(at(f)));
+    check('the weights still sum to one everywhere between centres',
+      off.every(v => Math.abs(v - 1) < 1e-6), off.map(v => v.toFixed(4)).join(' '));
+    // A unit step through the kernel, sampled finely: how hard is the hardest
+    // edge it can draw? The B-spline this replaced managed 0.75 per texel.
+    const step = (i) => (i >= 0 ? 1 : 0);
+    let steepest = 0, prev = null;
+    for (let x = -3; x <= 3; x += 1 / 32) {
+      const i = Math.floor(x), k = at(x - i);
+      const v = k[0] * step(i - 1) + k[1] * step(i) + k[2] * step(i + 1) + k[3] * step(i + 2);
+      if (prev !== null) steepest = Math.max(steepest, Math.abs(v - prev) * 32);
+      prev = v;
+    }
+    check('a boundary comes back at least as hard as the texels that hold it',
+      steepest > 1.0, `${steepest.toFixed(2)} per cell across a step (B-spline managed 0.75)`);
+  }
 }
 
 // ── 6. The audit ─────────────────────────────────────────────────────

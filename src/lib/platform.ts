@@ -87,12 +87,20 @@ export function renderScale(): number {
 /**
  * The quality ladder for a tier, best rung first, plus where to start on it.
  *
- * Hosted caps at 384² and never renders above 1.5x pixels: a page someone is
- * trying for the first time must not stutter, and the governor can climb from
- * the start rung if there's room. Local and native run the full ladder — the
- * point of running it yourself is to use the whole machine. Software GL gets
- * only the CPU solver; emulated float render targets are far slower than the
- * JavaScript solver and the governor would only find that out the slow way.
+ * Hosted never renders above 1.5x pixels and still starts low, but it no
+ * longer stops at 384². The cap was a safety net written as a ceiling, and a
+ * ceiling is the wrong shape for it: the governor already measures the real
+ * frame interval and steps down within a couple of seconds, so a machine that
+ * cannot hold 512² loses nothing by being offered it, while a machine that can
+ * was being held at cells nearly three screen pixels wide on a 1080p
+ * projector — which is most of what "the liquids look soft" turned out to be.
+ * What the hosted page still will not do is 768² or above 1.5x pixels: that is
+ * where a first visit on an unknown laptop starts costing more than it returns.
+ *
+ * Local and native run the full ladder — the point of running it yourself is
+ * to use the whole machine. Software GL gets only the CPU solver; emulated
+ * float render targets are far slower than the JavaScript solver and the
+ * governor would only find that out the slow way.
  */
 export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: QualityRung[]; start: number } {
   const dpr = devicePixels();
@@ -101,7 +109,8 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
   const rungs: QualityRung[] =
     tier === 'hosted'
       ? [
-          { grid: 384, dpr: Math.min(dpr, 1.5) },
+          { grid: 512, dpr: Math.min(dpr, 1.5) },
+          { grid: 512, dpr: 1 },
           { grid: 384, dpr: 1 },
           { grid: 256, dpr: 1 },
           { grid: 'cpu', dpr: 1 },
