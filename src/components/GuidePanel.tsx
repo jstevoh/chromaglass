@@ -114,7 +114,7 @@ const SECTIONS: Section[] = [
         <H>When something is wrong</H>
         <Rows items={[
           ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Inputs → Sound); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
-          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Inputs → Audio Mappings.</>],
+          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Inputs → Sound Mappings.</>],
           ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
           ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and Thin Film are photograph-only — they do nothing in the light-show render.</>],
@@ -270,7 +270,7 @@ const SECTIONS: Section[] = [
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],
           ['Beat Prediction', <>A phase-locked beat clock. The microphone hears a kick after it happens, so the clock learns the tempo and fires the next one <Em>early</Em>. <Em>Beat Lead</Em> is how early, in milliseconds.</>],
         ]} />
-        <H>Audio Mappings</H>
+        <H>Sound Mappings</H>
         <P>
           Four destinations — velocity, density, colour, rotation — each fed by one of
           eight features: volume, bass, mid, treble, energy, timbre, complexity, or none.

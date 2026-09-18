@@ -53,10 +53,18 @@ export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
 
 const RANGE = PIN_RANGE;
 
-/** How a few of them read better than a bare percentage. */
+/**
+ * How a few of them read better than a bare percentage.
+ *
+ * Zoom does: `4.00×` is a magnification anyone can picture. Speed did not.
+ * It rode 0.005 to 0.3 and printed `0.022`, which is the only number on
+ * either desk that is not a percentage or a unit, and which tells you
+ * nothing — not how fast it is, not how much room is left, not which way is
+ * more. Every other ride beside it reads as a share of its travel, so this
+ * one does too.
+ */
 const READS: Partial<Record<string, (v: number) => string>> = {
-  globalSpeed: v => v.toFixed(3),
-  macroZoom:   v => `${v.toFixed(2)}×`,
+  macroZoom: v => `${v.toFixed(2)}×`,
 };
 
 /** The Dimmer's handle is white because it is the one that can black the room out. */
@@ -316,9 +324,23 @@ export function PerformDesk(p: PerformDeskProps) {
               testId="toggle-beat"
             />
           </div>
-          <p className="mt-3 pb-2 text-[12px] text-faint">
-            {p.midiName ? `${p.midiName} · a CC on a fader moves it here too` : 'No controller. Settings → MIDI to learn one.'}
-          </p>
+          {/*
+            The line that says there is no controller is the one place someone
+            reads when their controller is not working, and it used to spell
+            out a route — "Settings → MIDI" — for them to walk by hand. It is
+            a button now: it says the same thing and goes there.
+          */}
+          {p.midiName ? (
+            <p className="mt-3 pb-2 text-[12px] text-faint">{`${p.midiName} · a CC on a fader moves it here too`}</p>
+          ) : (
+            <button
+              onClick={p.onMidi}
+              className="mt-3 pb-2 text-left text-[12px] text-faint underline decoration-dotted underline-offset-2 hover:text-text-2"
+              data-testid="no-controller-hint"
+            >
+              No controller yet — set one up
+            </button>
+          )}
         </div>
         )}
         {/*

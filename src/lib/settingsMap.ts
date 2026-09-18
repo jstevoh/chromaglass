@@ -47,7 +47,7 @@ export interface SettingsSection {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'audio-input', name: 'Sound', category: 'inputs',
     terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration song' },
-  { id: 'audio-mappings', name: 'Audio Mappings', category: 'inputs',
+  { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
     terms: 'sound bass mid treble energy timbre map drive reactive band patch patches impact modular route routing source' },
   { id: 'room', name: 'The Room', category: 'inputs',
     terms: 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror presence patch patches mapping map route routing modular source layer plate sound film bass drive impact' },

@@ -1508,6 +1508,65 @@ try {
     check('and nothing is smaller than 24px', legible.small.length === 0, legible.small.slice(0, 6).join(', '));
   }
 
+  // ── Nothing is painted on top of anything you can click ───────────
+  /*
+    Found by a usability pass over the shipped build, at 1024 — a laptop width.
+
+    The desk header centres the Perform / Design / Sequence switch by taking it
+    out of the flow, which is exact and, out of the flow, stops it pushing
+    anything. So as the window narrows the right-hand cluster slides underneath
+    it, and at 1024 the switch was painted over the Mic, Wall and MIDI dots.
+    Those dots had just been made clickable, so reaching for Mic did not merely
+    miss — it switched the desk to Design.
+
+    Nothing existing could have caught it. The duplicate-control check counts
+    testids, the legibility check measures type, and both are happy with two
+    controls in the same place. This asks the only question that matters: click
+    the middle of each control, and is the control what you hit?
+
+    An element scrolled out of a list is not covered, it is out of view, so the
+    walk up the clipping ancestors comes first. Without it a long cue list
+    reports every row below the fold and the check drowns in its own noise —
+    which is what the first draft of it did.
+  */
+  {
+    const coveredAt = async (w, h) => {
+      await page.setViewportSize({ width: w, height: h });
+      await settle(1200);
+      return page.evaluate(() => {
+        const inView = (el) => {
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const cs = getComputedStyle(p);
+            if (/auto|scroll|hidden/.test(cs.overflowY + cs.overflowX)) {
+              const pr = p.getBoundingClientRect();
+              if (cy < pr.top - 1 || cy > pr.bottom + 1 || cx < pr.left - 1 || cx > pr.right + 1) return false;
+            }
+          }
+          return cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight;
+        };
+        const out = [];
+        for (const el of document.querySelectorAll('button, input, select, [role="tab"]')) {
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height || !inView(el)) continue;
+          const top = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+          if (!top || el === top || el.contains(top) || top.contains(el)) continue;
+          const me = el.dataset.testid || el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 20) || el.tagName;
+          const by = top.dataset?.testid || (top.textContent || '').trim().slice(0, 20) || top.tagName;
+          out.push(`${me} under ${by}`);
+        }
+        return out;
+      });
+    };
+    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860]]) {
+      const hit = await coveredAt(w, h);
+      check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
+    }
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await settle(900);
+  }
+
   // ── Nothing is on the screen twice ────────────────────────────────
   //
   // The Band button was in the sound picker twice — the same markup pasted

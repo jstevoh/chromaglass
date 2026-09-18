@@ -124,7 +124,7 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
 }
 
 export const ACTION_LABELS: Record<MidiAction, string> = {
-  'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Random',
+  'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',

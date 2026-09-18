@@ -638,6 +638,43 @@ check('and the Sound section can choose the source, not just the device',
 check('and the sections the dots aim at exist',
   ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 
+// ── One name per thing ──────────────────────────────────────────────
+/*
+  A usability pass over the shipped build found the same idea wearing several
+  names, which is the kind of thing that only shows up when you read every
+  screen at once and is invisible in any one of them.
+
+  These are cheap to check and were all real: the section called "Audio
+  Mappings" in an app whose every control says Sound; the one setting labelled
+  "Global Speed" in the panel and "Speed" on the desk; and the palette command
+  named "Settings" while the button that does the same thing says "All
+  settings…", so typing the words on the button matched nothing at all.
+*/
+const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const guide = readFileSync(join(root, 'src/components/GuidePanel.tsx'), 'utf8');
+check('the app says Sound, never Audio, to the person using it',
+  !/name: 'Audio Mappings'/.test(readFileSync(join(root, 'src/lib/settingsMap.ts'), 'utf8'))
+  && !/> Audio Mappings/.test(panel) && !/Inputs → Audio Mappings/.test(guide));
+check('and one setting does not answer to two names',
+  !/label="Global Speed"/.test(panel) && /label="Speed"/.test(panel));
+check('and the palette finds the button by the words on it',
+  /id: 'open-settings', name: 'All settings'/.test(app));
+check('and one action has one name',
+  /'lucky': 'Randomise'/.test(readFileSync(join(root, 'src/lib/midi.ts'), 'utf8')));
+
+// A footer written for one long scroll, now under every section of seventeen.
+check('no section carries another section\'s footnote',
+  !/Squish Plate effect was the hallmark/.test(panel));
+
+// The one number on either desk that was neither a percentage nor a unit.
+const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
+check('every ride reads as a share of its travel, or a unit',
+  !/globalSpeed: v => v\.toFixed\(3\)/.test(perform) && /macroZoom: v => `\$\{v\.toFixed\(2\)\}×`/.test(perform));
+
+// A line telling you where to go, where a button could take you.
+check('the no-controller line goes there instead of naming the route',
+  /data-testid="no-controller-hint"/.test(perform) && !/Settings → MIDI to learn one/.test(perform));
+
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));
 check('the desk starts with controls that exist', badRides.length === 0, badRides.join(', '));
