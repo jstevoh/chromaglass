@@ -145,6 +145,27 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
   return null;
 }
 
+/**
+ * The look the app opens on.
+ *
+ * It was Classic every time, which is a fine look and a poor introduction:
+ * the plate can do thirty other things and the first one anybody saw was
+ * always the same one. Chosen once per load rather than per render, because
+ * "the look you arrived on" should not change under you when React re-renders.
+ *
+ * Macro looks are left out — a closeup of one bead is a strange first
+ * impression of a light show — and `?look=<id>` pins it, which is how the
+ * harnesses stay deterministic without the app having to be boring.
+ */
+export const OPENING_LOOK: string = (() => {
+  try {
+    const asked = new URLSearchParams(window.location.search).get('look');
+    if (asked && PRESETS.some(p => p.id === asked)) return asked;
+  } catch { /* no window: the default below */ }
+  const pool = PRESETS.filter(p => !p.settings.macroMode);
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : 'classic';
+})();
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
 
@@ -310,10 +331,10 @@ export default function App() {
    * every key. The sequencer glides settings continuously through a show, so
    * that ran on every frame of every transition.
    */
-  const [pinnedPresetId, setPinnedPresetId] = useState<string | null>('classic');
+  const [pinnedPresetId, setPinnedPresetId] = useState<string | null>(OPENING_LOOK);
   const [settings, setSettings] = useState<VisualizerSettings>(() => {
-    const classic = PRESETS.find(p => p.id === 'classic');
-    const base = classic ? { ...DEFAULT_SETTINGS, ...classic.settings } : { ...DEFAULT_SETTINGS };
+    const opening = PRESETS.find(p => p.id === OPENING_LOOK);
+    const base = opening ? { ...DEFAULT_SETTINGS, ...opening.settings } : { ...DEFAULT_SETTINGS };
     // Diagnostic override for this page load only: ?sim=cpu | auto | <edge>.
     // Lets a device be pinned to a solver grid without touching its settings.
     const sim = new URLSearchParams(window.location.search).get('sim');
@@ -351,9 +372,14 @@ export default function App() {
   // because the state it snapshots is declared further down.
   const castReadyRef = useRef<() => void>(() => {});
   const stageRef = useRef<{ width: number; height: number } | null>(null);
+  /** `setToast` is declared further down; the cast sender needs it up here. */
+  const setToastRef = useRef<(m: string) => void>(() => {});
   const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow } = useCastSender(
     () => castReadyRef.current(),
     (size) => { stageRef.current = size; visualizerRef.current?.setStage(size); },
+    // A blocked popup used to be silent, so Send to wall did visibly nothing
+    // and there was no telling that from the feature being broken.
+    (message) => setToastRef.current(message),
   );
   const [presetSeq, setPresetSeq] = useState(0);
 
@@ -672,7 +698,10 @@ export default function App() {
   */
   const startFilmWindow = async () => {
     try {
-      await visualizerRef.current?.startFilmWindow(() => setFilmSource('none'));
+      await visualizerRef.current?.startFilmWindow(
+        () => setFilmSource('none'),
+        () => setToast('That window is coming through black — share the tab instead'),
+      );
       setFilmSource('window');
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
@@ -857,6 +886,7 @@ export default function App() {
 
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
+    setDocDirty(true);
   };
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
@@ -866,6 +896,10 @@ export default function App() {
     // that does not ask for them gets a plain plate, not the last preset's.
     setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
     setPinnedPresetId(presetId);
+    // A built-in is somewhere to start, not a file of yours: ⌘S asks for a
+    // name rather than writing over a look that ships with the app.
+    setDocId(null);
+    setDocDirty(false);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(presetId);
   };
@@ -873,13 +907,86 @@ export default function App() {
   const applyUserPreset = (p: UserPreset) => {
     setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
     setPinnedPresetId(p.id);
+    // Your own look, opened: ⌘S from here writes over it rather than making
+    // a second copy.
+    setDocId(p.id);
+    setDocDirty(false);
     setPresetSeq(n => n + 1);
     visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null, liquids: p.liquids ?? null });
   };
+  /*
+    ── The look you are working on, as a document ────────────────────
+
+    There was no such thing before. "Save" always made a *new* saved look and
+    always put a file in Downloads, so the ordinary act of building something
+    over twenty minutes produced twenty copies and twenty files, and there was
+    no way to save over the one you were working on. And there was no way to
+    start from nothing: the app opened on a look and every route from there
+    began at another look.
+
+    So: `docId` is the saved look these settings belong to, or null for one
+    that has never been saved. `docDirty` is whether they have been touched
+    since. Save writes over the document when there is one and asks for a name
+    when there is not, Save as always asks, and New is an empty plate.
+  */
+  /**
+   * A line that fades, for the moves whose whole result is invisible.
+   *
+   * Saving over a document changes nothing you can see — that is the point of
+   * it — so without a word it is indistinguishable from the button not
+   * working. Same for an empty plate, which looks like a plate that failed.
+   */
+  const [toast, setToast] = useState<string | null>(null);
+  setToastRef.current = setToast;
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const [docId, setDocId] = useState<string | null>(null);
+  const [docDirty, setDocDirty] = useState(false);
+  /** Whether Save should ask for a name (no document yet) or just write. */
+  const [saveMode, setSaveMode] = useState<'as' | 'over'>('as');
+
   const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
     const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
     setPinnedPresetId(p.id);
+    setDocId(p.id);
+    setDocDirty(false);
+  };
+
+  /** ⌘S: over the document when there is one, otherwise ask for a name. */
+  const saveLook = () => {
+    if (!docId) { setSaveMode('as'); setShowSave(true); return; }
+    const plate = visualizerRef.current?.describePlate();
+    const saved = userPresets.saveOver(docId, settings, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null);
+    if (!saved) { setSaveMode('as'); setShowSave(true); return; }   // deleted underneath us
+    setDocDirty(false);
+    setToast(`Saved “${saved.name}”`);
+  };
+  /** ⇧⌘S: always a new one. */
+  const saveLookAs = () => { setSaveMode('as'); setShowSave(true); };
+
+  /**
+   * An empty plate.
+   *
+   * Clear rather than drain: draining is a performance move that swirls what
+   * is there down a hole over a second and a half, which is lovely and is not
+   * what "new" means. The palette is unpinned too — a look begun from nothing
+   * should not inherit the last one's dyes.
+   */
+  const newLook = () => {
+    setSettings({ ...DEFAULT_SETTINGS });
+    setClearTrigger(v => v + 1);
+    visualizerRef.current?.setHarmonyLock(null);
+    setPinnedPresetId(null);
+    setDocId(null);
+    setDocDirty(false);
+    setCued(null);
+    setDeskMode('design');
+    setToast('Empty plate');
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
@@ -931,6 +1038,7 @@ export default function App() {
   const rideFrame = useRef(0);
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     ride.write(String(key), value);
+    setDocDirty(true);
     if (rideFrame.current) return;
     rideFrame.current = requestAnimationFrame(() => {
       rideFrame.current = 0;
@@ -1021,12 +1129,31 @@ export default function App() {
     return () => clearInterval(id);
   }, [deskMode]);
 
-  /** A look that has drifted from the preset it was pinned to. */
-  const lookEdited = pinnedPresetId != null && activePresetId == null;
+  /*
+    "Edited" is the document's own flag now.
+
+    It used to be derived — pinned to a preset, and the settings no longer
+    matching it — which cannot be true of an empty plate somebody has since
+    painted (there is no preset to differ from), and which blinks off again if
+    the values happen to coincide. Two answers to one question is how the desk
+    and the panel came to disagree about everything else, so there is one.
+  */
   const pinnedLookName = useMemo(() => {
     if (!pinnedPresetId) return null;
     return allPresets.find(p => p.id === pinnedPresetId)?.name ?? null;
   }, [allPresets, pinnedPresetId]);
+
+  /**
+   * What the look you are working on is called.
+   *
+   * The name of your document when there is one, the built-in you started
+   * from when there is not, and "Untitled" for an empty plate — which is the
+   * state the app could not previously be in at all.
+   */
+  const docName = useMemo(() => {
+    if (docId) return userPresets.presets.find(p => p.id === docId)?.name ?? 'Untitled look';
+    return pinnedLookName ?? 'Untitled look';
+  }, [docId, userPresets.presets, pinnedLookName]);
 
   /**
    * The cue list: the looks, in order, each carrying two of its own dyes so a
@@ -1161,6 +1288,9 @@ export default function App() {
     setPaletteWindow: (size, lead) => visualizerRef.current?.setPaletteWindow(size, lead),
     sectionLabel: musicIntel.state.section?.label ?? null,
     isActive,
+    // Design is not a place a sequence gets to write settings. See the note
+    // on `suspended`.
+    suspended: designing,
     presets: allPresets,
   });
   // ── Files made for a song ───────────────────────────────────────
@@ -1328,6 +1458,10 @@ export default function App() {
     lastSongChangeSeq.current = songChange.seq;
     const mode = settings.onNewSong ?? 'off';
     if (mode === 'off' || sequencer.status.running) return;
+    // Nor does a new song get to replace a look while it is being built. The
+    // sequencer is suspended in Design for the same reason; this is the other
+    // thing that rewrites the settings without being asked.
+    if (designing) return;
     // A preset or sequence made for the song that just started takes precedence.
     const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
     if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
@@ -1745,6 +1879,9 @@ export default function App() {
       { id: 'go',        name: 'Go — send the cued look',   kind: 'Actions', kbd: 'Space', run: () => goLook() },
       { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: '⌫',    run: () => revertLook() },
       { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: 'B', run: toggleBlackout },
+      { id: 'new',       name: 'New — an empty plate',      kind: 'Actions', run: newLook },
+      { id: 'save',      name: 'Save this look',            kind: 'Actions', kbd: '⌘S',  run: saveLook },
+      { id: 'save-as',   name: 'Save as a new look…',       kind: 'Actions', kbd: '⇧⌘S', run: saveLookAs },
       { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
       { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
       { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
@@ -1809,6 +1946,13 @@ export default function App() {
       if (designing && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         setShowSave(true);
+        return;
+      }
+      // Save as, the shifted Save. Before Save could write over anything there
+      // was nothing for it to be the other half of.
+      if (designing && (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveLookAs();
         return;
       }
       if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -1988,6 +2132,15 @@ export default function App() {
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
       <AnimatePresence>
 
+        {toast && (
+          <div
+            className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
+            data-testid="toast"
+          >
+            {toast}
+          </div>
+        )}
+
         {!overlaysVisible && showCleanHint && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -2018,7 +2171,7 @@ export default function App() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex flex-col items-start gap-4 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex max-w-[55vw] flex-col items-start gap-4 transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
@@ -2045,7 +2198,7 @@ export default function App() {
                       that change the plate — the interesting ones — below the
                       fold. Paired, the whole bench is in view at once.
                     */}
-                    <div className="grid grid-cols-2 gap-1">
+                    <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-1">
                     {group.map((liq) => {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
@@ -2093,7 +2246,7 @@ export default function App() {
                 {/* Quick color swatches — one click recolors the selected liquid */}
                 <div className="flex flex-col gap-1.5 w-full">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
-                  <div className="grid grid-cols-8 gap-1">
+                  <div className="grid grid-cols-5 min-[440px]:grid-cols-8 gap-1">
                     {DROPPER_COLORS.map(hex => {
                       const isCurrent = selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
                       return (
@@ -2204,7 +2357,7 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 max-w-[40vw] transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
@@ -2948,9 +3101,12 @@ export default function App() {
           onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
           randomiseArmed={luckyArmed}
           plateRef={preview.ref}
-          lookName={pinnedLookName}
-          edited={lookEdited}
-          onSave={() => setShowSave(true)}
+          lookName={docName}
+          edited={docDirty}
+          onSave={saveLook}
+          onSaveAs={saveLookAs}
+          onNew={newLook}
+          dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
           mode={showSequencer ? 'sequence' : 'design'}
           onMode={(m) => {
@@ -2977,7 +3133,7 @@ export default function App() {
 
       {showSave && (
         <SaveLookSheet
-          suggested={pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          suggested={saveMode === 'as' && docId ? `${docName} copy` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           songName={musicIntel.state.track?.title ?? null}
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}

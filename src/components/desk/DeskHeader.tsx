@@ -140,7 +140,17 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           className="ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong px-3 text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
           data-testid="search-chip"
         >
-          Search <span className="font-mono text-[11px] text-faint">⌘K</span>
+          {/*
+            The word goes before the dots do.
+
+            At 1024 the right-hand cluster was still about twenty pixels too
+            wide and the leftmost thing in it — the Mic dot — sat under the
+            centred switch. "Search" is the most expendable word in the header:
+            the shortcut beside it says what the button is, and ⌘K is the one
+            convention every app this sits beside already uses.
+          */}
+          <span className="hidden xl:inline">Search </span>
+          <span className="font-mono text-[11px] text-faint">⌘K</span>
         </button>
         {trailing}
       </div>

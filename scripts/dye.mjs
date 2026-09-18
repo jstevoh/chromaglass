@@ -108,7 +108,7 @@ const apart = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 
 
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&sim=384`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&sim=384&look=classic`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   const engine = () => page.evaluate(() => window.chromaglassDebug?.().engine ?? null);

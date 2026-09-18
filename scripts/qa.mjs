@@ -80,7 +80,17 @@ const GPU = process.env.QA_GPU ?? '';
   QA_DPR=1 runs it the slow way, for anything that needs the real thing.
 */
 const DPR = process.env.QA_DPR ?? '0.35';
-const URL = `http://localhost:${PORT}/?debug&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
+/*
+  `look=classic` because the app now opens on a random one.
+
+  That is right for somebody arriving — the plate does thirty things and the
+  first one anybody saw was always the same — and wrong for anything that
+  measures the plate. `wall` reads its brightness and compares a graded frame
+  against an ungraded one: a bright look under 2.2x gain clips and lifts by
+  1.19x where the check wants 1.25x, so the suite started failing on which
+  look it happened to get. Every harness that measures pixels pins it.
+*/
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
@@ -1488,7 +1498,7 @@ try {
   {
     await page.setViewportSize({ width: 1600, height: 900 });
     await settle(1000);
-    const legible = await page.evaluate(() => {
+    const measure = () => page.evaluate(() => {
       const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(','); return p[3] === undefined ? 1 : parseFloat(p[3]); };
       const tiny = [], faint = [], small = [];
       for (const el of document.querySelectorAll('button, input, select, [role="menuitem"], a')) {
@@ -1503,9 +1513,33 @@ try {
       }
       return { tiny, faint, small };
     });
+    const legible = await measure();
     check('nothing you can click has text under 11px', legible.tiny.length === 0, legible.tiny.slice(0, 6).join(', '));
     check('and none of it is under 60% opacity', legible.faint.length === 0, legible.faint.slice(0, 6).join(', '));
     check('and nothing is smaller than 24px', legible.small.length === 0, legible.small.slice(0, 6).join(', '));
+
+    /*
+      And inside the panels, which is where it was never looking.
+
+      This measured whatever was on screen, and what was on screen was the
+      desk with nothing open — which passes, and passed all along. The
+      settings pane, the sequencer and the controller panel were carrying
+      buttons at 10px in the old uppercase style the whole time, under a check
+      that reported the app legible. A floor that only holds where it is
+      already met is not a floor.
+    */
+    for (const [name, open_] of [
+      ['settings', async () => { await clickOn('open-all-settings'); return appears('settings-panel'); }],
+      ['the controller panel', async () => { await clickOn('dot-midi'); return appears('midi-panel'); }],
+    ]) {
+      const up = await open_();
+      await settle(700);
+      const inPanel = await measure();
+      check(`nothing in ${name} is under 11px either`,
+        up && inPanel.tiny.length === 0, up ? inPanel.tiny.slice(0, 5).join(', ') : 'never opened');
+      await page.keyboard.press('Escape');
+      await settle(600);
+    }
   }
 
   // ── Nothing is painted on top of anything you can click ───────────
@@ -1559,7 +1593,15 @@ try {
         return out;
       });
     };
-    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860]]) {
+    /*
+      Including the widths below 1024, where the app shows its own older
+      overlay interface rather than the desk. Two columns pinned to opposite
+      edges at the same vertical centre, so their combined width is the only
+      thing keeping them apart — and on a phone it was not: the bottle rows
+      and an eight-wide swatch grid made the left one 270px of a 390px window
+      and the right column was painted over the end of it.
+    */
+    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860], [430, 932], [390, 844]]) {
       const hit = await coveredAt(w, h);
       check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
     }

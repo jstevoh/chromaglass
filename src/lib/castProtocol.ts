@@ -58,6 +58,15 @@ export type CastMessage =
   /** Receiver → sender, on load: send me everything. */
   | { type: 'hello' }
   /**
+   * The receiver is going away — its window was closed or navigated.
+   *
+   * The sender also polls `window.closed`, but a poll is up to its own
+   * interval late and cannot see a receiver presented to another device at
+   * all. This says so at the moment it happens, so the Wall dot goes dark and
+   * the button is ready again straight away.
+   */
+  | { type: 'goodbye' }
+  /**
    * Receiver → sender: this window mirrors the sender's own canvas (a second
    * display on the same machine), so the sender should render at this size —
    * the projector's pixels — and need not send the show at all.

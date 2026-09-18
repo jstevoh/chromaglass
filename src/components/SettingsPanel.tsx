@@ -10,6 +10,7 @@ import { Info } from './Info';
 import { OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
 import { Segmented, Sheet } from './ui';
+import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 
@@ -49,7 +50,7 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
         title={on ? `On ${name}. Click to take it off.` : `Put this on ${name}`}
         aria-label={`${on ? 'Remove from' : 'Add to'} ${name}`}
         data-testid={`pin-${desk}-${String(settingKey)}`}
-        className={`h-[18px] w-[18px] shrink-0 rounded-[4px] border text-[9px] font-bold leading-none transition-colors ${
+        className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[11px] font-bold leading-none transition-colors ${
           on
             ? 'border-white bg-white text-black'
             : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
@@ -205,13 +206,30 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   return (
     <div className={`flex flex-col gap-2 mb-4 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
+        {/*
+          The rail beside this pane is sentence case and so is every control
+          on both desks; only in here was a control's own name shouted. Two
+          type conventions touching each other reads as two different
+          programs, and the shouting one was the one describing eighty
+          controls. Section headings keep their uppercase eyebrow, which the
+          rail's category headers share — that is a level, not a label.
+        */}
+        <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text">
           {Icon && <Icon size={14} />}
           <span className="truncate">{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}
-          <span className="text-[10px] font-mono opacity-50">{disabled ? disabled : safeValue.toFixed(2)}</span>
+          {/*
+            And the same reading as the desk, from the same function. This
+            printed `toFixed(2)` on everything, so the Dimmer said 100% on the
+            desk and 1.00 here — one control disagreeing with itself across two
+            screens — and `0.02` for a speed that rides 0.005 to 0.3 told you
+            nothing at all.
+          */}
+          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">
+            {disabled ? disabled : readSetting(String(settingKey ?? ''), safeValue, min, max)}
+          </span>
         </div>
       </div>
       <input
@@ -399,7 +417,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <button
             onClick={() => setQuery('')}
             aria-label="Clear the search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[10px] uppercase tracking-widest text-white/40 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[12px] text-white/40 hover:text-white"
           >
             Clear
           </button>
@@ -417,7 +435,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           scrolling panel was one more place to keep in step. */}
       {/* Sound Section */}
       <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('audio-input') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Audio Input
         </h3>
         <Slider
@@ -451,7 +469,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* What is listening at all */}
         {onAudioSource && (
           <div className="flex flex-col gap-1.5 mb-4 mt-2">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Source</span>
+            <span className="text-[13px] font-medium text-text">Source</span>
             <Segmented
               value={audioSource === 'file' ? 'file' : audioSource}
               options={[
@@ -474,7 +492,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
         {onAudioInput && (
           <div className="flex flex-col gap-1.5 mb-4 mt-2">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Input</span>
+            <span className="text-[13px] font-medium text-text">Input</span>
             <select
               value={audioInputId}
               onChange={(e) => onAudioInput(e.target.value)}
@@ -503,7 +521,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {onBlackout && (
           <button
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
@@ -513,7 +531,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
         {/* Room calibration */}
         <div className="flex items-center justify-between mb-3 mt-5">
-          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Auto Calibrate</span>
+          <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
           <button
             onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
             className={`w-10 h-5 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
@@ -533,7 +551,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="beatPrediction"
         />
         <Slider
-          label="Beat Lead (ms)"
+          label="Beat Lead"
           value={settings.beatLead ?? 0}
           min={0}
           max={250}
@@ -549,8 +567,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {onTap && (
           <div className="mb-4 mt-2 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-widest opacity-70">Tempo</span>
-              <span className="font-mono text-[10px] opacity-50" data-testid="tempo-readout">
+              <span className="text-[13px] font-medium text-text">Tempo</span>
+              <span className="font-mono text-[12px] opacity-50" data-testid="tempo-readout">
                 {tempo?.source
                   ? `${tempo.bpm} bpm \u00b7 ${tempo.source === 'clock' ? 'midi clock' : tempo.source === 'tap' ? 'tapped' : 'set'}`
                   : 'listening'}
@@ -561,7 +579,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 onClick={onTap}
                 data-testid="tempo-tap"
                 title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-11 flex-1 rounded-lg border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest transition-all hover:bg-white/10"
+                className="min-h-11 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
               >
                 Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
               </button>
@@ -570,7 +588,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className={`min-h-11 flex-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all ${
+                className={`min-h-11 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
                   tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
                 }`}
               >
@@ -597,7 +615,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 }}
                 className="min-h-11 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-white/30"
               />
-              <span className="text-[10px] uppercase tracking-widest opacity-30">off the setlist</span>
+              <span className="text-[12px] opacity-30">off the setlist</span>
             </div>
             <Info>
               The beat clock works the tempo out from what it hears, which is the right answer on a clean feed from the desk and a hard one in a loud room. Three ways to tell it instead.
@@ -611,13 +629,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
         {/* A new song, a new look */}
         <div className="flex flex-col gap-2 mb-4 mt-2">
-          <div className="text-xs font-bold uppercase tracking-widest opacity-70">On a New Song</div>
+          <div className="text-[13px] font-medium text-text">On a New Song</div>
           <div className="grid grid-cols-3 gap-1">
             {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
               <button
                 key={mode}
                 onClick={() => onUpdate({ onNewSong: mode })}
-                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
                   (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
@@ -636,10 +654,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {calibration ? (
               <>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] uppercase tracking-widest opacity-60">
+                  <span className="text-[12px] opacity-60">
                     {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
                   </span>
-                  <span className="text-[10px] font-mono opacity-50">
+                  <span className="text-[12px] font-mono opacity-50">
                     {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
                   </span>
                 </div>
@@ -651,11 +669,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 </div>
               </>
             ) : (
-              <span className="text-[10px] uppercase tracking-widest opacity-40">Waiting for audio</span>
+              <span className="text-[12px] opacity-40">Waiting for audio</span>
             )}
             <button
               onClick={() => onRecalibrate?.()}
-              className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
+              className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
             >
               Recalibrate room
             </button>
@@ -665,7 +683,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Sound Mappings Section */}
       <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('audio-mappings') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Activity size={12} /> Sound Mappings
         </h3>
 
@@ -711,7 +729,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         
         {['velocity', 'density', 'color', 'rotation'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">{param}</span>
+            <span className="text-[13px] font-medium text-text">{param}</span>
             <select
               value={settings.audioMappings[param as keyof typeof settings.audioMappings]}
               onChange={(e) => onUpdate({
@@ -720,7 +738,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                   [param]: e.target.value
                 }
               })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:border-white/30 transition-all"
             >
               {['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'].map((feature) => (
                 <option key={feature} value={feature} className="bg-gray-900">
@@ -734,7 +752,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Light Show Look Section */}
       <section id="settings-look" className={`mb-8 scroll-mt-4 ${shown('look') ? '' : 'hidden'} ${focusSection === 'look' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="look">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Palette size={12} /> Light Show Look
         </h3>
         <Slider
@@ -887,7 +905,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Show Section */}
       <section id="settings-show" className={`mb-8 scroll-mt-4 ${shown('show') ? '' : 'hidden'} ${focusSection === 'show' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="show">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Clapperboard size={12} /> Show
         </h3>
         <Info>
@@ -951,23 +969,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
           settingKey="backgroundLoop"
         />
-        <div className="flex flex-col gap-2 mb-4">
-          <div className="text-xs font-bold uppercase tracking-widest opacity-70">Kaleidoscope</div>
-          <div className="grid grid-cols-4 gap-1">
-            {[0, 2, 4, 6].map((k) => (
-              <button
-                key={k}
-                onClick={() => onUpdate({ kaleidoscope: k })}
-                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-                title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
-              >
-                {k === 0 ? 'Off' : `${k}×`}
-              </button>
-            ))}
-          </div>
-        </div>
         <Slider
           label="Round Dish"
           value={settings.dishVignette ?? 0}
@@ -993,20 +994,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Camera Section */}
       <section id="settings-camera" className={`mb-8 scroll-mt-4 ${shown('camera') ? '' : 'hidden'} ${focusSection === 'camera' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="camera">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Aperture size={12} /> Camera
         </h3>
         <Info>
           The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
         </Info>
         <div className="flex flex-col gap-2 mb-4">
-          <div className="text-xs font-bold uppercase tracking-widest opacity-70">Render Style</div>
+          <div className="text-[13px] font-medium text-text">Render Style</div>
           <div className="grid grid-cols-2 gap-1">
             {(['show', 'photo'] as const).map((style) => (
               <button
                 key={style}
                 onClick={() => onUpdate({ renderStyle: style })}
-                className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
                   (settings.renderStyle ?? 'show') === style ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={style === 'show' ? 'The projected light show: dye as light on black' : 'The photograph: dye over lit paper'}
@@ -1021,7 +1022,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-2 gap-2 mb-4">
             {(['paperA', 'paperB'] as const).map((key) => (
               <label key={key} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">{key === 'paperA' ? 'Paper A' : 'Paper B'}</span>
+                <span className="text-[13px] font-medium opacity-60">{key === 'paperA' ? 'Paper A' : 'Paper B'}</span>
                 <input
                   type="color"
                   value={settings[key] ?? '#000000'}
@@ -1058,9 +1059,68 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
       </section>
 
+      {/*
+        Kaleidoscope Section
+
+        It used to be one control three-quarters of the way down Show, between
+        Background Loop and Round Dish, and two of its three dimensions were
+        constants inside the shader — so there was nothing to group and no way
+        to play it. Folds, how fast the rig turns, and how much plate feeds
+        each wedge, together, and all three on the MIDI list.
+      */}
+      <section id="settings-kaleidoscope" className={`mb-8 scroll-mt-4 ${shown('kaleidoscope') ? '' : 'hidden'} ${focusSection === 'kaleidoscope' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="kaleidoscope">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Aperture size={12} /> Kaleidoscope
+        </h3>
+        <Info>
+          A mirror rig over the plate, the four-fold dish of the reference stills. Folds sets how many wedges; Spin turns the rig, and runs backwards below zero; Zoom decides how much of the plate feeds each wedge — pulled in, a few enormous shapes, and taken out to the rim, something fine and busy. All three ride a fader.
+        </Info>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[13px] font-medium text-text">Folds</div>
+            {pins && <PinChips settingKey="kaleidoscope" />}
+          </div>
+          <div className="grid grid-cols-5 gap-1" data-testid="kaleido-folds">
+            {[0, 2, 4, 6, 8].map((k) => (
+              <button
+                key={k}
+                onClick={() => onUpdate({ kaleidoscope: k })}
+                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
+                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
+                data-testid={`kaleido-folds-${k}`}
+              >
+                {k === 0 ? 'Off' : `${k}×`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Spin"
+          value={settings.kaleidoSpin ?? 0}
+          min={-0.5}
+          max={0.5}
+          step={0.005}
+          onChange={(v: number) => onUpdate({ kaleidoSpin: v })}
+          settingKey="kaleidoSpin"
+          disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
+        />
+        <Slider
+          label="Zoom"
+          value={settings.kaleidoZoom ?? 0.72}
+          min={0.2}
+          max={1.6}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ kaleidoZoom: v })}
+          settingKey="kaleidoZoom"
+          disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
+        />
+      </section>
+
       {/* Lamp Section */}
       <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('lamp') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Lightbulb size={12} /> Lamp
         </h3>
         <Info>
@@ -1115,7 +1175,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* The Room Section */}
       <section id="settings-room" className={`mb-8 scroll-mt-4 ${shown('room') ? '' : 'hidden'} ${focusSection === 'room' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="room">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Video size={12} /> The Room
         </h3>
         <Info>
@@ -1124,7 +1184,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => onSceneToggle?.(!sceneOn)}
-            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-toggle"
           >
             {sceneOn ? 'Watching' : 'Watch the room'}
@@ -1153,19 +1213,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               data-testid="scene-preview"
             />
             {sceneState?.error ? (
-              <p className="mt-2 text-[10px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
             ) : (
               <>
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-white/70 transition-[width] duration-100" style={{ width: `${Math.round((sceneState?.energy ?? 0) * 100)}%` }} />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[10px] font-mono opacity-40">
+                <div className="mt-1 flex items-center justify-between text-[12px] font-mono opacity-40">
                   <span>{sceneState?.active ? `${sceneState.people} tracked` : 'opening…'}</span>
                   <span>{sceneState ? `${sceneState.ms.toFixed(1)} ms` : ''}</span>
                 </div>
               </>
             )}
-            <p className="mt-2 text-[10px] leading-relaxed opacity-40">
+            <p className="mt-2 text-[12px] leading-relaxed opacity-40">
               Frames are read in this page and never leave it. Nothing is recorded, and the camera stops the moment this is switched off.
             </p>
           </div>
@@ -1213,14 +1273,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <div className="flex items-center gap-2 mb-2">
           <button
             onClick={() => onUpdate({ scenePeople: !(settings.scenePeople !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-people"
           >
             Hold people
           </button>
           <button
             onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-mirror"
           >
             Mirror
@@ -1228,10 +1288,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </div>
         <div className="mt-5 mb-3">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-bold uppercase tracking-widest opacity-70">Patches</div>
+            <div className="text-[13px] font-medium text-text">Patches</div>
             <button
               onClick={() => onUpdate({ sceneMappings: [...(settings.sceneMappings ?? []), { source: 'room', feature: 'motion', setting: 'turbulenceScale', depth: 0.5, layer: 'all' }] })}
-              className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"
+              className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"
               data-testid="scene-map-add"
             >
               Add
@@ -1269,7 +1329,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-source-${i}`}
                     >
                       {PATCH_SOURCES.map(([value, label]) => (
@@ -1284,7 +1344,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
                       {featuresFor(m.source ?? 'room').map(([value, label]) => (
@@ -1299,7 +1359,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, setting: e.target.value as SceneMapping['setting'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none"
+                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                     >
                       {sceneTargets.map(t => (
                         <option key={t.key} value={t.key}>{t.label}</option>
@@ -1338,7 +1398,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[10px] outline-none disabled:opacity-30"
+                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -1360,7 +1420,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       }}
                       className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
                     />
-                    <span className="text-[10px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
+                    <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -1400,7 +1460,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         the picture) is still the panel, one click away.
       */}
       <section id="settings-midi" className={`mb-8 scroll-mt-4 ${shown('midi') ? '' : 'hidden'} ${focusSection === 'midi' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="midi">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sliders size={12} /> Controller
         </h3>
         {!midi ? (
@@ -1413,19 +1473,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <>
             <button
               onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
-              className={`mb-3 w-full rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              className={`mb-3 w-full rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
                 midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10 hover:bg-white/15'
               }`}
               data-testid="settings-midi-enable"
             >
               {midi.enabled ? 'MIDI is on' : 'Turn MIDI on'}
             </button>
-            {midi.error && <p className="mb-3 text-[10px] text-red-300" data-testid="settings-midi-error">{midi.error}</p>}
+            {midi.error && <p className="mb-3 text-[12px] text-red-300" data-testid="settings-midi-error">{midi.error}</p>}
 
             {midi.enabled && (
               <>
                 <div className="mb-3 flex flex-col gap-1.5">
-                  <span className="text-xs font-bold uppercase tracking-widest opacity-70">Controller</span>
+                  <span className="text-[13px] font-medium text-text">Controller</span>
                   <select
                     value={midi.ports.input}
                     onChange={e => midi.choosePorts({ input: e.target.value })}
@@ -1436,7 +1496,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                   </select>
                   {midi.inputs.length === 0 && (
-                    <p className="text-[10px] text-white/40" data-testid="settings-midi-none">
+                    <p className="text-[12px] text-white/40" data-testid="settings-midi-none">
                       Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
                     </p>
                   )}
@@ -1450,14 +1510,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 {detectedFactory && (
                   <button
                     onClick={() => midi.loadFactory(detectedFactory.id)}
-                    className="mb-3 w-full rounded-lg border border-emerald-400/40 bg-emerald-500/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-emerald-100 transition-colors hover:bg-emerald-500/25"
+                    className="mb-3 w-full rounded-lg border border-emerald-400/40 bg-emerald-500/15 py-2.5 text-[13px] font-medium text-emerald-100 transition-colors hover:bg-emerald-500/25"
                     data-testid="settings-midi-setup"
                   >
                     Set up the {detectedFactory.name}
                   </button>
                 )}
                 <div className="mb-3 flex flex-col gap-1.5">
-                  <span className="text-xs font-bold uppercase tracking-widest opacity-70">
+                  <span className="text-[13px] font-medium text-text">
                     {detectedFactory ? 'Or another map' : 'Factory map'}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -1465,7 +1525,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       <button
                         key={f.id}
                         onClick={() => midi.loadFactory(f.id as FactoryMapId)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70 transition-colors hover:bg-white/10"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-white/70 transition-colors hover:bg-white/10"
                         data-testid={`settings-midi-factory-${f.id}`}
                       >
                         {f.name}
@@ -1481,8 +1541,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 */}
                 {midi.watched ? (
                   <div className="mb-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Listening</p>
-                    <p className="mt-1 text-[10px] leading-relaxed text-amber-100/80">
+                    <p className="text-[13px] font-medium text-amber-100">Listening</p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
                       Sweep every fader and knob, then press each pad and button. Nothing reaches the show meanwhile.
                     </p>
                     <p className="mt-1.5 font-mono text-[11px] text-amber-100" data-testid="settings-midi-auto-tally">
@@ -1491,14 +1551,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     <div className="mt-2 flex gap-1.5">
                       <button
                         onClick={() => midi.finishAutoMap(midi.activeInputName)}
-                        className="flex-1 rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-black"
+                        className="flex-1 rounded-lg bg-white px-2.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-black"
                         data-testid="settings-midi-auto-finish"
                       >
                         Map them
                       </button>
                       <button
                         onClick={() => midi.cancelAutoMap()}
-                        className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70"
+                        className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-white/70"
                         data-testid="settings-midi-auto-cancel"
                       >
                         Cancel
@@ -1508,14 +1568,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 ) : (
                   <button
                     onClick={() => midi.startAutoMap()}
-                    className="mb-3 w-full rounded-lg border border-white/15 bg-white/5 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors hover:bg-white/10"
+                    className="mb-3 w-full rounded-lg border border-white/15 bg-white/5 py-2.5 text-[13px] font-medium transition-colors hover:bg-white/10"
                     title="Watch what this controller sends and build a map from it — for hardware with no factory map, which is most of it"
                     data-testid="settings-midi-auto"
                   >
                     Auto-map this controller…
                   </button>
                 )}
-                <p className="mb-3 text-[10px] text-white/40" data-testid="settings-midi-state">
+                <p className="mb-3 text-[12px] text-white/40" data-testid="settings-midi-state">
                   {midi.map.bindings.length} bindings · {midi.activeInputName ?? 'no device'}
                   {midi.clocked ? ' · clock arriving' : ''}
                 </p>
@@ -1525,7 +1585,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {onOpenMidi && (
               <button
                 onClick={onOpenMidi}
-                className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors hover:bg-white/10"
+                className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-[13px] font-medium transition-colors hover:bg-white/10"
                 title="Learn a control, shift banks, the bindings list, and your controller drawn to scale"
                 data-testid="settings-midi-open"
               >
@@ -1542,18 +1602,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('projectors') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Projector size={12} /> Projectors
         </h3>
         {onProjectorMode && (
           <div className="flex flex-col gap-2 mb-5">
-            <div className="text-xs font-bold uppercase tracking-widest opacity-70">Second Screen</div>
+            <div className="text-[13px] font-medium text-text">Second Screen</div>
             <div className="grid grid-cols-3 gap-1">
               {([['ask', 'Ask'], ['auto', 'Automatic'], ['off', 'Off']] as const).map(([m, label]) => (
                 <button
                   key={m}
                   onClick={() => onProjectorMode(m)}
-                  className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                   data-testid={`projector-mode-${m}`}
                 >
                   {label}
@@ -1628,8 +1688,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Film Projector</span>
-            <span className="text-[10px] font-mono opacity-50">
+            <span className="text-[13px] font-medium text-text">Film Projector</span>
+            <span className="text-[12px] font-mono opacity-50">
               {filmSource === 'file' ? 'loop playing'
                 : filmSource === 'camera' ? 'camera live'
                 : filmSource === 'window' ? 'window live'
@@ -1647,14 +1707,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             />
             <button
               onClick={() => filmInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
               title="Play a video file through the dye, looping"
             >
               <Film size={13} /> Load loop
             </button>
             <button
               onClick={() => onFilmCamera?.()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
               title="Point a camera at a real dish of oil and composite it through the solver"
               data-testid="film-camera"
             >
@@ -1669,7 +1729,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <button
               onClick={() => onFilmWindow?.()}
               disabled={!canCaptureWindow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
               title={canCaptureWindow
                 ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
                 : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
@@ -1680,7 +1740,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <button
               onClick={() => onFilmClear?.()}
               disabled={filmSource === 'none'}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 disabled:opacity-30"
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
               data-testid="film-off"
             >
               Off
@@ -1766,14 +1826,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Simulation Section */}
       <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('simulation') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation
         </h3>
         <div className="flex flex-col gap-2 mb-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">Fluid Grid</span>
+            <span className="text-[13px] font-medium text-text">Fluid Grid</span>
             {engineStatus && (
-              <span className="text-[10px] font-mono opacity-50">
+              <span className="text-[12px] font-mono opacity-50">
                 {engineStatus.label} · {liveFps ?? (engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–')} fps
               </span>
             )}
@@ -1805,11 +1865,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Macro Closeup Section */}
       <section id="settings-macro" className={`mb-8 scroll-mt-4 ${shown('macro') ? '' : 'hidden'} ${focusSection === 'macro' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="macro">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Bead Camera</span>
+          <span className="text-[13px] font-medium text-text">Bead Camera</span>
           <button
             onClick={() => onUpdate({ macroMode: !settings.macroMode })}
             className={`w-10 h-5 rounded-full relative transition-colors ${settings.macroMode ? 'bg-white' : 'bg-white/20'}`}
@@ -1916,7 +1976,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Squish Plate Section */}
       <section id="settings-squish" className={`mb-8 scroll-mt-4 ${shown('squish') ? '' : 'hidden'} ${focusSection === 'squish' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="squish">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sliders size={12} /> Squish Plate
         </h3>
         <Slider
@@ -1947,13 +2007,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="rainDrip"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Viscosity</span>
+          <span className="text-[13px] font-medium text-text">Viscosity</span>
           <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
             {(['thick', 'thin'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[10px] uppercase tracking-widest rounded-md transition-all ${
+                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
                   settings.viscosity === v ? 'bg-white text-black font-bold' : 'hover:bg-white/5 opacity-50'
                 }`}
               >
@@ -1975,7 +2035,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Heat Slide Section */}
       <section id="settings-heat" className={`mb-8 scroll-mt-4 ${shown('heat') ? '' : 'hidden'} ${focusSection === 'heat' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="heat">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Thermometer size={12} /> Heat Slide
         </h3>
         <Slider
@@ -2018,7 +2078,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Manual Interaction Section */}
       <section id="settings-interaction" className={`mb-8 scroll-mt-4 ${shown('interaction') ? '' : 'hidden'} ${focusSection === 'interaction' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="interaction">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Wind size={12} /> Manual Interaction
         </h3>
         <Slider
@@ -2043,7 +2103,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Fluid Physics Section */}
       <section id="settings-physics" className={`mb-8 scroll-mt-4 ${shown('physics') ? '' : 'hidden'} ${focusSection === 'physics' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="physics">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
         <Slider
@@ -2086,7 +2146,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Automation Section */}
       <section id="settings-automation" className={`mb-8 scroll-mt-4 ${shown('automation') ? '' : 'hidden'} ${focusSection === 'automation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="automation">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Sparkles size={12} /> Automation
         </h3>
         <Slider
@@ -2102,7 +2162,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mixer Section */}
       <section id="settings-layers" className={`mb-8 scroll-mt-4 ${shown('layers') ? '' : 'hidden'} ${focusSection === 'layers' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="layers">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Layers size={12} /> Multi-Layer Mixer
         </h3>
         <Slider
@@ -2124,7 +2184,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="rotationSpeed"
         />
         <div className="flex items-center justify-between mb-4 mt-4">
-          <span className="text-xs font-bold uppercase tracking-widest opacity-70">LED Platform</span>
+          <span className="text-[13px] font-medium text-text">LED Platform</span>
           <button
             onClick={() => onUpdate({ ledPlatform: !settings.ledPlatform })}
             className={`w-10 h-5 rounded-full relative transition-colors ${settings.ledPlatform ? 'bg-white' : 'bg-white/20'}`}
@@ -2135,7 +2195,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {settings.ledPlatform && (
           <div className="flex flex-col gap-4 mb-4">
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold uppercase tracking-widest opacity-70">LED Mode</span>
+              <span className="text-[13px] font-medium text-text">LED Mode</span>
               <select
                 value={settings.ledMode}
                 onChange={(e) => onUpdate({ ledMode: e.target.value as LedMode })}
@@ -2151,7 +2211,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             
             {settings.ledMode === 'single' && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold uppercase tracking-widest opacity-70">LED Color</span>
+                <span className="text-[13px] font-medium text-text">LED Color</span>
                 <input
                   type="color"
                   value={settings.ledColor}
@@ -2191,11 +2251,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="gooeyEffect"
         />
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest opacity-70">Blend Mode</span>
+          <span className="text-[13px] font-medium text-text">Blend Mode</span>
           <select
             value={settings.blendMode}
             onChange={(e) => onUpdate({ blendMode: e.target.value as BlendMode })}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30 transition-all"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:border-white/30 transition-all"
           >
             {blendModes.map((mode) => (
               <option key={mode} value={mode} className="bg-gray-900">

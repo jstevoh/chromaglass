@@ -156,7 +156,7 @@ const Switch = ({ label, on, onChange, hint, testId }: {
     onClick={() => onChange(!on)}
     title={hint}
     data-testid={testId}
-    className={`flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 text-[10px] font-bold uppercase tracking-widest transition-all ${
+    className={`flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 text-[13px] font-medium transition-all ${
       on ? 'border-white bg-white text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'
     }`}
   >
@@ -184,7 +184,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
           onClick={onReset}
           disabled={identity}
           data-testid="output-reset"
-          className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
+          className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all ${
             identity ? 'cursor-not-allowed border-white/5 opacity-30' : 'border-white/15 hover:bg-white/10'
           }`}
         >
@@ -218,7 +218,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
       <div className="mb-3 flex justify-end">
         <button
           onClick={() => set({ corners: [...IDENTITY_CORNERS] as OutputConfig['corners'] })}
-          className="text-[10px] uppercase tracking-widest text-white/35 hover:text-white/70"
+          className="text-[12px] text-white/35 hover:text-white/70"
           data-testid="corners-square"
         >
           Square the corners

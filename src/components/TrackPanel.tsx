@@ -148,7 +148,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           <button
             onClick={() => { onManualTag(tagArtist, tagTitle); setTagArtist(''); setTagTitle(''); }}
             disabled={!tagArtist.trim() || !tagTitle.trim()}
-            className="w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-[10px] font-bold uppercase tracking-widest transition-all"
+            className="w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-[13px] font-medium transition-all"
           >
             Identify as this track
           </button>
@@ -189,7 +189,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           {state.replayListenNumber != null && (
             <button
               onClick={onStopReplay}
-              className="flex items-center gap-2 w-full mb-3 px-3 py-2 rounded-lg bg-purple-500/20 border border-purple-400/40 text-[10px] font-bold uppercase tracking-widest text-purple-200"
+              className="flex items-center gap-2 w-full mb-3 px-3 py-2 rounded-lg bg-purple-500/20 border border-purple-400/40 text-[13px] font-medium text-purple-200"
             >
               <Square size={10} /> Replaying listen #{state.replayListenNumber} — tap to return to live evolution
             </button>

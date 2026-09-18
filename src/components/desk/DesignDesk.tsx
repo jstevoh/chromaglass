@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
+import { readSetting } from '../../lib/readout';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -21,22 +22,6 @@ import type { LiquidType, VisualizerSettings } from '../../types';
  */
 
 const RANGE = PIN_RANGE;
-
-/**
- * How a few of them read better than a bare percentage.
- *
- * Keyed by setting rather than listed with the recipe, because the recipe is
- * now whatever the operator put on it — there is no fixed eight to hang a
- * formatter off any more.
- */
-const READS: Partial<Record<string, (v: number) => string>> = {
-  globalSpeed: v => v.toFixed(3),
-  macroZoom:   v => `${v.toFixed(2)}x`,
-  grainScale:  v => `${Math.round(v)}`,
-  macroHold:   v => `${v.toFixed(1)}s`,
-  beatLead:    v => `${Math.round(v)}ms`,
-  gelSpeed:    v => `${v.toFixed(2)} rpm`,
-};
 
 /** All seven, with the letter that picks each one. */
 const TOOLS = [
@@ -79,6 +64,10 @@ export interface DesignDeskProps {
   lookName: string | null;
   edited: boolean;
   onSave: () => void;
+  onSaveAs: () => void;
+  onNew: () => void;
+  /** Whether the look has unsaved changes, for the dot on Save. */
+  dirty: boolean;
   onSendToWall: () => void;
 
   mode: DeskMode;
@@ -97,6 +86,8 @@ export interface DesignDeskProps {
 }
 
 export function DesignDesk(p: DesignDeskProps) {
+  /** The document menu, hung off the look's own name. */
+  const [docMenu, setDocMenu] = useState(false);
   const [picking, setPicking] = useState(false);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
@@ -108,8 +99,43 @@ export function DesignDesk(p: DesignDeskProps) {
           <>
             <span className="text-muted">Look</span>
             <span className="text-faint">/</span>
-            <span className="truncate">{p.lookName ?? 'Untitled'}</span>
-            {p.edited && <Tag>edited</Tag>}
+            <div className="relative flex min-w-0 items-center gap-2">
+              <button
+                onClick={() => setDocMenu(v => !v)}
+                className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
+                title="New, Save, Save as…"
+                data-testid="doc-menu-button"
+              >
+                <span className="truncate">{p.lookName ?? 'Untitled'}</span>
+                <span className="text-faint">⌄</span>
+              </button>
+              {p.edited && <Tag>edited</Tag>}
+              {docMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setDocMenu(false)} />
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+                    data-testid="doc-menu"
+                  >
+                    {[
+                      ['New — an empty plate', '', p.onNew, 'doc-new'],
+                      ['Save', '⌘S', p.onSave, 'doc-save'],
+                      ['Save as…', '⇧⌘S', p.onSaveAs, 'doc-save-as'],
+                    ].map(([label, kbd, run, id]) => (
+                      <button
+                        key={String(id)}
+                        onClick={() => { setDocMenu(false); (run as () => void)(); }}
+                        className="flex w-full items-center justify-between gap-4 px-3 py-2 text-left text-[13px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+                        data-testid={String(id)}
+                      >
+                        <span>{String(label)}</span>
+                        {kbd ? <span className="font-mono text-[11px] text-faint">{String(kbd)}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </>
         }
         mode={p.mode}
@@ -123,8 +149,20 @@ export function DesignDesk(p: DesignDeskProps) {
         onSearch={p.onSearch}
         trailing={
           <>
-            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">Send to wall</Button>
-            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">Save</Button>
+            {/*
+              New, Save, Save as — the three a document needs.
+
+              Save used to be the only one, and it made a new copy every time
+              and downloaded a file, so there was no way to save over what you
+              were working on and no way to begin from nothing. The dot on Save
+              is whether there is anything to save.
+            */}
+            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
+              <span className="hidden xl:inline">Send to&nbsp;</span>wall
+            </Button>
+            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
+              {p.dirty ? 'Save •' : 'Save'}
+            </Button>
           </>
         }
       />
@@ -281,7 +319,6 @@ export function DesignDesk(p: DesignDeskProps) {
             if (!spec) return null;          // a key saved by an older build
             const raw = p.settings[key];
             const v = typeof raw === 'number' ? raw : spec.min;
-            const read = READS[String(key)];
             return (
               <Slider
                 key={String(key)}
@@ -289,7 +326,7 @@ export function DesignDesk(p: DesignDeskProps) {
                 value={v}
                 min={spec.min}
                 max={spec.max}
-                display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
+                display={readSetting(String(key), v, spec.min, spec.max)}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
                 midiKey={`setting:${String(key)}`}
                 testId={`recipe-${String(key)}`}

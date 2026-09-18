@@ -49,7 +49,11 @@ const OVERRIDE_FIELDS: { key: keyof VisualizerSettings; label: string; min: numb
   { key: 'bubbles',         label: 'Bubbles',          min: 0,    max: 1,    step: 0.05 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5,  max: 2,    step: 0.05 },
   { key: 'backgroundLoop',  label: 'Background Loop',  min: 0,    max: 1,    step: 0.05 },
-  { key: 'kaleidoscope',    label: 'Kaleidoscope',     min: 0,    max: 6,    step: 2 },
+  { key: 'kaleidoscope',    label: 'Kaleidoscope',     min: 0,    max: 8,    step: 2 },
+  // A stage can turn the rig and change how much plate feeds it, which is most
+  // of what a kaleidoscope does over a song.
+  { key: 'kaleidoSpin',     label: 'Kaleido Spin',     min: -0.5, max: 0.5,  step: 0.005 },
+  { key: 'kaleidoZoom',     label: 'Kaleido Zoom',     min: 0.2,  max: 1.6,  step: 0.01 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0,    max: 1,    step: 0.05 },
   { key: 'lightPlay',       label: 'Light Play',       min: 0,    max: 1,    step: 0.05 },
   { key: 'secondLamp',      label: 'Second Lamp',      min: 0,    max: 1,    step: 0.05 },
@@ -70,7 +74,7 @@ const fmt = (sec: number) => `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toS
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <label className="flex flex-col gap-1 mb-3">
-    <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">{label}</span>
+    <span className="text-[13px] font-medium opacity-60">{label}</span>
     {children}
   </label>
 );
@@ -161,9 +165,9 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       <div className="flex items-center gap-2 mb-4" data-testid="seq-transport">
         <button onClick={onPrev} disabled={!isRunningThis} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
         {isRunningThis && status.running ? (
-          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[10px] uppercase tracking-widest" data-testid="seq-pause"><Pause size={14} /> Pause</button>
+          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
         ) : (
-          <button onClick={() => onPlay(selected?.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[10px] uppercase tracking-widest" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
+          <button onClick={() => onPlay(selected?.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
         )}
         <button onClick={onNext} disabled={!isRunningThis} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
         <button onClick={onStop} disabled={status.sequenceId === null} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
@@ -207,8 +211,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Files: a sequence is a JSON file you can keep and share */}
       <div className="flex gap-2 mb-2">
-        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
-        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
+        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-30" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
+        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
         <input
           ref={fileRef}
           type="file"
@@ -227,8 +231,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Sequence actions */}
       <div className="flex gap-2 mb-6">
-        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
-        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Start a new sequence"><Plus size={12} /> New</button>
+        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
+        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
         {editable && (
           <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
         )}
@@ -242,15 +246,15 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
             <input value={selected.name} onChange={(e) => update(seq => ({ ...seq, name: e.target.value }))} className={inputCls} />
           </Field>
           <label className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Loop</span>
+            <span className="text-[13px] font-medium opacity-60">Loop</span>
             <input type="checkbox" checked={selected.loop} onChange={(e) => update(seq => ({ ...seq, loop: e.target.checked }))} className="accent-white" />
           </label>
           <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1.5">Song</div>
+            <div className="text-[13px] font-medium opacity-60 mb-1.5">Song</div>
             {selected.song ? (
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] truncate">♪ {songLabel(selected.song)}</span>
-                <button onClick={() => onBindSong?.(selected, null)} className="text-[9px] uppercase tracking-widest opacity-60 hover:opacity-100 shrink-0" data-testid="seq-unbind-song">Forget</button>
+                <button onClick={() => onBindSong?.(selected, null)} className="text-[12px] opacity-60 hover:opacity-100 shrink-0" data-testid="seq-unbind-song">Forget</button>
               </div>
             ) : currentSong ? (
               <button onClick={() => onBindSong?.(selected, currentSong)} className="w-full text-left text-[11px] hover:text-white/100 text-white/80" data-testid="seq-bind-song">
@@ -260,7 +264,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <p className="text-[10px] opacity-40">Identify a song (the Track panel) and you can make this sequence for it: it will start with the song and stop when it ends.</p>
             )}
           </div>
-          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest"><Plus size={12} /> Add stage</button>
+          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
           {!stage && <p className="text-[10px] opacity-40">Tap a stage above to edit it.</p>}
           {stage && editIndex !== null && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -314,7 +318,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                   <option value="off">Off</option>
                 </select>
               </Field>
-              <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2 mt-2">Overrides</div>
+              <div className="text-[13px] font-medium opacity-60 mb-2 mt-2">Overrides</div>
               {OVERRIDE_FIELDS.map(f => {
                 const v = stage.settings?.[f.key];
                 const on = typeof v === 'number';

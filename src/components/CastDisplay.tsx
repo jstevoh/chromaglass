@@ -227,7 +227,18 @@ function CastReceiver() {
       const bc = new BroadcastChannel(CAST_CHANNEL);
       bc.onmessage = (e: MessageEvent<CastMessage>) => handle(e.data);
       bc.postMessage({ type: 'hello' } satisfies CastMessage);
-      cleanups.push(() => bc.close());
+      /*
+        And say so on the way out.
+
+        Closing this window with its own X left the sender polling for up to a
+        second before it noticed, and during that second the projector was
+        gone while the app still believed it was casting. `pagehide` rather
+        than `beforeunload`: it fires for a closed tab and for one the browser
+        freezes, which `beforeunload` does not reliably do.
+      */
+      const bye = () => { try { bc.postMessage({ type: 'goodbye' } satisfies CastMessage); } catch { /* channel already shut */ } };
+      window.addEventListener('pagehide', bye);
+      cleanups.push(() => { window.removeEventListener('pagehide', bye); bye(); bc.close(); });
     }
 
     // If the sender goes quiet the plate keeps running on its last settings;

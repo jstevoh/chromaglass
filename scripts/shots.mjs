@@ -112,7 +112,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
   // The band drives it, so the plate is doing what it does in front of music
   // rather than sitting in whatever state automation happens to leave it.
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);              // the gesture the band needs
   await page.waitForTimeout(6000);
 

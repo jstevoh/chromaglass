@@ -22,7 +22,7 @@ interface MidiPanelProps {
 }
 
 const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40';
-const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
+const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
 
 export function MidiPanel({ midi, presets, activity, onActivity, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
@@ -46,11 +46,11 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
     return (
       <div key={key} className="flex items-center gap-2 py-1 border-b border-white/5" data-testid={`midi-target-${key}`}>
         <span className="flex-1 text-[11px] truncate">{label}</span>
-        <span className="text-[9px] font-mono text-white/40 truncate max-w-[40%]">{bound.map(b => sourceLabel(b.source)).join(', ')}</span>
+        <span className="text-[11px] font-mono text-white/40 truncate max-w-[40%]">{bound.map(b => sourceLabel(b.source)).join(', ')}</span>
         <button
           onClick={() => (isLearning ? midi.cancelLearn() : midi.learn(target, encoder && target.kind === 'setting' ? 'relative' : 'absolute'))}
           disabled={!midi.enabled}
-          className={`px-2 py-1 rounded-md border text-[9px] font-bold uppercase tracking-wider disabled:opacity-30 ${isLearning ? 'bg-amber-400 text-black border-amber-400 animate-pulse' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+          className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-30 ${isLearning ? 'bg-amber-400 text-black border-amber-400 animate-pulse' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
           data-testid={`midi-learn-${key}`}
         >
           {isLearning ? 'Touch it…' : 'Learn'}
@@ -68,12 +68,12 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         <ControllerSurface midi={midi} presets={presets} surface={surface} onClose={() => setShowSurface(false)} />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
-      <p className="text-[10px] leading-relaxed opacity-40 mb-4">
+      <p className="text-[12px] leading-relaxed opacity-40 mb-4">
         Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Pick a factory map or teach your controller: choose what a control should do, then touch it.
       </p>
 
       {!midi.supported && (
-        <p className="text-[10px] leading-relaxed text-amber-200/80 mb-4" data-testid="midi-unsupported">
+        <p className="text-[12px] leading-relaxed text-amber-200/80 mb-4" data-testid="midi-unsupported">
           This browser has no Web MIDI. Chrome, Edge and Opera have it; Safari and Firefox do not.
         </p>
       )}
@@ -83,31 +83,31 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         <button
           onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
           disabled={!midi.supported}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-medium disabled:opacity-30 ${midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10'}`}
           data-testid="midi-enable"
         >
           <Radio size={14} /> {midi.enabled ? 'MIDI on' : 'Turn MIDI on'}
         </button>
         <span className={`h-2.5 w-2.5 rounded-full ${midi.lastEvent && performance.now() - midi.lastEvent.at < 400 ? 'bg-emerald-400' : midi.enabled ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
       </div>
-      {midi.error && <p className="text-[10px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
+      {midi.error && <p className="text-[12px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
       {midi.enabled && (
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <label className="text-[9px] uppercase tracking-widest text-white/50">In
+          <label className="text-[12px] text-white/50">In
             <select value={midi.ports.input} onChange={e => midi.choosePorts({ input: e.target.value })} className={inputCls} data-testid="midi-input">
               <option value="all">All devices</option>
               {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select>
           </label>
-          <label className="text-[9px] uppercase tracking-widest text-white/50">LEDs
+          <label className="text-[12px] text-white/50">LEDs
             <select value={midi.ports.output} onChange={e => midi.choosePorts({ output: e.target.value })} className={inputCls} data-testid="midi-output">
               <option value="auto">Auto</option>
               <option value="off">Off</option>
               {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
           </label>
-          {midi.inputs.length === 0 && <p className="col-span-2 text-[10px] text-white/40">No controller found. Plug one in; it appears here by itself.</p>}
-          {midi.lastEvent && <p className="col-span-2 text-[9px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(midi.lastEvent.source)} = {midi.lastEvent.value}</p>}
+          {midi.inputs.length === 0 && <p className="col-span-2 text-[12px] text-white/40">No controller found. Plug one in; it appears here by itself.</p>}
+          {midi.lastEvent && <p className="col-span-2 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(midi.lastEvent.source)} = {midi.lastEvent.value}</p>}
         </div>
       )}
 
@@ -147,8 +147,8 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         {midi.enabled && (
           midi.watched ? (
             <div className="mb-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2.5" data-testid="midi-auto-listening">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Listening</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-amber-100/80">
+              <p className="text-[13px] font-medium text-amber-100">Listening</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
                 Sweep every fader and knob end to end, then press each pad and button you want to use.
                 Nothing reaches the show while this is listening.
               </p>
@@ -188,7 +188,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
           )
         )}
         {autoSaid && (
-          <p className="mb-2 text-[10px] text-emerald-200/90" data-testid="midi-auto-said">{autoSaid}</p>
+          <p className="mb-2 text-[12px] text-emerald-200/90" data-testid="midi-auto-said">{autoSaid}</p>
         )}
         <div className="flex gap-1.5">
           <button onClick={midi.exportMap} className={`${chip(false)} flex-1`} data-testid="midi-export"><Download size={11} className="inline -mt-0.5 mr-1" />Save file</button>
@@ -209,16 +209,16 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         >
           <LayoutGrid size={11} /> {surface.name} picture
         </button>
-        {fileError && <p className="text-[10px] text-red-300 mt-2" data-testid="midi-file-error">{fileError}</p>}
-        <p className="text-[9px] text-white/40 mt-2" data-testid="midi-binding-count">{midi.map.bindings.length} bindings{midi.map.device ? ` · made on ${midi.map.device}` : ''}</p>
+        {fileError && <p className="text-[12px] text-red-300 mt-2" data-testid="midi-file-error">{fileError}</p>}
+        <p className="text-[11px] text-white/40 mt-2" data-testid="midi-binding-count">{midi.map.bindings.length} bindings{midi.map.device ? ` · made on ${midi.map.device}` : ''}</p>
       </div>
 
       {/* The shift layer */}
       {midi.enabled && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-widest text-white/50">Bank</span>
-            <span className="font-mono text-[9px] text-white/35" data-testid="midi-bank-count">
+            <span className="text-[12px] text-white/50">Bank</span>
+            <span className="font-mono text-[11px] text-white/35" data-testid="midi-bank-count">
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
           </div>
@@ -235,7 +235,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[9px] leading-relaxed text-white/40">
+          <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
             Nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
             learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where presets, dyes and the transport belong.
             Put <span className="text-white/60">Bank +</span> on a button to step them in the dark.
@@ -252,13 +252,13 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         slot on it or riding blind. This puts a running list of what changed
         and where it landed in the corner instead.
       */}
-      <label className="mb-3 flex items-center gap-2 text-[10px]" data-testid="midi-activity-toggle">
+      <label className="mb-3 flex items-center gap-2 text-[12px]" data-testid="midi-activity-toggle">
         <input type="checkbox" checked={activity} onChange={e => onActivity(e.target.checked)} />
         Show what the controller is doing, on the desk
       </label>
 
       {/* Fader manners */}
-      <div className="flex items-center gap-2 mb-4 text-[10px]">
+      <div className="flex items-center gap-2 mb-4 text-[12px]">
         <label
           className="flex items-center gap-1.5 flex-1"
           title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a preset loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
@@ -273,7 +273,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         ))}
       </div>
       {midi.learning && (
-        <p className="text-[10px] text-amber-200 mb-2 animate-pulse" data-testid="midi-learning">Move or press the control for “{targetLabel(midi.learning.target, presetName)}”…</p>
+        <p className="text-[12px] text-amber-200 mb-2 animate-pulse" data-testid="midi-learning">Move or press the control for “{targetLabel(midi.learning.target, presetName)}”…</p>
       )}
       <div className="mb-6" data-testid="midi-targets">
         {tab === 'settings' && LEARNABLE_SETTINGS.map(s => learnButton({ kind: 'setting', key: s.key, min: s.min, max: s.max }, s.label, `setting-${String(s.key)}`))}
@@ -283,11 +283,11 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       </div>
 
       {/* Bindings */}
-      <h3 className="text-[9px] uppercase tracking-widest text-white/50 mb-2">Bindings</h3>
+      <h3 className="text-[12px] text-white/50 mb-2">Bindings</h3>
       <div data-testid="midi-bindings">
-        {midi.map.bindings.length === 0 && <p className="text-[10px] text-white/40">None yet.</p>}
+        {midi.map.bindings.length === 0 && <p className="text-[12px] text-white/40">None yet.</p>}
         {midi.map.bindings.map(b => (
-          <div key={b.id} className={`flex items-center gap-2 py-1 border-b border-white/5 text-[10px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding">
+          <div key={b.id} className={`flex items-center gap-2 py-1 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding">
             <span className="font-mono text-white/50 w-24 shrink-0">{sourceLabel(b.source)}</span>
             <span className="flex-1 truncate">{targetLabel(b.target, presetName)}</span>
             {b.target.kind === 'setting' && b.source.kind === 'cc' && (
