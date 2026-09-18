@@ -226,6 +226,30 @@ const escapeCloses = async (testId) => {
  *
  * The assertion is unchanged. Something that never turns up still fails.
  */
+/**
+ * Wait for a *measurement* to arrive somewhere, rather than for an element.
+ *
+ * The same lesson as `escapeCloses` and `appears`, learned a third time on a
+ * check that loaded a logo and then looked at the canvas after a fixed pause.
+ * Locally the pause was plenty. On the runner the chain behind it — read the
+ * file, decode the image, upload a texture, draw a frame — had not finished,
+ * so the check sampled 5% of the frame and failed, and the very next check,
+ * one second later, measured 67% on the same picture. The feature was right
+ * and the wait was too short, which is the only way this kind of check ever
+ * fails.
+ *
+ * So: take the measurement repeatedly until it satisfies the predicate, and
+ * hand back the last reading either way. Something that never arrives still
+ * fails, and fails with the number it got to.
+ */
+const reaches = async (measure, ok, tries = 25) => {
+  let last = await measure();
+  for (let i = 0; i < tries && !ok(last); i++) {
+    await settle(300);
+    last = await measure();
+  }
+  return last;
+};
 const appears = async (testId, poke) => {
   for (let i = 0; i < 20; i++) {
     if (poke) await poke();
@@ -520,6 +544,12 @@ try {
   // silhouette against dark ground, and the contrast went up tenfold rather
   // than down. The feature was right and the check was wrong.
   {
+    /** Mean absolute difference per channel, 0 for identical frames. */
+    const apart = (a, b) => {
+      let sum = 0;
+      for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
+      return sum / (a.length * 0.75);
+    };
     const frame = () => page.evaluate(() => {
       const c = document.querySelector('#liquid-canvas');
       const o = document.createElement('canvas');
@@ -528,16 +558,21 @@ try {
       x.drawImage(c, 0, 0, o.width, o.height);
       return [...x.getImageData(0, 0, o.width, o.height).data];
     });
-    /** Mean absolute difference per channel, 0 for identical frames. */
-    const apart = (a, b) => {
-      let sum = 0;
-      for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
-      return sum / (a.length * 0.75);
-    };
+    /**
+     * Set the zoom and wait for the picture to stop moving, rather than for a
+     * clock. The camera eases toward a new zoom over about a second, and how
+     * many frames that is depends entirely on what else the runner is doing.
+     */
     const at = async (zoom) => {
       await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
-      await settle(1800);
-      return frame();
+      let prev = await frame();
+      for (let i = 0; i < 12; i++) {
+        await settle(300);
+        const now = await frame();
+        if (apart(prev, now) < 2) return now;
+        prev = now;
+      }
+      return prev;
     };
 
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
@@ -610,33 +645,33 @@ try {
     await page.setInputFiles('#mark-file', {
       name: 'mark.png', mimeType: 'image/png', buffer: Buffer.from(MAGENTA_PNG, 'base64'),
     });
-    await settle(900);
     // Big enough that a share of the frame is unambiguous.
     await page.evaluate(() => window.chromaglassSettings?.({ markScale: 0.8, markMix: 1, markX: 0.5, markY: 0.5 }));
-    await settle(700);
-    const after = await magentaShare();
+    // Polled, not slept on: reading the file, decoding it, uploading a texture
+    // and drawing a frame is a chain, and how long it takes is the runner's
+    // business rather than ours. See `reaches`.
+    const after = await reaches(magentaShare, v => v > 0.15);
     check('a loaded mark reaches the canvas, not just the page',
       before < 0.02 && after > 0.15, `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame`);
 
     // The house dimmer is the lamp. Taking the lamp out should not take the
     // sponsor's logo off the wall with it.
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 0 }));
-    await settle(500);
-    const blacked = await magentaShare();
+    const blacked = await reaches(magentaShare, v => v > 0.15);
     check('and a blackout leaves it on the wall', blacked > 0.15,
       `${(blacked * 100).toFixed(1)}% with the dimmer at zero`);
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 1 }));
 
     // Its own opacity is the control for taking it off, and it has to reach 0.
     await page.evaluate(() => window.chromaglassSettings?.({ markMix: 0 }));
-    await settle(500);
-    check('and its opacity takes it off', (await magentaShare()) < 0.02);
+    const faded = await reaches(magentaShare, v => v < 0.02);
+    check('and its opacity takes it off', faded < 0.02, `${(faded * 100).toFixed(1)}% left`);
     await page.evaluate(() => window.chromaglassSettings?.({ markMix: 1 }));
-    await settle(400);
+    await reaches(magentaShare, v => v > 0.15);
 
     await clickOn('mark-clear');
-    await settle(600);
-    check('and taking it off leaves nothing behind', (await magentaShare()) < 0.02);
+    const cleared = await reaches(magentaShare, v => v < 0.02);
+    check('and taking it off leaves nothing behind', cleared < 0.02, `${(cleared * 100).toFixed(1)}% left`);
   }
 
   // ── The room camera ───────────────────────────────────────────────
