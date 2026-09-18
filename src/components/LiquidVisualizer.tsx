@@ -5069,7 +5069,15 @@ void main() {
               that changes the whole frame at once — and it is rare, because
               the rest between them is half of what makes it read.
             */
-            if (ph.gust > 0.82 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+            // 0.45, not 0.82: the gust handed over here is already scaled by
+            // surge, so a threshold near the top made the pour fire only above
+            // surge 0.82 — nothing at the default of 0.55, and the feature was
+            // a switch disguised as a dial. At 0.45 a quiet look still never
+            // pours (its gust cannot reach it), the middle pours now and then,
+            // and a loud one pours often, which is what the dial was for. The
+            // size and the force still ride the gust, so a bigger surge is
+            // also a bigger pour.
+            if (ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
               lastFloodRef.current = now;
               const af = fluidsRef.current[0];
               if (af) {
