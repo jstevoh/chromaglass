@@ -86,6 +86,8 @@ export interface DesignDeskProps {
 }
 
 export function DesignDesk(p: DesignDeskProps) {
+  /** The document menu, hung off the look's own name. */
+  const [docMenu, setDocMenu] = useState(false);
   const [picking, setPicking] = useState(false);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
@@ -97,8 +99,43 @@ export function DesignDesk(p: DesignDeskProps) {
           <>
             <span className="text-muted">Look</span>
             <span className="text-faint">/</span>
-            <span className="truncate">{p.lookName ?? 'Untitled'}</span>
-            {p.edited && <Tag>edited</Tag>}
+            <div className="relative flex min-w-0 items-center gap-2">
+              <button
+                onClick={() => setDocMenu(v => !v)}
+                className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
+                title="New, Save, Save as…"
+                data-testid="doc-menu-button"
+              >
+                <span className="truncate">{p.lookName ?? 'Untitled'}</span>
+                <span className="text-faint">⌄</span>
+              </button>
+              {p.edited && <Tag>edited</Tag>}
+              {docMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setDocMenu(false)} />
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+                    data-testid="doc-menu"
+                  >
+                    {[
+                      ['New — an empty plate', '', p.onNew, 'doc-new'],
+                      ['Save', '⌘S', p.onSave, 'doc-save'],
+                      ['Save as…', '⇧⌘S', p.onSaveAs, 'doc-save-as'],
+                    ].map(([label, kbd, run, id]) => (
+                      <button
+                        key={String(id)}
+                        onClick={() => { setDocMenu(false); (run as () => void)(); }}
+                        className="flex w-full items-center justify-between gap-4 px-3 py-2 text-left text-[13px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+                        data-testid={String(id)}
+                      >
+                        <span>{String(label)}</span>
+                        {kbd ? <span className="font-mono text-[11px] text-faint">{String(kbd)}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </>
         }
         mode={p.mode}
@@ -120,9 +157,7 @@ export function DesignDesk(p: DesignDeskProps) {
               were working on and no way to begin from nothing. The dot on Save
               is whether there is anything to save.
             */}
-            <Button height={32} onClick={p.onNew} testId="new-look">New</Button>
             <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">Send to wall</Button>
-            <Button height={32} kbd="⇧⌘S" onClick={p.onSaveAs} testId="save-look-as">Save as…</Button>
             <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
               {p.dirty ? 'Save •' : 'Save'}
             </Button>

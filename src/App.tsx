@@ -372,9 +372,14 @@ export default function App() {
   // because the state it snapshots is declared further down.
   const castReadyRef = useRef<() => void>(() => {});
   const stageRef = useRef<{ width: number; height: number } | null>(null);
+  /** `setToast` is declared further down; the cast sender needs it up here. */
+  const setToastRef = useRef<(m: string) => void>(() => {});
   const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow } = useCastSender(
     () => castReadyRef.current(),
     (size) => { stageRef.current = size; visualizerRef.current?.setStage(size); },
+    // A blocked popup used to be silent, so Send to wall did visibly nothing
+    // and there was no telling that from the feature being broken.
+    (message) => setToastRef.current(message),
   );
   const [presetSeq, setPresetSeq] = useState(0);
 
@@ -932,6 +937,7 @@ export default function App() {
    * working. Same for an empty plate, which looks like a plate that failed.
    */
   const [toast, setToast] = useState<string | null>(null);
+  setToastRef.current = setToast;
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2400);

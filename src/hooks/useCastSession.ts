@@ -12,7 +12,12 @@ import { CAST_CHANNEL, type CastMessage } from '../lib/castProtocol';
  * reaches whatever receiver is live, and `onReceiverReady` fires when one
  * connects so the app can push a full snapshot.
  */
-export function useCastSender(onReceiverReady: () => void, onStage?: (size: { width: number; height: number } | null) => void) {
+export function useCastSender(
+  onReceiverReady: () => void,
+  onStage?: (size: { width: number; height: number } | null) => void,
+  /** Something went wrong the operator needs to know about, in words. */
+  onTrouble?: (message: string) => void,
+) {
   const [isCasting, setIsCasting] = useState(false);
   /** For a window we opened: whether it fills its screen (the browser's own fullscreen, no title bar); null when unknown or not a window. */
   const [windowFullscreen, setWindowFullscreen] = useState<boolean | null>(null);
@@ -24,6 +29,10 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
   readyRef.current = onReceiverReady;
   const stageRef = useRef(onStage);
   stageRef.current = onStage;
+  const troubleRef = useRef(onTrouble);
+  troubleRef.current = onTrouble;
+  /** Bumped per open, so a fresh window never reuses a stale window's name. */
+  const openSeq = useRef(0);
 
   const cleanup = useCallback(() => {
     if (checkIntervalRef.current) {
@@ -68,9 +77,12 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
     bc.onmessage = (e: MessageEvent<CastMessage>) => {
       if (e.data?.type === 'hello') readyRef.current();
       if (e.data?.type === 'stage') stageRef.current?.({ width: e.data.width, height: e.data.height });
+      // The receiver closing, at the moment it happens rather than whenever
+      // the poll next comes round.
+      if (e.data?.type === 'goodbye') cleanup();
     };
     channelRef.current = bc;
-  }, []);
+  }, [cleanup]);
 
   /**
    * Open the receiver in a window. With the Window Management API and a
@@ -87,15 +99,44 @@ export function useCastSender(onReceiverReady: () => void, onStage?: (size: { wi
     const features = screen
       ? `popup,fullscreen,left=${Math.round(screen.availLeft)},top=${Math.round(screen.availTop)},width=${Math.round(screen.availWidth)},height=${Math.round(screen.availHeight)}`
       : 'popup,width=1920,height=1080';
-    const castWindow = window.open(castUrl, 'chromaglass-cast', features);
-    if (!castWindow) return false;
+    /*
+      Reopening after the window was closed by hand.
+
+      Three things made that unreliable, and the first one made it silent.
+
+      A blocked popup returned false and said nothing at all, so "Send to
+      wall" did visibly nothing and there was no way to tell a blocked popup
+      from a broken feature. Chrome is readier to block the second open than
+      the first, which is exactly the case being reported.
+
+      The window was opened under a fixed name, and a named target that the
+      browser still half-remembers can hand back a window that never
+      navigates — so the name now carries a counter and every open is its own
+      window.
+
+      And an open window should be brought forward rather than duplicated:
+      pressing the button twice meant a second projector nobody asked for.
+    */
+    const live = windowRef.current;
+    if (live && !live.closed) {
+      try { live.focus(); } catch { /* another screen, another space */ }
+      return true;
+    }
+    const castWindow = window.open(castUrl, `chromaglass-cast-${++openSeq.current}`, features);
+    if (!castWindow) {
+      troubleRef.current?.('Chrome blocked the projector window — allow pop-ups for this site');
+      return false;
+    }
     windowRef.current = castWindow;
     openChannel();
     setIsCasting(true);
+    // Cleared first: opening twice used to leave the previous poll running for
+    // a window nobody holds a reference to any more.
+    if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     checkIntervalRef.current = setInterval(() => {
       if (castWindow.closed) { cleanup(); return; }
       setWindowFullscreen(readWindowFullscreen(castWindow));
-    }, 1000);
+    }, 400);
     try {
       const w = window as unknown as { getScreenDetails?: () => Promise<{ screens: ScreenLike[]; currentScreen: ScreenLike }> };
       if (w.getScreenDetails) {
