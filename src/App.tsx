@@ -248,6 +248,17 @@ export default function App() {
     (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
       (key: string, value?: number) => { touch(key, value); };
     /*
+      Fire any of the one-shot actions by name.
+
+      The same list a pad, a phone or an OSC message reaches, so a harness can
+      put the show into a state — automation on, the sequencer running — that
+      it would otherwise have to find a button for. Written for the motion
+      measurements, which spent several runs quietly measuring a plate whose
+      automation was off.
+    */
+    (window as unknown as { chromaglassAction?: unknown }).chromaglassAction =
+      (name: string) => { runActionRef.current?.(name as MidiAction); };
+    /*
       Set any setting from the harness.
 
       `npm run detail` judges a frame by numbers, and the question it exists to
@@ -1619,11 +1630,36 @@ export default function App() {
   }, [castSend]);
   castReadyRef.current = sendCastState;
   useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
+  /*
+    The live state, for a harness to read.
+
+    This used to close over the render's `castState` and be re-registered when
+    it changed, which sounds equivalent and is not: a look fade or the
+    sequencer rewrites settings between renders, and what came back was
+    whichever snapshot the last effect happened to capture. A harness setting a
+    value and reading it straight back got the old one — which cost three
+    rounds of measuring the wrong plate before anyone thought to check the
+    instrument. Reading refs means it cannot be stale.
+  */
+  const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
+  liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState, audio: audioData, songChange });
+      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => {
+        const l = liveDebugRef.current;
+        return {
+          isCasting: l.isCasting,
+          castState: l.castState,
+          audio: l.audioData,
+          songChange: l.songChange,
+          // Straight from the render rather than from the cast snapshot, which
+          // is assembled for a receiver and not for a question.
+          isAutomated: l.isAutomated,
+          settings: settingsRef.current,
+        };
+      };
     }
-  }, [isCasting, castState, audioData, songChange]);
+  }, []);
   // The audio bands, thirty times a second — the raw spectrum stays here.
   const lastCastAudioRef = useRef(0);
   useEffect(() => {
@@ -1757,6 +1793,7 @@ export default function App() {
     const next = allPresets[(i + dir + allPresets.length) % allPresets.length];
     cuePreset(next.id);
   };
+  const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
       case 'seed':            setSeedCount(prev => prev + 1); break;
@@ -1921,6 +1958,7 @@ export default function App() {
     },
   });
 
+  runActionRef.current = runAction;
   relaySendRef.current = remoteLink.send;
 
   /*

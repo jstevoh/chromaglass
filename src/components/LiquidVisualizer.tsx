@@ -358,6 +358,7 @@ class FluidSimulation {
   phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
   /** The clock's own lean, slewed so no one frame can move it far. */
   private clockLean = 1;
+  get clockLeanNow(): number { return this.clockLean; }
   /** Wall-clock seconds this step covers, for smoothing that means the same thing at any frame rate. */
   dtSeconds = 1 / 60;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
@@ -1321,9 +1322,21 @@ class FluidSimulation {
       the plate reads the clock, so this is the only place speed can come from
       without the picture tearing.
     */
-    // The drift, not the drive: the gust's job is impulses, and a clock that
-    // jumped with one would lurch. This is the slow half of the phrase only.
-    const want = 1 + (this.phrase.drift - 0.5) * 1.1;
+    /*
+      Follow the whole phrase, and let the slew be what keeps it civil.
+
+      This followed the drift alone, on the reasoning that a clock which jumps
+      with a gust would lurch. True, but the drift hovers around the middle of
+      its range — measured on a running plate it sat between 0.45 and 0.58 —
+      so the lean never left a few percent of 1 and the timestep moved by three
+      percent over half a minute. Which is not a speed-up by any definition.
+
+      The slew below is the thing that stops a lurch, and it is a two and a
+      half second time constant: a gust that takes half a second to arrive is
+      already smoothed into a swell by the time the clock sees it. So take the
+      whole drive and let the filter do its job.
+    */
+    const want = 1 + (this.phrase.drive - 1) * 0.85;
     /*
       Slewed on seconds rather than on steps.
       
@@ -1334,7 +1347,7 @@ class FluidSimulation {
       arrived at all, which is most of why the first version of the phrasing
       measured as doing nothing. A time constant is the same on both.
     */
-    this.clockLean += (want - this.clockLean) * (1 - Math.exp(-this.dtSeconds / 1.2));
+    this.clockLean += (want - this.clockLean) * (1 - Math.exp(-this.dtSeconds / 2.5));
     dynamicSpeed *= this.clockLean;
 
     // Plates behind the lead are the background loop: the same show, slower
@@ -5978,6 +5991,9 @@ void main() {
         // What the shader was actually told about them last frame: a bubble
         // that is on the plate but not in these two numbers is not on screen.
         bubbleUniforms: () => ({ ...bubbleDebugRef.current }),
+        // The phrasing, so a check can watch the signal rather than guess from
+        // the picture whether it is arriving.
+        phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,
