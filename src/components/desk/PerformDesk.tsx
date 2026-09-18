@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { PALETTE } from '../../constants';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
+import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
 import { PIN_RANGE } from '../../lib/deskPins';
@@ -52,20 +53,6 @@ export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
 ];
 
 const RANGE = PIN_RANGE;
-
-/**
- * How a few of them read better than a bare percentage.
- *
- * Zoom does: `4.00×` is a magnification anyone can picture. Speed did not.
- * It rode 0.005 to 0.3 and printed `0.022`, which is the only number on
- * either desk that is not a percentage or a unit, and which tells you
- * nothing — not how fast it is, not how much room is left, not which way is
- * more. Every other ride beside it reads as a share of its travel, so this
- * one does too.
- */
-const READS: Partial<Record<string, (v: number) => string>> = {
-  macroZoom: v => `${v.toFixed(2)}×`,
-};
 
 /** The Dimmer's handle is white because it is the one that can black the room out. */
 const WHITE = new Set<string>(['dimmer']);
@@ -293,7 +280,6 @@ export function PerformDesk(p: PerformDeskProps) {
             if (!spec) return null;          // a key saved by an older build
             const raw = p.settings[key];
             const v = typeof raw === 'number' ? raw : spec.min;
-            const read = READS[String(key)];
             return (
               <Slider
                 key={String(key)}
@@ -301,7 +287,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 value={v}
                 min={spec.min}
                 max={spec.max}
-                display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
+                display={readSetting(String(key), v, spec.min, spec.max)}
                 cc={p.ccFor(key)}
                 white={WHITE.has(String(key))}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}

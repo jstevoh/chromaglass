@@ -83,7 +83,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         <button
           onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
           disabled={!midi.supported}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-medium disabled:opacity-30 ${midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10'}`}
           data-testid="midi-enable"
         >
           <Radio size={14} /> {midi.enabled ? 'MIDI on' : 'Turn MIDI on'}
@@ -93,13 +93,13 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       {midi.error && <p className="text-[10px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
       {midi.enabled && (
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <label className="text-[9px] uppercase tracking-widest text-white/50">In
+          <label className="text-[12px] text-white/50">In
             <select value={midi.ports.input} onChange={e => midi.choosePorts({ input: e.target.value })} className={inputCls} data-testid="midi-input">
               <option value="all">All devices</option>
               {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select>
           </label>
-          <label className="text-[9px] uppercase tracking-widest text-white/50">LEDs
+          <label className="text-[12px] text-white/50">LEDs
             <select value={midi.ports.output} onChange={e => midi.choosePorts({ output: e.target.value })} className={inputCls} data-testid="midi-output">
               <option value="auto">Auto</option>
               <option value="off">Off</option>
@@ -147,7 +147,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         {midi.enabled && (
           midi.watched ? (
             <div className="mb-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2.5" data-testid="midi-auto-listening">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-100">Listening</p>
+              <p className="text-[13px] font-medium text-amber-100">Listening</p>
               <p className="mt-1 text-[10px] leading-relaxed text-amber-100/80">
                 Sweep every fader and knob end to end, then press each pad and button you want to use.
                 Nothing reaches the show while this is listening.
@@ -217,7 +217,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       {midi.enabled && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-widest text-white/50">Bank</span>
+            <span className="text-[12px] text-white/50">Bank</span>
             <span className="font-mono text-[9px] text-white/35" data-testid="midi-bank-count">
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
@@ -283,7 +283,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       </div>
 
       {/* Bindings */}
-      <h3 className="text-[9px] uppercase tracking-widest text-white/50 mb-2">Bindings</h3>
+      <h3 className="text-[12px] text-white/50 mb-2">Bindings</h3>
       <div data-testid="midi-bindings">
         {midi.map.bindings.length === 0 && <p className="text-[10px] text-white/40">None yet.</p>}
         {midi.map.bindings.map(b => (

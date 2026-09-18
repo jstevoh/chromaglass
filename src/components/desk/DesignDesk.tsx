@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
+import { readSetting } from '../../lib/readout';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -21,22 +22,6 @@ import type { LiquidType, VisualizerSettings } from '../../types';
  */
 
 const RANGE = PIN_RANGE;
-
-/**
- * How a few of them read better than a bare percentage.
- *
- * Keyed by setting rather than listed with the recipe, because the recipe is
- * now whatever the operator put on it — there is no fixed eight to hang a
- * formatter off any more.
- */
-const READS: Partial<Record<string, (v: number) => string>> = {
-  globalSpeed: v => v.toFixed(3),
-  macroZoom:   v => `${v.toFixed(2)}x`,
-  grainScale:  v => `${Math.round(v)}`,
-  macroHold:   v => `${v.toFixed(1)}s`,
-  beatLead:    v => `${Math.round(v)}ms`,
-  gelSpeed:    v => `${v.toFixed(2)} rpm`,
-};
 
 /** All seven, with the letter that picks each one. */
 const TOOLS = [
@@ -281,7 +266,6 @@ export function DesignDesk(p: DesignDeskProps) {
             if (!spec) return null;          // a key saved by an older build
             const raw = p.settings[key];
             const v = typeof raw === 'number' ? raw : spec.min;
-            const read = READS[String(key)];
             return (
               <Slider
                 key={String(key)}
@@ -289,7 +273,7 @@ export function DesignDesk(p: DesignDeskProps) {
                 value={v}
                 min={spec.min}
                 max={spec.max}
-                display={read ? read(v) : `${Math.round(((v - spec.min) / (spec.max - spec.min)) * 100)}%`}
+                display={readSetting(String(key), v, spec.min, spec.max)}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
                 midiKey={`setting:${String(key)}`}
                 testId={`recipe-${String(key)}`}
