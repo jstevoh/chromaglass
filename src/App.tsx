@@ -2018,7 +2018,7 @@ export default function App() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex flex-col items-start gap-4 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex max-w-[55vw] flex-col items-start gap-4 transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 
@@ -2045,7 +2045,7 @@ export default function App() {
                       that change the plate — the interesting ones — below the
                       fold. Paired, the whole bench is in view at once.
                     */}
-                    <div className="grid grid-cols-2 gap-1">
+                    <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-1">
                     {group.map((liq) => {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
@@ -2093,7 +2093,7 @@ export default function App() {
                 {/* Quick color swatches — one click recolors the selected liquid */}
                 <div className="flex flex-col gap-1.5 w-full">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
-                  <div className="grid grid-cols-8 gap-1">
+                  <div className="grid grid-cols-5 min-[440px]:grid-cols-8 gap-1">
                     {DROPPER_COLORS.map(hex => {
                       const isCurrent = selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
                       return (
@@ -2204,7 +2204,7 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 transition-all duration-300 max-h-[calc(100vh-260px)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
+              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 max-w-[40vw] transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
             >
               <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
 

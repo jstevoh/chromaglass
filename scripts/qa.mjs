@@ -1583,7 +1583,15 @@ try {
         return out;
       });
     };
-    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860]]) {
+    /*
+      Including the widths below 1024, where the app shows its own older
+      overlay interface rather than the desk. Two columns pinned to opposite
+      edges at the same vertical centre, so their combined width is the only
+      thing keeping them apart — and on a phone it was not: the bottle rows
+      and an eight-wide swatch grid made the left one 270px of a 390px window
+      and the right column was painted over the end of it.
+    */
+    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860], [430, 932], [390, 844]]) {
       const hit = await coveredAt(w, h);
       check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
     }
