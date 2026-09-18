@@ -23,6 +23,7 @@ import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+import { Phrasing, type Phrase } from '../lib/phrasing';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -353,6 +354,12 @@ class FluidSimulation {
   private rbVy: Float32Array;
   private mcA: Float32Array;        // MacCormack intermediates (CPU path)
   private mcB: Float32Array;
+  /** What the plate is being asked to do this moment; set from outside once a frame. */
+  phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
+  /** The clock's own lean, slewed so no one frame can move it far. */
+  private clockLean = 1;
+  /** Wall-clock seconds this step covers, for smoothing that means the same thing at any frame rate. */
+  dtSeconds = 1 / 60;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
   /** The thickness as the sharpening pass found it: every channel gates on this. */
@@ -1302,6 +1309,34 @@ class FluidSimulation {
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
+    /*
+      And the clock leans forward and back.
+
+      The note above says audio energy is kept out of the timestep to stop it
+      jumping, and that is right: a clock that tracks a kick drum stutters,
+      because a solver asked for a big step and then a small one does not
+      advect smoothly, it lurches. What is safe is a *slow* lean, so this rides
+      the phrase's drift rather than its gust — seconds, not beats — and is
+      slewed on top of that so no single frame can move it far. Nothing else in
+      the plate reads the clock, so this is the only place speed can come from
+      without the picture tearing.
+    */
+    // The drift, not the drive: the gust's job is impulses, and a clock that
+    // jumped with one would lurch. This is the slow half of the phrase only.
+    const want = 1 + (this.phrase.drift - 0.5) * 1.1;
+    /*
+      Slewed on seconds rather than on steps.
+      
+      This was a flat 0.02 per solver step, which is not a smoothing constant
+      at all — it is a different smoothing constant on every machine. At sixty
+      steps a second it arrives in under a second; on the box this was measured
+      on, running two steps a second, it needed half a minute and so never
+      arrived at all, which is most of why the first version of the phrasing
+      measured as doing nothing. A time constant is the same on both.
+    */
+    this.clockLean += (want - this.clockLean) * (1 - Math.exp(-this.dtSeconds / 1.2));
+    dynamicSpeed *= this.clockLean;
+
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
     if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
@@ -2160,6 +2195,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
+  /**
+   * The plate's phrasing: what it should be doing this second.
+   *
+   * Stepped once a frame and read by the automation and by every solver, so
+   * both plates surge together rather than each breathing to its own weather.
+   */
+  const phrasingRef = useRef(new Phrasing());
+  const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -4487,6 +4530,23 @@ void main() {
         dynamicSpeed *= speedMultiplier;
         const timeMultiplier = dynamicSpeed * 20.0;
 
+        /*
+          The phrase, once a frame, before anything reads it.
+
+          On wall-clock seconds rather than solver steps, because it is about
+          how the show feels over the seconds a person watches rather than
+          about how far the liquid has been pushed. Paused, it holds where it
+          is instead of running on in the dark and coming back somewhere else.
+        */
+        if (isActiveRef.current) {
+          phraseRef.current = phrasingRef.current.step(
+            realDt,
+            currentSettings.surge ?? 0,
+            currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
+          );
+          for (const f of fluidsRef.current) if (f) { f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP; }
+        }
+
         if (isActiveRef.current) {
           simulationTimeRef.current += realDt * timeMultiplier;
         }
@@ -4904,11 +4964,24 @@ void main() {
             const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
             const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
-            // The rate scales everything: at the default it is a drop or a
-            // blow every second or so, quickening with the music; at full it
-            // is the old frenzy. (Before, the music term stood on its own and
-            // the slider hardly mattered.)
-            if (Math.random() < rate * (0.08 + energy * 0.5)) {
+            /*
+              The rate scales everything: at the default it is a drop or a
+              blow every second or so, quickening with the music; at full it
+              is the old frenzy. (Before, the music term stood on its own and
+              the slider hardly mattered.)
+
+              The phrase is what gives it shape. Without it this is a Poisson
+              process at a fixed rate, which means impulses arrive
+              independently and the amount of them over any minute is the same
+              as over any other — the plate is equally busy for as long as it
+              is on. The phrase's drive bunches them into gusts with quiet
+              between, which is what a dish being worked on actually looks
+              like: a pour, then twenty seconds of watching it spread, then a
+              press. At surge 0 the drive is 1 and this is the old behaviour
+              exactly.
+            */
+            const ph = phraseRef.current;
+            if (Math.random() < rate * (0.08 + energy * 0.5) * ph.drive) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -4918,7 +4991,7 @@ void main() {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3 + ph.gust * 3), (0.08 + energy * 0.18) * (1 + ph.gust * 1.5));
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
@@ -4927,7 +5000,10 @@ void main() {
                   const color = harmonyColor(harmonyRef.current);
                   const styles = injectStyleRef.current;
                   const style = styles[Math.floor(Math.random() * styles.length)];
-                  af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
+                  // A gust is a bigger pour, not just a more frequent one:
+                  // an even scatter of identical drops is the flatness this
+                  // is here to break.
+                  af.autoInject(style, rx, ry, (6.0 + energy * 35) * (1 + ph.gust * 1.3), color.r, color.g, color.b, energy);
                   af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.

@@ -185,6 +185,15 @@ export interface VisualizerSettings {
   heatDecay: number;
   
   // Automation
+  /**
+   * How much the plate breathes: surges of activity and rests between them.
+   *
+   * 0 is the flat plate — one rate, forever — which is what everything did
+   * before this existed and what a look that does not ask for phrasing still
+   * gets. Up, and the automation comes in gusts, the impulses land harder
+   * during them, and the clock itself leans forward and back.
+   */
+  surge: number;
   automateRate: number;
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
@@ -358,6 +367,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  // Enough to be felt without the plate ever looking like it is pulsing to a
+  // beat it invented: a busy few seconds every ten or so, and genuinely quiet
+  // in between.
+  surge: 0.55,
   automateRate: 0.12,
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
