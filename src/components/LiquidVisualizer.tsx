@@ -160,6 +160,8 @@ export interface LiquidVisualizerHandle {
   /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids. */
   applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
+  /** What is on each live layer: how full it is, and the colour of it. */
+  layerReport: () => { index: number; fill: number; colour: string }[];
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
   /**
    * Take on a preset's dyes, injection style and liquids without clearing the
@@ -287,6 +289,15 @@ class FluidSimulation {
   temp: Float32Array;
   temp0: Float32Array;
   meanDensity = 0; // rolling measure of how full the plate is
+  /**
+   * The average colour on this layer, 0..1 per channel.
+   *
+   * Summed in the same loops that already sum density, so it costs three
+   * adds per cell and no extra read. It is what a layer *is* rather than a
+   * record of what was dropped on it: a tab can show the colour actually
+   * sitting there, including after it has mixed into something else.
+   */
+  meanColor: [number, number, number] = [0, 0, 0];
   /** Plate tilt this step — a uniform acceleration, set by the show each step. */
   tiltX = 0;
   tiltY = 0;
@@ -400,15 +411,17 @@ class FluidSimulation {
     // One frame of latency instead of a pipeline stall every frame.
     if (!this.gpu.readbackAsync()) return;
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
-    let sum = 0;
+    let sum = 0, sr = 0, sg = 0, sb = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       const d = dye[i * 4 + 3];
       this.rbDensity[i] = d;
       this.rbVx[i] = vel[i * 4];
       this.rbVy[i] = vel[i * 4 + 1];
       sum += d;
+      sr += dye[i * 4]; sg += dye[i * 4 + 1]; sb += dye[i * 4 + 2];
     }
     this.meanDensity = sum / GRID_AREA;
+    this.meanColor = [sr / GRID_AREA, sg / GRID_AREA, sb / GRID_AREA];
   }
 
   private pullStateFromGpu() {
@@ -1346,7 +1359,7 @@ class FluidSimulation {
     this.sharpenDye(p.sharpness);
 
     // 10. Evaporation, damping, stability
-    let densSum = 0;
+    let densSum = 0, colR = 0, colG = 0, colB = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       this.vx[i] *= p.damping;
       this.vy[i] *= p.damping;
@@ -1370,6 +1383,7 @@ class FluidSimulation {
         this.densityB[i] *= capScale;
       }
       densSum += this.density[i];
+      colR += this.densityR[i]; colG += this.densityG[i]; colB += this.densityB[i];
       this.temp[i]     *= p.heatDecay;
       this.dhdt[i]     *= 0.5;
       this.gap[i]       = Math.min(0.03, this.gap[i] + 0.005);
@@ -1383,6 +1397,7 @@ class FluidSimulation {
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
     this.meanDensity = densSum / GRID_AREA;
+    this.meanColor = [colR / GRID_AREA, colG / GRID_AREA, colB / GRID_AREA];
   }
 
   /**
@@ -1884,6 +1899,24 @@ interface GLResources {
 
 // ─── React Component ─────────────────────────────────────────────────
 
+/**
+ * A layer's mean dye as a swatch.
+ *
+ * Normalised by its own brightest channel rather than shown raw: a layer with
+ * a little dye on it averages to almost black across the whole grid, and a row
+ * of near-black squares says nothing. Scaling to the hue keeps a quiet layer
+ * legible while `fill` carries how much is actually there.
+ */
+function rgbToHex(r: number, g: number, b: number): string {
+  const peak = Math.max(r, g, b);
+  const k = peak > 0.001 ? 0.85 / peak : 0;
+  const to = (v: number) => {
+    const n = Math.round(Math.max(0, Math.min(1, v * k)) * 255);
+    return n.toString(16).padStart(2, '0');
+  };
+  return peak <= 0.001 ? '#111111' : `#${to(r)}${to(g)}${to(b)}`;
+}
+
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, settings, seedCount = 0, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
@@ -2248,6 +2281,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
       layPlateRef.current(presetId);
     },
+    /*
+      What is on each layer.
+
+      A layer was "Layer 1" and "Layer 2" and nothing else: no way to tell an
+      empty one from a full one, which dyes were on it, or whether it was
+      contributing anything to what you can see. So switching between them was
+      blind, and anything that happened to change at the same time looked like
+      the switch having done it — which is exactly the confusion this is here
+      to remove.
+
+      Both numbers come from sums the solver already keeps, so this costs a
+      read of two fields per layer and nothing per frame.
+    */
+    layerReport: () => fluidsRef.current.slice(0, Math.max(1, Math.round(settingsRef.current.layerCount ?? 1))).map((f, i) => ({
+      index: i,
+      // How full it is. The scale is generous: a plate reads as busy long
+      // before its mean density approaches one.
+      fill: Math.max(0, Math.min(1, (f?.meanDensity ?? 0) / 0.35)),
+      colour: f ? rgbToHex(f.meanColor[0], f.meanColor[1], f.meanColor[2]) : '#000000',
+    })),
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
       injectStyles: [...injectStyleRef.current],

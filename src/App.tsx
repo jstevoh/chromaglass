@@ -936,6 +936,30 @@ export default function App() {
    * it — so without a word it is indistinguishable from the button not
    * working. Same for an empty plate, which looks like a plate that failed.
    */
+  /**
+   * What is on each layer, for the tabs.
+   *
+   * Polled a few times a second rather than read per frame: the numbers come
+   * off a readback that lands when it lands, and a badge showing how full a
+   * layer is does not need sixty looks a second at the cost of a re-render
+   * each.
+   */
+  const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
+  /** Which desk is up, for the poll below, which is armed once and never re-armed. */
+  const deskModeRef = useRef(deskMode);
+  deskModeRef.current = deskMode;
+  useEffect(() => {
+    const id = setInterval(() => {
+      // Only the bench draws them, and only when there is more than one layer
+      // to tell apart — otherwise this is a re-render for a badge nobody is
+      // looking at.
+      if (deskModeRef.current !== 'design') return;
+      const r = visualizerRef.current?.layerReport?.();
+      if (r && r.length > 1) setLayerReport(r);
+    }, 400);
+    return () => clearInterval(id);
+  }, []);
+
   const [toast, setToast] = useState<string | null>(null);
   setToastRef.current = setToast;
   useEffect(() => {
@@ -3094,6 +3118,7 @@ export default function App() {
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
           onAddLayer={() => updateSettings({ layerCount: Math.min(3, (settings.layerCount ?? 1) + 1) })}
+          layerReport={layerReport}
           settings={settings}
           onSetting={updateSettings}
           recipeKeys={recipeKeys}
