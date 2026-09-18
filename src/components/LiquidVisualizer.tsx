@@ -2232,6 +2232,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    */
   const phrasingRef = useRef(new Phrasing());
   const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
+  /** When the last flood pour landed, so gusts cannot stack into a wash. */
+  const lastFloodRef = useRef(-1e9);
+  /** `?filter=bspline` restores the sampler the Catmull-Rom one replaced. See docs/judging.md. */
+  const oldSamplerRef = useRef(false);
+  if (!oldSamplerRef.current) {
+    try { oldSamplerRef.current = new URLSearchParams(window.location.search).get('filter') === 'bspline'; } catch { /* no query */ }
+  }
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -2931,8 +2938,36 @@ const float DENSITY_SCALE = 8.0;
 // whose combined weight is a couple of percent, and renormalising. The five
 // are bilinear fetches placed off-centre so hardware filtering does the inner
 // pair for free, which is the same trick the B-spline version used.
+uniform float u_bspline;   // ?filter=bspline — the old sampler, to compare against
 vec4 textureBicubic(sampler2D tex, vec2 uv) {
   vec2 texSize = vec2(u_gridSize);
+  /*
+    The sampler this replaced, kept reachable from the query string.
+
+    Not because anyone should run it — it is the bug — but because the claim
+    that the plate got sharper was made from arithmetic on a machine that
+    cannot render a plate worth looking at, and the person who can judge it
+    should be able to flip between the two in a second rather than take my word
+    and a table of kernel weights. See docs/judging.md.
+  */
+  if (u_bspline > 0.5) {
+    vec2 inv = 1.0 / texSize;
+    vec2 t = uv * texSize - 0.5;
+    vec2 f = fract(t);
+    t -= f;
+    vec4 nx = vec4(1.0, 2.0, 3.0, 4.0) - f.x, qx = nx * nx * nx;
+    float ax = qx.x, bx = qx.y - 4.0 * qx.x, cx = qx.z - 4.0 * qx.y + 6.0 * qx.x;
+    vec4 wx = vec4(ax, bx, cx, 6.0 - ax - bx - cx) * (1.0 / 6.0);
+    vec4 ny = vec4(1.0, 2.0, 3.0, 4.0) - f.y, qy = ny * ny * ny;
+    float ay = qy.x, by = qy.y - 4.0 * qy.x, cy = qy.z - 4.0 * qy.y + 6.0 * qy.x;
+    vec4 wy = vec4(ay, by, cy, 6.0 - ay - by - cy) * (1.0 / 6.0);
+    vec4 c = t.xxyy + vec2(-0.5, 1.5).xyxy;
+    vec4 sw = vec4(wx.xz + wx.yw, wy.xz + wy.yw);
+    vec4 off = (c + vec4(wx.yw, wy.yw) / sw) * inv.xxyy;
+    vec4 s0 = texture(tex, off.xz), s1 = texture(tex, off.yz);
+    vec4 s2 = texture(tex, off.xw), s3 = texture(tex, off.yw);
+    return mix(mix(s3, s2, sw.x / (sw.x + sw.y)), mix(s1, s0, sw.x / (sw.x + sw.y)), sw.z / (sw.z + sw.w));
+  }
   vec2 samplePos = uv * texSize;
   vec2 texPos1 = floor(samplePos - 0.5) + 0.5;
   vec2 f = samplePos - texPos1;
@@ -4330,7 +4365,7 @@ void main() {
       'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
-      'u_mark','u_markOn','u_markRect',
+      'u_mark','u_markOn','u_markRect','u_bspline',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
       'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
@@ -5016,6 +5051,51 @@ void main() {
               exactly.
             */
             const ph = phraseRef.current;
+
+            /*
+              A gust does something, rather than doing more of the same.
+
+              The first version of the phrasing only scaled the trickle — how
+              often a drop lands and how big it is — and measured as changing
+              nothing at all: the same frame-to-frame motion as with it
+              switched off, at every lag from one second to fourteen. The
+              reason is in `phrasing.ts`: a plate already covered in churning
+              dye has a motion floor that swamps any modulation of small events
+              on top of it. Filmed liquid gets its dynamics from whole-frame
+              events, and from a dish that is often mostly still.
+
+              So the peak of a gust pours. A wide, soft flood across a good
+              share of the plate in one colour, which is the one thing here
+              that changes the whole frame at once — and it is rare, because
+              the rest between them is half of what makes it read.
+            */
+            if (ph.gust > 0.82 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+              lastFloodRef.current = now;
+              const af = fluidsRef.current[0];
+              if (af) {
+                const color = harmonyColor(harmonyRef.current);
+                const cx = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                const cy = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                // A third of the plate across, falling off to nothing, so it
+                // is a pour arriving rather than a rectangle being filled.
+                const R = GRID_SIZE * (0.18 + 0.16 * ph.gust);
+                const strength = (28 + energy * 40) * (0.5 + ph.gust);
+                for (let j = Math.max(1, Math.floor(cy - R)); j < Math.min(GRID_SIZE - 1, cy + R); j++) {
+                  for (let i = Math.max(1, Math.floor(cx - R)); i < Math.min(GRID_SIZE - 1, cx + R); i++) {
+                    const d = Math.hypot(i - cx, j - cy) / R;
+                    if (d >= 1) continue;
+                    const fall = (1 - d) * (1 - d);
+                    af.addDensity(i, j, strength * fall * 0.06, color.r, color.g, color.b);
+                  }
+                }
+                // And it lands: a pour pushes the plate out of the way.
+                af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
+                if ((currentSettings.bubbles ?? 0) > 0) {
+                  bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
+                }
+              }
+            }
+
             if (Math.random() < rate * (0.08 + energy * 0.5) * ph.drive) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
@@ -5800,6 +5880,7 @@ void main() {
             Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
           );
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
+          glCtx.uniform1f(uLocs['u_bspline'], oldSamplerRef.current ? 1 : 0);
           glCtx.uniform1i(uLocs['u_mark'], 14);
           glCtx.uniform1f(uLocs['u_markOn'], markOn);
           glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);

@@ -206,6 +206,14 @@ LTC over an audio input is not here. It is a different problem — a decoder
 rather than a parser — and worth doing only for rooms that have no MIDI to the
 desk at all.
 
+## Judging what a sandbox cannot
+
+Four decisions in here were made on evidence a software rasteriser can produce —
+kernels, deterministic simulations, arithmetic — and none has been seen on a
+machine that draws the plate at sixty frames a second. Each is a query parameter
+away from its alternative, so they can be judged in a minute rather than taken
+on trust: see [docs/judging.md](docs/judging.md).
+
 ## Shapes: LFOs and envelopes
 
 The patch bay already routed a source onto any setting with a bipolar depth —
