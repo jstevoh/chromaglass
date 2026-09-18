@@ -24,7 +24,7 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
-import { DEFAULT_LIQUID_TYPES, DEFAULT_SETTINGS } from '../src/types.ts';
+import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
 import fs from 'node:fs';
 
@@ -237,10 +237,6 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);
   check('the CPU solver reads its gate from the thickness too',
     cpuGate, cpuGate ? '' : 'sharpenDye in LiquidVisualizer.tsx is back to per-channel');
-
-  // And the pass has to be switched on, or none of the above reaches a plate.
-  check('the sharpening that counteracts the solver\'s own diffusion is on by default',
-    (DEFAULT_SETTINGS.sharpness ?? 0) > 0, `sharpness ${DEFAULT_SETTINGS.sharpness ?? 0}`);
 }
 
 // ── 6. The audit ─────────────────────────────────────────────────────

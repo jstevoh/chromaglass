@@ -324,20 +324,28 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
-  // Half. This shipped at 0 on a measurement that was right about what it saw
-  // and wrong about why: switched on for hundreds of frames it could not be
-  // told from 0 on a fixed composition. The reason was a bug in the pass, not
-  // a fact about it — the gate that keeps it from carving holes was read per
-  // channel, so where one dye met another at the same thickness it read zero
-  // and cancelled the flux. Almost every boundary on a full plate is a colour
-  // boundary, so the pass was inert almost everywhere. With the gate read from
-  // the thickness instead, a two-cell colour boundary narrows by a third over
-  // a couple of hundred steps and a wash is still left alone.
+  // Still off, and now for a better reason than before.
   //
-  // Half rather than full: the curve it maps through compresses the top, and
-  // above about this the terracing the old note describes starts to show on a
-  // shallow dish at the low grids the governor falls to.
-  sharpness: 0.5,
+  // The pass had a real bug in it: the gate that keeps it from carving holes
+  // was read per channel, so where one dye met another at the same thickness
+  // it read zero on both channels and cancelled the flux. A colour boundary is
+  // what the pass is for, and it was the one boundary it could not touch. That
+  // is fixed — the gate reads the thickness now, and `npm run plate` measures
+  // a two-cell colour boundary narrowing by a third over two hundred steps
+  // where before it did not move at all.
+  //
+  // What did not follow is a reason to turn it on. Three arms on one preset at
+  // one frame time — 0, a half, full — come out flat: on Fillmore, where the
+  // beads and the dish make the frame's structure stable enough to compare,
+  // 0 / 0.5 / 1.0 give edge fractions of 8.7, 8.3 and 8.5 percent and p99
+  // gradients of 55.5, 54.8 and 55.0. On Classic the same three arms spread
+  // from 1.9 to 10.2, but so do two runs of identical settings, so that is the
+  // preset's own drift rather than the setting.
+  //
+  // So it stays where the first measurement put it. It is a slider and it is on
+  // CC15; a plate that wants it can have it, and the pass will now do something
+  // when it is asked to.
+  sharpness: 0,
   granulation: 0.5,         // pigment texture between the boundaries, not just at them
   grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
