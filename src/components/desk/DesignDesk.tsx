@@ -51,6 +51,8 @@ export interface DesignDeskProps {
   layers: number;
   onLayer: (n: number) => void;
   onAddLayer: () => void;
+  /** What is on each live layer, for the tabs. */
+  layerReport?: { index: number; fill: number; colour: string }[];
 
   settings: VisualizerSettings;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
@@ -251,13 +253,46 @@ export function DesignDesk(p: DesignDeskProps) {
             <span className="font-mono text-[12px] text-dim">not on wall</span>
           </span>
           <span className="flex items-center gap-2">
-            <Segmented
-              value={String(p.layer)}
-              options={Array.from({ length: Math.max(1, p.layers) }, (_, i) => [String(i), `Layer ${i + 1}`] as const)}
-              onChange={v => p.onLayer(Number(v))}
-              height={32}
-              testId="layer-segmented"
-            />
+            {/*
+              Each layer says what is on it.
+
+              It was "Layer 1" and "Layer 2" and nothing else, so there was no
+              telling an empty layer from a full one, what colour was on it, or
+              whether it was contributing anything — which makes switching
+              blind, and makes anything that happens to change at the same time
+              look like the switch having caused it.
+
+              The dot is the layer's own mean dye and the bar is how full it is,
+              both from sums the solver already keeps.
+            */}
+            <div className="inline-flex rounded-md border border-border bg-elevated p-0.5" role="tablist" data-testid="layer-segmented">
+              {Array.from({ length: Math.max(1, p.layers) }, (_, i) => {
+                const rep = p.layerReport?.[i];
+                return (
+                  <button
+                    key={i}
+                    role="tab"
+                    aria-selected={p.layer === i}
+                    onClick={() => p.onLayer(i)}
+                    style={{ height: 28 }}
+                    data-testid={`layer-segmented-${i}`}
+                    className={`inline-flex items-center gap-2 rounded-sm px-3 text-[13px] font-medium transition-colors duration-[120ms] ${
+                      p.layer === i ? 'bg-active text-text' : 'text-muted hover:text-text-2'
+                    }`}
+                    title={rep ? `Layer ${i + 1} — ${Math.round(rep.fill * 100)}% full` : `Layer ${i + 1}`}
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                      style={{ background: rep?.colour ?? '#111111' }}
+                    />
+                    Layer {i + 1}
+                    <span className="h-1 w-6 shrink-0 overflow-hidden rounded-full bg-border" aria-hidden>
+                      <span className="block h-full rounded-full bg-text-2" style={{ width: `${Math.round((rep?.fill ?? 0) * 100)}%` }} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {p.layers < 3 && (
               <button
                 onClick={p.onAddLayer}
