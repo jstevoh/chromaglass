@@ -23,6 +23,30 @@
  *
  * Nothing here reads a clock or a random seed from outside, so a show can be
  * driven at any frame rate and a harness can drive it a step at a time.
+ *
+ * ## What this does not do, measured
+ *
+ * It does not, on its own, make the plate look dynamic. With the clock leaning
+ * twenty percent and gusts bunching the automation, the frame-to-frame motion
+ * of a running plate is statistically identical to the same plate with surge
+ * at zero: the same values, and the same autocorrelation at every lag from one
+ * second to fourteen. The only structure in either series is the plate slowly
+ * settling as it fills.
+ *
+ * The reason is worth writing down, because the obvious next move is to turn
+ * these numbers up and it will not work either. A plate that is already
+ * covered in churning dye has a motion floor that swamps anything done by
+ * modulating the rate of small events on top of it. Filmed liquid gets its
+ * dynamics from whole-frame events — a pour that floods a third of the frame,
+ * a cut to another shot — and from a dish that is often mostly *still*. Ours is
+ * never still and its events are never large, so scaling the trickle up and
+ * down moves a number nobody can see.
+ *
+ * What would: gusts that fire the events the app already has and that do change
+ * the whole frame — a flood pour, a partial drain, a dye swap — rather than
+ * scaling the size of a drop. That is a visible change to what the plate does
+ * unbidden, which is a decision rather than a tuning, so this stops here and
+ * provides the shape for whatever makes that call.
  */
 
 /** What the plate should be doing right now, all 0..1 unless noted. */
