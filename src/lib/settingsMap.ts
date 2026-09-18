@@ -57,7 +57,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'look', name: 'Light Show Look', category: 'look',
     terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look' },
   { id: 'show', name: 'Show', category: 'look',
-    terms: 'hue journey beat squeeze background loop kaleidoscope dish vignette projectors beads cells' },
+    terms: 'hue journey beat squeeze background loop dish vignette projectors beads cells' },
+  /*
+    A section of its own, because it is played rather than set.
+
+    It was three-quarters of one control buried in Show, between Background
+    Loop and Round Dish — a section whose own terms list runs "hue journey
+    beat squeeze background loop kaleidoscope dish vignette projectors beads
+    cells", which is a drawer rather than a subject. Two of its three
+    dimensions were constants in the shader, so there was nothing to group.
+    Now there is.
+  */
+  { id: 'kaleidoscope', name: 'Kaleidoscope', category: 'look',
+    terms: 'kaleidoscope mirror folds wedges spin rotation turn rig zoom mandala symmetry reflect prism' },
   { id: 'lamp', name: 'Lamp', category: 'look',
     terms: 'light play motion hotspot second lamp iridescence projector bulb' },
   { id: 'camera', name: 'Camera', category: 'look',

@@ -969,23 +969,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
           settingKey="backgroundLoop"
         />
-        <div className="flex flex-col gap-2 mb-4">
-          <div className="text-[13px] font-medium text-text">Kaleidoscope</div>
-          <div className="grid grid-cols-4 gap-1">
-            {[0, 2, 4, 6].map((k) => (
-              <button
-                key={k}
-                onClick={() => onUpdate({ kaleidoscope: k })}
-                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-                title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
-              >
-                {k === 0 ? 'Off' : `${k}×`}
-              </button>
-            ))}
-          </div>
-        </div>
         <Slider
           label="Round Dish"
           value={settings.dishVignette ?? 0}
@@ -1073,6 +1056,65 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })}
           settingKey="thinFilm"
+        />
+      </section>
+
+      {/*
+        Kaleidoscope Section
+
+        It used to be one control three-quarters of the way down Show, between
+        Background Loop and Round Dish, and two of its three dimensions were
+        constants inside the shader — so there was nothing to group and no way
+        to play it. Folds, how fast the rig turns, and how much plate feeds
+        each wedge, together, and all three on the MIDI list.
+      */}
+      <section id="settings-kaleidoscope" className={`mb-8 scroll-mt-4 ${shown('kaleidoscope') ? '' : 'hidden'} ${focusSection === 'kaleidoscope' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="kaleidoscope">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Aperture size={12} /> Kaleidoscope
+        </h3>
+        <Info>
+          A mirror rig over the plate, the four-fold dish of the reference stills. Folds sets how many wedges; Spin turns the rig, and runs backwards below zero; Zoom decides how much of the plate feeds each wedge — pulled in, a few enormous shapes, and taken out to the rim, something fine and busy. All three ride a fader.
+        </Info>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[13px] font-medium text-text">Folds</div>
+            {pins && <PinChips settingKey="kaleidoscope" />}
+          </div>
+          <div className="grid grid-cols-5 gap-1" data-testid="kaleido-folds">
+            {[0, 2, 4, 6, 8].map((k) => (
+              <button
+                key={k}
+                onClick={() => onUpdate({ kaleidoscope: k })}
+                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
+                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
+                data-testid={`kaleido-folds-${k}`}
+              >
+                {k === 0 ? 'Off' : `${k}×`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Spin"
+          value={settings.kaleidoSpin ?? 0}
+          min={-0.5}
+          max={0.5}
+          step={0.005}
+          onChange={(v: number) => onUpdate({ kaleidoSpin: v })}
+          settingKey="kaleidoSpin"
+          disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
+        />
+        <Slider
+          label="Zoom"
+          value={settings.kaleidoZoom ?? 0.72}
+          min={0.2}
+          max={1.6}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ kaleidoZoom: v })}
+          settingKey="kaleidoZoom"
+          disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
         />
       </section>
 

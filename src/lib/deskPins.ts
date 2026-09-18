@@ -83,7 +83,10 @@ const SECTION_OF: Record<string, string> = {
   soundImpact: 'audio-mappings',
   sceneDrive: 'room',
   sceneHands: 'room',
-  sceneImpact: 'room',};
+  sceneImpact: 'room',
+  kaleidoscope: 'kaleidoscope',
+  kaleidoSpin: 'kaleidoscope',
+  kaleidoZoom: 'kaleidoscope',};
 
 const FROM_MIDI: DeskSpec[] = LEARNABLE_SETTINGS.map(s => ({ ...s, section: SECTION_OF[String(s.key)] ?? 'look' }));
 

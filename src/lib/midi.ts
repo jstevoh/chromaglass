@@ -182,6 +182,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
+  // The mirror rig, which is the one optical trick people reach for mid-song.
+  // Folds is a stepped choice and rides a fader as one: 0, then 2 to 12.
+  { key: 'kaleidoscope',   label: 'Kaleidoscope',     min: 0, max: 12 },
+  { key: 'kaleidoSpin',    label: 'Kaleido Spin',     min: -0.5, max: 0.5 },
+  { key: 'kaleidoZoom',    label: 'Kaleido Zoom',     min: 0.2, max: 1.6 },
   { key: 'beatLead',        label: 'Beat Lead (ms)',   min: 0, max: 250 },
   // The film as a force rather than a slide. Worth a fader for the same
   // reason Room Drive is: how hard the reel pushes the plate is something you

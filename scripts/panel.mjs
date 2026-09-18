@@ -88,7 +88,21 @@ check('every control the panel draws is one a desk can hold', missing.length ===
 // The other direction: a spec for a control nobody can see is a row in every
 // picker that leads nowhere. `audioImpact` and friends may legitimately appear
 // only as MIDI targets, so this names what it found rather than failing on it.
-const drawn = new Set(sliders.map(s => s.key));
+/*
+  Drawn, not merely slid.
+
+  This asked whether a setting had a `<Slider>`, which was the same question
+  until a control turned up that should not be a fader: the kaleidoscope's
+  fold count is a choice of five, and five buttons say so better than a slider
+  swept through the gaps between them. It had pin chips and a section of its
+  own and the check still called it invisible.
+
+  So a standalone `PinChips settingKey="…"` counts too. That is the panel's own
+  mark for "this is a control, and here is how to put it on a desk", which is
+  exactly what the question means.
+*/
+const chipped = [...panel.matchAll(/<PinChips settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]);
+const drawn = new Set([...sliders.map(s => s.key), ...chipped]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');
@@ -728,6 +742,32 @@ check('and only one thing decides that', !/const lookEdited =/.test(app));
 check('the opening look is not always the same one',
   /export const OPENING_LOOK/.test(app) && /Math\.random\(\) \* pool\.length/.test(app));
 check('and can be pinned so a harness is not random', /get\('look'\)/.test(app));
+
+// ── The mirror rig ──────────────────────────────────────────────────
+/*
+  Two of its three dimensions were constants in the shader — `u_time * 0.02`
+  for the spin and `rad * 0.72` for the zoom — so the one optical trick people
+  reach for mid-song had exactly one control, three-quarters of the way down a
+  section called Show whose own terms list is a drawer rather than a subject.
+
+  The phase is integrated on the CPU rather than derived from elapsed time,
+  which is the part worth gating: a rate multiplied by elapsed time moves the
+  whole history, so every nudge of the speed used to jump the pattern to a new
+  angle. That is invisible from outside and would come back the moment
+  somebody simplified it.
+*/
+const vis = panel0;
+check('the mirror rig turns at a rate somebody can set',
+  /uniform float u_kaleidoPhase/.test(vis) && !/a \+= u_time \* 0\.02/.test(vis));
+check('and its phase is integrated, not multiplied out of elapsed time',
+  /kaleidoPhaseRef\.current \+= \(currentSettings\.kaleidoSpin/.test(vis) && /realDt/.test(vis));
+check('and how much plate feeds a wedge is a setting too',
+  /uniform float u_kaleidoZoom/.test(vis) && !/rad \* 0\.72/.test(vis));
+check('and all three can reach a controller',
+  ['kaleidoscope', 'kaleidoSpin', 'kaleidoZoom'].every(k => PIN_RANGE.has(k)));
+check('and they live together rather than in the Show drawer',
+  SECTION_BY_ID.has('kaleidoscope')
+  && ['kaleidoscope', 'kaleidoSpin', 'kaleidoZoom'].every(k => PIN_RANGE.get(k)?.section === 'kaleidoscope'));
 
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));

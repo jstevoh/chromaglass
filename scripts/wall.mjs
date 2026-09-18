@@ -232,7 +232,7 @@ let failed = 0;
 
 try {
   page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
   // Long enough for the governor to settle and the plate to have something on
   // it: a bare plate is black everywhere and every gate below would pass for
   // the wrong reason.

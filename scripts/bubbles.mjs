@@ -85,7 +85,7 @@ const browser = await launchChromium(chromium);
 
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   // The bundle the page loaded must be the one just built. `bubbleUniforms`

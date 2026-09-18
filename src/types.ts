@@ -220,7 +220,24 @@ export interface VisualizerSettings {
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
   beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
   backgroundLoop: number;     // the layers behind the lead run slower and calmer, a background loop the live plate plays over
-  kaleidoscope: number;       // mirror the plate into 2, 4 or 6 folds (0 = off), the four-fold dish of the reference stills
+  kaleidoscope: number;       // mirror the plate into 2..12 folds (0 = off), the four-fold dish of the reference stills
+  /**
+   * How fast the mirror rig turns, and which way.
+   *
+   * Was `u_time * 0.02` inside the shader: a constant, so the one thing a
+   * hand wants to do with a kaleidoscope — speed it up into the chorus, stop
+   * it dead, run it backwards — could not be done at all. Signed, and zero is
+   * a still rig.
+   */
+  kaleidoSpin: number;
+  /**
+   * How much plate feeds each wedge.
+   *
+   * Was `rad * 0.72`, also a constant. Low pulls the plate's middle right in
+   * and the pattern turns into a few enormous shapes; high takes in the rim
+   * and it becomes fine and busy. The other half of playing one.
+   */
+  kaleidoZoom: number;
   dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, a thin bright ring at it
   lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
@@ -340,6 +357,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   beatSqueeze: 0.5,
   backgroundLoop: 0.5,
   kaleidoscope: 0,
+  kaleidoSpin: 0.02,        // the rate that used to be baked into the shader
+  kaleidoZoom: 0.72,        // and the pull-in that was baked in beside it
   dishVignette: 0,
   lightPlay: 0.6,
   lampMotion: 0.5,

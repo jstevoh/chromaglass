@@ -49,7 +49,11 @@ const OVERRIDE_FIELDS: { key: keyof VisualizerSettings; label: string; min: numb
   { key: 'bubbles',         label: 'Bubbles',          min: 0,    max: 1,    step: 0.05 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5,  max: 2,    step: 0.05 },
   { key: 'backgroundLoop',  label: 'Background Loop',  min: 0,    max: 1,    step: 0.05 },
-  { key: 'kaleidoscope',    label: 'Kaleidoscope',     min: 0,    max: 6,    step: 2 },
+  { key: 'kaleidoscope',    label: 'Kaleidoscope',     min: 0,    max: 8,    step: 2 },
+  // A stage can turn the rig and change how much plate feeds it, which is most
+  // of what a kaleidoscope does over a song.
+  { key: 'kaleidoSpin',     label: 'Kaleido Spin',     min: -0.5, max: 0.5,  step: 0.005 },
+  { key: 'kaleidoZoom',     label: 'Kaleido Zoom',     min: 0.2,  max: 1.6,  step: 0.01 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0,    max: 1,    step: 0.05 },
   { key: 'lightPlay',       label: 'Light Play',       min: 0,    max: 1,    step: 0.05 },
   { key: 'secondLamp',      label: 'Second Lamp',      min: 0,    max: 1,    step: 0.05 },

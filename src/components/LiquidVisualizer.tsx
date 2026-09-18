@@ -1935,6 +1935,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { clearTriggerRef.current = clearTrigger; }, [clearTrigger]);
   useEffect(() => { seedCountRef.current = seedCount; }, [seedCount]);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
+  /**
+   * Where the mirror rig has turned to, in radians.
+   *
+   * Integrated rather than derived from elapsed time: a rate multiplied by
+   * elapsed time moves the whole history, so every nudge of the speed used to
+   * jump the pattern. In turns per second, which is why the 2π.
+   */
+  const kaleidoPhaseRef = useRef(0);
   const harmonyRef = useRef(pickHarmony());
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
@@ -2688,7 +2696,9 @@ uniform float u_filmMix;
 uniform float u_filmKey;
 uniform vec2  u_filmScale;
 uniform float u_lampWarmth;        // halogen grade
-uniform float u_kaleido;           // mirror folds (0 = off, else 2/4/6)
+uniform float u_kaleido;           // mirror folds (0 = off, else 2..12)
+uniform float u_kaleidoPhase;      // where the rig has turned to, accumulated on the CPU
+uniform float u_kaleidoZoom;       // how much plate feeds each wedge
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
@@ -3514,8 +3524,18 @@ void main() {
     float wedge = 6.28318530718 / u_kaleido;
     float a = mod(ang, wedge);
     if (a > wedge * 0.5) a = wedge - a;              // mirror inside the wedge
-    a += u_time * 0.02;                              // the rig turns, slowly
-    c = vec2(cos(a), sin(a)) * rad * 0.72;           // pull in so the plate's middle fills the wedge
+    /*
+      The rig's angle arrives already accumulated.
+
+      It used to be u_time * 0.02, which is fine for a constant and wrong
+      for a control: changing a rate that multiplies elapsed time moves the
+      whole history, so every nudge of the speed jumped the pattern to a
+      new angle. The phase is integrated on the CPU instead, from the frame's
+      own dt, so the rig speeds up, slows, stops and reverses from
+      wherever it happens to be standing.
+    */
+    a += u_kaleidoPhase;
+    c = vec2(cos(a), sin(a)) * rad * u_kaleidoZoom;
     uv = clamp(c / vec2(aspect, 1.0) + 0.5, 0.001, 0.999);
   }
   float dof = 0.0;
@@ -4074,7 +4094,7 @@ void main() {
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
-      'u_kaleido','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
+      'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
       'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
@@ -5441,6 +5461,12 @@ void main() {
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
             glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
+            // Integrated here rather than in the shader, so a change of rate
+            // does not move where the rig already is. See the note in the
+            // fragment source.
+            if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
+            glCtx.uniform1f(uLocs['u_kaleidoPhase'], kaleidoPhaseRef.current);
+            glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
           }
           glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
           {

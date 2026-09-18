@@ -80,7 +80,17 @@ const GPU = process.env.QA_GPU ?? '';
   QA_DPR=1 runs it the slow way, for anything that needs the real thing.
 */
 const DPR = process.env.QA_DPR ?? '0.35';
-const URL = `http://localhost:${PORT}/?debug&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
+/*
+  `look=classic` because the app now opens on a random one.
+
+  That is right for somebody arriving — the plate does thirty things and the
+  first one anybody saw was always the same — and wrong for anything that
+  measures the plate. `wall` reads its brightness and compares a graded frame
+  against an ungraded one: a bright look under 2.2x gain clips and lifts by
+  1.19x where the check wants 1.25x, so the suite started failing on which
+  look it happened to get. Every harness that measures pixels pins it.
+*/
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
