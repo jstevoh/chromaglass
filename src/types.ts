@@ -424,7 +424,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look
-  macroZoom: 4.0,           // ~32 sim cells across the frame — one bead and its ground
+  // 1 is the whole plate, and the zoom is what takes you in: the camera picks
+  // a bead somewhere past 1 and the closeup's own exposure, depth of field and
+  // surface arrive over the travel rather than at a threshold. This shipped at
+  // 4 with the slider inert unless `macroMode` was on, which made a control on
+  // the desk — where there is no such switch — do nothing at all.
+  macroZoom: 1.0,
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
   macroSync: 0.5,

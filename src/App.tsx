@@ -923,7 +923,10 @@ export default function App() {
     // otherwise a macro preset would leave the next one zoomed in.
     // Likewise the Fillmore projectors, beads, cells and fingering: a preset
     // that does not ask for them gets a plain plate, not the last preset's.
-    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
+    // macroZoom alongside macroMode: the zoom is what magnifies now, so a look
+    // that does not ask for a closeup has to put the camera back on the plate
+    // rather than inherit whatever the last one was pushed to.
+    setSettings(prev => ({ ...prev, macroMode: false, macroZoom: 1, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
     setPinnedPresetId(presetId);
     // A built-in is somewhere to start, not a file of yours: ⌘S asks for a
     // name rather than writing over a look that ships with the app.
@@ -1503,9 +1506,12 @@ export default function App() {
       filmKey: settings.filmKey,
       glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
       postBlurRadius: Math.random() * 0.7,
-      // One roll in four goes closeup — a magnified chase is its own happy accident
-      macroMode: Math.random() < 0.25,
-      macroZoom: 4 + Math.random() * 8,
+      // One roll in four goes closeup — a magnified chase is its own happy
+      // accident. The zoom decides now, so the roll lands on the zoom and the
+      // flag follows it rather than the two disagreeing.
+      ...(Math.random() < 0.25
+        ? { macroMode: true, macroZoom: 4 + Math.random() * 8 }
+        : { macroMode: false, macroZoom: 1 }),
       macroChase: 0.35 + Math.random() * 0.65,
       macroHold: 2.5 + Math.random() * 7,
       macroCells: Math.random(),
@@ -1674,10 +1680,13 @@ export default function App() {
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
-    if (!cur.macroMode) { if (dir > 0) updateSettings({ macroMode: true, macroZoom: 2 }); return; }
-    const z = Math.max(1, cur.macroZoom ?? 4);
-    const next = Math.max(1, Math.min(16, z * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
-    updateSettings({ macroZoom: Math.round(next * 10) / 10 });
+    // One ramp from the plate outward, with no step onto it: pushing in from
+    // 1 is the closeup arriving, and coming back down lands at the plate
+    // rather than at a switch that has to be found and turned off.
+    const z = Math.max(1, cur.macroZoom ?? 1);
+    const next = Math.max(1, Math.min(16, (z < 1.05 && dir > 0 ? 1.2 : z) * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
+    const zoom = Math.round(next * 100) / 100;
+    updateSettings({ macroZoom: zoom, macroMode: zoom > 1.05 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // ── Recording ──
@@ -1699,7 +1708,10 @@ export default function App() {
     const onWheel = (e: WheelEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t || (t.id !== 'liquid-canvas' && !t.closest?.('#liquid-canvas'))) return;
-      if (!settingsRef.current.macroMode || e.deltaY === 0) return;
+      // Still never *starts* a closeup: a trackpad brush over the plate must
+      // not become a camera move. Once in, the wheel rides it all the way back
+      // out to the plate, which is where the old guard would strand it.
+      if ((settingsRef.current.macroZoom ?? 1) <= 1.001 || e.deltaY === 0) return;
       e.preventDefault();
       zoomMacro(e.deltaY < 0 ? 1 : -1, Math.min(1, Math.abs(e.deltaY) / 100));
     };
@@ -1754,7 +1766,14 @@ export default function App() {
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
-      case 'macro-toggle':    updateSettings({ macroMode: !settings.macroMode }); break;
+      case 'macro-toggle': {
+        // A pad still wants one press in and one press out. It moves the zoom,
+        // because that is the control; the flag rides along for the looks that
+        // still read it.
+        const inNow = (settingsRef.current.macroZoom ?? 1) > 1.05;
+        updateSettings(inNow ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: 4 });
+        break;
+      }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
       case 'seq-next':        sequencer.next(); break;
       case 'seq-prev':        sequencer.prev(); break;
@@ -2274,11 +2293,11 @@ export default function App() {
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
-      {settings.macroMode && overlaysVisible && (
+      {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
-          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 4).toFixed(1)}×</span>
+          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
         </div>
       )}

@@ -92,6 +92,20 @@ interface LiquidVisualizerProps {
   output?: OutputConfig;
 }
 
+/**
+ * Where the closeup is fully itself, and what a look that only says "macro"
+ * means by it.
+ *
+ * The travel from the plate to the closeup runs from 1x to MACRO_FULL_ZOOM:
+ * below that the exposure, the defocus, the silhouette warp and the relief are
+ * mixed in rather than switched on, so pushing the slider reads as a lens
+ * moving. Two is low enough that nothing pops on the way past and high enough
+ * that a bead is worth looking at when it lands.
+ */
+const MACRO_FULL_ZOOM = 2.0;
+/** A preset or a saved show that sets `macroMode` with no zoom of its own. */
+const MACRO_PRESET_ZOOM = 4.0;
+
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -2970,13 +2984,13 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   // Plate-wide, u_exposure blends toward the same floor-and-gain so a thin
   // film between ink structures reads as bare glass rather than a grey wash.
   float exposed = max(0.0, totalDensity - u_filmLevel) * u_filmGain;
-  float thickness = (u_macro > 0.5
-    ? exposed
-    : mix(totalDensity * 2.8, exposed, u_exposure)) * (1.0 + darkness * 1.7);
+  // Magnified, only dye thick enough to be a bead should register; plate-wide
+  // the backlight comes through everything. Mixed rather than switched, so
+  // pushing in is the exposure opening rather than a cut to another plate.
+  float m = clamp(u_macro, 0.0, 1.0);
+  float thickness = mix(mix(totalDensity * 2.8, exposed, u_exposure), exposed, m) * (1.0 + darkness * 1.7);
   float alpha = 1.0 - exp(-thickness);
-  // Magnified, a bead of ink is opaque; at plate scale the backlight is meant
-  // to come through everything, so the old ceiling stays there.
-  alpha = min(u_macro > 0.5 ? 0.995 : 0.95, alpha);
+  alpha = min(mix(0.95, 0.995, m), alpha);
 
   return vec4(r, g, b, alpha);
 }
@@ -3420,7 +3434,9 @@ vec2 macroWarpOffset(vec2 fuv) {
   vec2 t = vec2(u_time * 0.012, u_time * -0.009);
   vec2 w = vec2(fbm3(fuv * f + t), fbm3(fuv * f + vec2(37.2, 11.7) + t)) - 0.5;
   w += (vec2(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
-  return w * (u_macroEdge * 1.1 / u_logicalGrid);
+  // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
+  // plate-wide frame is noise, and on a bead it is the silhouette.
+  return w * (u_macroEdge * 1.1 * clamp(u_macro, 0.0, 1.0) / u_logicalGrid);
 }
 
 vec2 macroWarp(vec2 fuv) { return fuv + macroWarpOffset(fuv); }
@@ -3433,9 +3449,9 @@ vec4 decodeFluidRaw(vec4 raw) {
   float norm = 1.0 / totalDensity;
   vec3 c = exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm);
   float darkness = 1.0 - max(c.r, max(c.g, c.b));
-  float thickness = (u_macro > 0.5 ? max(0.0, totalDensity - u_filmLevel) * u_filmGain : totalDensity * 2.8)
+  float thickness = mix(totalDensity * 2.8, max(0.0, totalDensity - u_filmLevel) * u_filmGain, clamp(u_macro, 0.0, 1.0))
                   * (1.0 + darkness * 1.7);
-  return vec4(c, min(u_macro > 0.5 ? 0.995 : 0.95, 1.0 - exp(-thickness)));
+  return vec4(c, min(mix(0.95, 0.995, clamp(u_macro, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
 
 // 5-tap defocus. The blur radius is constant in screen space, so the
@@ -3618,7 +3634,20 @@ void main() {
   // ── Macro closeup setup ───────────────────────────────────────────
   // Defocus grows away from the frame centre — the shallow depth of field a
   // real macro lens has wide open, and what sells the magnification.
-  bool macro = u_macro > 0.5;
+  /*
+    How far into the closeup we are, 0 at the plate and 1 once the camera is
+    properly in. It used to be a bool, and the difference is the whole of why
+    the closeup arrived as a cut: the exposure, the depth of field, the
+    silhouette warp and the ground relief all switched on together in one
+    frame. Each of them is now mixed in over the travel.
+
+    The bool survives only for the branches that pick *which*
+    geometry to sample — the dish framing against the magnified one — where
+    there is nothing to mix between. It flips early, at a tenth of the way in,
+    because the dish is barely on screen by then anyway.
+  */
+  float macroAmt = clamp(u_macro, 0.0, 1.0);
+  bool macro = macroAmt > 0.1;
   float aspect = u_resolution.x / max(1.0, u_resolution.y);
   vec2 uvScreen = uv;   // the unfolded frame, for the dish
   // ── Kaleidoscope ─────────────────────────────────────────────────
@@ -3649,7 +3678,9 @@ void main() {
   float dof = 0.0;
   if (macro) {
     float rad = length((uv - 0.5) * vec2(aspect, 1.0));
-    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * u_macroDepth;
+    // Scaled by how far in we are: a lens opens up as it comes in, so the
+    // defocus arrives with the magnification rather than ahead of it.
+    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * u_macroDepth * macroAmt;
   }
 
   // ── LED Platform background ────────────────────────────────────────
@@ -3716,7 +3747,7 @@ void main() {
   vec2 fuv0 = uvToFluid(uv, c0, s0);
   if (u_dishSpread > 0.001 && !macro) fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0);
   vec2 fuvBase = fuv0;   // the plate before any macro warp: where bubbles live
-  vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) : vec2(0.0);
+  vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) * macroAmt : vec2(0.0);
   if (macro) fuv0 = macroWarp(fuv0);
   vec4 fluid0 = decodeFluidDof(u_layer0, fuv0, blurFluid, useBlur, dof);
   vec2 dish0 = vec2(1.0, 0.0), dish1 = vec2(1.0, 0.0);
@@ -3783,16 +3814,17 @@ void main() {
   // ── Substrate grain + contact shadow ──────────────────────────────
   // Magnified, the ground under the dye should read as a surface, and the dye
   // should sit *on* it rather than float in front of it.
-  if (macro && u_macroDepth > 0.005) {
+  if (macro && u_macroDepth * macroAmt > 0.005) {
+    float depth = u_macroDepth * macroAmt;
     float fiber = fbm3(uv * vec2(aspect, 1.0) * 230.0);
-    bgColor = bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * u_macroDepth;
+    bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
     // Two offsets — a contact shadow tight to the bead and a softer, wider
     // one behind it. The gap between them is what lifts the paint off the
     // ground instead of leaving it pasted flat onto it.
     float shA = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.008, -0.008), c0, s0)).a) * 2.6);
     float shB = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.022, -0.022), c0, s0)).a) * 1.6);
     float shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
-    bgColor *= mix(1.0, 0.18, shadow * u_macroDepth);
+    bgColor *= mix(1.0, 0.18, shadow * depth);
   }
 
   vec3 outColor = bgColor;
@@ -3844,7 +3876,7 @@ void main() {
     // A second projector at a different throw: the layer is viewed magnified
     // about the centre and drifts slowly, so one frame carries two scales.
     if (!macro && u_layerZoom1 > 1.001) fuv1 = (fuv1 - 0.5) / u_layerZoom1 + 0.5 + u_layerDrift1;
-    vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) : vec2(0.0);
+    vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) * macroAmt : vec2(0.0);
     if (macro) fuv1 = macroWarp(fuv1);
     vec4 fluid1 = decodeFluidDof(u_layer1, fuv1, blurFluid, useBlur, dof);
     if (u_dishSpread > 0.001 && !macro) {
@@ -5309,10 +5341,32 @@ void main() {
         // ── Macro camera ──────────────────────────────────────
         // Locks the frame onto one bead of dye. Off, this stays at the plate-wide
         // framing (centre 0.5,0.5 at zoom 1) and costs nothing.
-        const macroOn = currentSettings.macroMode === true;
+        /*
+          How far in we are, from the zoom alone.
+
+          This used to be `macroMode === true` and nothing else, which made the
+          zoom slider inert until a toggle somewhere else was found and turned
+          on — and made the closeup a cut rather than a move: one frame at the
+          plate, the next at six times on a bead, with a different exposure,
+          a different depth of field and a different silhouette.
+
+          The zoom is the control now. At 1 the frame is the whole plate; past
+          it the camera picks a subject and pushes in, and `macroAmount` carries
+          how far along that travel we are so the closeup's own behaviours can
+          fade in over it instead of switching. Fully in by two times, which is
+          about where a bead is big enough for any of them to read.
+
+          `macroMode` is still honoured for the looks and saved shows that set
+          it: on with a zoom nobody moved means the framing it has always meant.
+        */
+        const wantZoom = currentSettings.macroMode === true
+          ? Math.max(MACRO_PRESET_ZOOM, currentSettings.macroZoom ?? MACRO_PRESET_ZOOM)
+          : Math.max(1, currentSettings.macroZoom ?? 1);
+        const macroAmount = Math.max(0, Math.min(1, (wantZoom - 1) / (MACRO_FULL_ZOOM - 1)));
+        const macroOn = wantZoom > 1.005;
         if (macroOn !== lastMacroOnRef.current) {
           lastMacroOnRef.current = macroOn;
-          if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on switch-on
+          if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on the way in
         }
         if (macroOn && fluidsRef.current.length > 0) {
           if (isActiveRef.current && drainFrameRef.current === 0) {
@@ -5323,7 +5377,7 @@ void main() {
               { density: subject.readDensity, vx: subject.readVx, vy: subject.readVy, size: GRID_SIZE },
               realDt,
               {
-                zoom: Math.max(1, currentSettings.macroZoom ?? 6),
+                zoom: wantZoom,
                 chase: currentSettings.macroChase ?? 0.6,
                 hold: Math.max(0.5, currentSettings.macroHold ?? 5),
                 floor: filmLevelRef.current,
@@ -5740,7 +5794,7 @@ void main() {
           glCtx.uniform1i(uLocs['u_vel1'], 7);
           glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
           glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
-          glCtx.uniform1f(uLocs['u_macro'], macroOn ? 1 : 0);
+          glCtx.uniform1f(uLocs['u_macro'], macroAmount);
           glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
           glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
           glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);

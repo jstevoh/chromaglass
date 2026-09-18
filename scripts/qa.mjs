@@ -503,6 +503,67 @@ try {
     [...document.querySelectorAll('input[type="range"]')].filter(i => !i.getAttribute('aria-label')).length);
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
 
+  // ── The macro zoom is a move, not a switch ────────────────────────
+  //
+  // This one is here because the slider did nothing. It reached the renderer
+  // only when a toggle in another panel was already on, so on the desk — where
+  // there is no such toggle — dragging it changed the number and not the
+  // picture. A control that is drawn and does nothing is worse than one that
+  // is missing, and nothing in the suite would have noticed.
+  //
+  // Measured on the canvas, because "the zoom did something" is a claim about
+  // the frame. A magnified plate has larger features in it, so the variance
+  // surviving a wide blur rises: the same dye across fewer, bigger shapes.
+  {
+    const coarse = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      const o = document.createElement('canvas');
+      o.width = 96; o.height = 54;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, o.width, o.height);
+      const d = x.getImageData(0, 0, o.width, o.height).data;
+      // Mean absolute difference between neighbouring pixels: high when the
+      // frame is full of small detail, low when it is a few big shapes.
+      let sum = 0, n = 0;
+      for (let y = 0; y < o.height; y++) {
+        for (let xx = 1; xx < o.width; xx++) {
+          const i = (xx + y * o.width) * 4, j = i - 4;
+          sum += Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]);
+          n++;
+        }
+      }
+      return sum / n;
+    });
+
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+    await settle(1500);
+    const wide = await coarse();
+
+    // Straight to the zoom, with no toggle touched: this is exactly the path
+    // that used to do nothing.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 9 }));
+    await settle(2500);
+    const close = await coarse();
+    check('the zoom alone magnifies the plate, with no switch thrown',
+      close < wide * 0.85, `neighbour contrast ${wide.toFixed(1)} wide → ${close.toFixed(1)} at 9×`);
+
+    // And it is a travel rather than a cut: halfway along, the frame is
+    // between the two rather than at one end of them.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1 }));
+    await settle(1500);
+    const backHome = await coarse();
+    check('and coming back down lands at the plate again',
+      Math.abs(backHome - wide) < wide * 0.35, `${wide.toFixed(1)} → ${backHome.toFixed(1)}`);
+
+    // The readout follows the zoom, not the old flag.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));
+    await settle(600);
+    const readout = await page.evaluate(() => document.querySelector('[data-testid="macro-zoom-value"]')?.textContent ?? null);
+    check('and the frame says how far in it is', readout === '5.0×', `readout ${readout}`);
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+    await settle(800);
+  }
+
   // ── The mark: a logo that survives the plate ──────────────────────
   //
   // The whole point of compositing it in the shader rather than putting an

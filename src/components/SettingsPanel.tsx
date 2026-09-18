@@ -1942,27 +1942,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[13px] font-medium text-text">Bead Camera</span>
-          <button
-            onClick={() => onUpdate({ macroMode: !settings.macroMode })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${settings.macroMode ? 'bg-white' : 'bg-white/20'}`}
-            title="Magnify the plate and chase a single bead of liquid"
-          >
-            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.macroMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
-          </button>
-        </div>
-        {settings.macroMode && (
-          <>
-            <Slider
-              label="Zoom"
-              value={settings.macroZoom}
-              min={1}
-              max={16}
-              step={0.5}
-              onChange={(v: number) => onUpdate({ macroZoom: v })}
+        {/*
+          Zoom first, and never hidden.
+
+          It used to sit behind the Bead Camera switch, so the slider a desk or
+          a pin draws — which has no switch next to it — did nothing at all
+          until somebody found this panel and turned the camera on. The zoom is
+          the control: at 1 the frame is the whole plate, and pushing it in is
+          the closeup arriving rather than a cut to it.
+        */}
+        <Slider
+          label="Zoom"
+          value={settings.macroZoom ?? 1}
+          min={1}
+          max={16}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ macroZoom: v, macroMode: v > 1.05 })}
           settingKey="macroZoom"
         />
+        {(settings.macroZoom ?? 1) <= 1.05 && (
+          <Info>
+            At 1× this is the whole plate. Push the zoom in and the camera picks a bead and follows it — the exposure,
+            the depth of field and the surface under the dye all arrive with the magnification rather than switching on
+            at a threshold. Everything below shapes that closeup and takes effect as you come in.
+          </Info>
+        )}
+        {(settings.macroZoom ?? 1) > 1.05 && (
+          <>
             <Slider
               label="Chase Speed"
               value={settings.macroChase}
