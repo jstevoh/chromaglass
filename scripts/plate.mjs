@@ -278,6 +278,32 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   }
 }
 
+// ── 5.8. Every look says how much it breathes ──────────────────
+//
+// `surge` decides whether a plate drifts at one rate or surges and rests, and
+// it is the difference between Lumia and Acid Trip far more than any single
+// colour is. A preset that does not name it inherits whatever the default
+// happens to be, which means the two of them breathe identically — and the
+// whole point of a library of looks is that they do not.
+{
+  const missing = PRESETS.filter(p => typeof p.settings.surge !== 'number');
+  check('every look chooses how much it breathes',
+    missing.length === 0, missing.map(p => p.id).join(', ') || `all ${PRESETS.length}`);
+
+  const surges = PRESETS.map(p => p.settings.surge ?? 0);
+  const lo = Math.min(...surges), hi = Math.max(...surges);
+  check('and the library uses the range rather than clustering on one value',
+    lo < 0.25 && hi > 0.8, `${lo} to ${hi}`);
+
+  // The looks whose whole character is stillness must not be the loud ones.
+  const still = ['lumia', 'velvet-underground', 'aurora-borealis'];
+  const loud = ['acid-trip', 'microscopic-chaos', 'bass-drop'];
+  const surgeOf = (id) => PRESETS.find(p => p.id === id)?.settings.surge ?? -1;
+  check('the quiet looks are quieter than the loud ones',
+    Math.max(...still.map(surgeOf)) < Math.min(...loud.map(surgeOf)),
+    `${still.map(surgeOf).join('/')} against ${loud.map(surgeOf).join('/')}`);
+}
+
 // ── 6. The audit ─────────────────────────────────────────────────────
 console.log('');
 console.log('     what is on each plate:');
