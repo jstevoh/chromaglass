@@ -1556,6 +1556,9 @@ export default function App() {
   // was: the band stops, the wall goes dark, the band starts, the wall comes
   // back. The dimmer itself is a setting, so a fader can ride it by hand.
   const [blackout, setBlackout] = useState(false);
+  /** For the lighting feed below, which is armed once and must not close over a stale value. */
+  const blackoutRef = useRef(blackout);
+  blackoutRef.current = blackout;
   const dimmerBeforeRef = useRef(1);
   const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // On a timer, not requestAnimationFrame: the laptop's window is often
@@ -1815,6 +1818,33 @@ export default function App() {
   });
 
   relaySendRef.current = remoteLink.send;
+
+  /*
+    The plate's colour, out to the lighting rig.
+
+    The same `layerReport` the bench draws its tabs from, twenty times a second
+    to the show server, which turns it into Art-Net (see `server/artnet.js`).
+    The par cans wash the room in whatever the dye is doing instead of whatever
+    was set before the doors opened.
+
+    Faster than the bench's poll because a light that lags the screen by half a
+    second reads as broken, and it costs nothing when nothing is listening: no
+    relay, no socket, no send. It carries no React state, so the loop never
+    causes a render.
+  */
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') return;
+    const id = setInterval(() => {
+      const layers = visualizerRef.current?.layerReport?.();
+      if (!layers?.length) return;
+      // The plate's own brightness, so the room dims when the glass thins
+      // rather than sitting at full on an empty plate. Blackout is black.
+      const fill = layers.reduce((a, l) => a + l.fill, 0) / layers.length;
+      const master = blackoutRef.current ? 0 : Math.min(1, fill * 1.6);
+      relaySendRef.current?.({ type: 'lights', layers: layers.map(l => ({ colour: l.colour, fill: l.fill })), master });
+    }, 50);
+    return () => clearInterval(id);
+  }, [remoteLink.status]);
 
   // ── MIDI controller and game controller ─────────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);

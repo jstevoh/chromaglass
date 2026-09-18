@@ -27,6 +27,7 @@
     "lint": "tsc --noEmit",
     "remote": "node server/remote-server.js",
     "detail": "node scripts/detail.mjs",
+    "lights": "node scripts/lights.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",

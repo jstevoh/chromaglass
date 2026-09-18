@@ -162,6 +162,49 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 /chromaglass/dye #rrggbb               the dropper's colour
 ```
 
+## Art-Net: the room's lights follow the plate
+
+Every lighting box takes Art-Net *in* so a desk can drive the visuals. This does
+that too, but the direction worth having is the other one. The plate already
+knows what colour it is, layer by layer, so the par cans washing the room can be
+the same blue the dye just went, and the projection and the rig stop being two
+things somebody matches by hand.
+
+The browser cannot open a UDP socket, so the show server does the sending — run
+`npm run remote` and give it a host:
+
+```
+ARTNET_HOST=10.0.0.255 npm run remote          # broadcast to the lighting network
+ARTNET_HOST=10.0.0.9 ARTNET_FIXTURES=6 ARTNET_ORDER=rgbw ARTNET_START=17 npm run remote
+```
+
+| | |
+|---|---|
+| `ARTNET_HOST` | where to send. Nothing is sent until this is set. A broadcast address works. |
+| `ARTNET_UNIVERSE` | 0 by default; anything up to 32767, net and sub-net handled for you |
+| `ARTNET_FIXTURES` | how many, 4 by default. They take the plate's layers in turn, so two layers over six pars alternate. |
+| `ARTNET_START` | the first channel, 1 by default |
+| `ARTNET_ORDER` | `rgb` (default), `grb`, `brg`, `rgbw`, `drgb`, `drgbw` — `d` is a dimmer taking the brightest channel, `w` a white taking the colour's own white content |
+| `ARTNET_RATE` | frames a second, 30 by default, 44 is the spec's ceiling |
+| `ARTNET_PORT` | 6454 by default |
+
+The plate's own thickness rides the level, so the room dims when the glass thins
+instead of sitting at full over nothing, and a blackout on the desk is a
+blackout on the rig.
+
+**The other direction.** `ARTNET_IN` maps channels onto settings, for a show
+where the desk holds the running order:
+
+```
+ARTNET_IN=1:audioImpact,2:gooeyEffect,10:globalSpeed:0:0.1 npm run remote
+```
+
+A channel is 0–255 and maps onto 0–1 unless the pair carries its own range, as
+`globalSpeed` does above. A desk sends its universe forty times a second whether
+anything moved or not, so only a channel that actually changed becomes a change
+here. `npm run lights` checks the packet, the patch and a universe over a real
+socket.
+
 ## MIDI and game controllers
 
 A controller on the desk becomes the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer. Chrome, Edge or Opera — Safari and Firefox have no Web MIDI.
@@ -435,7 +478,8 @@ src/
     OutputPanel.tsx            # Load-in: drag the corners square, pull the masks in, grade for the room
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
-  remote-server.js             # LAN static server + control relay + OSC in (npm run remote)
+  remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)
+  artnet.js                    # Art-Net packet and patch: the plate's colour out to the rig, a desk's faders in
 public/
   manifest.webmanifest         # PWA manifest: installable, standalone window
   sw.js                        # Service worker: light cache, never the relay
