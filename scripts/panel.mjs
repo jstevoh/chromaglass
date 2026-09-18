@@ -666,14 +666,68 @@ check('and one action has one name',
 check('no section carries another section\'s footnote',
   !/Squish Plate effect was the hallmark/.test(panel));
 
-// The one number on either desk that was neither a percentage nor a unit.
+/*
+  How a value reads, asked in one place.
+
+  This used to look for the formatter inside PerformDesk, because that is where
+  a copy of it lived — and so did another copy in DesignDesk, and a third rule
+  in the settings panel, which is how `4.00×` and `4.00x` and `1.00` for a
+  dimmer the desk called 100% all shipped together. There is one now, and the
+  check reads it there and confirms the copies are gone.
+*/
 const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
-check('every ride reads as a share of its travel, or a unit',
-  !/globalSpeed: v => v\.toFixed\(3\)/.test(perform) && /macroZoom: v => `\$\{v\.toFixed\(2\)\}×`/.test(perform));
+const design = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
+const readout = readFileSync(join(root, 'src/lib/readout.ts'), 'utf8');
+check('a value reads the same way wherever it is shown',
+  /export function readSetting/.test(readout)
+  && !/const READS/.test(perform) && !/const READS/.test(design));
+check('and every ride is a share of its travel unless it has a unit',
+  /macroZoom:  v => `\$\{v\.toFixed\(2\)\}×`/.test(readout)
+  && !/globalSpeed:/.test(readout)
+  && /readSetting\(String\(key\), v, spec\.min, spec\.max\)/.test(perform)
+  && /readSetting\(String\(key\), v, spec\.min, spec\.max\)/.test(design));
+check('and the settings panel asks the same question',
+  /readSetting\(String\(settingKey \?\? ''\), safeValue, min, max\)/.test(panel));
 
 // A line telling you where to go, where a button could take you.
 check('the no-controller line goes there instead of naming the route',
   /data-testid="no-controller-hint"/.test(perform) && !/Settings → MIDI to learn one/.test(perform));
+
+// ── A document, and a desk that is not a performance ────────────────
+/*
+  Three behaviours with no home in a DOM check, because each is about what
+  does *not* happen.
+
+  A sequence rewrites the settings on a clock and Design is where those same
+  settings are chosen by hand, so a look being built was edited underneath the
+  person building it every few seconds. Design suspends the sequencer now, and
+  a new song no longer gets to replace the look either — that was the other
+  thing changing settings without being asked. Neither is visible from outside
+  without waiting out a stage, which is why they are read here.
+
+  And there was no document: Save always made a *new* saved look and always
+  put a file on disk, so twenty minutes of building produced twenty looks and
+  twenty files with no way to write over the one in hand, and no way to begin
+  from nothing.
+*/
+const seqHook = readFileSync(join(root, 'src/hooks/useShowSequencer.ts'), 'utf8');
+const presetHook = readFileSync(join(root, 'src/hooks/useUserPresets.ts'), 'utf8');
+check('a sequence can be held', /suspended\?: boolean/.test(seqHook) && /if \(a\.suspended\)/.test(seqHook));
+check('and Design holds it', /suspended: designing/.test(app));
+check('and a new song does not repaint a look being built', /if \(designing\) return;/.test(app));
+
+check('saving can write over the look in hand', /const saveOver = useCallback/.test(presetHook));
+check('and saving is no longer a download', !/upsert\(p\);\n    downloadText/.test(presetHook) && /const exportPreset/.test(presetHook));
+check('and there is a way to start from nothing',
+  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.DEFAULT_SETTINGS \}\)/.test(app));
+check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app) && /edited=\{docDirty\}/.test(app));
+// One flag, not two: `lookEdited` was derived from the pinned preset and could
+// not be true of an empty plate somebody had since painted.
+check('and only one thing decides that', !/const lookEdited =/.test(app));
+
+check('the opening look is not always the same one',
+  /export const OPENING_LOOK/.test(app) && /Math\.random\(\) \* pool\.length/.test(app));
+check('and can be pinned so a harness is not random', /get\('look'\)/.test(app));
 
 // ── The defaults ────────────────────────────────────────────────────
 const badRides = DEFAULT_RIDES.filter(k => !PIN_RANGE.has(String(k)));
