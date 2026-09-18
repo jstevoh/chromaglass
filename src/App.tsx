@@ -22,6 +22,7 @@ import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
+import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
 import type { EngineStatus } from './lib/platform';
@@ -1333,6 +1334,29 @@ export default function App() {
 
   useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
 
+  /*
+    MIDI timecode, and the position the sequence follows.
+
+    The reader is fed from the MIDI callback below at a hundred messages a
+    second and never touches React. This poll reads it four times a second,
+    which is as often as a stage boundary can matter, and sets state only when
+    the second changes — a set that lasts an hour is then 3600 renders rather
+    than 360,000.
+  */
+  const timecodeRef = useRef(new TimecodeReader());
+  const [timecode, setTimecode] = useState<TimecodePosition | null>(null);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const p = timecodeRef.current.read(performance.now());
+      setTimecode(prev => {
+        if (p === null) return prev === null ? prev : null;
+        if (prev && prev.seconds === p.seconds && prev.minutes === p.minutes && prev.hours === p.hours) return prev;
+        return p;
+      });
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
+
   const sequencer = useShowSequencer({
     getSettings: () => settingsRef.current,
     applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
@@ -1344,6 +1368,7 @@ export default function App() {
     // on `suspended`.
     suspended: designing,
     presets: allPresets,
+    timecodeAt: timecode?.at ?? null,
   });
   // ── Files made for a song ───────────────────────────────────────
   // When a song is identified, a sequence made for it starts at the right
@@ -1936,6 +1961,13 @@ export default function App() {
       if (kind === 'clock') t.clockPulse(at);
       else if (kind === 'stop') t.clockStop();
       else t.clockStart(at);
+    }, []),
+    // Timecode, straight into the reader for the same reason: a rolling desk
+    // sends a hundred of these a second and none of them is a render.
+    useCallback((message: { quarter: number } | { full: Uint8Array }, at: number) => {
+      const r = timecodeRef.current;
+      if ('quarter' in message) r.quarter(message.quarter, at);
+      else r.full(message.full, at);
     }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
@@ -2817,6 +2849,7 @@ export default function App() {
             onTempoClear={clearTempo}
             onTempoBpm={setTempoBpm}
             midiClocked={midi.clocked}
+            timecode={timecode ? formatTimecode(timecode) : null}
             focusSection={settingsSection}
             /*
               The panel can put any of its controls on either desk, so it needs

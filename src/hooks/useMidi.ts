@@ -74,7 +74,16 @@ const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
  */
 export type MidiClockHandler = (kind: MidiRealtime, at: number) => void;
 
-export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[], onClock?: MidiClockHandler) {
+/**
+ * MIDI timecode, straight off the same cable.
+ *
+ * Handed out raw for the same reason as clock: what a position means is the
+ * show's business. `quarter` is the data byte of an 0xF1 message, `full` the
+ * whole SysEx of a locate.
+ */
+export type MidiTimecodeHandler = (message: { quarter: number } | { full: Uint8Array }, at: number) => void;
+
+export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[], onClock?: MidiClockHandler, onTimecode?: MidiTimecodeHandler) {
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +126,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const takeover = useRef(new SoftTakeover()).current;
   const eventTick = useRef(0);
   const clockRef = useRef(onClock); clockRef.current = onClock;
+  const timecodeRef = useRef(onTimecode); timecodeRef.current = onTimecode;
   /** Whether clock has been seen on this port lately, for the panel to report. */
   const [clocked, setClocked] = useState(false);
   const clockSeenAt = useRef(-Infinity);
@@ -288,6 +298,19 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
               const at = performance.now();
               clockSeenAt.current = at;
               clockRef.current?.(rt, at);
+              return;
+            }
+            // Timecode, before the channel-message parser: a quarter-frame is
+            // 0xF1 and one data byte, which is two bytes, so `parseMidi` would
+            // read it as a control change on a channel that does not exist.
+            // A rolling desk sends a hundred a second, so this allocates
+            // nothing and touches no state.
+            if (m.data[0] === 0xf1 && m.data.length >= 2) {
+              timecodeRef.current?.({ quarter: m.data[1] }, performance.now());
+              return;
+            }
+            if (m.data[0] === 0xf0) {
+              timecodeRef.current?.({ full: m.data }, performance.now());
               return;
             }
             const ev = parseMidi(m.data);

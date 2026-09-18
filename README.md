@@ -186,6 +186,26 @@ A Pi or a mini PC behind the screen, powered on, showing the plate: no laptop,
 nothing to click. Same build, two systemd units and a browser told to get out
 of the way. See [docs/appliance.md](docs/appliance.md).
 
+## Timecode
+
+A festival or a theatre runs to a timeline, and a visual on its own timer
+drifts away from it over an evening. If the desk sends **MIDI timecode** down
+the cable the faders are already on, the show follows it: the position decides
+which stage of the running sequence is up and how far into it we are, so a
+locate at the desk puts the visuals where the sound and the lights are rather
+than wherever its own clock had got to. Nothing to set up — it appears in
+**Settings → Sound** while a desk is sending, and the moment the desk stops the
+show takes its own clock back.
+
+All four rates are read (24, 25, 29.97, 30), full-frame locates as well as
+rolling quarter-frames, and the two frames a quarter-frame message spends
+spelling itself out are put back — without that a show sits permanently eighty
+milliseconds behind the desk. `npm run timecode` checks all of it.
+
+LTC over an audio input is not here. It is a different problem — a decoder
+rather than a parser — and worth doing only for rooms that have no MIDI to the
+desk at all.
+
 ## Art-Net: the room's lights follow the plate
 
 Every lighting box takes Art-Net *in* so a desk can drive the visuals. This does
@@ -475,6 +495,7 @@ src/
     frameProbe.ts              # What the frame that just went to the wall actually looked like
     flashGuard.ts              # Three flashes a second, and no more
     tempo.ts                   # MIDI clock, tap and a typed bpm, for when the microphone is not the best source
+    timecode.ts                # MIDI timecode: the desk's position, so the sequence follows the running order
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye

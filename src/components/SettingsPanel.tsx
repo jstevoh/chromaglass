@@ -143,6 +143,8 @@ interface SettingsPanelProps {
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
   midiClocked?: boolean;
+  /** Where a desk says we are, formatted, or null when nothing is sending timecode. */
+  timecode?: string | null;
   /** What to do when a second screen is connected. */
   projectorMode?: 'ask' | 'auto' | 'off';
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
@@ -251,7 +253,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
@@ -629,6 +631,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
               {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
             </Info>
+            {/*
+              Timecode is not a tempo, so it is its own line rather than a
+              fourth way of setting one. Shown only while a desk is sending:
+              a readout that says nothing all evening is worse than no readout.
+            */}
+            {timecode && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2" data-testid="timecode-readout">
+                <span className="text-[13px] font-medium text-text">Timecode</span>
+                <span className="font-mono text-[13px] tabular-nums">{timecode}</span>
+                <span className="text-[12px] opacity-40">the sequence is following the desk</span>
+              </div>
+            )}
           </div>
         )}
 
