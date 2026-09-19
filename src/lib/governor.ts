@@ -46,6 +46,17 @@ const HUGE_MS = 500;
 const RETRY_AFTER_S = 90;
 const HELD_RETRY_AFTER_S = 30;
 
+/**
+ * The post chain's own level, spent before any rung while a heavy effect is
+ * on (feedback, slit-scan): those passes are fill-bound, and a smaller solver
+ * grid, all the rungs can offer, does nothing for them.
+ *
+ *   0  every pass at full resolution
+ *   1  the heavy passes at half resolution
+ *   2  the heavy passes off
+ */
+export type PostLevel = 0 | 1 | 2;
+
 export class QualityGovernor {
   private index: number;
   private readonly start: number;
@@ -58,6 +69,11 @@ export class QualityGovernor {
   private settleUntil: number;
   private everSteppedDown = false;
   private hugeStreak = 0;
+  private post: PostLevel = 0;
+  /** Post level → when it last failed (seconds). */
+  private readonly postFailed = new Map<number, number>();
+  /** Set each frame by the renderer: whether a heavy post pass is on. */
+  heavyPost = false;
 
   constructor(private readonly rungs: QualityRung[], start: number, now: number) {
     this.index = Math.max(0, Math.min(rungs.length - 1, start));
@@ -71,6 +87,11 @@ export class QualityGovernor {
 
   get frameMs(): number {
     return this.emaFrame;
+  }
+
+  /** The post chain's level. Back to 0 whenever no heavy pass is on: there is nothing to spare. */
+  get postLevel(): PostLevel {
+    return this.heavyPost ? this.post : 0;
   }
 
   /** Below where this machine started — the signal that it has less room than it looked. */
@@ -104,6 +125,13 @@ export class QualityGovernor {
     if (this.emaFrame > SLOW_MS) {
       this.fastSince = null;
       this.slowSince ??= now;
+      // The post chain's level first, while a heavy pass is on: the rungs
+      // shrink the solver, and those passes are fill-bound.
+      if (now - this.slowSince >= DOWN_AFTER_S && this.heavyPost && this.post < 2) {
+        this.postFailed.set(this.post, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.post = (this.post + 1) as PostLevel;
+        return this.moved(now);
+      }
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
         this.failed.set(this.index, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.index += 1;
@@ -117,9 +145,22 @@ export class QualityGovernor {
     if (this.emaFrame < FAST_MS && this.emaWork < WORK_BUDGET_MS) {
       this.fastSince ??= now;
       if (now - this.fastSince >= UP_AFTER_S) {
+        // Up in the reverse order of down: the rungs the solver lost below
+        // where it started, then the effects, then any rung above the start.
         const above = this.index - 1;
         const failedAt = this.failed.get(above);
-        if (above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S)) {
+        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S);
+        if (rungFree && this.index > this.start) {
+          this.index = above;
+          return this.moved(now);
+        }
+        const better = this.post - 1;
+        const postFailedAt = this.postFailed.get(better);
+        if (this.heavyPost && better >= 0 && (postFailedAt === undefined || now - postFailedAt >= RETRY_AFTER_S)) {
+          this.post = better as PostLevel;
+          return this.moved(now);
+        }
+        if (rungFree) {
           this.index = above;
           return this.moved(now);
         }
