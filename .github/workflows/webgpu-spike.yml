@@ -1,0 +1,32 @@
+name: WebGPU spike (P0)
+
+# docs/webgpu-plan.md, P0: can CI run WebGPU with no GPU? Runs only on the
+# spike branch; it is a measurement, not a gate, and never merges.
+on:
+  push:
+    branches: ['spike/webgpu-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: WebGPU on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Probe
+        run: node scripts/webgpu-spike.mjs --grids 128,256
