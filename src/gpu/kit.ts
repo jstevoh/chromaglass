@@ -42,10 +42,20 @@ export class PipelineCache {
     return m;
   }
 
+  /**
+   * A compute pipeline, with its bind group layout read from the shader's own
+   * `@binding` declarations rather than inferred.
+   *
+   * Not `layout: 'auto'`: that drops any binding the shader does not happen to
+   * use, so a pass that ignores one of its uniforms (a fill, say) refuses the
+   * bind group every one of its siblings takes. The declarations are the
+   * truth, and they are right there in the source.
+   */
   computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline {
     let p = this.compute.get(name);
     if (!p) {
-      p = this.device.createComputePipeline({ label: name, layout: 'auto', compute: { module: this.module(code, name), entryPoint } });
+      const layout = this.device.createPipelineLayout({ label: name, bindGroupLayouts: [layoutFromWgsl(this.device, code, name)] });
+      p = this.device.createComputePipeline({ label: name, layout, compute: { module: this.module(code, name), entryPoint } });
       this.compute.set(name, p);
     }
     return p;
@@ -56,6 +66,37 @@ export class PipelineCache {
     if (!p) { p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) }); this.render.set(name, p); }
     return p;
   }
+}
+
+/**
+ * The bind group layout a WGSL source describes, from its `@group(0)
+ * @binding(n)` declarations: uniforms, sampled textures (filterable only
+ * where the shader samples them through a sampler), storage textures with
+ * their format, and samplers.
+ */
+export function layoutFromWgsl(device: GPUDevice, code: string, label?: string): GPUBindGroupLayout {
+  const entries: GPUBindGroupLayoutEntry[] = [];
+  const re = /@group\(0\)\s*@binding\((\d+)\)\s*var(?:<(\w+)(?:,\s*\w+)?>)?\s+(\w+)\s*:\s*([^;]+);/g;
+  for (const m of code.matchAll(re)) {
+    const binding = Number(m[1]);
+    const space = m[2];
+    const name = m[3];
+    const type = m[4].trim();
+    const visibility = GPUShaderStage.COMPUTE;
+    if (space === 'uniform') entries.push({ binding, visibility, buffer: { type: 'uniform' } });
+    else if (space === 'storage') {
+      const writable = /read_write/.test(m[0]);
+      entries.push({ binding, visibility, buffer: { type: writable ? 'storage' : 'read-only-storage' } });
+    }
+    else if (type.startsWith('texture_storage_2d')) {
+      const format = type.slice(type.indexOf('<') + 1).split(',')[0].trim() as GPUTextureFormat;
+      entries.push({ binding, visibility, storageTexture: { access: 'write-only', format } });
+    } else if (type.startsWith('texture_2d')) {
+      const sampled = new RegExp(`textureSampleLevel\\(\\s*${name}\\b`).test(code);
+      entries.push({ binding, visibility, texture: { sampleType: sampled ? 'float' : 'unfilterable-float' } });
+    } else if (type === 'sampler') entries.push({ binding, visibility, sampler: { type: 'filtering' } });
+  }
+  return device.createBindGroupLayout({ label, entries });
 }
 
 /** A bind group for a pipeline's group 0 from resources in binding order: buffers, textures (their default view), samplers or views. */
@@ -77,6 +118,31 @@ export function bindGroup(
 // ── Textures ─────────────────────────────────────────────────────────
 
 export const FIELD_USAGE = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST;
+
+/**
+ * A float texture, read straight out, waiting for the GPU. For harnesses and
+ * self-tests — the show never stalls like this.
+ *
+ * `channels` is how many floats a texel holds (2 for rg32float, 4 for
+ * rgba32float); the rows come back packed, without the copy's 256-byte
+ * padding.
+ */
+export async function readTextureF32(device: GPUDevice, tex: GPUTexture, channels: 2 | 4): Promise<Float32Array> {
+  const w = tex.width, h = tex.height;
+  const row = Math.ceil((w * channels * 4) / 256) * 256;
+  const buf = device.createBuffer({ label: `read ${tex.label}`, size: row * h, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const enc = device.createCommandEncoder({ label: `read ${tex.label}` });
+  enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [w, h]);
+  device.queue.submit([enc.finish()]);
+  await buf.mapAsync(GPUMapMode.READ);
+  const padded = new Float32Array(buf.getMappedRange().slice(0));
+  buf.unmap();
+  buf.destroy();
+  const out = new Float32Array(w * h * channels);
+  const stride = row / 4;
+  for (let y = 0; y < h; y++) out.set(padded.subarray(y * stride, y * stride + w * channels), y * w * channels);
+  return out;
+}
 
 /** Two textures of one format, read one and write the other, then swap. */
 export class PingPong {

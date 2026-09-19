@@ -3293,6 +3293,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const ladder = qualityLadder(tier, gpuClass);
     governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
 
+    // The plate's own shaders. FROZEN while the WebGPU port runs
+    // (docs/webgpu-plan.md, P2–P3): the compositor moves to WGSL in P3, so a
+    // change here has to be made twice. Bug fixes only, ported in the same
+    // pull request.
     const vertSrc = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
