@@ -32,29 +32,83 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { PIN_RANGE } from './deskPins';
 
 /**
- * What a preset that does not mention them should get.
+ * What belongs to the room rather than to a look.
  *
- * A macro preset must not leave the next one zoomed in, and the Fillmore's
- * projectors, beads, cells and fingering must not leak into a plain plate.
- * `applyPreset` has always applied this base before the preset's own values;
- * a fade has to aim at the same target or the two paths disagree about what
- * the preset means.
+ * A look is everything about how the plate looks and moves, and how the music,
+ * the room and the film drive it. What the room *is* stays put when the look
+ * changes: the microphone's calibration and latency, whether a new song changes
+ * the look at all, the house dimmer, the logo, the film that is loaded and how
+ * it is keyed, how the room camera's picture is read, and the grid this machine
+ * can hold. A look that set any of these would carry it on into every look after
+ * it, which is the thing this file exists to stop.
  */
-export const LOOK_BASE: Partial<VisualizerSettings> = {
-  macroMode: false,
-  renderStyle: 'show',
-  camera: 0,
-  dishSpread: 0,
-  beads: 0,
-  cells: 0,
-  fingering: 0,
-};
+export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof VisualizerSettings>([
+  'sensitivity', 'bassBoost', 'autoCalibrate', 'beatPrediction', 'beatLead', 'onNewSong',
+  'dimmer',
+  'markMix', 'markX', 'markY', 'markScale',
+  'filmMix', 'filmKey',
+  'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
+  'simResolution',
+]);
 
-/** Where a fade is aiming: the base, then the preset over it. */
-export function targetLook(current: VisualizerSettings, preset: Partial<VisualizerSettings>): VisualizerSettings {
-  // The solver grid is a property of this machine, not of the look. A preset
-  // from a desktop must not pin a laptop to a grid it cannot hold.
-  return { ...current, ...LOOK_BASE, ...preset, simResolution: current.simResolution };
+/**
+ * Every look setting, at the value a look gets when it does not mention it.
+ *
+ * A look is complete: it never inherits from the look before it. Looks used
+ * to be written as a handful of changes over whatever was already on the
+ * plate, so a look's lacing, dye budget, exposure, Lumia or bubbles were
+ * whatever the last look had left there, and the same look came out
+ * differently depending on what had been played before it. (The app now opens
+ * on a random look, which made that visible: Acid Trip after Lumia ran its
+ * plate nearly dry and drew a bare LED wheel.)
+ *
+ * So every look setting has a value here, the app's defaults, with the
+ * framing, beads, cells and fingering off. The macro camera, the Fillmore's
+ * projectors and its beads should only appear when a look asks for them. A look
+ * lists what it wants different from this, and everything it does not list is
+ * this, whatever came before. A fade still travels from where the plate is to
+ * the complete look; it is the destination that no longer depends on the
+ * route.
+ */
+export const LOOK_BASE: Readonly<Partial<VisualizerSettings>> = (() => {
+  const base: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    if (!RIG_KEYS.has(key as keyof VisualizerSettings)) base[key] = value;
+  }
+  Object.assign(base, {
+    macroMode: false,
+    macroZoom: 1,
+    renderStyle: 'show',
+    camera: 0,
+    dishSpread: 0,
+    beads: 0,
+    cells: 0,
+    fingering: 0,
+  });
+  return base as Partial<VisualizerSettings>;
+})();
+
+/**
+ * A look, complete: every look setting, from the look where it says and from
+ * the base where it does not. Anything the look says about the room is left
+ * out, so the room stays as it is.
+ */
+export function lookOf(look: Partial<VisualizerSettings>): Partial<VisualizerSettings> {
+  // The base's tables (the sound mappings, the patches) are copied, so a look
+  // that is edited in place cannot write through into every look after it.
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(LOOK_BASE)) {
+    out[key] = typeof value === 'object' && value !== null ? structuredClone(value) : value;
+  }
+  for (const [key, value] of Object.entries(look)) {
+    if (!RIG_KEYS.has(key as keyof VisualizerSettings)) out[key] = value;
+  }
+  return out as Partial<VisualizerSettings>;
+}
+
+/** Where a look change is aiming: the room as it is, with the look complete over it. */
+export function targetLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {
+  return { ...current, ...lookOf(look) } as VisualizerSettings;
 }
 
 /** Ease in and out: a fade that starts and stops gently reads as a hand, not a switch. */

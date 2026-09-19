@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualizerSettings } from '../types';
 import { PRESETS, type Preset } from '../presets';
+import { lookOf } from '../lib/lookFade';
 import {
   ShowSequence, ShowStage, SequencerStatus,
   builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
@@ -104,9 +105,11 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     const a = argsRef.current;
     const preset = stage.presetId ? (a.presets ?? PRESETS).find(p => p.id === stage.presetId) : null;
     if (preset) a.adoptPreset(preset.id);
-    const target: Partial<VisualizerSettings> = { ...(preset?.settings ?? {}), ...(stage.settings ?? {}) };
+    // A stage that names a look glides to the whole of it (see LOOK_BASE), with
+    // the stage's own settings over it. A stage with no look is a set of
+    // changes to the one already playing, and glides only those.
+    const target: Partial<VisualizerSettings> = { ...(preset ? lookOf(preset.settings) : {}), ...(stage.settings ?? {}) };
     if (stage.macro !== undefined) target.macroMode = stage.macro;
-    else if (preset && preset.settings.macroMode === undefined) target.macroMode = false;
     const current = a.getSettings();
     const from: Partial<VisualizerSettings> = {};
     for (const key of Object.keys(target) as (keyof VisualizerSettings)[]) (from as Record<string, unknown>)[key] = current[key];

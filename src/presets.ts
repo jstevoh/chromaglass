@@ -45,8 +45,6 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.005,    // colors persist a long time
       airVelocity: 0.04,         // near-still air — no turbulence
       vibrationFrequency: 0.08,  // minimal vibration — serene
-      sensitivity: 0.4,
-      bassBoost: 1.0,
       audioImpact: 0.55,         // audible music visibly drives the fluid
       turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
@@ -93,8 +91,6 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.002,    // stars persist for a very long time
       airVelocity: 0.02,         // near-vacuum — no turbulence
       vibrationFrequency: 0.0,   // no vibration — serene void
-      sensitivity: 0.5,
-      bassBoost: 1.2,
       audioImpact: 0.4,
       turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
       turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
@@ -197,17 +193,18 @@ export const PRESETS: Preset[] = [
   {
     id: 'lava-lamp',
     name: 'Lava Lamp',
-    description: 'Highly buoyant, gooey blobs rising over a warm fire LED.',
+    description: 'Wax blobs glowing in a dark, ember-lit liquid: they swell, merge and rise.',
     settings: {
       globalSpeed: 0.04,
       surge: 0.4,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.9,
+      gooeyEffect: 1,
       rotationSpeed: 0.01,
-      centerGravity: 0.1,
+      centerGravity: 0,          // the wax wanders the lamp; the music already pours it in the middle
       ledPlatform: true,
-      ledMode: 'fire',
+      ledMode: 'single',         // one dim ember under the whole lamp, not a colour wheel
+      ledColor: '#5c1400',
       ledSpeed: 0.02,
       surfaceTension: 0.2,
       diffusionRate: 0.00005,
@@ -226,12 +223,18 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.1,
-      turbulenceScale: 0.15,     // lava moves as whole blobs, minimal ripple
+      turbulenceScale: 0.05,     // lava moves as whole blobs: no ripple to tear their edges
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.85,  // high cohesion — rounded rising globs
+      blobSurfaceTension: 1,     // as round as the plate will hold them
       boundaryContrast: 0.3,
       saturationBoost: 1.3,
-      glossiness: 0.12,          // faint wax sheen — the one preset that earns it
+      glossiness: 0.3,           // a wax sheen, the one look that earns one
+      edgeRelief: 0.6,           // and a rim, so a blob reads as a body rather than a stain
+      // The liquid is clear and the wax is not. A full plate is a red wash (which is
+      // what this look was with music on): at 0.45 the wax has somewhere to be, and
+      // the exposure keeps the thin film between blobs as the liquid, not a tint.
+      dyeBudget: 0.45,
+      exposure: 0.9,
       postBlurRadius: 0.55,      // softer edges than the flat-dye presets
       audioMappings: {
         velocity: 'bass',
@@ -271,7 +274,12 @@ export const PRESETS: Preset[] = [
       polarity: 0.5,
       heatIntensity: 0.5,
       boilingPoint: 0.5,
-      evaporationRate: 0.04,
+      // It lays dye on the weakest thing the music does (timbre) and dried it at
+      // 0.04, so with a band playing the plate ran empty and the frame was the
+      // bare LED wheel. It holds its dye now, and the wheel shows through it.
+      evaporationRate: 0.02,
+      dyeBudget: 0.6,
+      audioImpact: 0.8,
       airVelocity: 0.5,
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
@@ -400,7 +408,12 @@ export const PRESETS: Preset[] = [
       polarity: 0.8,
       heatIntensity: 0.9,
       boilingPoint: 0.4,
-      evaporationRate: 0.06,
+      // The fire wheel with nothing on it, under music: 0.06 dried the plate
+      // faster than the pour filled it, and the pour follows complexity, which
+      // read two percent of its range until the analyser was fixed.
+      evaporationRate: 0.025,
+      dyeBudget: 0.6,
+      audioImpact: 0.8,
       airVelocity: 0.4,
       vibrationFrequency: 0.7,
       audioMappings: {
@@ -483,6 +496,11 @@ export const PRESETS: Preset[] = [
       heatIntensity: 0.25,
       boilingPoint: 0.85,
       evaporationRate: 0.008,
+      // Curtains, not a sheet: a full plate on the lighter blend was one flat
+      // green. With less dye and the thin film read as sky, the ocean lamp
+      // shows between the folds.
+      dyeBudget: 0.35,
+      exposure: 0.5,
       airVelocity: 0.08,
       vibrationFrequency: 0.15,
       audioMappings: {
@@ -714,11 +732,13 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.05,
       rotationSpeed: 0.06,
       centerGravity: 0.95,
-      ledPlatform: true,
+      // Glitter wants a night sky. On the rainbow wheel, with the dye dried
+      // and diffused away, the frame was the wheel and nothing else.
+      ledPlatform: false,
       ledMode: 'rainbow',
       ledSpeed: 0.35,
       surfaceTension: 0.01,
-      diffusionRate: 0.0012,
+      diffusionRate: 0.0003,     // a spark stays a spark
       buoyancy: 0.7,
       advection: 0.9,
       damping: 0.92,
@@ -731,7 +751,9 @@ export const PRESETS: Preset[] = [
       polarity: 0.15,
       heatIntensity: 0.6,
       boilingPoint: 0.35,
-      evaporationRate: 0.055,
+      evaporationRate: 0.015,
+      dyeBudget: 0.45,
+      audioImpact: 0.85,
       airVelocity: 0.55,
       vibrationFrequency: 0.85,
       audioMappings: {
@@ -1459,7 +1481,6 @@ export const PRESETS: Preset[] = [
         // More people, more dye on the plate.
         { feature: 'crowd', setting: 'dyeBudget', depth: 0.25 },
       ],
-      scenePeople: true,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
@@ -1508,7 +1529,6 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
-      sensitivity: 0.5,
       audioImpact: 0.3,            // the beat is when a drop lands, not a shove of its own
       turbulenceScale: 0.05,
       turbulenceDetail: 2,
@@ -1568,7 +1588,6 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.006,      // a film that is always thinning is always about to go
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
-      sensitivity: 0.55,
       audioImpact: 0.5,
       turbulenceScale: 0.3,        // some vorticity, so the fronts curl instead of ringing
       turbulenceDetail: 3,
@@ -1630,7 +1649,6 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.002,
       airVelocity: 0.08,
       vibrationFrequency: 0.0,
-      sensitivity: 0.45,
       audioImpact: 0.4,
       turbulenceScale: 0.18,       // low: a smooth current shows a stuck patch, a rough one hides it
       turbulenceDetail: 2,

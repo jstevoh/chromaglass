@@ -233,8 +233,19 @@ export function useAudioAnalyzer(
           const curr = timeDomainData[i] - 128;
           if ((prev >= 0 && curr < 0) || (prev < 0 && curr >= 0)) zeroCrossings++;
         }
-        const complexity = (zeroCrossings / (binCount - 1)) * 100
-          * (autoCal ? calibratedTrim(sens) : sens);
+        // Read on a scale of a hundred like every other feature, but the rate
+        // itself is a few percent: twice the dominant frequency over the sample
+        // rate, 2% for a 500 Hz line and about 10% for hi-hats, snares and
+        // distortion. Taken raw, every mapping to it moved about two percent of
+        // its travel, and eight of the looks' sound mappings (Boiling Point's
+        // pour and Acid Trip's colour among them) did nothing at all. So about
+        // seven percent is the top, where the band's median reads a quarter of
+        // the travel, near the other features. It is not ranged against the
+        // room like the levels: it is a property of the sound rather than of
+        // how loud it is here, and a range learned from it rides its transients
+        // and reads nearly zero between them.
+        const zcr = (zeroCrossings / (binCount - 1)) * 100;
+        const complexity = Math.min(100, zcr * 15) * (autoCal ? calibratedTrim(sens) : sens);
 
         // ── Exponential smoothing (per-feature) ──────────────────
         setAudioData(prev => {
