@@ -3313,6 +3313,8 @@ export default function App() {
       {performing && overlaysVisible && (
         <PerformDesk
           onOpenSettings={openAllSettings}
+          automated={isAutomated}
+          onAutomate={setIsAutomated}
           cues={cues}
           liveId={activePresetId}
           nextId={cued?.id ?? null}
@@ -3390,6 +3392,8 @@ export default function App() {
       {designing && overlaysVisible && (
         <DesignDesk
           onOpenSettings={openAllSettings}
+          automated={isAutomated}
+          onAutomate={setIsAutomated}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
@@ -3409,7 +3413,9 @@ export default function App() {
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
-          onAddLayer={() => updateSettings({ layerCount: Math.min(3, (settings.layerCount ?? 1) + 1) })}
+          // Two: the compositor draws the lead plate and one behind it, and a
+          // third was simulated in full — a whole solver's GPU time — and never shown.
+          onAddLayer={() => updateSettings({ layerCount: Math.min(2, (settings.layerCount ?? 1) + 1) })}
           layerReport={layerReport}
           settings={settings}
           onSetting={updateSettings}

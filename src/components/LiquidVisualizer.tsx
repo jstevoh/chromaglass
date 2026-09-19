@@ -112,6 +112,8 @@ const GRID_SIZE = 192;                    // sim resolution — higher = smoothe
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 /** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
 const TURB_SPEED = 0.5;
+/** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
+const DRIP_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 /**
  * How much curvature counts as a boundary rather than a wash, as a fraction of
@@ -1312,7 +1314,7 @@ class FluidSimulation {
   }
 
   applyVibration(intensity: number, frequency: number, time: number) {
-    if (intensity <= 0.001 || frequency <= 0.001) return;
+    if (intensity <= 0.0005 || frequency <= 0.001) return;
     const freqX = frequency * 0.5;
     const freqY = frequency * 0.5;
     const speed = time * 20;
@@ -1539,9 +1541,22 @@ class FluidSimulation {
       const treble01 = Math.min(1, audioData.treble / 70);
       const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
       if (s > 0.08) spin = s * 0.03;
-      if (settings.vibrationFrequency > 0.3) {
-        vibIntensity = audioData.energy * settings.vibrationFrequency * 0.002;
-        vibFrequency = settings.vibrationFrequency * 3;
+    }
+    /*
+      Vibration: a standing ripple on the per-step channel, the plate being
+      tapped. It was energy × setting × 0.002 behind two gates (the setting above
+      0.3, the result above 0.001), which with the analyser's energy topping out
+      at 0.85 meant nothing below about 0.6 and nothing at all without a mic.
+      Now a floor that works in silence and swells with the music, and the
+      slider sets the wavelength as well as the depth: 25 cells at the bottom,
+      4 at the top. `vibFrequency` is twice the wave number (both solvers halve it).
+    */
+    {
+      const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
+      if (vf > 0.005) {
+        const energy = audioData ? Math.min(1, audioData.energy) : 0;
+        vibIntensity = vf * (0.4 + 0.6 * energy) * 0.5;
+        vibFrequency = 2 * (0.25 + vf * 1.25);
       }
     }
 
@@ -1589,7 +1604,7 @@ class FluidSimulation {
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, surfaceTension, fingering,
       vibIntensity, vibFrequency,
-      drip: settings.rainDrip > 0.1 ? settings.rainDrip : 0,
+      drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
       air: settings.airVelocity > 0.1 ? settings.airVelocity : 0,
       evapFactor, time,
@@ -1740,14 +1755,20 @@ class FluidSimulation {
     }
   }
 
+  // Rain drip: streaks of the plate sliding downhill, with the glass between
+  // them holding on. The pull was 0.3 × dt per step, under a thousandth of a
+  // cell and never visible, while the friction between streaks switched on at
+  // full strength past 0.1 and only slowed everything else down. The pull is a
+  // current now (DRIP_SPEED at 1.0, about five cells a second in the streaks)
+  // and the friction grows with the slider.
   private applyDripping(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const dripGravity = 0.3 * dt * strength;
+    const dripPull = DRIP_SPEED * strength;
     for (let j = 1; j < this.size - 1; j++) {
       for (let i = 1; i < this.size - 1; i++) {
         const idx = i + j * this.size;
         const streak = (noise2D(i * 0.15, j * 0.02 - time * 0.2) + 1) * 0.5;
-        this.vy[idx] += dripGravity * (0.1 + streak * streak * 0.9);
-        const friction = 0.5 + (1.0 - Math.max(0, streak)) ** 3 * 20.0;
+        this.vy[idx] -= dripPull * (0.1 + streak * streak * 0.9);   // downhill is -y (see the GPU twin)
+        const friction = (0.5 + (1.0 - Math.max(0, streak)) ** 3 * 20.0) * strength;
         const decay = Math.exp(-friction * dt);
         this.vy[idx] *= decay;
         this.vx[idx] *= decay;
@@ -2282,6 +2303,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
+  const beadFrameRef = useRef(0);    // the beads' own frame clock (see the populate call)
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
@@ -4314,7 +4336,10 @@ void main() {
   // lamp down should not take the sponsor's logo with it — a blackout with a
   // mark still on the wall is a normal thing to want. Its own opacity is the
   // control for that.
-  if (u_markOn > 0.5) {
+  // Any opacity at all: u_markOn is the fader, not a switch, and testing it
+  // against 0.5 left the bottom half of the fade invisible and the mark
+  // popping in at half strength.
+  if (u_markOn > 0.001) {
     vec2 m = (uvScreen - u_markRect.xy) / max(u_markRect.zw, vec2(1e-4)) * 0.5 + 0.5;
     if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
       vec4 mark = texture(u_mark, vec2(m.x, 1.0 - m.y));
@@ -5201,25 +5226,36 @@ void main() {
               }
             }
 
-            // The hue journey: a set drifts its colours over minutes, one dye
-            // draining as the next arrives, never a jump. With the journey off
-            // the old behaviour stays — a random re-pick every ~45 s.
-            const journeyMin = currentSettings.hueJourney ?? 0;
-            if (!harmonyLockRef.current) {
-              if (journeyMin > 0) {
-                const j = journeyRef.current;
-                if (j.lastAt < 0) j.lastAt = time;
-                if (time - j.lastAt >= journeyMin * 60) {
-                  j.lastAt = time;
-                  j.lead += 1;
-                  const contract = presetContractRef.current;
-                  harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
-                }
-              } else if (Math.random() < 0.0004) {
-                harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
-              }
+            // With no hue journey set, an evolving plate re-picks its palette at
+            // random every ~45 s. The journey itself runs below, evolving or not.
+            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0004) {
+              harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
             }
 
+          }
+
+          /*
+            The hue journey: a set drifts its colours over minutes, one dye
+            draining as the next arrives, never a jump.
+
+            It lived inside the evolve block above, so with Random Evolve off —
+            the default — it never ran, and its "minutes" were the solver's clock:
+            at the default Speed one of them took three and a half real minutes,
+            at full Speed eight seconds. On the wall clock now, while playing.
+          */
+          if (isActiveRef.current && drainFrameRef.current === 0 && !harmonyLockRef.current) {
+            const journeyMin = currentSettings.hueJourney ?? 0;
+            if (journeyMin > 0) {
+              const j = journeyRef.current;
+              const nowS = performance.now() * 0.001;
+              if (j.lastAt < 0 || j.lastAt > nowS) j.lastAt = nowS;
+              if (nowS - j.lastAt >= journeyMin * 60) {
+                j.lastAt = nowS;
+                j.lead += 1;
+                const contract = presetContractRef.current;
+                harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
+              }
+            }
           }
 
           // ── Seed trigger ───────────────────────────────────────
@@ -5274,8 +5310,17 @@ void main() {
               const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
               const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
 
+              // The velocity route drives the bass burst. It was never read, and
+              // the density route gated this whole block, so setting density to
+              // "none" silenced every reaction to the music, bursts included.
+              const velRoute = currentSettings.audioMappings.velocity as AudioFeatureKey;
+              const velRaw = getAudioValue(currentAudioData, velRoute);
+              // Same scale as bass01 below (feature / 70) so the default route,
+              // bass, behaves exactly as before; energy is already 0–1.
+              const vel01 = velRoute === 'energy' ? velRaw : Math.min(1, velRaw * (100 / 70));
+
               const impact = currentSettings.audioImpact ?? 0.45;
-              if (impact > 0.01 && currentAudioData.volume > 3 && densityMod > 0.005) {
+              if (impact > 0.01 && currentAudioData.volume > 3) {
                 // Each audio feature carries a different color from the harmony,
                 // so bass, mids and swells paint distinguishable hues.
                 const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
@@ -5301,13 +5346,15 @@ void main() {
                   const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
 
                   // Center pulse — scales with density mapping
-                  activeFluid.autoInject(aStyle(), centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a, densityMod);
-                  activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
+                  if (densityMod > 0.005) {
+                    activeFluid.autoInject(aStyle(), centerX, centerY, densityMod * 0.025 * autoAmp, ar_a, ag_a, ab_a, densityMod);
+                    activeFluid.addTemp(centerX, centerY, densityMod * 0.018 * autoAmp);
+                  }
 
-                  // Bass hit: radial velocity burst — scales with impact + auto mode
-                  if (bass01 > 0.25) {
+                  // A hit on the velocity route: radial burst — scales with impact + auto mode
+                  if (vel01 > 0.25) {
                     const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
-                    const bassStr = (bass01 - 0.25) * autoAmp;
+                    const bassStr = (vel01 - 0.25) * autoAmp;
                     for (let bj = -burstR; bj <= burstR; bj += 3) {
                       for (let bi = -burstR; bi <= burstR; bi += 3) {
                         const dist = Math.sqrt(bi * bi + bj * bj);
@@ -5459,7 +5506,12 @@ void main() {
               if (beadAmt <= 0) {
                 if (beads.beads.length) beads.clear();
               } else {
-                if (simStep === 0 && gestureFrameRef.current % 30 === 0) {
+                // Every thirtieth frame. This read the gesture counter, which only
+                // advances while someone is painting: before the first stroke it
+                // repopulated on every frame (up to count × 6 placement tries,
+                // each checking every bead), and after one it mostly never ran
+                // again, so the beads stopped following their slider.
+                if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
                   const dens = fluidsRef.current[0]?.readDensity;
                   beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt, dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
                 }
@@ -5624,9 +5676,14 @@ void main() {
           `macroMode` is still honoured for the looks and saved shows that set
           it: on with a zoom nobody moved means the framing it has always meant.
         */
+        // The slider and the zoom keys write macroMode = (zoom > 1.05) alongside
+        // the zoom, so a floor of 4x under macroMode made every zoom from 1.05
+        // to 4 render at 4x. The floor is only for a look that turns macroMode
+        // on and leaves the zoom where it was.
+        const setZoom = currentSettings.macroZoom ?? 1;
         const wantZoom = currentSettings.macroMode === true
-          ? Math.max(MACRO_PRESET_ZOOM, currentSettings.macroZoom ?? MACRO_PRESET_ZOOM)
-          : Math.max(1, currentSettings.macroZoom ?? 1);
+          ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM)
+          : Math.max(1, setZoom);
         const macroAmount = Math.max(0, Math.min(1, (wantZoom - 1) / (MACRO_FULL_ZOOM - 1)));
         const macroOn = wantZoom > 1.005;
         if (macroOn !== lastMacroOnRef.current) {

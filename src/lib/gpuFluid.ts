@@ -318,18 +318,22 @@ void main() {
   }
 
   // Vibration
-  if (u_vibI > 0.001 && d > 0.05) {
+  if (u_vibI > 0.0005 && d > 0.05) {
     float f = u_vibF * 0.5, s = u_time * 20.0;
     v.x += sin(p.x * f + s) * cos(p.y * f) * u_vibI;
     v.y += cos(p.x * f) * sin(p.y * f + s) * u_vibI;
   }
 
-  // Dripping: streaky downward pull with heavy friction between streaks
-  if (u_drip > 0.1) {
+  // Dripping: streaks sliding downhill, the glass between them holding on.
+  // A current of 0.5 at full (DRIP_SPEED on the CPU), friction growing with it.
+  if (u_drip > 0.01) {
     float streak = (snoise(vec2(p.x * 0.15, p.y * 0.02 - u_time * 0.2)) + 1.0) * 0.5;
-    v.y += 0.3 * u_dt * u_drip * (0.1 + streak * streak * 0.9);
+    // Downhill is -y: the grid's y runs up the screen (y=0 is the bottom row,
+    // as the pointer mapping says), and this was += — rain falling upward,
+    // unnoticed only because it was too weak to see.
+    v.y -= 0.5 * u_drip * (0.1 + streak * streak * 0.9);
     float s1 = 1.0 - max(0.0, streak);
-    float friction = 0.5 + s1 * s1 * s1 * 20.0;
+    float friction = (0.5 + s1 * s1 * s1 * 20.0) * u_drip;
     v.xy *= exp(-friction * u_dt);
   }
 

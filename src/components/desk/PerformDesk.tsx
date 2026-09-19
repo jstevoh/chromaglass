@@ -73,6 +73,9 @@ interface PerformDeskProps {
   onFade: (s: number) => void;
   settings: VisualizerSettings;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
+  /** Whether the plate is evolving on its own, and the switch for it. */
+  automated: boolean;
+  onAutomate: (on: boolean) => void;
   /** Which CC each ride is learned to, so the desk and the controller agree. */
   ccFor: (key: keyof VisualizerSettings) => number | null;
   /** Which controls are on the strip, and the operator's right to change them. */
@@ -299,8 +302,14 @@ export function PerformDesk(p: PerformDeskProps) {
           <div className="mt-2 border-t border-border pt-3">
             <Toggle
               label="Random evolve"
-              on={(p.settings.automateRate ?? 0) > 0.02}
-              onChange={on => p.onSetting({ automateRate: on ? 0.15 : 0 })}
+              // The real switch. This used to write automateRate between 0 and
+              // 0.15, which only sets how often an evolving plate does something:
+              // with evolving off (the default) it showed "on" and did nothing.
+              on={p.automated}
+              onChange={on => {
+                p.onAutomate(on);
+                if (on && (p.settings.automateRate ?? 0) < 0.02) p.onSetting({ automateRate: 0.15 });
+              }}
               testId="toggle-evolve"
             />
             <Toggle
