@@ -879,8 +879,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ granulation: v })}
           settingKey="granulation"
         />
+        {/* "Fineness", not "Size": the number is grain cells across the
+            plate, so up is finer grain, not bigger. */}
         <Slider
-          label="Grain Size"
+          label="Grain Fineness"
           disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
           value={settings.grainScale ?? 320}
           min={60}
@@ -945,7 +947,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Layer Scale Variety"
-          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 or more Projector Layers'}
+          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 Layers'}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
           max={1.0}
@@ -1049,7 +1051,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Background Loop"
-          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 or more Projector Layers'}
+          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
           max={1.0}
@@ -1121,22 +1123,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </div>
         )}
-        <Slider label="Camera" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })}
+        {/*
+          "Lens", not "Camera": the section is called Camera, the room has a
+          camera and the film has one too, and this is none of them — it is
+          how much of the photograph's lens is over the picture.
+        */}
+        <Slider label="Lens" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })}
           settingKey="camera"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })}
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })}
           settingKey="focus"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })}
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })}
           settingKey="aperture"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })}
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })}
           settingKey="bloom"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })}
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })}
           settingKey="chromaticAberration"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Camera above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
+        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
           settingKey="refraction"
         />
         <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })}
@@ -1161,7 +1168,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Aperture size={12} /> Kaleidoscope
         </h3>
         <Info>
-          A mirror rig over the plate, the four-fold dish of the reference stills. Folds sets how many wedges; Spin turns the rig, and runs backwards below zero; Zoom decides how much of the plate feeds each wedge — pulled in, a few enormous shapes, and taken out to the rim, something fine and busy. All three ride a fader.
+          A mirror rig over the plate, the four-fold dish of the reference stills. Folds sets how many wedges; Kaleido Spin turns the rig, and runs backwards below zero; Kaleido Zoom decides how much of the plate feeds each wedge — pulled in, a few enormous shapes, and taken out to the rim, something fine and busy. All three ride a fader.
         </Info>
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center justify-between gap-2">
@@ -1185,7 +1192,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </div>
         </div>
         <Slider
-          label="Spin"
+          label="Kaleido Spin"
           value={settings.kaleidoSpin ?? 0}
           min={-0.5}
           max={0.5}
@@ -1195,7 +1202,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
         />
         <Slider
-          label="Zoom"
+          label="Kaleido Zoom"
           value={settings.kaleidoZoom ?? 0.72}
           min={0.2}
           max={1.6}
@@ -1437,8 +1444,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
             className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-mirror"
+            title="Flip the camera's view left for right, for a camera facing the room"
           >
-            Mirror
+            Flip Camera
           </button>
         </div>
         {/* The patch bay was here. It reads the film, the sound and the shapes
@@ -1449,7 +1457,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           Any feature of the room onto any control is a patch, in {goTo('patches', 'room')}.
         </p>
         <Info>
-          <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Mirror</span> for a camera facing the room, so a hand moved left moves the dye left.
+          <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Flip Camera</span> for a camera facing the room, so a hand moved left moves the dye left.
         </Info>
       </section>
 
@@ -2160,7 +2168,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           the closeup arriving rather than a cut to it.
         */}
         <Slider
-          label="Zoom"
+          label="Macro Zoom"
           value={settings.macroZoom ?? 1}
           min={1}
           max={16}
@@ -2223,7 +2231,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="macroCellScale"
         />
             <Slider
-              label="Lacing"
+              label="Macro Lacing"
               value={settings.macroLacing}
               min={0}
               max={1}
@@ -2355,8 +2363,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Wind size={12} /> Manual Interaction
         </h3>
+        {/* "Updraft", not "Blow Velocity": it is a constant draught over the
+            whole plate, and has nothing to do with how hard the Blow tool
+            blows. */}
         <Slider
-          label="Blow Velocity"
+          label="Updraft"
           value={settings.airVelocity}
           min={0}
           max={1.0}
@@ -2365,7 +2376,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="airVelocity"
         />
         <Slider
-          label="Vibration Freq"
+          label="Vibration"
           value={settings.vibrationFrequency}
           min={0}
           max={1.0}
@@ -2407,8 +2418,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ advection: v })}
           settingKey="advection"
         />
+        {/*
+          "Momentum", not "Damping (Friction)": this is how much velocity
+          survives each step, so up means more of the motion is kept — less
+          friction, the opposite of what the old label promised.
+        */}
         <Slider
-          label="Damping (Friction)"
+          label="Momentum"
           value={settings.damping}
           min={0.8}
           max={1.0}
@@ -2440,7 +2456,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Layers size={12} /> Multi-Layer Mixer
         </h3>
         <Slider
-          label="Projector Layers"
+          label="Layers"
           value={settings.layerCount}
           min={1}
           max={2}

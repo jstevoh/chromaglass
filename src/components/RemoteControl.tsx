@@ -542,7 +542,7 @@ export default function RemoteControl() {
             </button>
             {settings?.macroMode && (
               <div className="mt-4">
-                <Slider label="Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>

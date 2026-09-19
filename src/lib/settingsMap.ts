@@ -85,7 +85,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'midi apc40 apc mini launchpad nanokontrol launch control xl fader knob pad learn map bank shift soft takeover led clock controller akai novation korg usb' },
 
   { id: 'look', name: 'Light Show Look', category: 'look',
-    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid' },
+    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid grain size' },
   { id: 'show', name: 'Show', category: 'look',
     terms: 'hue journey colour color beat squeeze background loop dish vignette spread beads cells' },
   /*
@@ -122,10 +122,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
   { id: 'heat', name: 'Heat Slide', category: 'plate',
     terms: 'temperature buoyancy convection lamp warmth slide' },
+  // The old names of Momentum, Updraft and Vibration stay findable, as Grain
+  // Fineness's does under Light Show Look: someone who learned them as
+  // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
-    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection' },
+    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction' },
   { id: 'interaction', name: 'Manual Interaction', category: 'plate',
-    terms: 'brush dropper blow press tools mouse touch radius strength' },
+    terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency' },
 
   /*
     The wall: where the picture goes and what shape it is when it gets there.

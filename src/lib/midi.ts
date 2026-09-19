@@ -179,7 +179,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0, max: 1 },
   { key: 'secondLamp',      label: 'Second Lamp',      min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
-  { key: 'camera',          label: 'Camera',           min: 0, max: 1 },
+  { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
   { key: 'aperture',        label: 'Aperture',         min: 0, max: 1 },
   { key: 'bloom',           label: 'Bloom',            min: 0, max: 1 },

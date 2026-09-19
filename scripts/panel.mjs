@@ -266,6 +266,9 @@ const MUST_FIND = [
   ['film mix', 'film'], ['reel', 'film'], ['window', 'film'], ['prelinger', 'film'],
   ['lumia', 'lamp'], ['gel wheel', 'lamp'], ['exposure', 'lamp'], ['lamp warmth', 'lamp'],
   ['patch', 'patches'], ['lfo', 'patches'], ['room impact', 'patches'], ['sound impact', 'patches'],
+  // Renamed controls, by their new names and by the old ones people learned.
+  ['momentum', 'physics'], ['damping', 'physics'], ['lens', 'camera'], ['updraft', 'interaction'],
+  ['blow velocity', 'interaction'], ['grain fineness', 'look'], ['grain size', 'look'], ['macro lacing', 'macro'],
   ['bpm', 'audio-input'], ['microphone', 'audio-input'],
   ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
 ];
@@ -851,6 +854,34 @@ check('and the palette finds the button by the words on it',
   /id: 'open-settings', name: 'All settings'/.test(app));
 check('and one action has one name',
   /'lucky': 'Randomise'/.test(readFileSync(join(root, 'src/lib/midi.ts'), 'utf8')));
+
+/*
+  Names that collided, or said the opposite of what the control does.
+
+  "Camera" was a section, the room's camera, the film's camera source and a
+  slider. "Zoom" was the kaleidoscope's and the macro's, and "Spin" the
+  kaleidoscope's with nothing to say so; "Lacing" was the look's and the
+  closeup's. "Damping (Friction)" went up as the friction went down, "Grain
+  Size" went up as the grain got finer, "Blow Velocity" had nothing to do with
+  the Blow tool, and the room's "Mirror" sat a section away from the mirror
+  rig. Each keeps its key — saved looks, maps and patches name those — and has
+  one name wherever it is shown.
+*/
+const RENAMED = {
+  camera: 'Lens', layerCount: 'Layers', kaleidoSpin: 'Kaleido Spin', kaleidoZoom: 'Kaleido Zoom',
+  macroZoom: 'Macro Zoom', macroLacing: 'Macro Lacing', damping: 'Momentum',
+  grainScale: 'Grain Fineness', airVelocity: 'Updraft', vibrationFrequency: 'Vibration',
+};
+const misnamed = Object.entries(RENAMED).filter(([k, name]) =>
+  sliders.find(s => s.key === k)?.label !== name || PIN_RANGE.get(k)?.label !== name);
+check('a renamed control has its new name on the sheet and on every desk, fader and stage',
+  misnamed.length === 0,
+  misnamed.map(([k, name]) => `${k}: sheet "${sliders.find(s => s.key === k)?.label}", registry "${PIN_RANGE.get(k)?.label}", wanted "${name}"`).join(' · '));
+check('and on the phone', /<Slider label="Macro Zoom" field="macroZoom"/.test(remote));
+check('and no reason a control is greyed names one by its old name',
+  !/needs Camera above 0|Projector Layers|add a patch under The Room|add a mapping under The Room/.test(panel));
+check('and the room camera flips rather than mirrors',
+  /data-testid="scene-mirror"[\s\S]{0,200}Flip Camera/.test(panel) && !/>\s*Mirror\s*</.test(sectionSource('room')));
 
 // A footer written for one long scroll, now under every section of seventeen.
 check('no section carries another section\'s footnote',
