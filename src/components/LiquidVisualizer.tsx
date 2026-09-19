@@ -127,6 +127,19 @@ function particleFlowScale(fluid: { dt: number } | undefined, s: VisualizerSetti
   return (fluid.dt * Math.max(0, s.advection ?? 1)) / 0.05;
 }
 
+/*
+  The lasting current's gains: the speed each force asks for, in solver velocity
+  units (at the default Speed one unit is about ten cells a second on the
+  192-cell plate). The current relaxes toward that at the rate Damping sets.
+  Tuned on an M4 against the picture: a preset's usual setting should give a
+  current you can follow by eye, and the top of each slider a strong one,
+  without sweeping the plate clear.
+*/
+const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat field is small, ~0.03 on average
+const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
+const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
+const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
+
 /** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
 const DRIP_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -376,6 +389,16 @@ class FluidSimulation {
   /** Plate tilt this step — a uniform acceleration, set by the show each step. */
   tiltX = 0;
   tiltY = 0;
+  /** The plate's rock as the render loop last set it (not scaled to a tilt): drives the current. */
+  rockX = 0;
+  rockY = 0;
+  // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
+  // at half the logical grid: velocity, warm pressure and divergence.
+  private readonly CM = GRID_SIZE / 2;
+  private cvx = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cvy = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cpr = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cdv = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
   /** Which plate this is: 0 is the live plate, the rest run behind it as a background loop. */
   layerIndex = 0;
 
@@ -657,6 +680,7 @@ class FluidSimulation {
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
+    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
     this.gpu?.clear();
   }
@@ -1424,25 +1448,8 @@ class FluidSimulation {
     this.solveSqueezePressure(p.visc);
     this.updateSqueezeVelocity(p.visc);
 
-    // 2. Buoyancy & center gravity
-    const cx = this.size / 2;
-    const cy = this.size / 2;
-    for (let i = 0; i < GRID_AREA; i++) {
-      this.vy[i] -= this.temp[i] * p.buoyancy * dt;
-      this.vx[i] += p.tiltX * dt;
-      this.vy[i] += p.tiltY * dt;
-      if (p.gravity > 0) {
-        const x = i % this.size;
-        const y = (i - x) / this.size;
-        const dx = cx - x;
-        const dy = cy - y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 0) {
-          this.vx[i] += (dx / dist) * p.gravity * dt;
-          this.vy[i] += (dy / dist) * p.gravity * dt;
-        }
-      }
-    }
+    // 2. Buoyancy, the rock and centre gravity act on the lasting current now
+    // (stepCurrent, below); here the end-of-step limit took them straight out.
 
     // 3-6. Velocity: diffuse → project → advect → project
     this.diffuse(1, this.vx0, this.vx, p.nu, dt);
@@ -1472,6 +1479,9 @@ class FluidSimulation {
     if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
     if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
+
+    // 8.9. The lasting current joins the flow the dye is about to ride.
+    this.stepCurrent(p);
 
     // 9. Diffuse & advect density + temp. MacCormack keeps the filaments that
     // plain semi-Lagrangian transport would smear away within a few steps.
@@ -1640,7 +1650,82 @@ class FluidSimulation {
       smearX, smearY,
       air: settings.airVelocity > 0.1 ? settings.airVelocity : 0,
       evapFactor, time,
+      // The lasting current. Damping is its drag per step — the first thing that
+      // control has ever visibly done — and the cap keeps a step's travel under
+      // ¾ of a cell whatever the Speed and Advection.
+      currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
+      currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
+      rockX: this.rockX * CUR_ROCK,
+      rockY: this.rockY * CUR_ROCK,
+      currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
+      twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * CUR_TWIST * (this.layerIndex % 2 === 0 ? 1 : -1),
+      meanDensity: this.meanDensity,
+      maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
     };
+  }
+
+  /**
+   * One step of the lasting current on the CPU engine (see GpuFluid.stepCurrent):
+   * forces and drag at half the logical grid, a warm Gauss-Seidel projection,
+   * then added into the velocity the dye is about to be carried by. The legacy
+   * field's end-of-step limit takes it back out of vx/vy afterwards; the current
+   * itself lives in cvx/cvy.
+   */
+  private stepCurrent(p: GpuStepParams) {
+    const M = this.CM, S = this.size;
+    const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
+    const sm = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+    for (let j = 1; j < M - 1; j++) {
+      for (let i = 1; i < M - 1; i++) {
+        const k = i + j * M;
+        const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
+        const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
+        let fx = p.rockX * dd;
+        let fy = p.currentBuoy * Math.tanh(Math.max(0, this.temp[q]) * 20) + p.rockY * dd;   // saturated heat (see the GPU twin)
+        const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
+        const r = Math.sqrt(tx * tx + ty * ty);
+        if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
+        const w = 1 - sm(0, 0.5, r);
+        const tw = p.twist * w * w;
+        fx += tw * ty; fy -= tw * tx;
+        // Relax toward the flow the forces ask for (see the GPU twin).
+        let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
+        let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
+        const s = Math.sqrt(vx * vx + vy * vy);
+        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
+        cvx[k] = vx; cvy[k] = vy;
+      }
+    }
+    // Walls: no flow through them.
+    for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
+    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
+    }
+    for (let it = 0; it < 10; it++) {
+      for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+        const k = i + j * M;
+        cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
+      }
+      for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
+    }
+    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
+      cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
+    }
+    // Into the velocity the dye is carried by, sampled up to the logical grid.
+    for (let j = 1; j < S - 1; j++) {
+      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = Math.max(0, Math.min(1, y - j0));
+      for (let i = 1; i < S - 1; i++) {
+        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = Math.max(0, Math.min(1, x - i0));
+        const k = i0 + j0 * M;
+        const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
+        const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
+        this.vx[i + j * S] += ux;
+        this.vy[i + j * S] += uy;
+      }
+    }
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -5549,7 +5634,11 @@ void main() {
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
             const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
             const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
-            for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; }
+            // The current takes the rock itself (its spring's displacement and the
+            // sway, ±1–2), scaled by the slider; the phone's tilt joins it.
+            const rockX = (rock.x + swayX) * R + ext.x * 1.1 * extK;
+            const rockY = (rock.y + swayY) * R + ext.y * 1.1 * extK;
+            for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; }
 
             // ── Oil beads ───────────────────────────────────────
             {
