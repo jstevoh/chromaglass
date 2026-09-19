@@ -561,6 +561,14 @@ void main() {
 uniform sampler2D u_dye;
 void main() {
   vec4 dye = max(texture(u_dye, v_uv), vec4(0.0));
+  // The colour channels clip above 8 while the density they are divided by
+  // does not, so thick dye decodes paler than it should (thick red as pink).
+  // Left as it is on purpose: with the hue fixed per unit and only opacity
+  // following thickness, that clip is the only thing that makes a thick pool
+  // look different from a thin one. Packing the colour at 1/40 removed it and
+  // flattened boiling-point and acid-trip to single colours (and cost 8-bit
+  // precision in thin dye). It goes when the plate is drawn as light through
+  // dye, where thickness deepens the colour — see docs/evaluation-2026-09.md.
   fragColor = sqrt(clamp(dye * 0.125, 0.0, 1.0));
 }`,
 
@@ -590,6 +598,14 @@ export class GpuFluid {
   private press!: PingPong;
   private spress!: PingPong;
   private div!: Target;
+  /**
+   * The velocity the dye was actually carried by this step: the field after
+   * the post-projection forces, before the end-of-step clamp takes them back
+   * out. What the CPU readers get, so beads, bubbles and the soap and milk
+   * ride the flow the dye rides — not the clamped remainder, which is all but
+   * still and ignores turbulence entirely.
+   */
+  private velForced!: Target;
   private scratchA!: Target;   // MacCormack intermediates
   private scratchB!: Target;
   private readbackTarget!: Target;
@@ -683,6 +699,7 @@ export class GpuFluid {
     this.press = this.pingPong(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.spress = this.pingPong(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.div = this.target(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
+    this.velForced = this.target(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
     // The scratch targets carry the dye's advection intermediates, so they
     // match the dye's precision (the velocity passes through them too).
     this.scratchA = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
@@ -707,7 +724,7 @@ export class GpuFluid {
     const gl = this.gl;
     for (const t of [this.dye.read, this.dye.write, this.vel.read, this.vel.write,
                      this.press.read, this.press.write, this.spress.read, this.spress.write,
-                     this.div, this.scratchA, this.scratchB]) {
+                     this.div, this.velForced, this.scratchA, this.scratchB]) {
       this.clearTarget(t, 0, 0, 0, 0);
     }
     this.clearTarget(this.squeeze.read, 0.03, 0, 0, 0);
@@ -849,6 +866,10 @@ export class GpuFluid {
       gl.uniform1f(u.get('u_air')!, p.air);
     });
     this.vel.swap();
+    this.run('scale', this.velForced, (u) => {
+      this.bind(u, 'u_src', this.vel.read.tex, 0);
+      gl.uniform1f(u.get('u_k')!, 1);
+    });
 
     // 9. Dye: diffuse, then MacCormack advect through the forced velocity
     const a = p.dt * p.diff * n2;
@@ -990,7 +1011,7 @@ export class GpuFluid {
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, free.dye);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
     this.run('downsample', this.readbackTarget, (u) => {
-      this.bind(u, 'u_src', this.vel.read.tex, 0);
+      this.bind(u, 'u_src', this.velForced.tex, 0);
     }, this.L);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, free.vel);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, 0);
@@ -1014,7 +1035,7 @@ export class GpuFluid {
     }, this.L);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, this.rbDye);
     this.run('downsample', this.readbackTarget, (u) => {
-      this.bind(u, 'u_src', this.vel.read.tex, 0);
+      this.bind(u, 'u_src', this.velForced.tex, 0);
     }, this.L);
     gl.readPixels(0, 0, this.L, this.L, gl.RGBA, gl.FLOAT, this.rbVel);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1050,7 +1071,7 @@ export class GpuFluid {
     for (const s of this.pbo) { gl.deleteBuffer(s.dye); gl.deleteBuffer(s.vel); if (s.fence) gl.deleteSync(s.fence); }
     this.pbo = [];
     if (this.grain) for (const t of [this.grain.read, this.grain.write]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
-    for (const t of [this.div, this.scratchA, this.scratchB, this.readbackTarget]) {
+    for (const t of [this.div, this.velForced, this.scratchA, this.scratchB, this.readbackTarget]) {
       gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex);
     }
     for (const t of [this.deltaDye, this.deltaVel, this.deltaMul]) gl.deleteTexture(t);
