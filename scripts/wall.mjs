@@ -225,6 +225,11 @@ const BASE = {
   flipX: false, flipY: false, corners: IDENTITY,
   maskTop: 0, maskRight: 0, maskBottom: 0, maskLeft: 0, maskFeather: 0,
   gain: 1, gamma: 1,
+  // Listed, not omitted: `withOutput({})` means "a plain projector", and a key
+  // that is missing from here is a key the reset cannot put back — the last
+  // section of this run waited twenty seconds for a config with no shapes in
+  // it while a shape from the section before was still on.
+  surfaces: [],
 };
 
 let page;
@@ -605,15 +610,8 @@ try {
       src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, ...extra,
     });
     /** Mean luminance over a rectangle of the frame, in 0..1 screen space. */
-    const region = (grid, x0, y0, x1, y1, cols = 32, rows = 18) => {
-      let sum = 0, n = 0;
-      for (let r = Math.floor(y0 * rows); r < Math.ceil(y1 * rows); r++) {
-        for (let c = Math.floor(x0 * cols); c < Math.ceil(x1 * cols); c++) {
-          sum += grid[r * cols + c]; n++;
-        }
-      }
-      return n ? sum / n : 0;
-    };
+    const region = (g, x0, y0, x1, y1) =>
+      g ? meanOver(g, (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1) : NaN;
 
     await withOutput({});
     const bare = await gridOf();
