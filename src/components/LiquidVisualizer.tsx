@@ -6,6 +6,8 @@ import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, 
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
+import { FINISH_GLSL, PostChain, type PostTest } from '../lib/postChain';
+import { UNIT } from '../lib/textureUnits';
 import type { TempoSource } from '../lib/tempo';
 import { FlashGuard } from '../lib/flashGuard';
 import { FrameProbe } from '../lib/frameProbe';
@@ -175,6 +177,12 @@ const MAX_PINNED_GRID = 1024;
 
 // Which grid the solver should run on. A pinned size is honoured up to the
 // smaller of the cap above and the context's texture limit; 'auto' hands the
+/** The post chain's level in the engine label, only when it has been spent (see QualityGovernor.postLevel). */
+function postLevelLabel(governor: QualityGovernor | null | undefined): string {
+  const level = governor?.postLevel ?? 0;
+  return level === 1 ? ' · effects ½' : level === 2 ? ' · effects off' : '';
+}
+
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
@@ -2377,6 +2385,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The output pass: the projector's geometry and grade. Built only if it would change a pixel. */
   const outputRef = useRef<OutputPass | null>(null);
   /**
+   * The post chain (lib/postChain.ts): built the first frame an effect is on,
+   * dropped when none is, so with every effect off the plate still finishes
+   * the frame itself and nothing else is allocated.
+   */
+  const postRef = useRef<PostChain | null>(null);
+  /** The harness's switches: run the chain with no effect on, and its test effect. */
+  const postForceRef = useRef(false);
+  const postTestRef = useRef<PostTest | null>(null);
+  /**
+   * The effects' clock and dice: a frame count and a seed, never the wall
+   * clock or Math.random, so the same seed makes the same film twice.
+   */
+  const fxFrameRef = useRef(0);
+  const fxSeedRef = useRef(1);
+  /** The harness's hold on the effects' clock: while set, every frame is this frame. */
+  const fxHoldRef = useRef<number | null>(null);
+  /**
    * Three flashes a second, and no more.
    *
    * The probe reads back what actually reached the screen; the guard counts
@@ -3128,6 +3153,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       cameraRef.current = null;
       outputRef.current = null;
       probeRef.current = null;
+      postRef.current = null;
       flashRef.current.reset();
       flashGainRef.current = 1;
       // The governor is deliberately *not* dropped. It holds no GL objects, and
@@ -3257,6 +3283,7 @@ uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_transmission;      // light through the dye: thin pale, thick deep (0 = the flat glow)
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
+uniform int   u_finishInMain;      // 1: finish the frame here (dimmer, mark, dither); 2: dither only (into the camera's 8-bit texture, the chain finishing later); 0: nothing, the chain finishes
 uniform sampler2D u_mark;          // a still laid over the plate: a logo, a title card
 uniform float u_markOn;            // 1 when there is one loaded
 uniform vec4 u_markRect;           // where it sits: centre xy, half-size xy, all in screen uv
@@ -3382,6 +3409,7 @@ float hash(vec2 p) {
   p += dot(p, p + 34.23);
   return fract(p.x * p.y);
 }
+${FINISH_GLSL}
 
 // Decode Beer-Lambert from packed texture
 // R/G/B channels store log-space absorptions, A stores total density
@@ -4736,48 +4764,12 @@ void main() {
   float grain = (hash(v_uv * u_resolution + fract(u_time * 47.3)) - 0.5) * 0.03
               * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
   if (u_cameraOn == 0) outColor = clamp(outColor + grain, 0.0, 1.0);
-  // The dimmer sits last, the way the lamp's own dimmer does: everything
-  // upstream, the camera pass included, sees a darker plate.
-  outColor *= u_dimmer;
-
-  // ── The mark ────────────────────────────────────────
-  //
-  // A logo or a title, laid over the finished frame rather than poured into
-  // the plate. Dropping an image into the liquid is the lovely thing to do
-  // with it and the wrong thing to do with a client's mark, which has to stay
-  // legible for three hours.
-  //
-  // It is composited here, in the shader, and not as an element over the
-  // canvas, because everything downstream reads the canvas: the projector
-  // window, a cast to another screen, the recorder, and another machine
-  // capturing this window. A mark that lived in the DOM would be on the
-  // laptop's screen and on none of them.
-  //
-  // Below the dimmer on purpose. The house dimmer is the lamp, and taking the
-  // lamp down should not take the sponsor's logo with it — a blackout with a
-  // mark still on the wall is a normal thing to want. Its own opacity is the
-  // control for that.
-  // Any opacity at all: u_markOn is the fader, not a switch, and testing it
-  // against 0.5 left the bottom half of the fade invisible and the mark
-  // popping in at half strength.
-  if (u_markOn > 0.001) {
-    vec2 m = (uvScreen - u_markRect.xy) / max(u_markRect.zw, vec2(1e-4)) * 0.5 + 0.5;
-    if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
-      vec4 mark = texture(u_mark, vec2(m.x, 1.0 - m.y));
-      outColor = mix(outColor, mark.rgb, mark.a * u_markOn);
-    }
-  }
-
-  // Triangular dither of one 8-bit step, the last thing before the canvas
-  // quantises. The grain above fades out below luma 0.03 on purpose, which is
-  // exactly where the black ground, the lamp falloff and the dish shade sit,
-  // so slow dark ramps banded — and on a projector in a dark room the darks are
-  // what everyone is looking at. Fixed per pixel, so it cannot shimmer, and
-  // never on true black: black has to stay black (the mapping's dark between
-  // shapes is measured as zero), and a ramp that bands is above it anyway.
-  float dth = hash(gl_FragCoord.xy) + hash(gl_FragCoord.xy + vec2(17.31, 5.73)) - 1.0;
-  float lit = step(1.0 / 255.0, max(outColor.r, max(outColor.g, outColor.b)));
-  fragColor = vec4(outColor + dth * lit / 255.0, 1.0);
+  // The dimmer, the mark and the dither (FINISH_GLSL, in lib/postChain.ts):
+  // here when this pass draws for the screen, in the post chain's finish when
+  // an effect runs after it, which is why they are one shared function.
+  fragColor = u_finishInMain == 1 ? finishFrame(outColor, uvScreen)
+            : u_finishInMain == 2 ? ditherOut(outColor)
+            : vec4(outColor, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }
 #endif`;
@@ -4916,7 +4908,7 @@ void main() {
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
       'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
-      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn',
+      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn','u_finishInMain',
     ];
     const uLocs: Record<string, WebGLUniformLocation | null> = {};
     for (const name of uniformNames) {
@@ -5324,7 +5316,7 @@ void main() {
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
           const status: EngineStatus = {
             label: lead?.gpu
-              ? `GPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x`
+              ? `GPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
               : `CPU · ${GRID_SIZE}²${gpuUnavailable ? ' · GPU unavailable' : ''}`,
             engine: lead?.gpu ? 'gpu' : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
@@ -6421,15 +6413,15 @@ void main() {
           // packing layer 1 would otherwise unbind layer 0 from the unit the
           // renderer reads it from. The derive pass reads through unit 0 too.
           for (let l = 0; l < fluidsRef.current.length; l++) {
-            glCtx.activeTexture(glCtx.TEXTURE0 + l);
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.layer0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
             if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
-              glCtx.activeTexture(glCtx.TEXTURE6 + l);
+              glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.vel0 + l);
               glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
             }
           }
           for (let l = 0; l < 2; l++) {
-            glCtx.activeTexture(glCtx.TEXTURE2 + l);
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.derived0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, derive ? derive.textures[l] : null);
           }
 
@@ -6445,25 +6437,25 @@ void main() {
               for (let l = 0; l < 2; l++) {
                 const tex = fluidsRef.current[l]?.gpu?.grainTexture ?? null;
                 if (!tex) continue;
-                glCtx.activeTexture(glCtx.TEXTURE12 + l);
+                glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
                 glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
                 if (l === 0) grainOn = 1;
               }
               // The second plate borrows the lead's coordinates when it has none.
               if (grainOn && !fluidsRef.current[1]?.gpu?.grainTexture) {
-                glCtx.activeTexture(glCtx.TEXTURE13);
+                glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
                 glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
               }
             }
           }
 
-          // The oil beads' mask: bound every frame on its own unit (11; the
-          // camera pass owns 9 and 10), uploaded when the beads moved. A unit
-          // left pointing at the camera's scene texture made every draw with
-          // the camera on a feedback loop, and the photograph and closeup
-          // presets drew black.
+          // The oil beads' mask: bound every frame on its own unit (see
+          // textureUnits.ts), uploaded when the beads moved. A unit left
+          // pointing at the camera's scene texture made every draw with the
+          // camera on a feedback loop, and the photograph and closeup presets
+          // drew black; the output pass on this same unit did it again.
           {
-            glCtx.activeTexture(glCtx.TEXTURE11);
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
             glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
             const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
             if (beadAmt > 0) {
@@ -6483,7 +6475,7 @@ void main() {
           const markRect = [0.5, 0.5, 0.5, 0.5];
           {
             const mk = markRef.current;
-            glCtx.activeTexture(glCtx.TEXTURE14);
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.mark);
             glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
             if (mk) {
               if (mk.dirty) {
@@ -6515,7 +6507,7 @@ void main() {
             const f = filmRef.current;
             const v = f.video;
             if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
-              glCtx.activeTexture(glCtx.TEXTURE8);
+              glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.film);
               glCtx.bindTexture(glCtx.TEXTURE_2D, glr.filmTexture);
               glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
               glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, v);
@@ -6530,10 +6522,10 @@ void main() {
           glCtx.useProgram(prog);
           glCtx.bindVertexArray(vaoObj);
 
-          glCtx.uniform1i(uLocs['u_layer0'], 0);
-          glCtx.uniform1i(uLocs['u_layer1'], 1);
-          glCtx.uniform1i(uLocs['u_derived0'], 2);
-          glCtx.uniform1i(uLocs['u_derived1'], 3);
+          glCtx.uniform1i(uLocs['u_layer0'], UNIT.layer0);
+          glCtx.uniform1i(uLocs['u_layer1'], UNIT.layer1);
+          glCtx.uniform1i(uLocs['u_derived0'], UNIT.derived0);
+          glCtx.uniform1i(uLocs['u_derived1'], UNIT.derived1);
           glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
           glCtx.uniform1i(uLocs['u_layerCount'], fluidsRef.current.length);
           glCtx.uniform1f(uLocs['u_rotation0'], rotationAnglesRef.current[0] ?? 0);
@@ -6570,13 +6562,11 @@ void main() {
           // dimmer rather than adding a pass is what lets one implementation
           // cover the laptop, the projector, a network display and the
           // recorder: every material is already lit through this number.
-          glCtx.uniform1f(
-            uLocs['u_dimmer'],
-            Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
-          );
+          const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current;
+          glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
           glCtx.uniform1f(uLocs['u_bspline'], oldSamplerRef.current ? 1 : 0);
-          glCtx.uniform1i(uLocs['u_mark'], 14);
+          glCtx.uniform1i(uLocs['u_mark'], UNIT.mark);
           glCtx.uniform1f(uLocs['u_markOn'], markOn);
           glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
           {
@@ -6633,10 +6623,10 @@ void main() {
             glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
             glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
             glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
-            glCtx.uniform1i(uLocs['u_film'], 8);
-            glCtx.uniform1i(uLocs['u_beadTex'], 11);
-            glCtx.uniform1i(uLocs['u_grain0'], 12);
-            glCtx.uniform1i(uLocs['u_grain1'], 13);
+            glCtx.uniform1i(uLocs['u_film'], UNIT.film);
+            glCtx.uniform1i(uLocs['u_beadTex'], UNIT.beads);
+            glCtx.uniform1i(uLocs['u_grain0'], UNIT.grain0);
+            glCtx.uniform1i(uLocs['u_grain1'], UNIT.grain1);
             glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
             glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
             glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
@@ -6677,8 +6667,8 @@ void main() {
           glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
 
           // Macro closeup
-          glCtx.uniform1i(uLocs['u_vel0'], 6);
-          glCtx.uniform1i(uLocs['u_vel1'], 7);
+          glCtx.uniform1i(uLocs['u_vel0'], UNIT.vel0);
+          glCtx.uniform1i(uLocs['u_vel1'], UNIT.vel1);
           glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
           glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
           glCtx.uniform1f(uLocs['u_macro'], macroAmount);
@@ -6715,6 +6705,21 @@ void main() {
           glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
           glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
           glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
+
+          // ── The post chain ─────────────────────────────────────
+          // Only while an effect is on (none yet; the harness can force it,
+          // or run its test effect). Off, the plate finishes the frame itself
+          // and none of this is allocated.
+          const postTest = postTestRef.current;
+          const wantPost = postForceRef.current || (postTest?.mode ?? 0) > 0;
+          if (wantPost && !postRef.current) postRef.current = new PostChain(glCtx);
+          else if (!wantPost && postRef.current) { postRef.current.dispose(); postRef.current = null; }
+          const chain = wantPost && postRef.current?.ok ? postRef.current : null;
+          // Into the chain's half floats nothing; into the camera's 8-bit texture
+          // still a dither, or a dark ramp bands before the camera sees it.
+          glCtx.uniform1i(uLocs['u_finishInMain'], !chain ? 1 : cam ? 2 : 0);
+          fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
+
           // The output pass is prepared whenever it exists, even when the
           // camera is the thing the plate draws into — the camera renders
           // *through* it, so its texture has to be allocated and attached
@@ -6726,10 +6731,19 @@ void main() {
           if (out) out.bindTarget(canvas.width, canvas.height);
           if (cam) {
             cam.bindTarget(canvas.width, canvas.height);
+          } else if (chain) {
+            chain.bindScene(canvas.width, canvas.height);
           } else if (!out) {
             glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
             glCtx.viewport(0, 0, canvas.width, canvas.height);
           }
+          // The plate's own program and vertex array, again. A pass built this
+          // frame (the camera, the output pass, the chain) binds its own vertex
+          // array in its constructor and leaves none bound, and the plate then
+          // drew with no vertices: nothing, for one frame, whenever the camera
+          // or a projector control was first touched.
+          glCtx.useProgram(prog);
+          glCtx.bindVertexArray(vaoObj);
           glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
           glCtx.bindVertexArray(null);
           if (cam) {
@@ -6744,7 +6758,14 @@ void main() {
               filmic: 1,
               vignette: 0.6,
               grain: 0.6,
-            }, out ? out.fbo : null);
+              // Into the chain's half floats, the finish dithers once, at the end.
+              dither: chain ? 0 : 1,
+            }, chain ? chain.sceneTarget(canvas.width, canvas.height) : out ? out.fbo : null);
+          }
+          if (chain) {
+            chain.effects(fxFrameRef.current, fxSeedRef.current, postTest);
+            if (out) out.bindTarget(canvas.width, canvas.height);
+            chain.finishTo(out ? out.fbo : null, { dimmer: dimmerNow, markOn, markRect: markRect as [number, number, number, number] });
           }
           if (out) out.draw(canvas.width, canvas.height, outCfg);
 
@@ -6771,6 +6792,8 @@ void main() {
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
       if (frameS > 0 && governorRef.current) {
+        // No heavy post pass exists yet (feedback and slit-scan will be the first).
+        governorRef.current.heavyPost = false;
         governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current);
       }
 
@@ -6817,6 +6840,64 @@ void main() {
         outputPass: outputRef.current,
         outputConfig: outputCfgRef.current,
         flash: () => ({ ...flashRef.current.state, luminance: probeRef.current?.luminance ?? null }),
+        /**
+         * The post chain, for `npm run fx`: whether it runs and at what depth,
+         * forcing it on with no effect, its test effect (1 seeded noise, 2 the
+         * history ring's picture from `delay` frames ago), the effects' clock
+         * and seed, and the ring's self-test.
+         */
+        post: {
+          active: !!postRef.current,
+          float: postRef.current?.float ?? null,
+          history: postRef.current?.historySize ?? null,
+          frame: fxFrameRef.current,
+          force: (on: boolean) => { postForceRef.current = !!on; },
+          test: (mode: 0 | 1 | 2, delay = 1) => { postTestRef.current = mode ? { mode, delay } : null; },
+          seed: (n: number) => { fxSeedRef.current = n >>> 0; },
+          /** Hold the effects' clock at one frame (null lets it run), so a frame can be drawn twice. */
+          hold: (frame: number | null) => { fxHoldRef.current = frame === null ? null : frame >>> 0; },
+          ringSelfTest: () => postRef.current?.ringSelfTest() ?? null,
+        },
+        /** The canvas's mean luminance now, through the probe's reduction, read synchronously. */
+        probeNow: () => probeRef.current?.measureNow(canvas.width, canvas.height) ?? null,
+        /**
+         * Paint the canvas black with lit rectangles (x, y, w, h in pixels,
+         * from the bottom left) and read it back through the probe: the
+         * reading should be the lit fraction of the frame, wherever the
+         * rectangles fall. The next frame paints over it.
+         */
+        probeSelfTest: (rects: [number, number, number, number][]) => {
+          const glr = webGLRef.current;
+          const probe = probeRef.current;
+          if (!glr || !probe) return null;
+          const g = glr.gl;
+          const clear = g.getParameter(g.COLOR_CLEAR_VALUE) as Float32Array;
+          g.bindFramebuffer(g.FRAMEBUFFER, null);
+          g.clearColor(0, 0, 0, 1);
+          g.clear(g.COLOR_BUFFER_BIT);
+          g.enable(g.SCISSOR_TEST);
+          g.clearColor(1, 1, 1, 1);
+          for (const [x, y, w, h] of rects) { g.scissor(x, y, w, h); g.clear(g.COLOR_BUFFER_BIT); }
+          g.disable(g.SCISSOR_TEST);
+          g.clearColor(clear[0], clear[1], clear[2], clear[3]);
+          const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
+          return { mean: probe.measureNow(canvas.width, canvas.height), lit };
+        },
+        /** A test mark (a white bar fading out to the right), or none, for the finish's identity check. */
+        markTest: (on: boolean) => {
+          if (!on) { markRef.current = null; return; }
+          const c = document.createElement('canvas');
+          c.width = 128; c.height = 32;
+          const g2 = c.getContext('2d')!;
+          const ramp = g2.createLinearGradient(0, 0, 128, 0);
+          ramp.addColorStop(0, 'rgba(255,255,255,1)');
+          ramp.addColorStop(1, 'rgba(255,255,255,0)');
+          g2.fillStyle = ramp;
+          g2.fillRect(0, 0, 128, 32);
+          markRef.current = { source: c, aspect: 4, dirty: true };
+        },
+        /** WebGL's error flag; reading it clears it. */
+        glError: () => webGLRef.current?.gl.getError() ?? null,
         glLost: glLostRef.current,
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
@@ -6864,6 +6945,8 @@ void main() {
         outputRef.current = null;
         probeRef.current?.dispose();
         probeRef.current = null;
+        postRef.current?.dispose();
+        postRef.current = null;
         webGLRef.current = null;
       }
     };

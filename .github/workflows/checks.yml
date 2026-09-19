@@ -125,6 +125,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - run: npm run wall
+      # The post chain the effects run in (docs/filters-plan.md, F0), on the
+      # build the wall step just made.
+      - run: node scripts/fx.mjs
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.

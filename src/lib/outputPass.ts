@@ -23,6 +23,7 @@
  * upstream pass renders into, and one full-screen draw that reads it.
  */
 
+import { UNIT } from './textureUnits';
 import { composeOntoPin, cornerPinMatrix, type OutputConfig, type Surface, type SurfaceShape } from './outputConfig';
 
 // Geometry arrives in screen space (0,0 top left to 1,1 bottom right) — the
@@ -135,8 +136,13 @@ const SHAPE_INDEX: Record<SurfaceShape, number> = { rect: 0, ellipse: 1, triangl
 /** The whole frame, as a surface's corners would describe it. */
 const FULL_QUAD: OutputConfig['corners'] = [0, 0, 1, 0, 1, 1, 0, 1];
 
-/** Above the camera pass's units, so neither can unbind the other's texture. */
-const SCENE_UNIT = 11;
+/**
+ * Its own unit (see textureUnits.ts). It was 11, "above the camera pass's
+ * units" but also the plate's bead mask: the frame this pass was built, and
+ * each resize after, the plate drew into a target bound on its own bead unit,
+ * a feedback loop WebGL refuses, and the wall went black for a frame.
+ */
+const SCENE_UNIT = UNIT.output;
 
 /** Six vertices of two floats: one quad as two triangles. */
 const QUAD_FLOATS = 12;

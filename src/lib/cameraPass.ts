@@ -15,6 +15,8 @@
  * afford it at 2x renders at 1x.
  */
 
+import { UNIT } from './textureUnits';
+
 const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
@@ -41,6 +43,7 @@ uniform float u_bloom;          // glow around the highlights
 uniform float u_filmic;         // the sensor's roll-off (ACES) against a straight clamp
 uniform float u_vignette;
 uniform float u_grain;
+uniform float u_dither;          // 1 onto the canvas, 0 into the post chain
 
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -123,9 +126,10 @@ void main() {
   vec3 plain = texture(u_scene, uv).rgb;
   vec3 outc = mix(plain, clamp(col, 0.0, 1.0), u_amount);
   // One 8-bit step of triangular dither before the canvas quantises again,
-  // never on true black (see the display shader's final write).
+  // never on true black (see the display shader's final write). Not when the
+  // frame goes on into the post chain: its finish dithers once, at the end.
   float dth = hash(gl_FragCoord.xy) + hash(gl_FragCoord.xy + vec2(17.31, 5.73)) - 1.0;
-  outc += dth * step(1.0 / 255.0, max(outc.r, max(outc.g, outc.b))) / 255.0;
+  outc += u_dither * dth * step(1.0 / 255.0, max(outc.r, max(outc.g, outc.b))) / 255.0;
   fragColor = vec4(outc, 1.0);
 }`;
 
@@ -140,16 +144,18 @@ export interface CameraUniforms {
   filmic: number;
   vignette: number;
   grain: number;
+  /** One step of dither for an 8-bit target (the default); 0 when the post chain finishes the frame. */
+  dither?: number;
 }
 
 const UNIFORM_NAMES = [
   'u_scene', 'u_aux', 'u_resolution', 'u_time', 'u_amount', 'u_refraction', 'u_chromatic',
-  'u_focus', 'u_aperture', 'u_bloom', 'u_filmic', 'u_vignette', 'u_grain',
+  'u_focus', 'u_aperture', 'u_bloom', 'u_filmic', 'u_vignette', 'u_grain', 'u_dither',
 ] as const;
 
-/** Texture units the pass reads on, above everything the plate pass binds. */
-const SCENE_UNIT = 9;
-const AUX_UNIT = 10;
+/** Texture units the pass reads on: see textureUnits.ts. */
+const SCENE_UNIT = UNIT.cameraScene;
+const AUX_UNIT = UNIT.cameraAux;
 
 export class CameraPass {
   private readonly program: WebGLProgram;
@@ -283,6 +289,7 @@ export class CameraPass {
     gl.uniform1f(this.loc.u_filmic, u.filmic);
     gl.uniform1f(this.loc.u_vignette, u.vignette);
     gl.uniform1f(this.loc.u_grain, u.grain);
+    gl.uniform1f(this.loc.u_dither, u.dither ?? 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
   }
