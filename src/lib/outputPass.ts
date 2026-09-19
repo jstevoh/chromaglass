@@ -291,13 +291,19 @@ export class OutputPass {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    const live = (cfg.surfaces ?? []).filter(s => s.enabled && s.opacity > 0);
-    if (live.length === 0) {
-      // No mapping: the picture lands on the pinned rectangle, exactly as it
-      // did before any of this existed.
+    const surfaces = cfg.surfaces ?? [];
+    if (surfaces.length === 0) {
+      // No mapping at all: the picture lands on the pinned rectangle, exactly
+      // as it did before any of this existed.
       this.drawQuad(cfg.corners, [0, 0, 1, 1], 'rect', 0, 1);
     } else {
-      for (const s of live) {
+      // Mapped, and possibly all of it switched off — which is a blackout, not
+      // an absence of mapping. Falling back to the full frame here would mean
+      // that cueing the last shape off lit the entire wall instead of going
+      // dark, which is the wrong way round for the one control somebody
+      // reaches for when they want the light to stop.
+      for (const s of surfaces) {
+        if (!s.enabled || s.opacity <= 0) continue;
         const placed = composeOntoPin(s.corners, cfg.corners);
         if (placed) this.drawQuad(placed, s.src, s.shape, s.feather, s.opacity);
       }

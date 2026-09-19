@@ -646,9 +646,14 @@ try {
     // has to be dark while its middle is lit — the one claim that separates a
     // working local-space shape test from one that silently draws rectangles.
     await withOutput({ surfaces: [surf('ellipse', 0.25, 0.1, 0.75, 0.9)] });
-    const round = await gridOf();
+    // Finer than the default grid: the patch that is unambiguously outside the
+    // circle but inside its quad is small, and at 32x18 it is one cell. The
+    // first version of this sampled out to (0.33, 0.25), which is local
+    // (0.16, 0.19) — 0.46 from the centre, so inside the circle and lit. It
+    // failed on a circle that was drawn correctly.
+    const round = await gridOf(64, 36);
     const mid = region(round, 0.45, 0.45, 0.55, 0.55);
-    const nook = region(round, 0.26, 0.12, 0.33, 0.25);
+    const nook = region(round, 0.26, 0.11, 0.31, 0.20);
     check('a circle leaves the corners of its quad dark',
       mid > 0.01 && nook < mid * 0.2,
       `middle ${mid.toFixed(3)}, corner ${nook.toFixed(3)}`);
