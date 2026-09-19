@@ -5648,8 +5648,12 @@ void main() {
             // the deltas the step is about to take. Costs nothing on a plate
             // with none of the four liquids on it, which is every preset that
             // does not ask for them.
-            const disp = SIM_STEP * (currentSettings.advection ?? 0.45) * (GRID_SIZE - 2);
-            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, disp);
+            // At the dye's own rate: the solver's dt, not the wall-clock step,
+            // which is five or six times larger. With the phase riding the flow
+            // the dye rides (see readVx), the wall-clock rate carried the soap
+            // across the plate ahead of the dye it is meant to be thinning.
+            const adv = currentSettings.advection ?? 0.45;
+            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, fluid.dt * adv * (GRID_SIZE - 2));
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {

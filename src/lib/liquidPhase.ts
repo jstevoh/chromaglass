@@ -208,6 +208,8 @@ export class LiquidPhase {
     src.set(field);
     const last = s - 2;
     let total = 0;
+    let before = 0;
+    for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) before += src[i + j * s];
 
     for (let j = 1; j < s - 1; j++) {
       for (let i = 1; i < s - 1; i++) {
@@ -226,6 +228,21 @@ export class LiquidPhase {
         field[idx] = out < FLOOR ? 0 : out;
         total += field[idx];
       }
+    }
+    /*
+      A backtrace does not conserve what it carries. Where the flow converges it
+      samples the same few cells over and over, and the liquid multiplies —
+      measured with the plate's real flow under it, a dose of soap grew to
+      fifteen times itself in fifteen seconds and thinned the dye everywhere it
+      reached, emptying Solar Flare under music. None of these liquids is ever
+      made by moving: if a pass left more than decay alone would have, scale it
+      back to that.
+    */
+    const allowed = before * keep;
+    if (total > allowed && total > 0) {
+      const k = allowed / total;
+      for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) field[i + j * s] *= k;
+      total = allowed;
     }
     return total;
   }
