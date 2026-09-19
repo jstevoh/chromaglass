@@ -110,6 +110,8 @@ const MACRO_PRESET_ZOOM = 4.0;
 
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
+/** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
+const TURB_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
 /**
  * How much curvature counts as a boundary rather than a wash, as a fraction of
@@ -1530,7 +1532,9 @@ class FluidSimulation {
       const impact = settings.audioImpact ?? 0.45;
       // Audio energy breathes extra turbulence into the field so the liquid
       // visibly churns with the music instead of drifting at constant pace.
-      turbScale *= 1 + Math.min(1, audioData.energy) * impact * 2.0;
+      // Capped, now that turbulence is a real current: tripled on a loud
+      // track it would tear a calm look apart rather than make it breathe.
+      turbScale = Math.min(Math.max(turbScale, 1.2), turbScale * (1 + Math.min(1, audioData.energy) * impact * 2.0));
       const mid01 = Math.min(1, audioData.mid / 70);
       const treble01 = Math.min(1, audioData.treble / 70);
       const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
@@ -1940,46 +1944,64 @@ class FluidSimulation {
     }
   }
 
-  // Multi-octave curl noise — turbulence at several scales simultaneously.
-  // Octave 0 is a low-frequency swirl that moves whole blobs; higher octaves
-  // add ripples, filament trails and satellite droplets at lower amplitude.
+  // Multi-octave curl noise — a current at several scales at once. Octave 0 is
+  // a slow swirl that carries whole blobs; the higher octaves add ripples and
+  // filament trails, each 0.55 of the one below.
+  //
+  // It used to be scaled by the raw difference of two noise samples 1.5 cells
+  // apart, never divided by that span: about 1% of the strength its constants
+  // describe, with the octaves weighted the wrong way round (the finest was the
+  // strongest). Measured on an M4, the picture moved the same at 0, 0.3 and 1.
+  // Now each octave is a real gradient (rms ≈ 3 in noise space) and `scale` is
+  // an rms speed: TURB_SPEED solver units at 1.0, which at the default Speed is
+  // about five cells a second on a 192-cell plate. It is applied to the liquid
+  // everywhere, because clear oil flows too and a curl weighted by dye density
+  // is not divergence-free: it piles dye up along its own edges.
   applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
     if (scale <= 0.005) return;
-    const step = 2;
+    const step = 2;   // sampled on a stride, and each sample fills its 2x2 block
     const eps = 0.75; // finite-difference offset in grid cells
+    const k = scale * (TURB_SPEED / 3);
     for (let o = 0; o < octaves; o++) {
       const freq = (0.012 / GRID_SCALE) * (1 << o); // feature size stays constant relative to the frame
-      const amp = scale * 0.010 * Math.pow(0.55, o);
+      const amp = k * Math.pow(0.55, o) / (2 * eps * freq);
       const tOff = time * (0.06 + o * 0.05) + o * 37.7;
-      for (let j = 1; j < this.size - 1; j += step) {
-        for (let i = 1; i < this.size - 1; i += step) {
+      for (let j = 1; j < this.size - 2; j += step) {
+        for (let i = 1; i < this.size - 2; i += step) {
           const idx = i + j * this.size;
-          const d = this.density[idx];
-          if (d < 0.02) continue;
           // Curl of scalar noise field: v = (dn/dy, -dn/dx) — divergence-free
           const dn_dx = noise2D((i + eps) * freq, j * freq + tOff) - noise2D((i - eps) * freq, j * freq + tOff);
           const dn_dy = noise2D(i * freq, (j + eps) * freq + tOff) - noise2D(i * freq, (j - eps) * freq + tOff);
-          const m = amp * Math.min(1.5, d);
-          this.vx[idx] +=  dn_dy * m;
-          this.vy[idx] += -dn_dx * m;
+          const ux = dn_dy * amp, uy = -dn_dx * amp;
+          this.vx[idx] += ux; this.vx[idx + 1] += ux; this.vx[idx + this.size] += ux; this.vx[idx + this.size + 1] += ux;
+          this.vy[idx] += uy; this.vy[idx + 1] += uy; this.vy[idx + this.size] += uy; this.vy[idx + this.size + 1] += uy;
         }
       }
     }
   }
 
   // Inject curl-noise vorticity into dense fluid regions — driven by mid/treble
+  // The same fix as the turbulence: the difference over 0.01 of noise space is
+  // divided by it, so `strength` (0–0.03) reaches an rms of about 0.4 at the top
+  // instead of a thousandth of that. Every 3rd cell, filling its 3x3 block.
   injectVorticity(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    const step = 3; // sample every 3 cells for performance
-    for (let j = 1; j < this.size - 1; j += step) {
-      for (let i = 1; i < this.size - 1; i += step) {
+    const step = 3;
+    const k = (strength / 0.03) * (0.4 / 3) * 100;
+    for (let j = 1; j < this.size - 3; j += step) {
+      for (let i = 1; i < this.size - 3; i += step) {
         const idx = i + j * this.size;
-        if (this.density[idx] > 0.05) {
+        const d = this.density[idx];
+        if (d > 0.05) {
           // Curl noise: perpendicular to gradient of noise field
           const n = noise2D(i * 0.025, j * 0.025 + time * 0.08);
           const dn_dx = noise2D(i * 0.025 + 0.01, j * 0.025 + time * 0.08) - n;
           const dn_dy = noise2D(i * 0.025, j * 0.025 + 0.01 + time * 0.08) - n;
-          this.vx[idx] +=  dn_dy * strength * this.density[idx];
-          this.vy[idx] += -dn_dx * strength * this.density[idx];
+          const m = k * Math.min(1, d);
+          for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
+            const c = idx + a + b * this.size;
+            this.vx[c] +=  dn_dy * m;
+            this.vy[c] += -dn_dx * m;
+          }
         }
       }
     }
