@@ -614,6 +614,17 @@ npm run build
 npx firebase deploy --only hosting
 ```
 
-## License
+## Licence
 
-MIT
+**[Business Source License 1.1](LICENSE)**, converting automatically to Apache 2.0
+on 2030-09-19.
+
+In plain terms: **performing with it is free, selling it is not.** Run it,
+modify it, play a show with it, charge for that show, sell the footage a plate
+renders — none of that needs permission. What the licence reserves is offering
+ChromaGlass itself, or a derivative, to other people as a product: as software,
+as a hosted service, or on a box.
+
+Versions **1.2.0 and earlier were MIT**, and that grant is permanent for anyone
+who has them. See [LICENSE-HISTORY.md](LICENSE-HISTORY.md) for what applies to
+what, and why this line rather than the usual non-commercial one.
