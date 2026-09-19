@@ -1,4 +1,4 @@
-# Four things that need your eyes and a real GPU
+# Things that need your eyes and a real GPU
 
 Everything in this file was changed on evidence that a sandbox can produce —
 arithmetic, kernels, deterministic simulations — and none of it has been seen on
@@ -7,7 +7,8 @@ each one in about a minute, and how to put it back if you disagree.
 
 The sandbox this was built in rasterises in software at two or three frames a
 second. That is enough to prove a kernel and useless for judging a look, so
-these are the four decisions where my evidence stops and yours starts.
+the first four are the decisions where my evidence stops and yours starts. The
+last two were measured on an M4 on frozen frames, and they are still taste.
 
 ## 1. The reconstruction filter — the one I care about
 
@@ -71,6 +72,37 @@ wide on a 1080p projector.
 
 If a first visit on your slowest machine stutters before the governor catches
 it, the cap goes back.
+
+## 5. Light through the dye, at half
+
+The plate used to draw each dye as one colour at any thickness, so a thin wash
+and a thick pool differed only in opacity. Light Through Dye (Lamp & Light) puts
+the lamp through the dye instead: a thin wash goes pale, a thick pool deep, and
+two dyes on top of each other go darker. It is at 0.5 in every look. At 1 a dense
+blue goes nearly black and Galaxy loses a third of its brightness, and 0.5 is where
+the depth arrived without that.
+
+```
+?set=transmission=0     the flat glow it replaced
+?set=transmission=1     the whole effect
+```
+
+This changes every look, which is why it is here.
+
+## 6. The display's neighbourhood, worked out per texel
+
+The normal, the interface line and the gooey blur used to be worked out around
+every screen pixel, about sixty-five reads a pixel a plate. They are now worked
+out once per texel and interpolated, which on a frozen classic frame at 3x takes
+the frame from 43 ms to 18. On frozen frames the two paths come out within one
+8-bit step on most looks, with a few boundary pixels a few steps apart.
+
+```
+?derived=0              the per-pixel path, for comparison
+```
+
+If a highlight or an interface line looks faceted, softer or shifted with it
+on, that is the thing to report.
 
 ---
 

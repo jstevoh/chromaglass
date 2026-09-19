@@ -128,7 +128,11 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // texel centre, and how steeply the kernel can reconstruct a step edge.
 {
   const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
-  const body = src.slice(src.indexOf('vec4 textureBicubic'));
+  // The weights live in bicubicSigned, which the derive pass's signed fields are
+  // read through; textureBicubic is the same reconstruction clamped at zero.
+  check('the dye is still read through the one reconstruction',
+    /vec4 textureBicubic\(sampler2D tex, vec2 uv\) \{\s*return max\(bicubicSigned\(tex, uv\), vec4\(0\.0\)\);/.test(src));
+  const body = src.slice(src.indexOf('vec4 bicubicSigned'));
   const weights = [...body.slice(0, body.indexOf('vec2 w12')).matchAll(/vec2 w[0-3] = ([^;]+);/g)].map(m => m[1]);
   check('the shader still has four reconstruction weights to read', weights.length === 4,
     `found ${weights.length}`);

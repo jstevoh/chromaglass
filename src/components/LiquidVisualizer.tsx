@@ -2241,6 +2241,19 @@ interface GLResources {
   filmTexture: WebGLTexture;
   markTexture: WebGLTexture;
   beadTexture: WebGLTexture;
+  /**
+   * The derive pass (DERIVE_PASS in the shader): each plate's normal and
+   * interface line, worked out once per texel before the display runs. Null
+   * without float render targets, and the display then works them out per
+   * pixel as it always did.
+   */
+  derive: {
+    program: WebGLProgram;
+    u: Record<string, WebGLUniformLocation | null>;
+    textures: WebGLTexture[];
+    fbos: WebGLFramebuffer[];
+    sizes: number[];
+  } | null;
 }
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -2488,6 +2501,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const oldSamplerRef = useRef(false);
   if (!oldSamplerRef.current) {
     try { oldSamplerRef.current = new URLSearchParams(window.location.search).get('filter') === 'bspline'; } catch { /* no query */ }
+  }
+  /**
+   * `?derived=0` works each plate's neighbourhood out per pixel again, as it
+   * was before the derive pass, to compare against. A ref, so a check can flip
+   * it on a frozen frame through chromaglassDebug().
+   */
+  const perPixelRef = useRef<boolean | null>(null);
+  if (perPixelRef.current === null) {
+    try { perPixelRef.current = new URLSearchParams(window.location.search).get('derived') === '0'; } catch { perPixelRef.current = false; }
   }
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
@@ -3088,6 +3110,9 @@ layout(location = 1) out vec4 auxOut;   // for the camera: normal.xy (biased), d
 
 uniform sampler2D u_layer0;
 uniform sampler2D u_layer1;
+uniform sampler2D u_derived0;      // each plate's neighbourhood, worked out once per texel (see DERIVE_PASS)
+uniform sampler2D u_derived1;
+uniform float u_derivedOn;         // 0 with ?derived=0: worked out per pixel, as before the derive pass
 uniform int u_layerCount;
 uniform float u_rotation0;
 uniform float u_rotation1;
@@ -3198,7 +3223,7 @@ const float DENSITY_SCALE = 8.0;
 // are bilinear fetches placed off-centre so hardware filtering does the inner
 // pair for free, which is the same trick the B-spline version used.
 uniform float u_bspline;   // ?filter=bspline — the old sampler, to compare against
-vec4 textureBicubic(sampler2D tex, vec2 uv) {
+vec4 bicubicSigned(sampler2D tex, vec2 uv) {
   vec2 texSize = vec2(u_gridSize);
   /*
     The sampler this replaced, kept reachable from the query string.
@@ -3248,10 +3273,15 @@ vec4 textureBicubic(sampler2D tex, vec2 uv) {
            + texture(tex, vec2(p3.x,  p12.y)) * (w3.x  * w12.y)
            + texture(tex, vec2(p12.x, p3.y))  * (w12.x * w3.y);
   float wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
-  // The negative lobe can undershoot past zero at a hard boundary. Every
-  // channel here is a density that is squared on decode, so a negative would
-  // come back as dye rather than as nothing: clamp before it can.
-  return max(acc / wsum, vec4(0.0));
+  return acc / wsum;
+}
+
+// The negative lobe can undershoot past zero at a hard boundary. Every
+// channel of a plate is a density that is squared on decode, so a negative
+// would come back as dye rather than as nothing: clamp before it can. (The
+// derive pass's fields are signed, and read through bicubicSigned.)
+vec4 textureBicubic(sampler2D tex, vec2 uv) {
+  return max(bicubicSigned(tex, uv), vec4(0.0));
 }
 
 // Hash-based film grain
@@ -3319,6 +3349,24 @@ vec2 fluidFlow(sampler2D vtex, vec2 fuv) {
 
 // Approximate Gaussian blur on density alpha in fluid UV space
 float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
+  // At the usual settings the kernel's step is a few screen pixels, which is a
+  // fraction of a texel, and a blur that narrow over a bilinear field is
+  // decided by its first few moments. Three taps an axis, at 0 and 1.554 steps
+  // either side weighted 0.617 and 0.191, have the 5x5 kernel's second and
+  // fourth moments along each axis (0.924 and 2.232 steps), for nine reads
+  // instead of twenty-five. Wider than half a texel the field's corners would
+  // start to show between the taps, so the whole kernel runs.
+  if (u_derivedOn > 0.5 && blurFluid * u_gridSize < 0.5) {
+    float d = blurFluid * 1.554;
+    vec3 k = vec3(0.19138, 0.61724, 0.19138);
+    float acc = 0.0;
+    for (int j = 0; j < 3; j++) {
+      for (int i = 0; i < 3; i++) {
+        acc += k[i] * k[j] * texture(tex, fuv + vec2(float(i - 1), float(j - 1)) * d).a;
+      }
+    }
+    return acc;
+  }
   // 5x5 Gaussian kernel weights (sigma~1)
   const float w[25] = float[25](
     0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902,
@@ -3386,8 +3434,9 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   return vec4(r, g, b, alpha);
 }
 
-// Sobel normals in fluid UV space
-vec3 sobelNormal(sampler2D tex, vec2 fuv) {
+// The density gradient the plate's lighting is taken from: a Sobel over three
+// solver cells, in fluid UV space.
+vec2 sobelGrad(sampler2D tex, vec2 fuv) {
   float ts = 3.0 / u_logicalGrid;
   float d00 = decodeDensity(textureBicubic(tex, fuv + vec2(-ts, -ts)).a);
   float d10 = decodeDensity(textureBicubic(tex, fuv + vec2(0.0, -ts)).a);
@@ -3399,7 +3448,17 @@ vec3 sobelNormal(sampler2D tex, vec2 fuv) {
   float d22 = decodeDensity(textureBicubic(tex, fuv + vec2( ts,  ts)).a);
   float gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
   float gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
-  return normalize(vec3(-gradX * 0.9, -gradY * 0.9, 1.0));
+  return vec2(gradX, gradY);
+}
+
+vec3 gradNormal(vec2 g) {
+  return normalize(vec3(-g * 0.9, 1.0));
+}
+
+// Per pixel, as it was before the derive pass: eight reconstructions of the
+// plate for every screen pixel. Still what ?derived=0 draws.
+vec3 sobelNormal(sampler2D tex, vec2 fuv) {
+  return gradNormal(sobelGrad(tex, fuv));
 }
 
 // ─── The lamp ───────────────────────────────────────────────────────
@@ -3447,7 +3506,8 @@ vec3 applyLighting(vec3 color, vec3 normal, bool darkBlend, vec2 fuv) {
 
 // Bright thin interface line where two distinct dye colors meet —
 // fakes the oil-water boundary glow without a multi-fluid solve.
-float boundaryEdge(sampler2D tex, vec2 fuv) {
+// The colour change across the pixel, before it is shaped into a line.
+float boundaryDiff(sampler2D tex, vec2 fuv) {
   vec4 cC = decodeFluid(tex, fuv, 0.0, false);
   if (cC.a < 0.03) return 0.0;
   float e = (3.0 / u_logicalGrid) * 0.55;
@@ -3461,7 +3521,15 @@ float boundaryEdge(sampler2D tex, vec2 fuv) {
   float maskY = min(cT.a, cB.a);
   float diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
   float diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
-  return smoothstep(0.12, 0.75, diffX + diffY);
+  return diffX + diffY;
+}
+
+float boundaryLine(float diff) {
+  return smoothstep(0.12, 0.75, diff);
+}
+
+float boundaryEdge(sampler2D tex, vec2 fuv) {
+  return boundaryLine(boundaryDiff(tex, fuv));
 }
 
 // The meniscus a bead has between two plates: a dark rim where the oil
@@ -4018,6 +4086,28 @@ vec3 ledColor(float t) {
   }
 }
 
+#ifdef DERIVE_PASS
+/*
+  The derive pass: run once per plate per frame at the plate's own resolution,
+  before the display.
+
+  The display lights every pixel from the plate around it — a Sobel over three
+  solver cells for the normal, four decodes a cell apart for the interface
+  line — and did that reconstruction for every screen pixel: sixty-five
+  texture reads a pixel a plate, the most expensive thing in the frame on a
+  Retina screen. Both are smooth on the scale of whole solver cells, and a
+  Retina frame has dozens of pixels to every texel, so they are worked out here
+  once per texel and the display interpolates them with the same Catmull-Rom
+  it reads the plate with. The functions are the display's own, compiled from
+  the same source, so what is worked out is what the display worked out.
+*/
+uniform sampler2D u_src;
+void main() {
+  vec2 g = sobelGrad(u_src, v_uv);
+  float diff = u_boundaryContrast > 0.005 ? boundaryDiff(u_src, v_uv) : 0.0;
+  fragColor = vec4(g, diff, 0.0);
+}
+#else
 void main() {
   vec2 uv = v_uv;
   bool darkBlend = u_darkBlend != 0;
@@ -4163,13 +4253,17 @@ void main() {
   // Lighting — a heavily defocused pixel has no edge detail worth resolving,
   // so skip the 8-tap normal and the interface pass out there.
   bool sharp0 = dof < 0.55;
-  vec3 normal0 = sharp0 ? sobelNormal(u_layer0, fuv0) : vec3(0.0, 0.0, 1.0);
+  // The normal and the interface line are both read from the plate around the
+  // pixel, and the derive pass has already worked them out once per texel: one
+  // interpolated read here instead of thirteen reconstructions of the plate.
+  vec4 near0 = sharp0 && u_derivedOn > 0.5 ? bicubicSigned(u_derived0, fuv0) : vec4(0.0);
+  vec3 normal0 = !sharp0 ? vec3(0.0, 0.0, 1.0) : u_derivedOn > 0.5 ? gradNormal(near0.xy) : sobelNormal(u_layer0, fuv0);
   fluid0.rgb = applyLighting(fluid0.rgb, normal0, darkBlend, fuv0);
   if (darkBlend) fluid0.a *= 0.6;
 
   // Bright interface line where dye colors meet
   if (u_boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
-    float edge0 = boundaryEdge(u_layer0, fuv0);
+    float edge0 = u_derivedOn > 0.5 ? boundaryLine(near0.z) : boundaryEdge(u_layer0, fuv0);
     fluid0.rgb += fluid0.rgb * edge0 * u_boundaryContrast * 1.6 + vec3(edge0 * u_boundaryContrast * 0.25);
   }
   if (u_lacing > 0.005 && fluid0.a > 0.02 && sharp0) fluid0.rgb = lacing(fluid0.rgb, u_layer0, fuv0, fluid0.a, u_lacing);
@@ -4286,12 +4380,14 @@ void main() {
     }
 
     bool sharp1 = dof < 0.55;
-    vec3 normal1 = sharp1 ? sobelNormal(u_layer1, fuv1) : vec3(0.0, 0.0, 1.0);
+    // The normal and the interface line, from the derive pass.
+    vec4 near1 = sharp1 && u_derivedOn > 0.5 ? bicubicSigned(u_derived1, fuv1) : vec4(0.0);
+    vec3 normal1 = !sharp1 ? vec3(0.0, 0.0, 1.0) : u_derivedOn > 0.5 ? gradNormal(near1.xy) : sobelNormal(u_layer1, fuv1);
     fluid1.rgb = applyLighting(fluid1.rgb, normal1, darkBlend, fuv1);
     if (darkBlend) fluid1.a *= 0.6;
 
     if (u_boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
-      float edge1 = boundaryEdge(u_layer1, fuv1);
+      float edge1 = u_derivedOn > 0.5 ? boundaryLine(near1.z) : boundaryEdge(u_layer1, fuv1);
       fluid1.rgb += fluid1.rgb * edge1 * u_boundaryContrast * 1.6 + vec3(edge1 * u_boundaryContrast * 0.25);
     }
     if (u_lacing > 0.005 && fluid1.a > 0.02 && sharp1) fluid1.rgb = lacing(fluid1.rgb, u_layer1, fuv1, fluid1.a, u_lacing);
@@ -4575,7 +4671,8 @@ void main() {
   float lit = step(1.0 / 255.0, max(outColor.r, max(outColor.g, outColor.b)));
   fragColor = vec4(outColor + dth * lit / 255.0, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
-}`;
+}
+#endif`;
 
     const compileShader = (type: number, src: string): WebGLShader | null => {
       const sh = gl.createShader(type)!;
@@ -4615,6 +4712,53 @@ void main() {
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
 
+    // The derive pass: the display's own source with a different main, so the
+    // neighbourhood it works out once per texel is the one the display worked
+    // out per pixel. Its target is half float — the gradient is signed and
+    // the interface sum runs past one — and without float targets the display
+    // goes on working the neighbourhood out per pixel.
+    let derive: GLResources['derive'] = null;
+    if (gl.getExtension('EXT_color_buffer_float')) {
+      const dv = compileShader(gl.VERTEX_SHADER, vertSrc);
+      const df = compileShader(gl.FRAGMENT_SHADER, fragSrc.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n'));
+      if (dv && df) {
+        const dp = gl.createProgram()!;
+        gl.attachShader(dp, dv);
+        gl.attachShader(dp, df);
+        gl.bindAttribLocation(dp, aPos, 'a_pos');
+        gl.linkProgram(dp);
+        gl.deleteShader(dv);
+        gl.deleteShader(df);
+        if (gl.getProgramParameter(dp, gl.LINK_STATUS)) {
+          const u: Record<string, WebGLUniformLocation | null> = {};
+          for (const name of ['u_src', 'u_gridSize', 'u_logicalGrid', 'u_bspline', 'u_filmLevel', 'u_filmGain', 'u_exposure', 'u_macro', 'u_transmission', 'u_boundaryContrast']) {
+            u[name] = gl.getUniformLocation(dp, name);
+          }
+          const textures: WebGLTexture[] = [];
+          const fbos: WebGLFramebuffer[] = [];
+          for (let i = 0; i < 2; i++) {
+            const tex = gl.createTexture()!;
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, null);
+            textures.push(tex);
+            const fbo = gl.createFramebuffer()!;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+            fbos.push(fbo);
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          derive = { program: dp, u, textures, fbos, sizes: [1, 1] };
+        } else {
+          console.warn('ChromaGlass: the derive pass did not link; the display works the neighbourhood out per pixel.', gl.getProgramInfoLog(dp));
+          gl.deleteProgram(dp);
+        }
+      }
+    }
+
     // Create textures for existing layers + 2 slots minimum
     const maxLayers = Math.max(2, fluidsRef.current.length);
     const textures: WebGLTexture[] = [];
@@ -4650,7 +4794,7 @@ void main() {
 
     // Collect uniform locations
     const uniformNames = [
-      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1',
+      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1','u_derived0','u_derived1','u_derivedOn',
       'u_resolution','u_gooey','u_darkBlend','u_blendMode',
       'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
       'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
@@ -4703,6 +4847,7 @@ void main() {
       filmTexture,
       markTexture,
       beadTexture,
+      derive,
     };
 
     const resize = () => {
@@ -6126,10 +6271,46 @@ void main() {
 
           }
 
+          // ── Each plate's neighbourhood, once per texel ─────────
+          // See DERIVE_PASS in the shader. Its inputs are the display's own
+          // uniforms, set here from the same values the display gets below.
+          const derive = glr.derive && !perPixelRef.current ? glr.derive : null;
+          if (derive) {
+            const du = derive.u;
+            glCtx.useProgram(derive.program);
+            glCtx.bindVertexArray(vaoObj);
+            glCtx.uniform1i(du.u_src, 0);
+            glCtx.uniform1f(du.u_gridSize, fluidsRef.current[0]?.gpu?.N ?? GRID_SIZE);
+            glCtx.uniform1f(du.u_logicalGrid, GRID_SIZE);
+            glCtx.uniform1f(du.u_bspline, oldSamplerRef.current ? 1 : 0);
+            glCtx.uniform1f(du.u_filmLevel, filmLevelRef.current);
+            glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, filmGainRef.current)));
+            glCtx.uniform1f(du.u_exposure, Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+            glCtx.uniform1f(du.u_macro, macroAmount);
+            glCtx.uniform1f(du.u_transmission, Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
+            glCtx.uniform1f(du.u_boundaryContrast, currentSettings.boundaryContrast ?? 0.35);
+            glCtx.activeTexture(glCtx.TEXTURE0);
+            for (let l = 0; l < Math.min(2, fluidsRef.current.length); l++) {
+              const size = glr.texSizes.get(texs[l]) ?? GRID_SIZE;
+              if (derive.sizes[l] !== size) {
+                glCtx.bindTexture(glCtx.TEXTURE_2D, derive.textures[l]);
+                glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA16F, size, size, 0, glCtx.RGBA, glCtx.HALF_FLOAT, null);
+                derive.sizes[l] = size;
+              }
+              glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+              glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, derive.fbos[l]);
+              glCtx.viewport(0, 0, size, size);
+              glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
+            }
+            glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+            glCtx.viewport(0, 0, canvas.width, canvas.height);
+            glCtx.bindVertexArray(null);
+          }
+
           // Bind the renderer's samplers only once every layer is packed: the
           // GPU solver's pack pass uses unit 0 for its own source texture, so
           // packing layer 1 would otherwise unbind layer 0 from the unit the
-          // renderer reads it from.
+          // renderer reads it from. The derive pass reads through unit 0 too.
           for (let l = 0; l < fluidsRef.current.length; l++) {
             glCtx.activeTexture(glCtx.TEXTURE0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
@@ -6137,6 +6318,10 @@ void main() {
               glCtx.activeTexture(glCtx.TEXTURE6 + l);
               glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
             }
+          }
+          for (let l = 0; l < 2; l++) {
+            glCtx.activeTexture(glCtx.TEXTURE2 + l);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, derive ? derive.textures[l] : null);
           }
 
           // Pigment coordinates, one plate per unit (12 and 13). A layer without
@@ -6238,6 +6423,9 @@ void main() {
 
           glCtx.uniform1i(uLocs['u_layer0'], 0);
           glCtx.uniform1i(uLocs['u_layer1'], 1);
+          glCtx.uniform1i(uLocs['u_derived0'], 2);
+          glCtx.uniform1i(uLocs['u_derived1'], 3);
+          glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
           glCtx.uniform1i(uLocs['u_layerCount'], fluidsRef.current.length);
           glCtx.uniform1f(uLocs['u_rotation0'], rotationAnglesRef.current[0] ?? 0);
           glCtx.uniform1f(uLocs['u_rotation1'], rotationAnglesRef.current[1] ?? 0);
@@ -6508,6 +6696,8 @@ void main() {
         film: filmRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
+        /** The derive pass's switch, live: `perPixel.current = true` draws as ?derived=0 does. */
+        perPixel: perPixelRef,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputPass: outputRef.current,
         outputConfig: outputCfgRef.current,
@@ -6545,6 +6735,11 @@ void main() {
         for (const fbo of glr.packFbos.values()) glCtx.deleteFramebuffer(fbo);
         for (const tex of texs) glCtx.deleteTexture(tex);
         for (const tex of velTexs) glCtx.deleteTexture(tex);
+        if (glr.derive) {
+          for (const fbo of glr.derive.fbos) glCtx.deleteFramebuffer(fbo);
+          for (const tex of glr.derive.textures) glCtx.deleteTexture(tex);
+          glCtx.deleteProgram(glr.derive.program);
+        }
         glCtx.deleteBuffer(pb);
         glCtx.deleteVertexArray(vaoObj);
         glCtx.deleteProgram(prog);
