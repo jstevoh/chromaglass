@@ -50,9 +50,17 @@ try {
   await page.mouse.click(8, 8);
   await page.waitForTimeout(4000);
 
-  // Shortened waits: this run is about the path working, not about the
-  // numbers, which mean nothing on a software rasteriser anyway.
-  await page.evaluate(() => window.chromaglassBench({ settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500 }));
+  // Three rungs, not five, and shortened waits. This run is about the path
+  // working; the numbers mean nothing on a software rasteriser, and asking one
+  // to solve 768² costs minutes for a figure nobody would quote. The rungs are
+  // chosen to walk all three outcomes instead: one the GPU can do, one it
+  // cannot (99999 is clamped to the texture limit, so it never arrives and
+  // must be recorded as a refusal rather than hanging the run), and the CPU
+  // fallback.
+  await page.evaluate(() => window.chromaglassBench({
+    rungs: [256, 99999, 'cpu'],
+    settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500,
+  }));
 
   await page.waitForSelector('[data-bench-text]', { timeout: 120000 });
   const text = await page.textContent('[data-bench-text]');
@@ -72,6 +80,22 @@ try {
     failed = true;
   } else {
     console.log('  ok  the report has a table in it');
+  }
+  // A rung that cannot be reached is the case most likely to hang, so it is
+  // the one worth asserting on rather than merely running.
+  if (!/99999.*—/.test(text ?? '')) {
+    console.error('  ✗ an unreachable rung was not recorded as a refusal');
+    failed = true;
+  } else {
+    console.log('  ok  an unreachable rung is recorded as a refusal, not a hang');
+  }
+  for (const want of ['256²', 'cpu192']) {
+    if (!new RegExp(`${want.replace('²','\\u00b2')}\\s+\\d`).test(text ?? '')) {
+      console.error(`  ✗ ${want} produced no numbers`);
+      failed = true;
+    } else {
+      console.log(`  ok  ${want} produced numbers`);
+    }
   }
 } finally {
   await browser.close();

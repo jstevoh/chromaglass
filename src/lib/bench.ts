@@ -178,7 +178,11 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
 
     const frame: number[] = [], sim: number[] = [], other: number[] = [], steps: number[] = [];
     const sampleUntil = deps.now() + sampleMs;
-    while (deps.now() < sampleUntil || frame.length < minSamples) {
+    // The sample-count floor waits for readings that a null status would never
+    // supply, so it gets a deadline of its own: a measurement that cannot be
+    // taken has to end as a short row, never as a loop with no way out.
+    const hardStop = deps.now() + sampleMs + rebuildMs;
+    while ((deps.now() < sampleUntil || frame.length < minSamples) && deps.now() < hardStop) {
       await deps.sleep(everyMs);
       const s = deps.read();
       if (!s) continue;
