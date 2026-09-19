@@ -55,9 +55,17 @@ MacBook, Apple M4 · 2026-09-18 (local evening) · branch `claude/liquid-light-c
    **3001**. All Step 4 work used `http://localhost:3001/?debug`.
 5. **⌘K opens the command palette**, not Settings. The route that worked is the "All settings…" button
    → the "Projectors" rail item → scroll to Mapping.
-6. Screenshots are in `docs/bench/mapping/*.png` **on the Mac only and are not committed**, because the
-   task said to commit only this file and `macbook-m4.txt`. Each one is described in words below. Ask
-   the Mac to push them if you want them.
+6. Screenshots are in [`docs/bench/mapping/`](mapping/). They were left out of the first commit, because
+   the task said to commit only this file and `macbook-m4.txt`, and added afterwards. These are the
+   second-pass captures, taken after the fixes at the end of this file, so the Settings shots show Mapping
+   as its own section with a wall-shaped pad. The quads and shapes are the same as described below:
+   [a](mapping/01a-circle-skewed-wall.png) ·
+   [a, pad](mapping/01a-circle-skewed-panel.png) ·
+   [b](mapping/01b-three-shapes-wall.png) ·
+   [c](mapping/01c-cube-wall.png) ·
+   [c, pad](mapping/01c-cube-panel.png) ·
+   [d](mapping/01d-selected-off-wall.png) ·
+   [d, one shape off](mapping/01d2-single-circle-off-wall.png)
 
 ## STEP 1 — sync
 
