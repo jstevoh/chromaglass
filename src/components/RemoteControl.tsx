@@ -9,6 +9,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
+import { LOCKUP_URL } from '../brand';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -432,10 +433,10 @@ export default function RemoteControl() {
       {/* Status */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 px-5 py-4 backdrop-blur">
         <div>
-          <h1 className="text-lg font-bold italic tracking-tighter">
-            Chroma<span className="not-italic">Glass</span>
+          <h1>
+            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-8 w-auto" draggable={false} />
           </h1>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
         </div>
         <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}

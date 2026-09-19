@@ -57,6 +57,7 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { LOCKUP_URL } from './brand';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -3143,8 +3144,14 @@ export default function App() {
       {!deskUp && (
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
-          <h1 className="text-2xl font-light tracking-tighter italic font-serif">
-            Chroma<span className="font-bold not-italic">Glass</span>
+          {/*
+            The mark and the name, drawn by `npm run brand`. Smaller on a
+            phone: the card shares the row with the button pill, and at 375
+            wide 24px tall is what fits — any taller and the image is only
+            letterboxed into the same width with empty bands above and below.
+          */}
+          <h1>
+            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
           </h1>
           {/* The preset's name is the menu: one click from the top of the screen. */}
           <button
