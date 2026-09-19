@@ -2631,7 +2631,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * `applyPreset` (it is what the caller is telling us); laying the plate is
    * the part that has to be repeatable from inside.
    */
+  /*
+    The second plate, laid the way the look lays it.
+
+    A look that brings a second layer usually arrives with it: the settings
+    that add the layer and the call that lays the plate come in the same breath,
+    and the layer is only built once React has taken the new count, a moment
+    after the plate was laid. Laid only when it already existed, the second
+    plate came out empty whenever the look before had one layer, and stayed
+    empty: the music pours into the lead plate. Fillmore after Lumia had one
+    dish and an empty ring, Fillmore after Classic had two. So the layer is laid
+    here and again the moment it is built.
+  */
+  const laidPresetRef = useRef<string | null>(null);
+  const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
+    // The Fillmore look is two projectors: the second plate starts with its own wash.
+    if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
+  };
+
   const layPlate = (presetId: string) => {
+    laidPresetRef.current = presetId;
     for (const fluid of fluidsRef.current) fluid.clearAll();
     bubblesRef.current.clear();
     chemRef.current.reset();
@@ -2644,8 +2663,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const contract = presetContractRef.current;
       harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
     }
-    // The Fillmore look is two projectors: the second plate starts with its own wash.
-    if (presetId === 'fillmore-1969' && fluidsRef.current[1]) fluidsRef.current[1].seedPreset('fillmore-wash', noise2D);
+    for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     // The plate is laid with its liquids as well as its dye, rather than
@@ -2988,6 +3006,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
           }
         }
+        if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
 

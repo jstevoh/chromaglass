@@ -28,7 +28,7 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
-import { blendLooks, targetLook, ease, LOOK_BASE } from '../src/lib/lookFade.ts';
+import { blendLooks, targetLook, ease, LOOK_BASE, RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -39,7 +39,7 @@ const check = (name, ok, detail = '') => {
 const look = (id) => {
   const p = PRESETS.find(x => x.id === id);
   if (!p) throw new Error(`no preset ${id}`);
-  return { ...DEFAULT_SETTINGS, ...p.settings };
+  return targetLook(DEFAULT_SETTINGS, p.settings);
 };
 
 /**
@@ -118,6 +118,73 @@ function drive({ from, to, seconds, clearing }) {
   check('and the Fillmore rig does not leak into a plain plate',
     plain.beads === LOOK_BASE.beads && plain.fingering === LOOK_BASE.fingering && plain.camera === LOOK_BASE.camera,
     `beads ${plain.beads}, fingering ${plain.fingering}, camera ${plain.camera}`);
+}
+
+// ── 3b. A look is the same look whatever was playing before it ──────
+//
+// Looks used to be a few changes over whatever was on the plate, so a look's
+// dye budget, exposure, lacing or Lumia were the last look's, and the same
+// look came out differently on different nights. Every setting now belongs
+// either to the room or to the look, and a look is complete.
+{
+  const unclassified = Object.keys(DEFAULT_SETTINGS).filter(k => !RIG_KEYS.has(k) && !(k in LOOK_BASE));
+  check('every setting belongs either to the room or to the look',
+    unclassified.length === 0, unclassified.join(', '));
+  const both = Object.keys(LOOK_BASE).filter(k => RIG_KEYS.has(k));
+  check('and none to both', both.length === 0, both.join(', '));
+
+  const leaks = [];
+  for (const a of PRESETS) {
+    const afterA = targetLook(DEFAULT_SETTINGS, a.settings);
+    for (const b of PRESETS) {
+      const viaA = targetLook(afterA, b.settings);
+      const fresh = targetLook(DEFAULT_SETTINGS, b.settings);
+      for (const k of Object.keys(LOOK_BASE)) {
+        if (JSON.stringify(viaA[k]) !== JSON.stringify(fresh[k])) leaks.push(`${b.id}.${k} after ${a.id}`);
+      }
+    }
+  }
+  check(`every look comes out the same whatever was playing before it (${PRESETS.length}×${PRESETS.length} pairs)`,
+    leaks.length === 0, `${leaks.length} leaks: ${leaks.slice(0, 4).join(', ')}`);
+  // The control: the old way, a look laid over whatever was playing.
+  let oldLeaks = 0;
+  for (const a of PRESETS) {
+    const afterA = { ...DEFAULT_SETTINGS, ...a.settings };
+    for (const b of PRESETS) {
+      const viaA = { ...afterA, ...b.settings }, fresh = { ...DEFAULT_SETTINGS, ...b.settings };
+      for (const k of Object.keys(LOOK_BASE)) if (JSON.stringify(viaA[k]) !== JSON.stringify(fresh[k])) oldLeaks++;
+    }
+  }
+  console.log(`     the old way, a look laid over the last one: ${oldLeaks} settings depended on what came before`);
+  check('and the old way really did leak', oldLeaks > 0, 'if this passes, the check above is measuring nothing');
+
+  const room = { ...DEFAULT_SETTINGS, sensitivity: 0.9, bassBoost: 2, dimmer: 0.3, markX: 0.2, filmMix: 0.1, scenePeople: false, simResolution: 'cpu' };
+  const moved = [];
+  for (const p of PRESETS) {
+    const t = targetLook(room, p.settings);
+    for (const k of RIG_KEYS) if (JSON.stringify(t[k]) !== JSON.stringify(room[k])) moved.push(`${p.id}.${k}`);
+  }
+  check('and never moves the room: the microphone, the dimmer, the logo, the grid',
+    moved.length === 0, moved.slice(0, 4).join(', '));
+  const says = PRESETS.flatMap(p => Object.keys(p.settings).filter(k => RIG_KEYS.has(k)).map(k => `${p.id}.${k}`));
+  check('no built-in look says anything about the room', says.length === 0, says.join(', '));
+
+  // A saved look from an older build does not mention what was added since.
+  const saved = { globalSpeed: 0.05, lacing: 0.4 };
+  const worn = { ...DEFAULT_SETTINGS, exposure: 0.9, lumia: 0.8, dyeBudget: 0.2, beads: 0.7 };
+  const opened = targetLook(worn, saved);
+  const stale = Object.keys(LOOK_BASE).filter(k => !(k in saved) && JSON.stringify(opened[k]) !== JSON.stringify(LOOK_BASE[k]));
+  check('a look that does not mention a setting gets the base, not the last look\'s',
+    stale.length === 0 && opened.globalSpeed === 0.05 && opened.lacing === 0.4, stale.slice(0, 4).join(', '));
+
+  // The sequencer's stages aim at the same thing.
+  const stage = lookOf(PRESETS.find(p => p.id === 'lava-lamp').settings);
+  const short = Object.keys(LOOK_BASE).filter(k => !(k in stage));
+  check('a sequencer stage that names a look aims at all of it', short.length === 0, short.join(', '));
+  const t1 = lookOf({}), t2 = lookOf({});
+  t1.audioMappings.velocity = 'none';
+  check('and a look edited in place cannot write through into the next',
+    t2.audioMappings.velocity === LOOK_BASE.audioMappings.velocity && DEFAULT_SETTINGS.audioMappings.velocity !== 'none');
 }
 
 // ── 4. The gate: a look change never darkens the stage ───────────────

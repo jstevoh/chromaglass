@@ -28,7 +28,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'timbre-shifter':     [2, 8, 0],
   'boiling-point':      [0, 1, 3],
   'microscopic-chaos':  [9, 10, 5],
-  'aurora-borealis':    [5, 6, 7],
+  'aurora-borealis':    [5, 6, 10, 7],   // greens and purples, as it says: there was no purple in it
   'solar-flare':        [0, 1, 3],
   'jellyfish-bloom':    [2, 11, 10],
   'fractal-dream':      [6, 10, 2],

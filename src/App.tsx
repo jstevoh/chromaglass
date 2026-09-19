@@ -13,7 +13,7 @@ import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from 
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
-import { blendLooks, targetLook, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { blendLooks, targetLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -133,11 +133,12 @@ async function micAlreadyAllowed(): Promise<boolean> {
 const SCENE_ON_KEY = 'chromaglass-scene-on';
 const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
 
-// Detect which preset (if any) matches the current settings.
+// Detect which preset (if any) matches the current settings. Only the look is
+// compared: a look does not set the room (see RIG_KEYS).
 function detectActivePreset(settings: VisualizerSettings): string | null {
   for (const preset of PRESETS) {
     const ps = preset.settings;
-    const match = Object.keys(ps).every(key => {
+    const match = Object.keys(ps).filter(key => !RIG_KEYS.has(key as keyof VisualizerSettings)).every(key => {
       const pv = (ps as any)[key];
       const sv = (settings as any)[key];
       if (typeof pv === 'object' && pv !== null) {
@@ -923,7 +924,7 @@ export default function App() {
     if (isUserPresetId(pinnedPresetId)) {
       const up = userPresets.presets.find(p => p.id === pinnedPresetId);
       if (up && Object.keys(up.settings).every(k =>
-        k === 'simResolution' || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) {
+        RIG_KEYS.has(k as keyof VisualizerSettings) || JSON.stringify((up.settings as any)[k]) === JSON.stringify((settings as any)[k]))) {
         return pinnedPresetId;
       }
     }
@@ -1010,14 +1011,9 @@ export default function App() {
   };
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
-    // Presets that don't mention the macro camera get the plate-wide framing —
-    // otherwise a macro preset would leave the next one zoomed in.
-    // Likewise the Fillmore projectors, beads, cells and fingering: a preset
-    // that does not ask for them gets a plain plate, not the last preset's.
-    // macroZoom alongside macroMode: the zoom is what magnifies now, so a look
-    // that does not ask for a closeup has to put the camera back on the plate
-    // rather than inherit whatever the last one was pushed to.
-    setSettings(prev => ({ ...prev, macroMode: false, macroZoom: 1, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
+    // The whole look, whatever was playing before it: see LOOK_BASE. The room
+    // (the microphone's calibration, the dimmer, the logo, the grid) stays.
+    setSettings(prev => targetLook(prev, presetSettings));
     setPinnedPresetId(presetId);
     // A built-in is somewhere to start, not a file of yours: ⌘S asks for a
     // name rather than writing over a look that ships with the app.
@@ -1028,7 +1024,9 @@ export default function App() {
   };
 
   const applyUserPreset = (p: UserPreset) => {
-    setSettings(prev => ({ ...p.settings, simResolution: prev.simResolution }));
+    // A saved look is a look like any other. Anything added to the app since it
+    // was saved comes from the base rather than from whatever was playing.
+    setSettings(prev => targetLook(prev, p.settings));
     setPinnedPresetId(p.id);
     // Your own look, opened: ⌘S from here writes over it rather than making
     // a second copy.
