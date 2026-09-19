@@ -2384,6 +2384,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ vibrationFrequency: v })}
           settingKey="vibrationFrequency"
         />
+        {/* How far a dropped liquid falls before it meets the plate: at 0 it is
+            laid on; higher, it lands — pressing the film into a ring, pushing
+            the liquid round it outward, and throwing satellite droplets. Works
+            on the Drop tool and on the drops the show makes by itself. */}
+        <Slider
+          label="Drop Height"
+          value={settings.dropHeight ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ dropHeight: v })}
+          settingKey="dropHeight"
+        />
       </section>
 
       {/* Fluid Physics Section */}

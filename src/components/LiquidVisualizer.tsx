@@ -140,6 +140,9 @@ const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (dens
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
 const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
 
+/** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
+const DROP_EVERY = 10;
+
 /** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
 const DRIP_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -390,6 +393,9 @@ class FluidSimulation {
   tiltX = 0;
   tiltY = 0;
   /** The plate's rock as the render loop last set it (not scaled to a tilt): drives the current. */
+  /** How far a dropped liquid falls, 0–1 (set each frame from Drop Height), and the plate's Fingering for its splash. */
+  dropHeight = 0;
+  dropFingering = 0;
   rockX = 0;
   rockY = 0;
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
@@ -1345,16 +1351,82 @@ class FluidSimulation {
         break;
       }
       default: { // drop
-        const dropR = Math.round(3 * k);
+        // How hard it lands: the height it fell from, times how big a drop it
+        // is — so a real drop from the dropper or the bench splashes, and the
+        // faint pulse the music lays down on every frame (which also takes this
+        // shape) does not.
+        const h = Math.max(0, Math.min(1, this.dropHeight));
+        // Impact grows as the square root of the height (the speed a fall
+        // reaches does), so the middle of the slider already splashes.
+        const e = Math.sqrt(h) * Math.min(1.5, amount / 5);
+        // A drop from higher spreads thinner as it lands: a wider disc, the
+        // same dye.
+        const spread = 1 + 0.6 * e;
+        const dropR = Math.round(3 * k * spread);
+        const thin = 1 / (spread * spread);
         for (let ddy = -dropR; ddy <= dropR; ddy++)
           for (let ddx = -dropR; ddx <= dropR; ddx++) {
             const dd = Math.sqrt(ddx * ddx + ddy * ddy);
             if (dd > dropR) continue;
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
-            this.addDensity(nx, ny, amount * Math.pow(1 - dd / dropR, 2), r, g, b);
+            this.addDensity(nx, ny, amount * thin * Math.pow(1 - dd / dropR, 2), r, g, b);
           }
+        if (e > 0.02) this.splash(x, y, dropR, h, e, amount, r, g, b);
         break;
       }
+    }
+  }
+
+  /*
+    A drop landing from a height: what liquid falling into liquid does between
+    two plates of glass.
+
+    - It presses the film. The impact is a squeeze pulse under the drop — the
+      same machinery as the beat squeeze and the Press tool — which drives the
+      liquid out in a ring and, with Fingering up, breaks the ring into fingers.
+    - The crown pushes outward: a ring-shaped kick just outside the drop, the
+      liquid it displaced shoving its neighbours.
+    - It throws satellites: droplets of its own dye flung clear of the impact,
+      more of them and further out the higher it fell.
+
+    `e` is the impact (height × drop size); `h` the height alone, which sets
+    how far things are thrown.
+  */
+  private splash(x: number, y: number, dropR: number, h: number, e: number, amount: number, r: number, g: number, b: number) {
+    const S = this.size;
+    const k = GRID_SCALE;
+    const inside = (px: number, py: number) => px >= 2 && px < S - 2 && py >= 2 && py < S - 2;
+    this.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, this.dropFingering, true);
+
+    const r0 = dropR * 0.6, r1 = dropR * (2 + 3 * h);
+    const R = Math.ceil(r1);
+    for (let j = -R; j <= R; j += 2) {
+      for (let i = -R; i <= R; i += 2) {
+        const d = Math.sqrt(i * i + j * j);
+        if (d < r0 || d > r1) continue;
+        const px = x + i, py = y + j;
+        if (!inside(px, py)) continue;
+        const f = 0.9 * e * Math.sin(Math.PI * (d - r0) / (r1 - r0));
+        this.addVelocity(px, py, (i / d) * f, (j / d) * f);
+      }
+    }
+
+    const n = Math.round(e * 7 * (0.6 + Math.random() * 0.8));
+    for (let q = 0; q < n; q++) {
+      const a = Math.random() * Math.PI * 2;
+      const dist = dropR * (1.4 + (1 + 5 * h) * Math.random());
+      const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
+      if (!inside(px, py)) continue;
+      const sr = Math.max(1, Math.round((0.8 + Math.random() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
+      for (let dy = -sr; dy <= sr; dy++) {
+        for (let dx = -sr; dx <= sr; dx++) {
+          const dd = Math.sqrt(dx * dx + dy * dy);
+          if (dd > sr || !inside(px + dx, py + dy)) continue;
+          this.addDensity(px + dx, py + dy, amount * 0.22 * (1 - dd / sr), r, g, b);
+        }
+      }
+      const kick = (0.25 + 0.5 * h) * Math.min(1, e);
+      this.addVelocity(px, py, Math.cos(a) * kick, Math.sin(a) * kick);
     }
   }
 
@@ -2421,6 +2493,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
   const beadFrameRef = useRef(0);    // the beads' own frame clock (see the populate call)
+  const dropClockRef = useRef(0);    // solver steps since the dropper was pressed (Drop Height lets go of drops on it)
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
@@ -4812,7 +4885,11 @@ void main() {
             currentSettings.surge ?? 0,
             currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
           );
-          for (const f of fluidsRef.current) if (f) { f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP; }
+          for (const f of fluidsRef.current) if (f) {
+            f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP;
+            f.dropHeight = currentSettings.dropHeight ?? 0;
+            f.dropFingering = currentSettings.fingering ?? 0;
+          }
         }
 
         if (isActiveRef.current) {
@@ -5119,6 +5196,10 @@ void main() {
           }
 
           // ── Manual injection ───────────────────────────────────
+          // The dropper's clock runs while it is held and starts again at 0 on
+          // the next press, so every press lands a drop at once.
+          if (!isMouseDownRef.current) dropClockRef.current = 0;
+          else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
           if (isMouseDownRef.current && drainFrameRef.current === 0) {
             const { x, y } = mousePosRef.current;
             const af = fluidsRef.current[activeLayerRef.current];
@@ -5234,6 +5315,18 @@ void main() {
                   af.addVelocity(sx, sy, nx_dir * 0.3 * w, ny_dir * 0.3 * w);
                 }
 
+              } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
+                // The dropper held above the plate lets go of drops rather than
+                // pouring a stream: one as the press lands, then one every
+                // DROP_EVERY steps while it is held, each carrying the dye the
+                // stream would have laid in that time and each landing with its
+                // splash (autoInject's drop reads the height).
+                if (dropClockRef.current % DROP_EVERY === 0) {
+                  const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY;
+                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
+                  if (heat > 0) af.addTemp(x, y, heat * 2);
+                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, 1);
+                }
               } else {
                 // dropper (default)
                 const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);

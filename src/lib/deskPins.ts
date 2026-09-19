@@ -155,6 +155,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'heat' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
+  { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
   { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: 0.001, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },

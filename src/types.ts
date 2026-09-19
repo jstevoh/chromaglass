@@ -165,6 +165,7 @@ export interface VisualizerSettings {
   // Manual/Interaction
   airVelocity: number;
   vibrationFrequency: number;
+  dropHeight?: number;        // how far a dropped liquid falls: 0 lays it on the plate, 1 splashes
   
   // Mixer
   layerCount: number;
@@ -337,6 +338,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
   vibrationFrequency: 0.0,
+  dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
   gooeyEffect: 0.45,        // organic blob merging
