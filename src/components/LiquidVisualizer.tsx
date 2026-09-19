@@ -2876,7 +2876,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useEffect(() => {
     const currentCount = fluidsRef.current.length;
-    const targetCount = settings.layerCount;
+    // Whole layers only, whatever arrives (a fade, a fader, a saved show): a
+    // fractional count here builds a solver on one change and drops it on the next.
+    const targetCount = Math.max(1, Math.min(2, Math.round(settings.layerCount ?? 1)));
 
     if (currentCount < targetCount) {
       for (let i = currentCount; i < targetCount; i++) {
