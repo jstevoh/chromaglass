@@ -41,10 +41,10 @@ export interface DeskSpec {
 
 /** Where each of the MIDI forty is shown in the panel. */
 const SECTION_OF: Record<string, string> = {
-  dimmer: 'audio-input',
+  dimmer: 'master',
   audioImpact: 'audio-mappings',
   automateRate: 'automation',
-  globalSpeed: 'audio-input',
+  globalSpeed: 'master',
   dyeBudget: 'look',
   turbulenceScale: 'look',
   plateRock: 'look',
