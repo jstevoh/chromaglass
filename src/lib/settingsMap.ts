@@ -128,7 +128,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
     terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction' },
   { id: 'interaction', name: 'Manual Interaction', category: 'plate',
-    terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency' },
+    terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency drop height fall splash impact crown satellite droplets' },
 
   /*
     The wall: where the picture goes and what shape it is when it gets there.
