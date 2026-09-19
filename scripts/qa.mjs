@@ -579,14 +579,21 @@ try {
      */
     const at = async (zoom) => {
       await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
-      let prev = await frame();
-      for (let i = 0; i < 12; i++) {
-        await settle(300);
-        const now = await frame();
-        if (apart(prev, now) < 2) return now;
-        prev = now;
+      // Wait for the camera to arrive, asked of the camera. This waited for
+      // two frames 300 ms apart to look alike, which on a runner rasterising
+      // in software is also what a camera still easing looks like: the frames
+      // come slowly enough that the move between two of them is small, and
+      // the check measured a zoom that had not finished (1.7 from the plate,
+      // after the plate gained its lasting current and every frame got a
+      // little dearer). The camera's own zoom says when it is there.
+      const want = zoom === 1 ? 1 : Math.max(zoom, 2);
+      for (let i = 0; i < 60; i++) {
+        const z = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
+        if (z !== null && Math.abs(z - want) < Math.max(0.05, want * 0.08)) break;
+        await settle(250);
       }
-      return prev;
+      await settle(400);
+      return frame();
     };
 
     // Something to magnify. Since the turbulence became a real current (#71)
