@@ -179,6 +179,14 @@ function CastReceiver() {
         timeDomainData: EMPTY,
         calibration: null,
       });
+    } else if (msg.type === 'mark') {
+      // The logo, as a picture rather than as a setting. Decoded here and
+      // handed to this window's own visualizer, because this is a separate
+      // document that has never seen the operator's file.
+      if (!msg.dataUrl) { visualizerRef.current?.clearMark?.(); return; }
+      const img = new window.Image();
+      img.onload = () => visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
+      img.src = msg.dataUrl;
     }
   }, []);
 

@@ -226,6 +226,30 @@ const escapeCloses = async (testId) => {
  *
  * The assertion is unchanged. Something that never turns up still fails.
  */
+/**
+ * Wait for a *measurement* to arrive somewhere, rather than for an element.
+ *
+ * The same lesson as `escapeCloses` and `appears`, learned a third time on a
+ * check that loaded a logo and then looked at the canvas after a fixed pause.
+ * Locally the pause was plenty. On the runner the chain behind it — read the
+ * file, decode the image, upload a texture, draw a frame — had not finished,
+ * so the check sampled 5% of the frame and failed, and the very next check,
+ * one second later, measured 67% on the same picture. The feature was right
+ * and the wait was too short, which is the only way this kind of check ever
+ * fails.
+ *
+ * So: take the measurement repeatedly until it satisfies the predicate, and
+ * hand back the last reading either way. Something that never arrives still
+ * fails, and fails with the number it got to.
+ */
+const reaches = async (measure, ok, tries = 25) => {
+  let last = await measure();
+  for (let i = 0; i < tries && !ok(last); i++) {
+    await settle(300);
+    last = await measure();
+  }
+  return last;
+};
 const appears = async (testId, poke) => {
   for (let i = 0; i < 20; i++) {
     if (poke) await poke();
@@ -502,6 +526,154 @@ try {
   const unlabelled = await page.evaluate(() =>
     [...document.querySelectorAll('input[type="range"]')].filter(i => !i.getAttribute('aria-label')).length);
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
+
+  // ── The macro zoom is a move, not a switch ────────────────────────
+  //
+  // This one is here because the slider did nothing. It reached the renderer
+  // only when a toggle in another panel was already on, so on the desk — where
+  // there is no such toggle — dragging it changed the number and not the
+  // picture. A control that is drawn and does nothing is worse than one that
+  // is missing, and nothing in the suite would have noticed.
+  //
+  // Measured as how far the frame has travelled from the plate-wide one, which
+  // is the claim: not that magnification looks like anything in particular,
+  // but that the zoom moves the picture and moves it *gradually*. The first
+  // version of this check asserted a direction — that a magnified frame has
+  // less neighbour contrast, because bigger shapes — and that was wrong twice
+  // over: pushing in also raises the closeup's exposure, which throws a hard
+  // silhouette against dark ground, and the contrast went up tenfold rather
+  // than down. The feature was right and the check was wrong.
+  {
+    /** Mean absolute difference per channel, 0 for identical frames. */
+    const apart = (a, b) => {
+      let sum = 0;
+      for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
+      return sum / (a.length * 0.75);
+    };
+    const frame = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      const o = document.createElement('canvas');
+      o.width = 96; o.height = 54;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, o.width, o.height);
+      return [...x.getImageData(0, 0, o.width, o.height).data];
+    });
+    /**
+     * Set the zoom and wait for the picture to stop moving, rather than for a
+     * clock. The camera eases toward a new zoom over about a second, and how
+     * many frames that is depends entirely on what else the runner is doing.
+     */
+    const at = async (zoom) => {
+      await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
+      let prev = await frame();
+      for (let i = 0; i < 12; i++) {
+        await settle(300);
+        const now = await frame();
+        if (apart(prev, now) < 2) return now;
+        prev = now;
+      }
+      return prev;
+    };
+
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+    await settle(1800);
+    const plate = await frame();
+
+    // The plate goes on moving under all of this, so measure how far it
+    // wanders on its own first: nothing below counts unless it clears this.
+    await settle(1800);
+    const drift = apart(plate, await frame());
+
+    // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
+    const far = apart(plate, await at(9));
+    check('the zoom alone moves the picture, with no switch thrown',
+      far > Math.max(6, drift * 4), `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift`);
+
+    // That it is a *travel* and not a cut is checked in `npm run plate`, on
+    // the ramp itself, because it cannot honestly be checked here. This asked
+    // whether a frame at 1.4x sits nearer the plate-wide one than a frame at
+    // 9x does, and image distance is simply not monotonic in zoom: on the
+    // runner the magnified bead landed closer to the plate frame in average
+    // pixel value than the mid-zoom did, and the check failed on a plate that
+    // was behaving perfectly. A pure function is the right thing to assert a
+    // pure function about.
+
+    // Back to the plate, not stranded in the closeup.
+    const home = apart(plate, await at(1));
+    check('and it comes back to the plate again',
+      home < far * 0.5, `${home.toFixed(1)} back at 1×`);
+
+    // The readout follows the zoom, not the old flag.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));
+    await settle(600);
+    const readout = await page.evaluate(() => document.querySelector('[data-testid="macro-zoom-value"]')?.textContent ?? null);
+    check('and the frame says how far in it is', readout === '5.0×', `readout ${readout}`);
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+    await settle(800);
+  }
+
+  // ── The mark: a logo that survives the plate ──────────────────────
+  //
+  // The whole point of compositing it in the shader rather than putting an
+  // element over the canvas is that it reaches everything which reads the
+  // canvas — the projector window, a cast, the recorder, another machine
+  // capturing this one. So the check is on the canvas pixels, not on the DOM:
+  // a mark that is only in the DOM would pass a DOM check and be missing from
+  // every screen that matters.
+  {
+    await clickOn('settings-nav-mark');
+    await settle(300);
+    // Eight magenta pixels. Magenta because nothing the plate does on its own
+    // is full red and full blue with no green at all, so finding it on the
+    // canvas cannot be the liquid having a moment.
+    const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
+    const magentaShare = () => page.evaluate(() => {
+      const c = document.querySelector('#liquid-canvas');
+      if (!c) return -1;
+      const o = document.createElement('canvas');
+      o.width = 160; o.height = 90;
+      const x = o.getContext('2d', { willReadFrequently: true });
+      x.drawImage(c, 0, 0, o.width, o.height);
+      const d = x.getImageData(0, 0, o.width, o.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
+      }
+      return n / (o.width * o.height);
+    });
+
+    const before = await magentaShare();
+    await page.setInputFiles('#mark-file', {
+      name: 'mark.png', mimeType: 'image/png', buffer: Buffer.from(MAGENTA_PNG, 'base64'),
+    });
+    // Big enough that a share of the frame is unambiguous.
+    await page.evaluate(() => window.chromaglassSettings?.({ markScale: 0.8, markMix: 1, markX: 0.5, markY: 0.5 }));
+    // Polled, not slept on: reading the file, decoding it, uploading a texture
+    // and drawing a frame is a chain, and how long it takes is the runner's
+    // business rather than ours. See `reaches`.
+    const after = await reaches(magentaShare, v => v > 0.15);
+    check('a loaded mark reaches the canvas, not just the page',
+      before < 0.02 && after > 0.15, `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame`);
+
+    // The house dimmer is the lamp. Taking the lamp out should not take the
+    // sponsor's logo off the wall with it.
+    await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 0 }));
+    const blacked = await reaches(magentaShare, v => v > 0.15);
+    check('and a blackout leaves it on the wall', blacked > 0.15,
+      `${(blacked * 100).toFixed(1)}% with the dimmer at zero`);
+    await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 1 }));
+
+    // Its own opacity is the control for taking it off, and it has to reach 0.
+    await page.evaluate(() => window.chromaglassSettings?.({ markMix: 0 }));
+    const faded = await reaches(magentaShare, v => v < 0.02);
+    check('and its opacity takes it off', faded < 0.02, `${(faded * 100).toFixed(1)}% left`);
+    await page.evaluate(() => window.chromaglassSettings?.({ markMix: 1 }));
+    await reaches(magentaShare, v => v > 0.15);
+
+    await clickOn('mark-clear');
+    const cleared = await reaches(magentaShare, v => v < 0.02);
+    check('and taking it off leaves nothing behind', cleared < 0.02, `${(cleared * 100).toFixed(1)}% left`);
+  }
 
   // ── The room camera ───────────────────────────────────────────────
   // One click on the rail, which is the whole point of the rail: the thing
@@ -1320,6 +1492,7 @@ try {
     const lit = async () => page.evaluate(() =>
       document.querySelectorAll('[data-midi-hit="true"]').length);
     check('nothing is lit before anything is pressed', (await lit()) === 0, `${await lit()} lit`);
+    const pressedAt = Date.now();
     await page.evaluate(() => window.chromaglassTouch?.('preset:oil-on-water'));
     await settle(120);
     const onNow = await page.evaluate(() => {
@@ -1328,10 +1501,17 @@ try {
     });
     check('a controller press lights the row it fired',
       onNow.hit && onNow.any === 1, `row ${onNow.hit}, ${onNow.any} lit in total`);
-    // Long enough to be well past the flash, short enough that a stuck one
-    // still fails rather than the harness waiting it out.
-    await settle(700);
-    check('and the light goes out again', (await lit()) === 0, `${await lit()} still lit`);
+    // Waited for, not slept on. The flash is a 260ms timer, and a fixed 700ms
+    // after it was a race on a runner rasterising in software: a frame there
+    // takes ~500ms, the timer's callback queues behind one, and the check
+    // read "lit" a moment before the row went out — then printed "0 still
+    // lit" from its second look. Three seconds is still short enough that a
+    // light which never clears fails rather than the harness waiting it out.
+    const outAfter = await page.waitForFunction(
+      () => document.querySelectorAll('[data-midi-hit="true"]').length === 0, null, { timeout: 3000 },
+    ).then(() => Date.now() - pressedAt, () => null);
+    check('and the light goes out again', outAfter !== null,
+      outAfter !== null ? `out ${outAfter}ms after the press` : `${await lit()} still lit after 3s`);
 
     /*
       ── What the controller is doing, without the controls on screen ──

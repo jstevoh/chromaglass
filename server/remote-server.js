@@ -24,6 +24,7 @@ import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
+import { ARTNET_PORT, artnetConfig, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(HERE, '..', 'dist');
@@ -184,6 +185,15 @@ wss.on('connection', (socket) => {
       broadcastTo('mirror', raw, socket);
       return;
     }
+    // What colour the plate is. It goes to the lighting rig, not to phones —
+    // twenty of these a second is noise on a control surface.
+    if (from === 'display' && message.type === 'lights') {
+      plate = {
+        layers: Array.isArray(message.layers) ? message.layers.slice(0, 64) : [],
+        master: typeof message.master === 'number' ? message.master : 1,
+      };
+      return;
+    }
     if (from === 'mirror') return;   // a display only listens
     // Displays talk to phones; phones talk to displays.
     broadcastTo(from === 'display' ? 'controller' : 'display', raw, socket);
@@ -298,6 +308,54 @@ if (OSC_PORT > 0) {
   udp.bind(OSC_PORT, '0.0.0.0', () => { oscStatus = `udp ${OSC_PORT}`; });
 }
 
+// ── Art-Net ─────────────────────────────────────────────
+//
+// Out: the display tells us what colour each layer of the plate is, twenty
+// times a second, and that becomes a universe of DMX. The par cans wash the
+// room in whatever the dye is doing rather than in whatever somebody set
+// before the doors opened. See `artnet.js` for why this lives here and not in
+// the browser.
+//
+// In: a lighting desk drives settings, the same way OSC does, for a show
+// where the desk is the thing with the running order in it.
+const artnet = artnetConfig();
+const ARTNET_IN = parseInMap(process.env.ARTNET_IN);
+let artnetStatus = artnet ? `${artnet.host}:${artnet.port} universe ${artnet.universe}` : 'off';
+/** The last thing the display said about the plate, resent at the frame rate. */
+let plate = { layers: [], master: 0 };
+let artSeq = 0;
+
+if (artnet) {
+  const out = createSocket({ type: 'udp4', reuseAddr: true });
+  out.on('error', (err) => { artnetStatus = `off (${err.code ?? err.message})`; try { out.close(); } catch { /* already */ } });
+  // Broadcast needs asking for, and a lighting network is very often reached
+  // that way — 2.255.255.255 and 10.255.255.255 are both conventional here.
+  out.bind(() => { try { out.setBroadcast(true); } catch { /* unicast only, which is fine */ } });
+  const tick = setInterval(() => {
+    const frame = buildUniverse(plate.layers, { ...artnet, master: plate.master });
+    const packet = encodeArtDmx(artnet.universe, (artSeq = (artSeq % 255) + 1), frame);
+    out.send(packet, artnet.port, artnet.host, () => { /* a rig that is not there is not an error */ });
+  }, Math.round(1000 / artnet.rate));
+  tick.unref?.();
+}
+
+if (ARTNET_IN.size > 0) {
+  const seen = new Map();
+  const listen = createSocket({ type: 'udp4', reuseAddr: true });
+  listen.on('error', () => { try { listen.close(); } catch { /* already */ } });
+  listen.on('message', (buf, rinfo) => {
+    if (!isPrivateAddress(rinfo.address)) return;
+    const packet = decodeArtDmx(buf);
+    // Our own output, if we are broadcasting into the same universe we listen
+    // on: taking it back in would be a loop that slowly walks every mapped
+    // setting to whatever the fixture channel happens to hold.
+    if (!packet || (artnet && packet.universe === artnet.universe)) return;
+    const settings = patchFromUniverse(packet.data, ARTNET_IN, seen);
+    if (settings) broadcastTo('display', JSON.stringify({ type: 'patch', settings }));
+  });
+  listen.bind(ARTNET_PORT, '0.0.0.0');
+}
+
 // ── Startup banner ─────────────────────────────────────────────────────
 
 /**
@@ -331,6 +389,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('\n  ChromaGlass show server\n');
   console.log(`  Show key:           ${SHOW_KEY}`);
   console.log(`  Laptop (the show):  http://localhost:${PORT}/`);
+  if (artnet) console.log(`  Art-Net out:        ${artnetStatus}  (${artnet.count} x ${artnet.order} from channel ${artnet.start}, ${artnet.rate} fps)`);
+  if (ARTNET_IN.size > 0) console.log(`  Art-Net in:         udp port ${ARTNET_PORT}  (${[...ARTNET_IN].map(([c, m]) => `${c}->${m.key}`).join(', ')})`);
   if (OSC_PORT > 0) console.log(`  OSC in:             udp port ${OSC_PORT}  (/chromaglass/setting/<key> <n>, /chromaglass/action/<name>, /chromaglass/preset <id>, /blow /drop /press /tilt /dye)`);
   if (hosts.length === 0) {
     console.log('  No LAN address found — is this machine on a network?');

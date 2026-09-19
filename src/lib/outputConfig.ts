@@ -31,6 +31,50 @@
  * mid-show is what `dimmer` is for, and that is on the master fader already.
  */
 
+/**
+ * What shape a surface cuts out of its quad.
+ *
+ * Every surface is four corners and a projective map, whatever shape it ends
+ * up being — that is what keeps one solver, one piece of geometry and one set
+ * of drag handles behind all of them, and it is how the mapping tools this is
+ * modelled on do it too. The shape is a test in the quad's *local* space, so
+ * it keystones with the quad: a circle pinned onto a surface that is not
+ * square to the projector lands as the ellipse that reads as a circle from the
+ * seats, which is the entire point of doing this at load-in rather than in a
+ * drawing program.
+ */
+export type SurfaceShape = 'rect' | 'ellipse' | 'triangle' | 'diamond';
+
+export const SURFACE_SHAPES: SurfaceShape[] = ['rect', 'ellipse', 'triangle', 'diamond'];
+
+export interface Surface {
+  /** Stable across reorders and edits, so a drag knows what it has hold of. */
+  id: string;
+  shape: SurfaceShape;
+  /**
+   * The four corners on the wall, clockwise from top left, in screen space
+   * (0,0 top left to 1,1 bottom right) — the same space and the same winding
+   * as the projector's own corner pin, so one solver serves both.
+   */
+  corners: [number, number, number, number, number, number, number, number];
+  /**
+   * Which piece of the plate this surface shows: x, y, width, height in
+   * source space, 0..1.
+   *
+   * The default is the whole picture, so a new surface is a window onto the
+   * show rather than a crop of it. Narrowing it is how one plate feeds several
+   * surfaces without every one of them being the same image — a column taking
+   * a tall slice, a disc taking the middle.
+   */
+  src: [number, number, number, number];
+  /** Off keeps a surface in the list without lighting it: a cue rather than a delete. */
+  enabled: boolean;
+  /** 0..1, so a surface can sit behind the others rather than beside them. */
+  opacity: number;
+  /** How soft the shape's own edge is, in its local space. 0 is a hard cut. */
+  feather: number;
+}
+
 export interface OutputConfig {
   /**
    * Mirror left-to-right. Rear projection onto a gauze or a vinyl screen — the
@@ -69,6 +113,22 @@ export interface OutputConfig {
    * knock it off in the dark.
    */
   flashGuard: boolean;
+  /**
+   * Projection mapping: the shapes the picture is cut into on the wall.
+   *
+   * Empty — and it is empty until somebody adds one — means the whole frame is
+   * the picture, which is what every show that is pointed at a screen wants
+   * and costs nothing. With surfaces in it the frame is black except where a
+   * surface lands, so the gaps between them are as deliberate as the shapes:
+   * a projector aimed at three panels with wall between them lights the panels
+   * and leaves the wall dark, instead of lighting all of it and hoping.
+   *
+   * These sit *inside* the projector's corner pin, and the order matters. The
+   * pin squares the projector against the room; the surfaces map the squared
+   * picture onto things in it. Doing it the other way round would mean every
+   * surface had to be re-dragged the first time the projector was nudged.
+   */
+  surfaces: Surface[];
 }
 
 export const IDENTITY_CORNERS: OutputConfig['corners'] = [0, 0, 1, 0, 1, 1, 0, 1];
@@ -85,7 +145,11 @@ export const DEFAULT_OUTPUT: OutputConfig = {
   gain: 1,
   gamma: 1,
   flashGuard: true,
+  surfaces: [],
 };
+
+/** How many surfaces one output may carry. */
+export const MAX_SURFACES = 16;
 
 export const OUTPUT_KEY = 'chromaglass-output';
 
@@ -108,6 +172,9 @@ export function outputIsIdentity(o: OutputConfig): boolean {
   if (!o.corners.every((v, i) => near(v, IDENTITY_CORNERS[i]))) return false;
   if (o.maskTop > 1e-4 || o.maskRight > 1e-4 || o.maskBottom > 1e-4 || o.maskLeft > 1e-4) return false;
   if (!near(o.gain, 1) || !near(o.gamma, 1)) return false;
+  // Any surface at all changes the frame, because everything outside one goes
+  // black — a single small square is the largest change this config can make.
+  if (o.surfaces.length > 0) return false;
   return true;
 }
 
@@ -133,7 +200,94 @@ export function normalizeOutput(raw: unknown): OutputConfig {
     gain: clamp(o.gain === undefined ? 1 : Number(o.gain) || 1, 0.2, 3),
     gamma: clamp(o.gamma === undefined ? 1 : Number(o.gamma) || 1, 0.5, 2.5),
     flashGuard: o.flashGuard !== false,
+    surfaces: normalizeSurfaces((o as { surfaces?: unknown }).surfaces),
   };
+}
+
+const clampCorners = (raw: unknown): Surface['corners'] | null =>
+  Array.isArray(raw) && raw.length === 8 && raw.every(n => typeof n === 'number' && Number.isFinite(n))
+    ? (raw.map(n => clamp(n, -1, 2)) as Surface['corners'])
+    : null;
+
+/**
+ * Coerce a stored surface list. Anything that cannot be read as a surface is
+ * dropped rather than repaired: a half-understood quad is a shape in the wrong
+ * place on a wall, and a shape in the wrong place is worse than an absent one.
+ */
+export function normalizeSurfaces(raw: unknown): Surface[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Surface[] = [];
+  for (const item of raw.slice(0, MAX_SURFACES)) {
+    const s = (item ?? {}) as Partial<Surface>;
+    const corners = clampCorners(s.corners);
+    if (!corners) continue;
+    const shape = SURFACE_SHAPES.includes(s.shape as SurfaceShape) ? (s.shape as SurfaceShape) : 'rect';
+    const src = Array.isArray(s.src) && s.src.length === 4 && s.src.every(n => typeof n === 'number' && Number.isFinite(n))
+      ? ([clamp(s.src[0], 0, 1), clamp(s.src[1], 0, 1), clamp(s.src[2], 0.01, 1), clamp(s.src[3], 0.01, 1)] as Surface['src'])
+      : ([0, 0, 1, 1] as Surface['src']);
+    out.push({
+      id: typeof s.id === 'string' && s.id ? s.id : `s${out.length}-${Math.random().toString(36).slice(2, 8)}`,
+      shape,
+      corners,
+      src,
+      enabled: s.enabled !== false,
+      opacity: clamp(s.opacity === undefined ? 1 : Number(s.opacity) || 0, 0, 1),
+      feather: clamp(s.feather === undefined ? 0.01 : Number(s.feather) || 0, 0, 0.5),
+    });
+  }
+  return out;
+}
+
+let surfaceSeq = 0;
+const newId = () => `s${Date.now().toString(36)}-${(surfaceSeq++).toString(36)}`;
+
+/**
+ * A new surface, placed where it can be seen and grabbed.
+ *
+ * Dropped into the middle at a third of the frame rather than filling it: a
+ * surface that lands on the frame's own edges has its handles on the edges
+ * too, and the first thing anybody does with a new shape is drag a corner.
+ */
+export function makeSurface(shape: SurfaceShape = 'rect', at = 0): Surface {
+  // Step each new one down and right so a second add is not hidden under the
+  // first — the commonest way a new object looks like nothing happened.
+  const off = (at % 5) * 0.05;
+  const x0 = 0.33 + off, y0 = 0.33 + off, x1 = 0.67 + off, y1 = 0.67 + off;
+  return {
+    id: newId(),
+    shape,
+    corners: [x0, y0, x1, y0, x1, y1, x0, y1],
+    src: [0, 0, 1, 1],
+    enabled: true,
+    opacity: 1,
+    feather: 0.01,
+  };
+}
+
+/**
+ * A cube, as the three faces of it a projector can actually light.
+ *
+ * Not 3D: three quads in an isometric arrangement, each an ordinary surface
+ * that can be dragged away from the others the moment it is made. That is the
+ * honest version of a cube for this — a real one would need a camera, a
+ * projector position and a measured object, none of which the app knows, and
+ * the thing anybody actually points this at is a stack of boxes whose faces
+ * they want to line up by eye.
+ *
+ * The faces share the winding of every other surface: clockwise from the
+ * corner that is top left *on that face*.
+ */
+export function makeCube(cx = 0.5, cy = 0.5, r = 0.18): Surface[] {
+  const h = r * 0.5;            // half-width of the isometric step
+  const v = r * 0.29;           // the vertical the step rises by (2:1 isometric)
+  return [
+    // Top face: a rhombus, read clockwise from the far corner.
+    { ...makeSurface('rect'), corners: [cx, cy - r, cx + h * 2, cy - r + v * 2, cx, cy - r + v * 4, cx - h * 2, cy - r + v * 2] },
+    // Left face.
+    { ...makeSurface('rect'), corners: [cx - h * 2, cy - r + v * 2, cx, cy - r + v * 4, cx, cy + r, cx - h * 2, cy + r - v * 2] },
+    // Right face.
+    { ...makeSurface('rect'), corners: [cx, cy - r + v * 4, cx + h * 2, cy - r + v * 2, cx + h * 2, cy + r - v * 2, cx, cy + r] },
+  ].map((s, i) => ({ ...s, id: newId(), corners: s.corners as Surface['corners'], src: [i / 3, 0, 1 / 3, 1] as Surface['src'] }));
 }
 
 export function loadOutput(): OutputConfig {
@@ -163,6 +317,35 @@ export function saveOutput(o: OutputConfig): void {
  * and the caller then leaves the frame alone rather than dividing by zero.
  */
 export function cornerPinMatrix(corners: OutputConfig['corners']): Float32Array | null {
+  const f = squareToQuad(corners);
+  if (!f) return null;
+  const { a, b, c, d, e, g, h } = f;
+  const fq = f.f;
+
+  // Invert (adjugate is enough: a homography is only defined up to scale).
+  const A = e - fq * h, B = c * h - b, C = b * fq - c * e;
+  const D = fq * g - d, E = a - c * g, F = c * d - a * fq;
+  const G = d * h - e * g, H = b * g - a * h, I = a * e - b * d;
+  const det3 = a * A + b * D + c * G;
+  if (!Number.isFinite(det3) || Math.abs(det3) < 1e-12) return null;
+
+  // Column-major for GLSL: m[col][row].
+  return new Float32Array([A, D, G, B, E, H, C, F, I]);
+}
+
+interface Quad { a: number; b: number; c: number; d: number; e: number; f: number; g: number; h: number }
+
+/**
+ * Heckbert's unit-square-to-quad map, which is the forward direction: where a
+ * point of the picture lands on the wall.
+ *
+ * The shader wants the inverse of this, because it runs per output pixel and
+ * asks which pixel of the plate belongs there. Composing a surface onto the
+ * projector's keystone wants the forward one, because a surface's corners are
+ * points that have to be carried through the pin. They are the same eight
+ * numbers, so they are solved once here.
+ */
+function squareToQuad(corners: OutputConfig['corners']): Quad | null {
   const [x0, y0, x1, y1, x2, y2, x3, y3] = corners;
   // Heckbert: the unit square's corners, in this order, map to d0..d3.
   const sx = x0 - x1 + x2 - x3;
@@ -182,14 +365,86 @@ export function cornerPinMatrix(corners: OutputConfig['corners']): Float32Array 
     a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; c = x0;
     d = y1 - y0 + g * y1; e = y3 - y0 + h * y3; f = y0;
   }
+  // A quad with no area maps everything onto a line. The perspective branch
+  // catches that in its own determinant, but the affine branch had no test:
+  // four corners dragged into a row took it, produced a map that collapsed
+  // one axis, and returned it as if it were a quad. What that looks like is a
+  // surface that silently becomes a hairline on the wall — so it is refused
+  // here, where both branches pass through.
+  const det = a * (e - f * h) + b * (f * g - d) + c * (d * h - e * g);
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  return { a, b, c, d, e, f, g, h };
+}
 
-  // Invert (adjugate is enough: a homography is only defined up to scale).
-  const A = e - f * h, B = c * h - b, C = b * f - c * e;
-  const D = f * g - d, E = a - c * g, F = c * d - a * f;
-  const G = d * h - e * g, H = b * g - a * h, I = a * e - b * d;
-  const det3 = a * A + b * D + c * G;
-  if (!Number.isFinite(det3) || Math.abs(det3) < 1e-12) return null;
+/**
+ * Where a point of a quad's unit square lands inside that quad.
+ *
+ * The forward direction, used to draw a shape rather than to sample one: the
+ * panel needs the outline of a circle or a triangle *as it will appear on the
+ * wall*, which is its local-space outline carried through the same projective
+ * map the shader inverts. Sampling the boundary and mapping the samples is
+ * exact for the straight-edged shapes and as close as the sample count for the
+ * round one.
+ */
+export function pointInQuad(corners: Surface['corners'], u: number, v: number): [number, number] | null {
+  const q = squareToQuad(corners);
+  if (!q) return null;
+  const w = q.g * u + q.h * v + 1;
+  if (!Number.isFinite(w) || Math.abs(w) < 1e-9) return null;
+  return [(q.a * u + q.b * v + q.c) / w, (q.d * u + q.e * v + q.f) / w];
+}
 
-  // Column-major for GLSL: m[col][row].
-  return new Float32Array([A, D, G, B, E, H, C, F, I]);
+/**
+ * The outline a shape traces inside its quad, in screen space, for drawing.
+ *
+ * Straight-edged shapes are their corners; the ellipse is sampled, at a count
+ * chosen so the curve is smooth at the size this is ever drawn and no larger,
+ * since this runs on every pointer move while a corner is being dragged.
+ */
+export function surfaceOutline(shape: SurfaceShape, corners: Surface['corners']): [number, number][] {
+  const local: [number, number][] =
+    shape === 'triangle' ? [[0.5, 0], [1, 1], [0, 1]]
+    : shape === 'diamond' ? [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]
+    : shape === 'ellipse'
+      ? Array.from({ length: 28 }, (_, i) => {
+          const t = (i / 28) * Math.PI * 2;
+          return [0.5 + Math.cos(t) * 0.5, 0.5 + Math.sin(t) * 0.5] as [number, number];
+        })
+      : [[0, 0], [1, 0], [1, 1], [0, 1]];
+  const out: [number, number][] = [];
+  for (const [u, v] of local) {
+    const p = pointInQuad(corners, u, v);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Carry a surface's corners through the projector's keystone.
+ *
+ * A surface is dragged where it should land on the wall; the keystone is what
+ * squares the projector against that wall. Composing them by transforming the
+ * four corners works because a homography of a homography is a homography —
+ * so the quad that comes out of this is an ordinary surface with an ordinary
+ * projective interior, and the whole output stays one pass.
+ *
+ * It also gives the behaviour a load-in wants: nudge the projector's pin and
+ * every shape travels with the picture, instead of every shape needing to be
+ * dragged again.
+ */
+export function composeOntoPin(
+  surface: Surface['corners'],
+  pin: OutputConfig['corners'],
+): Surface['corners'] | null {
+  if (pin.every((v, i) => near(v, IDENTITY_CORNERS[i]))) return surface;
+  const q = squareToQuad(pin);
+  if (!q) return null;
+  const out: number[] = [];
+  for (let i = 0; i < 8; i += 2) {
+    const x = surface[i], y = surface[i + 1];
+    const w = q.g * x + q.h * y + 1;
+    if (!Number.isFinite(w) || Math.abs(w) < 1e-9) return null;
+    out.push((q.a * x + q.b * y + q.c) / w, (q.d * x + q.e * y + q.f) / w);
+  }
+  return out as Surface['corners'];
 }

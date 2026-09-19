@@ -99,7 +99,14 @@ export type SceneFeature =
  * the microphone or whatever is plugged into it. Absent means `room`, because
  * every mapping written before there was a choice was a room mapping.
  */
-export type PatchSource = 'room' | 'film' | 'sound';
+/**
+ * What may drive a patch.
+ *
+ * The first three are sensors — the room, the film and the sound all report
+ * what is happening. `shape` is the LFOs and envelopes: what was asked for
+ * rather than what was noticed. See `lib/modulators.ts`.
+ */
+export type PatchSource = 'room' | 'film' | 'sound' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -185,6 +192,15 @@ export interface VisualizerSettings {
   heatDecay: number;
   
   // Automation
+  /**
+   * How much the plate breathes: surges of activity and rests between them.
+   *
+   * 0 is the flat plate — one rate, forever — which is what everything did
+   * before this existed and what a look that does not ask for phrasing still
+   * gets. Up, and the automation comes in gusts, the impulses land harder
+   * during them, and the clock itself leans forward and back.
+   */
+  surge: number;
   automateRate: number;
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
@@ -214,6 +230,11 @@ export interface VisualizerSettings {
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
   dishSpread: number;         // each layer its own dish, spread apart like three projectors on one screen
   cells: number;              // fine cell network on the lead plate, strongest in the dish core
+  /** A logo or title over the finished frame: opacity, where it sits and how big. */
+  markMix: number;            // 0 = no mark on the wall, 1 = fully opaque
+  markX: number;              // centre, 0..1 across the frame
+  markY: number;              // centre, 0..1 up the frame
+  markScale: number;          // width as a fraction of the frame; height follows the image's own aspect
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
@@ -279,7 +300,9 @@ export interface VisualizerSettings {
   sceneDrive: number;         // how hard the room's motion stirs the liquid (0 = off)
   sceneHands: number;         // how strongly the people the sensor holds press and blow on the plate (0 = off)
   sceneImpact: number;        // master depth over every patch whose source is the room
-  soundImpact: number;        // master depth over every patch whose source is the sound
+  soundImpact: number;
+  /** Master depth over every patch driven by an LFO or an envelope. */
+  shapeImpact: number;        // master depth over every patch whose source is the sound
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -324,14 +347,27 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledColor: '#FF0000',
   ledSpeed: 0.05,
   surfaceTension: 0.05,
-  // Off. Measured on the projector's GPU it does nothing a viewer can see: at
-  // 512² and 384² it cannot be told from 0 on a fixed composition, and at 256²,
-  // the rung the governor falls to when the machine is busy, switching it on
-  // for hundreds of frames grows pale terraces and tears the lips of the
-  // tongues rather than narrowing an edge — on the same plate it moves the
-  // 10-90% edge width by less than the plate's own drift, even at full
-  // strength. The control stays for the CPU solver at low grids, where it does
-  // measurably steepen.
+  // Still off, and now for a better reason than before.
+  //
+  // The pass had a real bug in it: the gate that keeps it from carving holes
+  // was read per channel, so where one dye met another at the same thickness
+  // it read zero on both channels and cancelled the flux. A colour boundary is
+  // what the pass is for, and it was the one boundary it could not touch. That
+  // is fixed — the gate reads the thickness now, and `npm run plate` measures
+  // a two-cell colour boundary narrowing by a third over two hundred steps
+  // where before it did not move at all.
+  //
+  // What did not follow is a reason to turn it on. Three arms on one preset at
+  // one frame time — 0, a half, full — come out flat: on Fillmore, where the
+  // beads and the dish make the frame's structure stable enough to compare,
+  // 0 / 0.5 / 1.0 give edge fractions of 8.7, 8.3 and 8.5 percent and p99
+  // gradients of 55.5, 54.8 and 55.0. On Classic the same three arms spread
+  // from 1.9 to 10.2, but so do two runs of identical settings, so that is the
+  // preset's own drift rather than the setting.
+  //
+  // So it stays where the first measurement put it. It is a slider and it is on
+  // CC15; a plate that wants it can have it, and the pass will now do something
+  // when it is asked to.
   sharpness: 0,
   granulation: 0.5,         // pigment texture between the boundaries, not just at them
   grainScale: 110,
@@ -340,6 +376,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  // Enough to be felt without the plate ever looking like it is pulsing to a
+  // beat it invented: a busy few seconds every ten or so, and genuinely quiet
+  // in between.
+  surge: 0.55,
   automateRate: 0.12,
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
@@ -389,14 +429,29 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampWarmth: 0,
   dimmer: 1,
   fingering: 0,
-  beads: 0,
+  // A few. The plate is oil on water and the reference for the whole look is a
+  // dish of it, which is hundreds of small dark-rimmed droplets — but this sat
+  // at zero, so thirty of the thirty-two presets had none and the only hard
+  // edges on those plates were the ones the dye happened to make. Low enough
+  // that a preset which wants a clean wash still reads as one; Fillmore asks
+  // for 0.8 when it wants a field of them.
+  beads: 0.18,
   dishSpread: 0,
   cells: 0,
+  markMix: 1,
+  markX: 0.5,
+  markY: 0.12,              // low, where a logo goes, and out of the plate's busy middle
+  markScale: 0.22,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look
-  macroZoom: 4.0,           // ~32 sim cells across the frame — one bead and its ground
+  // 1 is the whole plate, and the zoom is what takes you in: the camera picks
+  // a bead somewhere past 1 and the closeup's own exposure, depth of field and
+  // surface arrive over the travel rather than at a threshold. This shipped at
+  // 4 with the slider inert unless `macroMode` was on, which made a control on
+  // the desk — where there is no such switch — do nothing at all.
+  macroZoom: 1.0,
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
   macroSync: 0.5,
@@ -414,6 +469,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // look has ever carried a sound patch, so there is nothing to protect — and a
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
+  shapeImpact: 1,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

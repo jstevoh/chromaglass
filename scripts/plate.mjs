@@ -26,6 +26,7 @@ import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
+import fs from 'node:fs';
 
 const STYLES = ['drop', 'pour', 'spray', 'splatter', 'streak'];
 /** Keys that are a plate but not a preset in the menu. */
@@ -109,6 +110,198 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   check('every bottle lays enough dye to show the colour you picked',
     invisible.length === 0,
     invisible.map(l => `${l.id} at ${l.injectAmount}`).join(', '));
+}
+
+// ── 5.5. The reconstruction filter is interpolating ─────────────
+//
+// Every sample the renderer takes of the dye goes through `textureBicubic`,
+// and for a long time that function was the cubic B-spline basis under a
+// comment that said Catmull-Rom. B-spline does not pass through its samples:
+// at a texel centre its weights are (1, 4, 1)/6, so each fetch returned a
+// blurred neighbourhood instead of the value that was there. Nothing failed,
+// no frame was wrong, the whole plate was simply soft — which is the kind of
+// bug that survives for months because it looks like a choice.
+//
+// This reads the four weight expressions out of the shipped shader and runs
+// them, so it tests the app rather than a copy of the maths. Two properties
+// tell the two families apart with no tuning in them at all: the weights at a
+// texel centre, and how steeply the kernel can reconstruct a step edge.
+{
+  const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const body = src.slice(src.indexOf('vec4 textureBicubic'));
+  const weights = [...body.slice(0, body.indexOf('vec2 w12')).matchAll(/vec2 w[0-3] = ([^;]+);/g)].map(m => m[1]);
+  check('the shader still has four reconstruction weights to read', weights.length === 4,
+    `found ${weights.length}`);
+  if (weights.length === 4) {
+    const at = (f) => weights.map(w => Function('f', `return ${w};`)(f));
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
+    const centre = at(0);
+    check('a sample at a texel centre returns that texel, not its neighbourhood',
+      Math.abs(centre[1] - 1) < 1e-6 && Math.abs(centre[0]) + Math.abs(centre[2]) + Math.abs(centre[3]) < 1e-6,
+      centre.map(v => v.toFixed(3)).join(' '));
+    const off = [0.25, 0.5, 0.75].map(f => sum(at(f)));
+    check('the weights still sum to one everywhere between centres',
+      off.every(v => Math.abs(v - 1) < 1e-6), off.map(v => v.toFixed(4)).join(' '));
+    // A unit step through the kernel, sampled finely: how hard is the hardest
+    // edge it can draw? The B-spline this replaced managed 0.75 per texel.
+    const step = (i) => (i >= 0 ? 1 : 0);
+    let steepest = 0, prev = null;
+    for (let x = -3; x <= 3; x += 1 / 32) {
+      const i = Math.floor(x), k = at(x - i);
+      const v = k[0] * step(i - 1) + k[1] * step(i) + k[2] * step(i + 1) + k[3] * step(i + 2);
+      if (prev !== null) steepest = Math.max(steepest, Math.abs(v - prev) * 32);
+      prev = v;
+    }
+    check('a boundary comes back at least as hard as the texels that hold it',
+      steepest > 1.0, `${steepest.toFixed(2)} per cell across a step (B-spline managed 0.75)`);
+  }
+}
+
+// ── 5.6. A colour boundary is a boundary the sharpen pass can hold ────
+//
+// Both solvers run an anti-diffusion pass to walk back the smearing the rest
+// of the step applies, and the gate that stops it carving holes used to be
+// read per channel. Where red meets blue at the same thickness that gate is
+// zero on both channels — full on one side, empty on the other — so the pass
+// cancelled itself at exactly the boundary it exists for. On a plate with dye
+// everywhere that is nearly every boundary, which is why it measured as doing
+// nothing and shipped switched off for months.
+//
+// This runs the kernel here, on a red field meeting a blue one at equal
+// thickness, and asks for the two things that tell a fixed pass from the
+// broken one: a boundary a couple of cells wide has to narrow, and a smooth
+// wash has to be left alone, because growing a wash is what terraces a dish.
+{
+  const N = 48, FLOOR = 0.08, K = 0.135;          // K is the curve's value at sharpness 1
+  const at = (x, y) => x + y * N;
+  const smeared = (sm) => {
+    const f = { a: new Float32Array(N * N), r: new Float32Array(N * N), b: new Float32Array(N * N) };
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const t = 1 / (1 + Math.exp(-(x - N / 2) / sm));
+      f.a[at(x, y)] = 1; f.r[at(x, y)] = 1 - t; f.b[at(x, y)] = t;
+    }
+    return f;
+  };
+  const g = (p, q) => (p < q ? p / (q + 1e-4) : q / (p + 1e-4));
+  const sweep = (f) => {
+    const src = [f.a, f.r, f.b].map(c => Float32Array.from(c));
+    const ga = src[0];                             // the gate is the thickness, for every channel
+    [f.a, f.r, f.b].forEach((out, ci) => {
+      const o = src[ci];
+      for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+        const i = at(x, y);
+        const nb = [i - 1, i + 1, i - N, i + N, i - N - 1, i - N + 1, i + N - 1, i + N + 1];
+        const w = [0.2, 0.2, 0.2, 0.2, 0.05, 0.05, 0.05, 0.05];
+        let flux = 0, lo = o[i], hi = o[i];
+        for (let n = 0; n < 8; n++) {
+          flux += w[n] * g(ga[i], ga[nb[n]]) * (o[i] - o[nb[n]]);
+          lo = Math.min(lo, o[nb[n]]); hi = Math.max(hi, o[nb[n]]);
+        }
+        const q = Math.sign(flux) * Math.max(Math.abs(flux) - FLOOR * (hi - lo), 0);
+        out[i] = Math.max(0, Math.min(hi, Math.max(lo, o[i] + K * q)));
+      }
+    });
+  };
+  /** The 10-90% width of the red channel across the middle row, in cells. */
+  const width = (f) => {
+    const row = [];
+    for (let x = 0; x < N; x++) row.push(f.r[at(x, N >> 1)]);
+    const lo = Math.min(...row), hi = Math.max(...row);
+    const cross = (p) => {
+      const tgt = lo + (hi - lo) * p;
+      for (let x = 1; x < N; x++) if ((row[x - 1] - tgt) * (row[x] - tgt) <= 0)
+        return x - 1 + (row[x - 1] - tgt) / (row[x - 1] - row[x] + 1e-9);
+      return NaN;
+    };
+    return Math.abs(cross(0.1) - cross(0.9));
+  };
+  const run = (sm) => { const f = smeared(sm); const before = width(f);
+    for (let i = 0; i < 200; i++) sweep(f); return [before, width(f)]; };
+
+  const [edge0, edge1] = run(0.5);
+  check('a smeared colour boundary narrows instead of sitting there',
+    edge1 < edge0 * 0.85, `${edge0.toFixed(1)} → ${edge1.toFixed(1)} cells over 200 steps`);
+
+  const [wash0, wash1] = run(3);
+  check('a smooth wash is still left alone rather than grown into terraces',
+    Math.abs(wash1 - wash0) < 0.2, `${wash0.toFixed(1)} → ${wash1.toFixed(1)} cells over 200 steps`);
+
+  // The model above is a model. These two read the shipped solvers, so a gate
+  // quietly put back the way it was fails here rather than in a show.
+  const shader = fs.readFileSync(process.cwd() + '/src/lib/gpuFluid.ts', 'utf8');
+  const gpuGate = /float gate\(vec4 a, vec4 b\) \{ return min\(a\.a, b\.a\)/.test(shader);
+  check('the GPU solver reads its gate from the thickness, not from the channel',
+    gpuGate, gpuGate ? '' : 'gate() in gpuFluid.ts is back to per-channel');
+  const cpu = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
+  const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);
+  check('the CPU solver reads its gate from the thickness too',
+    cpuGate, cpuGate ? '' : 'sharpenDye in LiquidVisualizer.tsx is back to per-channel');
+}
+
+// ── 5.7. The closeup is a travel, not a switch ─────────────────
+//
+// The macro zoom used to reach the renderer only through a boolean, so the
+// closeup arrived in one frame: a different exposure, a different depth of
+// field, a different silhouette, all at once. It ramps now, and how far along
+// the ramp a given zoom sits is a pure function of two constants in the
+// component — so this reads them out and runs it.
+//
+// It is here rather than in `npm run qa` because qa tried to check this from
+// the pixels, by asking whether a frame at 1.4x sits nearer the plate-wide
+// frame than one at 9x does. Image distance is not monotonic in zoom, and on a
+// slower machine the magnified bead landed *closer* to the plate frame than
+// the mid-zoom did, failing a check on a plate that was behaving correctly.
+{
+  const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  const full = Number(/const MACRO_FULL_ZOOM = ([\d.]+)/.exec(src)?.[1]);
+  const ramp = (zoom) => Math.max(0, Math.min(1, (zoom - 1) / (full - 1)));
+  check('the closeup has a ramp to travel along at all',
+    Number.isFinite(full) && full > 1, `fully in at ${full}x`);
+  if (Number.isFinite(full) && full > 1) {
+    check('the whole plate is none of the closeup', ramp(1) === 0);
+    const middle = ramp(1 + (full - 1) * 0.5);
+    check('half way in is half of it, not all and not none',
+      middle > 0.4 && middle < 0.6, `${middle.toFixed(2)} at ${(1 + (full - 1) * 0.5).toFixed(2)}x`);
+    check('and it is in all the way before the zoom runs out',
+      ramp(full) === 1 && ramp(16) === 1);
+    // No step along the way may carry most of the change: that is a cut with
+    // a ramp drawn around it.
+    let biggest = 0, prev = ramp(1);
+    for (let z = 1; z <= full; z += (full - 1) / 40) {
+      const now = ramp(z);
+      biggest = Math.max(biggest, now - prev);
+      prev = now;
+    }
+    check('and no one step along it is a cut', biggest < 0.1,
+      `the largest fortieth of the travel moves it ${biggest.toFixed(3)}`);
+  }
+}
+
+// ── 5.8. Every look says how much it breathes ──────────────────
+//
+// `surge` decides whether a plate drifts at one rate or surges and rests, and
+// it is the difference between Lumia and Acid Trip far more than any single
+// colour is. A preset that does not name it inherits whatever the default
+// happens to be, which means the two of them breathe identically — and the
+// whole point of a library of looks is that they do not.
+{
+  const missing = PRESETS.filter(p => typeof p.settings.surge !== 'number');
+  check('every look chooses how much it breathes',
+    missing.length === 0, missing.map(p => p.id).join(', ') || `all ${PRESETS.length}`);
+
+  const surges = PRESETS.map(p => p.settings.surge ?? 0);
+  const lo = Math.min(...surges), hi = Math.max(...surges);
+  check('and the library uses the range rather than clustering on one value',
+    lo < 0.25 && hi > 0.8, `${lo} to ${hi}`);
+
+  // The looks whose whole character is stillness must not be the loud ones.
+  const still = ['lumia', 'velvet-underground', 'aurora-borealis'];
+  const loud = ['acid-trip', 'microscopic-chaos', 'bass-drop'];
+  const surgeOf = (id) => PRESETS.find(p => p.id === id)?.settings.surge ?? -1;
+  check('the quiet looks are quieter than the loud ones',
+    Math.max(...still.map(surgeOf)) < Math.min(...loud.map(surgeOf)),
+    `${still.map(surgeOf).join('/')} against ${loud.map(surgeOf).join('/')}`);
 }
 
 // ── 6. The audit ─────────────────────────────────────────────────────

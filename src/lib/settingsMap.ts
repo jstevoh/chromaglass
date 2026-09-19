@@ -90,6 +90,18 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 
   { id: 'projectors', name: 'Projectors', category: 'stage',
     terms: 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop video window tab screen capture share archive internet archive prelinger movie footage' },
+  // Out of Projectors for the same reason as the mark: it made that section
+  // three screens deep, and cutting a picture into shapes is a job of its own.
+  { id: 'mapping', name: 'Mapping', category: 'stage',
+    terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between' },
+  /*
+    A section rather than a row in Projectors, because loading a mark and
+    placing it is a job somebody does once before doors and then leaves alone,
+    and because it is the one thing in here that belongs to whoever is paying
+    for the room rather than to the look.
+  */
+  { id: 'mark', name: 'Logo & Titles', category: 'stage',
+    terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Multi-Layer Mixer', category: 'stage',
     terms: 'layer blend mode screen multiply overlay exclusion count mixer led platform' },
   { id: 'simulation', name: 'Simulation', category: 'stage',

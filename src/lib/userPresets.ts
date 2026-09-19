@@ -87,6 +87,19 @@ export function cleanSettings(raw: Partial<VisualizerSettings>): VisualizerSetti
     else out[key] = d;
   }
   out.simResolution = 'auto';
+  /*
+    The macro zoom used to be inert unless `macroMode` was on.
+
+    It is the control now — a look is at the plate at 1x and travels into the
+    closeup as it rises — which means a look saved back when the zoom did
+    nothing would come back magnified by whatever the slider happened to be
+    left at. Under the old rules that look rendered plate-wide, so that is what
+    it is restored as. A look that had the camera on keeps its zoom, and one
+    saved with the camera on but no zoom of its own gets the framing that
+    always meant.
+  */
+  if (out.macroMode !== true) out.macroZoom = 1;
+  else if (typeof out.macroZoom !== 'number' || out.macroZoom <= 1) out.macroZoom = 4;
   return out as unknown as VisualizerSettings;
 }
 

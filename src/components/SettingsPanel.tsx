@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
+import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
-import { OutputPanel } from './OutputPanel';
+import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
 import { Segmented, Sheet } from './ui';
 import { readSetting } from '../lib/readout';
@@ -94,6 +95,10 @@ interface SettingsPanelProps {
   /** Another tab, window or screen, through the browser's own picker. */
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
+  /** The mark: a logo or title card over the finished frame, and whether one is loaded. */
+  markLoaded?: boolean;
+  onMarkFile?: (file: File) => void;
+  onMarkClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
   /*
     What is listening, and on which device.
@@ -139,6 +144,8 @@ interface SettingsPanelProps {
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
   midiClocked?: boolean;
+  /** Where a desk says we are, formatted, or null when nothing is sending timecode. */
+  timecode?: string | null;
   /** What to do when a second screen is connected. */
   projectorMode?: 'ask' | 'auto' | 'off';
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
@@ -170,11 +177,14 @@ const AUDIO_FEATURES: [AudioFeature, string][] = [
   ['complexity', 'Complexity'],
 ];
 
-/** The three things a patch can listen to, and what each one is called. */
+/** What a patch can listen to, and what each one is called. */
 const PATCH_SOURCES: [PatchSource, string][] = [
   ['room', 'Room'],
   ['film', 'Film'],
   ['sound', 'Sound'],
+  // The odd one out, and last for that reason: the other three report what is
+  // happening in the room, and this one is a shape you asked for.
+  ['shape', 'Shapes'],
 ];
 
 /**
@@ -186,7 +196,9 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  * can tell you.
  */
 const featuresFor = (source: PatchSource): [string, string][] =>
-  source === 'sound' ? AUDIO_FEATURES : SCENE_FEATURES;
+  source === 'sound' ? AUDIO_FEATURES
+    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
+    : SCENE_FEATURES;
 
 /**
  * What a patch may be plugged into. One list, in `sceneMap`, so the dropdown
@@ -247,15 +259,19 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
     && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
-  const [liveFps, setLiveFps] = useState<number | null>(null);
+  const [live, setLive] = useState<EngineStatus | null>(null);
+  /** `?debug` puts the frame's cost split under the engine readout. */
+  const showFrameSplit = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).has('debug');
   useEffect(() => {
     if (!getLiveEngineStatus) return;
-    const tick = () => { const s = getLiveEngineStatus(); setLiveFps(s && s.frameMs > 0 ? Math.round(1000 / s.frameMs) : null); };
+    const tick = () => { setLive(getLiveEngineStatus() ?? null); };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -624,6 +640,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
               {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
             </Info>
+            {/*
+              Timecode is not a tempo, so it is its own line rather than a
+              fourth way of setting one. Shown only while a desk is sending:
+              a readout that says nothing all evening is worse than no readout.
+            */}
+            {timecode && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2" data-testid="timecode-readout">
+                <span className="text-[13px] font-medium text-text">Timecode</span>
+                <span className="font-mono text-[13px] tabular-nums">{timecode}</span>
+                <span className="text-[12px] opacity-40">the sequence is following the desk</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1824,7 +1852,70 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
       </section>
 
+      {/* Mapping Section */}
+      <section id="settings-mapping" className={`mb-8 scroll-mt-4 ${shown('mapping') ? '' : 'hidden'} ${focusSection === 'mapping' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="mapping">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Shapes size={12} /> Mapping
+        </h3>
+        {output && onOutput && <MappingPanel output={output} onChange={onOutput} />}
+      </section>
+
       {/* Simulation Section */}
+      {/*
+        Logo & Titles
+
+        The one thing on the wall that is not the plate. `injectImage` already
+        existed and pours a picture into the liquid as dye, which is the lovely
+        thing to do with an image and the wrong thing to do with the mark of
+        whoever is paying for the room: it dissolves in about four seconds.
+        This one sits over the top and stays put for three hours.
+      */}
+      <section id="settings-mark" className={`mb-8 scroll-mt-4 ${shown('mark') ? '' : 'hidden'} ${focusSection === 'mark' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="stage" data-section="mark">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Image size={12} /> Logo &amp; Titles
+        </h3>
+        <div className="flex gap-2 mb-5">
+          <input
+            ref={markInputRef}
+            id="mark-file"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
+          />
+          <button
+            onClick={() => markInputRef.current?.click()}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+            title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
+            data-testid="mark-load"
+          >
+            <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
+          </button>
+          <button
+            onClick={() => onMarkClear?.()}
+            disabled={!markLoaded}
+            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+            data-testid="mark-clear"
+          >
+            Take it off
+          </button>
+        </div>
+        <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
+          onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
+        <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
+          onChange={(v: number) => onUpdate({ markScale: v })} settingKey="markScale" />
+        <Slider label="Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
+          onChange={(v: number) => onUpdate({ markX: v })} settingKey="markX" />
+        <Slider label="Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
+          onChange={(v: number) => onUpdate({ markY: v })} settingKey="markY" />
+        <Info>
+          Laid over the finished frame, so it reaches the projector window, a cast to another screen, a recording and
+          another machine capturing this one — not just the laptop's own screen. A PNG with transparency is what you
+          want; the plate shows through wherever the file is transparent. It sits under nothing, including the house
+          dimmer, so a blackout leaves the mark on the wall. Its own opacity is the control for taking it off.
+        </Info>
+      </section>
+
       <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('simulation') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Simulation
@@ -1834,10 +1925,40 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <span className="text-[13px] font-medium text-text">Fluid Grid</span>
             {engineStatus && (
               <span className="text-[12px] font-mono opacity-50">
-                {engineStatus.label} · {liveFps ?? (engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–')} fps
+                {engineStatus.label} · {(live ?? engineStatus).frameMs > 0 ? Math.round(1000 / (live ?? engineStatus).frameMs) : '–'} fps
+                {/*
+                  The speed, when it is not full speed. A frame rate says the
+                  frames are arriving; it cannot say the liquid inside them is
+                  advancing slower than the clock, which is what happens when a
+                  solver step costs more than a frame and the catch-up gives up.
+                  Shown only when it is true, because on a machine with room it
+                  is always 60 and would be noise.
+                */}
+                {(() => {
+                  const sps = (live ?? engineStatus).stepsPerSec;
+                  if (!(sps > 0) || sps >= 57) return null;
+                  return <span className="text-amber-300/80"> · {Math.round((sps / 60) * 100)}% speed</span>;
+                })()}
               </span>
             )}
           </div>
+          {/*
+            Where a frame actually goes, on a `?debug` visit. Cost that does
+            not fall when the grid falls is not the grid's cost, and that is
+            the whole question a grid sweep is trying to answer — so put both
+            halves next to the control that changes the grid, rather than
+            behind a console command typed once per reading.
+
+            `solver` is the CPU time to submit one step across every layer,
+            not the GPU time to run it: WebGL2 has no portable way to ask.
+          */}
+          {showFrameSplit && engineStatus && (
+            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+              solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
+              {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
+              {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of 60 steps/s
+            </div>
+          )}
           <select
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
@@ -1868,27 +1989,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Microscope size={12} /> Macro Closeup
         </h3>
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[13px] font-medium text-text">Bead Camera</span>
-          <button
-            onClick={() => onUpdate({ macroMode: !settings.macroMode })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${settings.macroMode ? 'bg-white' : 'bg-white/20'}`}
-            title="Magnify the plate and chase a single bead of liquid"
-          >
-            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.macroMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
-          </button>
-        </div>
-        {settings.macroMode && (
-          <>
-            <Slider
-              label="Zoom"
-              value={settings.macroZoom}
-              min={1}
-              max={16}
-              step={0.5}
-              onChange={(v: number) => onUpdate({ macroZoom: v })}
+        {/*
+          Zoom first, and never hidden.
+
+          It used to sit behind the Bead Camera switch, so the slider a desk or
+          a pin draws — which has no switch next to it — did nothing at all
+          until somebody found this panel and turned the camera on. The zoom is
+          the control: at 1 the frame is the whole plate, and pushing it in is
+          the closeup arriving rather than a cut to it.
+        */}
+        <Slider
+          label="Zoom"
+          value={settings.macroZoom ?? 1}
+          min={1}
+          max={16}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ macroZoom: v, macroMode: v > 1.05 })}
           settingKey="macroZoom"
         />
+        {(settings.macroZoom ?? 1) <= 1.05 && (
+          <Info>
+            At 1× this is the whole plate. Push the zoom in and the camera picks a bead and follows it — the exposure,
+            the depth of field and the surface under the dye all arrive with the magnification rather than switching on
+            at a threshold. Everything below shapes that closeup and takes effect as you come in.
+          </Info>
+        )}
+        {(settings.macroZoom ?? 1) > 1.05 && (
+          <>
             <Slider
               label="Chase Speed"
               value={settings.macroChase}

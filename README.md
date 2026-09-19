@@ -162,6 +162,135 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 /chromaglass/dye #rrggbb               the dropper's colour
 ```
 
+## A logo that survives the plate
+
+Dropping an image into the liquid is the lovely thing to do with it — the dye
+takes the picture and the plate pulls it apart over about four seconds — and
+exactly the wrong thing to do with the mark of whoever is paying for the room.
+**Settings → Logo & Titles** loads a still that sits over the finished frame
+instead: opacity, size, and where it sits.
+
+A PNG with transparency is what you want; the plate shows through wherever the
+file is transparent.
+
+It is composited in the shader rather than as an element over the canvas, so it
+reaches everything that reads the canvas — the projector window, a cast to
+another screen, a recording, and another machine capturing this window — and
+not merely the laptop's own display. It sits below the house dimmer, so a
+blackout leaves the mark on the wall; its own opacity is the control for
+taking it off.
+
+## Run it as a box
+
+A Pi or a mini PC behind the screen, powered on, showing the plate: no laptop,
+nothing to click. Same build, two systemd units and a browser told to get out
+of the way. See [docs/appliance.md](docs/appliance.md).
+
+## Timecode
+
+A festival or a theatre runs to a timeline, and a visual on its own timer
+drifts away from it over an evening. If the desk sends **MIDI timecode** down
+the cable the faders are already on, the show follows it: the position decides
+which stage of the running sequence is up and how far into it we are, so a
+locate at the desk puts the visuals where the sound and the lights are rather
+than wherever its own clock had got to. Nothing to set up — it appears in
+**Settings → Sound** while a desk is sending, and the moment the desk stops the
+show takes its own clock back.
+
+All four rates are read (24, 25, 29.97, 30), full-frame locates as well as
+rolling quarter-frames, and the two frames a quarter-frame message spends
+spelling itself out are put back — without that a show sits permanently eighty
+milliseconds behind the desk. `npm run timecode` checks all of it.
+
+LTC over an audio input is not here. It is a different problem — a decoder
+rather than a parser — and worth doing only for rooms that have no MIDI to the
+desk at all.
+
+## Judging what a sandbox cannot
+
+Four decisions in here were made on evidence a software rasteriser can produce —
+kernels, deterministic simulations, arithmetic — and none has been seen on a
+machine that draws the plate at sixty frames a second. Each is a query parameter
+away from its alternative, so they can be judged in a minute rather than taken
+on trust: see [docs/judging.md](docs/judging.md).
+
+## Shapes: LFOs and envelopes
+
+The patch bay already routed a source onto any setting with a bipolar depth —
+it just had nothing to plug in that was not a sensor. The room, the film and the
+sound all answer "what is happening out there"; **Shapes** answers "what did you
+ask for".
+
+Four LFOs and two envelopes, in **Settings → Sound Mappings** alongside the rest:
+
+| | |
+|---|---|
+| LFO 1 | sine, eight bars |
+| LFO 2 | sine, two bars |
+| LFO 3 | triangle, one bar |
+| LFO 4 | stepped — a new value held flat, every beat |
+| Envelope 1 | snap: up in a frame, gone in a third of a second |
+| Envelope 2 | swell: up in a tenth, gone in a second and a half |
+
+**The LFOs run on bars, not on seconds.** A free-running LFO against music
+drifts in and out of time and everything it touches looks almost-but-not-quite
+deliberate. These are divisions of a bar and stay put against MIDI clock, a
+tapped tempo or the beat clock listening; with no tempo at all they run the same
+divisions at 120.
+
+**The envelopes are fired, not free.** Every MIDI note fires both, whatever else
+that pad is bound to — an envelope is not something you assign a pad to, it is
+what the pad being hit feels like. Velocity scales them, so a soft note is a
+small one. Without a controller they sit at zero, which is the honest answer.
+
+`npm run shapes` checks the arithmetic: that a one-bar LFO is back where it
+started one bar later and gets there twice as fast at twice the tempo, that the
+triangle climbs at one rate and the sine does not, that the stepped one holds
+and jumps, and that the snap is over while the swell is still going.
+
+## Art-Net: the room's lights follow the plate
+
+Every lighting box takes Art-Net *in* so a desk can drive the visuals. This does
+that too, but the direction worth having is the other one. The plate already
+knows what colour it is, layer by layer, so the par cans washing the room can be
+the same blue the dye just went, and the projection and the rig stop being two
+things somebody matches by hand.
+
+The browser cannot open a UDP socket, so the show server does the sending — run
+`npm run remote` and give it a host:
+
+```
+ARTNET_HOST=10.0.0.255 npm run remote          # broadcast to the lighting network
+ARTNET_HOST=10.0.0.9 ARTNET_FIXTURES=6 ARTNET_ORDER=rgbw ARTNET_START=17 npm run remote
+```
+
+| | |
+|---|---|
+| `ARTNET_HOST` | where to send. Nothing is sent until this is set. A broadcast address works. |
+| `ARTNET_UNIVERSE` | 0 by default; anything up to 32767, net and sub-net handled for you |
+| `ARTNET_FIXTURES` | how many, 4 by default. They take the plate's layers in turn, so two layers over six pars alternate. |
+| `ARTNET_START` | the first channel, 1 by default |
+| `ARTNET_ORDER` | `rgb` (default), `grb`, `brg`, `rgbw`, `drgb`, `drgbw` — `d` is a dimmer taking the brightest channel, `w` a white taking the colour's own white content |
+| `ARTNET_RATE` | frames a second, 30 by default, 44 is the spec's ceiling |
+| `ARTNET_PORT` | 6454 by default |
+
+The plate's own thickness rides the level, so the room dims when the glass thins
+instead of sitting at full over nothing, and a blackout on the desk is a
+blackout on the rig.
+
+**The other direction.** `ARTNET_IN` maps channels onto settings, for a show
+where the desk holds the running order:
+
+```
+ARTNET_IN=1:audioImpact,2:gooeyEffect,10:globalSpeed:0:0.1 npm run remote
+```
+
+A channel is 0–255 and maps onto 0–1 unless the pair carries its own range, as
+`globalSpeed` does above. A desk sends its universe forty times a second whether
+anything moved or not, so only a channel that actually changed becomes a change
+here. `npm run lights` checks the packet, the patch and a universe over a real
+socket.
+
 ## MIDI and game controllers
 
 A controller on the desk becomes the show's hands: faders ride settings, pads cue presets and dye colours, buttons fire the one-shots and drive the sequencer. Chrome, Edge or Opera — Safari and Firefox have no Web MIDI.
@@ -292,7 +421,7 @@ The same build serves three situations, and only the assumed headroom differs:
 
 | Tier | How it runs | Ladder |
 |---|---|---|
-| **Hosted** | chromaglass.web.app | up to 384² at 1.5x pixels — never stutters on a first visit |
+| **Hosted** | chromaglass.web.app | up to 512² at 1.5x pixels — starts low and climbs only if the machine holds it |
 | **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
 | **Native** | a desktop shell around `dist/` (not built yet) | as local |
 
@@ -306,6 +435,37 @@ For testing, `?sim=cpu|auto|<size>`, `?tier=hosted|local|native` and
 `?warp=N` lifts the solver's catch-up cap (steps per frame) so a slow renderer
 still keeps up with wall-clock time, and `?debug` exposes
 `window.chromaglassDebug()` with the live solver state and governor.
+
+### What a frame costs on your machine — `?bench`
+
+Open any ChromaGlass URL with **`?bench`** on the end and it measures itself:
+it walks the solver down every grid in turn, waits for each to settle, samples
+it, and hands back a block of text with a Copy button. It takes about a minute
+and puts the grid back where it found it.
+
+```
+grid       fps   frame   solver    other  steps/s  speed
+256²        52  19.2ms    3.3ms   15.4ms       60    100%
+384²        36  27.8ms    7.4ms   15.1ms       60    100%
+512²        20  50.0ms   13.2ms   16.4ms       40     67%
+```
+
+Two columns are the point. **solver** is one step across every layer; **other**
+is the frame minus the solver — the renderer, the readback, React, everything
+that does not get cheaper when the grid does. If `other` stays flat while the
+grid falls, the grid was never what was costing you.
+
+**speed** is separate and easy to miss. When a solver step costs more than a
+frame's budget the loop stops asking for four steps and asks for one, so the
+plate advances slower than wall-clock while every frame still arrives on time.
+A frame rate cannot show that; at 25% the liquid is moving at a quarter speed
+and the show only looks a bit choppy. The engine readout in Settings →
+Simulation prints it too, whenever it is not 100%.
+
+`npm run bench` runs the same sweep from the command line, and
+`chromaglassBench()` starts it by hand on a `?debug` page. Nothing is sent
+anywhere — the report is text, printed and shown, for you to do what you like
+with.
 
 ## Controls
 
@@ -408,6 +568,8 @@ src/
     frameProbe.ts              # What the frame that just went to the wall actually looked like
     flashGuard.ts              # Three flashes a second, and no more
     tempo.ts                   # MIDI clock, tap and a typed bpm, for when the microphone is not the best source
+    timecode.ts                # MIDI timecode: the desk's position, so the sequence follows the running order
+    modulators.ts              # LFOs on the bar and fired envelopes, as patch-bay sources
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye
@@ -435,7 +597,10 @@ src/
     OutputPanel.tsx            # Load-in: drag the corners square, pull the masks in, grade for the room
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
-  remote-server.js             # LAN static server + control relay + OSC in (npm run remote)
+  remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)
+  artnet.js                    # Art-Net packet and patch: the plate's colour out to the rig, a desk's faders in
+  chromaglass.service          # systemd: the show server on a box (docs/appliance.md)
+  chromaglass-kiosk.service    # systemd: the browser, full screen, on the box's HDMI
 public/
   manifest.webmanifest         # PWA manifest: installable, standalone window
   sw.js                        # Service worker: light cache, never the relay
@@ -480,6 +645,17 @@ npm run build
 npx firebase deploy --only hosting
 ```
 
-## License
+## Licence
 
-MIT
+**[Business Source License 1.1](LICENSE)**, converting automatically to Apache 2.0
+on 2030-09-19.
+
+In plain terms: **performing with it is free, selling it is not.** Run it,
+modify it, play a show with it, charge for that show, sell the footage a plate
+renders — none of that needs permission. What the licence reserves is offering
+ChromaGlass itself, or a derivative, to other people as a product: as software,
+as a hosted service, or on a box.
+
+Versions **1.2.0 and earlier were MIT**, and that grant is permanent for anyone
+who has them. See [LICENSE-HISTORY.md](LICENSE-HISTORY.md) for what applies to
+what, and why this line rather than the usual non-commercial one.

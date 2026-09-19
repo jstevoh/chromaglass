@@ -1,0 +1,13 @@
+ChromaGlass grid sweep · 2026-09-19T02:34:57.946Z
+ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)
+tier local · gpu strong · 1 layer · dpr 1 · 1280x800
+
+grid        fps   frame   solver    other  steps/s  speed
+256²         59  17.0ms    1.7ms   15.3ms       59    98%
+384²         59  17.0ms    1.8ms   15.2ms       60   100%
+512²         59  17.0ms    1.8ms   15.1ms       60   100%
+768²         48  20.8ms    0.4ms   20.4ms       57    95%
+cpu192       42  23.6ms   22.3ms    1.4ms       42    69%
+
+solver = one step across every layer (CPU submission time on the GPU path).
+other  = the frame minus the solver. speed = steps/s against the 60 the show asks for.

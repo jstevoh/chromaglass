@@ -62,7 +62,10 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   const line = `${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`;
   console.log(line);
-  if (!process.stdout.isTTY) process.stderr.write(line + '\n');
+  // Piped (`npm run wall | tail`), the terminal still sees progress on stderr.
+  // Only when stderr is a terminal, though: with `2>&1`, or on CI where neither
+  // is, writing both printed every check twice.
+  if (!process.stdout.isTTY && process.stderr.isTTY) process.stderr.write(line + '\n');
 };
 
 // ── The flash guard, before anything is launched ─────────────────────
@@ -225,6 +228,11 @@ const BASE = {
   flipX: false, flipY: false, corners: IDENTITY,
   maskTop: 0, maskRight: 0, maskBottom: 0, maskLeft: 0, maskFeather: 0,
   gain: 1, gamma: 1,
+  // Listed, not omitted: `withOutput({})` means "a plain projector", and a key
+  // that is missing from here is a key the reset cannot put back — the last
+  // section of this run waited twenty seconds for a config with no shapes in
+  // it while a shape from the section before was still on.
+  surfaces: [],
 };
 
 let page;
@@ -262,7 +270,13 @@ try {
         && live.gain === c.gain && live.gamma === c.gamma
         && live.maskTop === c.maskTop && live.maskRight === c.maskRight
         && live.maskBottom === c.maskBottom && live.maskLeft === c.maskLeft
-        && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6);
+        && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6)
+        && (live.surfaces ?? []).length === (c.surfaces ?? []).length
+        && (live.surfaces ?? []).every((s, i) => {
+          const w = (c.surfaces ?? [])[i];
+          return w && s.shape === w.shape && s.enabled === w.enabled
+            && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
+        });
     }, want, { timeout: 20000 });
     await page.evaluate(() => new Promise((done) => {
       let n = 0;
@@ -582,6 +596,77 @@ try {
   check('the guard is on without anyone asking for it', guardOn === true, `flashGuard ${guardOn}`);
   const reading = await page.evaluate(() => window.chromaglassDebug?.().flash?.()?.luminance ?? null);
   check('and it is being fed', reading !== null && reading > 0, `luminance ${reading}`);
+
+  // ── 7b. Projection mapping ─────────────────────────────────────────
+  //
+  // The geometry is proved in `npm run map`, which has no picture in it. What
+  // can only be seen here is whether the shapes actually *mask*: that the
+  // frame goes dark where no surface lands, that a gap between two of them
+  // stays a gap, and that a circle is a circle rather than the rectangle it is
+  // cut from. Every claim is a ratio against the same cells with no surfaces
+  // on, so a plate that happens to be dark in one corner cannot pass or fail
+  // one of these on its own.
+  {
+    const quad = (x0, y0, x1, y1) => [x0, y0, x1, y0, x1, y1, x0, y1];
+    const surf = (shape, x0, y0, x1, y1, extra = {}) => ({
+      id: `${shape}-${x0}-${y0}`, shape, corners: quad(x0, y0, x1, y1),
+      src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, ...extra,
+    });
+    /** Mean luminance over a rectangle of the frame, in 0..1 screen space. */
+    const region = (g, x0, y0, x1, y1) =>
+      g ? meanOver(g, (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1) : NaN;
+
+    await withOutput({});
+    const bare = await gridOf();
+
+    // One small square: everything outside it must go out.
+    await withOutput({ surfaces: [surf('rect', 0.4, 0.4, 0.6, 0.6)] });
+    const one = await gridOf();
+    const outsideBefore = region(bare, 0.0, 0.0, 0.25, 0.25);
+    const outsideAfter = region(one, 0.0, 0.0, 0.25, 0.25);
+    check('outside a shape the projector goes dark',
+      outsideAfter < 0.01 && outsideAfter < outsideBefore * 0.1,
+      `${outsideBefore.toFixed(3)} -> ${outsideAfter.toFixed(3)}`);
+    const insideBefore = region(bare, 0.43, 0.43, 0.57, 0.57);
+    const insideAfter = region(one, 0.43, 0.43, 0.57, 0.57);
+    check('and inside it the picture is still there',
+      insideAfter > insideBefore * 0.3 && insideAfter > 0.01,
+      `${insideBefore.toFixed(3)} -> ${insideAfter.toFixed(3)}`);
+
+    // Two shapes with wall between them: the wall stays wall.
+    await withOutput({
+      surfaces: [surf('rect', 0.04, 0.3, 0.34, 0.7), surf('rect', 0.66, 0.3, 0.96, 0.7)],
+    });
+    const two = await gridOf();
+    const left = region(two, 0.08, 0.35, 0.3, 0.65);
+    const right = region(two, 0.7, 0.35, 0.92, 0.65);
+    const gap = region(two, 0.42, 0.35, 0.58, 0.65);
+    check('two shapes light, and the gap between them does not',
+      left > 0.01 && right > 0.01 && gap < 0.01,
+      `left ${left.toFixed(3)} gap ${gap.toFixed(3)} right ${right.toFixed(3)}`);
+
+    // A circle is not the square it was cut from. Its bounding quad's corner
+    // has to be dark while its middle is lit — the one claim that separates a
+    // working local-space shape test from one that silently draws rectangles.
+    await withOutput({ surfaces: [surf('ellipse', 0.25, 0.1, 0.75, 0.9)] });
+    // Finer than the default grid: the patch that is unambiguously outside the
+    // circle but inside its quad is small, and at 32x18 it is one cell. The
+    // first version of this sampled out to (0.33, 0.25), which is local
+    // (0.16, 0.19) — 0.46 from the centre, so inside the circle and lit. It
+    // failed on a circle that was drawn correctly.
+    const round = await gridOf(64, 36);
+    const mid = region(round, 0.45, 0.45, 0.55, 0.55);
+    const nook = region(round, 0.26, 0.11, 0.31, 0.20);
+    check('a circle leaves the corners of its quad dark',
+      mid > 0.01 && nook < mid * 0.2,
+      `middle ${mid.toFixed(3)}, corner ${nook.toFixed(3)}`);
+
+    // Off is off, without leaving the list.
+    await withOutput({ surfaces: [surf('rect', 0.4, 0.4, 0.6, 0.6, { enabled: false })] });
+    const dark = await gridOf();
+    check('a shape switched off lights nothing', region(dark, 0, 0, 1, 1) < 0.005,
+      `${region(dark, 0, 0, 1, 1).toFixed(4)}`);
+  }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────
   await withOutput({});

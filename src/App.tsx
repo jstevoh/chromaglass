@@ -22,8 +22,12 @@ import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
+import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { runBench, formatBench, readRenderer } from './lib/bench';
+import type { BenchOptions } from './lib/bench';
+import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
@@ -190,7 +194,10 @@ export default function App() {
       return value;
     });
   }, []);
-  const resetOutput = useCallback(() => setOutput({ ...DEFAULT_OUTPUT }), [setOutput]);
+  // The wall's Reset squares the projector and leaves the mapped shapes: they
+  // live in a section of their own with their own Clear, and a Reset pressed
+  // over there should not quietly throw away an evening's corner-dragging here.
+  const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
 
   // ── Where the tempo comes from ──────────────────────────────────
   // The microphone, unless something better is offering: a MIDI clock from
@@ -246,6 +253,50 @@ export default function App() {
     */
     (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
       (key: string, value?: number) => { touch(key, value); };
+    /*
+      Fire any of the one-shot actions by name.
+
+      The same list a pad, a phone or an OSC message reaches, so a harness can
+      put the show into a state — automation on, the sequencer running — that
+      it would otherwise have to find a button for. Written for the motion
+      measurements, which spent several runs quietly measuring a plate whose
+      automation was off.
+    */
+    (window as unknown as { chromaglassAction?: unknown }).chromaglassAction =
+      (name: string) => { runActionRef.current?.(name as MidiAction); };
+    /*
+      Set any setting from the harness.
+
+      `npm run detail` judges a frame by numbers, and the question it exists to
+      answer — how much of the softness is the solver and how much is the
+      renderer — needs the same plate photographed under several settings
+      rather than several plates. Driving the panel for that would mean a
+      different look each time; this changes one value on the running plate.
+    */
+    (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
+      (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+    (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
+      (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
+  }, []);
+
+  /*
+    `?bench` runs the grid sweep on its own and shows the result.
+
+    The measurement it takes is one somebody else has to run — it needs the
+    machine the show will run on, which is never the one the code was written
+    on — so the whole of it has to be a link that can be sent and a block of
+    text that comes back. Waits for the first frame, because a sweep that
+    starts before there is an engine to read measures the loading screen.
+  */
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('bench')) return;
+    let cancelled = false;
+    const wait = setInterval(() => {
+      if (cancelled || !engineStatusRef.current) return;
+      clearInterval(wait);
+      void startBenchRef.current?.();
+    }, 250);
+    return () => { cancelled = true; clearInterval(wait); };
   }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   /** For the first-gesture handler, which is installed once and must not close over a stale value. */
@@ -653,6 +704,23 @@ export default function App() {
     };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
+    /*
+      `?kiosk=1`: there is nobody to click.
+
+      A box behind the screen boots into this with no keyboard and no mouse,
+      so the gesture the browser wants is never coming. Chromium is started
+      with --autoplay-policy=no-user-gesture-required for exactly this, which
+      makes the audio context start without one — but nothing in the app was
+      asking it to, so the plate ran and heard nothing. This does the asking.
+
+      Only from the query string, so a hosted visit is untouched: a page that
+      started making noise before anyone touched it would be a worse first
+      visit than a silent one, and on a normal browser the context would
+      refuse anyway and the click handler above would still be waiting.
+    */
+    let kiosk = false;
+    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
+    if (kiosk) wake();
     return () => {
       window.removeEventListener('pointerdown', wake);
       window.removeEventListener('keydown', wake);
@@ -669,6 +737,57 @@ export default function App() {
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
+  // ── The grid sweep ──
+  // Walks the solver down every grid and reports where a frame's time went on
+  // each, so the question "is the grid what costs you" has an answer taken the
+  // same way on every machine rather than by hand, five times, from a readout.
+  const [bench, setBench] = useState<{ running: boolean; done: number; total: number; label: string; text: string | null }>(
+    { running: false, done: 0, total: 0, label: '', text: null },
+  );
+  const benchBusyRef = useRef(false);
+  /** The effect that installs the hooks runs once; this keeps it off a stale callback. */
+  const startBenchRef = useRef<((opts?: BenchOptions) => Promise<void>) | null>(null);
+  const startBench = useCallback(async (opts?: BenchOptions) => {
+    if (benchBusyRef.current) return;
+    benchBusyRef.current = true;
+    setBench({ running: true, done: 0, total: 0, label: 'starting', text: null });
+    // Whatever the grid was before this is the grid it goes back to; a
+    // diagnostic that leaves the show on a different setting than it found it
+    // is a diagnostic that changes the thing it measured.
+    let restore: VisualizerSettings['simResolution'] = 'auto';
+    setSettings(prev => { restore = prev.simResolution; return prev; });
+    try {
+      const report = await runBench({
+        setGrid: (g) => setSettings(prev => ({ ...prev, simResolution: g })),
+        read: () => engineStatusRef.current,
+        renderer: readRenderer,
+        sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+        now: () => performance.now(),
+        onProgress: (done, total, label) => setBench(b => ({ ...b, done, total, label })),
+      }, opts);
+      // Put the show back before showing the result, not after.
+      //
+      // The restore used to live only in the `finally`, which runs after the
+      // report is on screen — so for the few seconds it takes the engine to
+      // rebuild and republish, the sweep said it was finished while the plate
+      // was still on whatever rung it ended on. Measured at three and a half
+      // seconds of the show sitting on the CPU solver behind a panel saying
+      // the measurement was done. The `finally` stays as the path an error
+      // takes; setting it twice costs nothing, since the second is the same
+      // value and React drops it.
+      setSettings(prev => ({ ...prev, simResolution: restore }));
+      const text = formatBench(report);
+      console.log(text);
+      setBench({ running: false, done: 0, total: 0, label: '', text });
+    } catch (err) {
+      console.error('ChromaGlass: the grid sweep failed.', err);
+      setBench({ running: false, done: 0, total: 0, label: '', text: `The sweep failed: ${String(err)}` });
+    } finally {
+      setSettings(prev => ({ ...prev, simResolution: restore }));
+      benchBusyRef.current = false;
+    }
+  }, []);
+  startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   const loadFilm = async (file: File) => {
     await visualizerRef.current?.loadFilmFile(file);
@@ -894,7 +1013,10 @@ export default function App() {
     // otherwise a macro preset would leave the next one zoomed in.
     // Likewise the Fillmore projectors, beads, cells and fingering: a preset
     // that does not ask for them gets a plain plate, not the last preset's.
-    setSettings(prev => ({ ...prev, macroMode: false, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
+    // macroZoom alongside macroMode: the zoom is what magnifies now, so a look
+    // that does not ask for a closeup has to put the camera back on the plate
+    // rather than inherit whatever the last one was pushed to.
+    setSettings(prev => ({ ...prev, macroMode: false, macroZoom: 1, renderStyle: 'show', camera: 0, dishSpread: 0, beads: 0, cells: 0, fingering: 0, ...presetSettings }));
     setPinnedPresetId(presetId);
     // A built-in is somewhere to start, not a file of yours: ⌘S asks for a
     // name rather than writing over a look that ships with the app.
@@ -1305,6 +1427,29 @@ export default function App() {
 
   useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
 
+  /*
+    MIDI timecode, and the position the sequence follows.
+
+    The reader is fed from the MIDI callback below at a hundred messages a
+    second and never touches React. This poll reads it four times a second,
+    which is as often as a stage boundary can matter, and sets state only when
+    the second changes — a set that lasts an hour is then 3600 renders rather
+    than 360,000.
+  */
+  const timecodeRef = useRef(new TimecodeReader());
+  const [timecode, setTimecode] = useState<TimecodePosition | null>(null);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const p = timecodeRef.current.read(performance.now());
+      setTimecode(prev => {
+        if (p === null) return prev === null ? prev : null;
+        if (prev && prev.seconds === p.seconds && prev.minutes === p.minutes && prev.hours === p.hours) return prev;
+        return p;
+      });
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
+
   const sequencer = useShowSequencer({
     getSettings: () => settingsRef.current,
     applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
@@ -1316,6 +1461,7 @@ export default function App() {
     // on `suspended`.
     suspended: designing,
     presets: allPresets,
+    timecodeAt: timecode?.at ?? null,
   });
   // ── Files made for a song ───────────────────────────────────────
   // When a song is identified, a sequence made for it starts at the right
@@ -1450,9 +1596,12 @@ export default function App() {
       filmKey: settings.filmKey,
       glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
       postBlurRadius: Math.random() * 0.7,
-      // One roll in four goes closeup — a magnified chase is its own happy accident
-      macroMode: Math.random() < 0.25,
-      macroZoom: 4 + Math.random() * 8,
+      // One roll in four goes closeup — a magnified chase is its own happy
+      // accident. The zoom decides now, so the roll lands on the zoom and the
+      // flag follows it rather than the two disagreeing.
+      ...(Math.random() < 0.25
+        ? { macroMode: true, macroZoom: 4 + Math.random() * 8 }
+        : { macroMode: false, macroZoom: 1 }),
       macroChase: 0.35 + Math.random() * 0.65,
       macroHold: 2.5 + Math.random() * 7,
       macroCells: Math.random(),
@@ -1511,17 +1660,85 @@ export default function App() {
     output,
   }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
+  /**
+   * The mark, kept as a data URL so it can be sent to a receiver.
+   *
+   * A cast receiver and a network display are separate documents running their
+   * own copy of the solver; the settings that place the logo travel with
+   * everything else, but the picture has to be handed over once. Held here
+   * rather than only in the visualizer for that reason.
+   */
+  const markUrlRef = useRef<string | null>(null);
+  const [markLoaded, setMarkLoaded] = useState(false);
   const sendCastState = useCallback(() => {
     castSend({ type: 'state', state: castState });
-    if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+    // On the same call as the state, because the one moment a receiver needs
+    // the picture is the moment it says hello and gets its first state.
+    castSend({ type: 'mark', dataUrl: markUrlRef.current });
+    if (mirrorCount > 0) {
+      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+      relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+    }
   }, [castSend, castState, mirrorCount]);
+
+  const loadMark = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? '');
+      const img = new window.Image();
+      img.onload = () => {
+        visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
+        markUrlRef.current = url;
+        setMarkLoaded(true);
+        castSend({ type: 'mark', dataUrl: url });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        setToastRef.current?.('Mark on the wall');
+      };
+      img.onerror = () => setToastRef.current?.('That file would not open as a picture');
+      img.src = url;
+    };
+    reader.readAsDataURL(file);
+  }, [castSend]);
+
+  const clearMark = useCallback(() => {
+    visualizerRef.current?.clearMark?.();
+    markUrlRef.current = null;
+    setMarkLoaded(false);
+    castSend({ type: 'mark', dataUrl: null });
+    relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
+  }, [castSend]);
   castReadyRef.current = sendCastState;
   useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
+  /*
+    The live state, for a harness to read.
+
+    This used to close over the render's `castState` and be re-registered when
+    it changed, which sounds equivalent and is not: a look fade or the
+    sequencer rewrites settings between renders, and what came back was
+    whichever snapshot the last effect happened to capture. A harness setting a
+    value and reading it straight back got the old one — which cost three
+    rounds of measuring the wrong plate before anyone thought to check the
+    instrument. Reading refs means it cannot be stale.
+  */
+  const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
+  liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => ({ isCasting, castState, audio: audioData, songChange });
+      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => {
+        const l = liveDebugRef.current;
+        return {
+          isCasting: l.isCasting,
+          castState: l.castState,
+          audio: l.audioData,
+          songChange: l.songChange,
+          // Straight from the render rather than from the cast snapshot, which
+          // is assembled for a receiver and not for a question.
+          isAutomated: l.isAutomated,
+          settings: settingsRef.current,
+        };
+      };
     }
-  }, [isCasting, castState, audioData, songChange]);
+  }, []);
   // The audio bands, thirty times a second — the raw spectrum stays here.
   const lastCastAudioRef = useRef(0);
   useEffect(() => {
@@ -1545,6 +1762,9 @@ export default function App() {
   // was: the band stops, the wall goes dark, the band starts, the wall comes
   // back. The dimmer itself is a setting, so a fader can ride it by hand.
   const [blackout, setBlackout] = useState(false);
+  /** For the lighting feed below, which is armed once and must not close over a stale value. */
+  const blackoutRef = useRef(blackout);
+  blackoutRef.current = blackout;
   const dimmerBeforeRef = useRef(1);
   const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // On a timer, not requestAnimationFrame: the laptop's window is often
@@ -1575,10 +1795,13 @@ export default function App() {
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
-    if (!cur.macroMode) { if (dir > 0) updateSettings({ macroMode: true, macroZoom: 2 }); return; }
-    const z = Math.max(1, cur.macroZoom ?? 4);
-    const next = Math.max(1, Math.min(16, z * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
-    updateSettings({ macroZoom: Math.round(next * 10) / 10 });
+    // One ramp from the plate outward, with no step onto it: pushing in from
+    // 1 is the closeup arriving, and coming back down lands at the plate
+    // rather than at a switch that has to be found and turned off.
+    const z = Math.max(1, cur.macroZoom ?? 1);
+    const next = Math.max(1, Math.min(16, (z < 1.05 && dir > 0 ? 1.2 : z) * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
+    const zoom = Math.round(next * 100) / 100;
+    updateSettings({ macroZoom: zoom, macroMode: zoom > 1.05 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // ── Recording ──
@@ -1600,7 +1823,10 @@ export default function App() {
     const onWheel = (e: WheelEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t || (t.id !== 'liquid-canvas' && !t.closest?.('#liquid-canvas'))) return;
-      if (!settingsRef.current.macroMode || e.deltaY === 0) return;
+      // Still never *starts* a closeup: a trackpad brush over the plate must
+      // not become a camera move. Once in, the wheel rides it all the way back
+      // out to the plate, which is where the old guard would strand it.
+      if ((settingsRef.current.macroZoom ?? 1) <= 1.001 || e.deltaY === 0) return;
       e.preventDefault();
       zoomMacro(e.deltaY < 0 ? 1 : -1, Math.min(1, Math.abs(e.deltaY) / 100));
     };
@@ -1646,6 +1872,7 @@ export default function App() {
     const next = allPresets[(i + dir + allPresets.length) % allPresets.length];
     cuePreset(next.id);
   };
+  const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
       case 'seed':            setSeedCount(prev => prev + 1); break;
@@ -1655,7 +1882,14 @@ export default function App() {
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
-      case 'macro-toggle':    updateSettings({ macroMode: !settings.macroMode }); break;
+      case 'macro-toggle': {
+        // A pad still wants one press in and one press out. It moves the zoom,
+        // because that is the control; the flag rides along for the looks that
+        // still read it.
+        const inNow = (settingsRef.current.macroZoom ?? 1) > 1.05;
+        updateSettings(inNow ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: 4 });
+        break;
+      }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
       case 'seq-next':        sequencer.next(); break;
       case 'seq-prev':        sequencer.prev(); break;
@@ -1803,7 +2037,35 @@ export default function App() {
     },
   });
 
+  runActionRef.current = runAction;
   relaySendRef.current = remoteLink.send;
+
+  /*
+    The plate's colour, out to the lighting rig.
+
+    The same `layerReport` the bench draws its tabs from, twenty times a second
+    to the show server, which turns it into Art-Net (see `server/artnet.js`).
+    The par cans wash the room in whatever the dye is doing instead of whatever
+    was set before the doors opened.
+
+    Faster than the bench's poll because a light that lags the screen by half a
+    second reads as broken, and it costs nothing when nothing is listening: no
+    relay, no socket, no send. It carries no React state, so the loop never
+    causes a render.
+  */
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') return;
+    const id = setInterval(() => {
+      const layers = visualizerRef.current?.layerReport?.();
+      if (!layers?.length) return;
+      // The plate's own brightness, so the room dims when the glass thins
+      // rather than sitting at full on an empty plate. Blackout is black.
+      const fill = layers.reduce((a, l) => a + l.fill, 0) / layers.length;
+      const master = blackoutRef.current ? 0 : Math.min(1, fill * 1.6);
+      relaySendRef.current?.({ type: 'lights', layers: layers.map(l => ({ colour: l.colour, fill: l.fill })), master });
+    }, 50);
+    return () => clearInterval(id);
+  }, [remoteLink.status]);
 
   // ── MIDI controller and game controller ─────────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
@@ -1814,6 +2076,8 @@ export default function App() {
       action: runAction,
       applyPreset: cuePreset,
       selectDye,
+      // Every note plays the envelopes, whatever else that pad is for.
+      noteStruck: (velocity) => visualizerRef.current?.fireEnvelopes?.(velocity),
     },
     {
       activePresetId,
@@ -1835,6 +2099,13 @@ export default function App() {
       if (kind === 'clock') t.clockPulse(at);
       else if (kind === 'stop') t.clockStop();
       else t.clockStart(at);
+    }, []),
+    // Timecode, straight into the reader for the same reason: a rolling desk
+    // sends a hundred of these a second and none of them is a render.
+    useCallback((message: { quarter: number } | { full: Uint8Array }, at: number) => {
+      const r = timecodeRef.current;
+      if ('quarter' in message) r.quarter(message.quarter, at);
+      else r.full(message.full, at);
     }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
@@ -2141,11 +2412,11 @@ export default function App() {
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
-      {settings.macroMode && overlaysVisible && (
+      {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
-          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 4).toFixed(1)}×</span>
+          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
         </div>
       )}
@@ -2158,6 +2429,7 @@ export default function App() {
 
         {toast && (
           <div
+            key="toast"
             className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
             data-testid="toast"
           >
@@ -2167,6 +2439,7 @@ export default function App() {
 
         {!overlaysVisible && showCleanHint && (
           <motion.div
+            key="clean-hint"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 1.2 } }}
@@ -2648,8 +2921,21 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
+      {/* One child per AnimatePresence: it tells its children apart by key, two
+          without one both read as "", and React warned on every frame the
+          pair was up. The components here take no `key` in their props type. */}
       <AnimatePresence>
         {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        <BenchOverlay
+          running={bench.running}
+          done={bench.done}
+          total={bench.total}
+          label={bench.label}
+          text={bench.text}
+          onClose={() => setBench(b => ({ ...b, text: null }))}
+        />
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
@@ -2716,6 +3002,7 @@ export default function App() {
             onTempoClear={clearTempo}
             onTempoBpm={setTempoBpm}
             midiClocked={midi.clocked}
+            timecode={timecode ? formatTimecode(timecode) : null}
             focusSection={settingsSection}
             /*
               The panel can put any of its controls on either desk, so it needs
@@ -2738,6 +3025,9 @@ export default function App() {
             onFilmCamera={startFilmCamera}
             onFilmWindow={startFilmWindow}
             onFilmClear={clearFilm}
+            markLoaded={markLoaded}
+            onMarkFile={loadMark}
+            onMarkClear={clearMark}
             onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />
         )}
@@ -2751,6 +3041,8 @@ export default function App() {
             onHide={() => setShowActivity(false)}
           />
         )}
+      </AnimatePresence>
+      <AnimatePresence>
         {showMidi && (
           <MidiPanel
             midi={midi}

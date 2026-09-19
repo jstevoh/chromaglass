@@ -66,6 +66,10 @@ const SECTION_OF: Record<string, string> = {
   focus: 'camera',
   aperture: 'camera',
   bloom: 'camera',
+  markMix: 'mark',
+  markX: 'mark',
+  markY: 'mark',
+  markScale: 'mark',
   sharpness: 'look',
   granulation: 'look',
   macroZoom: 'macro',
@@ -137,6 +141,12 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },
   { key: 'damping', label: "Damping (Friction)", min: 0.8, max: 1, section: 'physics' },
+  // The mark. Opacity above all, because taking a logo off between sets is a
+  // thing a hand does on a fader rather than a thing anyone opens a panel for.
+  { key: 'markMix', label: "Logo Opacity", min: 0, max: 1, section: 'mark' },
+  { key: 'markScale', label: "Logo Size", min: 0.03, max: 1, section: 'mark' },
+  { key: 'markX', label: "Logo Across", min: 0, max: 1, section: 'mark' },
+  { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Projector Layers", min: 1, max: 2, section: 'layers' },
   { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'layers' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },

@@ -30,6 +30,16 @@ export interface MidiHost {
   action: (action: MidiAction) => void;
   applyPreset: (presetId: string) => void;
   selectDye: (paletteIndex: number) => void;
+  /**
+   * A note was struck, with its velocity.
+   *
+   * Separate from the bindings on purpose: this fires for *every* note-on,
+   * whatever that note is also bound to, because an envelope is not a thing
+   * you assign a pad to — it is what the pad being hit feels like. A grid of
+   * preset pads therefore also plays the envelopes, which is the behaviour a
+   * synth has and the reason the envelopes are worth having at all.
+   */
+  noteStruck?: (velocity: number) => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -74,7 +84,16 @@ const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
  */
 export type MidiClockHandler = (kind: MidiRealtime, at: number) => void;
 
-export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[], onClock?: MidiClockHandler) {
+/**
+ * MIDI timecode, straight off the same cable.
+ *
+ * Handed out raw for the same reason as clock: what a position means is the
+ * show's business. `quarter` is the data byte of an 0xF1 message, `full` the
+ * whole SysEx of a locate.
+ */
+export type MidiTimecodeHandler = (message: { quarter: number } | { full: Uint8Array }, at: number) => void;
+
+export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: string[], onClock?: MidiClockHandler, onTimecode?: MidiTimecodeHandler) {
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +136,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const takeover = useRef(new SoftTakeover()).current;
   const eventTick = useRef(0);
   const clockRef = useRef(onClock); clockRef.current = onClock;
+  const timecodeRef = useRef(onTimecode); timecodeRef.current = onTimecode;
   /** Whether clock has been seen on this port lately, for the panel to report. */
   const [clocked, setClocked] = useState(false);
   const clockSeenAt = useRef(-Infinity);
@@ -143,6 +163,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const src = eventSource(e);
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
+    // Ahead of the bindings, and regardless of them: see `noteStruck`.
+    if (e.kind === 'noteon') hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)));
     if (now - eventTick.current > 80) { eventTick.current = now; setLastEvent({ source: src, value: e.value, at: now }); }
 
     /*
@@ -288,6 +310,19 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
               const at = performance.now();
               clockSeenAt.current = at;
               clockRef.current?.(rt, at);
+              return;
+            }
+            // Timecode, before the channel-message parser: a quarter-frame is
+            // 0xF1 and one data byte, which is two bytes, so `parseMidi` would
+            // read it as a control change on a channel that does not exist.
+            // A rolling desk sends a hundred a second, so this allocates
+            // nothing and touches no state.
+            if (m.data[0] === 0xf1 && m.data.length >= 2) {
+              timecodeRef.current?.({ quarter: m.data[1] }, performance.now());
+              return;
+            }
+            if (m.data[0] === 0xf0) {
+              timecodeRef.current?.({ full: m.data }, performance.now());
               return;
             }
             const ev = parseMidi(m.data);

@@ -89,6 +89,24 @@ jobs:
       - name: The room
         run: npm run scene
 
+      # Four harnesses that were written as gates and then never gated
+      # anything, because nothing here ran them. All four cover arithmetic
+      # with no picture in it, which is the kind most able to be quietly
+      # wrong: a triangle that is really a sawtooth, a timecode reader two
+      # frames behind all night, a fixture lit on the wrong channel, a shape
+      # mapped onto the wrong part of a wall.
+      - name: The shapes
+        run: npm run shapes
+
+      - name: The timecode
+        run: npm run timecode
+
+      - name: The lights
+        run: npm run lights
+
+      - name: The mapping
+        run: npm run map
+
   # The projector's geometry and the flash guard: which pixels are black, and
   # how many times a second the whole screen is allowed to change.
   wall:

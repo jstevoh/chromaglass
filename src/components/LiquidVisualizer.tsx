@@ -23,6 +23,8 @@ import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+import { Phrasing, type Phrase } from '../lib/phrasing';
+import { Modulators } from '../lib/modulators';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -92,6 +94,20 @@ interface LiquidVisualizerProps {
   output?: OutputConfig;
 }
 
+/**
+ * Where the closeup is fully itself, and what a look that only says "macro"
+ * means by it.
+ *
+ * The travel from the plate to the closeup runs from 1x to MACRO_FULL_ZOOM:
+ * below that the exposure, the defocus, the silhouette warp and the relief are
+ * mixed in rather than switched on, so pushing the slider reads as a lens
+ * moving. Two is low enough that nothing pops on the way past and high enough
+ * that a bead is worth looking at when it lands.
+ */
+const MACRO_FULL_ZOOM = 2.0;
+/** A preset or a saved show that sets `macroMode` with no zoom of its own. */
+const MACRO_PRESET_ZOOM = 4.0;
+
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -104,13 +120,31 @@ const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const SHARP_FLOOR = 0.08;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
+/**
+ * The largest grid a pinned `?sim=` may ask for.
+ *
+ * This used to clamp to the context's own texture limit, which is not a safety
+ * limit — it is how big a texture the driver will *describe*, not how big a
+ * one it can afford. On a machine reporting 8192, `?sim=8192` asks for a
+ * gigabyte in a single RGBA32F buffer and more than a dozen of them, and the
+ * GPU context is lost: the plate stops, the render loop stops publishing, and
+ * everything reading the engine's state freezes on whatever it last said. It
+ * takes a documented query parameter to get there, which makes it reachable
+ * rather than theoretical.
+ *
+ * 1024 is one step past the top of the ladder, so there is still room to try a
+ * grid finer than the app will choose for itself, and the footprint stays in
+ * the low hundreds of megabytes rather than the low gigabytes.
+ */
+const MAX_PINNED_GRID = 1024;
+
 // Which grid the solver should run on. A pinned size is honoured up to the
-// context's texture limit; 'auto' hands the choice to the frame-time governor;
-// 'cpu' is the 192² fallback.
+// smaller of the cap above and the context's texture limit; 'auto' hands the
+// choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
   if (want === 'cpu') return 0;
-  return Math.max(64, Math.min(Math.round(want), maxTexture));
+  return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
@@ -219,6 +253,28 @@ export interface LiquidVisualizerHandle {
   startFilmWindow: (onEnded?: () => void, onBlank?: () => void) => Promise<void>;
   clearFilm: () => void;
   /**
+   * A logo or title card laid over the finished frame.
+   *
+   * Not `injectImage`, which pours a picture into the plate as dye: that is
+   * the lovely thing to do with an image and the wrong thing to do with a
+   * client's mark, which has to stay readable for three hours. This one sits
+   * over the top and does not dissolve.
+   *
+   * Composited in the shader rather than as an element over the canvas, so it
+   * reaches everything that reads the canvas: the projector window, a cast to
+   * another screen, the recorder, and another machine capturing this window.
+   */
+  loadMark: (source: CanvasImageSource, width: number, height: number) => void;
+  clearMark: () => void;
+  /**
+   * Fire the envelopes — a MIDI note, a pad, a finger on the phone.
+   *
+   * On the handle rather than reached through settings because it is an event,
+   * and because the thing firing it should not have to know what an envelope
+   * is. `velocity` scales how far they swing, so a hard note hits harder.
+   */
+  fireEnvelopes: (velocity?: number) => void;
+  /**
    * The element the film is playing in, so it can be read back as a sensor
    * as well as shown through the dye. Null when nothing is loaded.
    *
@@ -325,8 +381,17 @@ class FluidSimulation {
   private rbVy: Float32Array;
   private mcA: Float32Array;        // MacCormack intermediates (CPU path)
   private mcB: Float32Array;
+  /** What the plate is being asked to do this moment; set from outside once a frame. */
+  phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
+  /** The clock's own lean, slewed so no one frame can move it far. */
+  private clockLean = 1;
+  get clockLeanNow(): number { return this.clockLean; }
+  /** Wall-clock seconds this step covers, for smoothing that means the same thing at any frame rate. */
+  dtSeconds = 1 / 60;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
+  /** The thickness as the sharpening pass found it: every channel gates on this. */
+  private shpA: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
@@ -368,6 +433,7 @@ class FluidSimulation {
     this.mcA = new Float32Array(GRID_AREA);
     this.mcB = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
+    this.shpA = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -1271,6 +1337,46 @@ class FluidSimulation {
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
+    /*
+      And the clock leans forward and back.
+
+      The note above says audio energy is kept out of the timestep to stop it
+      jumping, and that is right: a clock that tracks a kick drum stutters,
+      because a solver asked for a big step and then a small one does not
+      advect smoothly, it lurches. What is safe is a *slow* lean, so this rides
+      the phrase's drift rather than its gust — seconds, not beats — and is
+      slewed on top of that so no single frame can move it far. Nothing else in
+      the plate reads the clock, so this is the only place speed can come from
+      without the picture tearing.
+    */
+    /*
+      Follow the whole phrase, and let the slew be what keeps it civil.
+
+      This followed the drift alone, on the reasoning that a clock which jumps
+      with a gust would lurch. True, but the drift hovers around the middle of
+      its range — measured on a running plate it sat between 0.45 and 0.58 —
+      so the lean never left a few percent of 1 and the timestep moved by three
+      percent over half a minute. Which is not a speed-up by any definition.
+
+      The slew below is the thing that stops a lurch, and it is a two and a
+      half second time constant: a gust that takes half a second to arrive is
+      already smoothed into a swell by the time the clock sees it. So take the
+      whole drive and let the filter do its job.
+    */
+    const want = 1 + (this.phrase.drive - 1) * 0.85;
+    /*
+      Slewed on seconds rather than on steps.
+      
+      This was a flat 0.02 per solver step, which is not a smoothing constant
+      at all — it is a different smoothing constant on every machine. At sixty
+      steps a second it arrives in under a second; on the box this was measured
+      on, running two steps a second, it needed half a minute and so never
+      arrived at all, which is most of why the first version of the phrasing
+      measured as doing nothing. A time constant is the same on both.
+    */
+    this.clockLean += (want - this.clockLean) * (1 - Math.exp(-this.dtSeconds / 2.5));
+    dynamicSpeed *= this.clockLean;
+
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
     if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
@@ -1739,9 +1845,15 @@ class FluidSimulation {
     if (k <= 0.0001) return;
     const N = this.size;
     // How much of an interface a pair of cells straddles: 1 where both hold
-    // comparable dye, 0 where one is empty. See the note in `sharpenDye` in
-    // gpuFluid.ts for why the pass carves holes without it.
+    // comparable liquid, 0 where one is empty. It is read from the thickness
+    // for every channel, never from the channel being sharpened — see the note
+    // in `sharpenDye` in gpuFluid.ts for why a per-channel gate cancels itself
+    // at exactly the boundaries this pass is for.
     const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
+    // The thickness as it stands before any channel is touched, including
+    // before the thickness itself is: the gate must not shift under the pass.
+    this.shpA.set(this.density);
+    const ga = this.shpA;
     for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
       this.shp.set(ch);
       const o = this.shp;
@@ -1752,8 +1864,9 @@ class FluidSimulation {
           const dl = o[i - N - 1], dr = o[i - N + 1], ul = o[i + N - 1], ur = o[i + N + 1];
           // The isotropic nine-point weights; see the note in gpuFluid.ts for
           // why the diagonals matter.
-          const f = 0.20 * (gate(c, l) * (c - l) + gate(c, r) * (c - r) + gate(c, d) * (c - d) + gate(c, u) * (c - u))
-                  + 0.05 * (gate(c, dl) * (c - dl) + gate(c, dr) * (c - dr) + gate(c, ul) * (c - ul) + gate(c, ur) * (c - ur));
+          const a = ga[i];
+          const f = 0.20 * (gate(a, ga[i - 1]) * (c - l) + gate(a, ga[i + 1]) * (c - r) + gate(a, ga[i - N]) * (c - d) + gate(a, ga[i + N]) * (c - u))
+                  + 0.05 * (gate(a, ga[i - N - 1]) * (c - dl) + gate(a, ga[i - N + 1]) * (c - dr) + gate(a, ga[i + N - 1]) * (c - ul) + gate(a, ga[i + N + 1]) * (c - ur));
           const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
           const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
           // Curvature below a fraction of the local range is a wash, not an
@@ -1894,6 +2007,7 @@ interface GLResources {
   maxTexture: number;
   /** The film projector's frame — a video file or the camera — uploaded each frame it plays. */
   filmTexture: WebGLTexture;
+  markTexture: WebGLTexture;
   beadTexture: WebGLTexture;
 }
 
@@ -2049,9 +2163,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * picture and one per plate, and allocating those sixty times a second to
    * throw them away shows up as a stutter long before it shows up as a bug.
    */
+  /**
+   * The LFOs and envelopes, stepped here because this is where the frame is.
+   *
+   * Handed out on the visualizer's handle so a note, a pad or a phone tap can
+   * fire the envelopes without any of them needing to know what one is.
+   */
+  const modRef = useRef(new Modulators());
   const patchRef = useRef<PatchBay | null>(null);
   if (!patchRef.current) patchRef.current = new PatchBay(settings);
   const gelAngleRef = useRef(0);
+  /** The mark: a still over the finished frame, uploaded once and then left alone. */
+  const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
+
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
@@ -2118,6 +2242,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
+  /**
+   * The plate's phrasing: what it should be doing this second.
+   *
+   * Stepped once a frame and read by the automation and by every solver, so
+   * both plates surge together rather than each breathing to its own weather.
+   */
+  const phrasingRef = useRef(new Phrasing());
+  const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
+  /** When the last flood pour landed, so gusts cannot stack into a wash. */
+  const lastFloodRef = useRef(-1e9);
+  /** `?filter=bspline` restores the sampler the Catmull-Rom one replaced. See docs/judging.md. */
+  const oldSamplerRef = useRef(false);
+  if (!oldSamplerRef.current) {
+    try { oldSamplerRef.current = new URLSearchParams(window.location.search).get('filter') === 'bspline'; } catch { /* no query */ }
+  }
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -2127,6 +2266,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simAccumRef = useRef(0);
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
+  /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
+  const stepsPerSecRef = useRef(60);
+  /** What the catch-up rule allowed last frame, for the debug readout. */
+  const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
   const outputCfgRef = useRef(output);
   outputCfgRef.current = output;
@@ -2484,6 +2627,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       try { await v.play(); } catch { /* as above */ }
     },
     clearFilm: () => stopFilm(),
+    loadMark: (source, width, height) => {
+      markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
+    },
+    clearMark: () => { markRef.current = null; },
+    fireEnvelopes: (velocity = 1) => modRef.current.fire(velocity),
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
@@ -2755,6 +2903,9 @@ uniform float u_kaleidoZoom;       // how much plate feeds each wedge
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
+uniform sampler2D u_mark;          // a still laid over the plate: a logo, a title card
+uniform float u_markOn;            // 1 when there is one loaded
+uniform vec4 u_markRect;           // where it sits: centre xy, half-size xy, all in screen uv
 uniform sampler2D u_grain0;         // pigment coordinates, lead plate: .rg one phase, .ba the other
 uniform sampler2D u_grain1;
 uniform float u_grainOn;           // 1 when the solver is carrying the coordinates
@@ -2788,37 +2939,82 @@ uniform float u_filmGain;          // maps the density above that level onto ful
 const float PI = 3.14159265359;
 const float DENSITY_SCALE = 8.0;
 
-// Catmull-Rom bicubic weights
-vec4 cubic(float v) {
-  vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
-  vec4 s = n * n * n;
-  float x = s.x;
-  float y = s.y - 4.0 * s.x;
-  float z = s.z - 4.0 * s.y + 6.0 * s.x;
-  float w = 6.0 - x - y - z;
-  return vec4(x, y, z, w) * (1.0 / 6.0);
-}
-
-// Bicubic texture sampling — smooth C1 upscaling, eliminates grid aliasing
+// Bicubic texture sampling — Catmull-Rom, which passes through its samples.
+//
+// This used to be the cubic B-spline basis under a comment that said
+// Catmull-Rom, and the difference is the whole of why the plate looked soft.
+// B-spline does not interpolate: at a texel centre its weights are
+// (1, 4, 1)/6, so every fetch returned a blurred neighbourhood rather than the
+// value that was there. That is a low-pass of about 0.6 of a cell applied to
+// every sample the renderer takes — the dye, the normals, the interface line,
+// the lacing — before anything else got a chance to soften it. At 384 cells on
+// a 1080p projector one cell is nearly three pixels, so it read as an eight
+// pixel smear over the whole plate.
+//
+// Catmull-Rom has the same support and the same cost bracket, and at a texel
+// centre its weights are (0, 1, 0): what is in the cell is what comes out.
+// Between centres it reconstructs with a mild negative lobe, which is what
+// gives a boundary its edge back.
+//
+// The nine taps of the full kernel collapse to five by dropping the corners,
+// whose combined weight is a couple of percent, and renormalising. The five
+// are bilinear fetches placed off-centre so hardware filtering does the inner
+// pair for free, which is the same trick the B-spline version used.
+uniform float u_bspline;   // ?filter=bspline — the old sampler, to compare against
 vec4 textureBicubic(sampler2D tex, vec2 uv) {
   vec2 texSize = vec2(u_gridSize);
-  vec2 invTex = 1.0 / texSize;
-  uv = uv * texSize - 0.5;
-  vec2 fxy = fract(uv);
-  uv -= fxy;
-  vec4 xcubic = cubic(fxy.x);
-  vec4 ycubic = cubic(fxy.y);
-  vec4 c = uv.xxyy + vec2(-0.5, 1.5).xyxy;
-  vec4 s = vec4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
-  vec4 offset = c + vec4(xcubic.yw, ycubic.yw) / s;
-  offset *= invTex.xxyy;
-  vec4 s0 = texture(tex, offset.xz);
-  vec4 s1 = texture(tex, offset.yz);
-  vec4 s2 = texture(tex, offset.xw);
-  vec4 s3 = texture(tex, offset.yw);
-  float sx = s.x / (s.x + s.y);
-  float sy = s.z / (s.z + s.w);
-  return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy);
+  /*
+    The sampler this replaced, kept reachable from the query string.
+
+    Not because anyone should run it — it is the bug — but because the claim
+    that the plate got sharper was made from arithmetic on a machine that
+    cannot render a plate worth looking at, and the person who can judge it
+    should be able to flip between the two in a second rather than take my word
+    and a table of kernel weights. See docs/judging.md.
+  */
+  if (u_bspline > 0.5) {
+    vec2 inv = 1.0 / texSize;
+    vec2 t = uv * texSize - 0.5;
+    vec2 f = fract(t);
+    t -= f;
+    vec4 nx = vec4(1.0, 2.0, 3.0, 4.0) - f.x, qx = nx * nx * nx;
+    float ax = qx.x, bx = qx.y - 4.0 * qx.x, cx = qx.z - 4.0 * qx.y + 6.0 * qx.x;
+    vec4 wx = vec4(ax, bx, cx, 6.0 - ax - bx - cx) * (1.0 / 6.0);
+    vec4 ny = vec4(1.0, 2.0, 3.0, 4.0) - f.y, qy = ny * ny * ny;
+    float ay = qy.x, by = qy.y - 4.0 * qy.x, cy = qy.z - 4.0 * qy.y + 6.0 * qy.x;
+    vec4 wy = vec4(ay, by, cy, 6.0 - ay - by - cy) * (1.0 / 6.0);
+    vec4 c = t.xxyy + vec2(-0.5, 1.5).xyxy;
+    vec4 sw = vec4(wx.xz + wx.yw, wy.xz + wy.yw);
+    vec4 off = (c + vec4(wx.yw, wy.yw) / sw) * inv.xxyy;
+    vec4 s0 = texture(tex, off.xz), s1 = texture(tex, off.yz);
+    vec4 s2 = texture(tex, off.xw), s3 = texture(tex, off.yw);
+    return mix(mix(s3, s2, sw.x / (sw.x + sw.y)), mix(s1, s0, sw.x / (sw.x + sw.y)), sw.z / (sw.z + sw.w));
+  }
+  vec2 samplePos = uv * texSize;
+  vec2 texPos1 = floor(samplePos - 0.5) + 0.5;
+  vec2 f = samplePos - texPos1;
+
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-0.5 + 0.5 * f);
+  vec2 w12 = w1 + w2;
+  vec2 off12 = w2 / w12;
+
+  vec2 p0 = (texPos1 - 1.0) / texSize;
+  vec2 p3 = (texPos1 + 2.0) / texSize;
+  vec2 p12 = (texPos1 + off12) / texSize;
+
+  vec4 acc = texture(tex, vec2(p12.x, p0.y))  * (w12.x * w0.y)
+           + texture(tex, vec2(p0.x,  p12.y)) * (w0.x  * w12.y)
+           + texture(tex, vec2(p12.x, p12.y)) * (w12.x * w12.y)
+           + texture(tex, vec2(p3.x,  p12.y)) * (w3.x  * w12.y)
+           + texture(tex, vec2(p12.x, p3.y))  * (w12.x * w3.y);
+  float wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  // The negative lobe can undershoot past zero at a hard boundary. Every
+  // channel here is a density that is squared on decode, so a negative would
+  // come back as dye rather than as nothing: clamp before it can.
+  return max(acc / wsum, vec4(0.0));
 }
 
 // Hash-based film grain
@@ -2876,7 +3072,10 @@ float blurAlpha(sampler2D tex, vec2 fuv, float blurFluid) {
   for (int j = -2; j <= 2; j++) {
     for (int i = -2; i <= 2; i++) {
       vec2 offset = vec2(float(i), float(j)) * blurFluid;
-      float a = textureBicubic(tex, fuv + offset).a;
+      // Plain bilinear here, not the bicubic: this is twenty-five taps whose
+      // whole purpose is to blur, so reconstructing each one sharply first
+      // costs five fetches apiece to throw the sharpness away again.
+      float a = texture(tex, fuv + offset).a;
       result += a * w[(j + 2) * 5 + (i + 2)];
     }
   }
@@ -2915,13 +3114,13 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   // Plate-wide, u_exposure blends toward the same floor-and-gain so a thin
   // film between ink structures reads as bare glass rather than a grey wash.
   float exposed = max(0.0, totalDensity - u_filmLevel) * u_filmGain;
-  float thickness = (u_macro > 0.5
-    ? exposed
-    : mix(totalDensity * 2.8, exposed, u_exposure)) * (1.0 + darkness * 1.7);
+  // Magnified, only dye thick enough to be a bead should register; plate-wide
+  // the backlight comes through everything. Mixed rather than switched, so
+  // pushing in is the exposure opening rather than a cut to another plate.
+  float m = clamp(u_macro, 0.0, 1.0);
+  float thickness = mix(mix(totalDensity * 2.8, exposed, u_exposure), exposed, m) * (1.0 + darkness * 1.7);
   float alpha = 1.0 - exp(-thickness);
-  // Magnified, a bead of ink is opaque; at plate scale the backlight is meant
-  // to come through everything, so the old ceiling stays there.
-  alpha = min(u_macro > 0.5 ? 0.995 : 0.95, alpha);
+  alpha = min(mix(0.95, 0.995, m), alpha);
 
   return vec4(r, g, b, alpha);
 }
@@ -3365,7 +3564,9 @@ vec2 macroWarpOffset(vec2 fuv) {
   vec2 t = vec2(u_time * 0.012, u_time * -0.009);
   vec2 w = vec2(fbm3(fuv * f + t), fbm3(fuv * f + vec2(37.2, 11.7) + t)) - 0.5;
   w += (vec2(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
-  return w * (u_macroEdge * 1.1 / u_logicalGrid);
+  // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
+  // plate-wide frame is noise, and on a bead it is the silhouette.
+  return w * (u_macroEdge * 1.1 * clamp(u_macro, 0.0, 1.0) / u_logicalGrid);
 }
 
 vec2 macroWarp(vec2 fuv) { return fuv + macroWarpOffset(fuv); }
@@ -3378,9 +3579,9 @@ vec4 decodeFluidRaw(vec4 raw) {
   float norm = 1.0 / totalDensity;
   vec3 c = exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm);
   float darkness = 1.0 - max(c.r, max(c.g, c.b));
-  float thickness = (u_macro > 0.5 ? max(0.0, totalDensity - u_filmLevel) * u_filmGain : totalDensity * 2.8)
+  float thickness = mix(totalDensity * 2.8, max(0.0, totalDensity - u_filmLevel) * u_filmGain, clamp(u_macro, 0.0, 1.0))
                   * (1.0 + darkness * 1.7);
-  return vec4(c, min(u_macro > 0.5 ? 0.995 : 0.95, 1.0 - exp(-thickness)));
+  return vec4(c, min(mix(0.95, 0.995, clamp(u_macro, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
 
 // 5-tap defocus. The blur radius is constant in screen space, so the
@@ -3563,7 +3764,20 @@ void main() {
   // ── Macro closeup setup ───────────────────────────────────────────
   // Defocus grows away from the frame centre — the shallow depth of field a
   // real macro lens has wide open, and what sells the magnification.
-  bool macro = u_macro > 0.5;
+  /*
+    How far into the closeup we are, 0 at the plate and 1 once the camera is
+    properly in. It used to be a bool, and the difference is the whole of why
+    the closeup arrived as a cut: the exposure, the depth of field, the
+    silhouette warp and the ground relief all switched on together in one
+    frame. Each of them is now mixed in over the travel.
+
+    The bool survives only for the branches that pick *which*
+    geometry to sample — the dish framing against the magnified one — where
+    there is nothing to mix between. It flips early, at a tenth of the way in,
+    because the dish is barely on screen by then anyway.
+  */
+  float macroAmt = clamp(u_macro, 0.0, 1.0);
+  bool macro = macroAmt > 0.1;
   float aspect = u_resolution.x / max(1.0, u_resolution.y);
   vec2 uvScreen = uv;   // the unfolded frame, for the dish
   // ── Kaleidoscope ─────────────────────────────────────────────────
@@ -3594,7 +3808,9 @@ void main() {
   float dof = 0.0;
   if (macro) {
     float rad = length((uv - 0.5) * vec2(aspect, 1.0));
-    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * u_macroDepth;
+    // Scaled by how far in we are: a lens opens up as it comes in, so the
+    // defocus arrives with the magnification rather than ahead of it.
+    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * u_macroDepth * macroAmt;
   }
 
   // ── LED Platform background ────────────────────────────────────────
@@ -3661,7 +3877,7 @@ void main() {
   vec2 fuv0 = uvToFluid(uv, c0, s0);
   if (u_dishSpread > 0.001 && !macro) fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0);
   vec2 fuvBase = fuv0;   // the plate before any macro warp: where bubbles live
-  vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) : vec2(0.0);
+  vec2 flow0 = macro ? fluidFlow(u_vel0, fuv0) * macroAmt : vec2(0.0);
   if (macro) fuv0 = macroWarp(fuv0);
   vec4 fluid0 = decodeFluidDof(u_layer0, fuv0, blurFluid, useBlur, dof);
   vec2 dish0 = vec2(1.0, 0.0), dish1 = vec2(1.0, 0.0);
@@ -3728,16 +3944,17 @@ void main() {
   // ── Substrate grain + contact shadow ──────────────────────────────
   // Magnified, the ground under the dye should read as a surface, and the dye
   // should sit *on* it rather than float in front of it.
-  if (macro && u_macroDepth > 0.005) {
+  if (macro && u_macroDepth * macroAmt > 0.005) {
+    float depth = u_macroDepth * macroAmt;
     float fiber = fbm3(uv * vec2(aspect, 1.0) * 230.0);
-    bgColor = bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * u_macroDepth;
+    bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
     // Two offsets — a contact shadow tight to the bead and a softer, wider
     // one behind it. The gap between them is what lifts the paint off the
     // ground instead of leaving it pasted flat onto it.
     float shA = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.008, -0.008), c0, s0)).a) * 2.6);
     float shB = 1.0 - exp(-decodeDensity(textureBicubic(u_layer0, uvToFluid(uv + vec2(0.022, -0.022), c0, s0)).a) * 1.6);
     float shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
-    bgColor *= mix(1.0, 0.18, shadow * u_macroDepth);
+    bgColor *= mix(1.0, 0.18, shadow * depth);
   }
 
   vec3 outColor = bgColor;
@@ -3789,7 +4006,7 @@ void main() {
     // A second projector at a different throw: the layer is viewed magnified
     // about the centre and drifts slowly, so one frame carries two scales.
     if (!macro && u_layerZoom1 > 1.001) fuv1 = (fuv1 - 0.5) / u_layerZoom1 + 0.5 + u_layerDrift1;
-    vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) : vec2(0.0);
+    vec2 flow1 = macro ? fluidFlow(u_vel1, fuv1) * macroAmt : vec2(0.0);
     if (macro) fuv1 = macroWarp(fuv1);
     vec4 fluid1 = decodeFluidDof(u_layer1, fuv1, blurFluid, useBlur, dof);
     if (u_dishSpread > 0.001 && !macro) {
@@ -4058,6 +4275,31 @@ void main() {
   // upstream, the camera pass included, sees a darker plate.
   outColor *= u_dimmer;
 
+  // ── The mark ────────────────────────────────────────
+  //
+  // A logo or a title, laid over the finished frame rather than poured into
+  // the plate. Dropping an image into the liquid is the lovely thing to do
+  // with it and the wrong thing to do with a client's mark, which has to stay
+  // legible for three hours.
+  //
+  // It is composited here, in the shader, and not as an element over the
+  // canvas, because everything downstream reads the canvas: the projector
+  // window, a cast to another screen, the recorder, and another machine
+  // capturing this window. A mark that lived in the DOM would be on the
+  // laptop's screen and on none of them.
+  //
+  // Below the dimmer on purpose. The house dimmer is the lamp, and taking the
+  // lamp down should not take the sponsor's logo with it — a blackout with a
+  // mark still on the wall is a normal thing to want. Its own opacity is the
+  // control for that.
+  if (u_markOn > 0.5) {
+    vec2 m = (uvScreen - u_markRect.xy) / max(u_markRect.zw, vec2(1e-4)) * 0.5 + 0.5;
+    if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
+      vec4 mark = texture(u_mark, vec2(m.x, 1.0 - m.y));
+      outColor = mix(outColor, mark.rgb, mark.a * u_markOn);
+    }
+  }
+
   fragColor = vec4(outColor, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }`;
@@ -4145,6 +4387,7 @@ void main() {
       'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
       'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
+      'u_mark','u_markOn','u_markRect','u_bspline',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
       'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
@@ -4158,6 +4401,15 @@ void main() {
     const filmTexture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, filmTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // The mark: a logo or title laid over the finished frame. Transparent
+    // until one is loaded, so the shader's branch is the only cost.
+    const markTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, markTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -4176,6 +4428,7 @@ void main() {
       packFbos: new Map(), texSizes: new Map(),
       maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
       filmTexture,
+      markTexture,
       beadTexture,
     };
 
@@ -4323,9 +4576,11 @@ void main() {
         room: sceneRef?.current ?? null,
         film: filmSenseRef?.current ?? null,
         sound: currentAudioData,
+        shape: modRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
+        shapeImpact: settingsRef.current.shapeImpact ?? 1,
       }, settingsRef.current.layerCount ?? 1, performance.now());
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
@@ -4364,6 +4619,26 @@ void main() {
         dynamicSpeed *= speedMultiplier;
         const timeMultiplier = dynamicSpeed * 20.0;
 
+        /*
+          The phrase, once a frame, before anything reads it.
+
+          On wall-clock seconds rather than solver steps, because it is about
+          how the show feels over the seconds a person watches rather than
+          about how far the liquid has been pushed. Paused, it holds where it
+          is instead of running on in the dark and coming back somewhere else.
+        */
+        // The LFOs, on the bar rather than on the second: see `modulators.ts`.
+        if (isActiveRef.current) modRef.current.step(realDt, tempoRef?.current?.bpm ?? 0);
+
+        if (isActiveRef.current) {
+          phraseRef.current = phrasingRef.current.step(
+            realDt,
+            currentSettings.surge ?? 0,
+            currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
+          );
+          for (const f of fluidsRef.current) if (f) { f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP; }
+        }
+
         if (isActiveRef.current) {
           simulationTimeRef.current += realDt * timeMultiplier;
         }
@@ -4374,9 +4649,24 @@ void main() {
         // slow frame into a run of them — better to let the show run a little
         // slow than to stutter.
         const catchUp = simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP;
+        catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
         simAccumRef.current -= simSteps * SIM_STEP;
+
+        // How many steps a second that is actually producing.
+        //
+        // The cap above is the one thing in the loop that trades the show's
+        // speed for a smooth frame, and it does it silently: when a step costs
+        // more than a frame's budget the plate advances less than a second of
+        // liquid per second of wall clock, and every frame still arrives on
+        // time. A frame rate cannot show that — 15 fps with four steps a frame
+        // and 15 fps with one are the same number and a quarter of the motion.
+        // So measure the rate directly and report it next to the frame rate.
+        if (realDt > 0) {
+          const k = 1 - Math.exp(-realDt / 1.5);
+          stepsPerSecRef.current += (simSteps / realDt - stepsPerSecRef.current) * k;
+        }
 
         // ── Drain animation ────────────────────────────────────
         if (drainTriggerRef.current > lastDrainTrigger.current) {
@@ -4498,11 +4788,18 @@ void main() {
             engine: lead?.gpu ? 'gpu' : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
             dpr: dprRef.current,
-            tier, gpu: gpuClass,
+            tier, gpu: gpuClass, renderer: rendererString,
             governed,
             steppedDown: governed && governor.steppedDown,
             gpuUnavailable,
             frameMs: governor.frameMs,
+            simMs: simMsRef.current,
+            layers: fluidsRef.current.length,
+            stepsPerSec: stepsPerSecRef.current,
+            // The solver's share of a frame is one step's cost times the steps
+            // that frame owed; what is left is everything that is not the
+            // solver, and does not fall when the grid does.
+            otherMs: Math.max(0, governor.frameMs - simMsRef.current * stepsPerSecRef.current * (governor.frameMs / 1000)),
           };
           const prev = engineStatusRef.current;
           // The label changes rarely; the frame time ticks over once a second.
@@ -4781,11 +5078,77 @@ void main() {
             const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
             const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
-            // The rate scales everything: at the default it is a drop or a
-            // blow every second or so, quickening with the music; at full it
-            // is the old frenzy. (Before, the music term stood on its own and
-            // the slider hardly mattered.)
-            if (Math.random() < rate * (0.08 + energy * 0.5)) {
+            /*
+              The rate scales everything: at the default it is a drop or a
+              blow every second or so, quickening with the music; at full it
+              is the old frenzy. (Before, the music term stood on its own and
+              the slider hardly mattered.)
+
+              The phrase is what gives it shape. Without it this is a Poisson
+              process at a fixed rate, which means impulses arrive
+              independently and the amount of them over any minute is the same
+              as over any other — the plate is equally busy for as long as it
+              is on. The phrase's drive bunches them into gusts with quiet
+              between, which is what a dish being worked on actually looks
+              like: a pour, then twenty seconds of watching it spread, then a
+              press. At surge 0 the drive is 1 and this is the old behaviour
+              exactly.
+            */
+            const ph = phraseRef.current;
+
+            /*
+              A gust does something, rather than doing more of the same.
+
+              The first version of the phrasing only scaled the trickle — how
+              often a drop lands and how big it is — and measured as changing
+              nothing at all: the same frame-to-frame motion as with it
+              switched off, at every lag from one second to fourteen. The
+              reason is in `phrasing.ts`: a plate already covered in churning
+              dye has a motion floor that swamps any modulation of small events
+              on top of it. Filmed liquid gets its dynamics from whole-frame
+              events, and from a dish that is often mostly still.
+
+              So the peak of a gust pours. A wide, soft flood across a good
+              share of the plate in one colour, which is the one thing here
+              that changes the whole frame at once — and it is rare, because
+              the rest between them is half of what makes it read.
+            */
+            // 0.45, not 0.82: the gust handed over here is already scaled by
+            // surge, so a threshold near the top made the pour fire only above
+            // surge 0.82 — nothing at the default of 0.55, and the feature was
+            // a switch disguised as a dial. At 0.45 a quiet look still never
+            // pours (its gust cannot reach it), the middle pours now and then,
+            // and a loud one pours often, which is what the dial was for. The
+            // size and the force still ride the gust, so a bigger surge is
+            // also a bigger pour.
+            if (ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+              lastFloodRef.current = now;
+              const af = fluidsRef.current[0];
+              if (af) {
+                const color = harmonyColor(harmonyRef.current);
+                const cx = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                const cy = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                // A third of the plate across, falling off to nothing, so it
+                // is a pour arriving rather than a rectangle being filled.
+                const R = GRID_SIZE * (0.18 + 0.16 * ph.gust);
+                const strength = (28 + energy * 40) * (0.5 + ph.gust);
+                for (let j = Math.max(1, Math.floor(cy - R)); j < Math.min(GRID_SIZE - 1, cy + R); j++) {
+                  for (let i = Math.max(1, Math.floor(cx - R)); i < Math.min(GRID_SIZE - 1, cx + R); i++) {
+                    const d = Math.hypot(i - cx, j - cy) / R;
+                    if (d >= 1) continue;
+                    const fall = (1 - d) * (1 - d);
+                    af.addDensity(i, j, strength * fall * 0.06, color.r, color.g, color.b);
+                  }
+                }
+                // And it lands: a pour pushes the plate out of the way.
+                af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
+                if ((currentSettings.bubbles ?? 0) > 0) {
+                  bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
+                }
+              }
+            }
+
+            if (Math.random() < rate * (0.08 + energy * 0.5) * ph.drive) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -4795,7 +5158,7 @@ void main() {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3), 0.08 + energy * 0.18);
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3 + ph.gust * 3), (0.08 + energy * 0.18) * (1 + ph.gust * 1.5));
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
@@ -4804,7 +5167,10 @@ void main() {
                   const color = harmonyColor(harmonyRef.current);
                   const styles = injectStyleRef.current;
                   const style = styles[Math.floor(Math.random() * styles.length)];
-                  af.autoInject(style, rx, ry, 6.0 + energy * 35, color.r, color.g, color.b, energy);
+                  // A gust is a bigger pour, not just a more frequent one:
+                  // an even scatter of identical drops is the flatness this
+                  // is here to break.
+                  af.autoInject(style, rx, ry, (6.0 + energy * 35) * (1 + ph.gust * 1.3), color.r, color.g, color.b, energy);
                   af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
@@ -5218,10 +5584,32 @@ void main() {
         // ── Macro camera ──────────────────────────────────────
         // Locks the frame onto one bead of dye. Off, this stays at the plate-wide
         // framing (centre 0.5,0.5 at zoom 1) and costs nothing.
-        const macroOn = currentSettings.macroMode === true;
+        /*
+          How far in we are, from the zoom alone.
+
+          This used to be `macroMode === true` and nothing else, which made the
+          zoom slider inert until a toggle somewhere else was found and turned
+          on — and made the closeup a cut rather than a move: one frame at the
+          plate, the next at six times on a bead, with a different exposure,
+          a different depth of field and a different silhouette.
+
+          The zoom is the control now. At 1 the frame is the whole plate; past
+          it the camera picks a subject and pushes in, and `macroAmount` carries
+          how far along that travel we are so the closeup's own behaviours can
+          fade in over it instead of switching. Fully in by two times, which is
+          about where a bead is big enough for any of them to read.
+
+          `macroMode` is still honoured for the looks and saved shows that set
+          it: on with a zoom nobody moved means the framing it has always meant.
+        */
+        const wantZoom = currentSettings.macroMode === true
+          ? Math.max(MACRO_PRESET_ZOOM, currentSettings.macroZoom ?? MACRO_PRESET_ZOOM)
+          : Math.max(1, currentSettings.macroZoom ?? 1);
+        const macroAmount = Math.max(0, Math.min(1, (wantZoom - 1) / (MACRO_FULL_ZOOM - 1)));
+        const macroOn = wantZoom > 1.005;
         if (macroOn !== lastMacroOnRef.current) {
           lastMacroOnRef.current = macroOn;
-          if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on switch-on
+          if (macroOn) macroCamRef.current.reset();   // pick a fresh subject on the way in
         }
         if (macroOn && fluidsRef.current.length > 0) {
           if (isActiveRef.current && drainFrameRef.current === 0) {
@@ -5232,7 +5620,7 @@ void main() {
               { density: subject.readDensity, vx: subject.readVx, vy: subject.readVy, size: GRID_SIZE },
               realDt,
               {
-                zoom: Math.max(1, currentSettings.macroZoom ?? 6),
+                zoom: wantZoom,
                 chase: currentSettings.macroChase ?? 0.6,
                 hold: Math.max(0.5, currentSettings.macroHold ?? 5),
                 floor: filmLevelRef.current,
@@ -5448,6 +5836,39 @@ void main() {
             }
           }
 
+          // The mark, if one is loaded. Uploaded once, on the frame after it
+          // arrives, and then just bound: a logo does not change sixty times a
+          // second and re-uploading it would be the most expensive thing in
+          // the frame.
+          let markOn = 0;
+          const markRect = [0.5, 0.5, 0.5, 0.5];
+          {
+            const mk = markRef.current;
+            glCtx.activeTexture(glCtx.TEXTURE14);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
+            if (mk) {
+              if (mk.dirty) {
+                glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+                glCtx.pixelStorei(glCtx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, mk.source as TexImageSource);
+                mk.dirty = false;
+              }
+              const mix = Math.max(0, Math.min(1, currentSettings.markMix ?? 1));
+              if (mix > 0.002) {
+                markOn = mix;
+                // Width is the setting; height follows the image's own aspect
+                // against the frame's, so a wide logo is not stretched tall on
+                // a 16:9 wall and squat on a 4:3 one.
+                const halfW = Math.max(0.002, (currentSettings.markScale ?? 0.22)) * 0.5;
+                const frameAspect = canvas.width / Math.max(1, canvas.height);
+                markRect[0] = Math.max(0, Math.min(1, currentSettings.markX ?? 0.5));
+                markRect[1] = Math.max(0, Math.min(1, currentSettings.markY ?? 0.12));
+                markRect[2] = halfW;
+                markRect[3] = halfW * (frameAspect / Math.max(0.01, mk.aspect));
+              }
+            }
+          }
+
           // The film projector's frame, if one is playing.
           let filmOn = 0;
           let filmScaleX = 1, filmScaleY = 1;
@@ -5511,6 +5932,10 @@ void main() {
             Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current,
           );
           glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
+          glCtx.uniform1f(uLocs['u_bspline'], oldSamplerRef.current ? 1 : 0);
+          glCtx.uniform1i(uLocs['u_mark'], 14);
+          glCtx.uniform1f(uLocs['u_markOn'], markOn);
+          glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
             glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
@@ -5613,7 +6038,7 @@ void main() {
           glCtx.uniform1i(uLocs['u_vel1'], 7);
           glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
           glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
-          glCtx.uniform1f(uLocs['u_macro'], macroOn ? 1 : 0);
+          glCtx.uniform1f(uLocs['u_macro'], macroAmount);
           glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
           glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
           glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
@@ -5716,11 +6141,21 @@ void main() {
         engine: engineStatusRef.current?.label ?? '',
         status: engineStatusRef.current,
         governor: governorRef.current,
+        /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
+        solver: () => ({
+          simMs: simMsRef.current,
+          stepsPerSec: stepsPerSecRef.current,
+          catchUp: catchUpRef.current,
+          layers: fluidsRef.current.length,
+        }),
         externalTilt: externalTiltRef.current,
         bubbles: bubblesRef.current,
         // What the shader was actually told about them last frame: a bubble
         // that is on the plate but not in these two numbers is not on screen.
         bubbleUniforms: () => ({ ...bubbleDebugRef.current }),
+        // The phrasing, so a check can watch the signal rather than guess from
+        // the picture whether it is arriving.
+        phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,

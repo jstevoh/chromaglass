@@ -109,6 +109,15 @@ export type RemoteMessage =
   | { type: 'mirrors'; count: number }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
+  /**
+   * Display → relay: what colour the plate is, for the lighting rig.
+   *
+   * The relay turns this into Art-Net, so the par cans washing the room carry
+   * the dye's own colour. It stops at the relay — a phone has no use for
+   * twenty of these a second — and the browser could not send the UDP itself
+   * in any case.
+   */
+  | { type: 'lights'; layers: { colour: string; fill: number }[]; master: number }
   /** Relay → display, when a controller joins and needs a snapshot. */
   | { type: 'request-state' }
   /** Display → controllers. */

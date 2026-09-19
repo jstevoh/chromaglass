@@ -43,6 +43,17 @@ export interface UseShowSequencerArgs {
   suspended?: boolean;
   /** Every preset a stage may name: the built-ins and the user's own. */
   presets?: Preset[];
+  /**
+   * Where a desk says we are, in seconds from the top, or null when nothing
+   * is sending timecode.
+   *
+   * With this arriving, the sequence stops being a timer and becomes a
+   * timeline: the position decides which stage is up and how far into it we
+   * are, so a set that is paused, located or restarted at the desk lands in
+   * the same place the sound and the lights do. Without it nothing changes
+   * and the stage clock runs as it always has.
+   */
+  timecodeAt?: number | null;
 }
 
 interface Run {
@@ -221,7 +232,42 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       // so returning to Perform resumes where the set was rather than where
       // it would have got to on its own.
       if (a.suspended) { run.enteredAt += TICK_MS * 0.001; return; }
-      if (!a.isActive) { run.enteredAt += TICK_MS * 0.001; return; }   // the show is paused: hold the stage clock
+      /*
+        Locked to a desk.
+
+        A timecode position is the whole answer — which stage, and how far in —
+        so the stage clock is not advanced, it is *set* from the position. That
+        is what makes a locate work: the desk jumps to 00:04:30 and the show
+        goes to whatever stage covers that second rather than carrying on from
+        where its own timer had got to.
+
+        Held above the pause check on purpose. A show following a desk is not
+        paused when the desk stops rolling, it is parked, and parked is what
+        the position says it is.
+      */
+      const tc = a.timecodeAt;
+      if (tc !== null && tc !== undefined) {
+        let acc = 0, index = 0;
+        for (; index < seq.stages.length - 1; index++) {
+          if (acc + seq.stages[index].seconds > tc) break;
+          acc += seq.stages[index].seconds;
+        }
+        // A timeline longer than the sequence wraps when it loops and parks on
+        // the last stage when it does not, which is what the timer does too.
+        if (seq.loop) {
+          const total = seq.stages.reduce((t, st) => t + st.seconds, 0) || 1;
+          const within = ((tc % total) + total) % total;
+          acc = 0; index = 0;
+          for (; index < seq.stages.length - 1; index++) {
+            if (acc + seq.stages[index].seconds > within) break;
+            acc += seq.stages[index].seconds;
+          }
+          run.enteredAt = now() - (within - acc);
+        } else {
+          run.enteredAt = now() - Math.max(0, tc - acc);
+        }
+        if (index !== run.stageIndex) { enterStage(seq, index); return; }
+      } else if (!a.isActive) { run.enteredAt += TICK_MS * 0.001; return; }   // the show is paused: hold the stage clock
       const elapsed = now() - run.enteredAt;
 
       // Glide the settings toward the stage's target.
@@ -240,7 +286,9 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
         // No song map (nothing identified yet): the clock runs the stage, a little long.
         else if (label === null && elapsed >= Math.max(stage.seconds, MIN_SECTION_SECONDS) * 1.5) advance = true;
       }
-      if (advance) {
+      // A desk's position owns the stage; advancing on our own clock as well
+      // would fight it every tick.
+      if (advance && (a.timecodeAt === null || a.timecodeAt === undefined)) {
         const last = run.stageIndex >= seq.stages.length - 1;
         if (last && !seq.loop) { run.pausedAt = now(); publish(); return; }
         enterStage(seq, last ? 0 : run.stageIndex + 1);
