@@ -62,7 +62,10 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   const line = `${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`;
   console.log(line);
-  if (!process.stdout.isTTY) process.stderr.write(line + '\n');
+  // Piped (`npm run wall | tail`), the terminal still sees progress on stderr.
+  // Only when stderr is a terminal, though: with `2>&1`, or on CI where neither
+  // is, writing both printed every check twice.
+  if (!process.stdout.isTTY && process.stderr.isTTY) process.stderr.write(line + '\n');
 };
 
 // ── The flash guard, before anything is launched ─────────────────────

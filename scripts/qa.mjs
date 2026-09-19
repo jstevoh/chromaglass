@@ -1492,6 +1492,7 @@ try {
     const lit = async () => page.evaluate(() =>
       document.querySelectorAll('[data-midi-hit="true"]').length);
     check('nothing is lit before anything is pressed', (await lit()) === 0, `${await lit()} lit`);
+    const pressedAt = Date.now();
     await page.evaluate(() => window.chromaglassTouch?.('preset:oil-on-water'));
     await settle(120);
     const onNow = await page.evaluate(() => {
@@ -1500,10 +1501,17 @@ try {
     });
     check('a controller press lights the row it fired',
       onNow.hit && onNow.any === 1, `row ${onNow.hit}, ${onNow.any} lit in total`);
-    // Long enough to be well past the flash, short enough that a stuck one
-    // still fails rather than the harness waiting it out.
-    await settle(700);
-    check('and the light goes out again', (await lit()) === 0, `${await lit()} still lit`);
+    // Waited for, not slept on. The flash is a 260ms timer, and a fixed 700ms
+    // after it was a race on a runner rasterising in software: a frame there
+    // takes ~500ms, the timer's callback queues behind one, and the check
+    // read "lit" a moment before the row went out — then printed "0 still
+    // lit" from its second look. Three seconds is still short enough that a
+    // light which never clears fails rather than the harness waiting it out.
+    const outAfter = await page.waitForFunction(
+      () => document.querySelectorAll('[data-midi-hit="true"]').length === 0, null, { timeout: 3000 },
+    ).then(() => Date.now() - pressedAt, () => null);
+    check('and the light goes out again', outAfter !== null,
+      outAfter !== null ? `out ${outAfter}ms after the press` : `${await lit()} still lit after 3s`);
 
     /*
       ── What the controller is doing, without the controls on screen ──
