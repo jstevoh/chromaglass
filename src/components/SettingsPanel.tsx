@@ -266,6 +266,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   const canCaptureWindow = typeof navigator !== 'undefined'
     && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
   const [live, setLive] = useState<EngineStatus | null>(null);
+  /** `?debug` puts the frame's cost split under the engine readout. */
+  const showFrameSplit = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).has('debug');
   useEffect(() => {
     if (!getLiveEngineStatus) return;
     const tick = () => { setLive(getLiveEngineStatus() ?? null); };
@@ -1931,6 +1934,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </span>
             )}
           </div>
+          {/*
+            Where a frame actually goes, on a `?debug` visit. Cost that does
+            not fall when the grid falls is not the grid's cost, and that is
+            the whole question a grid sweep is trying to answer — so put both
+            halves next to the control that changes the grid, rather than
+            behind a console command typed once per reading.
+
+            `solver` is the CPU time to submit one step across every layer,
+            not the GPU time to run it: WebGL2 has no portable way to ask.
+          */}
+          {showFrameSplit && engineStatus && (
+            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+              solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
+              {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
+              {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of 60 steps/s
+            </div>
+          )}
           <select
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
