@@ -120,13 +120,31 @@ const GRID_AREA = GRID_SIZE * GRID_SIZE;
 const SHARP_FLOOR = 0.08;
 const PALETTE_COUNT = PALETTE_RGB.length;
 
+/**
+ * The largest grid a pinned `?sim=` may ask for.
+ *
+ * This used to clamp to the context's own texture limit, which is not a safety
+ * limit — it is how big a texture the driver will *describe*, not how big a
+ * one it can afford. On a machine reporting 8192, `?sim=8192` asks for a
+ * gigabyte in a single RGBA32F buffer and more than a dozen of them, and the
+ * GPU context is lost: the plate stops, the render loop stops publishing, and
+ * everything reading the engine's state freezes on whatever it last said. It
+ * takes a documented query parameter to get there, which makes it reachable
+ * rather than theoretical.
+ *
+ * 1024 is one step past the top of the ladder, so there is still room to try a
+ * grid finer than the app will choose for itself, and the footprint stays in
+ * the low hundreds of megabytes rather than the low gigabytes.
+ */
+const MAX_PINNED_GRID = 1024;
+
 // Which grid the solver should run on. A pinned size is honoured up to the
-// context's texture limit; 'auto' hands the choice to the frame-time governor;
-// 'cpu' is the 192² fallback.
+// smaller of the cap above and the context's texture limit; 'auto' hands the
+// choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
   if (want === 'cpu') return 0;
-  return Math.max(64, Math.min(Math.round(want), maxTexture));
+  return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
