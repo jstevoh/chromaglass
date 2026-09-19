@@ -235,6 +235,43 @@ async function main() {
     out.splatPoured = { records: list.count, mass: +mass(await viaSplat.readField('dye')).toFixed(2) };
     viaCpu.dispose();
     viaSplat.dispose();
+
+    // ── A picture poured ───────────────────────────────────────────
+    // Eight by eight, red on the left and blue on the right, into the box
+    // the app pours pictures into. There is no CPU twin to compare against —
+    // the point of the pass is that it samples the source rather than the
+    // 120×72 the CPU could manage — so the check is that the dye lands
+    // inside the box, in the right colours, in the right quantity.
+    const BOX: [number, number, number, number] = [0.19, 0.31, 0.81, 0.69];
+    const src = new ImageData(8, 8);
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const i = (y * 8 + x) * 4;
+      src.data[i + (x < 4 ? 0 : 2)] = 255;
+      src.data[i + 3] = 255;
+    }
+    const pour = new WebGPUFluid(gpu.device, L, L, opts);
+    pour.pourImage(src, BOX, { strength: 1.5, floor: 0.5, flipY: false });
+    const got = await pour.readField('dye');
+    const at = (nx: number, ny: number) => {
+      const i = (Math.round(ny * L) * L + Math.round(nx * L)) * 4;
+      return [got[i], got[i + 1], got[i + 2], got[i + 3]];
+    };
+    let inside = 0, outside = 0;
+    for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
+      const u = (x + 0.5) / L, v = (y + 0.5) / L;
+      const d = got[(y * L + x) * 4 + 3];
+      if (u > BOX[0] && u < BOX[2] && v > BOX[1] && v < BOX[3]) inside += d; else outside += d;
+    }
+    // (0.5 + 1.5·luma) per cell, red luma 0.299 and blue 0.114, over the box.
+    const cells = (BOX[2] - BOX[0]) * (BOX[3] - BOX[1]) * L * L;
+    out.pour = {
+      inside: +inside.toFixed(2),
+      outside: +outside.toFixed(4),
+      expected: +(cells * ((0.5 + 1.5 * 0.299) + (0.5 + 1.5 * 0.114)) / 2).toFixed(2),
+      red: at(0.3, 0.5).map((v) => +v.toFixed(3)),
+      blue: at(0.7, 0.5).map((v) => +v.toFixed(3)),
+    };
+    pour.dispose();
   }
 
   // ── The measurements ─────────────────────────────────────────────

@@ -82,6 +82,14 @@ try {
       // Pours: the CPU's arrays against the GPU's own splats.
       check('the splats land where the CPU painted them', r.splatDye.meanRel < 0.005 && r.splatDye.maxRel < 0.1,
         `dye mean ${r.splatDye.meanRel} of rms, worst ${r.splatDye.maxRel}; velocity worst ${r.splatVel.maxRel}`);
+      // A picture: inside the box, in its own colours, in the right quantity.
+      const p = r.pour;
+      const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.abs(b);
+      check('a picture pours where it is aimed', p.outside < 0.01 && near(p.inside, p.expected, 0.05),
+        `${p.inside} of dye inside, ${p.outside} outside, ${p.expected} expected`);
+      // Red absorbs nothing in red and −log(0.002) in the others; blue the reverse.
+      check('a picture keeps its colours', p.red[0] < 0.01 * p.red[1] && p.blue[2] < 0.01 * p.blue[1],
+        `red cell ${p.red.join(', ')}; blue cell ${p.blue.join(', ')}`);
       check('the splats poured something', r.splatPoured.mass > 10,
         `${r.splatPoured.records} records, ${r.splatPoured.mass} of dye`);
     }

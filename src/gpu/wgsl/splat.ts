@@ -126,7 +126,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let amount = (s.b.a + s.d.x * luma) * px.a;
   let eps = vec3f(0.002);
   let absorb = -log(max(px.rgb, eps));
-  textureStore(dye, vec2i(id.xy), vec4f(absorb * amount, amount, 0.0, 0.0));
+  textureStore(dye, vec2i(id.xy), vec4f(absorb * amount, amount));
 }`,
 
   /** Bilinear from the CPU's 192² delta arrays onto the full grid. */
