@@ -262,7 +262,13 @@ try {
         && live.gain === c.gain && live.gamma === c.gamma
         && live.maskTop === c.maskTop && live.maskRight === c.maskRight
         && live.maskBottom === c.maskBottom && live.maskLeft === c.maskLeft
-        && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6);
+        && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6)
+        && (live.surfaces ?? []).length === (c.surfaces ?? []).length
+        && (live.surfaces ?? []).every((s, i) => {
+          const w = (c.surfaces ?? [])[i];
+          return w && s.shape === w.shape && s.enabled === w.enabled
+            && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
+        });
     }, want, { timeout: 20000 });
     await page.evaluate(() => new Promise((done) => {
       let n = 0;
@@ -582,6 +588,79 @@ try {
   check('the guard is on without anyone asking for it', guardOn === true, `flashGuard ${guardOn}`);
   const reading = await page.evaluate(() => window.chromaglassDebug?.().flash?.()?.luminance ?? null);
   check('and it is being fed', reading !== null && reading > 0, `luminance ${reading}`);
+
+  // ── 7b. Projection mapping ─────────────────────────────────────────
+  //
+  // The geometry is proved in `npm run map`, which has no picture in it. What
+  // can only be seen here is whether the shapes actually *mask*: that the
+  // frame goes dark where no surface lands, that a gap between two of them
+  // stays a gap, and that a circle is a circle rather than the rectangle it is
+  // cut from. Every claim is a ratio against the same cells with no surfaces
+  // on, so a plate that happens to be dark in one corner cannot pass or fail
+  // one of these on its own.
+  {
+    const quad = (x0, y0, x1, y1) => [x0, y0, x1, y0, x1, y1, x0, y1];
+    const surf = (shape, x0, y0, x1, y1, extra = {}) => ({
+      id: `${shape}-${x0}-${y0}`, shape, corners: quad(x0, y0, x1, y1),
+      src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, ...extra,
+    });
+    /** Mean luminance over a rectangle of the frame, in 0..1 screen space. */
+    const region = (grid, x0, y0, x1, y1, cols = 32, rows = 18) => {
+      let sum = 0, n = 0;
+      for (let r = Math.floor(y0 * rows); r < Math.ceil(y1 * rows); r++) {
+        for (let c = Math.floor(x0 * cols); c < Math.ceil(x1 * cols); c++) {
+          sum += grid[r * cols + c]; n++;
+        }
+      }
+      return n ? sum / n : 0;
+    };
+
+    await withOutput({});
+    const bare = await gridOf();
+
+    // One small square: everything outside it must go out.
+    await withOutput({ surfaces: [surf('rect', 0.4, 0.4, 0.6, 0.6)] });
+    const one = await gridOf();
+    const outsideBefore = region(bare, 0.0, 0.0, 0.25, 0.25);
+    const outsideAfter = region(one, 0.0, 0.0, 0.25, 0.25);
+    check('outside a shape the projector goes dark',
+      outsideAfter < 0.01 && outsideAfter < outsideBefore * 0.1,
+      `${outsideBefore.toFixed(3)} -> ${outsideAfter.toFixed(3)}`);
+    const insideBefore = region(bare, 0.43, 0.43, 0.57, 0.57);
+    const insideAfter = region(one, 0.43, 0.43, 0.57, 0.57);
+    check('and inside it the picture is still there',
+      insideAfter > insideBefore * 0.3 && insideAfter > 0.01,
+      `${insideBefore.toFixed(3)} -> ${insideAfter.toFixed(3)}`);
+
+    // Two shapes with wall between them: the wall stays wall.
+    await withOutput({
+      surfaces: [surf('rect', 0.04, 0.3, 0.34, 0.7), surf('rect', 0.66, 0.3, 0.96, 0.7)],
+    });
+    const two = await gridOf();
+    const left = region(two, 0.08, 0.35, 0.3, 0.65);
+    const right = region(two, 0.7, 0.35, 0.92, 0.65);
+    const gap = region(two, 0.42, 0.35, 0.58, 0.65);
+    check('two shapes light, and the gap between them does not',
+      left > 0.01 && right > 0.01 && gap < 0.01,
+      `left ${left.toFixed(3)} gap ${gap.toFixed(3)} right ${right.toFixed(3)}`);
+
+    // A circle is not the square it was cut from. Its bounding quad's corner
+    // has to be dark while its middle is lit — the one claim that separates a
+    // working local-space shape test from one that silently draws rectangles.
+    await withOutput({ surfaces: [surf('ellipse', 0.25, 0.1, 0.75, 0.9)] });
+    const round = await gridOf();
+    const mid = region(round, 0.45, 0.45, 0.55, 0.55);
+    const nook = region(round, 0.26, 0.12, 0.33, 0.25);
+    check('a circle leaves the corners of its quad dark',
+      mid > 0.01 && nook < mid * 0.2,
+      `middle ${mid.toFixed(3)}, corner ${nook.toFixed(3)}`);
+
+    // Off is off, without leaving the list.
+    await withOutput({ surfaces: [surf('rect', 0.4, 0.4, 0.6, 0.6, { enabled: false })] });
+    const dark = await gridOf();
+    check('a shape switched off lights nothing', region(dark, 0, 0, 1, 1) < 0.005,
+      `${region(dark, 0, 0, 1, 1).toFixed(4)}`);
+  }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────
   await withOutput({});
