@@ -3629,11 +3629,22 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   vec4 cL = decodeFluid(tex, fuv + vec2(-e, 0.0), 0.0, false);
   vec4 cT = decodeFluid(tex, fuv + vec2(0.0,  e), 0.0, false);
   vec4 cB = decodeFluid(tex, fuv + vec2(0.0, -e), 0.0, false);
-  vec2 g = vec2(length(cR.rgb - cL.rgb) * smoothstep(0.02, 0.2, min(cR.a, cL.a)),
-                length(cT.rgb - cB.rgb) * smoothstep(0.02, 0.2, min(cT.a, cB.a)));
-  float gm = length(g);
+  // Which way is across the boundary. The colour changes along x and along y
+  // are vectors in colour space, and their lengths alone lose the sign between
+  // them: a boundary whose colour runs from top left to bottom right reads the
+  // same as one running from bottom left to top right, and the axis built from
+  // that folded direction cancels to nothing. Every blob's outline lost its
+  // thread at the two places where it faced that way. The direction of greatest
+  // change is the principal axis of the colour structure tensor, which keeps
+  // the sign.
+  vec3 dx = (cR.rgb - cL.rgb) * smoothstep(0.02, 0.2, min(cR.a, cL.a));
+  vec3 dy = (cT.rgb - cB.rgb) * smoothstep(0.02, 0.2, min(cT.a, cB.a));
+  float jxx = dot(dx, dx), jyy = dot(dy, dy), jxy = dot(dx, dy);
+  float jd = jxx - jyy;
+  float gm = sqrt(0.5 * (jxx + jyy + sqrt(jd * jd + 4.0 * jxy * jxy)));
   if (gm < 0.004) return color;
-  vec2 n = g / gm;                              // across the boundary
+  float th = abs(jxy) + abs(jd) > 1e-9 ? 0.5 * atan(2.0 * jxy, jd) : 0.0;
+  vec2 n = vec2(cos(th), sin(th));              // across the boundary
   vec2 tang = vec2(-n.y, n.x);                  // along it
   vec3 axis = (cR.rgb - cL.rgb) * n.x + (cT.rgb - cB.rgb) * n.y;
   float al = length(axis);
@@ -3706,8 +3717,13 @@ vec3 lacing(vec3 color, sampler2D tex, vec2 fuv, float alpha, float amount) {
   float reach = abs(fP - fM);                   // the whole change, in colour
   if (reach < 0.02) return color;
   // The level to draw at: the middle of that change, jittered a little so the
-  // threads are not a drawn contour.
-  float mid = 0.5 * (fP + fM) + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.14 * reach;
+  // threads are not a drawn contour. The jitter leans toward the brighter side
+  // rather than along n. The structure tensor gives an axis, not a direction,
+  // so n turns round as a boundary passes through vertical. Everything else here
+  // is the same either way round, but a jitter taken along n jumped to the
+  // other side of the middle there and put a kink in the thread.
+  float toward = clamp(dot(axis, vec3(0.299, 0.587, 0.114)) * 8.0, -1.0, 1.0);
+  float mid = 0.5 * (fP + fM) + (fbm3(fuv * u_logicalGrid * 0.16 + u_time * 0.015) - 0.5) * 0.14 * reach * toward;
   float lvl = abs(fC - mid);
   // Never thinner than the pixel it is drawn on, or a thread samples as a row
   // of broken dots — which is what the plate drawn small in a second dish was
