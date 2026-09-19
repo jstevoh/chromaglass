@@ -89,7 +89,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'damping', 'diffusionRate',
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
-  'platePressure', 'polarity', 'rainDrip', 'sharpness', 'turbulenceDetail',
+  'platePressure', 'polarity', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
   'turbulenceScale', 'vibrationFrequency',
 ]);
 
