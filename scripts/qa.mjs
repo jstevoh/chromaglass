@@ -707,6 +707,12 @@ try {
   check('switching the room camera on opens exactly one camera',
     (await page.evaluate(() => window.__media.length)) === 1,
     JSON.stringify(await page.evaluate(() => window.__media)));
+  // The patch bay has a section of its own now, after the sources it reads,
+  // so adding a room patch is one more row on the rail — and back again to
+  // switch the camera off, because a control in a hidden section cannot be
+  // clicked.
+  await clickOn('settings-nav-patches');
+  await settle(500);
   const mapAdd = firstVisible('scene-map-add');
   if (await mapAdd.count()) {
     // Counted rather than assumed: a preset can arrive with mappings of its
@@ -727,6 +733,8 @@ try {
       check('and choosing a feature and a control does not throw', true);
     }
   }
+  await clickOn('settings-nav-room');
+  await settle(500);
   await clickOn(roomToggle);   // and off again
   await settle(600);
 
@@ -1213,10 +1221,13 @@ try {
         The picker cannot be driven from a harness, so what is checked is that
         the way in exists, says what it is for, and does not throw — the rest
         is the browser's own dialog.
+
+        Film has its own section under Inputs now; it was the bottom third of
+        Projectors, which is where this used to look.
       */
       await clickOn('open-all-settings');
       await settle(1200);
-      await clickOn('settings-nav-projectors');
+      await clickOn('settings-nav-film');
       await settle(500);
       const film = await page.evaluate(() => {
         const box = (id) => {
@@ -1229,10 +1240,11 @@ try {
           title: w.title,
           width: Math.round(w.width),
           // In the row with the other two, which is the claim that matters.
-          // Not "on screen without scrolling": this lives inside a section
-          // eight controls deep, and Load loop and Camera are just as far
-          // down it. The pinned way *into* settings has to be above the fold
-          // and is checked for that; a control inside a section does not.
+          // Not "on screen without scrolling": this used to live inside a
+          // section eight controls deep, and Load loop and Camera were just
+          // as far down it. The pinned way *into* settings has to be above
+          // the fold and is checked for that; a control inside a section
+          // does not.
           inRow: Math.abs(w.top - cam.top) < 4 && Math.abs(w.top - off.top) < 4,
           between: cam.right <= w.left + 1 && w.right <= off.left + 1,
           wide: w.width > 40,
@@ -1253,8 +1265,11 @@ try {
         and that the plate selector refuses the settings it cannot move —
         `PER_LAYER` is checked against the solver's own source by `npm run
         panel`, and this is the other half: that the panel honours it.
+
+        Under Patches, not The Room: the bay reads four sources, and it and
+        the four masters over it are one section now.
       */
-      await clickOn('settings-nav-room');
+      await clickOn('settings-nav-patches');
       await settle(500);
       const addBtn = page.getByTestId('scene-map-add');
       if (await addBtn.count()) {
@@ -1303,7 +1318,7 @@ try {
           !!after && after.options.includes(after.value),
           after ? `${after.value}` : '');
       } else {
-        check('a patch names the source it listens to', false, 'no Add button in The Room');
+        check('a patch names the source it listens to', false, 'no Add button under Patches');
       }
       await page.keyboard.press('Escape');
       await settle(800);
@@ -1318,26 +1333,35 @@ try {
 
         Opens the panel for itself rather than inheriting whatever the block
         above left behind. It used to lean on the film-window checks having
-        just been on Projectors, and the moment a block was added between them
-        that went to The Room and closed the panel, this looked for two
-        controls in a panel that was not on screen and reported them missing.
-        A check that depends on the one before it is a check that fails for a
-        reason that has nothing to do with what it is testing.
+        just been on the film's section, and the moment a block was added
+        between them that went to The Room and closed the panel, this looked
+        for two controls in a panel that was not on screen and reported them
+        missing. A check that depends on the one before it is a check that
+        fails for a reason that has nothing to do with what it is testing.
       */
       await clickOn('open-all-settings');
       await settle(1200);
-      await clickOn('settings-nav-projectors');
+      /*
+        Film Drive is the film's own section; Film Impact is a master over the
+        film's patches, so it sits with the other three under Patches. Each is
+        read from the section it is in, and only while that section is the
+        one on screen: every section is in the page at once, so a control
+        found without looking there proves nothing about where it lives.
+      */
+      const sliderIn = (section, key) => page.evaluate(({ section, key }) => {
+        const sec = document.querySelector(`section[data-section="${section}"]`);
+        if (!sec || sec.classList.contains('hidden')) return null;
+        const el = sec.querySelector(`[data-testid="pins-${key}"]`);
+        const row = el?.closest('div.flex.flex-col');
+        const range = row?.querySelector('input[type="range"]');
+        return row ? { there: true, disabled: !!range?.disabled, why: row.getAttribute('title') ?? '' } : null;
+      }, { section, key });
+      await clickOn('settings-nav-film');
       await settle(500);
-      const force = await page.evaluate(() => {
-        const of = (key) => {
-          const el = [...document.querySelectorAll('[data-testid^="pins-"]')]
-            .find(e => e.dataset.testid === `pins-${key}`);
-          const row = el?.closest('div.flex.flex-col');
-          const range = row?.querySelector('input[type="range"]');
-          return row ? { there: true, disabled: !!range?.disabled, why: row.getAttribute('title') ?? '' } : null;
-        };
-        return { drive: of('filmDrive'), impact: of('filmImpact') };
-      });
+      const drive = await sliderIn('film', 'filmDrive');
+      await clickOn('settings-nav-patches');
+      await settle(500);
+      const force = { drive, impact: await sliderIn('patches', 'filmImpact') };
       check('the film can drive the plate as well as light it',
         !!force.drive && !!force.impact,
         `drive ${!!force.drive}, impact ${!!force.impact}`);
@@ -1411,7 +1435,9 @@ try {
         const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return at?.textContent?.trim() ?? null;
       });
-      check('the Wall dot opens the projector settings', /projector/i.test(wallDot ?? ''), wallDot ?? 'no panel');
+      // The section kept its id (`projectors`) when it became Wall, so the dot
+      // still opens it; what the rail says is the new name.
+      check('the Wall dot opens the wall settings', /wall/i.test(wallDot ?? ''), wallDot ?? 'no panel');
       await escapeCloses('settings-panel');
 
       await clickOn('dot-phone');

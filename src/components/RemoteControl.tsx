@@ -8,6 +8,7 @@ import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
+import { PIN_RANGE } from '../lib/deskPins';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -24,12 +25,15 @@ import { useWakeLock } from '../hooks/useWakeLock';
  * Defined at module level on purpose: a component created inside the render
  * body gets a new identity on every state message from the laptop, which
  * remounts the slider under the thumb that is dragging it.
+ *
+ * The travel is not written here. It is the setting's one range, from the
+ * registry every other surface reads: this page had Speed at 0.005–0.6, twice
+ * the sheet's top, and the macro zoom stopping at 12 where the sheet goes to
+ * 16, so the same thumb position meant a different plate from the phone.
  */
-function Slider({ label, field, min, max, step, format, value, connected, onDrag, onChange }: {
+function Slider({ label, field, step, format, value, connected, onDrag, onChange }: {
   label: string;
   field: keyof VisualizerSettings;
-  min: number;
-  max: number;
   step: number;
   format?: (v: number) => string;
   value: number | undefined;
@@ -37,6 +41,7 @@ function Slider({ label, field, min, max, step, format, value, connected, onDrag
   onDrag: (field: keyof VisualizerSettings, dragging: boolean) => void;
   onChange: (field: keyof VisualizerSettings, v: number) => void;
 }) {
+  const { min, max } = PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 };
   const current = value ?? min;
   return (
     <div className="mb-5">
@@ -491,10 +496,10 @@ export default function RemoteControl() {
           </div>
 
           {/* The dials that change the mood most */}
-          <Slider label="Sound Drive" field="audioImpact" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Speed" field="globalSpeed" min={0.005} max={0.6} step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Evolve Speed" field="automateRate" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Dimmer" field="dimmer" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Evolve Speed" field="automateRate" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dimmer" field="dimmer" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
           <div className="mb-6 flex gap-3">
             <button
               onClick={() => action('blackout-toggle')}
@@ -518,8 +523,8 @@ export default function RemoteControl() {
               {state?.recording != null ? `${Math.floor(state.recording / 60)}:${String(state.recording % 60).padStart(2, '0')}` : 'Rec'}
             </button>
           </div>
-          <Slider label="Dye Budget" field="dyeBudget" min={0.1} max={1.2} step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Plate Rock" field="plateRock" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -537,9 +542,9 @@ export default function RemoteControl() {
             </button>
             {settings?.macroMode && (
               <div className="mt-4">
-                <Slider label="Zoom" field="macroZoom" min={1} max={12} step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Music Sync" field="macroSync" min={0} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Shot Length" field="macroHold" min={1} max={15} step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>
             )}
           </div>

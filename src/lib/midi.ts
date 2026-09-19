@@ -144,12 +144,24 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
  */
 export const MIDI_BANKS = 4;
 
-/** The settings worth a fader, with their travel. */
-export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number }[] = [
+/**
+ * The settings worth a fader, with their travel.
+ *
+ * The travel is the settings sheet's, number for number. It used to be MIDI's
+ * own — Speed started at 0.005 where the sheet starts at 0, the macro zoom
+ * stopped at 12 where the sheet, the zoom keys and the wheel go to 16, and the
+ * folds ran 0 to 12 continuously where the sheet offers five buttons — so a
+ * fader at the top of its travel was not the sheet at the top of its travel,
+ * and every desk and patch that took its range from here inherited the
+ * difference. `npm run panel` holds the two together now.
+ *
+ * `step` marks a control that only takes whole steps; see `deskPins.ts`.
+ */
+export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number }[] = [
   { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
   { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
-  { key: 'globalSpeed',     label: 'Speed',            min: 0.005, max: 0.3 },
+  { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
@@ -167,13 +179,13 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0, max: 1 },
   { key: 'secondLamp',      label: 'Second Lamp',      min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
-  { key: 'camera',          label: 'Camera',           min: 0, max: 1 },
+  { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
   { key: 'aperture',        label: 'Aperture',         min: 0, max: 1 },
   { key: 'bloom',           label: 'Bloom',            min: 0, max: 1 },
   { key: 'sharpness',       label: 'Sharpness',        min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 12 },
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
   { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },
@@ -183,8 +195,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
-  // Folds is a stepped choice and rides a fader as one: 0, then 2 to 12.
-  { key: 'kaleidoscope',   label: 'Kaleidoscope',     min: 0, max: 12 },
+  // Folds is a stepped choice and rides a fader as one: the sheet's five
+  // buttons, Off, 2, 4, 6 and 8, each a fifth of the travel.
+  { key: 'kaleidoscope',   label: 'Kaleidoscope',     min: 0, max: 8, step: 2 },
   { key: 'kaleidoSpin',    label: 'Kaleido Spin',     min: -0.5, max: 0.5 },
   { key: 'kaleidoZoom',    label: 'Kaleido Zoom',     min: 0.2, max: 1.6 },
   { key: 'beatLead',        label: 'Beat Lead (ms)',   min: 0, max: 250 },
@@ -194,6 +207,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
   { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
+  // The fourth master, over the LFOs and envelopes. It had a setting and a
+  // reader and no control anywhere, so a shape patch could not be pulled down
+  // at all short of deleting it.
+  { key: 'shapeImpact',     label: 'Shapes Impact',    min: 0, max: 1 },
   // The room. Worth a fader more than most: how hard the crowd drives the
   // plate is the thing you ride between a verse and a chorus.
   { key: 'sceneDrive',      label: 'Room Drive',       min: 0, max: 1 },
@@ -201,6 +218,24 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'sceneImpact',     label: 'Room Impact',      min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
+const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));
+
+/**
+ * A binding's travel, brought up to the setting's one range.
+ *
+ * A setting binding carries its own min and max, copied from the list above
+ * when it was learned — so a map saved while Speed rode 0.005–0.3 on a fader
+ * would have gone on disagreeing with the sheet for as long as the file lived.
+ * Nothing in the app lets a binding's travel be edited, so the copy was never a
+ * choice somebody made, and replacing it with today's is the only way an old
+ * map and a new one mean the same thing. A key this list does not know keeps
+ * whatever it came with.
+ */
+export function onTodaysTravel(t: MidiTarget): MidiTarget {
+  if (t.kind !== 'setting') return t;
+  const s = LEARNABLE_BY_KEY.get(t.key);
+  return s ? { ...t, min: s.min, max: s.max } : t;
+}
 
 /** One incoming message, reduced to what a binding needs. */
 export interface MidiEvent {
@@ -385,6 +420,7 @@ export function parseMidiMap(text: string): MidiMap {
     (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
     .map(b => ({
       ...b,
+      target: onTodaysTravel(b.target),
       id: typeof b.id === 'string' ? b.id : `b-${Math.random().toString(36).slice(2, 8)}`,
       mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'],
       // A map written before banks existed has none, and every binding in it

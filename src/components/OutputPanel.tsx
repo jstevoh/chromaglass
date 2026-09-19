@@ -344,8 +344,11 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="output-panel">
+      {/* "Output" rather than "The Wall": the section this sits in is called
+          Wall now, and a heading repeating its own section reads as a second
+          section starting. */}
       <div className="flex items-center justify-between">
-        <div className="text-xs font-bold uppercase tracking-widest opacity-70">The Wall</div>
+        <div className="text-xs font-bold uppercase tracking-widest opacity-70">Output</div>
         <button
           onClick={onReset}
           disabled={identity}

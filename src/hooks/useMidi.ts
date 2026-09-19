@@ -7,6 +7,7 @@ import {
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
 import { SurfaceWatcher, buildAutoMap } from '../lib/autoMap';
+import { PIN_RANGE, onStep } from '../lib/deskPins';
 import { PALETTE } from '../constants';
 import { touch, touchKey } from '../lib/midiTouch';
 import { downloadText } from '../lib/userPresets';
@@ -234,17 +235,34 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         case 'setting': {
           if (e.kind === 'noteoff') break;
           const span = t.max - t.min || 1;
+          /*
+            A control that only takes whole steps — the folds — rides them as
+            detents: the sheet offers Off, 2, 4, 6 and 8, so a fader lands on
+            those and nothing between. The step is the registry's; the travel
+            is the binding's, which `parseMidiMap` has already brought up to
+            the same range.
+          */
+          const stepped = { min: t.min, max: t.max, step: PIN_RANGE.get(String(t.key))?.step };
           const cur = h.getSetting(t.key);
           const cur01 = cur === undefined ? 0 : Math.max(0, Math.min(1, (cur - t.min) / span));
           if (b.mode === 'relative') {
             const d = relativeDelta(e.value);
             if (d === 0) break;
-            const v = Math.max(t.min, Math.min(t.max, (cur ?? t.min) + d * span / 100));
-            h.setSetting(t.key, v);
+            // A whole step a click on a stepped control: a hundredth of the
+            // travel would round straight back to where it started.
+            const by = stepped.step ?? span / 100;
+            const v = Math.max(t.min, Math.min(t.max, (cur ?? t.min) + d * by));
+            h.setSetting(t.key, onStep(stepped, v));
             break;
           }
           let in01 = e.value / 127;
           if (e.kind === 'noteon') in01 = 1;
+          // Onto the nearest detent before soft takeover sees it, so the
+          // position it compares against the setting is one the setting can
+          // actually hold. Snapped afterwards instead, a fader resting between
+          // two steps would sit a fraction away from a value it had written
+          // itself, and takeover would read its own write as somebody else's.
+          if (stepped.step) in01 = (onStep(stepped, t.min + in01 * span) - t.min) / span;
           if (softRef.current) {
             const v = takeover.ride(b.id, in01, cur01);
             if (v === null) {
@@ -262,7 +280,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
             }
             in01 = v;
           }
-          h.setSetting(t.key, t.min + in01 * span);
+          h.setSetting(t.key, onStep(stepped, t.min + in01 * span));
           break;
         }
         case 'action': if (pressed) h.action(t.action); break;

@@ -290,6 +290,9 @@ export function PerformDesk(p: PerformDeskProps) {
                 value={v}
                 min={spec.min}
                 max={spec.max}
+                // A stepped control (folds, octaves, layers) lands on a step,
+                // as it does on the sheet; the rest keep the fine travel.
+                step={spec.step}
                 display={readSetting(String(key), v, spec.min, spec.max)}
                 cc={p.ccFor(key)}
                 white={WHITE.has(String(key))}

@@ -364,6 +364,8 @@ export function DesignDesk(p: DesignDeskProps) {
                 value={v}
                 min={spec.min}
                 max={spec.max}
+                // A stepped control lands on a step, as it does on the sheet.
+                step={spec.step}
                 display={readSetting(String(key), v, spec.min, spec.max)}
                 onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
                 midiKey={`setting:${String(key)}`}

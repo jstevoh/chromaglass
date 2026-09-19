@@ -300,9 +300,9 @@ export interface VisualizerSettings {
   sceneDrive: number;         // how hard the room's motion stirs the liquid (0 = off)
   sceneHands: number;         // how strongly the people the sensor holds press and blow on the plate (0 = off)
   sceneImpact: number;        // master depth over every patch whose source is the room
-  soundImpact: number;
+  soundImpact: number;        // master depth over every patch whose source is the sound
   /** Master depth over every patch driven by an LFO or an envelope. */
-  shapeImpact: number;        // master depth over every patch whose source is the sound
+  shapeImpact: number;
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time

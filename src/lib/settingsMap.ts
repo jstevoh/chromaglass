@@ -1,15 +1,15 @@
 /**
  * The map of the settings panel: what is in it, and where.
  *
- * Seventeen sections and ninety controls is not a list you scroll. It was one
- * — a single column with a three-way filter on top — and the result was the
+ * Two dozen sections and ninety-odd controls is not a list you scroll. It was
+ * one — a single column with a three-way filter on top — and the result was the
  * complaint that wrote this file: the controls existed, and could not be
  * found. So the panel is a rail of named places and one place at a time in the
  * pane, the way every settings screen anyone has used is built.
  *
  * It lives out here rather than inside the panel because three other things
  * need it: the command palette offers a row per section, the desks' pickers
- * group what you can pin by the section it came from, and `scripts/desk.mjs`
+ * group what you can pin by the section it came from, and `scripts/panel.mjs`
  * checks the panel's own source against it.
  */
 
@@ -54,14 +54,38 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'audio-input', name: 'Sound', category: 'inputs',
     terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song' },
   { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
-    terms: 'sound bass mid treble energy timbre map drive reactive band patch patches impact modular route routing source' },
+    terms: 'sound bass mid treble energy timbre map drive reactive band velocity density colour color rotation' },
   { id: 'room', name: 'The Room', category: 'inputs',
-    terms: 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror presence patch patches mapping map route routing modular source layer plate sound film bass drive impact' },
+    terms: 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror flip presence drive' },
+  /*
+    The film projector, out of Projectors.
+
+    It is an input — a reel, a camera on a real dish, another window — and it
+    drives the plate the way the room does, so it sits with the other things
+    that drive the show rather than in a Stage section between the corner pin
+    and a gel wheel. What it looks like on the wall is Film Mix and Film Key,
+    here too, because nobody loads a reel and then goes to a different
+    section to see it.
+  */
+  { id: 'film', name: 'Film', category: 'inputs',
+    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
+  /*
+    The patch bay, with every master over it.
+
+    It lived in The Room, because the room camera was the first thing that
+    could ride a setting. By the time it also took the film, the sound and the
+    shapes, most of what it routed had nothing to do with the room, and its
+    masters were in three different sections: Sound Impact in Sound Mappings,
+    Room Impact in The Room, Film Impact in Projectors (and the shapes had
+    none). One place now, after the sources it reads.
+  */
+  { id: 'patches', name: 'Patches', category: 'inputs',
+    terms: 'patch patches patch bay modular route routing mapping mappings map source feature control depth impact master lfo envelope shape shapes modulator room film sound' },
   { id: 'midi', name: 'Controller', category: 'inputs',
     terms: 'midi apc40 apc mini launchpad nanokontrol launch control xl fader knob pad learn map bank shift soft takeover led clock controller akai novation korg usb' },
 
   { id: 'look', name: 'Light Show Look', category: 'look',
-    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid' },
+    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid grain size' },
   { id: 'show', name: 'Show', category: 'look',
     terms: 'hue journey colour color beat squeeze background loop dish vignette spread beads cells' },
   /*
@@ -76,8 +100,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'kaleidoscope', name: 'Kaleidoscope', category: 'look',
     terms: 'kaleidoscope mirror folds wedges spin rotation turn rig zoom mandala symmetry reflect prism' },
-  { id: 'lamp', name: 'Lamp', category: 'look',
-    terms: 'light play motion hotspot second lamp iridescence projector bulb' },
+  /*
+    The lamp, and everything else a crew put in front of it.
+
+    Lumia, chemistry, the gel wheel, the lamp's warmth and the exposure were
+    the back half of Projectors, after the corner pin and the masks — the
+    section you set once at load-in and then leave alone. They are the
+    opposite: what the light looks like, ridden during a song. So they live
+    with the lamp they colour.
+  */
+  { id: 'lamp', name: 'Lamp & Light', category: 'look',
+    terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade' },
   { id: 'camera', name: 'Camera', category: 'look',
     terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',
@@ -89,19 +122,35 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
   { id: 'heat', name: 'Heat Slide', category: 'plate',
     terms: 'temperature buoyancy convection lamp warmth slide' },
+  // The old names of Momentum, Updraft and Vibration stay findable, as Grain
+  // Fineness's does under Light Show Look: someone who learned them as
+  // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
-    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection' },
+    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction' },
   { id: 'interaction', name: 'Manual Interaction', category: 'plate',
-    terms: 'brush dropper blow press tools mouse touch radius strength' },
+    terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency' },
 
-  { id: 'projectors', name: 'Projectors', category: 'stage',
-    terms: 'wall keystone corner pin mask blanking rear projection flip gain gamma flash limit strobe safety second screen hdmi lumia chemistry gel wheel warmth exposure film loop video window tab screen capture share archive internet archive prelinger movie footage' },
-  // Out of Projectors for the same reason as the mark: it made that section
-  // three screens deep, and cutting a picture into shapes is a job of its own.
+  /*
+    The wall: where the picture goes and what shape it is when it gets there.
+
+    It was called Projectors and it was three sections in one — this, the look
+    effects now under Lamp & Light, and the film projector now under Inputs —
+    so the one place you square up a projector at load-in was also where you
+    rode a gel wheel mid-song. What is left is the part that describes the
+    venue rather than the look: none of it is saved into a preset.
+
+    The id stays `projectors`. The Wall dot, `openSettingsAt('projectors')` and
+    every saved deep link name it, and an id is not something anyone reads.
+  */
+  { id: 'projectors', name: 'Wall', category: 'stage',
+    terms: 'wall projector projectors keystone corner pin mask masks blanking rear projection flip inverted output gain gamma grade flash limit strobe safety second screen hdmi load-in' },
+  // Out of the wall's section for the same reason as the mark: it made that
+  // section three screens deep, and cutting a picture into shapes is a job of
+  // its own.
   { id: 'mapping', name: 'Mapping', category: 'stage',
     terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between' },
   /*
-    A section rather than a row in Projectors, because loading a mark and
+    A section rather than a row under the wall, because loading a mark and
     placing it is a job somebody does once before doors and then leaves alone,
     and because it is the one thing in here that belongs to whoever is paying
     for the room rather than to the look.
