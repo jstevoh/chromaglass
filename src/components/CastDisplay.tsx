@@ -5,6 +5,7 @@ import type { AudioData } from '../hooks/useAudioAnalyzer';
 import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProtocol';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import { useWakeLock } from '../hooks/useWakeLock';
+import lockupUrl from '../assets/brand/lockup.svg';
 
 /**
  * The cast receiver: the show on the second screen.
@@ -308,7 +309,8 @@ function CastReceiver() {
       {(!linked || stale) && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           <div className="bg-black/70 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 text-center">
-            <p className="text-white/80 text-sm font-medium">ChromaGlass Cast Display</p>
+            <img src={lockupUrl} alt="ChromaGlass" className="mx-auto block h-9 w-auto" draggable={false} />
+            <p className="text-white/80 text-sm font-medium mt-2">Cast Display</p>
             <p className="text-white/40 text-xs mt-1">{linked ? 'The show window has gone quiet' : 'Waiting for the show…'}</p>
           </div>
         </div>

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
+import lockupUrl from '../../assets/brand/lockup.svg';
+import markUrl from '../../assets/brand/mark.svg';
 
 /**
  * The bar across the top of both desks.
@@ -61,7 +63,18 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
       truncates instead.
     */
     <header className="relative col-span-3 flex items-center justify-between gap-4 border-b border-border px-4">
-      <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">{breadcrumb}</div>
+      <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">
+        {/*
+          The name where there is room for it, the mark alone where there is
+          not. Below 1280 this side is already giving way to the centred mode
+          switch (see below), and what it has room for belongs to the
+          breadcrumb — the look that is up is what someone reads here.
+        */}
+        <img src={lockupUrl} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
+        <img src={markUrl} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+        {breadcrumb}
+      </div>
       {/*
         Out of the flow, so it is centred on the *header* rather than on
         whatever happens to be either side of it. Three columns did pin it, but

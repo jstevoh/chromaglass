@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — a new mark: the press
+
+**The icon is a press on the glass.** Blue and green dye fingering outward
+from a hand on the plate — the Fillmore sunburst the app draws with Fingering
+up — and at its centre a C, a bright meniscus round a dark pool: the old
+orange paint cell, opened up into a letter. It replaces the favicon, the
+installed-app icons (with a proper maskable one this time, instead of the same
+picture Android then cropped the corners off), the iOS touch icon and the
+share card.
+
+**The name is in the header, with the mark.** The dish beside the name, and
+one finger of dye running out of it and under both halves of it. It is on the
+phone-width header, the phone remote and the cast display's waiting card, and
+it is new on the laptop desks, which had never said what app they were: the
+whole wordmark from 1280 wide, the dish alone below that, where the left of
+the header already gives way to the centred mode switch.
+
+**Drawn by code.** `npm run brand` writes every size from
+`scripts/brand/art.mjs`, so a change to the mark is one change. The letters
+are Jost (SIL Open Font License), turned into shapes once by
+`scripts/brand/outline.mjs`, so the wordmark looks the same on every screen and
+needs no font to load. `docs/brand/` holds the full-detail files and the sizes
+other services ask for.
+
 ### Added — the controller shows the show, and says what it is doing
 
 **Knob LED rings follow the settings.** Feedback handled presets, dyes and
