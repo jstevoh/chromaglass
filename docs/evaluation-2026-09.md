@@ -2,6 +2,8 @@
 
 This evaluation was taken on a MacBook with an Apple M4. The numbers come from the app itself, running headless Chromium on Metal. Motion and colour measurements are made on the picture the app draws, alternating settings so drift cancels. Frame and step rates are read from the app's own counters.
 
+> **Test with music, and hold the look still.** Headless Chromium hears nothing, so the first rounds of comparisons ran on a silent plate. That hid most of what the audio does, and it hid one real regression (below). Set `localStorage['chromaglass-audio-source'] = 'simulated'` to get the built-in band. Also turn off `onNewSong`: its default cues a different look on every simulated song change, which makes before/after galleries compare different looks. And enter every look from the same predecessor, because looks inherit whatever they don't set.
+
 ## What was wrong, in one paragraph
 
 Most of the plate's forces did nothing you could see. The solver clamps its lasting velocity to 0.002 at the end of every step. At the tuned timestep that is about 0.05 cells a second, so 99.7% of dyed cells sat exactly at the cap in every look measured. Everything that visibly moves the picture is a push added after the pressure solve: fingering, colour repulsion, bursts. Each one moves the dye for a single step and is then clamped away. Forces written to build up over time did nothing: turbulence, spin, buoyancy, centre gravity and plate tilt. The turbulence's noise gradient was also never divided by its span, which put it at about 1% of its intended strength. Around those were a dozen controls with range bugs, gates or no reader at all.
@@ -18,7 +20,7 @@ Most of the plate's forces did nothing you could see. The solver clamps its last
 | Sound Mappings → velocity | Never read. Density "none" silenced all music reactions. | Drives the burst. Density gates only its own pulse. |
 | Hue journey | Only ran while evolving. Minutes ran on the solver clock (3.5 min to 8 s). | Wall clock, always. |
 | Oil beads | Repopulated every frame before a stroke, almost never after. | Their own clock. |
-| Beads, bubbles, soap/milk | Rode the clamped remainder, ~50× faster than the dye; ignored turbulence. | Ride the flow the dye rides, on its clock. |
+| Beads, bubbles, soap/milk | Rode the clamped remainder, ~50× faster than the dye; ignored turbulence. | Ride the flow the dye rides, on its clock (#74). This exposed a second bug: soap was advected at the wall-clock step (5–6× the dye) by a backtrace that doesn't conserve mass, so under music it multiplied ~15× and thinned the dye everywhere. Solar Flare kept half its dye. #76 moves it at the dye's rate and conserves it. |
 | Vibration | Nothing below ~0.6, nothing without a mic. | Works in silence and swells with music. #72's first version was too deep and too fine and broke the high-vibration looks into squares; #73 made it a shimmer (52- to 15-cell wave). |
 | Rain drip | Invisible pull; friction on at full past 0.1; pointed uphill. | A downhill streak current; friction scales with it. |
 | Heat Intensity, Boiling Point | Read by nothing. | Removed from the UI (the keys stay in saved looks). |
@@ -27,8 +29,25 @@ Most of the plate's forces did nothing you could see. The solver clamps its last
 | Ranges | Speed 0–1, Evaporation 0–1 in 0.05 steps, Dye Budget 0–1.5 on MIDI and phone. | Speed 0–0.3, Evaporation 0–0.08 in 0.0005 steps, Dye Budget 0.1–1.2. |
 | Layers | "+" could add a third layer that was simulated but never drawn. | Two. |
 | Settings search | 66 of 97 labels, typed as shown, didn't find their section. ⌘K matched names only. | Labels indexed, word-by-word matching. ⌘K matches terms and labels. |
-| Flash Limit | Last switch of the longest section. | Also beside Dimmer and Blackout. |
+| Flash Limit | Last switch of the longest section. | Also beside Dimmer and Blackout, in a new **Master** section the sheet opens on (#75). |
 | Names | "Projectors" meant a section and a slider. | The slider is "Dish Spread". |
+
+## Every slider, tested
+
+All 94 sliders in Settings were tested on the M4 with music playing, on the classic look, with each control's prerequisite switched on where it has one (Grain Size with Granulation, the camera's controls with the camera on, the macro's with the zoom in). There were two methods:
+
+- **Simulation controls:** alternate the ends of the range and measure the picture's motion, brightness, colour and edge detail, with repeats to separate the control from the plate's own chaos.
+- **Display-only controls:** freeze the liquid and change only that control, so the difference between two images of the same frame is the control and nothing else. This method is the more reliable of the two. The statistical one missed Glossiness and Lamp Warmth, which are obvious on a frozen frame (0.047 and 0.051 per channel).
+
+| Result | Controls |
+|---|---|
+| **Working, measured** | Speed, Dimmer, Sensitivity, Sound Drive, Beat Prediction, Beat Squeeze, Turbulence, Dye Budget, Edge Relief, Lacing, Granulation, Grain Size, Glossiness, Boundary Glow, Saturation, Post Blur, Gooey, Oil Beads, Plate Cells, Round Dish, Dish Spread, Camera, Focus, Bloom, Refraction, Kaleidoscope Zoom, Hot-Spot, Second Lamp, Iridescence, Lumia, Gel Wheel, Gel Speed, Lamp Warmth, Exposure, Macro Zoom, Paint Cells, Cell Size, Macro Lacing, Depth/Focus, Edge Detail, Relief, Chase Speed, Glass Smear, Rain Drip, Polarity, Diffusion, Layers, Rotation |
+| **Depends on the scene** | Thin Film and Micro-Droplets (thin dye only), Light Play (needs edge relief or bubbles), Bubbles and Plate Rock (fire on kicks), Blob Surface Tension (needs polarity), Fingering (shows with the Press tool), Layer Scale Variety and Background Loop (need a second layer with dye on it), Sound Impact (needs a patch in The Room) |
+| **Weak** | Sharpness (fixed per texel against a diffusion that grows with the grid; its own comment says it measured nothing), Turbulence Detail (fine octaves are small by design now), Chromatic Aberration and Aperture (about a pixel), Bass Boost (the band's bass already saturates the scale) |
+| **Structurally dead until the flow pass** | Buoyancy, Centre Gravity, Heat Decay, Blow Velocity's lift. They act only through the lasting velocity, which the end-of-step clamp holds at 0.002. Plate Pressure only adds ~39% to Speed. |
+| **Not testable headless** | The room camera's six, the film's four, the logo's four, Hue Journey (minutes), Beat Lead (timing) |
+
+Advection, Damping, Evaporation, Evolve Speed and LED Speed read as "no effect" on the statistical test, but their code paths are direct: advection scales every step's transport. They are judged by code rather than by that number.
 
 ## Efficiency on this machine
 
@@ -57,5 +76,5 @@ The earlier `docs/bench/macbook-m4.txt` figure of 59 fps at 512² was one layer 
 3. **Transmission optics.** The plate is drawn as coloured light over black; a projector sends lamp light through dye. Thin dye should be pale, thick dye deep, and overlaps darker. This changes every look, so it should ship behind a flag first.
 
    It also has to arrive together with the fix for thick dye. The packed colour channels clip above 8 while the density they are divided by does not, so thick dye decodes pale (thick red as pink). Fixing that alone was tried and reverted. The hue is fixed per unit and only opacity follows thickness, so the clip is the only thing that makes a thick pool look different from a thin one. Without it, Boiling Point and Acid Trip flattened to single colours. Packing the colour at 1/40 in an 8-bit texture also cost precision in thin dye.
-4. **Settings structure.** Put a Live/Master section first (Dimmer, Blackout, Flash Limit, Speed). Split the Projectors grab-bag (wall geometry vs look effects vs film). Move the patch bay and its four masters into a single Patches section. Give each setting one range across every surface (sheet, desk, MIDI, phone and sequencer disagree for Speed, Dye Budget, folds and zoom).
+4. **Settings structure.** The Master section is done (#75). Split the Projectors grab-bag (wall geometry vs look effects vs film). Move the patch bay and its four masters into a single Patches section. Give each setting one range across every surface (sheet, desk, MIDI, phone and sequencer disagree for Speed, Dye Budget, folds and zoom).
 5. **Looks that depend on music.** Acid Trip and Lava Lamp draw almost nothing in silence (the LED wheel or a flat wash). They should be judged with music playing before being retuned.
