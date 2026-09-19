@@ -1,0 +1,88 @@
+MacBook, Apple M4 — two sweeps, twenty minutes apart
+====================================================
+
+Taken with `?bench` on a local dev server, window 1470x956, two layers.
+Both runs are recorded because they disagree, and where they disagree
+matters more than either number on its own.
+
+
+Run 1 · 2026-09-19T01:44:03Z
+ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)
+tier local · gpu strong · 2 layers · dpr 1 · 1470x956
+
+grid        fps   frame   solver    other  steps/s  speed
+256²         59  17.0ms    0.8ms   16.1ms       60   100%
+384²         59  16.9ms    0.8ms   16.0ms       60   100%
+512²         58  17.1ms    0.8ms   16.3ms       60   100%
+768²         12  83.5ms    0.3ms   82.2ms       47    79%
+cpu192       23  43.6ms   39.3ms    3.5ms       23    39%
+
+
+Run 2 · 2026-09-19T02:03:40Z
+ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)
+tier local · gpu strong · 2 layers · dpr 1 · 1470x956
+
+grid        fps   frame   solver    other  steps/s  speed
+256²         59  16.9ms    0.8ms   16.1ms       60   100%
+384²         59  17.1ms    0.8ms   16.2ms       60   100%
+512²         59  16.9ms    0.8ms   16.1ms       60   100%
+768²         26  38.2ms    0.3ms   37.3ms       58    97%
+cpu192       22  45.7ms   41.2ms    2.8ms       23    38%
+
+
+What reproduced
+---------------
+
+Everything except 768².
+
+  - 256², 384² and 512² are the same frame: 16.9–17.1 ms, which is a 60 Hz
+    refresh. The grid is not costing anything measurable at any of the three;
+    the machine is waiting for the display. **512² is free on this hardware.**
+
+  - `solver` is 0.8 ms and flat across all three grids, in both runs. That is
+    the CPU time to submit one step across two layers — around seventy passes
+    a step per layer — and it does not grow with the grid, because a draw call
+    costs what it costs however many cells it covers. Submission is not where
+    the time goes, and a rewrite that collapses those passes into compute
+    dispatches would be optimising 0.8 ms inside a frame that is 94% idle.
+
+  - The CPU fallback runs the show at **38–39% speed**. Not 38% of the frame
+    rate — 38% of the *motion*: 23 solver steps a second against the 60 the
+    show asks for. A machine without float render targets does not degrade to
+    "a bit choppy", it plays the light show in slow motion. See appliance.md.
+
+
+What did not
+------------
+
+768² read 12 fps in run 1 and 26 fps in run 2 — a factor of two, on the one
+rung that decides where the ceiling is.
+
+Two candidates, and the runs cannot separate them:
+
+  - Run 1 was taken while the bench still read the GPU's name from a **second
+    WebGL2 context** it created and never released. That context is gone now
+    (the name comes from the app's own). 768² is the only rung with a working
+    set large enough — about 113 MB of float buffers — for another live
+    context to plausibly matter.
+
+  - Or the machine was simply busier during run 1. 768² is the only rung where
+    the GPU is saturated, so it is the only one where anything else competing
+    would show up at all. The three vsync-locked rungs cannot show it by
+    construction: they have 94% of a frame spare to absorb it.
+
+A third sweep on an otherwise idle machine would settle it. Until then, treat
+768² on this hardware as "somewhere between 26 and 60 fps, and not the rung to
+ship on" rather than as either number.
+
+
+The decision this supports
+--------------------------
+
+Ship 512². It is free here, it is finer than a 1080p projector resolves, and
+768² is neither reliably fast nor necessary. Do not rewrite the solver for
+this machine — there is nothing to win.
+
+This says nothing about a Raspberry Pi or a mini PC, which is a different
+question and still unmeasured. Run the sweep there before believing anything
+in appliance.md about it.

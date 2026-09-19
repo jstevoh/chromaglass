@@ -21,7 +21,12 @@ place.
 - **A GPU with float render targets.** This is the one hard requirement and it
   is pass or fail: the solver needs `EXT_color_buffer_float` and a working
   `RGBA32F` readback, and without them the app falls back to the 192²
-  JavaScript solver, which is not a show. Open the app with `?debug` and read
+  JavaScript solver, which is not a show. Measured on an M4, that fallback
+  runs at **38% speed** — 23 solver steps a second against the 60 the show
+  asks for, so the liquid moves at a bit over a third of its intended pace
+  while every frame still arrives on time. It does not look like a slow
+  machine; it looks like a different, duller piece of software. See
+  `docs/bench/macbook-m4.txt`. Open the app with `?debug` and read
   `chromaglassDebug().status` — `gpuUnavailable` says exactly this. A Pi 5's
   VideoCore VII does OpenGL ES 3.1 and Vulkan 1.2, so WebGL2 is there; whether
   Chromium's V3D path exposes that extension is a question for the board in
