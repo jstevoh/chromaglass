@@ -366,6 +366,28 @@ const stacked = fold(
   ctx({ room: reading(0.4, T), film: reading(0.4, T) }),
 );
 
+// ── Steps ──
+// The folds only take whole steps — the sheet offers Off, 2, 4, 6 and 8 — so a
+// patch riding them lands on one. After the sum rather than per patch: two
+// patches that each add most of a fold are, together, a fold, and rounding each
+// on its own would lose both.
+const folds = (patches, bass) => {
+  const base = { ...DEFAULT_SETTINGS, kaleidoscope: 0, layerCount: 1, sceneMappings: patches };
+  const bay = new PatchBay(base);
+  bay.fold(base, ctx({ sound: heard(bass) }), 1, T);
+  return bay.global.kaleidoscope;
+};
+const onFolds = (depth) => P({ source: 'sound', feature: 'bass', setting: 'kaleidoscope', depth });
+const foldSweep = [0, 20, 40, 60, 80, 100].map(b => folds([onFolds(1)], b));
+const mostOfOne = folds([onFolds(0.225)], 50);                  // 0.9 of a fold
+const twoOfThose = folds([onFolds(0.225), onFolds(0.225)], 50); // 1.8
+
+checks.push(
+  ['a patch on the folds lands on a fold the sheet offers', foldSweep.every(v => [0, 2, 4, 6, 8].includes(v)) && foldSweep.at(-1) === 8],
+  ['and most of a fold on its own is no fold', mostOfOne === 0],
+  ['but two patches that each add most of one add up to one', twoOfThose === 2],
+);
+
 checks.push(
   ['a room patch reads the room', roomOnly > 0.05],
   ['a film patch reads the film', Math.abs(filmOnly - roomOnly) < 1e-6],

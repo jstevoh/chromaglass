@@ -3,8 +3,9 @@ import { Sheet } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
-import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence } from '../lib/sequencer';
+import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence, GLIDES } from '../lib/sequencer';
 import { songLabel, type SongRef } from '../lib/songRef';
+import { PIN_RANGE, onStep } from '../lib/deskPins';
 
 /**
  * The show sequencer: a script for how the plate evolves over a song or a
@@ -38,37 +39,15 @@ interface SequencerPanelProps {
   onClose: () => void;
 }
 
-/** The settings a stage may glide — the ones that read as a show changing, not a re-tune. */
-const OVERRIDE_FIELDS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step: number }[] = [
-  { key: 'dyeBudget',       label: 'Dye Budget',       min: 0,    max: 1.5,  step: 0.05 },
-  { key: 'turbulenceScale', label: 'Turbulence',       min: 0,    max: 1,    step: 0.05 },
-  { key: 'audioImpact',     label: 'Audio Impact',     min: 0,    max: 1,    step: 0.05 },
-  { key: 'globalSpeed',     label: 'Speed',            min: 0.005, max: 0.15, step: 0.005 },
-  { key: 'plateRock',       label: 'Plate Rock',       min: 0,    max: 1,    step: 0.05 },
-  { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0,    max: 1,    step: 0.05 },
-  { key: 'bubbles',         label: 'Bubbles',          min: 0,    max: 1,    step: 0.05 },
-  { key: 'saturationBoost', label: 'Saturation',       min: 0.5,  max: 2,    step: 0.05 },
-  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0,    max: 1,    step: 0.05 },
-  { key: 'kaleidoscope',    label: 'Kaleidoscope',     min: 0,    max: 8,    step: 2 },
-  // A stage can turn the rig and change how much plate feeds it, which is most
-  // of what a kaleidoscope does over a song.
-  { key: 'kaleidoSpin',     label: 'Kaleido Spin',     min: -0.5, max: 0.5,  step: 0.005 },
-  { key: 'kaleidoZoom',     label: 'Kaleido Zoom',     min: 0.2,  max: 1.6,  step: 0.01 },
-  { key: 'dishVignette',    label: 'Round Dish',       min: 0,    max: 1,    step: 0.05 },
-  { key: 'lightPlay',       label: 'Light Play',       min: 0,    max: 1,    step: 0.05 },
-  { key: 'secondLamp',      label: 'Second Lamp',      min: 0,    max: 1,    step: 0.05 },
-  { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0,    max: 1,    step: 0.05 },
-  { key: 'camera',          label: 'Camera',           min: 0,    max: 1,    step: 0.05 },
-  { key: 'aperture',        label: 'Aperture',         min: 0,    max: 1,    step: 0.05 },
-  { key: 'bloom',           label: 'Bloom',            min: 0,    max: 1,    step: 0.05 },
-  { key: 'microDroplets',   label: 'Micro-droplets',   min: 0,    max: 1,    step: 0.05 },
-  { key: 'thinFilm',        label: 'Thin Film',        min: 0,    max: 1,    step: 0.05 },
-  { key: 'lumia',           label: 'Lumia',            min: 0,    max: 1,    step: 0.05 },
-  { key: 'chemistry',       label: 'Chemistry',        min: 0,    max: 1,    step: 0.05 },
-  { key: 'gelWheel',        label: 'Gel Wheel',        min: 0,    max: 1,    step: 0.05 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1,    max: 12,   step: 0.5 },
-  { key: 'macroSync',       label: 'Macro Music Sync', min: 0,    max: 1,    step: 0.05 },
-];
+/**
+ * The rows a stage's editor draws: the glides in `lib/sequencer`, named and
+ * ranged by the registry every other surface reads, so a stage cannot set a
+ * value the sheet could not.
+ */
+const OVERRIDE_FIELDS = GLIDES.flatMap(([key, fine]) => {
+  const spec = PIN_RANGE.get(String(key));
+  return spec ? [{ key, label: spec.label, min: spec.min, max: spec.max, step: spec.step ?? fine, spec }] : [];
+});
 
 const fmt = (sec: number) => `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, '0')}`;
 
@@ -324,7 +303,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                 const on = typeof v === 'number';
                 return (
                   <div key={f.key} className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={on} onChange={(e) => updateOverride(editIndex, f.key, e.target.checked ? (f.min + f.max) / 2 : undefined)} className="accent-white" title={`Glide ${f.label} in this stage`} />
+                    <input type="checkbox" checked={on} onChange={(e) => updateOverride(editIndex, f.key, e.target.checked ? onStep(f.spec, (f.min + f.max) / 2) : undefined)} className="accent-white" title={`Glide ${f.label} in this stage`} />
                     <span className="text-[10px] w-24 shrink-0 opacity-70">{f.label}</span>
                     <input type="range" min={f.min} max={f.max} step={f.step} value={on ? (v as number) : f.min} disabled={!on} onChange={(e) => updateOverride(editIndex, f.key, parseFloat(e.target.value))} className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white disabled:opacity-30" />
                     <span className="text-[9px] font-mono opacity-50 w-8 text-right">{on ? (v as number).toFixed(2) : '—'}</span>

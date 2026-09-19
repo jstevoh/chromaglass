@@ -23,13 +23,14 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
-import { settingLed, SoftTakeover } from '../src/lib/midi.ts';
+import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
 import { SettingRide } from '../src/lib/ride.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
+import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 
@@ -56,7 +57,11 @@ for (const block of panel.match(/<Slider\b[\s\S]*?\/>/g) ?? []) {
   const key = block.match(/onUpdate\(\{\s*([A-Za-z0-9_]+):/)?.[1] ?? null;
   const label = block.match(/label="([^"]+)"/)?.[1] ?? '?';
   const pinned = block.match(/settingKey="([A-Za-z0-9_]+)"/)?.[1] ?? null;
-  sliders.push({ key, label, pinned });
+  // Its travel as typed, so the registry can be held to it. A range that is
+  // not a literal number reads as NaN and fails below rather than passing.
+  const num = (name) => Number(block.match(new RegExp(`\\b${name}=\\{([^}]+)\\}`))?.[1]);
+  const rounds = /Math\.round\(v\)/.test(block);
+  sliders.push({ key, label, pinned, min: num('min'), max: num('max'), step: num('step'), rounds });
 }
 
 check('the settings panel still has its sliders', sliders.length > 60, `${sliders.length} found`);
@@ -113,6 +118,120 @@ check('every range has somewhere to travel', badRange.length === 0,
 
 const dupes = PINNABLE.map(s => String(s.key)).filter((k, i, a) => a.indexOf(k) !== i);
 check('and no control is in it twice', dupes.length === 0, dupes.join(', '));
+
+// ── One range per setting ───────────────────────────────────────────
+/*
+  The sheet, the desks, MIDI, the phone and a sequence stage each kept their
+  own idea of a control's travel, and they disagreed: Speed was 0–0.3 on the
+  sheet, 0.005–0.3 on a fader, 0.005–0.6 on the phone and 0.005–0.15 in a
+  stage; the macro zoom stopped at 12 everywhere but the sheet, which goes to
+  16; Dye Budget reached 1.5 in a stage where the solver stops at 1.2; and
+  the folds rode a fader continuously from 0 to 12 where the sheet offers five
+  buttons. The sheet is the one range now. The registry is held to it here,
+  and the phone and the sequencer read the registry instead of keeping a copy.
+*/
+const offRange = sliders.filter(s => {
+  const spec = s.key && PIN_RANGE.get(s.key);
+  return spec && (spec.min !== s.min || spec.max !== s.max);
+});
+check('every control has one range, and it is the sheet\'s', offRange.length === 0,
+  offRange.length
+    ? offRange.map(s => `${s.label}: sheet ${s.min}–${s.max}, registry ${PIN_RANGE.get(s.key).min}–${PIN_RANGE.get(s.key).max}`).join(' · ')
+    : `${sliders.length} sliders against the registry`);
+
+// A control the sheet only offers in whole steps says so in the registry, with
+// the sheet's step, so every other surface lands on the same values.
+const unstepped = sliders.filter(s => s.key && s.rounds && PIN_RANGE.get(s.key)?.step !== s.step);
+check('a control the sheet steps is stepped in the registry too', unstepped.length === 0,
+  unstepped.length
+    ? unstepped.map(s => `${s.label}: sheet steps by ${s.step}, registry by ${PIN_RANGE.get(s.key)?.step ?? 'nothing'}`).join(', ')
+    : sliders.filter(s => s.rounds).map(s => s.label).join(', '));
+const foldButtons = panel.match(/\{\[([0-9,\s]+)\]\.map\(\(k\) => \(\s*<button[\s\S]{0,200}?kaleidoscope: k/)?.[1]
+  ?.split(',').map(Number) ?? [];
+const folds = PIN_RANGE.get('kaleidoscope');
+const foldSteps = folds?.step
+  ? Array.from({ length: Math.round((folds.max - folds.min) / folds.step) + 1 }, (_, i) => folds.min + i * folds.step)
+  : [];
+check('and the folds are the sheet\'s five buttons wherever they are ridden',
+  foldButtons.length > 0 && foldButtons.join() === foldSteps.join(),
+  `buttons ${foldButtons.join(', ') || 'not found'}; registry ${foldSteps.join(', ') || 'not stepped'}`);
+
+// A fader across the folds, through the real soft takeover: every message has
+// to land, and on a fold the sheet offers. The detent goes on *before*
+// takeover sees the position, and the control is why: snapped afterwards, the
+// fader rests between two steps, a fraction away from a value it wrote itself,
+// and takeover reads its own write as somebody else's and lets go.
+const sweepFolds = (detentFirst) => {
+  const span = folds.max - folds.min;
+  const t = new SoftTakeover();
+  const seen = new Set();
+  let value = folds.min, held = 0;
+  for (let v = 0; v <= 127; v++) {
+    let in01 = v / 127;
+    if (detentFirst) in01 = (onStep(folds, folds.min + in01 * span) - folds.min) / span;
+    const out = t.ride('folds', in01, (value - folds.min) / span);
+    if (out === null) { held++; continue; }
+    value = onStep(folds, folds.min + out * span);
+    seen.add(value);
+  }
+  return { held, seen: [...seen].sort((a, b) => a - b) };
+};
+const swept = sweepFolds(true);
+check('a fader swept across the folds lands on every fold, and only those',
+  swept.held === 0 && swept.seen.join() === foldSteps.join(),
+  `${swept.seen.join(', ')}; ${swept.held} messages held`);
+check('and snapping after takeover instead would strand it',
+  sweepFolds(false).held > 0, 'if this passes, the check above is measuring nothing');
+const hookSrc = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
+check('and the hook puts the detent on first, on a fader and an encoder alike',
+  /if \(stepped\.step\) in01 = \(onStep\(stepped/.test(hookSrc)
+  && /const by = stepped\.step \?\? span \/ 100/.test(hookSrc)
+  && (hookSrc.match(/h\.setSetting\(t\.key, onStep\(stepped, /g) ?? []).length === 2);
+
+// A map saved while Speed rode 0.005–0.3 on a fader has to ride the sheet's
+// range when it is loaded now, or an old file keeps the old disagreement.
+const oldMap = parseMidiMap(JSON.stringify({
+  format: 'chromaglass-midi', version: 1, name: 'saved before',
+  bindings: [
+    ['globalSpeed', 0.005, 0.3], ['macroZoom', 1, 12], ['kaleidoscope', 0, 12], ['sensitivity', 0.2, 2],
+  ].map(([key, min, max], i) => ({
+    id: `b${i}`, mode: 'absolute', source: { kind: 'cc', channel: 0, number: i },
+    target: { kind: 'setting', key, min, max },
+  })),
+}));
+const travel = Object.fromEntries(oldMap.bindings.map(b => [b.target.key, [b.target.min, b.target.max]]));
+check('a map saved before rides today\'s ranges',
+  ['globalSpeed', 'macroZoom', 'kaleidoscope'].every(k =>
+    travel[k]?.[0] === PIN_RANGE.get(k).min && travel[k]?.[1] === PIN_RANGE.get(k).max),
+  Object.entries(travel).map(([k, [a, b]]) => `${k} ${a}–${b}`).join(', '));
+check('and a binding MIDI cannot learn keeps the travel it came with',
+  travel.sensitivity?.[0] === 0.2 && travel.sensitivity?.[1] === 2);
+check('and every MIDI range is in the registry as it is',
+  LEARNABLE_SETTINGS.every(m => PIN_RANGE.get(String(m.key))?.min === m.min && PIN_RANGE.get(String(m.key))?.max === m.max));
+
+// The phone and a sequence stage take the registry's travel instead of their own.
+const remote = readFileSync(join(root, 'src/components/RemoteControl.tsx'), 'utf8');
+check('the phone keeps no range of its own',
+  !/<Slider label="[^"]+" field="[A-Za-z0-9_]+"[^>]*\bmin=\{/.test(remote)
+  && /PIN_RANGE\.get\(String\(field\)\)/.test(remote));
+const seqPanel = readFileSync(join(root, 'src/components/SequencerPanel.tsx'), 'utf8');
+check('and neither does a sequence stage',
+  GLIDES.length > 20 && GLIDES.every(([k]) => PIN_RANGE.has(String(k)))
+  && /PIN_RANGE\.get\(String\(key\)\)/.test(seqPanel) && !/min:\s*-?[0-9.]+,\s*max:/.test(seqPanel),
+  GLIDES.filter(([k]) => !PIN_RANGE.has(String(k))).map(([k]) => String(k)).join(', '));
+// A stage gliding between fold counts steps through the sheet's, and a stage
+// that brings in a second layer does it once rather than a sliver a tick.
+{
+  const mid = [0.1, 0.3, 0.5, 0.7, 0.9].map(t => lerpSettings({ kaleidoscope: 0, layerCount: 1 }, { kaleidoscope: 8, layerCount: 2 }, t));
+  check('and a stage glides a stepped control by steps',
+    mid.every(m => foldSteps.includes(m.kaleidoscope) && (m.layerCount === 1 || m.layerCount === 2)),
+    mid.map(m => `${m.kaleidoscope}/${m.layerCount}`).join(' '));
+}
+// And a desk strip takes the step, so a pinned Layers cannot write 1.4.
+const performSrc = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
+const designSrc = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
+check('and a desk strip lands on a step too',
+  /step=\{spec\.step\}/.test(performSrc) && /step=\{spec\.step\}/.test(designSrc));
 
 // ── The map ─────────────────────────────────────────────────────────
 const badSection = PINNABLE.filter(s => !SECTION_BY_ID.has(s.section));

@@ -18,6 +18,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { SongRef } from './songRef';
+import { onSettingStep } from './deskPins';
 
 /** How a stage hands over to the next one. */
 export type StageAdvance = 'time' | 'section' | 'hold';
@@ -57,6 +58,49 @@ export interface ShowSequence {
 let idCounter = 0;
 export const stageId = (): string => `st-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
+/**
+ * The settings a stage may glide — the ones that read as a show changing, not
+ * a re-tune — and how finely each one's slider moves in the stage editor.
+ *
+ * Only that is written here. The name and the travel are the setting's own,
+ * from the registry every surface reads (`deskPins.ts`). The editor used to
+ * carry a copy of both, and it had Speed stopping at 0.15 where the sheet goes
+ * to 0.3, Dye Budget reaching 1.5 where the solver stops at 1.2, the macro
+ * zoom at 12 where the sheet goes to 16, and Sound Drive called Audio Impact.
+ * A control that only takes whole steps takes the registry's step whatever is
+ * written beside it, so the folds are the sheet's Off, 2, 4, 6 and 8.
+ */
+export const GLIDES: [keyof VisualizerSettings, number][] = [
+  ['dyeBudget', 0.05],
+  ['turbulenceScale', 0.05],
+  ['audioImpact', 0.05],
+  ['globalSpeed', 0.005],
+  ['plateRock', 0.05],
+  ['beatSqueeze', 0.05],
+  ['bubbles', 0.05],
+  ['saturationBoost', 0.05],
+  ['backgroundLoop', 0.05],
+  ['kaleidoscope', 2],
+  // A stage can turn the rig and change how much plate feeds it, which is most
+  // of what a kaleidoscope does over a song.
+  ['kaleidoSpin', 0.005],
+  ['kaleidoZoom', 0.01],
+  ['dishVignette', 0.05],
+  ['lightPlay', 0.05],
+  ['secondLamp', 0.05],
+  ['lampHotspot', 0.05],
+  ['camera', 0.05],
+  ['aperture', 0.05],
+  ['bloom', 0.05],
+  ['microDroplets', 0.05],
+  ['thinFilm', 0.05],
+  ['lumia', 0.05],
+  ['chemistry', 0.05],
+  ['gelWheel', 0.05],
+  ['macroZoom', 0.5],
+  ['macroSync', 0.05],
+];
+
 /** The numeric fields a stage may glide; everything else switches at stage entry. */
 export function lerpSettings(
   from: Partial<VisualizerSettings>,
@@ -68,7 +112,16 @@ export function lerpSettings(
   for (const key of Object.keys(to) as (keyof VisualizerSettings)[]) {
     const a = from[key], b = to[key];
     if (typeof a === 'number' && typeof b === 'number') {
-      out[key] = a + (b - a) * k;
+      /*
+        A control that only takes whole steps glides by stepping.
+
+        Two stages four folds apart used to pass through three, five and
+        seven — counts the sheet does not offer — and a stage entering a look
+        with a second layer wrote 1.002, 1.004… layers, one a tick for the
+        whole transition. The ends are left exactly where the stages put them.
+      */
+      const v = a + (b - a) * k;
+      out[key] = k > 0 && k < 1 ? onSettingStep(String(key), v) : v;
     } else {
       out[key] = k >= 1 || a === undefined ? b : (k > 0.5 ? b : a);
     }

@@ -32,7 +32,7 @@ import { getAudioValue, type AudioFeatureKey } from '../constants';
 import type { ModulatorFeature, Modulators } from './modulators';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
-import { PINNABLE } from './deskPins';
+import { PINNABLE, onStep } from './deskPins';
 
 /**
  * What a patch may be plugged into.
@@ -54,12 +54,13 @@ export const PATCH_TARGETS = PINNABLE.filter(s =>
   !String(s.key).startsWith('scene') && !NOT_A_TARGET.has(String(s.key)));
 
 /**
- * How far each setting a patch may ride can travel. Shared with the MIDI faders
- * on purpose where they overlap: a patch and a knob move a control over the
- * same range, so "half depth" means the same thing whichever hand is on it.
+ * How far each setting a patch may ride can travel: the setting's one range,
+ * the same on the sheet, a desk and a fader, so "half depth" means the same
+ * thing whichever hand is on it. `step` is there for the controls that only
+ * take whole steps, which a patch lands on a step like everything else does.
  */
-export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: number; max: number }>> =
-  Object.fromEntries(PATCH_TARGETS.map(s => [s.key, { min: s.min, max: s.max }]));
+export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: number; max: number; step?: number }>> =
+  Object.fromEntries(PATCH_TARGETS.map(s => [s.key, { min: s.min, max: s.max, step: s.step }]));
 
 /**
  * The settings that can mean something different on one plate than on another.
@@ -215,6 +216,7 @@ export class PatchBay {
     if (anyGlobal) {
       Object.assign(g, base);
       for (const l of live) if (layerOf(l.m) === 'all') this.ride(g, l);
+      this.land(g, live, 'all');
       this.out[0] = g;
     }
     const pictureFor = this.out[0];
@@ -225,7 +227,26 @@ export class PatchBay {
       const s = this.scratch[1 + i];
       Object.assign(s, pictureFor);
       for (const l of live) if (layerOf(l.m) === i) this.ride(s, l);
+      this.land(s, live, i);
       this.out[1 + i] = s;
+    }
+  }
+
+  /**
+   * Every stepped control the patches aimed here ride, put on its nearest step.
+   *
+   * After the sum, not per patch: two patches each adding most of a fold
+   * would each round to nothing on their own, and together they are a fold.
+   * Only what was aimed at `where`, so a setting no patch here touched is left
+   * exactly as the look has it.
+   */
+  private land(into: VisualizerSettings, live: { m: SceneMapping }[], where: number | 'all'): void {
+    for (const l of live) {
+      if (layerOf(l.m) !== where) continue;
+      const travel = SETTING_TRAVEL[l.m.setting];
+      const v = into[l.m.setting];
+      if (!travel?.step || typeof v !== 'number') continue;
+      (into as unknown as Record<string, number>)[l.m.setting] = onStep(travel, v);
     }
   }
 
