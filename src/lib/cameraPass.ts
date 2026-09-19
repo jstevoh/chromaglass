@@ -121,7 +121,12 @@ void main() {
   // The whole pass fades against the plate as drawn, so half a camera is
   // half the effect rather than a different picture.
   vec3 plain = texture(u_scene, uv).rgb;
-  fragColor = vec4(mix(plain, clamp(col, 0.0, 1.0), u_amount), 1.0);
+  vec3 outc = mix(plain, clamp(col, 0.0, 1.0), u_amount);
+  // One 8-bit step of triangular dither before the canvas quantises again,
+  // never on true black (see the display shader's final write).
+  float dth = hash(gl_FragCoord.xy) + hash(gl_FragCoord.xy + vec2(17.31, 5.73)) - 1.0;
+  outc += dth * step(1.0 / 255.0, max(outc.r, max(outc.g, outc.b))) / 255.0;
+  fragColor = vec4(outc, 1.0);
 }`;
 
 export interface CameraUniforms {

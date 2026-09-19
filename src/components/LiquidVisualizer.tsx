@@ -112,6 +112,21 @@ const GRID_SIZE = 192;                    // sim resolution — higher = smoothe
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 /** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
 const TURB_SPEED = 0.5;
+/*
+  How far the dye actually moves per unit of velocity, relative to what the
+  beads and bubbles assume. Both of them turn a velocity into cells with a
+  fixed dt of 0.05 and an advection of 1 (0.05 × 190 cells × 60 steps a second),
+  where the dye moves by the solver's own dt × advection — about 0.001 at the
+  defaults, so they drifted fifty times faster than the liquid under them and
+  ignored Speed and Advection. Multiplying the sampled velocity by this puts
+  them on the dye's clock without touching their own tuning (the beads' lag,
+  the bubbles' lead).
+*/
+function particleFlowScale(fluid: { dt: number } | undefined, s: VisualizerSettings): number {
+  if (!fluid) return 0;
+  return (fluid.dt * Math.max(0, s.advection ?? 1)) / 0.05;
+}
+
 /** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
 const DRIP_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -383,6 +398,8 @@ class FluidSimulation {
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
+  private fvx: Float32Array;
+  private fvy: Float32Array;
   private mcA: Float32Array;        // MacCormack intermediates (CPU path)
   private mcB: Float32Array;
   /** What the plate is being asked to do this moment; set from outside once a frame. */
@@ -398,8 +415,10 @@ class FluidSimulation {
   private shpA: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
-  get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
-  get readVy(): Float32Array { return this.gpu ? this.rbVy : this.vy; }
+  // The flow the dye was carried by this step (see GpuFluid.velForced): on the
+  // CPU, the snapshot taken before the end-of-step clamp.
+  get readVx(): Float32Array { return this.gpu ? this.rbVx : this.fvx; }
+  get readVy(): Float32Array { return this.gpu ? this.rbVy : this.fvy; }
 
   constructor(size: number, diffusion: number, viscosity: number, dt: number) {
     this.size = size;
@@ -434,6 +453,8 @@ class FluidSimulation {
     this.rbDensity = new Float32Array(GRID_AREA);
     this.rbVx = new Float32Array(GRID_AREA);
     this.rbVy = new Float32Array(GRID_AREA);
+    this.fvx = new Float32Array(GRID_AREA);
+    this.fvy = new Float32Array(GRID_AREA);
     this.mcA = new Float32Array(GRID_AREA);
     this.mcB = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
@@ -1468,7 +1489,10 @@ class FluidSimulation {
     // 9.5. Sharpen the interfaces the advection and the diffusion just softened.
     this.sharpenDye(p.sharpness);
 
-    // 10. Evaporation, damping, stability
+    // 10. Evaporation, damping, stability — after keeping the flow the dye
+    // was just carried by, for the readers (readVx/readVy).
+    this.fvx.set(this.vx);
+    this.fvy.set(this.vy);
     let densSum = 0, colR = 0, colG = 0, colB = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       this.vx[i] *= p.damping;
@@ -3092,6 +3116,7 @@ float decodeDensity(float a) {
   return a * a * DENSITY_SCALE;
 }
 
+
 vec4 sampleLayer(sampler2D tex, vec2 uv) {
   return textureBicubic(tex, uv);
 }
@@ -4355,7 +4380,16 @@ void main() {
     }
   }
 
-  fragColor = vec4(outColor, 1.0);
+  // Triangular dither of one 8-bit step, the last thing before the canvas
+  // quantises. The grain above fades out below luma 0.03 on purpose, which is
+  // exactly where the black ground, the lamp falloff and the dish shade sit,
+  // so slow dark ramps banded — and on a projector in a dark room the darks are
+  // what everyone is looking at. Fixed per pixel, so it cannot shimmer, and
+  // never on true black: black has to stay black (the mapping's dark between
+  // shapes is measured as zero), and a ramp that bands is above it anyway.
+  float dth = hash(gl_FragCoord.xy) + hash(gl_FragCoord.xy + vec2(17.31, 5.73)) - 1.0;
+  float lit = step(1.0 / 255.0, max(outColor.r, max(outColor.g, outColor.b)));
+  fragColor = vec4(outColor + dth * lit / 255.0, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }`;
 
@@ -4703,7 +4737,17 @@ void main() {
         // step is already most of a frame, catching up would only turn one
         // slow frame into a run of them — better to let the show run a little
         // slow than to stutter.
-        const catchUp = simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP;
+        //
+        // On the GPU path a step's JavaScript cost is only its submission, well
+        // under a millisecond, so that measure never saw the GPU falling behind:
+        // every slow frame owed the full four steps per layer, which made the
+        // next frame slower still. Measured on an M4 with two layers at 512²:
+        // 28 fps, running two steps a frame. The frame interval is what says
+        // the GPU is behind, so it caps the catch-up too — except under ?warp,
+        // where running ahead of the clock is the point.
+        const frameMsNow = governorRef.current?.frameMs ?? 16.7;
+        const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
+        const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
@@ -5526,11 +5570,12 @@ void main() {
                 if (isActiveRef.current && drainFrameRef.current === 0) {
                   const lead0 = fluidsRef.current[0];
                   const bvx = lead0?.readVx, bvy = lead0?.readVy;
+                  const bk = particleFlowScale(lead0, currentSettings);
                   beads.step(SIM_STEP, (bx, by) => {
                     if (!bvx || !bvy) return [0, 0];
                     const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                     const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
-                    return [bvx[ix + iy * GRID_SIZE], bvy[ix + iy * GRID_SIZE]];
+                    return [bvx[ix + iy * GRID_SIZE] * bk, bvy[ix + iy * GRID_SIZE] * bk];
                   }, tiltX, tiltY);
                 }
               }
@@ -5567,11 +5612,12 @@ void main() {
               const lead = fluidsRef.current[0];
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
+              const qk = particleFlowScale(lead, currentSettings);
               bubbles.step(SIM_STEP, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
-                return [vx[ix + iy * GRID_SIZE], vy[ix + iy * GRID_SIZE]];
+                return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
               }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
               // A bubble is air between the plates: the dye cannot sit under
               // it. A standing squeeze on each footprint keeps pumping the
