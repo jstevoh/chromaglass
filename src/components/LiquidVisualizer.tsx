@@ -6362,6 +6362,83 @@ void main() {
           filmGainRef.current += (3.2 / (peak - level) - filmGainRef.current) * slew;
         }
 
+        // ── What the frame is, before anything is drawn ───────
+        // These six advance once per rendered frame, and used to advance
+        // inside the draw below — which made them the renderer's business
+        // rather than the show's. They are the same numbers in the same
+        // order; the draw now only reads them. (docs/webgpu-plan.md, P3.)
+
+        // Velocity range for the macro detail pass, encoded against the
+        // frame's own peak speed so slow and fast passages both resolve;
+        // u_flowRate converts back to fluid-UV per second in the shader.
+        let flowRate = 0;
+        let velRange = 1e-3;
+        if (macroOn) {
+          const probe = fluidsRef.current[0];
+          const pvx = probe.readVx, pvy = probe.readVy;
+          for (let j = 2; j < GRID_SIZE - 2; j += 4) {
+            for (let i = 2; i < GRID_SIZE - 2; i += 4) {
+              const idx = i + j * GRID_SIZE;
+              const ax = Math.abs(pvx[idx]), ay = Math.abs(pvy[idx]);
+              if (ax > velRange) velRange = ax;
+              if (ay > velRange) velRange = ay;
+            }
+          }
+          // cells advected per second = v * (dt * (N-2)) / N / realDt
+          const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
+          flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
+        }
+
+        // The kaleidoscope's phase is integrated here rather than in the
+        // shader, so a change of rate does not move where the rig already is.
+        // See the note in the fragment source.
+        if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
+
+        // The lamp wanders slowly under the plate, and the plate's own rock
+        // moves it too — a tilted plate is lit from a new side.
+        {
+          const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
+          const rock = rockRef.current;
+          const lamp = lampRef.current;
+          const rockK = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
+          lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rock.x * 0.05 * rockK;
+          lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rock.y * 0.05 * rockK;
+          lamp.x2 = 0.5 - (lamp.x - 0.5) * 0.7 + noise2D(time * 0.019, 27.1) * 0.3 * motion;
+          lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
+        }
+
+        // The gel wheel turns on its own clock.
+        gelAngleRef.current = (gelAngleRef.current + realDt * (currentSettings.gelSpeed ?? 0.5) / 60) % 1;
+
+        // Second-layer throw: zoom grows with the setting, drift is a slow
+        // Lissajous so the two scales slide past each other.
+        {
+          const variety = Math.max(0, Math.min(1, currentSettings.layerScaleVariety ?? 0));
+          const view = layer1ViewRef.current;
+          view.zoom = 1 + variety * 1.6;
+          view.dx = Math.sin(time * 0.05) * 0.07 * variety;
+          view.dy = Math.cos(time * 0.037) * 0.07 * variety;
+        }
+
+        // The bubbles are packed for whoever draws them. Fewer bubbles, not
+        // fainter ones: the setting governs how many are on the plate, and
+        // each one still has to read as a lens rather than as a smudge, so
+        // its strength starts well above zero and climbs slowly. Scaling both
+        // by the same number made a plate at the new default nearly
+        // invisible — the harness caught it as "0 pixels changed".
+        {
+          const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
+          const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          bubbleDebugRef.current = {
+            count: Math.min(MAX_BUBBLES, count),
+            strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
+            amount: bubbleAmt,
+          };
+        }
+
+        // The frame the effects run on.
+        fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
+
         // ── WebGL GPU render ──────────────────────────────────
         if (glr) {
           const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
@@ -6377,28 +6454,6 @@ void main() {
             glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
             texs.push(tex);
             tData.push(new Uint8Array(GRID_AREA * 4));
-          }
-
-          // ── Velocity range for the macro detail pass ──────────
-          // Encoded against the frame's own peak speed so slow and fast
-          // passages both resolve; u_flowRate converts back to fluid-UV per
-          // second in the shader.
-          let flowRate = 0;
-          let velRange = 1e-3;
-          if (macroOn) {
-            const probe = fluidsRef.current[0];
-            const pvx = probe.readVx, pvy = probe.readVy;
-            for (let j = 2; j < GRID_SIZE - 2; j += 4) {
-              for (let i = 2; i < GRID_SIZE - 2; i += 4) {
-                const idx = i + j * GRID_SIZE;
-                const ax = Math.abs(pvx[idx]), ay = Math.abs(pvy[idx]);
-                if (ax > velRange) velRange = ax;
-                if (ay > velRange) velRange = ay;
-              }
-            }
-            // cells advected per second = v * (dt * (N-2)) / N / realDt
-            const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
-            flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
           }
 
           // An RGBA8 texture at the given edge, with a framebuffer so the GPU
@@ -6663,25 +6718,12 @@ void main() {
           {
             const k = Math.round(currentSettings.kaleidoscope ?? 0);
             glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
-            // Integrated here rather than in the shader, so a change of rate
-            // does not move where the rig already is. See the note in the
-            // fragment source.
-            if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
             glCtx.uniform1f(uLocs['u_kaleidoPhase'], kaleidoPhaseRef.current);
             glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
           }
           glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
           {
-            // The lamp wanders slowly under the plate, and the plate's own
-            // rock moves it too — a tilted plate is lit from a new side.
-            const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
-            const rock = rockRef.current;
             const lamp = lampRef.current;
-            const rockK = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
-            lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rock.x * 0.05 * rockK;
-            lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rock.y * 0.05 * rockK;
-            lamp.x2 = 0.5 - (lamp.x - 0.5) * 0.7 + noise2D(time * 0.019, 27.1) * 0.3 * motion;
-            lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
             glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
             glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
             glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
@@ -6707,7 +6749,6 @@ void main() {
             glCtx.uniform3f(uLocs['u_lumiaA'], a.r, a.g, a.b);
             glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
             const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
-            gelAngleRef.current = (gelAngleRef.current + realDt * (currentSettings.gelSpeed ?? 0.5) / 60) % 1;
             glCtx.uniform1f(uLocs['u_gelWheel'], gel);
             glCtx.uniform1f(uLocs['u_gelAngle'], gelAngleRef.current);
             glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
@@ -6727,29 +6768,14 @@ void main() {
             glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
           }
           {
-            // Second-layer throw: zoom grows with the setting, drift is a slow
-            // Lissajous so the two scales slide past each other.
-            const variety = Math.max(0, Math.min(1, currentSettings.layerScaleVariety ?? 0));
             const view = layer1ViewRef.current;
-            view.zoom = 1 + variety * 1.6;
-            view.dx = Math.sin(time * 0.05) * 0.07 * variety;
-            view.dy = Math.cos(time * 0.037) * 0.07 * variety;
             glCtx.uniform1f(uLocs['u_layerZoom1'], view.zoom);
             glCtx.uniform2f(uLocs['u_layerDrift1'], view.dx, view.dy);
-            const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
-            const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+            const bubbles = bubbleDebugRef.current;
             glCtx.uniform4fv(uLocs['u_bubbles'], bubblesRef.current.packed);
             glCtx.uniform4fv(uLocs['u_bubbleShape'], bubblesRef.current.packedShape);
-            // Fewer bubbles, not fainter ones. The setting now governs how
-            // many are on the plate; each one still has to read as a lens
-            // rather than as a smudge, so its strength starts well above zero
-            // and climbs slowly. Scaling both by the same number made a plate
-            // at the new default nearly invisible — the harness caught it as
-            // "0 pixels changed".
-            const bubbleStrength = Math.min(0.9, 0.35 + bubbleAmt * 0.8);
-            glCtx.uniform1i(uLocs['u_bubbleCount'], Math.min(MAX_BUBBLES, count));
-            glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbleStrength);
-            bubbleDebugRef.current = { count: Math.min(MAX_BUBBLES, count), strength: bubbleStrength, amount: bubbleAmt };
+            glCtx.uniform1i(uLocs['u_bubbleCount'], bubbles.count);
+            glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbles.strength);
           }
           glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
           // Sampling math follows the texture actually bound; the tuned look
@@ -6809,7 +6835,6 @@ void main() {
           // Into the chain's half floats nothing; into the camera's 8-bit texture
           // still a dither, or a dark ramp bands before the camera sees it.
           glCtx.uniform1i(uLocs['u_finishInMain'], !chain ? 1 : cam ? 2 : 0);
-          fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
           // The output pass is prepared whenever it exists, even when the
           // camera is the thing the plate draws into — the camera renders
