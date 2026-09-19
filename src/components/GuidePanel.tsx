@@ -103,8 +103,9 @@ const SECTIONS: Section[] = [
           ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Inputs → Sound). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
           ['2. Then the projector', <>Cast → <Em>Second display</Em>. Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
           ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save current</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
-          ['4. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
-          ['5. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
+          ['4. Plan the songs', <>In <Em>Songs</Em> (the desk's third mode), give each song a look — a built-in or one you saved — and say what happens while it plays: the title poured on the first note, a burst every four kicks, in close for each chorus, a drain before the end. Pick them from <Em>Add an action</Em> and change the numbers; keep a list that works as an <Em>action set</Em> for the next song. With <Em>Follow songs</Em> on, a song's show starts when the song is recognised; <Em>Run now</Em> starts it by hand.</>],
+          ['5. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
+          ['6. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
         ]} />
         <P>
           <Em>Record</Em>, the red button beside Cast, writes the show and its music to a{' '}

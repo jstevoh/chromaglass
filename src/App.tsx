@@ -31,6 +31,9 @@ import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
+import { SongsPanel, type LookChoice } from './components/SongsPanel';
+import { useSongShows } from './hooks/useSongShows';
+import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, type ActionSet, type SongAction, type SongShow } from './lib/songShows';
 import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
@@ -47,7 +50,7 @@ import { TempoSource, bpmOf } from './lib/tempo';
 import type { MidiAction } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
-import { downloadText, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
+import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, type SongRef } from './lib/songRef';
 import { useShowSequencer } from './hooks/useShowSequencer';
@@ -277,6 +280,18 @@ export default function App() {
     */
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
       (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+    /*
+      A song's show, from outside: the clip tool starts one on the first note of
+      a take, with the song's own look already on the plate.
+    */
+    (window as unknown as { chromaglassSongs?: unknown }).chromaglassSongs = () => songShowsRef.current;
+    (window as unknown as { chromaglassSongStart?: unknown }).chromaglassSongStart =
+      (id: string, opts?: { skip?: string[]; duration?: number }) => { songRuntimeRef.current?.start(id, opts); return songRuntimeRef.current?.status ?? null; };
+    (window as unknown as { chromaglassSongFor?: unknown }).chromaglassSongFor =
+      (title: string, artist: string) => showFor(songShowsRef.current, { title, artist });
+    (window as unknown as { chromaglassSongStop?: unknown }).chromaglassSongStop = () => songRuntimeRef.current?.stop();
+    (window as unknown as { chromaglassPourText?: unknown }).chromaglassPourText =
+      (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => visualizerRef.current?.pourText(rows, opts);
     (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
   }, []);
@@ -1449,6 +1464,34 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  // ── Songs: a look for each song, and what happens while it plays ──
+  // See lib/songShows.ts. Kept in the browser and in files; the runtime is
+  // wired up below, once the actions it performs exist.
+  const [songShows, setSongShowsState] = useState<SongShow[]>(loadShows);
+  const songShowsRef = useRef(songShows);
+  songShowsRef.current = songShows;
+  const setSongShows = useCallback((next: SongShow[]) => { setSongShowsState(next); saveShows(next); }, []);
+  const [userActionSets, setUserActionSets] = useState<ActionSet[]>(loadSets);
+  const actionSets = useMemo(() => [...BUILT_IN_SETS, ...userActionSets], [userActionSets]);
+  const saveActionSet = useCallback((set: ActionSet) => setUserActionSets(prev => {
+    const next = [...prev.filter(x => x.id !== set.id), { ...set, builtIn: undefined }];
+    saveSets(next);
+    return next;
+  }), []);
+  const deleteActionSet = useCallback((id: string) => setUserActionSets(prev => {
+    const next = prev.filter(x => x.id !== id);
+    saveSets(next);
+    return next;
+  }), []);
+  const [followSongs, setFollowSongsState] = useState<boolean>(() => {
+    try { return localStorage.getItem('chromaglass-follow-songs') !== '0'; } catch { return true; }
+  });
+  const setFollowSongs = useCallback((on: boolean) => {
+    setFollowSongsState(on);
+    try { localStorage.setItem('chromaglass-follow-songs', on ? '1' : '0'); } catch { /* private */ }
+  }, []);
+  const [showSongs, setShowSongs] = useState(false);
+
   const sequencer = useShowSequencer({
     getSettings: () => settingsRef.current,
     applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
@@ -1637,6 +1680,8 @@ export default function App() {
     // A preset or sequence made for the song that just started takes precedence.
     const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
     if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
+    // And so does a song's own show, when the Songs sheet is following songs.
+    if (song && followSongs && showFor(songShowsRef.current, song)) return;
     if (mode === 'random') { triggerLucky(); return; }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
     const next = pool[Math.floor(Math.random() * pool.length)];
@@ -2037,6 +2082,71 @@ export default function App() {
   });
 
   runActionRef.current = runAction;
+
+  // ── Songs: the runtime ──────────────────────────────────────────
+  /** A setting walked to a value over some seconds, the way a hand turns a knob. One walk per setting. */
+  const glidesRef = useRef(new Map<string, ReturnType<typeof setInterval>>());
+  const glideSetting = useCallback((key: keyof VisualizerSettings, to: number, seconds: number, atEnd?: Partial<VisualizerSettings>) => {
+    const timers = glidesRef.current;
+    const running = timers.get(String(key));
+    if (running) clearInterval(running);
+    const from = Number((settingsRef.current as unknown as Record<string, unknown>)[key] ?? 0);
+    if (!(seconds > 0)) { setSettings(p => ({ ...p, [key]: to, ...(atEnd ?? {}) })); return; }
+    const started = performance.now();
+    const timer = setInterval(() => {
+      const k = Math.min(1, (performance.now() - started) / (seconds * 1000));
+      const e = k * k * (3 - 2 * k);
+      setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
+      if (k >= 1) { clearInterval(timer); timers.delete(String(key)); }
+    }, 33);
+    timers.set(String(key), timer);
+  }, []);
+  useEffect(() => () => { for (const t of glidesRef.current.values()) clearInterval(t); }, []);
+
+  /** Do one of a song's actions, through the same moves a pad or a key makes. */
+  const performSongAction = useCallback((action: SongAction, show: SongShow) => {
+    const a = action.what;
+    const v = visualizerRef.current;
+    switch (a.do) {
+      case 'look': goLookNow(a.look.id, a.fade); break;
+      case 'drain': runActionRef.current?.('drain'); break;
+      case 'clear': runActionRef.current?.('clear'); break;
+      case 'seed': runActionRef.current?.('seed'); break;
+      case 'burst': v?.applyGesture({ tool: 'press', x: 0.5, y: 0.5, layer: 0, amount: 1 }); break;
+      case 'zoom':
+        if (a.zoom > 1.05) { setSettings(p => ({ ...p, macroMode: true })); glideSetting('macroZoom', a.zoom, a.over); }
+        else glideSetting('macroZoom', 1, a.over, { macroMode: false });
+        break;
+      case 'kaleidoscope': setSettings(p => ({ ...p, kaleidoscope: a.folds })); break;
+      case 'dyes': v?.stepDyes(); break;
+      case 'blackout': glideSetting('dimmer', 0, a.over); break;
+      case 'lights-up': glideSetting('dimmer', 1, a.over); break;
+      case 'set': glideSetting(a.key, a.value, a.over); break;
+      // In an ink that reads against the plate as it is: a title poured into a
+      // full, bright plate in the look's own dye does not show.
+      case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
+      case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+    }
+  }, [glideSetting, goLookNow]);
+
+  const songRuntime = useSongShows({
+    shows: songShows,
+    // Not while a look is being built: Design is where settings are chosen by hand.
+    follow: followSongs && !designing,
+    track: musicIntel.state.track,
+    positionSec: musicIntel.state.positionSec,
+    songMap: musicIntel.state.songMap,
+    isActive,
+    kicks: () => visualizerRef.current?.kicks() ?? 0,
+    applyLook: (show, fade) => goLookNow(show.look.id, fade),
+    perform: performSongAction,
+  });
+  const songRuntimeRef = useRef(songRuntime);
+  songRuntimeRef.current = songRuntime;
+  const lookChoices = useMemo<LookChoice[]>(() => [
+    ...PRESETS.map(p => ({ kind: 'preset' as const, id: p.id, name: p.name })),
+    ...userPresets.presets.map(p => ({ kind: 'saved' as const, id: p.id, name: p.name })),
+  ], [userPresets.presets]);
   relaySendRef.current = remoteLink.send;
 
   /*
@@ -2214,7 +2324,8 @@ export default function App() {
       { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
       { id: 'midi-activity', name: showActivity ? 'Hide what the controller is doing' : 'Show what the controller is doing',
         kind: 'Open', run: () => setShowActivity(v => !v) },
-      { id: 'open-seq',      name: 'Show sequencer',  kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
+      { id: 'open-songs',    name: 'Songs',           kind: 'Open', run: () => { setShowSongs(true); setShowMidi(false); } },
+      { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
       { id: 'open-design',   name: deskMode === 'perform' ? 'Design mode' : 'Perform mode', kind: 'Open',
@@ -2782,17 +2893,17 @@ export default function App() {
                   <span className="text-[7px] font-bold uppercase tracking-widest">{deskMode === 'perform' ? 'Perform' : 'Design'}</span>
                 </button>
 
-                {/* Show sequencer */}
+                {/* Songs: a look for each song and what happens while it plays */}
                 <button
-                  onClick={() => { setShowSequencer(!showSequencer); setShowTrackPanel(false); }}
+                  onClick={() => { setShowSongs(!showSongs); setShowTrackPanel(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSequencer || sequencer.status.running ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
-                  title="Show sequencer — script how the show evolves over a song or a set"
-                  data-testid="sequencer-button"
+                  title="Songs — a look for each song, and what happens while it plays"
+                  data-testid="songs-button"
                 >
-                  <Clapperboard size={16} className={showSequencer || sequencer.status.running ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Sequence</span>
+                  <Clapperboard size={16} className={showSongs || songRuntime.status.showId !== null ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Songs</span>
                 </button>
 
                 {/* MIDI controller */}
@@ -3052,6 +3163,30 @@ export default function App() {
             activity={showActivity}
             onActivity={setShowActivity}
             onClose={() => setShowMidi(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Songs ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSongs && (
+          <SongsPanel
+            shows={songShows}
+            onShows={setSongShows}
+            sets={actionSets}
+            onSaveSet={saveActionSet}
+            onDeleteSet={deleteActionSet}
+            looks={lookChoices}
+            currentSong={currentSong}
+            follow={followSongs}
+            onFollow={setFollowSongs}
+            status={songRuntime.status}
+            onRun={songRuntime.start}
+            onStop={songRuntime.stop}
+            onOpenSequences={() => { setShowSongs(false); setShowSequencer(true); }}
+            exportShows={() => { const used = savedLooksUsed(songShows); return showsFile(songShows, userPresets.presets.filter(p => used.has(p.id))); }}
+            onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
+            onClose={() => setShowSongs(false)}
           />
         )}
       </AnimatePresence>
@@ -3370,9 +3505,10 @@ export default function App() {
           }}
           dots={deskDots}
           onSearch={() => setShowPalette(true)}
-          mode={showSequencer ? 'sequence' : 'perform'}
+          mode={showSongs || showSequencer ? 'sequence' : 'perform'}
           onMode={(m) => {
-            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
+            setShowSongs(false);
             setShowSequencer(false);
             setDeskMode(m);
           }}
@@ -3439,9 +3575,10 @@ export default function App() {
           onNew={newLook}
           dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
-          mode={showSequencer ? 'sequence' : 'design'}
+          mode={showSongs || showSequencer ? 'sequence' : 'design'}
           onMode={(m) => {
-            if (m === 'sequence') { setShowSequencer(true); setShowMidi(false); return; }
+            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
+            setShowSongs(false);
             setShowSequencer(false);
             setDeskMode(m);
           }}

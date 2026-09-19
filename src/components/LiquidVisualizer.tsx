@@ -226,6 +226,17 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
 
 export interface LiquidVisualizerHandle {
   injectImage: (imageData: ImageData) => void;
+  /**
+   * Pour words into the lead plate: each row drawn at the biggest size its
+   * share of the box allows, in `colour` (default: the look's brightest dye;
+   * 'contrast' picks an ink that reads against the plate as it is), level on
+   * the frame whatever angle the plate is turned to.
+   */
+  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
+  /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
+  kicks: () => number;
+  /** Move the look's working dyes on by one, the way the hue journey would. */
+  stepDyes: () => void;
   /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids. */
   applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
@@ -2487,6 +2498,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
+  /** Every kick since the plate started, for a show that acts on every Nth one. */
+  const kickCountRef = useRef(0);
   /**
    * The plate's phrasing: what it should be doing this second.
    *
@@ -2688,6 +2701,66 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
+    },
+    pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
+      const fluid = fluidsRef.current[0];
+      if (!fluid || rows.length === 0) return;
+      // The box injectImage pours into, on the logical grid.
+      const S = fluid.size;
+      const w = Math.round(S * 0.81) - Math.round(S * 0.19);
+      const h = Math.round(S * 0.69) - Math.round(S * 0.31);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      if (!g) return;
+      const lum = (r: number, gg: number, b: number) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+      const brightest = (): string => {
+        const idx = presetContractRef.current ?? harmonyRef.current;
+        let best = { r: 1, g: 1, b: 1 }, bl = -1;
+        for (const i of idx) { const p = PALETTE_RGB[i]; if (p && lum(p.r, p.g, p.b) > bl) { bl = lum(p.r, p.g, p.b); best = p; } }
+        return `rgb(${Math.round(best.r * 255)}, ${Math.round(best.g * 255)}, ${Math.round(best.b * 255)})`;
+      };
+      let colour = opts.colour ?? brightest();
+      if (colour === 'contrast') {
+        // Dark letters on a bright plate, the look's brightest dye on a dark one.
+        const m = fluid.meanColor, d = Math.min(1, fluid.meanDensity);
+        colour = m && d > 0.25 && lum(m[0], m[1], m[2]) > 0.3 ? 'rgb(14, 14, 18)' : brightest();
+      }
+      const [c0, c1] = opts.columns ?? [0, 1];
+      const x0 = Math.round(c0 * w), x1 = Math.round(c1 * w);
+      const room = (x1 - x0) - 6;
+      const face = (px: number) => `900 ${px}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
+      const share = rows.reduce((a, r) => a + (r.weight ?? 1), 0);
+      const usable = h - 6;
+      g.fillStyle = colour;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      // Turned against the plate's own angle so the words read level on the frame.
+      const angle = rotationAnglesRef.current[0] ?? 0;
+      if (angle) { g.translate(w / 2, h / 2); g.rotate(angle); g.translate(-w / 2, -h / 2); }
+      let y = 3;
+      for (const r of rows) {
+        const band = usable * (r.weight ?? 1) / share;
+        let px = Math.floor(band * 0.95);
+        g.font = face(px);
+        while (px > 6 && g.measureText(r.text).width > room) { px -= 1; g.font = face(px); }
+        g.fillText(r.text, (x0 + x1) / 2, y + band / 2);
+        y += band;
+      }
+      // The plate's rows run from the bottom of the frame up; a canvas's run down.
+      const img = g.getImageData(0, 0, w, h);
+      const flipped = g.createImageData(w, h);
+      for (let yy = 0; yy < h; yy++) flipped.data.set(img.data.subarray((h - 1 - yy) * w * 4, (h - yy) * w * 4), yy * w * 4);
+      fluid.injectImage(flipped);
+    },
+    kicks: () => kickCountRef.current,
+    stepDyes: () => {
+      const w = paletteWindowRef.current;
+      const n = presetContractRef.current?.length ?? 0;
+      paletteWindowRef.current = { size: w.size ?? Math.max(1, Math.min(3, n > 1 ? n - 1 : 1)), lead: w.lead + 1 };
+      if (harmonyLockRef.current) return;
+      const contract = presetContractRef.current;
+      if (contract) harmonyRef.current = harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0);
     },
     applyPreset: (presetId: string, extras) => {
       // A user's preset carries its own dyes and injection styles; register
@@ -5060,6 +5133,7 @@ void main() {
           // sequence number, so the clock can tell a new beat from a held one.
           beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+          if (kickRef.current.kick) kickCountRef.current++;
         }
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
