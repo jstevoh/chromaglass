@@ -57,7 +57,7 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import lockupUrl from './assets/brand/lockup.svg';
+import { LOCKUP_URL } from './brand';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -3151,7 +3151,7 @@ export default function App() {
             letterboxed into the same width with empty bands above and below.
           */}
           <h1>
-            <img src={lockupUrl} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
+            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
           </h1>
           {/* The preset's name is the menu: one click from the top of the screen. */}
           <button

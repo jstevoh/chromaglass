@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
-import lockupUrl from '../../assets/brand/lockup.svg';
-import markUrl from '../../assets/brand/mark.svg';
+import { LOCKUP_URL, MARK_URL } from '../../brand';
 
 /**
  * The bar across the top of both desks.
@@ -70,8 +69,8 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           switch (see below), and what it has room for belongs to the
           breadcrumb — the look that is up is what someone reads here.
         */}
-        <img src={lockupUrl} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
-        <img src={markUrl} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
+        <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
         <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
         {breadcrumb}
       </div>
