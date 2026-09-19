@@ -181,6 +181,33 @@ async function main() {
     for (let i = 0; i < gpuAct.length; i++) gpuAct[i] = got[i * 2 + 1];
     out.chem = compare(cpu.activator, gpuAct);
     out.chemAlive = { cpu: +sum(cpu.activator).toFixed(3), webgpu: +sum(gpuAct).toFixed(3) };
+
+    // And the dye it lays down: once as the CPU did it — a scan of the
+    // activator into the delta arrays — and once as the deposit pass.
+    if (N === L) {
+      const AMOUNT = 0.02, THRESHOLD = 0.22;
+      const colour: [number, number, number] = [0.8, 0.35, 0.95];
+      const dyeAdd = new Float32Array(L * L * 4);
+      const eps = 0.002;
+      const absorb = colour.map((c) => -Math.log(Math.max(eps, c)));
+      for (let i = 0; i < L * L; i++) {
+        const a = cpu.activator[i];
+        if (a <= THRESHOLD) continue;
+        const w = AMOUNT * (a - THRESHOLD);
+        dyeAdd[i * 4] = absorb[0] * w; dyeAdd[i * 4 + 1] = absorb[1] * w; dyeAdd[i * 4 + 2] = absorb[2] * w;
+        dyeAdd[i * 4 + 3] = w;
+      }
+      const opts = { float32Filterable: gpu.float32Filterable };
+      const viaCpu = new WebGPUFluid(gpu.device, L, L, opts);
+      viaCpu.applyDeltas(dyeAdd, new Float32Array(L * L * 4), new Float32Array(L * L).fill(1), PARAMS.dt);
+      const viaPass = new WebGPUFluid(gpu.device, L, L, opts);
+      viaPass.depositChemistry(chem.texture, AMOUNT, colour, THRESHOLD);
+      const laid = await viaPass.readField('dye');
+      out.chemDye = compare(await viaCpu.readField('dye'), laid);
+      out.chemDyeMass = +mass(laid).toFixed(3);
+      viaCpu.dispose();
+      viaPass.dispose();
+    }
     chem.dispose();
   }
 

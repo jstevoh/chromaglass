@@ -89,6 +89,8 @@ try {
       // The reaction is its own field, on its own grid: CPU against compute.
       check('the reaction agrees', r.chem.meanRel < 0.02 && r.chem.maxRel < 0.35,
         `mean ${r.chem.meanRel} of rms, worst ${r.chem.maxRel} (rms ${r.chem.rms})`);
+      check('the reaction lays down its dye', r.chemDye.meanRel < 0.005 && r.chemDye.maxRel < 0.1 && r.chemDyeMass > 0.5,
+        `mean ${r.chemDye.meanRel} of rms, worst ${r.chemDye.maxRel}; ${r.chemDyeMass} of dye`);
       check('the reaction is alive', r.chemAlive.cpu > 1 && r.chemAlive.webgpu > 1,
         `activator CPU ${r.chemAlive.cpu}, WebGPU ${r.chemAlive.webgpu}`);
     }
