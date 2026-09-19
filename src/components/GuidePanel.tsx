@@ -117,7 +117,7 @@ const SECTIONS: Section[] = [
           ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Inputs → Sound Mappings.</>],
           ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
-          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and Thin Film are photograph-only — they do nothing in the light-show render.</>],
+          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Camera) at zero. A slider that cannot do anything says why in place of its value.</>],
           ['The wall went dark on a look change', <>You used Load rather than Cue and Go. Load clears the plate on purpose; Go never does.</>],
           ['It got slow', <>The status line names the rung the engine settled on. Set <Em>Sim Resolution</Em> to a fixed number rather than auto if a look depends on a particular grid, and expect the frame-time governor to step auto back down on a machine that cannot hold it.</>],
         ]} />
@@ -265,8 +265,8 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Sensitivity', <>How hard the analysis drives everything downstream. The first thing to reach for in a room that is louder or quieter than the last one.</>],
           ['Bass Boost', <>Weights the 20–250 Hz band before it is mapped. A PA with no low end, or too much of it, is fixed here rather than by re-tuning every slider.</>],
-          ['Global Speed', <>How fast the whole plate lives, independent of the music.</>],
-          ['Dimmer / Blackout', <>The house lights for the plate. <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
+          ['Speed', <>How fast the whole plate lives, independent of the music. In Settings → Live → Master, with the house lights.</>],
+          ['Dimmer / Blackout', <>The house lights for the plate, in Settings → Live → Master. <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],
           ['Beat Prediction', <>A phase-locked beat clock. The microphone hears a kick after it happens, so the clock learns the tempo and fires the next one <Em>early</Em>. <Em>Beat Lead</Em> is how early, in milliseconds.</>],
         ]} />
@@ -274,9 +274,10 @@ const SECTIONS: Section[] = [
         <P>
           Four destinations — velocity, density, colour, rotation — each fed by one of
           eight features: volume, bass, mid, treble, energy, timbre, complexity, or none.
-          This is the coarse wiring. <Em>Audio Impact</Em> in Light Show Look is how hard the
-          result lands, and it is the slider to move when the plate is either ignoring the
-          music or being shoved around by it.
+          This is the coarse wiring. <Em>Sound Drive</Em>, at the top of Sound Mappings, is how
+          hard the result lands, and it is the slider to move when the plate is either ignoring
+          the music or being shoved around by it. Any sound feature onto any other control is a
+          patch, in Settings → Inputs → Patches.
         </P>
       </>
     ),
@@ -293,7 +294,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Turbulence Scale / Detail', <>Multi-octave curl noise added to the velocity field. Scale is how strong, Detail is how many octaves — structure from whole-blob motion down to ripple and filament trails.</>],
           ['Sharpness', <>How hard the boundary between two dyes is held. High values keep a boundary a boundary instead of letting diffusion soften it into a gradient.</>],
-          ['Granulation / Grain Size', <>Pigment that separates the way real pigment does, and travels <Em>with</Em> the dye rather than sitting on the screen.</>],
+          ['Granulation / Grain Fineness', <>Pigment that separates the way real pigment does, and travels <Em>with</Em> the dye rather than sitting on the screen. Fineness up is smaller grain.</>],
           ['Blob Surface Tension', <>Trades cohesion against shear. Low gives amoeba-like elongation and pinching; high gives rounder, self-contained blobs. Scaled by Polarity — see the interaction section.</>],
           ['Dye Budget', <>How full the plate is allowed to get. As it fills toward saturation, evaporation ramps up hard, so injection and removal find an equilibrium with empty glass left. A saturated plate has no boundaries and reads as a flat colour wash.</>],
           ['Edge Relief', <>The meniscus: the little bright lip where dye meets clear glass.</>],
@@ -307,16 +308,17 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Light show</Em> is dye as light on black — the projected image. <Em>Photograph</Em> is
           a two-pass render with a camera over the plate and lit paper behind it, and it
-          is what the Oil on Water, Colorful Cosmos and Sunny Side Up presets are. Focus,
-          Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and Thin Film
-          only do anything in the photograph.
+          is what the Oil on Water, Colorful Cosmos and Sunny Side Up presets are. <Em>Lens</Em> is
+          how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
+          Refraction are its controls, and do nothing with it at zero.
         </P>
-        <H>Lamp</H>
+        <H>Lamp &amp; Light</H>
         <P>
           One lamp lights everything. <Em>Light Play</Em> is how much it matters, <Em>Lamp
           Motion</Em> walks it about, <Em>Hot-Spot</Em> is the bright centre a real projector has,
           and <Em>Second Lamp</Em> adds another from a different angle. Bubbles act as lenses
-          for it and dye rims are lit from wherever it happens to be.
+          for it and dye rims are lit from wherever it happens to be. The same section holds the
+          other machines a crew put in front of the lamp — see <Em>The other projectors</Em>.
         </P>
       </>
     ),
@@ -334,7 +336,7 @@ const SECTIONS: Section[] = [
           ['Diffusion Rate', <>How fast dye bleeds into its neighbours. Near zero keeps pinpoints sharp; up high everything becomes a wash.</>],
           ['Buoyancy', <>How strongly warm liquid rises. This and Heat Intensity are what make a plate left alone keep moving.</>],
           ['Advection', <>How far the dye is carried per step. Raise it and the plate sweeps; lower it and motion becomes local churn.</>],
-          ['Damping', <>How much velocity survives each step. This is how long a gesture lasts — at 0.99 a blow is still visible half a minute later, at 0.95 it is gone in a second.</>],
+          ['Momentum', <>How much velocity survives each step (the setting is still <C>damping</C>; up keeps more of the motion, which is less friction, not more). This is how long a gesture lasts — at 0.99 a blow is still visible half a minute later, at 0.95 it is gone in a second.</>],
         ]} />
         <H>Squish Plate</H>
         <Rows items={[
@@ -380,7 +382,7 @@ const SECTIONS: Section[] = [
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks, punches on bass, chases on energy and tremors on treble.</>],
           ['Paint Cells / Cell Size', <>Synthesised cells at magnification — the rings a pour painting makes.</>],
-          ['Lacing / Edge Detail / Relief', <>The filaments, the fine boundary structure and the apparent thickness of the film.</>],
+          ['Macro Lacing / Edge Detail / Relief', <>The filaments, the fine boundary structure and the apparent thickness of the film.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>
@@ -401,15 +403,17 @@ const SECTIONS: Section[] = [
       <>
         <P>
           A real light show was never one projector. These are the others, each able to
-          run under or over the dye.
+          run under or over the dye. Lumia, Chemistry, the gel wheel, Lamp Warmth and Exposure
+          are in Settings → Look → Lamp &amp; Light; the film projector is an input of its own,
+          Settings → Inputs → Film.
         </P>
         <Rows items={[
           ['Lumia', <>Thomas Wilfred's aurora: slow folded sheets of light drifting under a nearly clear plate. No beat, no dye to speak of, minutes-long evolutions.</>],
           ['Chemistry', <>Reaction–diffusion that grows coral and cells on the plate, the way Mark Boyle's Sensual Laboratory projected reactions on the platen instead of oil in a dish.</>],
           ['Gel Wheel', <>A rotating colour wheel over the lamp, in revolutions per minute. Half a turn a minute is the Optikinetics look.</>],
-          ['Film projector', <>A video file on a loop, or a live camera, played <Em>through</Em> the dye rather than beside it. <Em>Film Mix</Em> and <Em>Film Key</Em> set how much and what it keys on.</>],
+          ['Film projector', <>A video file on a loop, a live camera or another window, played <Em>through</Em> the dye rather than beside it. <Em>Film Mix</Em> and <Em>Film Key</Em> set how much and what it keys on; <Em>Film Drive</Em> lets the reel's own motion move the liquid.</>],
           ['Lamp Warmth / Exposure', <>The halogen grade, for the sealed oil-wheel look, and how hot the whole image is driven.</>],
-          ['Projectors / Round Dish', <>Settings → Show. Each layer gets its own dish on a black screen, circular the way a real clock face is. The Fillmore East, 1969 preset is three of them at once.</>],
+          ['Dish Spread / Round Dish', <>Settings → Look → Show. Each layer gets its own dish on a black screen, circular the way a real clock face is. The Fillmore East, 1969 preset is three of them at once.</>],
         ]} />
       </>
     ),
@@ -430,7 +434,8 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Room Drive', <>The optical-flow lattice upsampled onto the grid and added as velocity every solver step. A wave of an arm reaches the plate about 100 ms after it happens.</>],
           ['Hands', <>Everyone the sensor holds becomes a projectionist: standing still is a palm on the top glass (so <Em>Fingering</Em> breaks it into spokes), moving is a puff of air the way they are going, arriving is a drop. A track keeps its identity, so the same dancer keeps the same dye across a set.</>],
-          ['Mappings', <>How busy the floor is, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>.</>],
+          ['Patches', <>How busy the floor is, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>. The patch bay is a section of its own, Settings → Inputs → Patches, because it reads the film, the sound and the shapes as well.</>],
+          ['Flip Camera', <>For a camera facing the room, so a hand moved left moves the dye left.</>],
           ['Deadzone / Smoothing', <>What counts as nothing, and how much the reading is smoothed before it is used. A room is a noisy sensor.</>],
         ]} />
         <Note>
@@ -532,12 +537,12 @@ const SECTIONS: Section[] = [
           common reason a slider appears dead.
         </P>
 
-        <H>Turbulence × Damping × Advection</H>
+        <H>Turbulence × Momentum × Advection</H>
         <P>
-          Turbulence makes structure, Damping decides how long it survives, Advection
-          decides how far it travels before it dies. High turbulence with low damping is a
-          boil; high turbulence with high damping and high advection is a sweep with detail
-          in it. Turbulence alone, with damping low, mostly produces noise that vanishes.
+          Turbulence makes structure, Momentum decides how long it survives, Advection
+          decides how far it travels before it dies. High turbulence with low momentum is a
+          boil; high turbulence with high momentum and high advection is a sweep with detail
+          in it. Turbulence alone, with momentum low, mostly produces noise that vanishes.
         </P>
 
         <H>Heat Intensity × Buoyancy × Boiling Point × Heat Decay</H>
@@ -557,14 +562,14 @@ const SECTIONS: Section[] = [
           sliders alone.
         </P>
 
-        <H>Audio Impact × Automation</H>
+        <H>Sound Drive × Automation</H>
         <P>
           Automation roughly doubles the punch of every audio-driven injection on top of
-          whatever Audio Impact is set to. A plate tuned to taste with automation off will
+          whatever Sound Drive is set to. A plate tuned to taste with automation off will
           be about twice as emphatic when it is turned on.
         </P>
 
-        <H>Room Drive × Audio Impact</H>
+        <H>Room Drive × Sound Drive</H>
         <P>
           Both are hands on the same plate, and the loudest one wins the look. Crowd Plate
           sets the music down to 0.35 on purpose: with the music at its usual strength, an
@@ -580,12 +585,12 @@ const SECTIONS: Section[] = [
           inside the contract. Nothing can introduce a colour the preset did not name.
         </P>
 
-        <H>Render style gates whole sections</H>
+        <H>The lens gates the camera's controls</H>
         <P>
-          Focus, Aperture, Bloom, Chromatic Aberration, Refraction, Micro-Droplets and
-          Thin Film are photograph-only. Glossiness fights the projected look by design: at
-          anything above zero the dye reads as lit 3D spheres rather than as flat backlit
-          colour.
+          Focus, Aperture, Bloom, Chromatic Aberration and Refraction are what the lens does,
+          and do nothing with <Em>Lens</Em> at zero. Glossiness fights the projected look by
+          design: at anything above zero the dye reads as lit 3D spheres rather than as flat
+          backlit colour.
         </P>
 
         <H>Grid resolution is not a quality slider</H>
