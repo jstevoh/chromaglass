@@ -177,7 +177,21 @@ const context = await browser.newContext({ permissions: ['camera'], viewport: { 
 const page = await context.newPage();
 page.setDefaultTimeout(60_000);
 const note = (text) => { if (!IGNORED.some(re => re.test(text))) errors.push(text); };
-page.on('console', m => { if (m.type() === 'error') note(m.text()); });
+/*
+  A resource that failed to load on someone else's server is not the app
+  misbehaving. The lyrics lookup asks lrclib.net for the song playing, and that
+  answers 404 for a song it has never heard of and 502 when it is having a bad
+  day — which failed this check on about half the runs on one laptop, on the
+  day the lyrics service was slow, for nothing the app did. The console gives
+  the failed URL as the message's location, so only same-origin failures (and
+  every other kind of error) still count.
+*/
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  const at = m.location()?.url ?? '';
+  if (/Failed to load resource/i.test(m.text()) && /^https?:/.test(at) && !at.startsWith(`http://localhost:${PORT}/`)) return;
+  note(m.text());
+});
 page.on('pageerror', e => note(`uncaught: ${e.message}`));
 
 // Count every device the page opens, and never auto-accept a prompt silently:
