@@ -4776,6 +4776,7 @@ void main() {
             gpuUnavailable,
             frameMs: governor.frameMs,
             simMs: simMsRef.current,
+            layers: fluidsRef.current.length,
             stepsPerSec: stepsPerSecRef.current,
             // The solver's share of a frame is one step's cost times the steps
             // that frame owed; what is left is everything that is not the

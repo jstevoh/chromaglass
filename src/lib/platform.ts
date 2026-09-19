@@ -152,6 +152,8 @@ export interface EngineStatus {
   frameMs: number;
   /** Cost of one solver step across every layer, milliseconds. */
   simMs: number;
+  /** How many plates are being solved — the solver's cost is per layer. */
+  layers: number;
   /**
    * Solver steps actually being taken per second, against the 60 the show
    * asks for. Below that the plate is in slow motion: the frames are fine and

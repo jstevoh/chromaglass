@@ -25,6 +25,9 @@ import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtoco
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { runBench, formatBench, readRenderer } from './lib/bench';
+import type { BenchOptions } from './lib/bench';
+import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { SequencerPanel } from './components/SequencerPanel';
@@ -269,6 +272,28 @@ export default function App() {
     */
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
       (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+    (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
+      (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
+  }, []);
+
+  /*
+    `?bench` runs the grid sweep on its own and shows the result.
+
+    The measurement it takes is one somebody else has to run — it needs the
+    machine the show will run on, which is never the one the code was written
+    on — so the whole of it has to be a link that can be sent and a block of
+    text that comes back. Waits for the first frame, because a sweep that
+    starts before there is an engine to read measures the loading screen.
+  */
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('bench')) return;
+    let cancelled = false;
+    const wait = setInterval(() => {
+      if (cancelled || !engineStatusRef.current) return;
+      clearInterval(wait);
+      void startBenchRef.current?.();
+    }, 250);
+    return () => { cancelled = true; clearInterval(wait); };
   }, []);
   const [audioSource, setAudioSource] = useState<AudioSource>('none');
   /** For the first-gesture handler, which is installed once and must not close over a stale value. */
@@ -709,6 +734,45 @@ export default function App() {
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
+  // ── The grid sweep ──
+  // Walks the solver down every grid and reports where a frame's time went on
+  // each, so the question "is the grid what costs you" has an answer taken the
+  // same way on every machine rather than by hand, five times, from a readout.
+  const [bench, setBench] = useState<{ running: boolean; done: number; total: number; label: string; text: string | null }>(
+    { running: false, done: 0, total: 0, label: '', text: null },
+  );
+  const benchBusyRef = useRef(false);
+  /** The effect that installs the hooks runs once; this keeps it off a stale callback. */
+  const startBenchRef = useRef<((opts?: BenchOptions) => Promise<void>) | null>(null);
+  const startBench = useCallback(async (opts?: BenchOptions) => {
+    if (benchBusyRef.current) return;
+    benchBusyRef.current = true;
+    setBench({ running: true, done: 0, total: 0, label: 'starting', text: null });
+    // Whatever the grid was before this is the grid it goes back to; a
+    // diagnostic that leaves the show on a different setting than it found it
+    // is a diagnostic that changes the thing it measured.
+    let restore: VisualizerSettings['simResolution'] = 'auto';
+    setSettings(prev => { restore = prev.simResolution; return prev; });
+    try {
+      const report = await runBench({
+        setGrid: (g) => setSettings(prev => ({ ...prev, simResolution: g })),
+        read: () => engineStatusRef.current,
+        renderer: readRenderer,
+        sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+        onProgress: (done, total, label) => setBench(b => ({ ...b, done, total, label })),
+      }, opts);
+      const text = formatBench(report);
+      console.log(text);
+      setBench({ running: false, done: 0, total: 0, label: '', text });
+    } catch (err) {
+      console.error('ChromaGlass: the grid sweep failed.', err);
+      setBench({ running: false, done: 0, total: 0, label: '', text: `The sweep failed: ${String(err)}` });
+    } finally {
+      setSettings(prev => ({ ...prev, simResolution: restore }));
+      benchBusyRef.current = false;
+    }
+  }, []);
+  startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   const loadFilm = async (file: File) => {
     await visualizerRef.current?.loadFilmFile(file);
@@ -2842,6 +2906,14 @@ export default function App() {
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
       <AnimatePresence>
         {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
+        <BenchOverlay
+          running={bench.running}
+          done={bench.done}
+          total={bench.total}
+          label={bench.label}
+          text={bench.text}
+          onClose={() => setBench(b => ({ ...b, text: null }))}
+        />
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}

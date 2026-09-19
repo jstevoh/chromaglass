@@ -436,6 +436,37 @@ For testing, `?sim=cpu|auto|<size>`, `?tier=hosted|local|native` and
 still keeps up with wall-clock time, and `?debug` exposes
 `window.chromaglassDebug()` with the live solver state and governor.
 
+### What a frame costs on your machine — `?bench`
+
+Open any ChromaGlass URL with **`?bench`** on the end and it measures itself:
+it walks the solver down every grid in turn, waits for each to settle, samples
+it, and hands back a block of text with a Copy button. It takes about a minute
+and puts the grid back where it found it.
+
+```
+grid       fps   frame   solver    other  steps/s  speed
+256²        52  19.2ms    3.3ms   15.4ms       60    100%
+384²        36  27.8ms    7.4ms   15.1ms       60    100%
+512²        20  50.0ms   13.2ms   16.4ms       40     67%
+```
+
+Two columns are the point. **solver** is one step across every layer; **other**
+is the frame minus the solver — the renderer, the readback, React, everything
+that does not get cheaper when the grid does. If `other` stays flat while the
+grid falls, the grid was never what was costing you.
+
+**speed** is separate and easy to miss. When a solver step costs more than a
+frame's budget the loop stops asking for four steps and asks for one, so the
+plate advances slower than wall-clock while every frame still arrives on time.
+A frame rate cannot show that; at 25% the liquid is moving at a quarter speed
+and the show only looks a bit choppy. The engine readout in Settings →
+Simulation prints it too, whenever it is not 100%.
+
+`npm run bench` runs the same sweep from the command line, and
+`chromaglassBench()` starts it by hand on a `?debug` page. Nothing is sent
+anywhere — the report is text, printed and shown, for you to do what you like
+with.
+
 ## Controls
 
 | Control | Description |

@@ -47,7 +47,8 @@
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "dye": "npm run build && node scripts/dye.mjs",
     "sw": "npm run build && node scripts/sw.mjs",
-    "qa:gpu": "QA_GPU=mid npm run qa"
+    "qa:gpu": "QA_GPU=mid npm run qa",
+    "bench": "npm run build && node scripts/bench.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
