@@ -588,7 +588,22 @@ export default function App() {
     try {
       let stream: MediaStream;
       if (source === 'system') {
-        stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        // Raw, as the microphone below, and in stereo: a shared tab is the
+        // music itself. With plain `audio: true` Chrome shared a music tab as
+        // a call: one channel, with echo cancellation, noise suppression and
+        // auto gain all on. The show heard it processed, and a recording of
+        // it failed outright (the master's 320 kbps is more AAC than one
+        // channel carries). Plain again only if the constraints are refused,
+        // never after the person has said no to sharing.
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+            video: true,
+          });
+        } catch (e) {
+          if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
+          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        }
       } else {
         // Ask for the raw microphone. The browser's defaults — echo
         // cancellation, noise suppression and auto gain — are tuned for speech

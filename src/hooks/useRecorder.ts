@@ -62,12 +62,16 @@ function masterBitrate(): number | null {
  * re-encodes the take to 4K for YouTube, and every loss in the recorder is
  * carried into that: at 40 the grain and the thread edges survive. With it
  * set, H.264 is preferred (see MASTER_CANDIDATES) and the audio is asked for
- * explicitly at 320 kbps, rather than left to the encoder's default.
+ * explicitly at 160 kbps a channel, rather than left to the encoder's default.
+ * Not a flat 320: AAC carries at most about 288 kbps in one channel at 48 kHz,
+ * and asked for more, Chrome's encoder does not start and the recording comes
+ * out empty. A mono source did that: a shared tab, as Chrome first gave it.
  */
-function recorderBitrates(): { videoBitsPerSecond: number; audioBitsPerSecond?: number } {
+function recorderBitrates(audio: MediaStream | null): { videoBitsPerSecond: number; audioBitsPerSecond?: number } {
   const mbps = masterBitrate();
   if (mbps === null) return { videoBitsPerSecond: 12_000_000 };
-  return { videoBitsPerSecond: Math.round(mbps * 1_000_000), audioBitsPerSecond: 320_000 };
+  const channels = audio?.getAudioTracks()[0]?.getSettings?.().channelCount ?? 2;
+  return { videoBitsPerSecond: Math.round(mbps * 1_000_000), audioBitsPerSecond: channels >= 2 ? 320_000 : 160_000 };
 }
 
 const stamp = () => {
@@ -108,7 +112,7 @@ export function useRecorder(): Recorder {
     for (const t of audio?.getAudioTracks() ?? []) stream.addTrack(t.clone());
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(stream, { mimeType: mime, ...recorderBitrates() });
+      rec = new MediaRecorder(stream, { mimeType: mime, ...recorderBitrates(audio) });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start the recorder.');
       return;
