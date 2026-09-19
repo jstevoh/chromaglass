@@ -13,6 +13,8 @@
  * checks the panel's own source against it.
  */
 
+import { PINNABLE } from './deskPins';
+
 export interface SettingsCategory { id: string; name: string; hint: string }
 
 /**
@@ -46,7 +48,7 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'audio-input', name: 'Sound', category: 'inputs',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration song' },
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration calibrate recalibrate song' },
   { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
     terms: 'sound bass mid treble energy timbre map drive reactive band patch patches impact modular route routing source' },
   { id: 'room', name: 'The Room', category: 'inputs',
@@ -55,9 +57,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'midi apc40 apc mini launchpad nanokontrol launch control xl fader knob pad learn map bank shift soft takeover led clock controller akai novation korg usb' },
 
   { id: 'look', name: 'Light Show Look', category: 'look',
-    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look' },
+    terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid' },
   { id: 'show', name: 'Show', category: 'look',
-    terms: 'hue journey beat squeeze background loop dish vignette projectors beads cells' },
+    terms: 'hue journey colour color beat squeeze background loop dish vignette spread beads cells' },
   /*
     A section of its own, because it is played rather than set.
 
@@ -80,7 +82,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'evolve random drops air bursts rate dye budget' },
 
   { id: 'squish', name: 'Squish Plate', category: 'plate',
-    terms: 'plate pressure squeeze film hele-shaw gap thickness' },
+    terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
   { id: 'heat', name: 'Heat Slide', category: 'plate',
     terms: 'temperature buoyancy convection lamp warmth slide' },
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
@@ -111,9 +113,31 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 export const SECTION_NAME = new Map(SETTINGS_SECTIONS.map(s => [s.id, s.name]));
 export const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map(s => [s.id, s]));
 
-/** Does a query hit this section? The one answer the rail and the pane share. */
+/*
+  Every control's own label, by the section it lives in.
+
+  The terms above are what a section is *about*; they never included what is
+  written on it. So 66 of the 97 slider labels, typed exactly as shown, did not
+  find their own section — "bass boost", "film mix", "speed" found nothing, and
+  "grain" went to Simulation. The pin list already knows every label and its
+  section, so the index is built from that rather than kept by hand.
+*/
+const LABELS = new Map<string, string>();
+for (const p of PINNABLE) LABELS.set(p.section, `${LABELS.get(p.section) ?? ''} ${p.label}`);
+
+/** Everything a search can match for a section: name, terms and labels. */
+export function sectionSearchText(sec: SettingsSection): string {
+  return `${sec.name} ${sec.terms} ${LABELS.get(sec.id) ?? ''}`.toLowerCase();
+}
+
+/**
+ * Does a query hit this section? The one answer the rail and the pane share.
+ * Word by word — every word has to land somewhere — so "film mix" and
+ * "bass boost" work, and the order they are typed in does not matter.
+ */
 export function sectionMatches(sec: SettingsSection, q: string): boolean {
-  return `${sec.name} ${sec.terms}`.toLowerCase().includes(q);
+  const hay = sectionSearchText(sec);
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
 
 /** The section the panel opens on when nothing says otherwise. */

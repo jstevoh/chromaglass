@@ -3,7 +3,7 @@ import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
-import { SETTINGS_SECTIONS } from './lib/settingsMap';
+import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
@@ -2200,6 +2200,9 @@ export default function App() {
     const sections: Command[] = SETTINGS_SECTIONS.map(sec => ({
       id: `settings-${sec.id}`,
       name: `Settings: ${sec.name}`,
+      // Matched as well as the name: the section's terms and every label in
+      // it, so "keystone", "flash" or "dimmer" land on the section they live in.
+      terms: sectionSearchText(sec),
       kind: 'Open',
       run: () => { setSettingsSection(sec.id); setShowSettings(true); setShowHelp(false); },
     }));
