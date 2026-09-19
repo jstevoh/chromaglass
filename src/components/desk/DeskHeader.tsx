@@ -110,7 +110,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         <div className="pointer-events-auto">
           <Segmented
             value={mode}
-            options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Sequence']] as const}
+            options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Songs']] as const}
             onChange={onMode}
             height={32}
             testId="mode-segmented"

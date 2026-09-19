@@ -831,7 +831,7 @@ try {
   check('the keyboard shortcuts run without throwing', true);
 
   // ── The other panels ──────────────────────────────────────────────
-  for (const [title, what] of [['MIDI', 'the MIDI panel'], ['Sequence', 'the sequencer'], ['Track', 'the track panel']]) {
+  for (const [title, what] of [['MIDI', 'the MIDI panel'], ['Songs', 'the songs sheet'], ['Track', 'the track panel']]) {
     const b = page.locator(`button[title*="${title}" i]`).first();
     if (await b.count()) {
       await clickOn(b);
@@ -1714,6 +1714,40 @@ try {
     check('and Design shows the bench instead of the cue list',
       benchUp === 1 && bottles === 1 && cuesGone === 0,
       `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
+  }
+
+  // ── Songs: a look for each song, and what happens while it plays ──
+  //
+  // The desk's third mode. A song is added, given an action from the menu,
+  // the action is moved to a time, and the show is run by hand: the action has
+  // to reach the plate when it says, and the song has to be there after.
+  {
+    await clickOn('mode-segmented-sequence');
+    let up = 0;
+    for (let i = 0; i < 20 && !up; i++) { up = await page.getByTestId('songs-panel').count(); if (!up) await settle(300); }
+    check('the desk\'s third mode opens Songs', up === 1);
+    if (up) {
+      await page.getByTestId('songs-new-title').fill('QA Song');
+      await page.getByTestId('songs-new-artist').fill('QA Band');
+      await clickOn('songs-add');
+      await page.getByTestId('songs-add-action').selectOption({ label: 'Kaleidoscope on every chorus' });
+      await page.getByTestId('songs-action-0-when').selectOption('time');
+      const t = page.getByTestId('songs-action-0').locator('input').first();
+      await t.fill('0:02'); await t.blur();
+      const before = await page.evaluate(() => window.chromaglassDebug?.().settings.kaleidoscope ?? null);
+      await clickOn('songs-run');
+      let folds = before;
+      for (let i = 0; i < 30 && folds !== 6; i++) { await settle(250); folds = await page.evaluate(() => window.chromaglassDebug?.().settings.kaleidoscope ?? null); }
+      check('a song\'s action reaches the plate when it says', before === 0 && folds === 6, `kaleidoscope ${before} → ${folds}`);
+      await clickOn('songs-stop');
+      await page.evaluate(() => window.chromaglassSettings?.({ kaleidoscope: 0 }));
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-song-shows') || '[]').some((s) => s.song.title === 'QA Song' && s.actions.length === 1));
+      check('and the song is kept', stored);
+      await page.keyboard.press('Escape');
+      await settle(400);
+    }
+    await clickOn('mode-segmented-perform');
+    await settle(600);
   }
 
   // ── Readable in a dark room ───────────────────────────────────────
