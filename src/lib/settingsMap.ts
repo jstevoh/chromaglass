@@ -25,6 +25,7 @@ export interface SettingsCategory { id: string; name: string; hint: string }
  * input" is.
  */
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
+  { id: 'live',   name: 'Live',    hint: 'running the show' },
   { id: 'inputs', name: 'Inputs',  hint: 'what drives the show' },
   { id: 'look',   name: 'Look',    hint: 'what it looks like' },
   { id: 'plate',  name: 'Plate',   hint: 'the liquid itself' },
@@ -47,8 +48,11 @@ export interface SettingsSection {
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
+  // First, so the sheet opens on it: what a show is run with, whatever the look.
+  { id: 'master', name: 'Master', category: 'live',
+    terms: 'master house lights dimmer blackout black out flash limit strobe photosensitive epilepsy safety speed pace tempo of the plate' },
   { id: 'audio-input', name: 'Sound', category: 'inputs',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction blackout dimmer calibration calibrate recalibrate song' },
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song' },
   { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
     terms: 'sound bass mid treble energy timbre map drive reactive band patch patches impact modular route routing source' },
   { id: 'room', name: 'The Room', category: 'inputs',

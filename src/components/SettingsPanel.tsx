@@ -449,6 +449,69 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           plate's own name is where a projectionist already looks for them,
           and it carries saving and loading too; a second copy buried in a
           scrolling panel was one more place to keep in step. */}
+      {/* Master Section */}
+      {/*
+        The four things a show is run with, whatever the look: the house lights,
+        the blackout, the flash limit and the pace of the plate. They were the
+        middle of Sound — between the audio device and the room calibration —
+        which is where nobody reaching for the house lights in a dark room looks,
+        and the sheet opened on the microphone's sensitivity. It opens here now.
+      */}
+      <section id="settings-master" className={`mb-8 scroll-mt-4 ${shown('master') ? '' : 'hidden'} ${focusSection === 'master' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="master">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Lightbulb size={12} /> Master
+        </h3>
+        {/* The house lights */}
+        <Slider
+          label="Dimmer"
+          value={settings.dimmer ?? 1}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ dimmer: v })}
+          settingKey="dimmer"
+        />
+        {onBlackout && (
+          <button
+            onClick={onBlackout}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            title="Fade the plate to black and back (B on the keyboard)"
+            data-testid="blackout-button"
+          >
+            {blackout ? 'Lights up' : 'Blackout'}
+          </button>
+        )}
+        {/* The same switch as the one at the bottom of Projectors → The Wall,
+            where it used to live alone: the last control of the longest section. */}
+        {output && onOutput && (
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[13px] font-medium text-text">Flash Limit</span>
+            <button
+              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
+              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
+              title="Hold the whole screen below three flashes a second (photosensitivity)"
+              aria-label="Flash Limit"
+              aria-pressed={output.flashGuard}
+              data-testid="flash-limit-master"
+            >
+              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )}
+
+        {/* 0–0.3, the desk's and the controller's range: the timestep stops
+            growing near 0.21, so 70% of the old 0–1 travel only raced the clocks. */}
+        <Slider
+          label="Speed"
+          value={settings.globalSpeed}
+          min={0.0}
+          max={0.3}
+          step={0.001}
+          onChange={(v: number) => onUpdate({ globalSpeed: v })}
+          settingKey="globalSpeed"
+        />
+      </section>
+
       {/* Sound Section */}
       <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('audio-input') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
@@ -471,17 +534,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.1}
           onChange={(v: number) => onUpdate({ bassBoost: v })}
           settingKey="bassBoost"
-        />
-        {/* 0–0.3, the desk's and the controller's range: the timestep stops
-            growing near 0.21, so 70% of the old 0–1 travel only raced the clocks. */}
-        <Slider
-          label="Speed"
-          value={settings.globalSpeed}
-          min={0.0}
-          max={0.3}
-          step={0.001}
-          onChange={(v: number) => onUpdate({ globalSpeed: v })}
-          settingKey="globalSpeed"
         />
 
         {/* What is listening at all */}
@@ -523,46 +575,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <Info>
               On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
             </Info>
-          </div>
-        )}
-
-        {/* The house lights */}
-        <Slider
-          label="Dimmer"
-          value={settings.dimmer ?? 1}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ dimmer: v })}
-          settingKey="dimmer"
-        />
-        {onBlackout && (
-          <button
-            onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-            title="Fade the plate to black and back (B on the keyboard)"
-            data-testid="blackout-button"
-          >
-            {blackout ? 'Lights up' : 'Blackout'}
-          </button>
-        )}
-        {/* The flash limit, next to the other two things that keep a room safe.
-            It is the same switch as the one at the bottom of Projectors → The
-            Wall, which is where it lived alone: the last control of the longest
-            section, with no other way to it. */}
-        {output && onOutput && (
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[13px] font-medium text-text">Flash Limit</span>
-            <button
-              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
-              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
-              title="Hold the whole screen below three flashes a second (photosensitivity)"
-              aria-label="Flash Limit"
-              aria-pressed={output.flashGuard}
-              data-testid="flash-limit-master"
-            >
-              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
           </div>
         )}
 
