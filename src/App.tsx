@@ -2406,7 +2406,7 @@ export default function App() {
           >
             {projector.mode === 'auto' ? 'automatic' : 'always'}
           </button>
-          <button onClick={() => projector.setMode('off')} className="p-1 text-white/30 hover:text-white" aria-label="Dismiss and stop offering" title="Don't offer this (Settings → Projectors turns it back on)"><X size={11} /></button>
+          <button onClick={() => projector.setMode('off')} className="p-1 text-white/30 hover:text-white" aria-label="Dismiss and stop offering" title="Don't offer this (Settings → Wall turns it back on)"><X size={11} /></button>
         </div>
       )}
       {isCasting && windowFullscreen === false && overlaysVisible && (

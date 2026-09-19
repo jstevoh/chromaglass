@@ -1213,10 +1213,13 @@ try {
         The picker cannot be driven from a harness, so what is checked is that
         the way in exists, says what it is for, and does not throw — the rest
         is the browser's own dialog.
+
+        Film has its own section under Inputs now; it was the bottom third of
+        Projectors, which is where this used to look.
       */
       await clickOn('open-all-settings');
       await settle(1200);
-      await clickOn('settings-nav-projectors');
+      await clickOn('settings-nav-film');
       await settle(500);
       const film = await page.evaluate(() => {
         const box = (id) => {
@@ -1229,10 +1232,11 @@ try {
           title: w.title,
           width: Math.round(w.width),
           // In the row with the other two, which is the claim that matters.
-          // Not "on screen without scrolling": this lives inside a section
-          // eight controls deep, and Load loop and Camera are just as far
-          // down it. The pinned way *into* settings has to be above the fold
-          // and is checked for that; a control inside a section does not.
+          // Not "on screen without scrolling": this used to live inside a
+          // section eight controls deep, and Load loop and Camera were just
+          // as far down it. The pinned way *into* settings has to be above
+          // the fold and is checked for that; a control inside a section
+          // does not.
           inRow: Math.abs(w.top - cam.top) < 4 && Math.abs(w.top - off.top) < 4,
           between: cam.right <= w.left + 1 && w.right <= off.left + 1,
           wide: w.width > 40,
@@ -1318,15 +1322,15 @@ try {
 
         Opens the panel for itself rather than inheriting whatever the block
         above left behind. It used to lean on the film-window checks having
-        just been on Projectors, and the moment a block was added between them
-        that went to The Room and closed the panel, this looked for two
-        controls in a panel that was not on screen and reported them missing.
-        A check that depends on the one before it is a check that fails for a
-        reason that has nothing to do with what it is testing.
+        just been on the film's section, and the moment a block was added
+        between them that went to The Room and closed the panel, this looked
+        for two controls in a panel that was not on screen and reported them
+        missing. A check that depends on the one before it is a check that
+        fails for a reason that has nothing to do with what it is testing.
       */
       await clickOn('open-all-settings');
       await settle(1200);
-      await clickOn('settings-nav-projectors');
+      await clickOn('settings-nav-film');
       await settle(500);
       const force = await page.evaluate(() => {
         const of = (key) => {
@@ -1411,7 +1415,9 @@ try {
         const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return at?.textContent?.trim() ?? null;
       });
-      check('the Wall dot opens the projector settings', /projector/i.test(wallDot ?? ''), wallDot ?? 'no panel');
+      // The section kept its id (`projectors`) when it became Wall, so the dot
+      // still opens it; what the rail says is the new name.
+      check('the Wall dot opens the wall settings', /wall/i.test(wallDot ?? ''), wallDot ?? 'no panel');
       await escapeCloses('settings-panel');
 
       await clickOn('dot-phone');

@@ -143,6 +143,9 @@ const MUST_FIND = [
   ['video', 'room'], ['people', 'room'], ['camera', 'room'], ['crowd', 'room'],
   ['midi', 'midi'], ['apc40', 'midi'], ['controller', 'midi'], ['fader', 'midi'],
   ['keystone', 'projectors'], ['mask', 'projectors'], ['strobe', 'projectors'],
+  ['wall', 'projectors'], ['projector', 'projectors'],
+  ['film mix', 'film'], ['reel', 'film'], ['window', 'film'], ['prelinger', 'film'],
+  ['lumia', 'lamp'], ['gel wheel', 'lamp'], ['exposure', 'lamp'], ['lamp warmth', 'lamp'],
   ['bpm', 'audio-input'], ['microphone', 'audio-input'],
   ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
 ];
@@ -152,6 +155,30 @@ for (const [word, want] of MUST_FIND) {
   if (!hits.includes(want)) misses.push(`"${word}" → ${hits.join(', ') || 'nothing'} (wanted ${want})`);
 }
 check('searching for what you came for finds it', misses.length === 0, misses.join(' · '));
+
+// ── The wall, the lamp and the film ─────────────────────────────────
+/*
+  Projectors was three sections in one: the wall's geometry, six look effects
+  and the film projector. So the section you square a projector up in at
+  load-in and never touch again was also where a gel wheel was ridden
+  mid-song, and it was the longest row on the rail. The split is checked
+  here, where it would quietly grow back: the wall holds no setting a desk
+  can reach (everything on it is the venue's, kept off every fader on
+  purpose), the look effects live with the lamp they colour, and the film
+  is an input.
+*/
+const onWall = PINNABLE.filter(s => s.section === 'projectors');
+check('the wall holds the wall and nothing a fader can reach', onWall.length === 0,
+  onWall.map(s => s.label).join(', '));
+const LAMP = ['lumia', 'chemistry', 'gelWheel', 'gelSpeed', 'lampWarmth', 'exposure'];
+check('the look effects live with the lamp',
+  LAMP.every(k => PIN_RANGE.get(k)?.section === 'lamp'),
+  LAMP.filter(k => PIN_RANGE.get(k)?.section !== 'lamp').map(k => `${k} → ${PIN_RANGE.get(k)?.section}`).join(', '));
+check('and the film is an input of its own',
+  SECTION_BY_ID.get('film')?.category === 'inputs'
+  && ['filmMix', 'filmKey', 'filmDrive'].every(k => PIN_RANGE.get(k)?.section === 'film'));
+check('and the wall keeps the id every deep link opens',
+  SECTION_BY_ID.get('projectors')?.name === 'Wall' && /openSettingsAt\('projectors'\)/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8')));
 
 // ── The controller the section offers to set up ─────────────────────
 //

@@ -481,8 +481,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
         )}
-        {/* The same switch as the one at the bottom of Projectors → The Wall,
-            where it used to live alone: the last control of the longest section. */}
+        {/* The same switch as the one at the bottom of Wall → Output, where it
+            used to live alone: the last control of the longest section. */}
         {output && onOutput && (
           <div className="flex items-center justify-between mb-4">
             <span className="text-[13px] font-medium text-text">Flash Limit</span>
@@ -1179,10 +1179,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
       </section>
 
-      {/* Lamp Section */}
+      {/* Lamp & Light Section */}
       <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('lamp') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Lightbulb size={12} /> Lamp
+          <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
         <Info>
           One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
@@ -1231,6 +1231,73 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ iridescence: v })}
           settingKey="iridescence"
+        />
+        {/*
+          The other machines a crew stacked in front of the lamp.
+
+          These were the back half of Projectors, after the corner pin and the
+          masks: a section set once at load-in and then left alone, holding six
+          controls that are ridden during a song. They colour the light, so
+          they are here with the lamp rather than with the wall.
+        */}
+        <div className="mt-6 mb-3 text-[13px] font-medium text-text">The other machines</div>
+        <Info>
+          What else a light show crew stacked on the screen: Thomas Wilfred’s lumia rig, a reaction growing on the platen, a gel wheel turning over the lamp, and a sealed oil wheel’s halogen grade and exposure.
+        </Info>
+        <Slider
+          label="Lumia"
+          value={settings.lumia ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lumia: v })}
+          settingKey="lumia"
+        />
+        <Slider
+          label="Chemistry"
+          value={settings.chemistry ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ chemistry: v })}
+          settingKey="chemistry"
+        />
+        <Slider
+          label="Gel Wheel"
+          value={settings.gelWheel ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ gelWheel: v })}
+          settingKey="gelWheel"
+        />
+        <Slider
+          label="Gel Speed (rpm)"
+          disabled={(settings.gelWheel ?? 0) <= 0.001 && 'needs Gel Wheel above 0'}
+          value={settings.gelSpeed ?? 0.5}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ gelSpeed: v })}
+          settingKey="gelSpeed"
+        />
+        <Slider
+          label="Lamp Warmth"
+          value={settings.lampWarmth ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampWarmth: v })}
+          settingKey="lampWarmth"
+        />
+        <Slider
+          label="Exposure"
+          value={settings.exposure ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ exposure: v })}
+          settingKey="exposure"
         />
       </section>
 
@@ -1503,7 +1570,157 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </Info>
       </section>
 
-      {/* Projectors Section */}
+      {/*
+        Film
+
+        The film projector, as the input it is. It was the bottom third of
+        Projectors, under the corner pin and a gel wheel, which put the one
+        thing there that drives the plate in a section about the wall — and
+        made that section the longest on the rail. A reel, a camera on a real
+        dish or another window, how it shows, and what it does to the liquid.
+      */}
+      <section id="settings-film" className={`mb-8 scroll-mt-4 ${shown('film') ? '' : 'hidden'} ${focusSection === 'film' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="film">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Film size={12} /> Film
+        </h3>
+        <div className="mt-2 mb-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-medium text-text">Source</span>
+            <span className="text-[12px] font-mono opacity-50">
+              {filmSource === 'file' ? 'loop playing'
+                : filmSource === 'camera' ? 'camera live'
+                : filmSource === 'window' ? 'window live'
+                : 'off'}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              ref={filmInputRef}
+              id="film-loop-file"
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => filmInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+              title="Play a video file through the dye, looping"
+            >
+              <Film size={13} /> Load loop
+            </button>
+            <button
+              onClick={() => onFilmCamera?.()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+              title="Point a camera at a real dish of oil and composite it through the solver"
+              data-testid="film-camera"
+            >
+              <Camera size={13} /> Camera
+            </button>
+            {/*
+              Disabled rather than silently doing nothing where the browser
+              has no screen capture — which is every phone. A button that
+              looks pressable and answers with a console warning is the kind
+              of control that makes someone doubt the rest of the panel.
+            */}
+            <button
+              onClick={() => onFilmWindow?.()}
+              disabled={!canCaptureWindow}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              title={canCaptureWindow
+                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
+              data-testid="film-window"
+            >
+              <MonitorPlay size={13} /> Window
+            </button>
+            <button
+              onClick={() => onFilmClear?.()}
+              disabled={filmSource === 'none'}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              data-testid="film-off"
+            >
+              Off
+            </button>
+          </div>
+          <Info>
+            <span className="text-white/60">Window</span> is the way to a film you did not download.
+            Open one in another tab — the Internet Archive's Prelinger collection is thousands of
+            public-domain reels of exactly this era — press Window, and pick that tab. It reaches what a
+            link cannot: a video from another site plays in a page but cannot be read back into the
+            plate, and almost nothing on the web sends the header that would allow it. A window has no
+            origin, only pixels. Mute the tab and let the room's own sound drive the plate.
+          </Info>
+        </div>
+        <Slider
+          label="Film Mix"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          value={settings.filmMix ?? 0.7}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmMix: v })}
+          settingKey="filmMix"
+        />
+        <Slider
+          label="Film Key"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          value={settings.filmKey ?? 0.18}
+          min={0}
+          max={0.9}
+          step={0.02}
+          onChange={(v: number) => onUpdate({ filmKey: v })}
+          settingKey="filmKey"
+        />
+        {/*
+          The film as a force, not only a light.
+
+          Film Mix and Film Key decide how the reel *shows*. These two decide
+          what it *does*: the same analysis that reads the room camera reads
+          the film, so a pan drags the dye, a cut hits it, and a busy sequence
+          can ride whatever the room's mappings ride. Both at zero — the
+          default, and what every look saved before this does — and the
+          projector is the slide it always was, with the sensor not even
+          running.
+        */}
+        <Slider
+          label="Film Drive"
+          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          value={settings.filmDrive ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          icon={Wind}
+          onChange={(v: number) => onUpdate({ filmDrive: v })}
+          settingKey="filmDrive"
+        />
+        <Slider
+          label="Film Impact"
+          disabled={(filmSource ?? 'none') === 'none'
+            ? 'needs a loop, the camera or a window'
+            : (settings.sceneMappings?.length ?? 0) === 0 && 'add a mapping under The Room first'}
+          value={settings.filmImpact ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmImpact: v })}
+          settingKey="filmImpact"
+        />
+        {filmSource !== 'none' && (
+          <Info>
+            <span className="text-white/60">Film Drive</span> puts the film's own motion into the
+            liquid: a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot
+            does nothing at all — which is right, because nothing is moving.
+            <span className="text-white/60"> Film Impact</span> reads the same mappings The Room
+            uses, so "how busy → Turbulence" works off the reel as well as off the floor. One
+            warning worth having: capture this app's own window with Film Drive up and you have
+            built a feedback loop. It saturates rather than runs away — the stir is capped per cell
+            — but a plate stirred by a picture of itself is a plate being stirred by nothing in
+            particular.
+          </Info>
+        )}
+      </section>
+
       {/* ── Controller ───────────────────────────────────── */}
       {/*
         MIDI, back where it can be found.
@@ -1662,9 +1879,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
       </section>
 
+      {/*
+        Wall
+
+        The id is still `projectors`, which is what the Wall dot and every
+        deep link open. The section is only the wall now: where the picture
+        goes and what shape it arrives in, set once at load-in. The look
+        effects that shared it are under Lamp & Light, and the film projector
+        is an input of its own.
+      */}
       <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('projectors') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Projector size={12} /> Projectors
+          <Projector size={12} /> Wall
         </h3>
         {onProjectorMode && (
           <div className="flex flex-col gap-2 mb-5">
@@ -1688,200 +1914,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
         {output && onOutput && onOutputReset && (
           <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} />
-        )}
-        <Info>
-          The other machines a light show crew stacked on the screen: a lumia rig, a gel wheel over the lamp, a film loop, a camera on a real dish, and a sealed oil wheel’s halogen grade.
-        </Info>
-        <Slider
-          label="Lumia"
-          value={settings.lumia ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ lumia: v })}
-          settingKey="lumia"
-        />
-        <Slider
-          label="Chemistry"
-          value={settings.chemistry ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ chemistry: v })}
-          settingKey="chemistry"
-        />
-        <Slider
-          label="Gel Wheel"
-          value={settings.gelWheel ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ gelWheel: v })}
-          settingKey="gelWheel"
-        />
-        <Slider
-          label="Gel Speed (rpm)"
-          disabled={(settings.gelWheel ?? 0) <= 0.001 && 'needs Gel Wheel above 0'}
-          value={settings.gelSpeed ?? 0.5}
-          min={0}
-          max={3}
-          step={0.1}
-          onChange={(v: number) => onUpdate({ gelSpeed: v })}
-          settingKey="gelSpeed"
-        />
-        <Slider
-          label="Lamp Warmth"
-          value={settings.lampWarmth ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ lampWarmth: v })}
-          settingKey="lampWarmth"
-        />
-        <Slider
-          label="Exposure"
-          value={settings.exposure ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ exposure: v })}
-          settingKey="exposure"
-        />
-        <div className="mt-2 mb-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-medium text-text">Film Projector</span>
-            <span className="text-[12px] font-mono opacity-50">
-              {filmSource === 'file' ? 'loop playing'
-                : filmSource === 'camera' ? 'camera live'
-                : filmSource === 'window' ? 'window live'
-                : 'off'}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <input
-              ref={filmInputRef}
-              id="film-loop-file"
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
-            />
-            <button
-              onClick={() => filmInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Play a video file through the dye, looping"
-            >
-              <Film size={13} /> Load loop
-            </button>
-            <button
-              onClick={() => onFilmCamera?.()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Point a camera at a real dish of oil and composite it through the solver"
-              data-testid="film-camera"
-            >
-              <Camera size={13} /> Camera
-            </button>
-            {/*
-              Disabled rather than silently doing nothing where the browser
-              has no screen capture — which is every phone. A button that
-              looks pressable and answers with a console warning is the kind
-              of control that makes someone doubt the rest of the panel.
-            */}
-            <button
-              onClick={() => onFilmWindow?.()}
-              disabled={!canCaptureWindow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-              title={canCaptureWindow
-                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
-                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
-              data-testid="film-window"
-            >
-              <MonitorPlay size={13} /> Window
-            </button>
-            <button
-              onClick={() => onFilmClear?.()}
-              disabled={filmSource === 'none'}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-              data-testid="film-off"
-            >
-              Off
-            </button>
-          </div>
-          <Info>
-            <span className="text-white/60">Window</span> is the way to a film you did not download.
-            Open one in another tab — the Internet Archive's Prelinger collection is thousands of
-            public-domain reels of exactly this era — press Window, and pick that tab. It reaches what a
-            link cannot: a video from another site plays in a page but cannot be read back into the
-            plate, and almost nothing on the web sends the header that would allow it. A window has no
-            origin, only pixels. Mute the tab and let the room's own sound drive the plate.
-          </Info>
-        </div>
-        <Slider
-          label="Film Mix"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
-          value={settings.filmMix ?? 0.7}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ filmMix: v })}
-          settingKey="filmMix"
-        />
-        <Slider
-          label="Film Key"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
-          value={settings.filmKey ?? 0.18}
-          min={0}
-          max={0.9}
-          step={0.02}
-          onChange={(v: number) => onUpdate({ filmKey: v })}
-          settingKey="filmKey"
-        />
-        {/*
-          The film as a force, not only a light.
-
-          Film Mix and Film Key decide how the reel *shows*. These two decide
-          what it *does*: the same analysis that reads the room camera reads
-          the film, so a pan drags the dye, a cut hits it, and a busy sequence
-          can ride whatever the room's mappings ride. Both at zero — the
-          default, and what every look saved before this does — and the
-          projector is the slide it always was, with the sensor not even
-          running.
-        */}
-        <Slider
-          label="Film Drive"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
-          value={settings.filmDrive ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          icon={Wind}
-          onChange={(v: number) => onUpdate({ filmDrive: v })}
-          settingKey="filmDrive"
-        />
-        <Slider
-          label="Film Impact"
-          disabled={(filmSource ?? 'none') === 'none'
-            ? 'needs a loop, the camera or a window'
-            : (settings.sceneMappings?.length ?? 0) === 0 && 'add a mapping under The Room first'}
-          value={settings.filmImpact ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ filmImpact: v })}
-          settingKey="filmImpact"
-        />
-        {filmSource !== 'none' && (
-          <Info>
-            <span className="text-white/60">Film Drive</span> puts the film's own motion into the
-            liquid: a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot
-            does nothing at all — which is right, because nothing is moving.
-            <span className="text-white/60"> Film Impact</span> reads the same mappings The Room
-            uses, so "how busy → Turbulence" works off the reel as well as off the floor. One
-            warning worth having: capture this app's own window with Film Drive up and you have
-            built a feedback loop. It saturates rather than runs away — the stir is capped per cell
-            — but a plate stirred by a picture of itself is a plate being stirred by nothing in
-            particular.
-          </Info>
         )}
       </section>
 
