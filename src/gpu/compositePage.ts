@@ -13,7 +13,7 @@
  */
 
 import { PLATE_FRAG, PLATE_VERT } from '../lib/plateShader';
-import { DERIVE_WGSL } from './wgsl/plate';
+import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { UniformPack } from './uniforms';
 import { isGpuFailure, requestGpu } from './device';
@@ -145,15 +145,67 @@ const BASE: Record<string, number[]> = {
   bubbles: new Array(40 * 4).fill(0), bubbleShape: new Array(40 * 4).fill(0),
 };
 
+/** A handful of bubbles, packed as the app packs them. */
+function bubbleData() {
+  const pos: number[] = [], shape: number[] = [];
+  const at: [number, number, number, number][] = [
+    [0.38, 0.46, 0.05, 1.0], [0.46, 0.50, 0.04, 0.9], [0.62, 0.54, 0.06, 1.0],
+    [0.55, 0.70, 0.035, 0.8], [0.30, 0.62, 0.045, 0.95], [0.70, 0.40, 0.03, 0.85],
+  ];
+  for (let i = 0; i < 40; i++) {
+    const b = at[i] ?? [0, 0, 0, 0];
+    pos.push(...b);
+    shape.push(i < at.length ? 0.12 * Math.cos(i) : 0, i < at.length ? 0.12 * Math.sin(i) : 0, i < at.length ? 0.06 : 0, i * 0.7);
+  }
+  return { pos, shape };
+}
+const BUBBLES = bubbleData();
+
+/**
+ * One case per thing the composite does. Each turns on the one feature it is
+ * named for, so a failure says which translation is wrong rather than that
+ * the frame differs.
+ */
 const CASES: Record<string, Record<string, number[]>> = {
   derive: {},
   'derive-boundary': { boundaryContrast: [0.4] },
   'derive-bspline': { bspline: [1] },
+
+  display: {},
+  'display-lamp': { lamp: [0.42, 0.58, 0.5, 0.8], lamp2: [0.7, 0.3, 0.45, 0.5], lightPlay: [0.7] },
+  'display-gloss': { glossiness: [0.9], iridescence: [0.5], thinFilm: [0.8] },
+  'display-boundary': { boundaryContrast: [0.5] },
+  'display-per-pixel': { derivedOn: [0], boundaryContrast: [0.5] },
+  'display-relief': { edgeRelief: [0.9], lightPlay: [0.6], lamp2: [0.7, 0.3, 0.45, 0.5] },
+  'display-cells': { cells: [0.8] },
+  'display-lacing': { lacing: [0.7] },
+  'display-granulation': { granulation: [0.6], grainOn: [1], grainMix: [0.4] },
+  'display-gooey': { gooey: [0.7], postBlur: [0.8] },
+  'display-droplets': { droplets: [0.8] },
+  'display-bubbles': { bubbleCount: [6], bubbleStrength: [0.8], lightPlay: [0.6], bubbles: BUBBLES.pos, bubbleShape: BUBBLES.shape, iridescence: [0.4] },
+  'display-beads': { beads: [0.8] },
+  'display-kaleido': { kaleido: [6], kaleidoPhase: [0.7], kaleidoZoom: [0.8] },
+  'display-gel': { gelWheel: [0.8], gelAngle: [0.3] },
+  'display-lumia': { lumia: [0.7] },
+  'display-led': { ledPlatform: [1], ledMode: [2], ledAngle: [0.2] },
+  'display-led-rainbow': { ledPlatform: [1], ledMode: [4] },
+  'display-photo': { photo: [1] },
+  'display-dish': { dish: [0.7] },
+  'display-two-layers': { layerCount: [2], rotation1: [0.4], layerZoom1: [1.3], layerDrift1: [0.02, -0.01], blendMode: [2] },
+  'display-dish-spread': { layerCount: [2], dishSpread: [0.8], cells: [0.5] },
+  'display-film': { filmOn: [1], filmMix: [0.7], filmScale: [1.2, 0.9] },
+  'display-mark': { markOn: [0.8], markRect: [0.5, 0.3, 0.25, 0.12] },
+  'display-warmth': { lampWarmth: [0.8], saturation: [1.4], dimmer: [0.7] },
+  'display-dither-only': { finishInMain: [2] },
+  'display-no-finish': { finishInMain: [0] },
+  'display-camera': { cameraOn: [1] },
+  'display-macro': { macroOn: [1], camZoom: [8], camCenter: [0.42, 0.5], macroCells: [0.7], macroCellScale: [0.8], macroDepth: [0.6], macroEdge: [0.5], macroLacing: [0.6], macroRelief: [0.7], flowRate: [0.05], filmLevel: [0.2], filmGain: [2], exposure: [0.5] },
+  'display-macro-dof': { macroOn: [1], camZoom: [12], macroDepth: [1], macroRelief: [0.5], filmLevel: [0.25], filmGain: [2.5] },
 };
 
 // ── WebGL ───────────────────────────────────────────────────────────
 
-function glDraw(values: Record<string, number[]>): Uint8Array {
+function glDraw(values: Record<string, number[]>, pass: 'derive' | 'display'): Uint8Array {
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true })!;
@@ -166,7 +218,10 @@ function glDraw(values: Record<string, number[]>): Uint8Array {
   };
   const prog = gl.createProgram()!;
   gl.attachShader(prog, compile(gl.VERTEX_SHADER, PLATE_VERT));
-  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, PLATE_FRAG.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n')));
+  const fragSrc = pass === 'derive'
+    ? PLATE_FRAG.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n')
+    : PLATE_FRAG;
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(`link: ${gl.getProgramInfoLog(prog)}`);
   gl.useProgram(prog);
@@ -178,6 +233,28 @@ function glDraw(values: Record<string, number[]>): Uint8Array {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  // A framebuffer with both of the display's attachments, so its second output
+  // has somewhere to go and the first can be read back exactly. Built before
+  // the source textures are bound: making a texture binds it to the active
+  // unit, and doing that afterwards would take a source texture's place.
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  const attachments = pass === 'display' ? [0, 1] : [0];
+  for (const i of attachments) {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    // RGBA8, sized: an unsized RGBA texture is not colour-renderable in
+    // WebGL2, and the draw fails with INVALID_OPERATION rather than a black
+    // frame that says why.
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, W, H);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0);
+  }
+  gl.drawBuffers(attachments.map((i) => gl.COLOR_ATTACHMENT0 + i));
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('the framebuffer is incomplete');
 
   // The textures, in the units the shader's samplers are told about.
   let unit = 0;
@@ -214,14 +291,21 @@ function glDraw(values: Record<string, number[]>): Uint8Array {
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+  // A GL error here is the difference between "the frame is black" and
+  // "the draw never happened", which is an hour of looking in the wrong place.
+  const drawErr = gl.getError();
+  if (drawErr) out.glDrawError = drawErr;
   const pixels = new Uint8Array(W * H * 4);
+  gl.readBuffer(gl.COLOR_ATTACHMENT0);
   gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  const readErr = gl.getError();
+  if (readErr) out.glReadError = readErr;
   return pixels;
 }
 
 // ── WebGPU ──────────────────────────────────────────────────────────
 
-async function gpuDraw(device: GPUDevice, values: Record<string, number[]>): Promise<Uint8Array> {
+async function gpuDraw(device: GPUDevice, values: Record<string, number[]>, pass: 'derive' | 'display'): Promise<Uint8Array> {
   const pack = new UniformPack(PLATE_LAYOUT);
   for (const [name, v] of Object.entries(values)) pack.set(name, ...v);
   const missing = pack.unset();
@@ -230,46 +314,65 @@ async function gpuDraw(device: GPUDevice, values: Record<string, number[]>): Pro
   const ubo = device.createBuffer({ size: PLATE_LAYOUT.size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(ubo, 0, pack.bytes);
 
-  const src = SOURCES.src;
-  const tex = device.createTexture({
-    size: [src.size, src.size], format: 'rgba8unorm',
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-  device.queue.writeTexture({ texture: tex }, src.data, { bytesPerRow: src.size * 4 }, [src.size, src.size]);
+  const upload = (name: string) => {
+    const s = SOURCES[name];
+    const t = device.createTexture({
+      label: name, size: [s.size, s.size], format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture: t }, s.data, { bytesPerRow: s.size * 4 }, [s.size, s.size]);
+    return t;
+  };
   const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
 
-  const module = device.createShaderModule({ code: DERIVE_WGSL, label: 'derive' });
-  const layout = layoutFromWgsl(device, DERIVE_WGSL, 'derive', GPUShaderStage.FRAGMENT);
+  // The order the shader declares them in, after the uniform and the sampler.
+  const names = pass === 'derive'
+    ? ['src']
+    : ['layer0', 'layer1', 'derived0', 'derived1', 'vel0', 'vel1', 'grain0', 'grain1', 'film', 'mark', 'beadTex'];
+  const textures = names.map(upload);
+
+  const code = pass === 'derive' ? DERIVE_WGSL : plateWgsl(DISPLAY_MAIN);
+  const module = device.createShaderModule({ code, label: pass });
+  const layout = layoutFromWgsl(device, code, pass, GPUShaderStage.FRAGMENT);
+  const targets = pass === 'derive'
+    ? [{ format: 'rgba8unorm' as GPUTextureFormat }]
+    : [{ format: 'rgba8unorm' as GPUTextureFormat }, { format: 'rgba8unorm' as GPUTextureFormat }];
   const pipeline = device.createRenderPipeline({
     layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
     vertex: { module, entryPoint: 'vs' },
-    fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+    fragment: { module, entryPoint: 'fs', targets },
     primitive: { topology: 'triangle-list' },
   });
 
-  const target = device.createTexture({
+  const makeTarget = () => device.createTexture({
     size: [W, H], format: 'rgba8unorm',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
+  const target = makeTarget();
+  const aux = pass === 'derive' ? null : makeTarget();
   const group = device.createBindGroup({
     layout,
     entries: [
       { binding: 0, resource: { buffer: ubo } },
       { binding: 1, resource: sampler },
-      { binding: 2, resource: tex.createView() },
+      ...textures.map((t, i) => ({ binding: 2 + i, resource: t.createView() })),
     ],
   });
 
   const row = Math.ceil((W * 4) / 256) * 256;
   const read = device.createBuffer({ size: row * H, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
   const enc = device.createCommandEncoder();
-  const pass = enc.beginRenderPass({
-    colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+  const attachment = (t: GPUTexture) => ({
+    view: t.createView(), loadOp: 'clear' as const, storeOp: 'store' as const,
+    clearValue: { r: 0, g: 0, b: 0, a: 1 },
   });
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, group);
-  pass.draw(6);
-  pass.end();
+  const rp = enc.beginRenderPass({
+    colorAttachments: aux ? [attachment(target), attachment(aux)] : [attachment(target)],
+  });
+  rp.setPipeline(pipeline);
+  rp.setBindGroup(0, group);
+  rp.draw(6);
+  rp.end();
   enc.copyTextureToBuffer({ texture: target }, { buffer: read, bytesPerRow: row }, [W, H]);
   device.queue.submit([enc.finish()]);
   await read.mapAsync(GPUMapMode.READ);
@@ -283,22 +386,29 @@ async function gpuDraw(device: GPUDevice, values: Record<string, number[]>): Pro
 // ── The comparison ──────────────────────────────────────────────────
 
 /**
- * How far apart two frames are. The GL frame comes back bottom row first and
- * the WGSL's shader flips its own uv to match, so the rows line up as they
- * are.
+ * How far apart two frames are. `gl` comes back bottom row first, as
+ * readPixels gives it; `gpu` comes out of the texture top row first. Same
+ * picture, turned over, so the rows are matched here rather than by flipping
+ * a shader's uv — the film grain hashes that uv, and would not survive it.
  */
-function compare(a: Uint8Array, b: Uint8Array) {
+function compare(gl: Uint8Array, gpu: Uint8Array) {
   let worst = 0, sum = 0, over2 = 0, over8 = 0, lit = 0;
-  for (let i = 0; i < a.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      const d = Math.abs(a[i + c] - b[i + c]);
-      if (d > worst) worst = d;
-      sum += d;
-      if (d > 2) over2++;
-      if (d > 8) over8++;
+  for (let y = 0; y < H; y++) {
+    const ga = (H - 1 - y) * W * 4;
+    const gb = y * W * 4;
+    for (let x = 0; x < W; x++) {
+      const i = ga + x * 4, j = gb + x * 4;
+      for (let c = 0; c < 3; c++) {
+        const d = Math.abs(gl[i + c] - gpu[j + c]);
+        if (d > worst) worst = d;
+        sum += d;
+        if (d > 2) over2++;
+        if (d > 8) over8++;
+      }
+      if (gl[i] > 4 || gl[i + 1] > 4 || gl[i + 2] > 4) lit++;
     }
-    if (a[i] > 4 || a[i + 1] > 4 || a[i + 2] > 4) lit++;
   }
+  const a = gl;
   const n = (a.length / 4) * 3;
   return {
     worst, mean: +(sum / n).toFixed(4),
@@ -320,8 +430,11 @@ async function main() {
   const errors: string[] = [];
   gpu.device.addEventListener('uncapturederror', (e) => errors.push(String((e as GPUUncapturedErrorEvent).error?.message ?? e).slice(0, 300)));
 
-  const glPixels = glDraw(values);
-  const gpuPixels = await gpuDraw(gpu.device, values);
+  const pass = name.startsWith('derive') ? 'derive' as const : 'display' as const;
+  const glPixels = glDraw(values, pass);
+  const gpuPixels = await gpuDraw(gpu.device, values, pass);
+  const mean = (px: Uint8Array) => { let s = 0; for (let i = 0; i < px.length; i += 4) s += px[i] + px[i + 1] + px[i + 2]; return +(s / (px.length / 4) / 3).toFixed(2); };
+  out.brightness = { webgl: mean(glPixels), webgpu: mean(gpuPixels) };
   out.diff = compare(glPixels, gpuPixels);
   if (errors.length) out.errors = errors.slice(0, 3);
   done();

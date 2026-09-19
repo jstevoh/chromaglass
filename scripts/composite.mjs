@@ -53,7 +53,29 @@ const run = async (name) => {
   return { ...r, pageErrors: errors };
 };
 
-const ALL = ['derive', 'derive-boundary', 'derive-bspline'];
+/**
+ * Where a case is allowed more than a level or two, and why.
+ *
+ * `lacing` measures two widths with fwidth, and WGSL will not let a function
+ * that takes a derivative be called from a per-pixel branch — the quad has to
+ * run whole. The GLSL called it from inside one, so in any quad straddling
+ * the threshold its derivatives were reading pixels that had taken a
+ * different path: undefined, by its own spec. The WGSL runs the call for the
+ * whole quad and masks the result, which is the defined version of the same
+ * thing, and the two differ on a handful of pixels along a thread's edge — 8
+ * of 786,432 subpixels here, by at most 8 of 255.
+ */
+const WORST = { 'display-lacing': 10 };
+
+const ALL = [
+  'derive', 'derive-boundary', 'derive-bspline',
+  'display', 'display-lamp', 'display-gloss', 'display-boundary', 'display-per-pixel',
+  'display-relief', 'display-cells', 'display-lacing', 'display-granulation', 'display-gooey',
+  'display-droplets', 'display-bubbles', 'display-beads', 'display-kaleido', 'display-gel',
+  'display-lumia', 'display-led', 'display-led-rainbow', 'display-photo', 'display-dish',
+  'display-two-layers', 'display-dish-spread', 'display-film', 'display-mark', 'display-warmth',
+  'display-dither-only', 'display-no-finish', 'display-camera', 'display-macro', 'display-macro-dof',
+];
 try {
   for (const name of (CASES.length ? CASES : ALL)) {
     const r = await run(name);
@@ -62,7 +84,8 @@ try {
     // Both draw into 8-bit targets through different compilers, so a level or
     // two apart is the same picture; what a translation bug looks like is a
     // region that differs, which is what the counts catch.
-    check(name, d.worst <= 4 && d.over2 < 0.002 && d.litFraction > 0.05,
+    if (process.env.COMPOSITE_VERBOSE) console.log('   ', JSON.stringify({ brightness: r.brightness, diff: d }));
+    check(name, d.worst <= (WORST[name] ?? 4) && d.over2 < 0.002 && d.litFraction > 0.05,
       `worst ${d.worst}/255, mean ${d.mean}, ${(d.over2 * 100).toFixed(3)}% over 2, ${(d.litFraction * 100).toFixed(0)}% of the frame lit — ${r.adapter}`);
     if (r.errors?.length || r.pageErrors.length) check(`${name}: no GPU errors`, false, (r.errors ?? r.pageErrors).slice(0, 2).join(' | '));
   }
