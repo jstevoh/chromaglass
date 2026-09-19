@@ -589,6 +589,12 @@ try {
       return prev;
     };
 
+    // Something to magnify. Since the turbulence became a real current (#71)
+    // the plate can mix toward one colour on a slow runner, and a zoom into a
+    // uniform field changes nothing: a deploy failed on "1.1 from the plate",
+    // a camera that was working pointed at a plate with nothing on it. Seed
+    // first, so this measures the camera rather than the plate's state.
+    await page.evaluate(() => window.chromaglassAction?.('seed'));
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
     await settle(1800);
     const plate = await frame();
