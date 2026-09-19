@@ -1,0 +1,748 @@
+/**
+ * The solver on WebGPU (docs/webgpu-plan.md, P2): the same scheme as
+ * `lib/gpuFluid.ts`, as compute passes over storage textures.
+ *
+ * It keeps that class's shape — `applyDeltas`, `step`, `readbackAsync`,
+ * `drainStep`, `clear` — so the CPU side above it does not know which engine
+ * is under it, and so `npm run parity` can run one step through both and
+ * compare the fields.
+ *
+ * What is the same: the physics, pass for pass (see `wgsl/fluid.ts`), the
+ * logical 192² grid the CPU writes and reads, and the order of a step.
+ *
+ * What is different:
+ * - Compute dispatches, so a step is one command buffer rather than 88 draws.
+ * - The fields WebGL held as 16-bit floats and WebGPU cannot store to
+ *   (pressure, divergence, the plate gap) are 32-bit here. That is more
+ *   precision, not less.
+ * - The deltas are full-resolution fields. The CPU can still fill them from
+ *   its 192² arrays (`applyDeltas`, which upsamples on the way in), but a
+ *   pour is better given as splats (`applySplats`), which are laid down at
+ *   the plate's own resolution and never cross the bus.
+ */
+
+import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup } from './kit';
+import { kernel } from './wgsl/fluid';
+import { splatKernel } from './wgsl/splat';
+import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
+import { SPLAT_FLOATS, type SplatList } from './splats';
+import type { GpuStepParams } from '../lib/gpuFluid';
+
+/** What the app used to scan the whole field for (see `measure`). */
+export interface FieldStats {
+  /** Dye per cell, averaged over the plate. */
+  meanDensity: number;
+  /** The plate's average absorption, channel by channel. */
+  meanColor: [number, number, number];
+  /** The thickest cell — "is there anything on the plate". */
+  maxDensity: number;
+  maxVx: number;
+  maxVy: number;
+  /** The fastest flow anywhere, for the macro detail pass. */
+  maxSpeed: number;
+  /** Which copy these numbers came from; it rises as fresh ones land. */
+  at: number;
+}
+
+const PRESSURE_ITERS = 24;
+const CURRENT_ITERS = 10;
+const SQUEEZE_ITERS = 10;
+const VISC_ITERS = 4;
+const DYE_ITERS = 4;
+/** The CPU solver's hard speed limit, in plate units per unit time. */
+const MAX_SPEED = 0.002;
+const GRAIN_PERIOD = 6;
+
+const VEL = 'rgba16float';
+const R32 = 'r32float';
+const RG32 = 'rg32float';
+const RGBA32 = 'rgba32float';
+
+/** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
+const SIM_FLOATS = 32;      // 30 used, rounded up for the uniform's 16-byte tail
+
+export class WebGPUFluid {
+  readonly N: number;
+  readonly L: number;
+  private readonly M: number;
+  private readonly disposer = new Disposer();
+  private readonly pipelines: PipelineCache;
+  private readonly groups = new Map<string, GPUBindGroup>();
+  private readonly dyeFormat: GPUTextureFormat;
+
+  private readonly dye: PingPong;
+  private readonly vel: PingPong;
+  private readonly squeeze: PingPong;
+  private readonly press: PingPong;
+  private readonly spress: PingPong;
+  private readonly cur: PingPong;
+  private readonly curP: PingPong;
+  private readonly grain: PingPong | null;
+  private readonly div: GPUTexture;
+  private readonly curDiv: GPUTexture;
+  private readonly velForced: GPUTexture;
+  private readonly scratchA: GPUTexture;
+  private readonly scratchB: GPUTexture;
+  private readonly readTarget: GPUTexture;
+  private readonly deltaDyeTex: GPUTexture;
+  private readonly deltaVelTex: GPUTexture;
+  private readonly deltaMulTex: GPUTexture;
+  private readonly cpuDyeTex: GPUTexture;
+  private readonly cpuVelTex: GPUTexture;
+  private readonly cpuMulTex: GPUTexture;
+  private splatBuf: GPUBuffer | null = null;
+  private readonly splatArgs: GPUBuffer;
+  private readonly statsArgs: GPUBuffer;
+  private readonly statsPartials: GPUBuffer;
+  private readonly statsResult: GPUBuffer;
+  private readonly statsRing: ReadbackRing;
+  private statsFresh = false;
+  private statsLatest: FieldStats = { meanDensity: 0, meanColor: [0, 0, 0], maxDensity: 0, maxSpeed: 0, maxVx: 0, maxVy: 0, at: -1 };
+
+  private readonly sim: GPUBuffer;
+  private readonly simData = new ArrayBuffer(SIM_FLOATS * 4);
+  private readonly simF = new Float32Array(this.simData);
+  private readonly simI = new Int32Array(this.simData);
+  /** One small uniform for each call site that needs its own numbers within a step. */
+  private readonly args = new Map<string, GPUBuffer>();
+  private readonly sampler: GPUSampler;
+
+  private readonly rbRow: number;
+  private readonly rbStaging: { dye: GPUBuffer; vel: GPUBuffer };
+  private readonly rbRings: { dye: ReadbackRing; vel: ReadbackRing };
+  private readonly rbDye: Float32Array;
+  private readonly rbVel: Float32Array;
+
+  private grainAge = 0;
+  private disposed = false;
+  /** Per-pass GPU times under ?debug. */
+  readonly profiler: GpuProfiler;
+
+  constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
+    this.N = physicalSize;
+    this.L = logicalSize;
+    this.M = Math.max(32, Math.round(physicalSize / 2));
+    this.pipelines = new PipelineCache(device);
+    this.profiler = new GpuProfiler(device, this.disposer, !!opts.timestamps);
+    // As WebGL: the dye is a 32-bit float where one can be filtered, because
+    // it is written several times a step and a half float loses a part in a
+    // thousand each time. Velocity stays half.
+    this.dyeFormat = opts.float32Filterable ? RGBA32 : VEL;
+
+    const pp = (size: number, format: GPUTextureFormat, label: string) => new PingPong(device, this.disposer, [size, size], format, label);
+    const tex = (size: number, format: GPUTextureFormat, label: string) => this.disposer.track(device.createTexture({
+      label, size: [size, size], format,
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+    }));
+
+    this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.vel = pp(this.N, VEL, 'vel');
+    this.squeeze = pp(this.N, RG32, 'squeeze');
+    this.press = pp(this.N, R32, 'pressure');
+    this.spress = pp(this.N, R32, 'squeeze pressure');
+    this.cur = pp(this.M, VEL, 'current');
+    this.curP = pp(this.M, R32, 'current pressure');
+    this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
+    this.div = tex(this.N, R32, 'divergence');
+    this.curDiv = tex(this.M, R32, 'current divergence');
+    this.velForced = tex(this.N, VEL, 'forced velocity');
+    this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
+    this.scratchB = tex(this.N, this.dyeFormat, 'scratch b');
+    this.readTarget = tex(this.L, RGBA32, 'readback');
+    this.deltaDyeTex = tex(this.N, RGBA32, 'dye delta');
+    this.deltaVelTex = tex(this.N, RGBA32, 'velocity delta');
+    this.deltaMulTex = tex(this.N, R32, 'dye multiplier');
+    this.cpuDyeTex = tex(this.L, RGBA32, 'dye delta (cpu)');
+    this.cpuVelTex = tex(this.L, RGBA32, 'velocity delta (cpu)');
+    this.cpuMulTex = tex(this.L, R32, 'dye multiplier (cpu)');
+
+    this.sim = this.disposer.track(device.createBuffer({ label: 'sim', size: SIM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.splatArgs = this.disposer.track(device.createBuffer({ label: 'splat args', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.statsArgs = this.disposer.track(device.createBuffer({ label: 'stats args', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.statsPartials = this.disposer.track(device.createBuffer({ label: 'stats partials', size: STATS_GROUPS * 2 * 16, usage: GPUBufferUsage.STORAGE }));
+    this.statsResult = this.disposer.track(device.createBuffer({ label: 'stats result', size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+    this.statsRing = new ReadbackRing(device, this.disposer, 32, 2, 'stats');
+    this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
+
+    this.rbDye = new Float32Array(this.L * this.L * 4);
+    this.rbVel = new Float32Array(this.L * this.L * 4);
+    this.rbRow = Math.ceil((this.L * 16) / 256) * 256;
+    const bytes = this.rbRow * this.L;
+    const staging = (label: string) => this.disposer.track(device.createBuffer({ label, size: bytes, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+    this.rbStaging = { dye: staging('readback dye'), vel: staging('readback vel') };
+    this.rbRings = { dye: new ReadbackRing(device, this.disposer, bytes, 2, 'dye readback'), vel: new ReadbackRing(device, this.disposer, bytes, 2, 'vel readback') };
+
+    this.clear();
+  }
+
+  // ── Plumbing ──────────────────────────────────────────────────────
+
+  private arg(name: string, values: number[]): GPUBuffer {
+    let buf = this.args.get(name);
+    if (!buf) {
+      buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+      this.args.set(name, buf);
+    }
+    const v = new Float32Array(8);
+    v.set(values.slice(0, 8));
+    this.device.queue.writeBuffer(buf, 0, v);
+    return buf;
+  }
+
+  private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline {
+    return this.pipelines.computePipeline(`${name}:${format}`, kernel(name, format));
+  }
+
+  /** A dispatch: the kernel, its args, the textures it reads, the one it writes, and a sampler if it wants one. */
+  private run(
+    pass: GPUComputePassEncoder,
+    name: string,
+    dst: GPUTexture,
+    reads: (GPUTexture | GPUSampler)[],
+    args: GPUBuffer,
+    size = this.N,
+  ): void {
+    const pipe = this.pipeline(name, dst.format);
+    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => (r instanceof GPUTexture ? r.label : 'sampler')).join(',')}:${args.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads.filter((r) => r instanceof GPUTexture) as GPUTexture[], dst, ...reads.filter((r) => !(r instanceof GPUTexture)) as GPUSampler[]]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(size / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  private fill(pass: GPUComputePassEncoder, dst: GPUTexture, value: [number, number, number, number], size: number): void {
+    this.run(pass, 'fill', dst, [], this.arg(`fill ${dst.label}`, [...value, size, size, 0, 0]), size);
+  }
+
+  private writeSim(p: GpuStepParams, disp: number): void {
+    const f = this.simF, i = this.simI;
+    f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
+    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.surfaceTension; f[9] = p.fingering;
+    f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
+    f[14] = p.smearX; f[15] = p.smearY;
+    f[16] = p.damping; f[17] = p.heatDecay; f[18] = MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
+    i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
+    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
+    f[26] = p.meanDensity; f[27] = p.maxCurrent;
+    f[28] = p.rockX; f[29] = p.rockY;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+  }
+
+  // ── The plate ─────────────────────────────────────────────────────
+
+  /** Wipe the plate: no dye, no motion, the gap at rest. */
+  clear(): void {
+    const enc = this.device.createCommandEncoder({ label: 'clear' });
+    const pass = enc.beginComputePass({ label: 'clear' });
+    // The sim buffer only needs its grid sizes for a fill.
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    for (const t of [this.press.a, this.press.b, this.spress.a, this.spress.b, this.div]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    for (const t of [this.squeeze.a, this.squeeze.b]) this.fill(pass, t, [0.03, 0, 0, 0], this.N);
+    for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
+    for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
+    if (this.grain) {
+      // Identity coordinates: seedGrain with both phases reseeded. It reads the
+      // other texture of the pair — a dispatch may not sample what it writes.
+      const identity = this.arg('grain identity', [0, 0, 0, 0]);
+      this.run(pass, 'seedGrain', this.grain.a, [this.grain.b], identity);
+      this.run(pass, 'seedGrain', this.grain.b, [this.grain.a], identity);
+    }
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.grainAge = 0;
+  }
+
+  /**
+   * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
+   * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
+   * L² (1 = no change) — the same arrays the WebGL solver takes.
+   */
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
+    const q = this.device.queue;
+    q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+    q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+    q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
+    q.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(0);
+    const enc = this.device.createCommandEncoder({ label: 'deltas' });
+    const pass = enc.beginComputePass({ label: 'deltas' });
+    // Onto the full grid, the same bilinear the delta passes used to do
+    // themselves, so the two paths meet at one place.
+    this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
+    this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+    this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
+    this.foldDeltas(pass);
+    pass.end();
+    q.submit([enc.finish()]);
+  }
+
+  /**
+   * Lay a frame's pours down at full resolution. The list is the app's
+   * (`gpu/splats.ts`); nothing but the records crosses the bus.
+   */
+  applySplats(list: SplatList, dt: number): void {
+    if (list.empty) return;
+    const q = this.device.queue;
+    const bytes = Math.max(64, list.count * SPLAT_FLOATS * 4);
+    if (!this.splatBuf || this.splatBuf.size < bytes) {
+      if (this.splatBuf) this.disposer.release(this.splatBuf);
+      this.splatBuf = this.disposer.track(this.device.createBuffer({
+        label: 'splats', size: Math.ceil(bytes * 1.5 / 256) * 256,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }));
+      this.groups.clear();
+    }
+    q.writeBuffer(this.splatBuf, 0, list.records);
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
+    q.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(list.count);
+    const enc = this.device.createCommandEncoder({ label: 'splats' });
+    const pass = enc.beginComputePass({ label: 'splats' });
+    this.splatPass(pass);
+    this.foldDeltas(pass);
+    pass.end();
+    q.submit([enc.finish()]);
+  }
+
+  /**
+   * A picture poured onto the plate — `injectImage` and the text pour, at the
+   * plate's own resolution rather than the 192² the CPU could manage.
+   *
+   * `box` is where it lands, in plate coordinates (0..1). `flipY` is for a
+   * source that counts its rows downwards, which a 2D canvas does.
+   */
+  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
+    const w = src.width, h = src.height;
+    if (!w || !h) return;
+    const tex = this.device.createTexture({
+      label: 'pour source', size: [w, h], format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    if (src instanceof ImageData) this.device.queue.writeTexture({ texture: tex }, src.data, { bytesPerRow: w * 4 }, [w, h]);
+    else this.device.queue.copyExternalImageToTexture({ source: src }, { texture: tex }, [w, h]);
+
+    const rec = new Float32Array(SPLAT_FLOATS);
+    rec.set(box, 0);
+    rec[7] = opts.floor ?? 0.5;                       // the dye a dark pixel still pours
+    rec[12] = opts.strength ?? 1.5;
+    rec[13] = opts.flipY === false ? 0 : 1;
+    const bytes = SPLAT_FLOATS * 4;
+    if (!this.splatBuf || this.splatBuf.size < bytes) {
+      if (this.splatBuf) this.disposer.release(this.splatBuf);
+      this.splatBuf = this.disposer.track(this.device.createBuffer({ label: 'splats', size: 1024, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
+      this.groups.clear();
+    }
+    this.device.queue.writeBuffer(this.splatBuf, 0, rec);
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(1);
+
+    const enc = this.device.createCommandEncoder({ label: 'pour image' });
+    const pass = enc.beginComputePass({ label: 'pour image' });
+    this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the picture adds; it takes nothing away
+    this.splatRun(pass, 'pourImage', 'rgba32float', [this.splatBuf, this.deltaDyeTex, tex, this.sampler], this.N, false);
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.dye.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    tex.destroy();
+  }
+
+  private writeSplatArgs(count: number): void {
+    const buf = new ArrayBuffer(16);
+    new Uint32Array(buf, 0, 1)[0] = count;
+    new Float32Array(buf, 4, 3).set([this.N, this.L, 0]);
+    this.device.queue.writeBuffer(this.splatArgs, 0, buf);
+  }
+
+  /**
+   * A splat-side dispatch. `rest` is the bindings after the args uniform, in
+   * the order the source declares them, and `format` is whatever storage
+   * format its destination wants.
+   *
+   * `cache` is off where a binding is a one-shot texture: a cached group
+   * would outlive it.
+   */
+  private splatRun(
+    pass: GPUComputePassEncoder,
+    name: string,
+    format: GPUTextureFormat,
+    rest: (GPUBuffer | GPUTexture | GPUSampler)[],
+    size: number,
+    cache = true,
+  ): void {
+    const pipe = this.pipelines.computePipeline(`${name}:${format}`, splatKernel(name, format));
+    const label = (r: GPUBuffer | GPUTexture | GPUSampler) => (r instanceof GPUSampler ? 'sampler' : r.label);
+    const key = `splat ${name}:${format}:${rest.map(label).join(',')}`;
+    let group = cache ? this.groups.get(key) : undefined;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.splatArgs, ...rest]);
+      if (cache) this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(size / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  private upsample(pass: GPUComputePassEncoder, src: GPUTexture, dst: GPUTexture): void {
+    this.splatRun(pass, 'upsampleDelta', dst.format, [src, dst], this.N);
+  }
+
+  private splatPass(pass: GPUComputePassEncoder): void {
+    this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex], this.N);
+  }
+
+  /** Dye, velocity and the plate gap take up whatever is in the delta fields. */
+  private foldDeltas(pass: GPUComputePassEncoder): void {
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.dye.swap();
+    this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('none', [0, 0, 0, 0]));
+    this.vel.swap();
+    this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, 0, 0, 0]));
+    this.squeeze.swap();
+  }
+
+  /**
+   * Lay down the dye the reaction has grown (`gpu/chemistry.ts`), in the same
+   * breath as the deltas — before the step, so this frame's flow carries it.
+   * `amount` is per cell per step, `colour` the dye's own colour.
+   */
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
+    if (amount <= 0) return;
+    const eps = 0.002;
+    const log = colour.map((c) => -Math.log(Math.max(eps, c)));
+    const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
+    const pass = enc.beginComputePass({ label: 'chemistry deposit' });
+    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, 0, 0, ...log, 0]));
+    this.dye.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /** One solver step. Call applyDeltas first when there is anything to add. */
+  step(p: GpuStepParams, deltasApplied: boolean): void {
+    const N = this.N;
+    const disp = p.dt * p.advection * ((N - 2) / N);
+    this.writeSim(p, disp);
+    const enc = this.device.createCommandEncoder({ label: 'step' });
+    const pass = enc.beginComputePass({ label: 'step', timestampWrites: this.profiler.pass('solver step') });
+
+    if (!deltasApplied) {
+      this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
+      this.squeeze.swap();
+    }
+
+    // 1. Hele-Shaw squeeze-film flow
+    const none = this.arg('none', [0, 0, 0, 0]);
+    for (let k = 0; k < SQUEEZE_ITERS; k++) {
+      this.run(pass, 'squeezeJacobi', this.spress.write, [this.spress.read, this.squeeze.read], none);
+      this.spress.swap();
+    }
+    this.run(pass, 'squeezeVel', this.vel.write, [this.vel.read, this.spress.read, this.squeeze.read], none);
+    this.vel.swap();
+
+    // 3. Viscous diffusion of momentum (xy) and heat (z)
+    const n2 = (N - 2) * (N - 2);
+    this.jacobi(pass, this.vel, [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0], VISC_ITERS, 'vel');
+
+    // 4. Project, 5. advect velocity by itself, 6. project again
+    this.project(pass);
+    this.macCormack(pass, this.vel, this.vel.read, disp, 'vel');
+    this.project(pass);
+
+    // 6.5–8.7 The post-projection forces
+    this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
+    this.vel.swap();
+
+    // 8.9. The lasting current, and the flow the dye rides
+    this.stepCurrent(pass);
+    this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read], this.arg('current grid', [0, this.M, 0, 0]));
+
+    // 9. Dye: diffuse, then advect through the forced velocity
+    const a = p.dt * p.diff * n2;
+    this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
+    this.macCormack(pass, this.dye, this.velForced, disp, 'dye');
+
+    // 9.5. Sharpen what the advection and the diffusion softened
+    if (p.sharpness > 0.0001) {
+      this.run(pass, 'sharpenDye', this.dye.write, [this.dye.read], none);
+      this.dye.swap();
+    }
+
+    // 9.6. Pigment coordinates ride along with the dye
+    if (this.grain) {
+      this.run(pass, 'advect', this.grain.write, [this.grain.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
+      this.grain.swap();
+      const before = this.grainAge;
+      this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
+      const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
+      const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
+      const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
+      if (keepA === 0 || keepB === 0) {
+        this.run(pass, 'seedGrain', this.grain.write, [this.grain.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
+        this.grain.swap();
+      }
+    }
+
+    // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
+    this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
+    this.dye.swap();
+    this.run(pass, 'decayVel', this.vel.write, [this.vel.read], none);
+    this.vel.swap();
+
+    pass.end();
+    this.profiler.resolveInto(enc);
+    this.device.queue.submit([enc.finish()]);
+    this.profiler.afterSubmit();
+  }
+
+  private jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
+    if (a.every((v) => v <= 0)) return;
+    const scratch = label === 'dye' ? this.scratchA : this.scratchB;
+    // x0, the field before the diffusion, kept while the field ping-pongs.
+    this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
+    const rcp = a.map((v) => 1 / (1 + 4 * v));
+    const args = this.arg(`jacobi ${label}`, [...a, ...rcp]);
+    for (let k = 0; k < iters; k++) {
+      this.run(pass, 'jacobi', field.write, [field.read, scratch], args);
+      field.swap();
+    }
+  }
+
+  private project(pass: GPUComputePassEncoder): void {
+    const none = this.arg('none', [0, 0, 0, 0]);
+    this.run(pass, 'divergence', this.div, [this.vel.read], none);
+    this.fill(pass, this.press.read, [0, 0, 0, 0], this.N);
+    for (let k = 0; k < PRESSURE_ITERS; k++) {
+      this.run(pass, 'pressureJacobi', this.press.write, [this.press.read, this.div], none);
+      this.press.swap();
+    }
+    this.run(pass, 'gradientSubtract', this.vel.write, [this.vel.read, this.press.read], none);
+    this.vel.swap();
+  }
+
+  /** The lasting current: forces, then its own projection, on the M grid. */
+  private stepCurrent(pass: GPUComputePassEncoder): void {
+    const m = this.arg('current grid', [0, this.M, 0, 0]);
+    this.run(pass, 'currentForces', this.cur.write, [this.cur.read, this.vel.read, this.dye.read], m, this.M);
+    this.cur.swap();
+    this.run(pass, 'curDivergence', this.curDiv, [this.cur.read], m, this.M);
+    for (let k = 0; k < CURRENT_ITERS; k++) {
+      this.run(pass, 'curPressure', this.curP.write, [this.curP.read, this.curDiv], m, this.M);
+      this.curP.swap();
+    }
+    this.run(pass, 'curGradient', this.cur.write, [this.cur.read, this.curP.read], m, this.M);
+    this.cur.swap();
+  }
+
+  private macCormack(pass: GPUComputePassEncoder, field: PingPong, velTex: GPUTexture, disp: number, label: string): void {
+    const fwd = this.arg('advect forward', [disp, 0, 0, 0]);
+    const back = this.arg('advect back', [-disp, 0, 0, 0]);
+    const phi0 = field.read;
+    this.run(pass, 'advect', this.scratchA, [phi0, velTex, this.sampler], fwd);
+    this.run(pass, 'advect', this.scratchB, [this.scratchA, velTex, this.sampler], back);
+    this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.sampler], fwd);
+    field.swap();
+    void label;
+  }
+
+  /** One frame of the drain: inward spiral, transport, evaporate. */
+  drainStep(t: number): void {
+    const pull = Math.pow(t, 0.4) * 4.0;
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    const enc = this.device.createCommandEncoder({ label: 'drain' });
+    const pass = enc.beginComputePass({ label: 'drain' });
+    this.run(pass, 'drainVel', this.vel.write, [], this.arg('drain', [pull, t, 0, 0]));
+    this.vel.swap();
+    this.run(pass, 'advect', this.dye.write, [this.dye.read, this.vel.read, this.sampler], this.arg('drain advect', [0.3 / this.L, 0, 0, 0]));
+    this.dye.swap();
+    this.run(pass, 'scaleDye', this.dye.write, [this.dye.read], this.arg('drain fade', [1 - (0.03 + t * t * 0.35), 0, 0, 0]));
+    this.dye.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  // ── What the CPU reads ────────────────────────────────────────────
+
+  /**
+   * Start a read of both fields, downsampled to the logical grid, and take
+   * whatever has come back. The readers (the bead camera, the dye regulator)
+   * see a field a frame or two old, as they did on WebGL.
+   */
+  readbackAsync(): boolean {
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    const none = this.arg('none', [0, 0, 0, 0]);
+    const enc = this.device.createCommandEncoder({ label: 'readback' });
+    const slots: { which: 'dye' | 'vel'; buf: GPUBuffer | null }[] = [];
+    for (const which of ['dye', 'vel'] as const) {
+      const pass = enc.beginComputePass({ label: `downsample ${which}` });
+      this.run(pass, 'downsample', this.readTarget, [which === 'dye' ? this.dye.read : this.velForced], none, this.L);
+      pass.end();
+      enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: this.rbStaging[which], bytesPerRow: this.rbRow }, [this.L, this.L]);
+      slots.push({ which, buf: this.rbRings[which].copyFrom(enc, this.rbStaging[which]) });
+    }
+    this.device.queue.submit([enc.finish()]);
+    for (const s of slots) if (s.buf) this.rbRings[s.which].collect(s.buf);
+    let fresh = false;
+    for (const which of ['dye', 'vel'] as const) {
+      const data = this.rbRings[which].latest;
+      if (!data) continue;
+      const src = new Float32Array(data);
+      const dst = which === 'dye' ? this.rbDye : this.rbVel;
+      const stride = this.rbRow / 4;
+      for (let y = 0; y < this.L; y++) dst.set(src.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
+      fresh = true;
+    }
+    return fresh;
+  }
+
+  /**
+   * Measure the plate on the GPU: the mean dye, the mean colour, the peak
+   * density and the fastest flow, in 32 bytes rather than a megabyte.
+   *
+   * The velocity it measures is the forced one the dye rides, which is what
+   * the CPU's mirror held. Like `readbackAsync`, it starts a read and takes
+   * whatever has landed, so the answer is a frame or two old — which is what
+   * the readers had before.
+   */
+  measure(): FieldStats {
+    const buf = new ArrayBuffer(16);
+    new Float32Array(buf, 0, 1)[0] = this.N;
+    new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    this.device.queue.writeBuffer(this.statsArgs, 0, buf);
+    const enc = this.device.createCommandEncoder({ label: 'measure' });
+    const pass = enc.beginComputePass({ label: 'measure' });
+    this.statsRun(pass, 'statsTiles', [this.dye.read, this.velForced, this.statsPartials], STATS_GROUPS);
+    this.statsRun(pass, 'statsFold', [this.statsPartials, this.statsResult], 1);
+    pass.end();
+    const slot = this.statsRing.copyFrom(enc, this.statsResult);
+    this.device.queue.submit([enc.finish()]);
+    if (slot) this.statsRing.collect(slot);
+    const data = this.statsRing.latest;
+    this.statsFresh = !!data;
+    if (data && this.statsRing.landed > this.statsLatest.at) {
+      const f = new Float32Array(data);
+      const area = this.N * this.N;
+      this.statsLatest = {
+        meanDensity: f[3] / area,
+        meanColor: [f[0] / area, f[1] / area, f[2] / area],
+        maxDensity: f[4], maxVx: f[5], maxVy: f[6], maxSpeed: f[7],
+        at: this.statsRing.landed,
+      };
+    }
+    return this.statsLatest;
+  }
+
+  /** The last measurement, without asking for another. */
+  get stats(): FieldStats { return this.statsLatest; }
+
+  /**
+   * The same measurement, waiting for the GPU. For harnesses, not the show:
+   * it answers about the plate as it is now rather than as it was two frames
+   * ago, at the cost of a stall.
+   */
+  async measureNow(): Promise<FieldStats> {
+    const buf = new ArrayBuffer(16);
+    new Float32Array(buf, 0, 1)[0] = this.N;
+    new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    this.device.queue.writeBuffer(this.statsArgs, 0, buf);
+    const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'measure now' });
+    const pass = enc.beginComputePass({ label: 'measure now' });
+    this.statsRun(pass, 'statsTiles', [this.dye.read, this.velForced, this.statsPartials], STATS_GROUPS);
+    this.statsRun(pass, 'statsFold', [this.statsPartials, this.statsResult], 1);
+    pass.end();
+    enc.copyBufferToBuffer(this.statsResult, 0, out, 0, 32);
+    this.device.queue.submit([enc.finish()]);
+    await out.mapAsync(GPUMapMode.READ);
+    const f = new Float32Array(out.getMappedRange().slice(0));
+    out.unmap();
+    out.destroy();
+    const area = this.N * this.N;
+    return {
+      meanDensity: f[3] / area,
+      meanColor: [f[0] / area, f[1] / area, f[2] / area],
+      maxDensity: f[4], maxVx: f[5], maxVy: f[6], maxSpeed: f[7],
+      at: this.statsLatest.at,
+    };
+  }
+
+  /** Whether any measurement has come back yet. */
+  get measured(): boolean { return this.statsFresh; }
+
+  /** Which copy the last measurement came from; it rises as fresh ones land. */
+  get measuredSeq(): number { return this.statsLatest.at; }
+
+  private statsRun(pass: GPUComputePassEncoder, name: string, rest: (GPUBuffer | GPUTexture)[], groups: number): void {
+    const pipe = this.pipelines.computePipeline(name, STATS_KERNELS[name]);
+    // The dye is a ping-pong, so the key has to name the half that is bound:
+    // a group cached under the kernel's name alone would go on measuring
+    // whichever texture happened to be the read side when it was made.
+    const key = `stats ${name}:${rest.map((r) => r.label).join(',')}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.statsArgs, ...rest]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(groups);
+  }
+
+  get rbDyeView(): Float32Array { return this.rbDye; }
+  get rbVelView(): Float32Array { return this.rbVel; }
+
+  /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
+  async readField(which: 'dye' | 'vel' | 'grain'): Promise<Float32Array> {
+    const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : this.grain?.read;
+    if (!src) throw new Error(`no ${which} field`);
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    const enc = this.device.createCommandEncoder({ label: 'read field' });
+    const pass = enc.beginComputePass();
+    this.run(pass, 'downsample', this.readTarget, [src], this.arg('none', [0, 0, 0, 0]), this.L);
+    pass.end();
+    const row = this.rbRow;
+    const buf = this.device.createBuffer({ size: row * this.L, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: buf, bytesPerRow: row }, [this.L, this.L]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const padded = new Float32Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    buf.destroy();
+    const out = new Float32Array(this.L * this.L * 4);
+    const stride = row / 4;
+    for (let y = 0; y < this.L; y++) out.set(padded.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
+    return out;
+  }
+
+  /** The pigment coordinates' crossfade, as the WebGL solver computes it. */
+  get grainMix(): number {
+    const c = Math.cos(Math.PI * (this.grainAge / GRAIN_PERIOD));
+    return c * c;
+  }
+
+  /** The fields, for the compositor (P3) to read directly. */
+  get fields() {
+    return { dye: this.dye.read, vel: this.vel.read, velForced: this.velForced, grain: this.grain?.read ?? null };
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.disposer.dispose();
+    this.groups.clear();
+  }
+}

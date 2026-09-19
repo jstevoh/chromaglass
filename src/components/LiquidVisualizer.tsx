@@ -3218,6 +3218,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let stage: WebGPUStage | null = null;
       let raf = 0;
       let cancelled = false;
+      // What the frame costs us, as opposed to how often the display asks for
+      // one: a CI runner's display rate says nothing about the stage.
+      let cpuMs = 0;
       const tier = detectTier();
       const size = () => {
         const dpr = devicePixels();
@@ -3242,7 +3245,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           frameMs += (now - last - frameMs) * 0.05;
           last = now;
           const dpr = size();
+          const t0 = performance.now();
           stage.frame();
+          cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
           if (now - reported > 500) {
             reported = now;
             const status: EngineStatus = {
@@ -3265,6 +3270,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           webgpu: stage && {
             label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
             timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
+            cpuMs: +cpuMs.toFixed(3),
             timings: Object.fromEntries(stage.profiler.ms),
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
@@ -3293,6 +3299,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const ladder = qualityLadder(tier, gpuClass);
     governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
 
+    // The plate's own shaders. FROZEN while the WebGPU port runs
+    // (docs/webgpu-plan.md, P2–P3): the compositor moves to WGSL in P3, so a
+    // change here has to be made twice. Bug fixes only, ported in the same
+    // pull request.
     const vertSrc = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;

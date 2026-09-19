@@ -1,4 +1,10 @@
 /**
+ * FROZEN while the WebGPU port runs (docs/webgpu-plan.md, P2–P3): the
+ * compositor moves to WGSL in P3, so a change here has to be made twice.
+ * Bug fixes only, ported in the same pull request.
+ */
+
+/**
  * The post chain: what happens to the finished plate before it reaches the
  * wall (docs/filters-plan.md, F0).
  *

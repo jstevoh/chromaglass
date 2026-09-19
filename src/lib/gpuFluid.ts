@@ -1,4 +1,12 @@
 /**
+ * FROZEN while the WebGPU port runs (docs/webgpu-plan.md, P2–P3). The WGSL
+ * twin in `src/gpu/wgsl/fluid.ts` matches this file pass for pass, and
+ * `npm run parity` checks that it does. A fix here is a fix there, in the
+ * same pull request; anything that is not a fix waits for the cutover, when
+ * this file goes away.
+ */
+
+/**
  * GPU fluid solver — the CPU `FluidSimulation` step, as fragment-shader passes
  * over ping-pong float textures.
  *

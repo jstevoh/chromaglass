@@ -43,6 +43,7 @@
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
+    "parity": "node scripts/parity.mjs",
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
     "brand": "node scripts/brand.mjs",
