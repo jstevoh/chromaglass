@@ -2426,6 +2426,7 @@ export default function App() {
 
         {toast && (
           <div
+            key="toast"
             className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
             data-testid="toast"
           >
@@ -2435,6 +2436,7 @@ export default function App() {
 
         {!overlaysVisible && showCleanHint && (
           <motion.div
+            key="clean-hint"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 1.2 } }}
@@ -2916,8 +2918,13 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
+      {/* One child per AnimatePresence: it tells its children apart by key, two
+          without one both read as "", and React warned on every frame the
+          pair was up. The components here take no `key` in their props type. */}
       <AnimatePresence>
         {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
+      </AnimatePresence>
+      <AnimatePresence>
         <BenchOverlay
           running={bench.running}
           done={bench.done}
@@ -3031,6 +3038,8 @@ export default function App() {
             onHide={() => setShowActivity(false)}
           />
         )}
+      </AnimatePresence>
+      <AnimatePresence>
         {showMidi && (
           <MidiPanel
             midi={midi}
