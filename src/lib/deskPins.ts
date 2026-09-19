@@ -137,6 +137,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: 1, section: 'lamp' },
+  { key: 'transmission', label: "Light Through Dye", min: 0, max: 1, section: 'lamp' },
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
   { key: 'filmKey', label: "Film Key", min: 0, max: 0.9, section: 'film' },
