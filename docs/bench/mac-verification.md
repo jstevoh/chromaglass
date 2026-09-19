@@ -3,16 +3,24 @@
 MacBook, Apple M4 · 2026-09-18 (local evening) · branch `claude/liquid-light-chromaglass-wn3eoo` at `c51c79b`
 ("Switching the last shape off lit the whole wall"). Automated run, no human at the machine.
 
+> **Correction (second pass, same evening).** The first version of this file measured the stage
+> using the canvas element's full 852×762 box. The Design stage *letterboxes* the canvas
+> (`objectFit: contain`), so the picture actually occupies 852×554 inside that box. The first table's
+> y coordinates were therefore off, and its numbers were muddier than the truth. The visual reading
+> was right. The measurements below were re-run with the letterboxed rect, and they are much cleaner.
+> The first version also said the stage "squashes" the canvas. It doesn't, and that line has been
+> withdrawn. The real mismatch was the Mapping pad being fixed at 16:9, which is now fixed (see the
+> end of this file).
+
 ## Short answers
 
 - **Circle on a skewed quad: correct.** It renders as a tilted, egg-shaped ellipse that keystones with
-  the quad. It is not a round circle bolted onto the quad. Only 0.5% of pixels light up in the quad's
-  corners outside the local-space ellipse, and only 0.5% inside the round circle a bolted-on
-  implementation would draw. Numbers are below.
+  the quad. It is not a round circle bolted onto the quad. 99.6% of the keystoned ellipse is lit,
+  while only 1% of the area a round, bolted-on circle would add is lit. Numbers are below.
 - **Area between shapes: black on screen.** A gap strip between the circle and the right column, and
   the gap between the triangle and the rectangle, both have mean luminance 0.000 on Metal.
-- **"Off": correct.** With one shape and that shape Off, the stage is black: 0.02% of pixels above
-  0.03 luminance, max 0.063, mean 0.000. With six shapes, switching one cube face Off removes only
+- **"Off": correct.** With one shape and that shape Off, the stage is black: no pixel above
+  0.03 luminance, max 0.000. With six shapes, switching one cube face Off removes only
   that face.
 - **All five harness lines pass**, on SwiftShader as the step was written and again on the M4's
   Metal renderer.
@@ -192,24 +200,25 @@ running from the upper left down to the pulled-out lower-right corner. The pictu
 and everything outside it is black. The pad preview in Settings draws the same outline
 (`01a-circle-skewed-panel.png`, `01a-circle-skewed-wall.png`).
 
-To settle this with numbers rather than by eye, I decoded the screenshot's stage region (160 px across)
-and counted pixels above 0.03 luminance. I compared the rendered shape against three predictions:
-the correct one (a circle in the quad's local space pushed through the homography), a round-on-screen
-circle on the quad's bounding box, and an axis-aligned ellipse inscribed in that bounding box. The
-"baseline" column is the same pixels with no shapes, a few seconds earlier:
+To settle this with numbers rather than by eye, I decoded the screenshot's letterboxed picture rect
+(160 px across) and counted pixels above 0.03 luminance. I compared the rendered shape against three
+predictions: the correct one (a circle in the quad's local space pushed through the homography), a
+round-on-screen circle on the quad's bounding box, and an axis-aligned ellipse inscribed in that
+bounding box. The "baseline" column is the same pixels with no shapes, a few seconds earlier:
 
 | region | lit | baseline |
 |---|---|---|
-| outside the quad | 0.000 | 0.641 |
-| quad corners, outside the keystoned ellipse | **0.005** | 0.887 |
-| inside a round circle but not the keystoned ellipse | **0.005** | 1.000 |
-| inside the bbox ellipse but not the keystoned ellipse | **0.002** | 0.869 |
-| inside the keystoned ellipse | 0.716 | 1.000 |
+| outside the quad | 0.001 | 0.861 |
+| quad corners, outside the keystoned ellipse | **0.020** | 0.523 |
+| inside a round circle but not the keystoned ellipse | **0.011** | 0.567 |
+| inside the bbox ellipse but not the keystoned ellipse | **0.010** | 0.589 |
+| inside the keystoned ellipse | **0.996** | 0.740 |
+| inside the keystoned ellipse but not the round circle | **1.000** | 1.000 |
+| inside the keystoned ellipse but not the bbox ellipse | **1.000** | 1.000 |
 
-Wherever either wrong hypothesis would light the wall and the correct one would not, the wall stays
-dark (0.2–0.5% lit, compared with 87–100% lit before shapes were added). Inside the ellipse, 72% is lit
-rather than 100%, because the whole plate is squeezed into the shape and the plate's own dark rim lands
-along the ellipse's edge. You can see that in the screenshot.
+The lit region is the keystoned ellipse, with both wrong hypotheses excluded. Every pixel that only the
+correct shape includes is lit, and about 1% of the pixels that only a wrong shape would include are
+lit, which is the 0.01 feathered edge at 160-px sampling.
 
 ### b) `+ Triangle` and `+ Rectangle`, spread apart
 
@@ -219,7 +228,7 @@ Triangle quad (0.64–0.95, 0.06–0.42), rectangle quad (0.68–0.95, 0.58–0.
 - Vertical strip between the circle and the right column (x 0.60–0.63): mean luminance **0.000**
 - Band between the triangle and the rectangle (y 0.45–0.55): mean **0.000**
 - The triangle's quad top-left corner, which is outside the triangle: mean **0.000**
-- Inside the triangle: 0.110. Inside the rectangle: 0.052. Both lit.
+- Inside the triangle: 0.593. Inside the rectangle: 0.347. Both lit.
 
 ### c) `+ Cube`
 
@@ -234,20 +243,40 @@ stored.
   that face disappears. The part of the ellipse it had been covering shows through, the rest of the
   frame stays black, and the button reads "Off".
 - **One shape only (the skewed circle), switched Off** (`01d2-single-circle-off-wall.png`): the
-  stage is **black**, not a lit full frame. Before switching Off, 14.1% of the stage was lit. After,
-  0.02% of pixels exceed 0.03 luminance, the maximum is 0.063 and the mean is 0.0000. The stored
+  stage is **black**, not a lit full frame. Before switching Off, 19.7% of the frame was lit. After,
+  no pixel exceeds 0.03 luminance and the maximum is 0.000. The stored
   surface has `enabled: false`. The last-shape-off bug that `c51c79b` fixes does not reproduce.
 
-## Other things noticed along the way (not fixed)
+## Fixed since, on this branch
 
-- **Selection is lost when Settings closes.** `selected` is `useState` inside `OutputPanel`. After
-  closing Settings to look at the wall and reopening it, no shape has handles or the On/Off editor
-  until you click the shape again. That is a small but real friction in the drag → look → drag loop.
-- **The pad is fixed at 16:9, but the stage showed the canvas at 852×762 CSS px while its backing
-  store was 1470×956** (the window's aspect). Positions match in normalised coordinates, but shapes
-  look different in proportion in the pad and on the stage. The cube is a clear isometric box in the
-  pad and noticeably flatter on the stage. Whether the stage should stretch like that is a separate
-  question. I did not check a separate projector window, whose aspect would decide what's correct.
-- React logs `Encountered two children with the same key, ""` repeatedly from page load onward,
-  before any mapping interaction. Pre-existing and unrelated to mapping as far as I can tell.
-- The duplicate `ok` lines in the `wall` output, noted above.
+Everything the first pass turned up has been fixed. I also fixed the two checks that had "A show
+night" red on CI for this PR.
+
+- **The Mapping pad matches the wall's shape.** Both pads, the keystone and the Mapping pad, now take
+  their aspect from the canvas's backing store (the frame the output pass maps onto) instead of a
+  fixed 16:9. It is 1.538 on this 1470×956 window, and a projector's own shape once one is attached.
+- **The selection survives closing Settings.** The shape with handles is remembered for the page's
+  life, so drag → close → look → reopen → drag works without clicking the shape again.
+- **Mapping is its own section.** Adding it had made Projectors 3.2 screens deep, and `qa` checks that
+  no section exceeds 3. That check was failing on CI. Mapping now has its own row under Stage, and
+  Projectors is 2.8 screens. The wall's Reset leaves the mapped shapes alone, since Mapping has its own
+  Clear all.
+- **"The light goes out again" waits instead of sampling once.** The 260 ms flash was read once at
+  about 820 ms, which raced a SwiftShader runner's ~500 ms frames. That check had also failed on CI
+  for this PR since `5d6678b`. It now waits up to 3 s: here it clears 276 ms after the press, and a
+  light that never goes out still fails.
+- **The duplicate-key warning came from `App.tsx`**, where three `<AnimatePresence>` blocks had two
+  unkeyed children each. `RunLocallyCard` and `BenchOverlay` warned every frame, about 200 times in
+  5 s, and now warn 0 times.
+- **Harnesses use the GPU on a Mac.** `scripts/chromium.mjs` adds `--use-angle=metal` on darwin.
+  `PW_SOFTWARE=1` puts it back on SwiftShader. Linux CI is unchanged.
+- **`wall` prints each check once.** It still echoes progress to stderr when stdout is piped, but
+  only when stderr is a terminal.
+
+Local results after the fixes, on the M4: `lint`, `plate`, `desk`, `panel`, `music`, `liquids`, `scene`,
+`shapes`, `timecode`, `lights` and `map` all pass. `wall` is 57/57 (18 s on Metal) and `qa` is 122/122.
+
+One local-only snag, not changed in the repo: npm 11 (this Mac) does not hoist vite's esbuild the way
+CI's npm 10 does, so `npm run plate/desk/panel/scene` fail here with `esbuild: command not found`. I
+ran them with `node_modules/vite/node_modules/.bin` on `PATH`. If you want them independent of
+hoisting, declare `esbuild` as a devDependency.
