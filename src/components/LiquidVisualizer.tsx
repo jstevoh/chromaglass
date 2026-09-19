@@ -4712,7 +4712,17 @@ void main() {
         // step is already most of a frame, catching up would only turn one
         // slow frame into a run of them — better to let the show run a little
         // slow than to stutter.
-        const catchUp = simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP;
+        //
+        // On the GPU path a step's JavaScript cost is only its submission, well
+        // under a millisecond, so that measure never saw the GPU falling behind:
+        // every slow frame owed the full four steps per layer, which made the
+        // next frame slower still. Measured on an M4 with two layers at 512²:
+        // 28 fps, running two steps a frame. The frame interval is what says
+        // the GPU is behind, so it caps the catch-up too — except under ?warp,
+        // where running ahead of the clock is the point.
+        const frameMsNow = governorRef.current?.frameMs ?? 16.7;
+        const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
+        const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
