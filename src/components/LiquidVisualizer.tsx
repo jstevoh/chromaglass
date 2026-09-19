@@ -1547,16 +1547,24 @@ class FluidSimulation {
       tapped. It was energy × setting × 0.002 behind two gates (the setting above
       0.3, the result above 0.001), which with the analyser's energy topping out
       at 0.85 meant nothing below about 0.6 and nothing at all without a mic.
-      Now a floor that works in silence and swells with the music, and the
-      slider sets the wavelength as well as the depth: 25 cells at the bottom,
-      4 at the top. `vibFrequency` is twice the wave number (both solvers halve it).
+      Now a floor that works in silence and swells with the music.
+
+      The first version of this ran the wavelength down to 4.6 cells at the top
+      and pushed hard enough to move the dye most of a cell each way — and a
+      sin × cos standing wave that fine and that deep is a checkerboard: the
+      looks that set vibration high (Acid Trip 0.9, Cyberpunk 0.8, Boiling
+      Point 0.7) broke up into blocky squares. The wave is 52 cells long at the
+      bottom of the slider and 15 at the top now, and the dye moves at most
+      about a fiftieth of a wavelength: a shimmer on the boundaries, which is
+      what a tapped plate does, not a tear. `vibFrequency` is twice the wave
+      number (both solvers halve it).
     */
     {
       const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
       if (vf > 0.005) {
         const energy = audioData ? Math.min(1, audioData.energy) : 0;
-        vibIntensity = vf * (0.4 + 0.6 * energy) * 0.5;
-        vibFrequency = 2 * (0.25 + vf * 1.25);
+        vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
+        vibFrequency = 2 * (0.12 + vf * 0.3);
       }
     }
 
