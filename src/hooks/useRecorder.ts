@@ -27,12 +27,48 @@ const MIME_CANDIDATES = [
   'video/mp4',
 ];
 
+/**
+ * With `?rec=` the recording is a master for another encode, and H.264 comes
+ * first where the browser has it: Chrome on a Mac records it on the hardware
+ * encoder, where VP9 is software and at a master's bitrate took enough of the
+ * CPU to cost a 1080×1920 take a third of its frames.
+ */
+const MASTER_CANDIDATES = [
+  'video/mp4;codecs=avc1.64002A,mp4a.40.2',
+  'video/mp4;codecs=avc1.64002A,opus',
+  'video/mp4;codecs=avc1,opus',
+  'video/mp4',
+];
+
 const pickMime = (): string | null => {
   const MR = (window as unknown as { MediaRecorder?: { isTypeSupported?: (t: string) => boolean } }).MediaRecorder;
   if (!MR) return null;
-  for (const m of MIME_CANDIDATES) if (!MR.isTypeSupported || MR.isTypeSupported(m)) return m;
+  const candidates = masterBitrate() ? [...MASTER_CANDIDATES, ...MIME_CANDIDATES] : MIME_CANDIDATES;
+  for (const m of candidates) if (!MR.isTypeSupported || MR.isTypeSupported(m)) return m;
   return null;
 };
+
+/** `?rec=<Mbps>`, or null for an ordinary recording. */
+function masterBitrate(): number | null {
+  let mbps = NaN;
+  try { mbps = Number(new URLSearchParams(window.location.search).get('rec')); } catch { /* no query */ }
+  return Number.isFinite(mbps) && mbps > 0 ? Math.min(100, Math.max(4, mbps)) : null;
+}
+
+/**
+ * `?rec=<Mbps>` for a recording that is going to be finished elsewhere.
+ *
+ * Twelve megabits is plenty for a file someone watches as it is. The clip tool
+ * re-encodes the take to 4K for YouTube, and every loss in the recorder is
+ * carried into that: at 40 the grain and the thread edges survive. With it
+ * set, H.264 is preferred (see MASTER_CANDIDATES) and the audio is asked for
+ * explicitly at 320 kbps, rather than left to the encoder's default.
+ */
+function recorderBitrates(): { videoBitsPerSecond: number; audioBitsPerSecond?: number } {
+  const mbps = masterBitrate();
+  if (mbps === null) return { videoBitsPerSecond: 12_000_000 };
+  return { videoBitsPerSecond: Math.round(mbps * 1_000_000), audioBitsPerSecond: 320_000 };
+}
 
 const stamp = () => {
   const d = new Date();
@@ -72,7 +108,7 @@ export function useRecorder(): Recorder {
     for (const t of audio?.getAudioTracks() ?? []) stream.addTrack(t.clone());
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12_000_000 });
+      rec = new MediaRecorder(stream, { mimeType: mime, ...recorderBitrates() });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start the recorder.');
       return;

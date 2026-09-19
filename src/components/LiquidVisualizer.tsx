@@ -6731,6 +6731,12 @@ void main() {
         film: filmRef.current,
         fluids: fluidsRef.current,
         gl: webGLRef.current,
+        /**
+         * Each plate's rotation, live. The clip tool squares a plate up before
+         * it pours a title into it, or the words come out at whatever angle the
+         * plate was laid at (a random one) and turn with it.
+         */
+        rotation: rotationAnglesRef,
         /** The derive pass's switch, live: `perPixel.current = true` draws as ?derived=0 does. */
         perPixel: perPixelRef,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
