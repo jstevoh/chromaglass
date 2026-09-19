@@ -68,6 +68,20 @@ export interface BenchDeps {
   /** The GPU's name, if the context will give it. */
   renderer(): string;
   sleep(ms: number): Promise<void>;
+  /**
+   * Wall clock, milliseconds.
+   *
+   * Every wait here is measured against this rather than by adding up what was
+   * asked for, because on the machines this exists to measure the two are not
+   * the same number. A `setTimeout(100)` on a page rendering at eleven frames
+   * a second comes back in six or seven hundred milliseconds — the timer
+   * cannot fire until the main thread is free, and the main thread is busy
+   * being the thing under test. Counting requested sleeps made a three second
+   * sample window take twenty, and every timeout with it: the sweep still
+   * finished and still finished correctly, it just took five times as long on
+   * precisely the slow machine whose owner is least willing to wait.
+   */
+  now(): number;
   /** Progress, for the overlay. */
   onProgress?(done: number, total: number, label: string): void;
 }
@@ -81,6 +95,8 @@ export interface BenchOptions {
   sampleMs?: number;
   /** How often to sample inside that window. */
   everyMs?: number;
+  /** Take at least this many samples, however slow the page is. */
+  minSamples?: number;
   /** How long to wait for the solver to be rebuilt on the new grid. */
   rebuildMs?: number;
 }
@@ -99,6 +115,12 @@ const SETTLE_MS = 4000;
 const SAMPLE_MS = 3000;
 const EVERY_MS = 250;
 const REBUILD_MS = 6000;
+/**
+ * A median wants more than a couple of numbers under it, and a page slow
+ * enough to matter may not produce many in a fixed window — so the window is
+ * a floor on time and this is a floor on samples.
+ */
+const MIN_SAMPLES = 5;
 
 const median = (xs: number[]): number => {
   if (xs.length === 0) return 0;
@@ -117,6 +139,7 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
   const sampleMs = opts.sampleMs ?? SAMPLE_MS;
   const everyMs = opts.everyMs ?? EVERY_MS;
   const rebuildMs = opts.rebuildMs ?? REBUILD_MS;
+  const minSamples = opts.minSamples ?? MIN_SAMPLES;
 
   const first = deps.read();
   const rows: BenchRow[] = [];
@@ -130,11 +153,10 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
     // Wait for the solver to actually be on the new grid. A rung the GPU
     // cannot allocate never arrives, and that is a result rather than a
     // hang — record it as one and move on.
-    let waited = 0;
+    const giveUpAt = deps.now() + rebuildMs;
     let arrived = false;
-    while (waited < rebuildMs) {
+    while (deps.now() < giveUpAt) {
       await deps.sleep(everyMs);
-      waited += everyMs;
       const s = deps.read();
       if (s && onRung(s, want)) { arrived = true; break; }
     }
@@ -151,10 +173,12 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
       continue;
     }
 
-    await deps.sleep(settleMs);
+    const settledAt = deps.now() + settleMs;
+    while (deps.now() < settledAt) await deps.sleep(Math.min(everyMs, settleMs));
 
     const frame: number[] = [], sim: number[] = [], other: number[] = [], steps: number[] = [];
-    for (let t = 0; t < sampleMs; t += everyMs) {
+    const sampleUntil = deps.now() + sampleMs;
+    while (deps.now() < sampleUntil || frame.length < minSamples) {
       await deps.sleep(everyMs);
       const s = deps.read();
       if (!s) continue;

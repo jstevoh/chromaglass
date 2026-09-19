@@ -759,6 +759,7 @@ export default function App() {
         read: () => engineStatusRef.current,
         renderer: readRenderer,
         sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+        now: () => performance.now(),
         onProgress: (done, total, label) => setBench(b => ({ ...b, done, total, label })),
       }, opts);
       const text = formatBench(report);
