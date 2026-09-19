@@ -472,11 +472,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ bassBoost: v })}
           settingKey="bassBoost"
         />
+        {/* 0–0.3, the desk's and the controller's range: the timestep stops
+            growing near 0.21, so 70% of the old 0–1 travel only raced the clocks. */}
         <Slider
           label="Speed"
           value={settings.globalSpeed}
           min={0.0}
-          max={1.0}
+          max={0.3}
           step={0.001}
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
           settingKey="globalSpeed"
@@ -543,6 +545,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           >
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
+        )}
+        {/* The flash limit, next to the other two things that keep a room safe.
+            It is the same switch as the one at the bottom of Projectors → The
+            Wall, which is where it lived alone: the last control of the longest
+            section, with no other way to it. */}
+        {output && onOutput && (
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[13px] font-medium text-text">Flash Limit</span>
+            <button
+              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
+              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
+              title="Hold the whole screen below three flashes a second (photosensitivity)"
+              aria-label="Flash Limit"
+              aria-pressed={output.flashGuard}
+              data-testid="flash-limit-master"
+            >
+              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
         )}
 
         {/* Room calibration */}
@@ -937,7 +958,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Clapperboard size={12} /> Show
         </h3>
         <Info>
-          How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the mirror rig and round dish of the projected clock face. The Show Sequencer scripts these over a song.
+          How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the round dish and spread of the projected clock faces. The Show Sequencer scripts these over a song.
         </Info>
         <Slider
           label="Hue Journey (min/step)"
@@ -1007,7 +1028,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="dishVignette"
         />
         <Slider
-          label="Projectors"
+          label="Dish Spread"
           value={settings.dishSpread ?? 0}
           min={0}
           max={1.0}
@@ -2165,30 +2186,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Thermometer size={12} /> Heat Slide
         </h3>
-        <Slider
-          label="Heat Intensity"
-          value={settings.heatIntensity}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ heatIntensity: v })}
-          settingKey="heatIntensity"
-        />
-        <Slider
-          label="Boiling Point"
-          value={settings.boilingPoint}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ boilingPoint: v })}
-          settingKey="boilingPoint"
-        />
+        {/* Heat Intensity and Boiling Point were here: nothing in either solver
+            read them. The keys stay in saved looks; the sliders are gone. */}
+        {/* 0–0.08: the looks run from 0.0015 to 0.06, and the old 0–1 slider's
+            first step (0.05) was seventeen times the default. */}
         <Slider
           label="Evaporation Rate"
           value={settings.evaporationRate}
           min={0}
-          max={1.0}
-          step={0.05}
+          max={0.08}
+          step={0.0005}
           onChange={(v: number) => onUpdate({ evaporationRate: v })}
           settingKey="evaporationRate"
         />

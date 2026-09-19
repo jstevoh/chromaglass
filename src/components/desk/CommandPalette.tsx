@@ -25,6 +25,12 @@ export interface Command {
   kind: string;
   /** A second string that also matches, e.g. a look's dyes. */
   hint?: string;
+  /**
+   * Words that also find it, matched only as a whole run of text — never as
+   * letters scattered in order, which against a long list of words would match
+   * nearly anything. A settings section's terms and control labels.
+   */
+  terms?: string;
   /** Printed on the right, e.g. the key that also does it. */
   kbd?: string;
   swatch?: string;
@@ -60,7 +66,12 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
     const query = q.trim().toLowerCase();
     if (!query) return commands.slice(0, 40);
     return commands
-      .map(c => ({ c, s: Math.max(score(query, c.name), score(query, c.hint ?? '') - 200, score(query, c.kind) - 400) }))
+      .map(c => ({ c, s: Math.max(
+        score(query, c.name),
+        score(query, c.hint ?? '') - 200,
+        score(query, c.kind) - 400,
+        c.terms && query.split(/\s+/).every(w => c.terms!.includes(w)) ? 450 : -1,
+      ) }))
       .filter(r => r.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 40)

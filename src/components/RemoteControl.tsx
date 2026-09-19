@@ -518,7 +518,7 @@ export default function RemoteControl() {
               {state?.recording != null ? `${Math.floor(state.recording / 60)}:${String(state.recording % 60).padStart(2, '0')}` : 'Rec'}
             </button>
           </div>
-          <Slider label="Dye Budget" field="dyeBudget" min={0} max={1.5} step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dye Budget" field="dyeBudget" min={0.1} max={1.2} step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
 
           {/* Macro camera */}
