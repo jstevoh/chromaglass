@@ -1324,6 +1324,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
           settingKey="lampWarmth"
         />
+        {/* How the lamp meets the dye: at 0 each dye is one flat colour at any
+            depth; toward 1 the light goes through it, so thin washes are pale
+            and thick pools deep, and overlaps darken. */}
+        <Slider
+          label="Light Through Dye"
+          value={settings.transmission ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ transmission: v })}
+          settingKey="transmission"
+        />
         <Slider
           label="Exposure"
           value={settings.exposure ?? 0}

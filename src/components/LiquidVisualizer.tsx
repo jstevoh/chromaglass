@@ -3138,6 +3138,7 @@ uniform float u_kaleidoPhase;      // where the rig has turned to, accumulated o
 uniform float u_kaleidoZoom;       // how much plate feeds each wedge
 uniform float u_dish;              // round-dish vignette strength
 uniform float u_exposure;          // plate-wide film exposure
+uniform float u_transmission;      // light through the dye: thin pale, thick deep (0 = the flat glow)
 uniform float u_dimmer;            // master brightness: the house dimmer, 0 is blackout
 uniform sampler2D u_mark;          // a still laid over the plate: a logo, a title card
 uniform float u_markOn;            // 1 when there is one loaded
@@ -3276,6 +3277,27 @@ float decodeDensity(float a) {
   return a * a * DENSITY_SCALE;
 }
 
+/*
+  Light through the dye.
+
+  Decoded, a dye's colour is its transmittance for one unit of thickness, and
+  the plate has only ever drawn that: the hue fixed whatever the depth, the
+  thickness setting nothing but how opaque the colour is. A projector sends the
+  lamp *through* the dye, and Beer–Lambert says what comes out: exp(−A·d), the
+  unit colour raised to the thickness. So a thin wash is pale, nearly the lamp
+  itself; a thick pool is the deep, dark version of the same dye; and where two
+  dyes share a cell their absorbances add, so an overlap goes darker rather than
+  brighter. Raising to the thickness also takes care of thick dye that decoded
+  pale (the packed colour channels clip above 8 while the density does not):
+  the clipped unit colour, raised to a thickness of four or six, is deep again.
+  Floored at a third of a unit so the thinnest film keeps a tint.
+*/
+vec3 lightThrough(vec3 unit, float thickness) {
+  if (u_transmission <= 0.001) return unit;
+  vec3 t = pow(max(unit, vec3(1e-4)), vec3(clamp(thickness, 0.35, 4.0)));
+  return mix(unit, t, u_transmission);
+}
+
 
 vec4 sampleLayer(sampler2D tex, vec2 uv) {
   return textureBicubic(tex, uv);
@@ -3338,6 +3360,8 @@ vec4 decodeFluid(sampler2D tex, vec2 fuv, float blurFluid, bool useBlur) {
   float r = exp(-decodeDensity(raw.r) * norm);
   float g = exp(-decodeDensity(raw.g) * norm);
   float b = exp(-decodeDensity(raw.b) * norm);
+  vec3 lt = lightThrough(vec3(r, g, b), absTotalDensity);
+  r = lt.r; g = lt.g; b = lt.b;
 
   // Ink that absorbs every wavelength hides what is behind it far sooner than
   // a transparent dye of the same thickness does. Without this the blacks sit
@@ -3814,7 +3838,7 @@ vec4 decodeFluidRaw(vec4 raw) {
   float totalDensity = decodeDensity(raw.a);
   if (totalDensity < 0.001 / DENSITY_SCALE) return vec4(0.0);
   float norm = 1.0 / totalDensity;
-  vec3 c = exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm);
+  vec3 c = lightThrough(exp(-vec3(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm), totalDensity);
   float darkness = 1.0 - max(c.r, max(c.g, c.b));
   float thickness = mix(totalDensity * 2.8, max(0.0, totalDensity - u_filmLevel) * u_filmGain, clamp(u_macro, 0.0, 1.0))
                   * (1.0 + darkness * 1.7);
@@ -4635,7 +4659,7 @@ void main() {
       'u_filmLevel','u_filmGain','u_logicalGrid',
       'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
       'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
-      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_dimmer',
+      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_transmission','u_dimmer',
       'u_mark','u_markOn','u_markRect','u_bspline',
       'u_beadTex','u_beads','u_dishSpread','u_cells',
       'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
@@ -6244,6 +6268,7 @@ void main() {
           glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
           glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
           glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+          glCtx.uniform1f(uLocs['u_transmission'], Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
           // The dimmer, with the flash guard's correction folded in. Riding the
           // dimmer rather than adding a pass is what lets one implementation
           // cover the laptop, the projector, a network display and the

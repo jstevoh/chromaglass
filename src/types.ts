@@ -238,6 +238,7 @@ export interface VisualizerSettings {
   markScale: number;          // width as a fraction of the frame; height follows the image's own aspect
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
+  transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
   beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
@@ -429,6 +430,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmDrive: 0,
   filmImpact: 0,
   lampWarmth: 0,
+  transmission: 0.5,          // halfway: thick pools deep and thin washes pale, without crushing a dense blue to black
   dimmer: 1,
   fingering: 0,
   // A few. The plate is oil on water and the reference for the whole look is a

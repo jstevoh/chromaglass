@@ -110,7 +110,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     with the lamp they colour.
   */
   { id: 'lamp', name: 'Lamp & Light', category: 'look',
-    terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade' },
+    terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
   { id: 'camera', name: 'Camera', category: 'look',
     terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',
