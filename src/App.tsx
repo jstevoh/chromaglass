@@ -762,6 +762,17 @@ export default function App() {
         now: () => performance.now(),
         onProgress: (done, total, label) => setBench(b => ({ ...b, done, total, label })),
       }, opts);
+      // Put the show back before showing the result, not after.
+      //
+      // The restore used to live only in the `finally`, which runs after the
+      // report is on screen — so for the few seconds it takes the engine to
+      // rebuild and republish, the sweep said it was finished while the plate
+      // was still on whatever rung it ended on. Measured at three and a half
+      // seconds of the show sitting on the CPU solver behind a panel saying
+      // the measurement was done. The `finally` stays as the path an error
+      // takes; setting it twice costs nothing, since the second is the same
+      // value and React drops it.
+      setSettings(prev => ({ ...prev, simResolution: restore }));
       const text = formatBench(report);
       console.log(text);
       setBench({ running: false, done: 0, total: 0, label: '', text });

@@ -142,6 +142,8 @@ export interface EngineStatus {
   dpr: number;
   tier: PlatformTier;
   gpu: GpuClass;
+  /** The GPU's name, as its own context reports it. */
+  renderer: string;
   /** True while the governor is choosing (simResolution is 'auto'). */
   governed: boolean;
   /** The governor has had to drop below where it started on this machine. */

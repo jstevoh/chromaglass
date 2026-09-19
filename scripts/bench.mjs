@@ -14,9 +14,31 @@
  */
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import net from 'node:net';
 
 const PORT = 4329;
+
+/*
+  Two modes, because this script has two jobs.
+
+  Plain, it checks the path: three rungs and short waits, on whatever GPU the
+  machine running CI happens to have, which may be no GPU at all. It is asking
+  whether the sweep works, and the numbers it prints are not worth reading.
+
+  `--full` takes the measurement: every rung, the honest waits, and `--out`
+  writes it into the repository so a reading from real hardware becomes a file
+  somebody can open rather than a screenshot in a conversation. Run it on the
+  machine a show runs on.
+
+    npm run bench -- --full --out docs/bench/macbook-m4.txt
+*/
+const FULL = process.argv.includes('--full');
+const OUT = (() => {
+  const i = process.argv.indexOf('--out');
+  return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
+})();
 
 let chromium;
 for (const resolve of [() => 'playwright', () => 'playwright-core']) {
@@ -50,53 +72,57 @@ try {
   await page.mouse.click(8, 8);
   await page.waitForTimeout(4000);
 
-  // Three rungs, not five, and shortened waits. This run is about the path
-  // working; the numbers mean nothing on a software rasteriser, and asking one
-  // to solve 768² costs minutes for a figure nobody would quote. The rungs are
-  // chosen to walk all three outcomes instead: one the GPU can do, one it
-  // cannot (99999 is clamped to the texture limit, so it never arrives and
-  // must be recorded as a refusal rather than hanging the run), and the CPU
-  // fallback.
-  await page.evaluate(() => window.chromaglassBench({
-    rungs: [256, 99999, 'cpu'],
-    settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500,
-  }));
+  // The quick pass walks all three outcomes rather than producing figures:
+  // one rung the GPU can do, one it cannot (99999 is clamped to the texture
+  // limit, so it never arrives and has to be recorded as a refusal rather
+  // than hanging the run), and the CPU fallback. Asking a software rasteriser
+  // for 768² costs minutes a frame for a number nobody would quote.
+  await page.evaluate((full) => window.chromaglassBench(
+    full ? {} : { rungs: [256, 99999, 'cpu'], settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500 },
+  ), FULL);
 
-  await page.waitForSelector('[data-bench-text]', { timeout: 120000 });
+  await page.waitForSelector('[data-bench-text]', { timeout: FULL ? 600000 : 180000 });
   const text = await page.textContent('[data-bench-text]');
   console.log(text);
 
-  // The sweep must put the grid back where it found it.
-  await page.waitForTimeout(500);
-  const restored = await page.evaluate(() => window.chromaglassDebug?.().status?.governed ?? null);
-  if (restored !== true) {
-    console.error(`\n  ✗ the sweep did not hand the grid back to the governor (governed=${restored})`);
-    failed = true;
-  } else {
-    console.log('  ok  the grid went back to Auto afterwards');
+  if (OUT) {
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    fs.writeFileSync(OUT, `${text}\n`);
+    console.log(`\nwritten to ${OUT}`);
   }
-  if (!/grid\s+fps\s+frame/.test(text ?? '')) {
-    console.error('  ✗ the report has no table in it');
-    failed = true;
-  } else {
-    console.log('  ok  the report has a table in it');
+
+  const check = (ok, yes, no) => {
+    if (ok) console.log(`  ok  ${yes}`);
+    else { console.error(`  ✗ ${no}`); failed = true; }
+  };
+
+  check(/grid\s+fps\s+frame/.test(text ?? ''), 'the report has a table in it', 'the report has no table in it');
+
+  // The CPU solver is the one rung every machine has, so it is the one the
+  // numbers are asserted on. Whether a *GPU* rung runs depends on the host —
+  // a container rasterising in software may refuse them all, and that is a
+  // fact about the container, not a failure of this code.
+  check(/cpu192\s+\d/.test(text ?? ''), 'the CPU rung produced numbers', 'the CPU rung produced no numbers');
+
+  if (!FULL) {
+    check(/99999.*—/.test(text ?? ''),
+      'an unreachable rung is recorded as a refusal, not a hang',
+      'an unreachable rung was not recorded as a refusal');
   }
-  // A rung that cannot be reached is the case most likely to hang, so it is
-  // the one worth asserting on rather than merely running.
-  if (!/99999.*—/.test(text ?? '')) {
-    console.error('  ✗ an unreachable rung was not recorded as a refusal');
-    failed = true;
-  } else {
-    console.log('  ok  an unreachable rung is recorded as a refusal, not a hang');
+
+  // The sweep must hand the grid back. Polled rather than slept on: the engine
+  // only republishes its status when the label changes or a second has gone
+  // by, so a fixed wait here reads whatever the last frame happened to say —
+  // which is the mistake this suite has now made four times.
+  let restored = null;
+  for (let i = 0; i < 80; i++) {
+    restored = await page.evaluate(() => window.chromaglassDebug?.().status?.governed ?? null);
+    if (restored === true) break;
+    await page.waitForTimeout(250);
   }
-  for (const want of ['256²', 'cpu192']) {
-    if (!new RegExp(`${want.replace('²','\\u00b2')}\\s+\\d`).test(text ?? '')) {
-      console.error(`  ✗ ${want} produced no numbers`);
-      failed = true;
-    } else {
-      console.log(`  ok  ${want} produced numbers`);
-    }
-  }
+  check(restored === true,
+    'the grid went back to Auto afterwards',
+    `the sweep did not hand the grid back to the governor (governed=${restored})`);
 } finally {
   await browser.close();
   stop();

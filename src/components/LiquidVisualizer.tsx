@@ -4770,7 +4770,7 @@ void main() {
             engine: lead?.gpu ? 'gpu' : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
             dpr: dprRef.current,
-            tier, gpu: gpuClass,
+            tier, gpu: gpuClass, renderer: rendererString,
             governed,
             steppedDown: governed && governor.steppedDown,
             gpuUnavailable,

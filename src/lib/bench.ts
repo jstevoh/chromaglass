@@ -208,7 +208,7 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
   return {
     at: new Date().toISOString(),
     machine: {
-      renderer: deps.renderer(),
+      renderer: first?.renderer || deps.renderer(),
       tier: first?.tier ?? '?',
       gpuClass: first?.gpu ?? '?',
       layers: first?.layers ?? 0,
