@@ -6,6 +6,9 @@ import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, 
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
+import { WebGPUStage } from '../gpu/stage';
+import { isGpuFailure, type GpuFailure } from '../gpu/device';
+import { kitSelfTest } from '../gpu/selftest';
 import { FINISH_GLSL, PostChain, type PostTest } from '../lib/postChain';
 import { UNIT } from '../lib/textureUnits';
 import type { TempoSource } from '../lib/tempo';
@@ -182,6 +185,14 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
   const level = governor?.postLevel ?? 0;
   return level === 1 ? ' · effects ½' : level === 2 ? ' · effects off' : '';
 }
+
+/**
+ * `?renderer=webgpu`: the WebGPU stage instead of WebGL (docs/webgpu-plan.md).
+ * It grows on main behind this flag until the cutover, then WebGL goes.
+ */
+const WEBGPU = (() => {
+  try { return new URLSearchParams(window.location.search).get('renderer') === 'webgpu'; } catch { return false; }
+})();
 
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
@@ -2501,6 +2512,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * new context and the show carries on where it was.
    */
   const glLostRef = useRef(false);
+  /** Under ?renderer=webgpu: why there is no GPU to draw with, for the "needs WebGPU" screen. */
+  const [gpuFailure, setGpuFailure] = useState<GpuFailure | null>(null);
   const [glLost, setGlLost] = useState(false);
   const [glEpoch, setGlEpoch] = useState(0);
   /** The look that is on the plate, so a rebuild can put the same one back. */
@@ -3196,6 +3209,74 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // ── WebGPU, under ?renderer=webgpu ────────────────────────────────
+    // Before anything else: a canvas holds one kind of context for life, and
+    // the WebGL path below would claim it. P1 draws the black plate; the
+    // solver (P2) and the compositor (P3) move in behind this branch.
+    if (WEBGPU) {
+      let stage: WebGPUStage | null = null;
+      let raf = 0;
+      let cancelled = false;
+      const tier = detectTier();
+      const size = () => {
+        const dpr = devicePixels();
+        const stagePx = stageRef.current;
+        canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
+        canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
+        return dpr;
+      };
+      void WebGPUStage.start(canvas).then((s) => {
+        if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
+        if (isGpuFailure(s)) {
+          console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
+          setGpuFailure(s);
+          return;
+        }
+        stage = s;
+        s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
+        let last = performance.now(), frameMs = 16.7, reported = 0;
+        const loop = () => {
+          if (!stage) return;
+          const now = performance.now();
+          frameMs += (now - last - frameMs) * 0.05;
+          last = now;
+          const dpr = size();
+          stage.frame();
+          if (now - reported > 500) {
+            reported = now;
+            const status: EngineStatus = {
+              label: `WebGPU · ${s.gpu.label}`,
+              engine: 'webgpu', grid: 0, dpr, tier, gpu: s.gpu.gpuClass, renderer: s.gpu.label,
+              governed: false, steppedDown: false, gpuUnavailable: false,
+              frameMs, simMs: 0, layers: 0, stepsPerSec: 0, otherMs: frameMs,
+            };
+            engineStatusRef.current = status;
+            onEngineStatusRef.current?.(status);
+          }
+          raf = requestAnimationFrame(loop);
+        };
+        loop();
+      });
+      if (new URLSearchParams(window.location.search).has('debug')) {
+        (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+          engine: engineStatusRef.current?.label ?? 'WebGPU · starting',
+          status: engineStatusRef.current,
+          webgpu: stage && {
+            label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
+            timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
+            timings: Object.fromEntries(stage.profiler.ms),
+          },
+          /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
+          grabFrame: () => stage?.grabFrame() ?? null,
+          /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
+          kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+          gpuFailure,
+          settings: settingsRef.current,
+        });
+      }
+      return () => { cancelled = true; cancelAnimationFrame(raf); stage?.dispose(); stage = null; };
+    }
 
     // ── WebGL2 initialization ──────────────────────────────────────────
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
@@ -7002,6 +7083,23 @@ void main() {
         no explanation is the worst thing that can happen to an operator in
         front of a room: this says the machine knows, and is coming back.
       */}
+      {/*
+        Under ?renderer=webgpu, a browser without it gets a clear screen, not a
+        degraded show (docs/webgpu-plan.md): what is missing, and where it works.
+      */}
+      {gpuFailure && (
+        <div className="absolute inset-0 flex items-center justify-center p-6" data-testid="needs-webgpu">
+          <div className="max-w-md text-center font-mono text-[12px] leading-relaxed text-white/70">
+            <div className="mb-3 text-[15px] tracking-wide text-white">ChromaGlass needs WebGPU</div>
+            <div className="mb-4 text-white/50">
+              {gpuFailure.failure === 'no-webgpu' ? 'This browser has no WebGPU.'
+                : gpuFailure.failure === 'no-adapter' ? 'This browser has WebGPU but no GPU to give it.'
+                : 'The GPU would not start.'}
+            </div>
+            <div>It runs in Chrome or Edge on a desktop, Chrome on a recent Android phone, Safari 26 on macOS and iOS, and Firefox on Windows.</div>
+          </div>
+        </div>
+      )}
       {glLost && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="gl-lost">
           <span className="font-mono text-[11px] tracking-widest text-white/40">rebuilding the plate…</span>

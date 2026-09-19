@@ -129,6 +129,24 @@ jobs:
       # build the wall step just made.
       - run: node scripts/fx.mjs
 
+  # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
+  # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
+  # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).
+  webgpu:
+    name: WebGPU (macOS)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - run: npm run webgpu
+
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.
   show:
