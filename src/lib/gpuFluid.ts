@@ -255,28 +255,36 @@ void main() {
   vec2 p = v_uv * u_L;
   vec2 eL = vec2(1.0 / u_L, 0.0);   // one logical cell
 
-  // Curl turbulence, CPU stride 2 → ×0.25
-  if (u_turbScale > 0.005 && d >= 0.02) {
-    float m0 = u_turbScale * 0.010 * min(1.5, d) * 0.25;
+  // Curl turbulence: a divergence-free current at several scales, applied
+  // to the liquid everywhere rather than only where there is dye (clear oil
+  // flows too, and a curl weighted by density is not divergence-free — it piles
+  // dye up along its own edges). Each octave's difference is divided by its
+  // span, so it is a gradient in noise space (rms ≈ 3), and the octaves fall
+  // off as 0.55^o. u_turbScale is then the rms speed in solver units / 0.5.
+  // See TURB_SPEED in LiquidVisualizer for the CPU twin.
+  if (u_turbScale > 0.005) {
+    vec2 cur = vec2(0.0);
     for (int o = 0; o < 4; o++) {
       if (o >= u_turbDetail) break;
       float freq = (0.012 / (u_L / 128.0)) * float(1 << o);
-      float amp = m0 * pow(0.55, float(o));
       float tOff = u_time * (0.06 + float(o) * 0.05) + float(o) * 37.7;
       float eps = 0.75;
       float dn_dx = snoise(vec2((p.x + eps) * freq, p.y * freq + tOff)) - snoise(vec2((p.x - eps) * freq, p.y * freq + tOff));
       float dn_dy = snoise(vec2(p.x * freq, (p.y + eps) * freq + tOff)) - snoise(vec2(p.x * freq, (p.y - eps) * freq + tOff));
-      v.xy += vec2(dn_dy, -dn_dx) * amp;
+      cur += vec2(dn_dy, -dn_dx) * (pow(0.55, float(o)) / (2.0 * eps * freq));
     }
+    v.xy += cur * (u_turbScale * (0.5 / 3.0));
   }
 
-  // Mid/treble vorticity, CPU stride 3 → ×(1/9)
+  // Mid/treble vorticity: eddies in the dense dye. The difference is taken
+  // over 0.01 of noise space and divided by it, like the turbulence above, so
+  // u_spin (0–0.03) reaches an rms of about 0.4 at the top.
   if (u_spin > 0.0 && d > 0.05) {
     vec2 q = p * 0.025 + vec2(0.0, u_time * 0.08);
     float n = snoise(q);
-    float dn_dx = snoise(q + vec2(0.01, 0.0)) - n;
-    float dn_dy = snoise(q + vec2(0.0, 0.01)) - n;
-    v.xy += vec2(dn_dy, -dn_dx) * u_spin * d * (1.0 / 9.0);
+    float dn_dx = (snoise(q + vec2(0.01, 0.0)) - n) * 100.0;
+    float dn_dy = (snoise(q + vec2(0.0, 0.01)) - n) * 100.0;
+    v.xy += vec2(dn_dy, -dn_dx) * (u_spin / 0.03) * (0.4 / 3.0) * min(1.0, d);
   }
 
   // Immiscibility: push away from neighbours of a different colour
