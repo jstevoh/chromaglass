@@ -68,12 +68,23 @@ const watch = (page) => {
       const engine = await page.evaluate(() => window.chromaglassDebug().engine);
       check('the engine label says WebGPU', /^WebGPU · /.test(engine), engine);
 
-      const f0 = await page.evaluate(() => window.chromaglassDebug().webgpu.frames);
-      const t0 = Date.now();
-      await page.waitForTimeout(2000);
-      const f1 = await page.evaluate(() => window.chromaglassDebug().webgpu.frames);
-      const fps = (f1 - f0) / ((Date.now() - t0) / 1000);
-      check('it holds the display rate', fps >= 50, `${fps.toFixed(1)} fps`);
+      // Against the display's own rate, not 60: a CI runner's headless display
+      // asks for 30 a second, and the question is whether the stage answers
+      // every one of them.
+      const rate = await page.evaluate(() => new Promise((done) => {
+        const start = window.chromaglassDebug().webgpu.frames;
+        const t0 = performance.now();
+        let ticks = 0;
+        const tick = () => {
+          ticks++;
+          if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+          else done({ ticks, frames: window.chromaglassDebug().webgpu.frames - start, ms: performance.now() - t0 });
+        };
+        requestAnimationFrame(tick);
+      }));
+      const fps = rate.frames / (rate.ms / 1000), display = rate.ticks / (rate.ms / 1000);
+      check('it draws a frame for every one the display asks for', fps >= display * 0.9 && fps > 20,
+        `${fps.toFixed(1)} fps, the display asking ${display.toFixed(1)}`);
 
       const frame = await page.evaluate(async () => {
         const g = await window.chromaglassDebug().grabFrame();
