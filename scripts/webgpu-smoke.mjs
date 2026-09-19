@@ -69,8 +69,11 @@ const watch = (page) => {
       check('the engine label says WebGPU', /^WebGPU · /.test(engine), engine);
 
       // Against the display's own rate, not 60: a CI runner's headless display
-      // asks for 30 a second, and the question is whether the stage answers
-      // every one of them.
+      // asks for 30 a second — sometimes 18, under load — and the question is
+      // whether the stage answers every one of them. How *fast* a frame is
+      // belongs to `npm run bench`, on a machine whose speed is known; the
+      // only speed asserted here is what the frame costs us on the CPU, which
+      // no amount of runner contention changes.
       const rate = await page.evaluate(() => new Promise((done) => {
         const start = window.chromaglassDebug().webgpu.frames;
         const t0 = performance.now();
@@ -83,8 +86,10 @@ const watch = (page) => {
         requestAnimationFrame(tick);
       }));
       const fps = rate.frames / (rate.ms / 1000), display = rate.ticks / (rate.ms / 1000);
-      check('it draws a frame for every one the display asks for', fps >= display * 0.9 && fps > 20,
+      check('it draws a frame for every one the display asks for', fps >= display * 0.9,
         `${fps.toFixed(1)} fps, the display asking ${display.toFixed(1)}`);
+      const cpuMs = await page.evaluate(() => window.chromaglassDebug().webgpu.cpuMs);
+      check('a frame costs little to encode', cpuMs > 0 && cpuMs < 8, `${cpuMs} ms of CPU in frame()`);
 
       const frame = await page.evaluate(async () => {
         const g = await window.chromaglassDebug().grabFrame();
