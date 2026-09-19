@@ -32,7 +32,7 @@ export interface BenchRow {
   want: SimResolution;
   /** What the solver actually ran — a grid can be clamped by the texture limit. */
   grid: number;
-  engine: 'gpu' | 'cpu';
+  engine: 'gpu' | 'cpu' | 'webgpu';
   frameMs: number;
   fps: number;
   /** One solver step across every layer. CPU submission time on the GPU path. */

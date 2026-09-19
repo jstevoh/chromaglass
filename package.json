@@ -42,6 +42,7 @@
     "panel": "esbuild scripts/panel.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/panel.mjs && node node_modules/.cache/panel.mjs",
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
+    "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
     "brand": "node scripts/brand.mjs",
@@ -68,6 +69,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/ws": "^8.18.1",
+    "@webgpu/types": "^0.1.74",
     "autoprefixer": "^10.4.21",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.1.14",

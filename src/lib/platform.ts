@@ -137,7 +137,8 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
 export interface EngineStatus {
   /** Short readout, e.g. "GPU · 512² · 1.0x". */
   label: string;
-  engine: 'gpu' | 'cpu';
+  /** WebGL's GPU solver, the CPU solver, or the WebGPU stage (?renderer=webgpu, until the cutover). */
+  engine: 'gpu' | 'cpu' | 'webgpu';
   grid: number;
   dpr: number;
   tier: PlatformTier;
