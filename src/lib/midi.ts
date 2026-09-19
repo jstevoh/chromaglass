@@ -194,6 +194,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
   { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
+  // The fourth master, over the LFOs and envelopes. It had a setting and a
+  // reader and no control anywhere, so a shape patch could not be pulled down
+  // at all short of deleting it.
+  { key: 'shapeImpact',     label: 'Shapes Impact',    min: 0, max: 1 },
   // The room. Worth a fader more than most: how hard the crowd drives the
   // plate is the thing you ride between a verse and a chorus.
   { key: 'sceneDrive',      label: 'Room Drive',       min: 0, max: 1 },

@@ -146,6 +146,7 @@ const MUST_FIND = [
   ['wall', 'projectors'], ['projector', 'projectors'],
   ['film mix', 'film'], ['reel', 'film'], ['window', 'film'], ['prelinger', 'film'],
   ['lumia', 'lamp'], ['gel wheel', 'lamp'], ['exposure', 'lamp'], ['lamp warmth', 'lamp'],
+  ['patch', 'patches'], ['lfo', 'patches'], ['room impact', 'patches'], ['sound impact', 'patches'],
   ['bpm', 'audio-input'], ['microphone', 'audio-input'],
   ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
 ];
@@ -177,6 +178,35 @@ check('the look effects live with the lamp',
 check('and the film is an input of its own',
   SECTION_BY_ID.get('film')?.category === 'inputs'
   && ['filmMix', 'filmKey', 'filmDrive'].every(k => PIN_RANGE.get(k)?.section === 'film'));
+// ── The patch bay ───────────────────────────────────────────────────
+/*
+  The bay lived in The Room and its masters in three other places: Sound
+  Impact in Sound Mappings, Room Impact in The Room, Film Impact in
+  Projectors, and none at all for the shapes. One section holds the bay and
+  all four now, and these are the ways that could come apart again: a master
+  wandering off to its source's section, the bay's markup ending up somewhere
+  else, a master becoming something a patch can ride (a source riding its own
+  master is a loop nobody asked for), and the Control menu going back to one
+  flat list of eighty.
+*/
+const MASTERS = ['sceneImpact', 'filmImpact', 'soundImpact', 'shapeImpact'];
+check('every master sits with the patch bay',
+  MASTERS.every(k => PIN_RANGE.get(k)?.section === 'patches'),
+  MASTERS.filter(k => PIN_RANGE.get(k)?.section !== 'patches').map(k => `${k} → ${PIN_RANGE.get(k)?.section ?? 'nowhere'}`).join(', '));
+/** The markup of one section, from its opening tag to the next `</section>`. */
+const sectionSource = (id) => {
+  const at = panel.indexOf(`data-section="${id}"`);
+  return at < 0 ? '' : panel.slice(at, panel.indexOf('</section>', at));
+};
+const bay = sectionSource('patches');
+check('and the bay is drawn there, not in The Room',
+  bay.includes('data-testid="scene-map-add"') && !sectionSource('room').includes('scene-map-add')
+  && MASTERS.every(k => bay.includes(`settingKey="${k}"`)));
+check('no source can ride a master',
+  !PATCH_TARGETS.some(t => MASTERS.includes(String(t.key))),
+  PATCH_TARGETS.filter(t => MASTERS.includes(String(t.key))).map(t => t.label).join(', '));
+check('and what a patch can aim at is grouped by section', /<optgroup key=\{g\.id\} label=\{g\.name\}>/.test(bay));
+
 check('and the wall keeps the id every deep link opens',
   SECTION_BY_ID.get('projectors')?.name === 'Wall' && /openSettingsAt\('projectors'\)/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8')));
 

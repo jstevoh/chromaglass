@@ -83,11 +83,13 @@ const SECTION_OF: Record<string, string> = {
   gelWheel: 'lamp',
   beatLead: 'audio-input',
   filmDrive: 'film',
-  filmImpact: 'film',
-  soundImpact: 'audio-mappings',
+  // The four masters, with the patch bay they pull down.
+  filmImpact: 'patches',
+  soundImpact: 'patches',
+  shapeImpact: 'patches',
+  sceneImpact: 'patches',
   sceneDrive: 'room',
   sceneHands: 'room',
-  sceneImpact: 'room',
   kaleidoscope: 'kaleidoscope',
   kaleidoSpin: 'kaleidoscope',
   kaleidoZoom: 'kaleidoscope',};

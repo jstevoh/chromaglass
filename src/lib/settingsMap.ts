@@ -69,6 +69,18 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'film', name: 'Film', category: 'inputs',
     terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
+  /*
+    The patch bay, with every master over it.
+
+    It lived in The Room, because the room camera was the first thing that
+    could ride a setting. By the time it also took the film, the sound and the
+    shapes, most of what it routed had nothing to do with the room, and its
+    masters were in three different sections: Sound Impact in Sound Mappings,
+    Room Impact in The Room, Film Impact in Projectors (and the shapes had
+    none). One place now, after the sources it reads.
+  */
+  { id: 'patches', name: 'Patches', category: 'inputs',
+    terms: 'patch patches patch bay modular route routing mapping mappings map source feature control depth impact master lfo envelope shape shapes modulator room film sound' },
   { id: 'midi', name: 'Controller', category: 'inputs',
     terms: 'midi apc40 apc mini launchpad nanokontrol launch control xl fader knob pad learn map bank shift soft takeover led clock controller akai novation korg usb' },
 

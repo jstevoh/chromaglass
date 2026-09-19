@@ -48,7 +48,7 @@ import { PINNABLE } from './deskPins';
  * takes it to eighty-one and costs nothing, because that list already had to
  * exist for the desk's pin chips.
  */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'layerCount']);
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount']);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
   !String(s.key).startsWith('scene') && !NOT_A_TARGET.has(String(s.key)));

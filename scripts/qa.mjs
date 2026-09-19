@@ -707,6 +707,12 @@ try {
   check('switching the room camera on opens exactly one camera',
     (await page.evaluate(() => window.__media.length)) === 1,
     JSON.stringify(await page.evaluate(() => window.__media)));
+  // The patch bay has a section of its own now, after the sources it reads,
+  // so adding a room patch is one more row on the rail — and back again to
+  // switch the camera off, because a control in a hidden section cannot be
+  // clicked.
+  await clickOn('settings-nav-patches');
+  await settle(500);
   const mapAdd = firstVisible('scene-map-add');
   if (await mapAdd.count()) {
     // Counted rather than assumed: a preset can arrive with mappings of its
@@ -727,6 +733,8 @@ try {
       check('and choosing a feature and a control does not throw', true);
     }
   }
+  await clickOn('settings-nav-room');
+  await settle(500);
   await clickOn(roomToggle);   // and off again
   await settle(600);
 
@@ -1257,8 +1265,11 @@ try {
         and that the plate selector refuses the settings it cannot move —
         `PER_LAYER` is checked against the solver's own source by `npm run
         panel`, and this is the other half: that the panel honours it.
+
+        Under Patches, not The Room: the bay reads four sources, and it and
+        the four masters over it are one section now.
       */
-      await clickOn('settings-nav-room');
+      await clickOn('settings-nav-patches');
       await settle(500);
       const addBtn = page.getByTestId('scene-map-add');
       if (await addBtn.count()) {
@@ -1307,7 +1318,7 @@ try {
           !!after && after.options.includes(after.value),
           after ? `${after.value}` : '');
       } else {
-        check('a patch names the source it listens to', false, 'no Add button in The Room');
+        check('a patch names the source it listens to', false, 'no Add button under Patches');
       }
       await page.keyboard.press('Escape');
       await settle(800);
@@ -1330,18 +1341,27 @@ try {
       */
       await clickOn('open-all-settings');
       await settle(1200);
+      /*
+        Film Drive is the film's own section; Film Impact is a master over the
+        film's patches, so it sits with the other three under Patches. Each is
+        read from the section it is in, and only while that section is the
+        one on screen: every section is in the page at once, so a control
+        found without looking there proves nothing about where it lives.
+      */
+      const sliderIn = (section, key) => page.evaluate(({ section, key }) => {
+        const sec = document.querySelector(`section[data-section="${section}"]`);
+        if (!sec || sec.classList.contains('hidden')) return null;
+        const el = sec.querySelector(`[data-testid="pins-${key}"]`);
+        const row = el?.closest('div.flex.flex-col');
+        const range = row?.querySelector('input[type="range"]');
+        return row ? { there: true, disabled: !!range?.disabled, why: row.getAttribute('title') ?? '' } : null;
+      }, { section, key });
       await clickOn('settings-nav-film');
       await settle(500);
-      const force = await page.evaluate(() => {
-        const of = (key) => {
-          const el = [...document.querySelectorAll('[data-testid^="pins-"]')]
-            .find(e => e.dataset.testid === `pins-${key}`);
-          const row = el?.closest('div.flex.flex-col');
-          const range = row?.querySelector('input[type="range"]');
-          return row ? { there: true, disabled: !!range?.disabled, why: row.getAttribute('title') ?? '' } : null;
-        };
-        return { drive: of('filmDrive'), impact: of('filmImpact') };
-      });
+      const drive = await sliderIn('film', 'filmDrive');
+      await clickOn('settings-nav-patches');
+      await settle(500);
+      const force = { drive, impact: await sliderIn('patches', 'filmImpact') };
       check('the film can drive the plate as well as light it',
         !!force.drive && !!force.impact,
         `drive ${!!force.drive}, impact ${!!force.impact}`);
