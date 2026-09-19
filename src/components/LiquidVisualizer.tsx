@@ -4355,7 +4355,16 @@ void main() {
     }
   }
 
-  fragColor = vec4(outColor, 1.0);
+  // Triangular dither of one 8-bit step, the last thing before the canvas
+  // quantises. The grain above fades out below luma 0.03 on purpose, which is
+  // exactly where the black ground, the lamp falloff and the dish shade sit,
+  // so slow dark ramps banded — and on a projector in a dark room the darks are
+  // what everyone is looking at. Fixed per pixel, so it cannot shimmer, and
+  // never on true black: black has to stay black (the mapping's dark between
+  // shapes is measured as zero), and a ramp that bands is above it anyway.
+  float dth = hash(gl_FragCoord.xy) + hash(gl_FragCoord.xy + vec2(17.31, 5.73)) - 1.0;
+  float lit = step(1.0 / 255.0, max(outColor.r, max(outColor.g, outColor.b)));
+  fragColor = vec4(outColor + dth * lit / 255.0, 1.0);
   auxOut = vec4(clamp(auxN, -1.0, 1.0) * 0.5 + 0.5, auxH, auxB);
 }`;
 

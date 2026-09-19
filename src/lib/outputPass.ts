@@ -115,8 +115,14 @@ void main() {
   // mid-tones, which is the move for a room with light in it (ambient light
   // adds a constant to every pixel and flattens the dark end, so the way back
   // is to pull the dark end down and let the gain carry the level).
-  col = pow(max(col * u_gain, vec3(0.0)), vec3(u_gamma));
-  fragColor = vec4(col * m, sa * u_opacity);
+  col = pow(max(col * u_gain, vec3(0.0)), vec3(u_gamma)) * m;
+  // The grade re-quantises what the plate already quantised, so it gets its
+  // own step of triangular dither — never on black, which is what the blanking
+  // and the dark between mapped shapes are measured against.
+  float dth = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453)
+            + fract(sin(dot(gl_FragCoord.xy + vec2(17.31, 5.73), vec2(12.9898, 78.233))) * 43758.5453) - 1.0;
+  col += dth * step(1.0 / 255.0, max(col.r, max(col.g, col.b))) / 255.0;
+  fragColor = vec4(col, sa * u_opacity);
 }`;
 
 const UNIFORM_NAMES = [
