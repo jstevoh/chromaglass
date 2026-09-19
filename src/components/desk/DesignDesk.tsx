@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
@@ -91,8 +92,23 @@ export interface DesignDeskProps {
 }
 
 export function DesignDesk(p: DesignDeskProps) {
-  /** The document menu, hung off the look's own name. */
-  const [docMenu, setDocMenu] = useState(false);
+  /**
+   * The document menu, hung off the look's own name.
+   *
+   * Drawn outside the desk, at the name's position. The plate is painted over
+   * its hole in the desk from a layer above the desk (so the canvas gets the
+   * pointer; see LiquidVisualizer), and the desk is one fixed layer: anything
+   * inside it, however high its own z-index, stays under the plate. The menu
+   * hangs down over the preview, so inside the desk its lower half went under
+   * the picture.
+   */
+  const [docMenu, setDocMenu] = useState<{ top: number; left: number } | null>(null);
+  const docButton = useRef<HTMLButtonElement | null>(null);
+  const toggleDocMenu = () => {
+    if (docMenu) { setDocMenu(null); return; }
+    const r = docButton.current?.getBoundingClientRect();
+    if (r) setDocMenu({ top: r.bottom + 4, left: r.left });
+  };
   const [picking, setPicking] = useState(false);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
@@ -106,7 +122,8 @@ export function DesignDesk(p: DesignDeskProps) {
             <span className="text-faint">/</span>
             <div className="relative flex min-w-0 items-center gap-2">
               <button
-                onClick={() => setDocMenu(v => !v)}
+                ref={docButton}
+                onClick={toggleDocMenu}
                 className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
                 title="New, Save, Save as…"
                 data-testid="doc-menu-button"
@@ -115,11 +132,12 @@ export function DesignDesk(p: DesignDeskProps) {
                 <span className="text-faint">⌄</span>
               </button>
               {p.edited && <Tag>edited</Tag>}
-              {docMenu && (
+              {docMenu && createPortal((
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setDocMenu(false)} />
+                  <div className="fixed inset-0 z-[60]" onClick={() => setDocMenu(null)} />
                   <div
-                    className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+                    className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+                    style={{ top: docMenu.top, left: docMenu.left }}
                     data-testid="doc-menu"
                   >
                     {[
@@ -129,7 +147,7 @@ export function DesignDesk(p: DesignDeskProps) {
                     ].map(([label, kbd, run, id]) => (
                       <button
                         key={String(id)}
-                        onClick={() => { setDocMenu(false); (run as () => void)(); }}
+                        onClick={() => { setDocMenu(null); (run as () => void)(); }}
                         className="flex w-full items-center justify-between gap-4 px-3 py-2 text-left text-[13px] text-text-2 transition-colors hover:bg-hover hover:text-text"
                         data-testid={String(id)}
                       >
@@ -139,7 +157,7 @@ export function DesignDesk(p: DesignDeskProps) {
                     ))}
                   </div>
                 </>
-              )}
+              ), document.body)}
             </div>
           </>
         }
