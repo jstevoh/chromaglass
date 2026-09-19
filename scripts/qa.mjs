@@ -618,10 +618,14 @@ try {
     // was behaving perfectly. A pure function is the right thing to assert a
     // pure function about.
 
-    // Back to the plate, not stranded in the closeup.
-    const home = apart(plate, await at(1));
+    // Back to the plate, not stranded in the closeup. Asked of the camera
+    // rather than of the picture: with the lasting current the plate itself
+    // moves further in the seconds this takes, so a frame at 1× no longer
+    // matches the one from before the zoom however well the camera came home.
+    await at(1);
+    const homeZoom = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
     check('and it comes back to the plate again',
-      home < far * 0.5, `${home.toFixed(1)} back at 1×`);
+      homeZoom !== null && homeZoom < 1.05, `camera at ${homeZoom === null ? '?' : homeZoom.toFixed(2)}×`);
 
     // The readout follows the zoom, not the old flag.
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));

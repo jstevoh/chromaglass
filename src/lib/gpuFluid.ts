@@ -56,10 +56,24 @@ export interface GpuStepParams {
   air: number;          // airVelocity (0 = off)
   evapFactor: number;
   time: number;
+  /**
+   * The lasting current (see `stepCurrent`). Everything here is per second in
+   * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
+   */
+  currentDamp: number;      // how much of the current survives a step (the Damping control)
+  currentBuoy: number;      // heat rising: × the temperature field
+  rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
+  rockY: number;
+  currentGrav: number;      // a concave dish, × (density − mean): heavy dye pools in the middle
+  twist: number;            // the top glass turning: a differential rotation, fastest inside
+  meanDensity: number;
+  maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
 }
 
 /** Jacobi iteration counts. Gauss-Seidel on the CPU converges roughly twice as fast per sweep. */
 const PRESSURE_ITERS = 24;
+/** The current's projection: warm-started from the last step, on a smooth half-resolution field. */
+const CURRENT_ITERS = 10;
 const SQUEEZE_ITERS = 10;
 const VISC_ITERS = 4;
 const DYE_ITERS = 4;
@@ -384,6 +398,57 @@ void main() {
   fragColor = vec4(v.xy - 0.5 * vec2(gx, gy) * u_N, v.zw);
 }`,
 
+  // ── The lasting current ────────────────────────────────────────────
+  // A second, slower velocity field at half resolution that keeps what it is
+  // given, dragged by the Damping control rather than clamped away. The
+  // forces here are the ones that are meant to build a flow over time and,
+  // on the main field, never could: its end-of-step speed limit held every
+  // cell at 0.002 (about 0.05 cells a second), so buoyancy, the plate's rock
+  // and a concave dish did nothing. Rock and gravity act on the dye's excess
+  // density, because a uniform push in a sealed dish is exactly what
+  // incompressibility removes: it is the heavy dye moving against the light
+  // that makes a flow, and the projection turns that into circulation.
+  currentForces: `${PRELUDE}
+uniform sampler2D u_cur; uniform sampler2D u_vel; uniform sampler2D u_dye;
+uniform float u_damp; uniform float u_dtS; uniform float u_buoy; uniform float u_grav;
+uniform float u_twist; uniform float u_meanD; uniform float u_maxCur; uniform vec2 u_rock;
+void main() {
+  vec2 c = texture(u_cur, v_uv).xy;
+  float temp = texture(u_vel, v_uv).z;
+  // Saturated: a bead six times the plate's mean is heavier than its
+  // surroundings, not six times as eager to move, and unbounded it raced.
+  float dd = tanh(texture(u_dye, v_uv).a - u_meanD);
+  // Heat rises: the grid's y runs up the screen. The heat field is small —
+  // measured, a few hundredths on average and a few tenths at a fresh dose —
+  // so it is taken on a saturating scale: warm dye rises, and a hot spot rises
+  // no faster than the slider allows.
+  vec2 f = vec2(0.0, u_buoy * tanh(max(temp, 0.0) * 20.0));
+  f += u_rock * dd;
+  vec2 toC = vec2(0.5) - v_uv;
+  float r = length(toC);
+  if (r > 1e-4) f += (toC / r) * (u_grav * dd);
+  // The top glass turning: angular speed falling off toward the rim, so the
+  // plate shears into arms instead of spinning as one piece.
+  float w = 1.0 - smoothstep(0.0, 0.5, r);
+  f += u_twist * w * w * vec2(toC.y, -toC.x);
+  // Relax toward the flow the forces ask for: in a film this thin between
+  // glass the drag is what sets the speed, so a force is a velocity to settle
+  // at, and Damping is only how long the plate takes to get there and to let go.
+  c = c * u_damp + f * (1.0 - u_damp);
+  float s = length(c);
+  if (s > u_maxCur) c *= u_maxCur / s;
+  fragColor = vec4(c, 0.0, 0.0);
+}`,
+
+  // The flow the dye rides: the main field plus the current, sampled up from
+  // its half resolution. Temperature (z) comes from the main field.
+  addCurrent: `${PRELUDE}
+uniform sampler2D u_vel; uniform sampler2D u_cur;
+void main() {
+  vec4 v = texture(u_vel, v_uv);
+  fragColor = vec4(v.xy + texture(u_cur, v_uv).xy, v.zw);
+}`,
+
   // Semi-Lagrangian advection. u_disp converts velocity to a uv displacement:
   // dt·(N-2)/N for the solver, or the drain's own scale.
   advect: `${PRELUDE}
@@ -606,6 +671,11 @@ export class GpuFluid {
    * still and ignores turbulence entirely.
    */
   private velForced!: Target;
+  /** The lasting current, its warm-started pressure and divergence, at half resolution. */
+  private cur!: PingPong;
+  private curP!: PingPong;
+  private curDiv!: Target;
+  private readonly M: number;
   private scratchA!: Target;   // MacCormack intermediates
   private scratchB!: Target;
   private readbackTarget!: Target;
@@ -660,6 +730,7 @@ export class GpuFluid {
     this.gl = gl;
     this.N = physicalSize;
     this.L = logicalSize;
+    this.M = Math.max(64, Math.round(physicalSize / 2));
     this.rbDye = new Float32Array(logicalSize * logicalSize * 4);
     this.rbVel = new Float32Array(logicalSize * logicalSize * 4);
     for (let i = 0; i < 2; i++) {
@@ -700,6 +771,9 @@ export class GpuFluid {
     this.spress = this.pingPong(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.div = this.target(N, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     this.velForced = this.target(N, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
+    this.cur = this.pingPong(this.M, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
+    this.curP = this.pingPong(this.M, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
+    this.curDiv = this.target(this.M, gl.R16F, gl.RED, gl.HALF_FLOAT, gl.LINEAR);
     // The scratch targets carry the dye's advection intermediates, so they
     // match the dye's precision (the velocity passes through them too).
     this.scratchA = this.target(N, dyeInternal, gl.RGBA, dyeType, gl.LINEAR);
@@ -724,7 +798,8 @@ export class GpuFluid {
     const gl = this.gl;
     for (const t of [this.dye.read, this.dye.write, this.vel.read, this.vel.write,
                      this.press.read, this.press.write, this.spress.read, this.spress.write,
-                     this.div, this.velForced, this.scratchA, this.scratchB]) {
+                     this.div, this.velForced, this.scratchA, this.scratchB,
+                     this.cur.read, this.cur.write, this.curP.read, this.curP.write, this.curDiv]) {
       this.clearTarget(t, 0, 0, 0, 0);
     }
     this.clearTarget(this.squeeze.read, 0.03, 0, 0, 0);
@@ -829,15 +904,9 @@ export class GpuFluid {
     });
     this.vel.swap();
 
-    // 2. Buoyancy and centre gravity
-    this.run('forcesA', this.vel.write, (u) => {
-      this.bind(u, 'u_vel', this.vel.read.tex, 0);
-      gl.uniform1f(u.get('u_dt')!, p.dt);
-      gl.uniform1f(u.get('u_buoyancy')!, p.buoyancy);
-      gl.uniform1f(u.get('u_gravity')!, p.gravity);
-      gl.uniform2f(u.get('u_tilt')!, p.tiltX, p.tiltY);
-    });
-    this.vel.swap();
+    // 2. Buoyancy, the plate's rock and centre gravity used to be applied here,
+    // to this field, where the end-of-step speed limit took them straight back
+    // out. They act on the lasting current now (stepCurrent).
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
@@ -866,15 +935,20 @@ export class GpuFluid {
       gl.uniform1f(u.get('u_air')!, p.air);
     });
     this.vel.swap();
-    this.run('scale', this.velForced, (u) => {
-      this.bind(u, 'u_src', this.vel.read.tex, 0);
-      gl.uniform1f(u.get('u_k')!, 1);
+
+    // 8.9. The lasting current, and the flow the dye rides: this field (with
+    // this step's pushes, which the end-of-step limit will take back out) plus
+    // the current (which keeps what it has, less its drag).
+    this.stepCurrent(p);
+    this.run('addCurrent', this.velForced, (u) => {
+      this.bind(u, 'u_vel', this.vel.read.tex, 0);
+      this.bind(u, 'u_cur', this.cur.read.tex, 1);
     });
 
     // 9. Dye: diffuse, then MacCormack advect through the forced velocity
     const a = p.dt * p.diff * n2;
     this.jacobi(this.dye, [a, a, a, a], DYE_ITERS);
-    this.macCormack(this.dye, this.vel.read.tex, disp);
+    this.macCormack(this.dye, this.velForced.tex, disp);
 
     // 9.5. Sharpen the interfaces the advection and the diffusion just softened.
     if (p.sharpness > 0.0001) {
@@ -890,7 +964,7 @@ export class GpuFluid {
     if (this.grain) {
       this.run('advect', this.grain.write, (u) => {
         this.bind(u, 'u_src', this.grain!.read.tex, 0);
-        this.bind(u, 'u_vel', this.vel.read.tex, 1);
+        this.bind(u, 'u_vel', this.velForced.tex, 1);
         gl.uniform1f(u.get('u_disp')!, disp);
       });
       this.grain.swap();
@@ -1071,7 +1145,8 @@ export class GpuFluid {
     for (const s of this.pbo) { gl.deleteBuffer(s.dye); gl.deleteBuffer(s.vel); if (s.fence) gl.deleteSync(s.fence); }
     this.pbo = [];
     if (this.grain) for (const t of [this.grain.read, this.grain.write]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
-    for (const t of [this.div, this.velForced, this.scratchA, this.scratchB, this.readbackTarget]) {
+    for (const pp of [this.cur, this.curP]) for (const t of [pp.read, pp.write]) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
+    for (const t of [this.div, this.velForced, this.curDiv, this.scratchA, this.scratchB, this.readbackTarget]) {
       gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex);
     }
     for (const t of [this.deltaDye, this.deltaVel, this.deltaMul]) gl.deleteTexture(t);
@@ -1081,6 +1156,46 @@ export class GpuFluid {
   }
 
   // ── Composite passes ──────────────────────────────────────────────
+
+  /**
+   * One step of the lasting current: forces and drag, then a projection so it
+   * stays incompressible. The pressure is not cleared between steps — the
+   * current changes slowly, so the last step's answer is most of this one's
+   * and ten warm iterations on the half-resolution field hold it well.
+   */
+  private stepCurrent(p: GpuStepParams): void {
+    const gl = this.gl;
+    const M = this.M;
+    this.run('currentForces', this.cur.write, (u) => {
+      this.bind(u, 'u_cur', this.cur.read.tex, 0);
+      this.bind(u, 'u_vel', this.vel.read.tex, 1);
+      this.bind(u, 'u_dye', this.dye.read.tex, 2);
+      gl.uniform1f(u.get('u_damp')!, p.currentDamp);
+      gl.uniform1f(u.get('u_dtS')!, 1 / 60);
+      gl.uniform1f(u.get('u_buoy')!, p.currentBuoy);
+      gl.uniform1f(u.get('u_grav')!, p.currentGrav);
+      gl.uniform1f(u.get('u_twist')!, p.twist);
+      gl.uniform1f(u.get('u_meanD')!, p.meanDensity);
+      gl.uniform1f(u.get('u_maxCur')!, p.maxCurrent);
+      gl.uniform2f(u.get('u_rock')!, p.rockX, p.rockY);
+    }, M, M);
+    this.cur.swap();
+    this.run('divergence', this.curDiv, (u) => {
+      this.bind(u, 'u_vel', this.cur.read.tex, 0);
+    }, M, M);
+    for (let k = 0; k < CURRENT_ITERS; k++) {
+      this.run('pressureJacobi', this.curP.write, (u) => {
+        this.bind(u, 'u_p', this.curP.read.tex, 0);
+        this.bind(u, 'u_div', this.curDiv.tex, 1);
+      }, M, M);
+      this.curP.swap();
+    }
+    this.run('gradientSubtract', this.cur.write, (u) => {
+      this.bind(u, 'u_vel', this.cur.read.tex, 0);
+      this.bind(u, 'u_p', this.curP.read.tex, 1);
+    }, M, M);
+    this.cur.swap();
+  }
 
   private project(): void {
     const gl = this.gl;
@@ -1153,19 +1268,25 @@ export class GpuFluid {
 
   // ── GL plumbing ───────────────────────────────────────────────────
 
-  private run(name: ShaderName, target: Target, setUniforms: (u: Map<string, WebGLUniformLocation | null>) => void, size = this.N): void {
-    this.runInto(name, target.fbo, setUniforms, size);
+  private run(name: ShaderName, target: Target, setUniforms: (u: Map<string, WebGLUniformLocation | null>) => void, size = this.N, grid = this.N): void {
+    this.runInto(name, target.fbo, setUniforms, size, grid);
   }
 
-  private runInto(name: ShaderName, fbo: WebGLFramebuffer, setUniforms: (u: Map<string, WebGLUniformLocation | null>) => void, size = this.N): void {
+  /**
+   * `size` is the viewport; `grid` is the resolution the stencil shaders step
+   * across (u_texel, u_N). They differ only for the downsample, which writes an
+   * L² target while reading the N² field; the half-resolution current passes
+   * give both as M.
+   */
+  private runInto(name: ShaderName, fbo: WebGLFramebuffer, setUniforms: (u: Map<string, WebGLUniformLocation | null>) => void, size = this.N, grid = this.N): void {
     const gl = this.gl;
     const program = this.program(name);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, size, size);
     gl.useProgram(program.prog);
     gl.bindVertexArray(this.vao);
-    gl.uniform2f(program.uniforms.get('u_texel')!, 1 / this.N, 1 / this.N);
-    gl.uniform1f(program.uniforms.get('u_N')!, this.N);
+    gl.uniform2f(program.uniforms.get('u_texel')!, 1 / grid, 1 / grid);
+    gl.uniform1f(program.uniforms.get('u_N')!, grid);
     gl.uniform1f(program.uniforms.get('u_L')!, this.L);
     setUniforms(program.uniforms);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

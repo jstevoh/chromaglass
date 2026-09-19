@@ -29,6 +29,7 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { PIN_RANGE } from './deskPins';
 
 /**
  * What a preset that does not mention them should get.
@@ -83,6 +84,13 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
     const b = to[key];
     if (key === 'simResolution') { out[key] = a; continue; }
     if (typeof a === 'number' && typeof b === 'number') {
+      // A control that only takes whole steps — layers, the kaleidoscope's
+      // folds, turbulence octaves — switches at the midpoint the way a choice
+      // does: in between is not a value it has. Faded, a Go from one layer to
+      // two passed the layer count through 1.05, 1.1, … and the visualizer
+      // built a whole second solver on one frame and threw it away on the next,
+      // for every frame of the fade.
+      if (PIN_RANGE.get(key)?.step) { out[key] = past ? b : a; continue; }
       // `a + (b - a) * 1` is not `b` in floating point: fading 0.5 to 0.05
       // lands on 0.04999999999999999. A hundredth of a millionth does not
       // show on a wall, but it means the look you cued is not the look you
