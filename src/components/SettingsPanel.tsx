@@ -265,10 +265,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
     && typeof (navigator.mediaDevices as { getDisplayMedia?: unknown } | undefined)?.getDisplayMedia === 'function';
-  const [liveFps, setLiveFps] = useState<number | null>(null);
+  const [live, setLive] = useState<EngineStatus | null>(null);
   useEffect(() => {
     if (!getLiveEngineStatus) return;
-    const tick = () => { const s = getLiveEngineStatus(); setLiveFps(s && s.frameMs > 0 ? Math.round(1000 / s.frameMs) : null); };
+    const tick = () => { setLive(getLiveEngineStatus() ?? null); };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -1914,7 +1914,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <span className="text-[13px] font-medium text-text">Fluid Grid</span>
             {engineStatus && (
               <span className="text-[12px] font-mono opacity-50">
-                {engineStatus.label} · {liveFps ?? (engineStatus.frameMs > 0 ? Math.round(1000 / engineStatus.frameMs) : '–')} fps
+                {engineStatus.label} · {(live ?? engineStatus).frameMs > 0 ? Math.round(1000 / (live ?? engineStatus).frameMs) : '–'} fps
+                {/*
+                  The speed, when it is not full speed. A frame rate says the
+                  frames are arriving; it cannot say the liquid inside them is
+                  advancing slower than the clock, which is what happens when a
+                  solver step costs more than a frame and the catch-up gives up.
+                  Shown only when it is true, because on a machine with room it
+                  is always 60 and would be noise.
+                */}
+                {(() => {
+                  const sps = (live ?? engineStatus).stepsPerSec;
+                  if (!(sps > 0) || sps >= 57) return null;
+                  return <span className="text-amber-300/80"> · {Math.round((sps / 60) * 100)}% speed</span>;
+                })()}
               </span>
             )}
           </div>

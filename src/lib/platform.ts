@@ -150,4 +150,19 @@ export interface EngineStatus {
   gpuUnavailable: boolean;
   /** Smoothed frame interval, milliseconds. */
   frameMs: number;
+  /** Cost of one solver step across every layer, milliseconds. */
+  simMs: number;
+  /**
+   * Solver steps actually being taken per second, against the 60 the show
+   * asks for. Below that the plate is in slow motion: the frames are fine and
+   * the liquid is evolving slower than wall-clock, which a frame rate cannot
+   * show you. See the catch-up rule in LiquidVisualizer.
+   */
+  stepsPerSec: number;
+  /**
+   * Frame time that is not the solver — renderer, readback, React, the bead
+   * camera, everything else. The number that says whether a finer grid is
+   * what is costing you, or whether the grid was never the problem.
+   */
+  otherMs: number;
 }

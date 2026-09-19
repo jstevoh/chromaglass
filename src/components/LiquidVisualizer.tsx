@@ -2248,6 +2248,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simAccumRef = useRef(0);
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
+  /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
+  const stepsPerSecRef = useRef(60);
+  /** What the catch-up rule allowed last frame, for the debug readout. */
+  const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
   const outputCfgRef = useRef(output);
   outputCfgRef.current = output;
@@ -4627,9 +4631,24 @@ void main() {
         // slow frame into a run of them — better to let the show run a little
         // slow than to stutter.
         const catchUp = simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP;
+        catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
         simAccumRef.current -= simSteps * SIM_STEP;
+
+        // How many steps a second that is actually producing.
+        //
+        // The cap above is the one thing in the loop that trades the show's
+        // speed for a smooth frame, and it does it silently: when a step costs
+        // more than a frame's budget the plate advances less than a second of
+        // liquid per second of wall clock, and every frame still arrives on
+        // time. A frame rate cannot show that — 15 fps with four steps a frame
+        // and 15 fps with one are the same number and a quarter of the motion.
+        // So measure the rate directly and report it next to the frame rate.
+        if (realDt > 0) {
+          const k = 1 - Math.exp(-realDt / 1.5);
+          stepsPerSecRef.current += (simSteps / realDt - stepsPerSecRef.current) * k;
+        }
 
         // ── Drain animation ────────────────────────────────────
         if (drainTriggerRef.current > lastDrainTrigger.current) {
@@ -4756,6 +4775,12 @@ void main() {
             steppedDown: governed && governor.steppedDown,
             gpuUnavailable,
             frameMs: governor.frameMs,
+            simMs: simMsRef.current,
+            stepsPerSec: stepsPerSecRef.current,
+            // The solver's share of a frame is one step's cost times the steps
+            // that frame owed; what is left is everything that is not the
+            // solver, and does not fall when the grid does.
+            otherMs: Math.max(0, governor.frameMs - simMsRef.current * stepsPerSecRef.current * (governor.frameMs / 1000)),
           };
           const prev = engineStatusRef.current;
           // The label changes rarely; the frame time ticks over once a second.
@@ -6097,6 +6122,13 @@ void main() {
         engine: engineStatusRef.current?.label ?? '',
         status: engineStatusRef.current,
         governor: governorRef.current,
+        /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
+        solver: () => ({
+          simMs: simMsRef.current,
+          stepsPerSec: stepsPerSecRef.current,
+          catchUp: catchUpRef.current,
+          layers: fluidsRef.current.length,
+        }),
         externalTilt: externalTiltRef.current,
         bubbles: bubblesRef.current,
         // What the shader was actually told about them last frame: a bubble
