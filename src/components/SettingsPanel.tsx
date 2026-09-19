@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image } from 'lucide-react';
+import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
@@ -8,7 +8,7 @@ import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
-import { OutputPanel } from './OutputPanel';
+import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
 import { Segmented, Sheet } from './ui';
 import { readSetting } from '../lib/readout';
@@ -1850,6 +1850,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             particular.
           </Info>
         )}
+      </section>
+
+      {/* Mapping Section */}
+      <section id="settings-mapping" className={`mb-8 scroll-mt-4 ${shown('mapping') ? '' : 'hidden'} ${focusSection === 'mapping' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="mapping">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Shapes size={12} /> Mapping
+        </h3>
+        {output && onOutput && <MappingPanel output={output} onChange={onOutput} />}
       </section>
 
       {/* Simulation Section */}

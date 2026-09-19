@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
 import {
   DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_SHAPES,
@@ -35,6 +35,46 @@ const SHAPE_LABELS: Record<SurfaceShape, string> = {
   rect: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle', diamond: 'Diamond',
 };
 
+/**
+ * The shape of the frame the corners are fractions of.
+ *
+ * Both pads were drawn at 16:9, which is right for a projector on HDMI and
+ * wrong for everything else: the plate renders at the window's shape unless a
+ * projector is attached, and on a 1470x956 laptop window a circle drawn round
+ * on the pad came out taller on the wall than it looked here. Read from the
+ * canvas's backing store, which is the frame the output pass actually maps
+ * onto, and followed while the panel is open because attaching a projector
+ * changes it without resizing this window.
+ */
+function useFrameAspect(): number {
+  const read = () => {
+    const c = document.getElementById('liquid-canvas') as HTMLCanvasElement | null;
+    const a = c && c.width > 0 && c.height > 0 ? c.width / c.height : 16 / 9;
+    return Math.max(0.5, Math.min(3, a));
+  };
+  const [aspect, setAspect] = useState(read);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const a = read();
+      setAspect(prev => (Math.abs(prev - a) > 0.005 ? a : prev));
+    }, 500);
+    return () => window.clearInterval(id);
+  }, []);
+  return aspect;
+}
+
+/**
+ * The shape that had its handles, kept across the panel closing.
+ *
+ * Mapping is drag a corner, close Settings to look at the wall, open it again,
+ * drag again. The panel unmounts when Settings closes, so a selection held only
+ * in its state was gone every time the operator looked, and the next drag
+ * started with a click to find the shape again. Held for the page's life, not
+ * saved: surfaces keep their ids, and one that has since been deleted simply
+ * matches nothing.
+ */
+let lastSelected: string | null = null;
+
 const poly = (pts: [number, number][]) => pts.map(([x, y]) => `${x * 100}% ${y * 100}%`).join(', ');
 
 /**
@@ -51,11 +91,12 @@ const poly = (pts: [number, number][]) => pts.map(([x, y]) => `${x * 100}% ${y *
  * projector is an ellipse on the wall, and the preview has to show that or it
  * is lying about the one thing it exists to show.
  */
-function SurfacePad({ surfaces, selected, onSelect, onChange }: {
+function SurfacePad({ surfaces, selected, onSelect, onChange, aspect }: {
   surfaces: Surface[];
   selected: string | null;
   onSelect: (id: string) => void;
   onChange: (id: string, next: Partial<Surface>) => void;
+  aspect: number;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -90,7 +131,7 @@ function SurfacePad({ surfaces, selected, onSelect, onChange }: {
     <div
       ref={boxRef}
       className="relative mb-3 w-full overflow-hidden rounded-lg border border-white/10 bg-black touch-none"
-      style={{ aspectRatio: '16 / 9' }}
+      style={{ aspectRatio: aspect }}
       onPointerMove={e => { if (dragging !== null) moveTo(dragging, e.clientX, e.clientY); }}
       onPointerUp={() => setDragging(null)}
       onPointerCancel={() => setDragging(null)}
@@ -156,11 +197,12 @@ function SurfacePad({ surfaces, selected, onSelect, onChange }: {
  * squinting at the actual wall. The grid is the point — a keystone is obvious
  * against straight lines and invisible against liquid.
  */
-function CornerPad({ value, onChange, flipX, flipY }: {
+function CornerPad({ value, onChange, flipX, flipY, aspect }: {
   value: OutputConfig['corners'];
   onChange: (next: OutputConfig['corners']) => void;
   flipX: boolean;
   flipY: boolean;
+  aspect: number;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -215,7 +257,7 @@ function CornerPad({ value, onChange, flipX, flipY }: {
     <div
       ref={boxRef}
       className="relative mb-3 w-full overflow-hidden rounded-lg border border-white/10 bg-black touch-none"
-      style={{ aspectRatio: '16 / 9' }}
+      style={{ aspectRatio: aspect }}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
@@ -293,25 +335,12 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
   wakeLock?: { supported: boolean; held: boolean };
 }) {
   const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
-
-  // ── Projection mapping ──
-  const surfaces = output.surfaces ?? [];
-  const [selected, setSelected] = useState<string | null>(null);
-  const active = surfaces.find(s => s.id === selected) ?? null;
-  const setSurfaces = (next: Surface[]) => set({ surfaces: next.slice(0, MAX_SURFACES) });
-  const patchSurface = (id: string, patch: Partial<Surface>) =>
-    setSurfaces(surfaces.map(s => (s.id === id ? { ...s, ...patch } : s)));
-  const addSurfaces = (made: Surface[]) => {
-    const next = [...surfaces, ...made].slice(0, MAX_SURFACES);
-    setSurfaces(next);
-    // Select what was just made: the first thing anybody does with a new shape
-    // is drag a corner, and a new shape with no handles looks like nothing
-    // happened.
-    if (next.length > surfaces.length) setSelected(next[surfaces.length].id);
-  };
+  const aspect = useFrameAspect();
   // Reset puts the guard back on as well as squaring the geometry, so it has
-  // something to do even when the geometry is already square.
-  const identity = outputIsIdentity(output) && output.flashGuard;
+  // something to do even when the geometry is already square. It leaves the
+  // mapped shapes alone — they have a section and a Clear of their own — so
+  // "already reset" is judged without them.
+  const identity = outputIsIdentity({ ...output, surfaces: [] }) && output.flashGuard;
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="output-panel">
@@ -351,6 +380,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
         onChange={corners => set({ corners })}
         flipX={output.flipX}
         flipY={output.flipY}
+        aspect={aspect}
       />
       <div className="mb-3 flex justify-end">
         <button
@@ -362,8 +392,77 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
         </button>
       </div>
 
-      {/* ── Projection mapping ─────────────────────────────────────── */}
-      <h4 className="mb-2 mt-6 text-[12px] uppercase tracking-[0.3em] opacity-30">Mapping</h4>
+      <Row label="Mask Top"    value={output.maskTop}    min={0} max={0.45} step={0.005} onChange={v => set({ maskTop: v })} />
+      <Row label="Mask Bottom" value={output.maskBottom} min={0} max={0.45} step={0.005} onChange={v => set({ maskBottom: v })} />
+      <Row label="Mask Left"   value={output.maskLeft}   min={0} max={0.45} step={0.005} onChange={v => set({ maskLeft: v })} />
+      <Row label="Mask Right"  value={output.maskRight}  min={0} max={0.45} step={0.005} onChange={v => set({ maskRight: v })} />
+      <Row label="Mask Edge"   value={output.maskFeather} min={0} max={0.25} step={0.005} onChange={v => set({ maskFeather: v })} />
+
+      <Row label="Output Gain"  value={output.gain}  min={0.2} max={3}   step={0.05} onChange={v => set({ gain: v })}  format={v => `${v.toFixed(2)}x`} />
+      <Row label="Output Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} onChange={v => set({ gamma: v })} />
+
+      <div className="mb-3 mt-1 flex gap-1.5">
+        <Switch
+          label={output.flashGuard ? 'Flash Limit On' : 'Flash Limit Off'}
+          on={output.flashGuard}
+          onChange={v => set({ flashGuard: v })}
+          hint="Hold the whole screen below three flashes a second"
+          testId="output-flash-guard"
+        />
+      </div>
+
+      <Info>
+        Set this once, at load-in, with the projector on and from where the audience will be — none of it belongs to a look, so nothing here is saved into a preset and no fader can reach it mid-song.
+        {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
+        {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
+        {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
+        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
+        {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and it is here, not in the settings, because no preset should be able to switch off a safety and no fader should be able to knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
+        {wakeLock && (
+          wakeLock.supported
+            ? ` The screen is being kept awake${wakeLock.held ? '' : ' while the plate is running'}, so nothing dims or sleeps mid-set.`
+            : ' This address cannot keep the screen awake (that needs https or localhost), so turn off sleep and the screensaver on this machine by hand.'
+        )}
+      </Info>
+    </div>
+  );
+}
+
+export { DEFAULT_OUTPUT };
+
+/**
+ * Projection mapping, as a section of its own.
+ *
+ * It was the middle of Projectors, between the corner pin and the masks, and
+ * took that section to 3.2 screens deep — past the three the settings sheet
+ * holds every section to, and far enough that the output grade and the flash
+ * limit below it were a long scroll from the wall they belong to. Same config,
+ * same room, its own row on the rail.
+ */
+export function MappingPanel({ output, onChange }: {
+  output: OutputConfig;
+  onChange: (next: OutputConfig) => void;
+}) {
+  const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
+  const aspect = useFrameAspect();
+  const surfaces = output.surfaces ?? [];
+  const [selected, setSelectedState] = useState<string | null>(() => lastSelected);
+  const setSelected = (id: string | null) => { lastSelected = id; setSelectedState(id); };
+  const active = surfaces.find(s => s.id === selected) ?? null;
+  const setSurfaces = (next: Surface[]) => set({ surfaces: next.slice(0, MAX_SURFACES) });
+  const patchSurface = (id: string, patch: Partial<Surface>) =>
+    setSurfaces(surfaces.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  const addSurfaces = (made: Surface[]) => {
+    const next = [...surfaces, ...made].slice(0, MAX_SURFACES);
+    setSurfaces(next);
+    // Select what was just made: the first thing anybody does with a new shape
+    // is drag a corner, and a new shape with no handles looks like nothing
+    // happened.
+    if (next.length > surfaces.length) setSelected(next[surfaces.length].id);
+  };
+
+  return (
+    <div className="mb-6 flex flex-col gap-2" data-testid="mapping-panel">
       <p className="mb-3 text-[12px] leading-relaxed text-white/40">
         Cut the picture into shapes on the wall, with the dark left dark between them.
         Add a shape, then drag its corners onto whatever the projector is pointed at —
@@ -375,6 +474,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
         selected={selected}
         onSelect={setSelected}
         onChange={patchSurface}
+        aspect={aspect}
       />
 
       <div className="mb-3 flex flex-wrap gap-1.5">
@@ -492,41 +592,6 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
           ))}
         </div>
       )}
-
-      <Row label="Mask Top"    value={output.maskTop}    min={0} max={0.45} step={0.005} onChange={v => set({ maskTop: v })} />
-      <Row label="Mask Bottom" value={output.maskBottom} min={0} max={0.45} step={0.005} onChange={v => set({ maskBottom: v })} />
-      <Row label="Mask Left"   value={output.maskLeft}   min={0} max={0.45} step={0.005} onChange={v => set({ maskLeft: v })} />
-      <Row label="Mask Right"  value={output.maskRight}  min={0} max={0.45} step={0.005} onChange={v => set({ maskRight: v })} />
-      <Row label="Mask Edge"   value={output.maskFeather} min={0} max={0.25} step={0.005} onChange={v => set({ maskFeather: v })} />
-
-      <Row label="Output Gain"  value={output.gain}  min={0.2} max={3}   step={0.05} onChange={v => set({ gain: v })}  format={v => `${v.toFixed(2)}x`} />
-      <Row label="Output Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} onChange={v => set({ gamma: v })} />
-
-      <div className="mb-3 mt-1 flex gap-1.5">
-        <Switch
-          label={output.flashGuard ? 'Flash Limit On' : 'Flash Limit Off'}
-          on={output.flashGuard}
-          onChange={v => set({ flashGuard: v })}
-          hint="Hold the whole screen below three flashes a second"
-          testId="output-flash-guard"
-        />
-      </div>
-
-      <Info>
-        Set this once, at load-in, with the projector on and from where the audience will be — none of it belongs to a look, so nothing here is saved into a preset and no fader can reach it mid-song.
-        {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
-        {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
-        {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
-        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
-        {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and it is here, not in the settings, because no preset should be able to switch off a safety and no fader should be able to knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
-        {wakeLock && (
-          wakeLock.supported
-            ? ` The screen is being kept awake${wakeLock.held ? '' : ' while the plate is running'}, so nothing dims or sleeps mid-set.`
-            : ' This address cannot keep the screen awake (that needs https or localhost), so turn off sleep and the screensaver on this machine by hand.'
-        )}
-      </Info>
     </div>
   );
 }
-
-export { DEFAULT_OUTPUT };

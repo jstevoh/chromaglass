@@ -194,7 +194,10 @@ export default function App() {
       return value;
     });
   }, []);
-  const resetOutput = useCallback(() => setOutput({ ...DEFAULT_OUTPUT }), [setOutput]);
+  // The wall's Reset squares the projector and leaves the mapped shapes: they
+  // live in a section of their own with their own Clear, and a Reset pressed
+  // over there should not quietly throw away an evening's corner-dragging here.
+  const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
 
   // ── Where the tempo comes from ──────────────────────────────────
   // The microphone, unless something better is offering: a MIDI clock from
