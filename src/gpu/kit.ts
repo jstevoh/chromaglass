@@ -203,6 +203,9 @@ export class ReadbackRing {
 
   /** The newest data that has come back, or null before the first. */
   get latest(): ArrayBuffer | null { return this.data; }
+
+  /** Which copy the newest data came from: it rises each time a fresh one lands. */
+  get landed(): number { return this.landedSeq; }
 }
 
 // ── GPU timings ──────────────────────────────────────────────────────

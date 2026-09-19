@@ -277,12 +277,7 @@ async function main() {
   // ── The measurements ─────────────────────────────────────────────
   // The 32-byte answer against the same sums taken over the field itself.
   {
-    // The ring answers a frame or two late by design, so ask until it does.
-    let m = gpuFluid.measure();
-    for (let i = 0; i < 50 && !gpuFluid.measured; i++) {
-      await new Promise((r) => setTimeout(r, 20));
-      m = gpuFluid.measure();
-    }
+    const m = await gpuFluid.measureNow();
     const area = gpuDye.length / 4;
     let sd = 0, sr = 0, sg = 0, sb = 0, maxD = 0, maxV = 0;
     for (let i = 0; i < gpuDye.length; i += 4) {
@@ -291,6 +286,39 @@ async function main() {
       maxV = Math.max(maxV, Math.hypot(gpuVel[i], gpuVel[i + 1]));
     }
     const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-9);
+
+    // Again after the field has moved on, and after the dye has changed hands:
+    // a measurement bound once to one half of the ping-pong would keep
+    // answering about the plate that half still holds.
+    for (let i = 0; i < 13; i++) gpuFluid.step({ ...PARAMS, time: PARAMS.time + i * PARAMS.dt }, true);
+    const m2 = await gpuFluid.measureNow();
+    const moved = await gpuFluid.readField('dye');
+    let sd2 = 0;
+    for (let i = 3; i < moved.length; i += 4) sd2 += moved[i];
+    out.measureAfterSteps = {
+      gpu: m2.meanDensity, field: sd2 / area,
+      rel: +rel(m2.meanDensity, sd2 / area).toExponential(2),
+      changed: +Math.abs(m2.meanDensity - m.meanDensity).toExponential(2),
+    };
+
+    // And the ring the show actually uses: with the plate held still, the
+    // numbers it hands back have to arrive at the same answer.
+    let ringed = gpuFluid.measure();
+    for (let i = 0; i < 100 && ringed.at < 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      ringed = gpuFluid.measure();
+    }
+    const firstAt = ringed.at;
+    for (let i = 0; i < 100 && ringed.at <= firstAt + 1; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      ringed = gpuFluid.measure();
+    }
+    out.measureRing = {
+      gpu: ringed.meanDensity, exact: m2.meanDensity,
+      rel: +rel(ringed.meanDensity, m2.meanDensity).toExponential(2),
+      copies: ringed.at,
+    };
+
     out.measure = {
       landed: gpuFluid.measured,
       meanDensity: { gpu: m.meanDensity, field: sd / area, rel: +rel(m.meanDensity, sd / area).toExponential(2) },

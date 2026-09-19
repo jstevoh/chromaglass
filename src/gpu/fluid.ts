@@ -40,6 +40,8 @@ export interface FieldStats {
   maxVy: number;
   /** The fastest flow anywhere, for the macro detail pass. */
   maxSpeed: number;
+  /** Which copy these numbers came from; it rises as fresh ones land. */
+  at: number;
 }
 
 const PRESSURE_ITERS = 24;
@@ -95,7 +97,7 @@ export class WebGPUFluid {
   private readonly statsResult: GPUBuffer;
   private readonly statsRing: ReadbackRing;
   private statsFresh = false;
-  private statsLatest: FieldStats = { meanDensity: 0, meanColor: [0, 0, 0], maxDensity: 0, maxSpeed: 0, maxVx: 0, maxVy: 0 };
+  private statsLatest: FieldStats = { meanDensity: 0, meanColor: [0, 0, 0], maxDensity: 0, maxSpeed: 0, maxVx: 0, maxVy: 0, at: -1 };
 
   private readonly sim: GPUBuffer;
   private readonly simData = new ArrayBuffer(SIM_FLOATS * 4);
@@ -630,13 +632,14 @@ export class WebGPUFluid {
     if (slot) this.statsRing.collect(slot);
     const data = this.statsRing.latest;
     this.statsFresh = !!data;
-    if (data) {
+    if (data && this.statsRing.landed > this.statsLatest.at) {
       const f = new Float32Array(data);
       const area = this.N * this.N;
       this.statsLatest = {
         meanDensity: f[3] / area,
         meanColor: [f[0] / area, f[1] / area, f[2] / area],
         maxDensity: f[4], maxVx: f[5], maxVy: f[6], maxSpeed: f[7],
+        at: this.statsRing.landed,
       };
     }
     return this.statsLatest;
@@ -645,12 +648,49 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
+  /**
+   * The same measurement, waiting for the GPU. For harnesses, not the show:
+   * it answers about the plate as it is now rather than as it was two frames
+   * ago, at the cost of a stall.
+   */
+  async measureNow(): Promise<FieldStats> {
+    const buf = new ArrayBuffer(16);
+    new Float32Array(buf, 0, 1)[0] = this.N;
+    new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    this.device.queue.writeBuffer(this.statsArgs, 0, buf);
+    const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'measure now' });
+    const pass = enc.beginComputePass({ label: 'measure now' });
+    this.statsRun(pass, 'statsTiles', [this.dye.read, this.velForced, this.statsPartials], STATS_GROUPS);
+    this.statsRun(pass, 'statsFold', [this.statsPartials, this.statsResult], 1);
+    pass.end();
+    enc.copyBufferToBuffer(this.statsResult, 0, out, 0, 32);
+    this.device.queue.submit([enc.finish()]);
+    await out.mapAsync(GPUMapMode.READ);
+    const f = new Float32Array(out.getMappedRange().slice(0));
+    out.unmap();
+    out.destroy();
+    const area = this.N * this.N;
+    return {
+      meanDensity: f[3] / area,
+      meanColor: [f[0] / area, f[1] / area, f[2] / area],
+      maxDensity: f[4], maxVx: f[5], maxVy: f[6], maxSpeed: f[7],
+      at: this.statsLatest.at,
+    };
+  }
+
   /** Whether any measurement has come back yet. */
   get measured(): boolean { return this.statsFresh; }
 
+  /** Which copy the last measurement came from; it rises as fresh ones land. */
+  get measuredSeq(): number { return this.statsLatest.at; }
+
   private statsRun(pass: GPUComputePassEncoder, name: string, rest: (GPUBuffer | GPUTexture)[], groups: number): void {
     const pipe = this.pipelines.computePipeline(name, STATS_KERNELS[name]);
-    const key = `stats ${name}`;
+    // The dye is a ping-pong, so the key has to name the half that is bound:
+    // a group cached under the kernel's name alone would go on measuring
+    // whichever texture happened to be the read side when it was made.
+    const key = `stats ${name}:${rest.map((r) => r.label).join(',')}`;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.statsArgs, ...rest]);

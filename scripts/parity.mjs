@@ -79,6 +79,12 @@ try {
       const m = r.measure;
       check('the plate measures itself', m.meanDensity.rel < 1e-4 && m.meanColor.rel < 1e-4 && m.maxDensity.rel < 1e-5 && m.maxSpeed.rel < 1e-5,
         `mean dye ${m.meanDensity.gpu} vs ${m.meanDensity.field}, peak ${m.maxDensity.gpu} vs ${m.maxDensity.field}, fastest ${m.maxSpeed.gpu} vs ${m.maxSpeed.field}`);
+      const m2 = r.measureAfterSteps;
+      check('it keeps measuring the plate it is on', m2.rel < 1e-4 && m2.changed > 0,
+        `after thirteen more steps ${m2.gpu} vs ${m2.field}, moved by ${m2.changed}`);
+      const ring = r.measureRing;
+      check('the measurement the show reads catches up', ring.copies > 1 && ring.rel < 1e-6,
+        `${ring.gpu} against ${ring.exact} exact, after ${ring.copies} copies`);
       // Pours: the CPU's arrays against the GPU's own splats.
       check('the splats land where the CPU painted them', r.splatDye.meanRel < 0.005 && r.splatDye.maxRel < 0.1,
         `dye mean ${r.splatDye.meanRel} of rms, worst ${r.splatDye.maxRel}; velocity worst ${r.splatVel.maxRel}`);
