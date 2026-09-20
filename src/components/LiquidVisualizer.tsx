@@ -19,7 +19,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outp
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
-import { classifyGpu, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
+import { classifyGpu, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
@@ -2310,6 +2310,31 @@ interface FrameView {
   fxSeed: number;
 }
 
+/**
+ * What the loop needs of whatever is drawing (docs/webgpu-plan.md, P3).
+ *
+ * The show decides a frame and hands it over; everything about *how* it is
+ * drawn — the programs, the textures, the passes, which solver the fields
+ * live on — is behind this. It is short because the frame's own state was
+ * taken out of the draw first.
+ */
+interface PlateRenderer {
+  /** For the engine badge: what this is running on. */
+  readonly info: { renderer: string; gpuClass: GpuClass };
+  /** The biggest texture this device will take, which decides the solver's grid. */
+  readonly maxTexture: number;
+  /** Size the canvas to the stage, at this device-pixel ratio. */
+  resize(): void;
+  /**
+   * Put this field's solver on the GPU at `wantRes`, or take it off when the
+   * resolution is 0. Returns false when this device cannot, and the caller
+   * should stop asking.
+   */
+  attachSolver(fluid: FluidSimulation, wantRes: number): boolean;
+  /** One frame. Returns what the flash guard read, or null when it is off. */
+  drawFrame(view: FrameView, fluids: FluidSimulation[]): number | null;
+}
+
 interface GLResources {
   gl: WebGL2RenderingContext;
   program: WebGLProgram;
@@ -4137,6 +4162,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return null;
     };
 
+    /**
+     * WebGL's side of the bargain. Everything above this point built it; this
+     * is the handle the loop holds, and the WebGPU stage will hand over the
+     * same shape once its compositor is wired (docs/webgpu-plan.md, P3).
+     */
+    const renderer: PlateRenderer = {
+      info: { renderer: rendererString, gpuClass },
+      get maxTexture() { return webGLRef.current?.maxTexture ?? 0; },
+      resize,
+      attachSolver(fluid, wantRes) {
+        const glr = webGLRef.current;
+        if (!glr || wantRes <= 0) {
+          if (fluid.gpu) fluid.detachGpu();
+          return true;
+        }
+        if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+        try {
+          if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
+          if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
+          return gpuSupportedRef.current;
+        } catch (err) {
+          console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
+          fluid.dropGpu();
+          return false;
+        }
+      },
+      drawFrame,
+    };
+
     const render = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
@@ -4357,21 +4411,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           dprRef.current = wantDpr;
           resize();
         }
-        const wantRes = glr ? resolveSimResolution(currentSettings.simResolution, governor, glr.maxTexture) : 0;
+        const wantRes = renderer ? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture) : 0;
         for (const fluid of fluidsRef.current) {
-          if (wantRes > 0 && glr && gpuSupportedRef.current !== false) {
-            if (!fluid.gpu || fluid.gpu.N !== wantRes) {
-              try {
-                if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
-                if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
-              } catch (err) {
-                console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
-                gpuSupportedRef.current = false;
-                fluid.dropGpu();
-              }
-            }
-          } else if (fluid.gpu) {
-            fluid.detachGpu();
+          if (renderer && !renderer.attachSolver(fluid, gpuSupportedRef.current === false ? 0 : wantRes)) {
+            gpuSupportedRef.current = false;
           }
         }
         {
