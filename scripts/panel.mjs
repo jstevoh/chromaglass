@@ -963,7 +963,10 @@ check('and can be pinned so a harness is not random', /get\('look'\)/.test(app))
   angle. That is invisible from outside and would come back the moment
   somebody simplified it.
 */
-const vis = panel0;
+// The rig is half in the component and half in the shader — the phase is
+// integrated on the CPU and spent in the GLSL — and the GLSL moved to its own
+// file for the WebGPU port (docs/webgpu-plan.md, P3), so both are read.
+const vis = panel0 + readFileSync(join(root, 'src/lib/plateShader.ts'), 'utf8');
 check('the mirror rig turns at a rate somebody can set',
   /uniform float u_kaleidoPhase/.test(vis) && !/a \+= u_time \* 0\.02/.test(vis));
 check('and its phase is integrated, not multiplied out of elapsed time',
