@@ -26,7 +26,7 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { engineName, engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
+import { installFrameReader, lastFrameRead } from './frame.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -92,15 +92,13 @@ const DPR = process.env.QA_DPR ?? '0.35';
   look it happened to get. Every harness that measures pixels pins it.
 */
 /*
-  The show night runs on whatever the app runs on, which since the cutover is
-  WebGPU (docs/webgpu-plan.md, P6). `CG_RENDERER=webgl` walks the old path
-  instead, which is what the Linux jobs do: a runner with no GPU can compute
-  WebGPU but cannot present its canvas, as the P0 spike measured.
+  It needs a machine with a GPU. A runner without one can compute WebGPU and
+  cannot present its canvas (the P0 spike), and since P7 there is no second
+  engine to fall back to — so this suite runs on the macOS job and nowhere
+  else.
 */
-const RENDERER = engineName();
-/** True on the engine the app now defaults to. */
-const ON_WEBGPU = RENDERER !== 'webgl';
-const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${engineQuery()}`;
+
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
@@ -457,7 +455,7 @@ try {
     const note = await lastFrameRead(page);
     const lit = read ? read.filter((_, i) => i % 4 === 0).filter((v, i) => Math.max(v, read[i * 4 + 1], read[i * 4 + 2]) > 8).length / (read.length / 4) : 0;
     check('the plate can be photographed',
-      !!read && (note?.scaled ?? 0) > 0.01 && (!ON_WEBGPU || note?.via === 'grabFrame'),
+      !!read && (note?.scaled ?? 0) > 0.01 && note?.via === 'grabFrame',
       note ? `${note.via}${note.size ? ` ${note.size[0]}×${note.size[1]}` : ''}, ` +
         `${note.lit !== undefined ? `${(note.lit * 100).toFixed(0)}% lit, ` : ''}` +
         `alpha ${note.alpha ? note.alpha.join('–') : 'n/a'}, scaled ${note.scaled ?? 'n/a'}` +
@@ -883,28 +881,20 @@ try {
     });
     if (canPause) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
     /*
-      Stilled, the two engines stage a gesture in different places. WebGL
-      leaves it in the CPU delta array this reads — measured, a drag stages
-      39.6 there with the transport paused and the plate untouched. WebGPU's
-      goes into a buffer the next step consumes, so there is nothing on the
-      CPU to count and the plate does not change either: both readings are
-      zero, and a check asking for a rise would be asking the wrong path a
-      question it cannot answer.
+      A drag has to reach the plate, and this is where that is caught.
 
-      That a pour deposits the same dye whichever solver takes it is
-      `npm run parity`'s business — it pours the same drop through both and
-      they agree to 4e-5 of rms. What is asked here is the staging, which
-      only one of them does where the CPU can see it.
+      It was excused on WebGPU once, on the reasoning that the two engines
+      stage a gesture in different places and this one reads the CPU's array.
+      That was wrong: nothing was staged anywhere, because the canvas had no
+      handlers at all — the WebGPU branch returned before they were
+      registered, and painting on the plate did nothing. The reading of zero
+      was the bug, and excusing it hid the bug for as long as it was excused.
     */
-    if (ON_WEBGPU) {
-      console.log('     the drag is staged on the GPU under this flag — `npm run parity` is what proves a pour lands');
-    } else {
-      check('and a drag across it lays down dye',
-        canPause && before !== null && after !== null && after - before > 1,
-        !canPause ? 'no transport to pause with — the plate could not be stilled'
-          : before === null ? 'no debug hook — run with ?debug'
-          : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
-    }
+    check('and a drag across it lays down dye',
+      canPause && before !== null && after !== null && after - before > 1,
+      !canPause ? 'no transport to pause with — the plate could not be stilled'
+        : before === null ? 'no debug hook — run with ?debug'
+        : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
   }
 
   // ── Keyboard shortcuts ────────────────────────────────────────────

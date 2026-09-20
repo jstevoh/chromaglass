@@ -32,7 +32,7 @@ export interface BenchRow {
   want: SimResolution;
   /** What the solver actually ran — a grid can be clamped by the texture limit. */
   grid: number;
-  engine: 'gpu' | 'cpu' | 'webgpu';
+  engine: 'webgpu' | 'cpu';
   frameMs: number;
   fps: number;
   /** One solver step across every layer. CPU submission time on the GPU path. */
@@ -101,7 +101,12 @@ export interface BenchOptions {
   rebuildMs?: number;
 }
 
-export const BENCH_RUNGS: SimResolution[] = [256, 384, 512, 768, 1024, 'cpu'];
+/**
+ * The rungs the sweep walks. No CPU one since P7: the stage samples the
+ * solver's textures, so a plate the CPU holds is a plate it cannot draw, and
+ * the ladder stops at the smallest grid it can.
+ */
+export const BENCH_RUNGS: SimResolution[] = [256, 384, 512, 768, 1024];
 
 /**
  * Long enough for the frame-time average to forget the rung before it.
@@ -263,18 +268,15 @@ export function formatBench(r: BenchReport): string {
   return out.join('\n');
 }
 
-/** The GPU's name from a throwaway context, for the report's header. */
+/**
+ * The GPU's name, for the report's header.
+ *
+ * It used to open a throwaway WebGL2 context and read
+ * `WEBGL_debug_renderer_info`. There is no such context to open since P7, and
+ * no need: the running stage already knows what adapter it got, and the
+ * report prefers the engine's own answer anyway — this is only the fallback
+ * for a report taken before the first frame.
+ */
 export function readRenderer(): string {
-  try {
-    const c = document.createElement('canvas');
-    const gl = c.getContext('webgl2');
-    if (!gl) return 'no webgl2';
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    const name = ext
-      ? String(gl.getParameter((ext as { UNMASKED_RENDERER_WEBGL: number }).UNMASKED_RENDERER_WEBGL))
-      : String(gl.getParameter(gl.RENDERER));
-    return name || 'unknown';
-  } catch {
-    return 'unknown';
-  }
+  return 'unknown';
 }

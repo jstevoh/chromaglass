@@ -52,33 +52,11 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import { engineName, engineQuery } from './frame.mjs';
+import { isGpuEngine } from './frame.mjs';
 
 const PORT = 4322;
 const LOOK = process.env.LOOK || 'sunny';
 const checks = [];
-/*
-  This one stays on WebGL, and says so rather than running and measuring
-  nothing (docs/webgpu-plan.md, P5).
-
-  What it measures is what colour a bottle deposits, by diffing the CPU's own
-  density and colour arrays before and after a brush stroke. Those arrays are
-  where the WebGL path stages a pour; the WebGPU path stages it on the GPU and
-  mirrors only density back, so every reading here would be zero and every
-  check would fail for a reason that has nothing to do with dye.
-
-  What would be lost by not running it here is covered elsewhere: the bottle's
-  chemistry is CPU-side and shared by both engines, and that a pour deposits
-  the same dye whichever solver takes it is `npm run parity`'s gate — the same
-  drop through both, agreeing to 4e-5 of rms.
-*/
-if (engineName() !== 'webgl') {
-  console.log(`the dye bottles are measured on the CPU's own arrays, which ${engineName()} does not fill.`);
-  console.log('run it with CG_RENDERER=webgl until that measurement moves to the GPU;');
-  console.log('what a pour deposits on this path is `npm run parity`, which already gates it.');
-  process.exit(0);
-}
-
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   const line = `${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`;
@@ -131,7 +109,7 @@ const apart = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 
 
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&sim=384&look=classic${engineQuery()}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&sim=384&look=classic`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   const engine = () => page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
@@ -258,7 +236,7 @@ try {
     await page.waitForTimeout(200);
 
     const eng = await engine();
-    check(`${label}: measured on the GPU solver`, /^GPU/.test(eng ?? ''), eng ?? 'no debug hook');
+    check(`${label}: measured on the GPU solver`, isGpuEngine(eng), eng ?? 'no debug hook');
 
     const out = await injected();
     check(`${label}: the brush put dye on the plate`, out.rgb !== null && out.cells > 10,

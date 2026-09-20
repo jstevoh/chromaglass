@@ -26,7 +26,7 @@ import { kernel } from './wgsl/fluid';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
-import type { GpuStepParams } from '../lib/gpuFluid';
+import type { GpuStepParams } from './solverTypes';
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {

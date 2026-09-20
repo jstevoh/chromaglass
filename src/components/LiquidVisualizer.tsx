@@ -4,8 +4,6 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
-import { CameraPass } from '../lib/cameraPass';
-import { OutputPass } from '../lib/outputPass';
 import { WebGPUStage } from '../gpu/stage';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
@@ -16,17 +14,14 @@ import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
-import { PostChain, type PostTest } from '../lib/postChain';
-import { PLATE_FRAG, PLATE_VERT } from '../lib/plateShader';
-import { UNIT } from '../lib/textureUnits';
+import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { FlashGuard } from '../lib/flashGuard';
-import { FrameProbe } from '../lib/frameProbe';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
-import { GpuFluid, type GpuStepParams, type PlateSolver } from '../lib/gpuFluid';
-import { classifyGpu, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
+import { detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
@@ -198,22 +193,6 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
  * `?renderer=webgpu`: the WebGPU stage instead of WebGL (docs/webgpu-plan.md).
  * It grows on main behind this flag until the cutover, then WebGL goes.
  */
-/**
- * Which engine draws the show (docs/webgpu-plan.md, P6 — the cutover).
- *
- * WebGPU, unless asked otherwise. A browser without it gets the "ChromaGlass
- * needs WebGPU" screen rather than a degraded show: the plate is a fluid
- * solver and a 1,500-line compositor, and the WebGL path was not a lighter
- * version of it but a second one, which is the thing this port exists to stop
- * maintaining.
- *
- * `?renderer=webgl` is the way back for the transition — a show tonight on a
- * machine that turns out to have a bad WebGPU driver should not be a reason
- * to redeploy. It goes, with the WebGL renderer itself, at P7.
- */
-const WEBGPU = (() => {
-  try { return new URLSearchParams(window.location.search).get('renderer') !== 'webgl'; } catch { return true; }
-})();
 
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
@@ -221,7 +200,9 @@ const resolveSimResolution = (setting: SimResolution | undefined, governor: Qual
   // Under the WebGPU flag there is nothing to draw a CPU-held plate with, so
   // a pin there becomes the smallest grid the stage can draw rather than a
   // black screen. The pin itself goes when the CPU solver does (P7).
-  if (want === 'cpu') return WEBGPU ? 256 : 0;
+  // There is no CPU rung to fall to: the stage draws the solver's
+  // textures, and a field on the CPU has none.
+  if (want === 'cpu') return 256;
   return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
@@ -2350,7 +2331,7 @@ interface FrameView {
  */
 interface PlateRenderer {
   /** For the engine badge: which API this is, and what it is running on. */
-  readonly info: { api: 'webgl' | 'webgpu'; renderer: string; gpuClass: GpuClass };
+  readonly info: { renderer: string; gpuClass: GpuClass };
   /** The biggest texture this device will take, which decides the solver's grid. */
   readonly maxTexture: number;
   /** Size the canvas to the stage, at this device-pixel ratio. */
@@ -2378,40 +2359,6 @@ interface PlateRenderer {
   debug?(): Record<string, unknown>;
 }
 
-interface GLResources {
-  gl: WebGL2RenderingContext;
-  program: WebGLProgram;
-  vao: WebGLVertexArrayObject;
-  posBuffer: WebGLBuffer;
-  textures: WebGLTexture[];
-  texData: Uint8Array[];
-  /** Velocity fields for layers 0/1 — macro detail is advected by these. */
-  velTextures: WebGLTexture[];
-  velData: Uint8Array[];
-  uLocs: Record<string, WebGLUniformLocation | null>;
-  /** Framebuffers the GPU solver renders its packed output into, keyed by texture. */
-  packFbos: Map<WebGLTexture, WebGLFramebuffer>;
-  /** Allocated edge length of each RGBA8 texture, so a resolution change reallocates it. */
-  texSizes: Map<WebGLTexture, number>;
-  maxTexture: number;
-  /** The film projector's frame — a video file or the camera — uploaded each frame it plays. */
-  filmTexture: WebGLTexture;
-  markTexture: WebGLTexture;
-  beadTexture: WebGLTexture;
-  /**
-   * The derive pass (DERIVE_PASS in the shader): each plate's normal and
-   * interface line, worked out once per texel before the display runs. Null
-   * without float render targets, and the display then works them out per
-   * pixel as it always did.
-   */
-  derive: {
-    program: WebGLProgram;
-    u: Record<string, WebGLUniformLocation | null>;
-    textures: WebGLTexture[];
-    fbos: WebGLFramebuffer[];
-    sizes: number[];
-  } | null;
-}
 
 // ─── React Component ─────────────────────────────────────────────────
 
@@ -2519,15 +2466,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** The camera pass, built the first time a frame asks for it. */
-  const cameraRef = useRef<CameraPass | null>(null);
   /** The output pass: the projector's geometry and grade. Built only if it would change a pixel. */
-  const outputRef = useRef<OutputPass | null>(null);
   /**
    * The post chain (lib/postChain.ts): built the first frame an effect is on,
    * dropped when none is, so with every effect off the plate still finishes
    * the frame itself and nothing else is allocated.
    */
-  const postRef = useRef<PostChain | null>(null);
   /** The harness's switches: run the chain with no effect on, and its test effect. */
   const postForceRef = useRef(false);
   const postTestRef = useRef<PostTest | null>(null);
@@ -2549,7 +2493,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * bass-driven master brightness at 150 bpm is a 2.5 Hz full-field flash that
    * nobody chose. See `lib/flashGuard.ts`.
    */
-  const probeRef = useRef<FrameProbe | null>(null);
   const flashRef = useRef(new FlashGuard());
   /** The gain the guard asked for last frame, applied to this one's dimmer. */
   const flashGainRef = useRef(1);
@@ -2623,7 +2566,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
-  const webGLRef = useRef<GLResources | null>(null);
   /**
    * The GL context, lost and got back.
    *
@@ -3248,22 +3190,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
 
-        // Allocate GPU texture data buffer for this layer
-        if (webGLRef.current) {
-          const glr = webGLRef.current;
-          const gl = glr.gl;
-          // Ensure textures/texData arrays are large enough
-          while (glr.textures.length <= i) {
-            const tex = gl.createTexture()!;
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            glr.textures.push(tex);
-            glr.texData.push(new Uint8Array(GRID_AREA * 4));
-          }
-        }
       }
     } else if (currentCount > targetCount) {
       for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
@@ -3272,66 +3198,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }
   }, [settings.layerCount]);
 
-  // The context, lost and restored. This effect owns only the listeners, so
-  // it outlives the rebuild it triggers: attaching them inside the setup
-  // effect would tear the 'restored' listener down in the same tick that
-  // handles it.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const lost = (e: Event) => {
-      // Without preventDefault the browser never sends 'webglcontextrestored',
-      // and there is nothing to recover from.
-      e.preventDefault();
-      glLostRef.current = true;
-      setGlLost(true);
-      // Every GL object died with the context. Dropping rather than detaching
-      // skips the readback (which would read from a dead context) and leaves
-      // the CPU arrays — the plate itself — untouched.
-      for (const fluid of fluidsRef.current) fluid.dropGpu();
-      webGLRef.current = null;
-      cameraRef.current = null;
-      outputRef.current = null;
-      probeRef.current = null;
-      postRef.current = null;
-      flashRef.current.reset();
-      flashGainRef.current = 1;
-      // The governor is deliberately *not* dropped. It holds no GL objects, and
-      // the frame between the restore and the rebuild belongs to the render
-      // loop of the effect that is about to be torn down — which reads
-      // `governorRef.current!` and threw "Cannot read properties of null
-      // (reading 'rung')" into the console of a show that had otherwise just
-      // recovered cleanly. The new setup replaces it a moment later anyway.
-    };
-    const restored = () => {
-      glLostRef.current = false;
-      setGlLost(false);
-      // The context may come back on different hardware — a Mac that has just
-      // switched GPUs is one of the ways it is lost in the first place — so
-      // the float-render-target probe is run again rather than trusted.
-      gpuSupportedRef.current = null;
-      // The plate itself did not survive, and pretending otherwise is how this
-      // shipped nearly broken: with the GPU solver the dye lives in GPU
-      // textures, the CPU arrays are only a downsampled readback of the
-      // *density*, and `dropGpu` throws even that away rather than stall on a
-      // dead context. Measured, the machinery all came back — context, solver,
-      // render loop, no errors — onto a plate with nothing on it, which on a
-      // wall is the same black rectangle as not recovering at all.
-      //
-      // So the look is laid again. It is not the identical plate, and it
-      // cannot be; it is the same look, back within a second, which for
-      // something whose whole claim is that no two shows are the same is the
-      // right kind of loss.
-      layPlateRef.current(livePresetRef.current);
-      setGlEpoch(n => n + 1);
-    };
-    canvas.addEventListener('webglcontextlost', lost as EventListener);
-    canvas.addEventListener('webglcontextrestored', restored);
-    return () => {
-      canvas.removeEventListener('webglcontextlost', lost as EventListener);
-      canvas.removeEventListener('webglcontextrestored', restored);
-    };
-  }, []);
+  /*
+    A device, lost and given back.
+
+    WebGL had an event for both halves, and this effect owned the listeners so
+    it outlived the rebuild it triggered. WebGPU has neither: a lost device is
+    a promise that settles, and there is no restore — the stage asks for a new
+    device instead, which it does in the setup effect where the old one lived
+    (see `s.lost.then` there). What is left of this is the two refs that tell
+    the rest of the app the plate is being rebuilt, which the loss handler
+    sets and the new stage clears.
+  */
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3576,14 +3453,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
-          // The badge says which API is carrying the show, because that is the
-          // thing being changed underneath it.
-          const api = renderer?.info.api === 'webgpu' ? 'WebGPU' : 'GPU';
           const status: EngineStatus = {
             label: lead?.gpu
-              ? `${api} · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
+              ? `WebGPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
               : `CPU · ${GRID_SIZE}²${gpuUnavailable ? ' · GPU unavailable' : ''}`,
-            engine: lead?.gpu ? (renderer?.info.api === 'webgpu' ? 'webgpu' : 'gpu') : 'cpu',
+            engine: lead?.gpu ? 'webgpu' : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
@@ -4748,9 +4622,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
-      // The WebGPU stage cannot draw a plate the CPU solver holds, so its
-      // ladder has no rung there (docs/webgpu-plan.md, P5).
-      const ladder = qualityLadder(tier, r.info.gpuClass, r.info.api !== 'webgpu');
+      // No rung the stage cannot draw: a plate the CPU holds has no
+      // textures to sample (docs/webgpu-plan.md, P5).
+      const ladder = qualityLadder(tier, r.info.gpuClass, false);
       governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
       r.resize();
       render();
@@ -4761,615 +4635,417 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // Before anything else: a canvas holds one kind of context for life, and
     // the WebGL path below would claim it. P1 draws the black plate; the
     // solver (P2) and the compositor (P3) move in behind this branch.
-    if (WEBGPU) {
-      let stage: WebGPUStage | null = null;
-      let camera: WebGPUCamera | null = null;
-      let projector: WebGPUOutput | null = null;
-      let probe: WebGPUFrameProbe | null = null;
-      let chain: WebGPUPostChain | null = null;
-      let cancelled = false;
-      // What the frame costs us, as opposed to how often the display asks for
-      // one: a CI runner's display rate says nothing about the stage.
-      let cpuMs = 0;
-      const size = () => {
-        const dpr = devicePixels();
-        const stagePx = stageRef.current;
-        canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
-        canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
-        return dpr;
-      };
-      void WebGPUStage.start(canvas).then((s) => {
-        if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
-        if (isGpuFailure(s)) {
-          console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
-          setGpuFailure(s);
-          return;
-        }
-        stage = s;
+    let stage: WebGPUStage | null = null;
+    let camera: WebGPUCamera | null = null;
+    let projector: WebGPUOutput | null = null;
+    let probe: WebGPUFrameProbe | null = null;
+    let chain: WebGPUPostChain | null = null;
+    let cancelled = false;
+    // What the frame costs us, as opposed to how often the display asks for
+    // one: a CI runner's display rate says nothing about the stage.
+    let cpuMs = 0;
+    const size = () => {
+      const dpr = devicePixels();
+      const stagePx = stageRef.current;
+      canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
+      canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
+      return dpr;
+    };
+    void WebGPUStage.start(canvas).then((s) => {
+      if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
+      if (isGpuFailure(s)) {
+        console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
+        setGpuFailure(s);
+        return;
+      }
+      stage = s;
 
-        /**
-         * The GPU, taken away (docs/webgpu-plan.md, P4).
-         *
-         * A projector plugged into a running laptop, a Mac switching between
-         * its GPUs, a driver resetting under load: the device is lost and
-         * every texture, buffer and pipeline with it. WebGPU has no event to
-         * say it is back — there is no restore, only a new device — so the
-         * recovery is to ask for one, which is what bumping the epoch does:
-         * this effect runs again from the top.
-         *
-         * `cancelled` is already set by then if the loss is our own teardown
-         * destroying the device, so a normal unmount goes quietly.
-         */
-        s.lost.then((info) => {
-          if (cancelled) return;
-          console.error('WebGPU device lost:', info.reason, info.message);
-          // Dropping rather than detaching skips a readback from a dead
-          // device and leaves the CPU's own state alone.
-          for (const fluid of fluidsRef.current) fluid.dropGpu();
-          camera = null;
-          projector = null;
-          probe = null;
-          stage = null;
-          flashRef.current.reset();
-          flashGainRef.current = 1;
-          glLostRef.current = true;
-          setGlLost(true);
-          setGlEpoch((n) => n + 1);
-        });
-
-        // Coming back from one. The plate did not survive — the dye lives in
-        // the solver's textures, and they died with the device — so the look
-        // is laid again: not the identical plate, which is not possible, but
-        // the same look, back within a second.
-        if (glLostRef.current) {
-          layPlateRef.current(livePresetRef.current);
-          glLostRef.current = false;
-          setGlLost(false);
-        }
-
-        /**
-         * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
-         *
-         * The solver is wired and so is the picture: the show's own loop
-         * runs, the fields live in `gpu/fluid.ts`, and the WGSL composite —
-         * the GLSL's twin, checked against it pixel for pixel by
-         * `npm run composite` — draws them, over the three pictures the page
-         * hands across each frame. What is still WebGL's alone is what comes
-         * after the plate: the camera pass, the output pass, the post chain
-         * and the flash probe, which is why `drawFrame` reads back no
-         * luminance yet.
-         */
-        const plate = new WebGPUPlate(s.device, s.format);
-        const gpuRenderer: PlateRenderer = {
-          info: { api: 'webgpu', renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
-          maxTexture: s.device.limits.maxTextureDimension2D,
-          resize: () => { size(); },
-          attachSolver(fluid, wantRes) {
-            if (wantRes <= 0) {
-              if (fluid.gpu) fluid.detachGpu();
-              return true;
-            }
-            if (fluid.gpu && fluid.gpu.N === wantRes) return true;
-            try {
-              fluid.attachGpu(new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
-                float32Filterable: s.gpu.float32Filterable,
-                timestamps: s.gpu.timestamps,
-              }));
-              return true;
-            } catch (err) {
-              /*
-                No degraded show (docs/webgpu-plan.md, the decision).
-
-                Dropping to the CPU solver is what this used to do, and while
-                WebGPU was behind a flag that was a reasonable way to keep
-                drawing. It is not one now: this stage samples the solver's
-                textures, so a field on the CPU is a field it cannot draw —
-                the plate would simulate perfectly well behind a black screen,
-                which is the failure CI found on the ladder's bottom rung.
-
-                So say so instead. A machine that cannot run the solver gets
-                the same screen as a machine with no WebGPU at all.
-              */
-              console.error('ChromaGlass: the WebGPU solver would not start.', err);
-              fluid.dropGpu();
-              setGpuFailure({
-                failure: 'no-adapter',
-                detail: `the solver would not start at ${wantRes}²: ${String(err).slice(0, 120)}`,
-              });
-              return false;
-            }
-          },
-          drawFrame: (view, fluids) => {
-            const t0 = performance.now();
-            // Every layer whose solver is the WebGPU one. A field still on
-            // the CPU has nothing for the compositor to sample, so it sits
-            // this frame out rather than drawing a stale plate.
-            const fields = fluids
-              .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
-              .filter((f): f is NonNullable<typeof f> => !!f);
-            if (fields.length && stage) {
-              // The three pictures the page hands over, on the frames they
-              // change: the beads' mask when they moved, the mark on the
-              // frame it arrives, and the film's frame every frame it plays.
-              // The uniforms are told about each of them in `plateUniforms`,
-              // under the same conditions, or the shader would be drawing a
-              // picture it had not been given.
-              if (view.beadMask) plate.setSource('beads', view.beadMask);
-              const mk = view.mark;
-              if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
-              else if (mk.dirty) {
-                plate.setSource('mark', mk.source);
-                // The chain's finish lays the mark over the frame when it is
-                // the one finishing, so it needs the picture as well.
-                const [mw, mh] = pictureSize(mk.source);
-                chain?.setMark(mk.source, mw, mh);
-                mk.dirty = false;
-              }
-              const film = view.film;
-              if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
-                plate.setSource('film', film.video);
-              }
-              // Two passes when the camera is on, as in WebGL: the plate is
-              // drawn into a texture and the camera looks at it, because
-              // refraction, depth of field, bloom and the sensor's roll-off
-              // all need the finished picture to sample from. Built the first
-              // frame it would do anything and dropped when it would not, so
-              // a show without a camera never pays for the second target.
-              const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
-              if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
-              else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
-              const cam = camera;
-
-              // The post chain, when an effect is on. None exist yet; the
-              // harness's test effect is what runs (docs/filters-plan.md,
-              // F0). Off, none of it is built and the plate finishes the
-              // frame itself, exactly as before there was a chain.
-              const postTest = view.postTest;
-              const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
-              if (wantPost && !chain) {
-                chain = new WebGPUPostChain(s.device, s.format);
-                // A mark that arrived before the chain did: it is uploaded on
-                // the frame it arrives and never again, so a chain built
-                // later would finish every frame without it.
-                if (view.mark) {
-                  const [mw, mh] = pictureSize(view.mark.source);
-                  chain.setMark(view.mark.source, mw, mh);
-                }
-              } else if (!wantPost && chain) { chain.dispose(); chain = null; }
-              const post = chain;
-
-              // The projector, last: flip, corner pin, blanking and grade.
-              // Built the first frame it would change anything and dropped
-              // when the operator resets it, so the common case — no
-              // projector, nothing set — never pays for the extra target or
-              // the extra draw.
-              const wantOut = !outputIsIdentity(view.outputCfg);
-              if (wantOut && !projector) projector = new WebGPUOutput(s.device, s.format);
-              else if (!wantOut && projector) { projector.dispose(); projector = null; }
-              const out = projector;
-              const quads = out ? fillOutputUniforms(out.pack, view.outputCfg, canvas.width, canvas.height) : 0;
-              fillPlateUniforms(plate.pack, {
-                view, fluids,
-                width: canvas.width, height: canvas.height,
-                derived: true,
-                grid: fields[0].dye.width,
-                // The plate leaves the grain to the camera when it is on, and
-                // still dithers into its 8-bit texture, or a dark ramp bands
-                // before the camera ever sees it.
-                cameraOn: !!cam,
-                // With a chain, the finish happens at the end of it instead.
-                postChain: !!post,
-              });
-              // What the finish needs, taken from the uniforms the plate was
-              // just given rather than worked out a second time here: the
-              // dimmer with the flash guard folded in, and the mark's fader
-              // and rectangle. One mapping, so the two cannot drift.
-              const [dimmerNow] = plate.pack.get('dimmer');
-              const [markOnNow] = plate.pack.get('markOn');
-              const markRectNow = plate.pack.get('markRect') as [number, number, number, number];
-              if (cam) {
-                fillCameraUniforms(cam.pack, {
-                  time: view.time,
-                  amount: camAmt,
-                  refraction: view.settings.refraction ?? 0,
-                  chromatic: view.settings.chromaticAberration ?? 0,
-                  focus: view.settings.focus ?? 0.5,
-                  aperture: view.settings.aperture ?? 0,
-                  bloom: view.settings.bloom ?? 0,
-                  // Into the chain's half floats, nothing: its finish
-                  // dithers once, at the end.
-                  dither: post ? 0 : 1,
-                }, canvas.width, canvas.height);
-              }
-              // The painter stays set, so `grabFrame` photographs the picture
-              // rather than an empty pass.
-              stage.paint = (encoder, target) => {
-                const size = { width: canvas.width, height: canvas.height };
-                /*
-                  The fields are read here rather than taken from the frame
-                  that set this painter, because the painter outlives that
-                  frame: `grabFrame` runs it again later, and by then a rung
-                  change may have disposed the solver those textures belonged
-                  to. A submit answers that with "Destroyed texture used in a
-                  submit" — which is what CI's show night found on the first
-                  run that had a machine slow enough to change rung while a
-                  harness was photographing the plate.
-                */
-                const live = fluidsRef.current
-                  .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
-                  .filter((f): f is NonNullable<typeof f> => !!f);
-                if (!live.length) return;
-                // A rebuild may also have changed the grid the uniforms were
-                // filled for; the shader samples by that number.
-                if (live[0].dye.width !== fields[0].dye.width) {
-                  plate.pack.set('gridSize', live[0].dye.width);
-                }
-                // Where each pass hands the frame on: the projector's texture
-                // if there is one, else the canvas; the chain's picture if
-                // there is one, else that; and the camera's scene if there is
-                // one, else that. Read inside out, it is the chain in order.
-                const screen = out ? out.sceneView(size.width, size.height) : target;
-                const afterEffects = post ? post.sceneView(size.width, size.height) : screen;
-                // Each pass is told whether it is writing a texture or the
-                // canvas, because a picture handed on has to be stored the
-                // way the next pass reads it (FLIP_Y, in `wgsl/plate.ts`).
-                // And what each one is drawing into, since the chain's
-                // picture is half float where the canvas and the projector's
-                // texture are not.
-                const stageFormat = s.format;
-                const plateFormat = cam ? stageFormat : post ? post.pictureFormat : stageFormat;
-                plate.draw(
-                  encoder,
-                  cam ? cam.sceneView(size.width, size.height) : afterEffects,
-                  size, live, Math.max(view.velRange, 1e-6),
-                  stage?.profiler.renderPass('plate'),
-                  !!cam || !!post || !!out,
-                  plateFormat,
-                );
-                if (cam && plate.auxTarget) {
-                  cam.draw(
-                    encoder, afterEffects, plate.auxTarget,
-                    stage?.profiler.renderPass('camera'), !!post || !!out,
-                    post ? post.pictureFormat : stageFormat,
-                  );
-                }
-                if (post) {
-                  post.effects(encoder, view.fxFrame, view.fxSeed, postTest);
-                  post.finish(encoder, screen, {
-                    dimmer: dimmerNow,
-                    markOn: markOnNow,
-                    markRect: markRectNow,
-                  }, stage?.profiler.renderPass('finish'), !!out);
-                }
-                if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
-              };
-            }
-            const frame = stage?.frame();
-            cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
-
-            // ── What the audience just saw ───────────────────────
-            // The delivered frame, reduced on the GPU to one number, a frame
-            // or two behind — as in WebGL. The reading goes back rather than
-            // the verdict: the loop folds it into the gain that reaches the
-            // next frame's view.
-            if (view.outputCfg.flashGuard && frame) {
-              if (!probe) probe = new WebGPUFrameProbe(s.device);
-              probe.measure(frame);
-              return probe.luminance;
-            }
-            if (probe) { probe.dispose(); probe = null; }
-            return null;
-          },
-          /**
-           * The drawing, plus one solver step per layer for each step the
-           * loop took. The profiler's numbers are per pass and per step, so
-           * the steps are what turns them into the cost of a frame.
-           */
-          gpuFrameMs: (steps: number) => {
-            if (!stage) return 0;
-            let ms = 0;
-            for (const v of stage.profiler.ms.values()) ms += v;
-            if (steps > 0) {
-              for (const f of fluidsRef.current) {
-                if (!(f.gpu instanceof WebGPUFluid)) continue;
-                for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
-              }
-            }
-            return ms;
-          },
-          debug: () => ({
-            webgpu: stage && {
-              label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
-              timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
-              cpuMs: +cpuMs.toFixed(3),
-              timings: Object.fromEntries(stage.profiler.ms),
-              /**
-               * The solver's own passes, per layer. It keeps a profiler of
-               * its own — the stage's only sees what the stage encodes — and
-               * without this the expensive half of a frame at the top rungs
-               * was the half nothing reported.
-               */
-              solver: fluidsRef.current.map((f) => (
-                f.gpu instanceof WebGPUFluid ? Object.fromEntries(f.gpu.profiler.ms) : null
-              )),
-            },
-            /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
-            grabFrame: () => stage?.grabFrame() ?? null,
-            /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
-            kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
-            /**
-             * Take the device away, as a driver would. The recovery is the
-             * app's own: a new device, a rebuilt stage, the look laid again.
-             */
-            loseDevice: () => { stage?.device.destroy(); },
-            /**
-             * The projector's pass, as the WebGL renderer publishes it: built
-             * only when it would change a pixel, so a harness asking whether
-             * a mapping reached the engine asks this. One surface, one
-             * question, either engine.
-             */
-            outputPass: projector,
-            /**
-             * The post chain, under the names the WebGL renderer publishes:
-             * `npm run fx` asks these of whichever engine is running, and the
-             * four that set something write the show's own refs, which both
-             * engines read.
-             */
-            post: {
-              active: !!chain,
-              float: chain?.float ?? null,
-              history: chain?.historySize ?? null,
-              frame: fxFrameRef.current,
-              force: (on: boolean) => { postForceRef.current = !!on; },
-              test: (mode: 0 | 1 | 2, delay = 1) => { postTestRef.current = mode ? { mode, delay } : null; },
-              seed: (n: number) => { fxSeedRef.current = n >>> 0; },
-              /** Hold the effects' clock at one frame (null lets it run), so a frame can be drawn twice. */
-              hold: (frame: number | null) => { fxHoldRef.current = frame === null ? null : frame >>> 0; },
-              ringSelfTest: () => chain?.ringSelfTest() ?? null,
-            },
-            /** The guard's own state, and the luminance it is being fed. */
-            flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
-            /**
-             * The reduction, against a frame whose mean is known by
-             * construction: white rectangles on black, measured with a stall.
-             */
-            probeSelfTest: async (rects: [number, number, number, number][]) => {
-              if (!stage) return null;
-              if (!probe) probe = new WebGPUFrameProbe(s.device);
-              const painted = stage.frame(probe.painter(stage.format, rects));
-              const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
-              return { mean: await probe.measureNow(painted), lit };
-            },
-            gpuFailure,
-          }),
-        };
-        startWith(gpuRenderer);
-      });
-      return () => {
-        cancelled = true;
-        cancelAnimationFrame(animationFrameId);
-        camera?.dispose();
+      /**
+       * The GPU, taken away (docs/webgpu-plan.md, P4).
+       *
+       * A projector plugged into a running laptop, a Mac switching between
+       * its GPUs, a driver resetting under load: the device is lost and
+       * every texture, buffer and pipeline with it. WebGPU has no event to
+       * say it is back — there is no restore, only a new device — so the
+       * recovery is to ask for one, which is what bumping the epoch does:
+       * this effect runs again from the top.
+       *
+       * `cancelled` is already set by then if the loss is our own teardown
+       * destroying the device, so a normal unmount goes quietly.
+       */
+      s.lost.then((info) => {
+        if (cancelled) return;
+        console.error('WebGPU device lost:', info.reason, info.message);
+        // Dropping rather than detaching skips a readback from a dead
+        // device and leaves the CPU's own state alone.
+        for (const fluid of fluidsRef.current) fluid.dropGpu();
         camera = null;
-        projector?.dispose();
         projector = null;
-        probe?.dispose();
         probe = null;
-        chain?.dispose();
-        chain = null;
-        stage?.dispose();
         stage = null;
+        flashRef.current.reset();
+        flashGainRef.current = 1;
+        glLostRef.current = true;
+        setGlLost(true);
+        setGlEpoch((n) => n + 1);
+      });
+
+      // Coming back from one. The plate did not survive — the dye lives in
+      // the solver's textures, and they died with the device — so the look
+      // is laid again: not the identical plate, which is not possible, but
+      // the same look, back within a second.
+      if (glLostRef.current) {
+        layPlateRef.current(livePresetRef.current);
+        glLostRef.current = false;
+        setGlLost(false);
+      }
+
+      /**
+       * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
+       *
+       * The solver is wired and so is the picture: the show's own loop
+       * runs, the fields live in `gpu/fluid.ts`, and the WGSL composite —
+       * the GLSL's twin, checked against it pixel for pixel by
+       * `npm run composite` — draws them, over the three pictures the page
+       * hands across each frame. What is still WebGL's alone is what comes
+       * after the plate: the camera pass, the output pass, the post chain
+       * and the flash probe, which is why `drawFrame` reads back no
+       * luminance yet.
+       */
+      const plate = new WebGPUPlate(s.device, s.format);
+      const gpuRenderer: PlateRenderer = {
+        info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
+        maxTexture: s.device.limits.maxTextureDimension2D,
+        resize: () => { size(); },
+        attachSolver(fluid, wantRes) {
+          if (wantRes <= 0) {
+            if (fluid.gpu) fluid.detachGpu();
+            return true;
+          }
+          if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+          try {
+            fluid.attachGpu(new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
+              float32Filterable: s.gpu.float32Filterable,
+              timestamps: s.gpu.timestamps,
+            }));
+            return true;
+          } catch (err) {
+            /*
+              No degraded show (docs/webgpu-plan.md, the decision).
+
+              Dropping to the CPU solver is what this used to do, and while
+              WebGPU was behind a flag that was a reasonable way to keep
+              drawing. It is not one now: this stage samples the solver's
+              textures, so a field on the CPU is a field it cannot draw —
+              the plate would simulate perfectly well behind a black screen,
+              which is the failure CI found on the ladder's bottom rung.
+
+              So say so instead. A machine that cannot run the solver gets
+              the same screen as a machine with no WebGPU at all.
+            */
+            console.error('ChromaGlass: the WebGPU solver would not start.', err);
+            fluid.dropGpu();
+            setGpuFailure({
+              failure: 'no-adapter',
+              detail: `the solver would not start at ${wantRes}²: ${String(err).slice(0, 120)}`,
+            });
+            return false;
+          }
+        },
+        drawFrame: (view, fluids) => {
+          const t0 = performance.now();
+          // Every layer whose solver is the WebGPU one. A field still on
+          // the CPU has nothing for the compositor to sample, so it sits
+          // this frame out rather than drawing a stale plate.
+          const fields = fluids
+            .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
+            .filter((f): f is NonNullable<typeof f> => !!f);
+          if (fields.length && stage) {
+            // The three pictures the page hands over, on the frames they
+            // change: the beads' mask when they moved, the mark on the
+            // frame it arrives, and the film's frame every frame it plays.
+            // The uniforms are told about each of them in `plateUniforms`,
+            // under the same conditions, or the shader would be drawing a
+            // picture it had not been given.
+            if (view.beadMask) plate.setSource('beads', view.beadMask);
+            const mk = view.mark;
+            if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
+            else if (mk.dirty) {
+              plate.setSource('mark', mk.source);
+              // The chain's finish lays the mark over the frame when it is
+              // the one finishing, so it needs the picture as well.
+              const [mw, mh] = pictureSize(mk.source);
+              chain?.setMark(mk.source, mw, mh);
+              mk.dirty = false;
+            }
+            const film = view.film;
+            if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
+              plate.setSource('film', film.video);
+            }
+            // Two passes when the camera is on, as in WebGL: the plate is
+            // drawn into a texture and the camera looks at it, because
+            // refraction, depth of field, bloom and the sensor's roll-off
+            // all need the finished picture to sample from. Built the first
+            // frame it would do anything and dropped when it would not, so
+            // a show without a camera never pays for the second target.
+            const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
+            if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
+            else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
+            const cam = camera;
+
+            // The post chain, when an effect is on. None exist yet; the
+            // harness's test effect is what runs (docs/filters-plan.md,
+            // F0). Off, none of it is built and the plate finishes the
+            // frame itself, exactly as before there was a chain.
+            const postTest = view.postTest;
+            const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
+            if (wantPost && !chain) {
+              chain = new WebGPUPostChain(s.device, s.format);
+              // A mark that arrived before the chain did: it is uploaded on
+              // the frame it arrives and never again, so a chain built
+              // later would finish every frame without it.
+              if (view.mark) {
+                const [mw, mh] = pictureSize(view.mark.source);
+                chain.setMark(view.mark.source, mw, mh);
+              }
+            } else if (!wantPost && chain) { chain.dispose(); chain = null; }
+            const post = chain;
+
+            // The projector, last: flip, corner pin, blanking and grade.
+            // Built the first frame it would change anything and dropped
+            // when the operator resets it, so the common case — no
+            // projector, nothing set — never pays for the extra target or
+            // the extra draw.
+            const wantOut = !outputIsIdentity(view.outputCfg);
+            if (wantOut && !projector) projector = new WebGPUOutput(s.device, s.format);
+            else if (!wantOut && projector) { projector.dispose(); projector = null; }
+            const out = projector;
+            const quads = out ? fillOutputUniforms(out.pack, view.outputCfg, canvas.width, canvas.height) : 0;
+            fillPlateUniforms(plate.pack, {
+              view, fluids,
+              width: canvas.width, height: canvas.height,
+              derived: true,
+              grid: fields[0].dye.width,
+              // The plate leaves the grain to the camera when it is on, and
+              // still dithers into its 8-bit texture, or a dark ramp bands
+              // before the camera ever sees it.
+              cameraOn: !!cam,
+              // With a chain, the finish happens at the end of it instead.
+              postChain: !!post,
+            });
+            // What the finish needs, taken from the uniforms the plate was
+            // just given rather than worked out a second time here: the
+            // dimmer with the flash guard folded in, and the mark's fader
+            // and rectangle. One mapping, so the two cannot drift.
+            const [dimmerNow] = plate.pack.get('dimmer');
+            const [markOnNow] = plate.pack.get('markOn');
+            const markRectNow = plate.pack.get('markRect') as [number, number, number, number];
+            if (cam) {
+              fillCameraUniforms(cam.pack, {
+                time: view.time,
+                amount: camAmt,
+                refraction: view.settings.refraction ?? 0,
+                chromatic: view.settings.chromaticAberration ?? 0,
+                focus: view.settings.focus ?? 0.5,
+                aperture: view.settings.aperture ?? 0,
+                bloom: view.settings.bloom ?? 0,
+                // Into the chain's half floats, nothing: its finish
+                // dithers once, at the end.
+                dither: post ? 0 : 1,
+              }, canvas.width, canvas.height);
+            }
+            // The painter stays set, so `grabFrame` photographs the picture
+            // rather than an empty pass.
+            stage.paint = (encoder, target) => {
+              const size = { width: canvas.width, height: canvas.height };
+              /*
+                The fields are read here rather than taken from the frame
+                that set this painter, because the painter outlives that
+                frame: `grabFrame` runs it again later, and by then a rung
+                change may have disposed the solver those textures belonged
+                to. A submit answers that with "Destroyed texture used in a
+                submit" — which is what CI's show night found on the first
+                run that had a machine slow enough to change rung while a
+                harness was photographing the plate.
+              */
+              const live = fluidsRef.current
+                .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
+                .filter((f): f is NonNullable<typeof f> => !!f);
+              if (!live.length) return;
+              // A rebuild may also have changed the grid the uniforms were
+              // filled for; the shader samples by that number.
+              if (live[0].dye.width !== fields[0].dye.width) {
+                plate.pack.set('gridSize', live[0].dye.width);
+              }
+              // Where each pass hands the frame on: the projector's texture
+              // if there is one, else the canvas; the chain's picture if
+              // there is one, else that; and the camera's scene if there is
+              // one, else that. Read inside out, it is the chain in order.
+              const screen = out ? out.sceneView(size.width, size.height) : target;
+              const afterEffects = post ? post.sceneView(size.width, size.height) : screen;
+              // Each pass is told whether it is writing a texture or the
+              // canvas, because a picture handed on has to be stored the
+              // way the next pass reads it (FLIP_Y, in `wgsl/plate.ts`).
+              // And what each one is drawing into, since the chain's
+              // picture is half float where the canvas and the projector's
+              // texture are not.
+              const stageFormat = s.format;
+              const plateFormat = cam ? stageFormat : post ? post.pictureFormat : stageFormat;
+              plate.draw(
+                encoder,
+                cam ? cam.sceneView(size.width, size.height) : afterEffects,
+                size, live, Math.max(view.velRange, 1e-6),
+                stage?.profiler.renderPass('plate'),
+                !!cam || !!post || !!out,
+                plateFormat,
+              );
+              if (cam && plate.auxTarget) {
+                cam.draw(
+                  encoder, afterEffects, plate.auxTarget,
+                  stage?.profiler.renderPass('camera'), !!post || !!out,
+                  post ? post.pictureFormat : stageFormat,
+                );
+              }
+              if (post) {
+                post.effects(encoder, view.fxFrame, view.fxSeed, postTest);
+                post.finish(encoder, screen, {
+                  dimmer: dimmerNow,
+                  markOn: markOnNow,
+                  markRect: markRectNow,
+                }, stage?.profiler.renderPass('finish'), !!out);
+              }
+              if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+            };
+          }
+          const frame = stage?.frame();
+          cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+
+          // ── What the audience just saw ───────────────────────
+          // The delivered frame, reduced on the GPU to one number, a frame
+          // or two behind — as in WebGL. The reading goes back rather than
+          // the verdict: the loop folds it into the gain that reaches the
+          // next frame's view.
+          if (view.outputCfg.flashGuard && frame) {
+            if (!probe) probe = new WebGPUFrameProbe(s.device);
+            probe.measure(frame);
+            return probe.luminance;
+          }
+          if (probe) { probe.dispose(); probe = null; }
+          return null;
+        },
+        /**
+         * The drawing, plus one solver step per layer for each step the
+         * loop took. The profiler's numbers are per pass and per step, so
+         * the steps are what turns them into the cost of a frame.
+         */
+        gpuFrameMs: (steps: number) => {
+          if (!stage) return 0;
+          let ms = 0;
+          for (const v of stage.profiler.ms.values()) ms += v;
+          if (steps > 0) {
+            for (const f of fluidsRef.current) {
+              if (!(f.gpu instanceof WebGPUFluid)) continue;
+              for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
+            }
+          }
+          return ms;
+        },
+        debug: () => ({
+          webgpu: stage && {
+            label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
+            timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
+            cpuMs: +cpuMs.toFixed(3),
+            timings: Object.fromEntries(stage.profiler.ms),
+            /**
+             * The solver's own passes, per layer. It keeps a profiler of
+             * its own — the stage's only sees what the stage encodes — and
+             * without this the expensive half of a frame at the top rungs
+             * was the half nothing reported.
+             */
+            solver: fluidsRef.current.map((f) => (
+              f.gpu instanceof WebGPUFluid ? Object.fromEntries(f.gpu.profiler.ms) : null
+            )),
+          },
+          /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
+          grabFrame: () => stage?.grabFrame() ?? null,
+          /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
+          kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+          /**
+           * Take the device away, as a driver would. The recovery is the
+           * app's own: a new device, a rebuilt stage, the look laid again.
+           */
+          loseDevice: () => { stage?.device.destroy(); },
+          /**
+           * The projector's pass, as the WebGL renderer publishes it: built
+           * only when it would change a pixel, so a harness asking whether
+           * a mapping reached the engine asks this. One surface, one
+           * question, either engine.
+           */
+          outputPass: projector,
+          /**
+           * The post chain, under the names the WebGL renderer publishes:
+           * `npm run fx` asks these of whichever engine is running, and the
+           * four that set something write the show's own refs, which both
+           * engines read.
+           */
+          post: {
+            active: !!chain,
+            float: chain?.float ?? null,
+            history: chain?.historySize ?? null,
+            frame: fxFrameRef.current,
+            force: (on: boolean) => { postForceRef.current = !!on; },
+            test: (mode: 0 | 1 | 2, delay = 1) => { postTestRef.current = mode ? { mode, delay } : null; },
+            seed: (n: number) => { fxSeedRef.current = n >>> 0; },
+            /** Hold the effects' clock at one frame (null lets it run), so a frame can be drawn twice. */
+            hold: (frame: number | null) => { fxHoldRef.current = frame === null ? null : frame >>> 0; },
+            ringSelfTest: () => chain?.ringSelfTest() ?? null,
+          },
+          /** The guard's own state, and the luminance it is being fed. */
+          flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
+          /**
+           * The reduction, against a frame whose mean is known by
+           * construction: white rectangles on black, measured with a stall.
+           */
+          probeSelfTest: async (rects: [number, number, number, number][]) => {
+            if (!stage) return null;
+            if (!probe) probe = new WebGPUFrameProbe(s.device);
+            const painted = stage.frame(probe.painter(stage.format, rects));
+            const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
+            return { mean: await probe.measureNow(painted), lit };
+          },
+          gpuFailure,
+        }),
       };
-    }
+      startWith(gpuRenderer);
+    });
 
-    // ── WebGL2 initialization ──────────────────────────────────────────
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
-    if (!gl) { console.error('WebGL2 not supported'); return; }
+    /*
+      The canvas's own pixels (docs/webgpu-plan.md, P7).
 
-    // Platform: where this build is running and on what, for the governor's
-    // starting guess. The renderer string is the only cheap read of the GPU.
-    const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    const rendererString = String(
-      (dbgInfo && gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '',
-    );
-    const gpuClass = classifyGpu(rendererString);
+      One path now, so this is where the size is decided for everything: the
+      governor's rung as a device-pixel ratio, and a projector's own pixels
+      when one is attached, with the renderer's texture limit as the ceiling.
 
-    const vertSrc = PLATE_VERT;
-    const fragSrc = PLATE_FRAG;
-
-    const compileShader = (type: number, src: string): WebGLShader | null => {
-      const sh = gl.createShader(type)!;
-      gl.shaderSource(sh, src);
-      gl.compileShader(sh);
-      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(sh));
-        gl.deleteShader(sh);
-        return null;
-      }
-      return sh;
-    };
-
-    const vert = compileShader(gl.VERTEX_SHADER, vertSrc);
-    const frag = compileShader(gl.FRAGMENT_SHADER, fragSrc);
-    if (!vert || !frag) return;
-
-    const program = gl.createProgram()!;
-    gl.attachShader(program, vert);
-    gl.attachShader(program, frag);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Program link error:', gl.getProgramInfoLog(program));
-      return;
-    }
-    gl.deleteShader(vert);
-    gl.deleteShader(frag);
-
-    // Full-screen quad
-    const vao = gl.createVertexArray()!;
-    gl.bindVertexArray(vao);
-    const posBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(program, 'a_pos');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
-
-    // The derive pass: the display's own source with a different main, so the
-    // neighbourhood it works out once per texel is the one the display worked
-    // out per pixel. Its target is half float — the gradient is signed and
-    // the interface sum runs past one — and without float targets the display
-    // goes on working the neighbourhood out per pixel.
-    let derive: GLResources['derive'] = null;
-    if (gl.getExtension('EXT_color_buffer_float')) {
-      const dv = compileShader(gl.VERTEX_SHADER, vertSrc);
-      const df = compileShader(gl.FRAGMENT_SHADER, fragSrc.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n'));
-      if (dv && df) {
-        const dp = gl.createProgram()!;
-        gl.attachShader(dp, dv);
-        gl.attachShader(dp, df);
-        gl.bindAttribLocation(dp, aPos, 'a_pos');
-        gl.linkProgram(dp);
-        gl.deleteShader(dv);
-        gl.deleteShader(df);
-        if (gl.getProgramParameter(dp, gl.LINK_STATUS)) {
-          const u: Record<string, WebGLUniformLocation | null> = {};
-          for (const name of ['u_src', 'u_gridSize', 'u_logicalGrid', 'u_bspline', 'u_filmLevel', 'u_filmGain', 'u_exposure', 'u_macro', 'u_transmission', 'u_boundaryContrast']) {
-            u[name] = gl.getUniformLocation(dp, name);
-          }
-          const textures: WebGLTexture[] = [];
-          const fbos: WebGLFramebuffer[] = [];
-          for (let i = 0; i < 2; i++) {
-            const tex = gl.createTexture()!;
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, null);
-            textures.push(tex);
-            const fbo = gl.createFramebuffer()!;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-            fbos.push(fbo);
-          }
-          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-          derive = { program: dp, u, textures, fbos, sizes: [1, 1] };
-        } else {
-          console.warn('ChromaGlass: the derive pass did not link; the display works the neighbourhood out per pixel.', gl.getProgramInfoLog(dp));
-          gl.deleteProgram(dp);
-        }
-      }
-    }
-
-    // Create textures for existing layers + 2 slots minimum
-    const maxLayers = Math.max(2, fluidsRef.current.length);
-    const textures: WebGLTexture[] = [];
-    const texData: Uint8Array[] = [];
-    for (let i = 0; i < maxLayers; i++) {
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      // Initialize with empty texture
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      textures.push(tex);
-      texData.push(new Uint8Array(GRID_AREA * 4));
-    }
-
-    // Velocity fields for the two composited layers — bound to units 6/7 and
-    // only refreshed while the macro camera is running.
-    const velTextures: WebGLTexture[] = [];
-    const velData: Uint8Array[] = [];
-    for (let i = 0; i < 2; i++) {
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      velTextures.push(tex);
-      velData.push(new Uint8Array(GRID_AREA * 4).fill(128)); // 128 = zero velocity
-    }
-
-    // Collect uniform locations
-    const uniformNames = [
-      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1','u_derived0','u_derived1','u_derivedOn',
-      'u_resolution','u_gooey','u_darkBlend','u_blendMode',
-      'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
-      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
-      'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
-      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
-      'u_filmLevel','u_filmGain','u_logicalGrid',
-      'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
-      'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
-      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_transmission','u_dimmer',
-      'u_mark','u_markOn','u_markRect','u_bspline',
-      'u_beadTex','u_beads','u_dishSpread','u_cells',
-      'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
-      'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
-      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn','u_finishInMain',
-    ];
-    const uLocs: Record<string, WebGLUniformLocation | null> = {};
-    for (const name of uniformNames) {
-      uLocs[name] = gl.getUniformLocation(program, name);
-    }
-
-    const filmTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, filmTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // The mark: a logo or title laid over the finished frame. Transparent
-    // until one is loaded, so the shader's branch is the only cost.
-    const markTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, markTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // The oil beads' mask: interiors in red, rims in green.
-    const beadTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, beadTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    webGLRef.current = {
-      gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
-      packFbos: new Map(), texSizes: new Map(),
-      maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
-      filmTexture,
-      markTexture,
-      beadTexture,
-      derive,
-    };
-
+      Both of those were lost on the WebGPU path while there were two. It
+      sized the canvas from the raw device ratio — so the ladder's dpr rungs
+      did nothing — and it returned before this listener was registered, so a
+      window that changed size kept the pixels it started with.
+    */
     const resize = () => {
-      // Device pixels per CSS pixel is a quality rung, so a Retina laptop
-      // running locally renders sharp and a struggling one drops to 1x.
       const dpr = dprRef.current;
-      const stage = stageRef.current;
-      if (stage) {
+      const stagePx = stageRef.current;
+      if (stagePx) {
         // A projector is mirroring this canvas: render at its pixels, with
         // the governor's rung as a fraction of them, so the mirror shows the
         // real picture and this window only a scaled copy.
         const frac = Math.min(1, dpr / devicePixels());
-        const cap = webGLRef.current?.maxTexture ?? 8192;
-        canvas.width = Math.max(1, Math.min(cap, Math.round(stage.width * frac)));
-        canvas.height = Math.max(1, Math.min(cap, Math.round(stage.height * frac)));
+        const cap = renderer?.maxTexture ?? 8192;
+        canvas.width = Math.max(1, Math.min(cap, Math.round(stagePx.width * frac)));
+        canvas.height = Math.max(1, Math.min(cap, Math.round(stagePx.height * frac)));
       } else {
         canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
         canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
       }
-      gl.viewport(0, 0, canvas.width, canvas.height);
     };
     resizeRef.current = resize;
     window.addEventListener('resize', resize);
@@ -5393,7 +5069,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     drawnRectRef.current = drawnRect;
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
-      const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
+      const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
       const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
       const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
@@ -5481,563 +5157,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      * `view`, and nothing else crosses — which is what lets a WebGPU
      * renderer take the same call when its compositor lands.
      */
-    const drawFrame = (view: FrameView, fluids: FluidSimulation[]): number | null => {
-      const glr = webGLRef.current;
-      if (!glr) return null;
-      const { settings: currentSettings, time, shot } = view;
-      const { macroOn, macroAmount, isDarkBlend, velRange, flowRate } = view;
-      const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
-
-      // Expand texture arrays if layer count increased
-      while (texs.length < fluids.length) {
-        const tex = glCtx.createTexture()!;
-        glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MIN_FILTER, glCtx.LINEAR);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MAG_FILTER, glCtx.LINEAR);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_S, glCtx.CLAMP_TO_EDGE);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_T, glCtx.CLAMP_TO_EDGE);
-        glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
-        texs.push(tex);
-        tData.push(new Uint8Array(GRID_AREA * 4));
-      }
-
-      // An RGBA8 texture at the given edge, with a framebuffer so the GPU
-      // solver can render into it. Reallocates when the resolution changes.
-      const ensureRenderTarget = (tex: WebGLTexture, size: number): WebGLFramebuffer => {
-        if (glr.texSizes.get(tex) !== size) {
-          glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, size, size, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
-          glr.texSizes.set(tex, size);
-        }
-        let fbo = glr.packFbos.get(tex);
-        if (!fbo) {
-          fbo = glCtx.createFramebuffer()!;
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, fbo);
-          glCtx.framebufferTexture2D(glCtx.FRAMEBUFFER, glCtx.COLOR_ATTACHMENT0, glCtx.TEXTURE_2D, tex, 0);
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-          glr.packFbos.set(tex, fbo);
-        }
-        return fbo;
-      };
-
-      // ── Pack each layer into the renderer's textures ───────
-      const inv8 = 1 / 8.0;
-      const encode = 127.5 / velRange;
-      for (let l = 0; l < fluids.length; l++) {
-        const fluid = fluids[l];
-        const wantVel = (macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2;
-
-        if (fluid.gpu) {
-          // The field never leaves the GPU: sqrt-encode straight into the
-          // layer texture, and the velocity texture when macro needs it.
-          const layerFbo = ensureRenderTarget(texs[l], fluid.gpu.N);
-          const velFbo = wantVel ? ensureRenderTarget(glr.velTextures[l], fluid.gpu.N) : null;
-          // Rendering into a framebuffer is WebGL's alone; the WebGPU
-          // renderer samples the solver's own textures instead.
-          if (fluid.gpu instanceof GpuFluid) fluid.gpu.packInto(layerFbo, velFbo, velRange);
-        } else {
-          // CPU path: sqrt-encoded for extra precision at low densities
-          // (the shader squares on decode). Kills banding.
-          const td = tData[l];
-          for (let i = 0; i < GRID_AREA; i++) {
-            const i4 = i * 4;
-            td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
-            td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
-            td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
-            td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
-          }
-          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
-          glr.texSizes.set(texs[l], GRID_SIZE);
-
-          if (wantVel) {
-            const vd = glr.velData[l];
-            for (let i = 0; i < GRID_AREA; i++) {
-              const i4 = i * 4;
-              vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
-              vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
-            }
-            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
-            glr.texSizes.set(glr.velTextures[l], GRID_SIZE);
-          }
-        }
-
-      }
-
-      // ── Each plate's neighbourhood, once per texel ─────────
-      // See DERIVE_PASS in the shader. Its inputs are the display's own
-      // uniforms, set here from the same values the display gets below.
-      const derive = glr.derive && !view.perPixel ? glr.derive : null;
-      if (derive) {
-        const du = derive.u;
-        glCtx.useProgram(derive.program);
-        glCtx.bindVertexArray(vaoObj);
-        glCtx.uniform1i(du.u_src, 0);
-        glCtx.uniform1f(du.u_gridSize, fluids[0]?.gpu?.N ?? GRID_SIZE);
-        glCtx.uniform1f(du.u_logicalGrid, GRID_SIZE);
-        glCtx.uniform1f(du.u_bspline, view.oldSampler ? 1 : 0);
-        glCtx.uniform1f(du.u_filmLevel, view.filmLevel);
-        glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, view.filmGain)));
-        glCtx.uniform1f(du.u_exposure, Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-        glCtx.uniform1f(du.u_macro, macroAmount);
-        glCtx.uniform1f(du.u_transmission, Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
-        glCtx.uniform1f(du.u_boundaryContrast, currentSettings.boundaryContrast ?? 0.35);
-        glCtx.activeTexture(glCtx.TEXTURE0);
-        for (let l = 0; l < Math.min(2, fluids.length); l++) {
-          const size = glr.texSizes.get(texs[l]) ?? GRID_SIZE;
-          if (derive.sizes[l] !== size) {
-            glCtx.bindTexture(glCtx.TEXTURE_2D, derive.textures[l]);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA16F, size, size, 0, glCtx.RGBA, glCtx.HALF_FLOAT, null);
-            derive.sizes[l] = size;
-          }
-          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, derive.fbos[l]);
-          glCtx.viewport(0, 0, size, size);
-          glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
-        }
-        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-        glCtx.viewport(0, 0, canvas.width, canvas.height);
-        glCtx.bindVertexArray(null);
-      }
-
-      // Bind the renderer's samplers only once every layer is packed: the
-      // GPU solver's pack pass uses unit 0 for its own source texture, so
-      // packing layer 1 would otherwise unbind layer 0 from the unit the
-      // renderer reads it from. The derive pass reads through unit 0 too.
-      for (let l = 0; l < fluids.length; l++) {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.layer0 + l);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-        if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
-          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.vel0 + l);
-          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
-        }
-      }
-      for (let l = 0; l < 2; l++) {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.derived0 + l);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, derive ? derive.textures[l] : null);
-      }
-
-      // Pigment coordinates, one plate per unit (12 and 13). A layer without
-      // them (the CPU solver, or a context without float render targets)
-      // leaves the unit on the bead mask and the shader falls back to a
-      // screen-fixed grain, which is why u_grainOn is per-frame, not per-layer.
-      let grainOn = 0;
-      {
-        const lead = fluids[0];
-        const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
-        if (gran > 0.002) {
-          for (let l = 0; l < 2; l++) {
-            const g = fluids[l]?.gpu;
-            const tex = (g instanceof GpuFluid ? g.grainTexture : null) ?? null;
-            if (!tex) continue;
-            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-            if (l === 0) grainOn = 1;
-          }
-          // The second plate borrows the lead's coordinates when it has none.
-          const lead1 = fluids[1]?.gpu;
-          if (grainOn && !(lead1 instanceof GpuFluid && lead1.grainTexture)) {
-            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, (lead!.gpu as GpuFluid).grainTexture!);
-          }
-        }
-      }
-
-      // The oil beads' mask: bound every frame on its own unit (see
-      // textureUnits.ts), uploaded on the frames the show redrew it. A unit
-      // left pointing at the camera's scene texture made every draw with the
-      // camera on a feedback loop, and the photograph and closeup presets
-      // drew black; the output pass on this same unit did it again.
-      {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
-        const cv = view.beadMask;
-        if (cv) {
-          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
-        }
-      }
-
-      // The mark, if one is loaded. Uploaded once, on the frame after it
-      // arrives, and then just bound: a logo does not change sixty times a
-      // second and re-uploading it would be the most expensive thing in
-      // the frame.
-      let markOn = 0;
-      const markRect = [0.5, 0.5, 0.5, 0.5];
-      {
-        const mk = view.mark;
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.mark);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
-        if (mk) {
-          if (mk.dirty) {
-            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-            glCtx.pixelStorei(glCtx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, mk.source as TexImageSource);
-            mk.dirty = false;
-          }
-          const mix = Math.max(0, Math.min(1, currentSettings.markMix ?? 1));
-          if (mix > 0.002) {
-            markOn = mix;
-            // Width is the setting; height follows the image's own aspect
-            // against the frame's, so a wide logo is not stretched tall on
-            // a 16:9 wall and squat on a 4:3 one.
-            const halfW = Math.max(0.002, (currentSettings.markScale ?? 0.22)) * 0.5;
-            const frameAspect = canvas.width / Math.max(1, canvas.height);
-            markRect[0] = Math.max(0, Math.min(1, currentSettings.markX ?? 0.5));
-            markRect[1] = Math.max(0, Math.min(1, currentSettings.markY ?? 0.12));
-            markRect[2] = halfW;
-            markRect[3] = halfW * (frameAspect / Math.max(0.01, mk.aspect));
-          }
-        }
-      }
-
-      // The film projector's frame, if one is playing.
-      let filmOn = 0;
-      let filmScaleX = 1, filmScaleY = 1;
-      {
-        const f = view.film;
-        const v = f.video;
-        if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
-          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.film);
-          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.filmTexture);
-          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, v);
-          filmOn = 1;
-          // Cover-fit: crop whichever axis the frame has too much of.
-          const va = v.videoWidth / v.videoHeight, ca = canvas.width / canvas.height;
-          if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
-        }
-      }
-
-      // Set uniforms and draw
-      glCtx.useProgram(prog);
-      glCtx.bindVertexArray(vaoObj);
-
-      glCtx.uniform1i(uLocs['u_layer0'], UNIT.layer0);
-      glCtx.uniform1i(uLocs['u_layer1'], UNIT.layer1);
-      glCtx.uniform1i(uLocs['u_derived0'], UNIT.derived0);
-      glCtx.uniform1i(uLocs['u_derived1'], UNIT.derived1);
-      glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
-      glCtx.uniform1i(uLocs['u_layerCount'], fluids.length);
-      glCtx.uniform1f(uLocs['u_rotation0'], view.rotations[0] ?? 0);
-      glCtx.uniform1f(uLocs['u_rotation1'], view.rotations[1] ?? 0);
-      glCtx.uniform2f(uLocs['u_resolution'], canvas.width, canvas.height);
-      glCtx.uniform1f(uLocs['u_gooey'], currentSettings.gooeyEffect ?? 0);
-      glCtx.uniform1i(uLocs['u_darkBlend'], isDarkBlend ? 1 : 0);
-
-      // Map blend mode string to int: screen=0, lighter=1, exclusion=2, multiply=3, overlay=4
-      const blendModeMap: Record<string, number> = {
-        'screen': 0, 'lighter': 1, 'exclusion': 2, 'multiply': 3, 'overlay': 4,
-      };
-      glCtx.uniform1i(uLocs['u_blendMode'], blendModeMap[currentSettings.blendMode] ?? 0);
-
-      glCtx.uniform1i(uLocs['u_ledPlatform'], currentSettings.ledPlatform ? 1 : 0);
-      const ledModeMap: Record<string, number> = { 'single': 0, 'ocean': 1, 'fire': 2, 'cyberpunk': 3, 'rainbow': 4 };
-      glCtx.uniform1i(uLocs['u_ledMode'], ledModeMap[currentSettings.ledMode] ?? 0);
-
-      // Parse ledColor hex to vec3
-      const lcRgb = hexToRgb(currentSettings.ledColor ?? '#ffffff');
-      glCtx.uniform3f(uLocs['u_ledColor'], lcRgb.r, lcRgb.g, lcRgb.b);
-
-      const ledAngle = time * (currentSettings.ledSpeed ?? 1) * 0.5 / (2 * Math.PI);
-      glCtx.uniform1f(uLocs['u_ledAngle'], ledAngle);
-      glCtx.uniform1f(uLocs['u_time'], time);
-      glCtx.uniform1f(uLocs['u_glossiness'], currentSettings.glossiness ?? 0);
-      glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
-      glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
-      glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
-      glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
-      glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-      glCtx.uniform1f(uLocs['u_transmission'], Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
-      // The dimmer, with the flash guard's correction folded in. Riding the
-      // dimmer rather than adding a pass is what lets one implementation
-      // cover the laptop, the projector, a network display and the
-      // recorder: every material is already lit through this number.
-      const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * view.dimmerGain;
-      glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
-      glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
-      glCtx.uniform1f(uLocs['u_bspline'], view.oldSampler ? 1 : 0);
-      glCtx.uniform1i(uLocs['u_mark'], UNIT.mark);
-      glCtx.uniform1f(uLocs['u_markOn'], markOn);
-      glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
-      {
-        const k = Math.round(currentSettings.kaleidoscope ?? 0);
-        glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
-        glCtx.uniform1f(uLocs['u_kaleidoPhase'], view.kaleidoPhase);
-        glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
-      }
-      glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
-      {
-        const lamp = view.lamp;
-        glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
-        glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
-        glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
-        glCtx.uniform1f(uLocs['u_iridescence'], Math.max(0, Math.min(1, currentSettings.iridescence ?? 0)));
-      }
-      {
-        const photo = currentSettings.renderStyle === 'photo';
-        glCtx.uniform1f(uLocs['u_photo'], photo ? 1 : 0);
-        const pa = hexToRgb(currentSettings.paperA ?? '#1e5fb8');
-        const pb = hexToRgb(currentSettings.paperB ?? '#f4c04a');
-        glCtx.uniform3f(uLocs['u_paperA'], pa.r, pa.g, pa.b);
-        glCtx.uniform3f(uLocs['u_paperB'], pb.r, pb.g, pb.b);
-        glCtx.uniform1f(uLocs['u_droplets'], Math.max(0, Math.min(1, currentSettings.microDroplets ?? 0)));
-        glCtx.uniform1f(uLocs['u_thinFilm'], Math.max(0, Math.min(1, currentSettings.thinFilm ?? 0)));
-      }
-      {
-        // Lumia and gel colours come from the working harmony, so they
-        // stay inside the preset's dyes.
-        const h = view.harmony;
-        const hc = (i: number) => PALETTE_RGB[h[i % h.length]];
-        const a = hc(0), b = hc(1), c2 = hc(2), d = hc(3);
-        glCtx.uniform1f(uLocs['u_lumia'], Math.max(0, Math.min(1, currentSettings.lumia ?? 0)));
-        glCtx.uniform3f(uLocs['u_lumiaA'], a.r, a.g, a.b);
-        glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
-        const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
-        glCtx.uniform1f(uLocs['u_gelWheel'], gel);
-        glCtx.uniform1f(uLocs['u_gelAngle'], view.gelAngle);
-        glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
-        glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
-        glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
-        glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
-        glCtx.uniform1i(uLocs['u_film'], UNIT.film);
-        glCtx.uniform1i(uLocs['u_beadTex'], UNIT.beads);
-        glCtx.uniform1i(uLocs['u_grain0'], UNIT.grain0);
-        glCtx.uniform1i(uLocs['u_grain1'], UNIT.grain1);
-        glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
-        glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
-        glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
-        glCtx.uniform1i(uLocs['u_filmOn'], filmOn);
-        glCtx.uniform1f(uLocs['u_filmMix'], Math.max(0, Math.min(1, currentSettings.filmMix ?? 0.7)));
-        glCtx.uniform1f(uLocs['u_filmKey'], Math.max(0, Math.min(0.9, currentSettings.filmKey ?? 0.18)));
-        glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
-      }
-      {
-        const throw1 = view.layer1;
-        glCtx.uniform1f(uLocs['u_layerZoom1'], throw1.zoom);
-        glCtx.uniform2f(uLocs['u_layerDrift1'], throw1.dx, throw1.dy);
-        const bubbles = view.bubbles;
-        glCtx.uniform4fv(uLocs['u_bubbles'], view.bubblePack.packed);
-        glCtx.uniform4fv(uLocs['u_bubbleShape'], view.bubblePack.shape);
-        glCtx.uniform1i(uLocs['u_bubbleCount'], bubbles.count);
-        glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbles.strength);
-      }
-      glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
-      // Sampling math follows the texture actually bound; the tuned look
-      // (normals, edge lines, macro cells) stays on the logical 192 grid.
-      glCtx.uniform1f(uLocs['u_gridSize'], fluids[0]?.gpu?.N ?? GRID_SIZE);
-      glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
-
-      // Macro closeup
-      glCtx.uniform1i(uLocs['u_vel0'], UNIT.vel0);
-      glCtx.uniform1i(uLocs['u_vel1'], UNIT.vel1);
-      glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
-      glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
-      glCtx.uniform1f(uLocs['u_macro'], macroAmount);
-      glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
-      glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
-      glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
-      glCtx.uniform1f(uLocs['u_macroDepth'], currentSettings.macroDepth ?? 0.5);
-      glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
-      glCtx.uniform1f(uLocs['u_macroRelief'], currentSettings.macroRelief ?? 0.7);
-      glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
-      glCtx.uniform1f(uLocs['u_filmLevel'], view.filmLevel);
-      glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, view.filmGain)));
-
-      // ── Two passes when the camera is on ───────────────────
-      // The plate is drawn to a texture and the camera looks at it:
-      // refraction, depth of field, bloom and the sensor's roll-off
-      // all need the finished picture to sample from.
-      const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
-      if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
-      const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
-
-      // ── The projector, last ────────────────────────────────
-      // Flip, corner pin, blanking and grade. Built the first frame it
-      // would change anything, and dropped again when the operator resets
-      // it, so the common case — no projector, nothing set — never pays
-      // for the extra target or the extra draw.
-      const outCfg = view.outputCfg;
-      const wantOut = !outputIsIdentity(outCfg);
-      if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
-      else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
-      const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
-      glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
-      glCtx.uniform1f(uLocs['u_grainMix'], fluids[0]?.gpu?.grainMix ?? 0);
-      glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
-      glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
-      glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
-
-      // ── The post chain ─────────────────────────────────────
-      // Only while an effect is on (none yet; the harness can force it,
-      // or run its test effect). Off, the plate finishes the frame itself
-      // and none of this is allocated.
-      const postTest = view.postTest;
-      const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
-      if (wantPost && !postRef.current) postRef.current = new PostChain(glCtx);
-      else if (!wantPost && postRef.current) { postRef.current.dispose(); postRef.current = null; }
-      const chain = wantPost && postRef.current?.ok ? postRef.current : null;
-      // Into the chain's half floats nothing; into the camera's 8-bit texture
-      // still a dither, or a dark ramp bands before the camera sees it.
-      glCtx.uniform1i(uLocs['u_finishInMain'], !chain ? 1 : cam ? 2 : 0);
-
-      // The output pass is prepared whenever it exists, even when the
-      // camera is the thing the plate draws into — the camera renders
-      // *through* it, so its texture has to be allocated and attached
-      // first. Preparing it only in the `else` branch meant that with a
-      // camera on (which is every photographic preset: Oil on Water,
-      // Colorful Cosmos, Sunny Side Up) the camera drew into a framebuffer
-      // with nothing attached and the output pass then sampled a texture
-      // with no storage. A keystone on those presets was a black wall.
-      if (out) out.bindTarget(canvas.width, canvas.height);
-      if (cam) {
-        cam.bindTarget(canvas.width, canvas.height);
-      } else if (chain) {
-        chain.bindScene(canvas.width, canvas.height);
-      } else if (!out) {
-        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-        glCtx.viewport(0, 0, canvas.width, canvas.height);
-      }
-      // The plate's own program and vertex array, again. A pass built this
-      // frame (the camera, the output pass, the chain) binds its own vertex
-      // array in its constructor and leaves none bound, and the plate then
-      // drew with no vertices: nothing, for one frame, whenever the camera
-      // or a projector control was first touched.
-      glCtx.useProgram(prog);
-      glCtx.bindVertexArray(vaoObj);
-      glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
-      glCtx.bindVertexArray(null);
-      if (cam) {
-        cam.draw(canvas.width, canvas.height, {
-          time,
-          amount: camAmt,
-          refraction: Math.max(0, Math.min(1, currentSettings.refraction ?? 0)),
-          chromatic: Math.max(0, Math.min(1, currentSettings.chromaticAberration ?? 0)),
-          focus: Math.max(0, Math.min(1, currentSettings.focus ?? 0.5)),
-          aperture: Math.max(0, Math.min(1, currentSettings.aperture ?? 0)),
-          bloom: Math.max(0, Math.min(1, currentSettings.bloom ?? 0)),
-          filmic: 1,
-          vignette: 0.6,
-          grain: 0.6,
-          // Into the chain's half floats, the finish dithers once, at the end.
-          dither: chain ? 0 : 1,
-        }, chain ? chain.sceneTarget(canvas.width, canvas.height) : out ? out.fbo : null);
-      }
-      if (chain) {
-        chain.effects(view.fxFrame, view.fxSeed, postTest);
-        if (out) out.bindTarget(canvas.width, canvas.height);
-        chain.finishTo(out ? out.fbo : null, { dimmer: dimmerNow, markOn, markRect: markRect as [number, number, number, number] });
-      }
-      if (out) out.draw(canvas.width, canvas.height, outCfg);
-
-      // ── What the audience just saw ─────────────────────────
-      // Last, with the finished frame still in the default framebuffer.
-      // The read is one frame behind, which does not matter for a question
-      // about the last second. What to do about it is the show's business,
-      // so the reading goes back rather than the verdict: the loop folds it
-      // into the gain that reaches the *next* frame's view, which is exactly
-      // where it reached before.
-      if (outCfg.flashGuard) {
-        if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
-        probeRef.current.measure(canvas.width, canvas.height);
-        return probeRef.current.luminance;
-      }
-      if (probeRef.current) {
-        probeRef.current.dispose();
-        probeRef.current = null;
-      }
-      return null;
-    };
-
-    /**
-     * WebGL's side of the bargain. Everything above this point built it; this
-     * is the handle the loop holds, and the WebGPU stage will hand over the
-     * same shape once its compositor is wired (docs/webgpu-plan.md, P3).
-     */
-    const webglRenderer: PlateRenderer = {
-      info: { api: 'webgl', renderer: rendererString, gpuClass },
-      get maxTexture() { return webGLRef.current?.maxTexture ?? 0; },
-      resize,
-      attachSolver(fluid, wantRes) {
-        const glr = webGLRef.current;
-        if (!glr || wantRes <= 0) {
-          if (fluid.gpu) fluid.detachGpu();
-          return true;
-        }
-        if (fluid.gpu && fluid.gpu.N === wantRes) return true;
-        try {
-          if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
-          if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
-          return gpuSupportedRef.current;
-        } catch (err) {
-          console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
-          fluid.dropGpu();
-          return false;
-        }
-      },
-      drawFrame,
-      debug: () => ({
-        gl: webGLRef.current,
-        /**
-         * Each plate's rotation, live. The clip tool squares a plate up before
-         * it pours a title into it, or the words come out at whatever angle the
-         * plate was laid at (a random one) and turn with it.
-         */
-        outputPass: outputRef.current,
-        flash: () => ({ ...flashRef.current.state, luminance: probeRef.current?.luminance ?? null }),
-        /**
-         * The post chain, for `npm run fx`: whether it runs and at what depth,
-         * forcing it on with no effect, its test effect (1 seeded noise, 2 the
-         * history ring's picture from `delay` frames ago), the effects' clock
-         * and seed, and the ring's self-test.
-         */
-        post: {
-          active: !!postRef.current,
-          float: postRef.current?.float ?? null,
-          history: postRef.current?.historySize ?? null,
-          frame: fxFrameRef.current,
-          force: (on: boolean) => { postForceRef.current = !!on; },
-          test: (mode: 0 | 1 | 2, delay = 1) => { postTestRef.current = mode ? { mode, delay } : null; },
-          seed: (n: number) => { fxSeedRef.current = n >>> 0; },
-          /** Hold the effects' clock at one frame (null lets it run), so a frame can be drawn twice. */
-          hold: (frame: number | null) => { fxHoldRef.current = frame === null ? null : frame >>> 0; },
-          ringSelfTest: () => postRef.current?.ringSelfTest() ?? null,
-        },
-        /** The canvas's mean luminance now, through the probe's reduction, read synchronously. */
-        probeNow: () => probeRef.current?.measureNow(canvas.width, canvas.height) ?? null,
-        /**
-         * Paint the canvas black with lit rectangles (x, y, w, h in pixels,
-         * from the bottom left) and read it back through the probe: the
-         * reading should be the lit fraction of the frame, wherever the
-         * rectangles fall. The next frame paints over it.
-         */
-        probeSelfTest: (rects: [number, number, number, number][]) => {
-          const glr = webGLRef.current;
-          const probe = probeRef.current;
-          if (!glr || !probe) return null;
-          const g = glr.gl;
-          const clear = g.getParameter(g.COLOR_CLEAR_VALUE) as Float32Array;
-          g.bindFramebuffer(g.FRAMEBUFFER, null);
-          g.clearColor(0, 0, 0, 1);
-          g.clear(g.COLOR_BUFFER_BIT);
-          g.enable(g.SCISSOR_TEST);
-          g.clearColor(1, 1, 1, 1);
-          for (const [x, y, w, h] of rects) { g.scissor(x, y, w, h); g.clear(g.COLOR_BUFFER_BIT); }
-          g.disable(g.SCISSOR_TEST);
-          g.clearColor(clear[0], clear[1], clear[2], clear[3]);
-          const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
-          return { mean: probe.measureNow(canvas.width, canvas.height), lit };
-        },
-        /** A test mark (a white bar fading out to the right), or none, for the finish's identity check. */
-        glError: () => webGLRef.current?.gl.getError() ?? null,
-        glLost: glLostRef.current,
-      }),
-    };
-
-    startWith(webglRenderer);
-
     return () => {
+      cancelled = true;
       stopFilm();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);
@@ -6048,34 +5169,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
 
-      // Clean up WebGL resources. A context that is already lost took them
-      // all with it, so there is nothing to delete and the calls would be
-      // no-ops at best; `webGLRef` is nulled by the loss handler either way.
-      const glr = webGLRef.current;
-      if (glr && !glr.gl.isContextLost()) {
-        const { gl: glCtx, program: prog, vao: vaoObj, posBuffer: pb, textures: texs, velTextures: velTexs } = glr;
-        for (const fluid of fluidsRef.current) fluid.detachGpu();
-        for (const fbo of glr.packFbos.values()) glCtx.deleteFramebuffer(fbo);
-        for (const tex of texs) glCtx.deleteTexture(tex);
-        for (const tex of velTexs) glCtx.deleteTexture(tex);
-        if (glr.derive) {
-          for (const fbo of glr.derive.fbos) glCtx.deleteFramebuffer(fbo);
-          for (const tex of glr.derive.textures) glCtx.deleteTexture(tex);
-          glCtx.deleteProgram(glr.derive.program);
-        }
-        glCtx.deleteBuffer(pb);
-        glCtx.deleteVertexArray(vaoObj);
-        glCtx.deleteProgram(prog);
-        cameraRef.current?.dispose();
-        cameraRef.current = null;
-        outputRef.current?.dispose();
-        outputRef.current = null;
-        probeRef.current?.dispose();
-        probeRef.current = null;
-        postRef.current?.dispose();
-        postRef.current = null;
-        webGLRef.current = null;
-      }
+      camera?.dispose();
+      camera = null;
+      projector?.dispose();
+      projector = null;
+      probe?.dispose();
+      probe = null;
+      chain?.dispose();
+      chain = null;
+      stage?.dispose();
+      stage = null;
     };
     /*
       What legitimately rebuilds the GL context, and nothing else.

@@ -43,7 +43,6 @@
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
-    "parity": "node scripts/parity.mjs",
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
     "brand": "node scripts/brand.mjs",
@@ -54,11 +53,7 @@
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
-    "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs",
-    "composite": "node scripts/composite.mjs",
-    "camera": "node scripts/camera.mjs",
-    "output": "node scripts/output.mjs",
-    "post": "node scripts/post.mjs"
+    "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

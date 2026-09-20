@@ -166,8 +166,8 @@ export function qualityLadder(
 export interface EngineStatus {
   /** Short readout, e.g. "GPU · 512² · 1.0x". */
   label: string;
-  /** WebGL's GPU solver, the CPU solver, or the WebGPU stage (?renderer=webgpu, until the cutover). */
-  engine: 'gpu' | 'cpu' | 'webgpu';
+  /** The stage's solver, or the CPU one while the plate is being carried across. */
+  engine: 'webgpu' | 'cpu';
   grid: number;
   dpr: number;
   tier: PlatformTier;

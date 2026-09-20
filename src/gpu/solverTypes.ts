@@ -1,0 +1,81 @@
+/**
+ * What a solver is told, and what the plate needs of one
+ * (docs/webgpu-plan.md, P7).
+ *
+ * Both of these were declared in `lib/gpuFluid.ts`, the WebGL solver, because
+ * that is where they were first needed — `PlateSolver` is the narrow face the
+ * frame loop sees, and it existed so that two solvers could both be one.
+ * There is one now, so they live beside it.
+ */
+
+/** Everything a step needs, already derived from settings by the caller. */
+export interface GpuStepParams {
+  dt: number;
+  visc: number;         // Hele-Shaw viscosity (thick 1.5 / thin 0.5)
+  nu: number;           // kinematic viscosity for momentum diffusion
+  diff: number;         // dye / heat diffusivity
+  buoyancy: number;
+  gravity: number;      // centre-gravity strength (already × 0.05)
+  tiltX: number;        // plate tilt, applied as a uniform acceleration
+  tiltY: number;
+  advection: number;
+  /** Interface sharpening, 0 = off. Counteracts the solver's own numerical diffusion. */
+  sharpness: number;
+  damping: number;
+  heatDecay: number;
+  turbScale: number;
+  turbDetail: number;
+  spin: number;         // vorticity strength (0 = off)
+  surfaceTension: number;
+  fingering: number;
+  vibIntensity: number;
+  vibFrequency: number;
+  drip: number;         // rainDrip (0 = off)
+  smearX: number;       // per-step shear, precomputed on the CPU
+  smearY: number;
+  air: number;          // airVelocity (0 = off)
+  evapFactor: number;
+  time: number;
+  /**
+   * The lasting current (see `stepCurrent`). Everything here is per second in
+   * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
+   */
+  currentDamp: number;      // how much of the current survives a step (the Damping control)
+  currentBuoy: number;      // heat rising: × the temperature field
+  rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
+  rockY: number;
+  currentGrav: number;      // a concave dish, × (density − mean): heavy dye pools in the middle
+  twist: number;            // the top glass turning: a differential rotation, fastest inside
+  meanDensity: number;
+  maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
+}
+
+/**
+ * What the plate needs of a solver, whichever API it runs on
+ * (docs/webgpu-plan.md, P3).
+ *
+ * `GpuFluid` below and `gpu/fluid.ts`'s `WebGPUFluid` both satisfy this, so
+ * `FluidSimulation` can hold either without knowing which. What is *not* here
+ * is anything one of them cannot do: `packInto` renders into a framebuffer,
+ * which is WebGL's alone, so the WebGL renderer narrows to its own class at
+ * the one place it needs it.
+ */
+export interface PlateSolver {
+  /** The physical grid it is solving on. */
+  readonly N: number;
+  /** The crossfade between the pigment's two phases. */
+  readonly grainMix: number;
+  /** The coordinates the pigment rides, where the device can carry them. */
+  readonly grainTexture?: unknown;
+  step(p: GpuStepParams, deltasApplied: boolean): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
+  /** Start a read and take whatever has landed; false before the first. */
+  readbackAsync(): boolean;
+  readonly rbDyeView: Float32Array;
+  readonly rbVelView: Float32Array;
+  /** The fields as the CPU last saw them, for carrying state across a change. */
+  readback(): { dye: Float32Array; vel: Float32Array };
+  drainStep(t: number): void;
+  clear(): void;
+  dispose(): void;
+}

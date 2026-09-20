@@ -127,15 +127,15 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // tell the two families apart with no tuning in them at all: the weights at a
 // texel centre, and how steeply the kernel can reconstruct a step edge.
 {
-  // The plate's GLSL lives in its own file since the WebGPU port needed a
-  // second copy of it to compare against (docs/webgpu-plan.md, P3).
-  const src = fs.readFileSync(process.cwd() + '/src/lib/plateShader.ts', 'utf8');
+  // The plate's shader is WGSL since the cutover (docs/webgpu-plan.md, P7);
+  // the GLSL it was read from is gone with the engine that ran it.
+  const src = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/plate.ts', 'utf8');
   // The weights live in bicubicSigned, which the derive pass's signed fields are
   // read through; textureBicubic is the same reconstruction clamped at zero.
   check('the dye is still read through the one reconstruction',
-    /vec4 textureBicubic\(sampler2D tex, vec2 uv\) \{\s*return max\(bicubicSigned\(tex, uv\), vec4\(0\.0\)\);/.test(src));
-  const body = src.slice(src.indexOf('vec4 bicubicSigned'));
-  const weights = [...body.slice(0, body.indexOf('vec2 w12')).matchAll(/vec2 w[0-3] = ([^;]+);/g)].map(m => m[1]);
+    /fn textureBicubic\(t: texture_2d<f32>, uv: vec2f\) -> vec4f \{\s*return max\(bicubicSigned\(t, uv\), vec4f\(0\.0\)\);/.test(src));
+  const body = src.slice(src.indexOf('fn bicubicSigned'));
+  const weights = [...body.slice(0, body.indexOf('let w12')).matchAll(/let w[0-3] = ([^;]+);/g)].map(m => m[1]);
   check('the shader still has four reconstruction weights to read', weights.length === 4,
     `found ${weights.length}`);
   if (weights.length === 4) {
@@ -234,10 +234,10 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 
   // The model above is a model. These two read the shipped solvers, so a gate
   // quietly put back the way it was fails here rather than in a show.
-  const shader = fs.readFileSync(process.cwd() + '/src/lib/gpuFluid.ts', 'utf8');
-  const gpuGate = /float gate\(vec4 a, vec4 b\) \{ return min\(a\.a, b\.a\)/.test(shader);
+  const shader = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/fluid.ts', 'utf8');
+  const gpuGate = /fn gate\(a: vec4f, b: vec4f\) -> f32 \{ return min\(a\.a, b\.a\)/.test(shader);
   check('the GPU solver reads its gate from the thickness, not from the channel',
-    gpuGate, gpuGate ? '' : 'gate() in gpuFluid.ts is back to per-channel');
+    gpuGate, gpuGate ? '' : 'gate() in gpu/wgsl/fluid.ts is back to per-channel');
   const cpu = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
   const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
   const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);

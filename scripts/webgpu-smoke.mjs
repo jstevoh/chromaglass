@@ -610,37 +610,33 @@ const laidOver = (page) => page.evaluate(async () => {
     return out;
   };
   try {
-    const seen = {};
-    for (const [engine, query] of [['WebGPU', ''], ['WebGL', '&renderer=webgl']]) {
-      const m = await read(query);
-      seen[engine] = m;
-      const pc = (v) => `${(v * 100).toFixed(1)}%`;
-      check(`${engine}: the mark lands in its own rectangle, the right way round`,
-        m.mark.inside > 0.35 && m.mark.inside > m.mark.outside * 5 &&
-        m.mark.inside > m.floor.inside * 5 && m.mark.lean > 1.5,
-        `${pc(m.mark.inside)} of the rectangle changed against ${pc(m.mark.outside)} of the rest, ` +
-        `${m.mark.lean.toFixed(2)}× brighter at its left end (the floor was ${pc(m.floor.inside)})`);
-      // What the beads are worth, over what the liquid was doing anyway. A
-      // difference rather than a ratio: how much of the frame they change
-      // depends on the dye under them, and how much it moves on its own
-      // depends on the moment — one run had them at 1.0% over a floor of
-      // 0.0%, another at 2.1% over 0.9%, and both are the beads arriving.
-      check(`${engine}: the beads' mask reaches the plate`,
-        m.count > 0 && m.beads.outside - m.beadFloor.outside > 0.004,
-        `${m.count} beads, worth ${pc(m.beads.outside)} of the frame, against ${pc(m.beadFloor.outside)} of it moving on its own`);
-      const blue = (c) => c.b - c.r;
-      check(`${engine}: a blue film makes a blue frame`,
-        m.film.playing.readyState >= 2 && m.film.playing.width > 0 &&
-        blue(m.film.lit) > blue(m.film.dry) + 12,
-        `blue led red by ${blue(m.film.dry).toFixed(1)} without the film and ${blue(m.film.lit).toFixed(1)} with it`);
-    }
-    // The picture belongs to the page, not to the engine: the same mark, the
-    // same rectangle, leaning the same way.
-    const g = seen.WebGPU, w = seen.WebGL;
-    check('both engines lay the mark the same way',
-      Math.abs(g.mark.inside - w.mark.inside) < 0.15 && g.mark.lean > 1.5 && w.mark.lean > 1.5,
-      `WebGPU ${(g.mark.inside * 100).toFixed(1)}% at ${g.mark.lean.toFixed(2)}×, ` +
-      `WebGL ${(w.mark.inside * 100).toFixed(1)}% at ${w.mark.lean.toFixed(2)}×`);
+    const m = await read('');
+    const pc = (v) => `${(v * 100).toFixed(1)}%`;
+    /*
+      There was a second engine to compare these against once, and that is
+      how the mark's orientation was proved: both laid it in the same
+      rectangle, leaning the same way. With one engine (P7) what is left is
+      the claim itself, which is the one that matters — the rectangle the
+      settings named is the rectangle the mark is in, and its bright end is
+      where its bright end was drawn.
+    */
+    check('the mark lands in its own rectangle, the right way round',
+      m.mark.inside > 0.35 && m.mark.inside > m.mark.outside * 5 &&
+      m.mark.inside > m.floor.inside * 5 && m.mark.lean > 1.5,
+      `${pc(m.mark.inside)} of the rectangle changed against ${pc(m.mark.outside)} of the rest, ` +
+      `${m.mark.lean.toFixed(2)}× brighter at its left end (the floor was ${pc(m.floor.inside)})`);
+    // What the beads are worth, over what the liquid was doing anyway. A
+    // difference rather than a ratio: how much of the frame they change
+    // depends on the dye under them, and how much it moves on its own
+    // depends on the moment.
+    check("the beads' mask reaches the plate",
+      m.count > 0 && m.beads.outside - m.beadFloor.outside > 0.004,
+      `${m.count} beads, worth ${pc(m.beads.outside)} of the frame, against ${pc(m.beadFloor.outside)} of it moving on its own`);
+    const blue = (c) => c.b - c.r;
+    check('a blue film makes a blue frame',
+      m.film.playing.readyState >= 2 && m.film.playing.width > 0 &&
+      blue(m.film.lit) > blue(m.film.dry) + 12,
+      `blue led red by ${blue(m.film.dry).toFixed(1)} without the film and ${blue(m.film.lit).toFixed(1)} with it`);
   } finally {
     await browser.close();
   }
@@ -659,24 +655,6 @@ const laidOver = (page) => page.evaluate(async () => {
     const shown = await screen.waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
     const text = shown ? (await screen.textContent()).replace(/\s+/g, ' ').trim() : '';
     check('without WebGPU, the "needs WebGPU" screen', shown && /needs WebGPU/.test(text), text.slice(0, 90));
-  } finally {
-    await browser.close();
-  }
-}
-
-// ── The way back ─────────────────────────────────────────────────────
-// `?renderer=webgl` still draws the old way, for a show on a machine whose
-// WebGPU driver turns out to be bad. It goes with the WebGL renderer at P7.
-{
-  const browser = await chromium.launch({ headless: true, channel: 'chromium', args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] });
-  try {
-    const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-    await page.goto(`${URL_BASE}&renderer=webgl`, { waitUntil: 'load' });
-    const engine = await page.waitForFunction(() => {
-      const e = window.chromaglassDebug?.().engine;
-      return e && e !== 'WebGPU · starting' ? e : null;
-    }, null, { timeout: 30_000 }).then((h) => h.jsonValue()).catch(() => null);
-    check('?renderer=webgl still draws the old way', !!engine && !/WebGPU/.test(engine), engine ?? 'no engine');
   } finally {
     await browser.close();
   }
