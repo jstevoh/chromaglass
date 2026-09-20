@@ -15,7 +15,7 @@ this repo.
 | | Plan | State |
 |---|---|---|
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
-| **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **In flight.** P0–P3 have landed (#93–#97): the kit, the solver, the compositor, the renderer split, and the camera and projector behind it. P4 is done: the flash guard, device loss, `bench` on both engines and the governor judged on real GPU timings. P5 (the harnesses and CI) is next |
+| **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Cut over.** P0–P6 are done: the kit, the solver, the compositor, the renderer split, the camera, the projector, the post chain, the flash guard, device loss, the harnesses and CI — and the app runs on WebGPU, with `?renderer=webgl` kept until P7 deletes the old path |
 | **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | Waiting for the cutover, so each is written once, in WGSL |
 | **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | Waiting for the same, then H6–H8 below |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the new renderer; the rest of §5 is independent |

@@ -74,7 +74,8 @@ const checks = [];
 */
 if (engineName() !== 'webgl') {
   console.log(`the dye bottles are measured on the CPU's own arrays, which ${engineName()} does not fill.`);
-  console.log('what a pour deposits on that path is `npm run parity`; nothing to do here.');
+  console.log('run it with CG_RENDERER=webgl until that measurement moves to the GPU;');
+  console.log('what a pour deposits on this path is `npm run parity`, which already gates it.');
   process.exit(0);
 }
 

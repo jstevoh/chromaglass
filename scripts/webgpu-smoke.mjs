@@ -4,10 +4,10 @@
  *
  *   npm run webgpu
  *
- * Under `?renderer=webgpu` the app gets a device, holds a black plate at the
- * display's rate, reads its own frame back, and runs the kit's self-test on
- * the GPU; a browser with no WebGPU adapter gets the "needs WebGPU" screen;
- * and without the flag nothing has changed.
+ * The app gets a device, draws its plate at the display's rate, reads its own
+ * frame back, and runs the kit's self-test on the GPU; a browser with no
+ * WebGPU adapter gets the "needs WebGPU" screen instead of a degraded show;
+ * and `?renderer=webgl` still draws the old way until P7 removes it.
  *
  * WebGPU needs Playwright's full Chromium (`channel: 'chromium'`): the default
  * headless shell has no adapter. In CI this runs on macOS, whose runners give
@@ -58,11 +58,11 @@ const watch = (page) => {
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
     const errors = watch(page);
-    await page.goto(`${URL_BASE}&renderer=webgpu`, { waitUntil: 'load' });
+    await page.goto(URL_BASE, { waitUntil: 'load' });
     const started = await page.waitForFunction(() => window.chromaglassDebug?.().webgpu?.frames > 30 && window.chromaglassDebug().webgpu, null, { timeout: 30_000 })
       .then((h) => h.jsonValue()).catch(() => null);
     const failure = await page.evaluate(() => window.chromaglassDebug?.().gpuFailure ?? null);
-    check('the stage starts under ?renderer=webgpu', !!started,
+    check('the stage starts, with nothing asked for', !!started,
       started ? `${started.label} (${started.gpuClass}${started.fallback ? ', software' : ''}), ${started.format}, timestamps ${started.timestamps}` : `no stage${failure ? `: ${failure.failure} — ${failure.detail}` : ''}`);
     if (started) {
       const engine = await page.evaluate(() => window.chromaglassDebug().engine);
@@ -611,7 +611,7 @@ const laidOver = (page) => page.evaluate(async () => {
   };
   try {
     const seen = {};
-    for (const [engine, query] of [['WebGPU', '&renderer=webgpu'], ['WebGL', '']]) {
+    for (const [engine, query] of [['WebGPU', ''], ['WebGL', '&renderer=webgl']]) {
       const m = await read(query);
       seen[engine] = m;
       const pc = (v) => `${(v * 100).toFixed(1)}%`;
@@ -654,7 +654,7 @@ const laidOver = (page) => page.evaluate(async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-    await page.goto(`${URL_BASE}&renderer=webgpu`, { waitUntil: 'load' });
+    await page.goto(URL_BASE, { waitUntil: 'load' });
     const screen = await page.locator('[data-testid="needs-webgpu"]').first();
     const shown = await screen.waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
     const text = shown ? (await screen.textContent()).replace(/\s+/g, ' ').trim() : '';
@@ -664,17 +664,19 @@ const laidOver = (page) => page.evaluate(async () => {
   }
 }
 
-// ── Without the flag ─────────────────────────────────────────────────
+// ── The way back ─────────────────────────────────────────────────────
+// `?renderer=webgl` still draws the old way, for a show on a machine whose
+// WebGPU driver turns out to be bad. It goes with the WebGL renderer at P7.
 {
   const browser = await chromium.launch({ headless: true, channel: 'chromium', args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-    await page.goto(`${URL_BASE}`, { waitUntil: 'load' });
+    await page.goto(`${URL_BASE}&renderer=webgl`, { waitUntil: 'load' });
     const engine = await page.waitForFunction(() => {
       const e = window.chromaglassDebug?.().engine;
       return e && e !== 'WebGPU · starting' ? e : null;
     }, null, { timeout: 30_000 }).then((h) => h.jsonValue()).catch(() => null);
-    check('without the flag, WebGL as before', !!engine && !/WebGPU/.test(engine), engine ?? 'no engine');
+    check('?renderer=webgl still draws the old way', !!engine && !/WebGPU/.test(engine), engine ?? 'no engine');
   } finally {
     await browser.close();
   }
