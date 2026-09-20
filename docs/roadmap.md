@@ -33,19 +33,31 @@ job: nothing was written twice. There is one shading language in the tree now �
    two renderers is the one state worth leaving quickly. What is left of it is the CPU
    solver's stepping — about a thousand unreachable lines, waiting on its own surgery.
 2. **Spend the headroom, in this order:**
-   - **H0 · Time the solver's step, pass by pass.** Small, and it decides the two items
-     under it. The step is one compute pass with one timestamp pair on it, so 17.9 ms of
-     a 37.9 ms frame is a single undifferentiated number; splitting it into labelled
-     passes behind a diagnostic flag says where that number is. See below for why this
-     is not a detour.
-   - **H2 · A better pressure solver.** Red-black or multigrid in place of 24 Jacobi
-     passes: less residual divergence, livelier small swirls — and, on the arithmetic in
-     [`webgpu-plan.md`](webgpu-plan.md), by far the largest single cost in the frame.
-     Forty-eight of a step's ~101 dispatches are pressure Jacobi.
+   - ~~**H0 · Time the solver's step, pass by pass.**~~ **Done 2026-09-20.** `?stages`
+     gives each stage its own pass and its own timestamps, `npm run stages` reads them
+     back, and the splitting costs 2%. It was worth asking: both readings below were
+     wrong, in opposite directions. The table is in
+     [`webgpu-plan.md`](webgpu-plan.md) — the short of it is that **cost does not track
+     dispatch count** (a pressure Jacobi dispatch is 0.049 ms; `forcesB`, one dispatch,
+     is 0.808), the two projections are **28.8%** of a step rather than 48% or 5%, and
+     **iterative solves as a class are 64.5%**.
+   - **H2 · A better solver for all five iterations, not just the pressure.** Red-black
+     or multigrid in place of 24 Jacobi passes — and the same treatment for dye
+     diffusion (14.2%), the squeeze film (11.6%) and viscosity (10.2%), which between
+     them cost more than the projections do. Less residual divergence, livelier small
+     swirls, and about two thirds of a step to aim at.
      *Gate:* 1024² holds 30 fps on the M4 that manages 22 today. That gate is **H3** —
      a 1024² rung on strong machines — which is two lines in `qualityLadder` and a
      governor that already judges by real GPU timings, so it is this item's test rather
      than an item of its own.
+   - **H2a · `forcesB` is one kernel too many things at once.** It is 8.6% of a step in
+     a single dispatch — 0.808 ms against 0.049 for a pressure Jacobi. Its floor, with
+     every force switched off, is 0.368; the six forces together add 0.44; and
+     **switching off any one of them on its own changes nothing measurable.** That is
+     not a branch being expensive, it is the compiled kernel's register footprint
+     holding occupancy down whatever it executes at runtime. The fix is to split it, or
+     to shrink the worst path — not to micro-optimise a branch, which is what measuring
+     one at a time would have suggested. Sized but not started.
    - **H1 · Dye carried by particles.** The measured gap in `PLAN.md` is that filmed
      liquid holds three to five times more structure at 4–8 px than ours. Particles
      don't smear, which is the fix. Takes density estimation with it, so sparse regions
@@ -75,16 +87,15 @@ job: nothing was written twice. There is one shading language in the tree now �
 
 ## Why this order and not another
 
-- **A measurement before the two items that argue about it.** H1, H2 and H3 are three
-  bets on where a step's 9 ms goes, and the evidence supports two readings that order
-  them oppositely. Read one way — the pressure solve is a slice of a 58-pass core the
-  spike measured at 3.74 ms — H2 is worth about 5% of a frame and should wait. Read the
-  other — cost tracks dispatch count, and 48 of ~101 dispatches are pressure Jacobi —
-  H2 is a third of the frame and everything else should wait for it. Those are a factor
-  of seven apart, and the machine can settle it in an afternoon. Guessing costs more
-  than asking.
+- **A measurement before the two items that argued about it** — done, and it was worth
+  the afternoon. Two readings of the old evidence put H2 at 5% of a frame and at a third
+  of it; the answer is 28.8% of a step for the projections, and 64.5% for the five
+  iterative solves together. Neither guess would have aimed the work at the right four
+  stages. The general form of the mistake is worth keeping: **the step is bound by what
+  each kernel does per pixel, not by how many kernels there are.**
 - **The pressure solver before the particles,** because particles *add* work to a step
-  that is already 47% of the frame. Landing H1 on an uncheapened step buys structure at
+  that is already 94% of the frame's GPU time at the top rung (17.8 ms a step, 1.75
+  steps a frame, against 2.1 ms of drawing). Landing H1 on an uncheapened step buys structure at
   4–8 px and then hands it back when the governor drops a rung to pay for it. H2 makes
   the room H1 spends. This reverses the order these two were written in, on the
   measurements taken during the port.
