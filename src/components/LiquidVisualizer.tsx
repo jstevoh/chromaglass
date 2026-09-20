@@ -12,6 +12,7 @@ import { WebGPUPlate } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
+import { WebGPUFrameProbe } from '../gpu/probe';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -4717,6 +4718,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let stage: WebGPUStage | null = null;
       let camera: WebGPUCamera | null = null;
       let projector: WebGPUOutput | null = null;
+      let probe: WebGPUFrameProbe | null = null;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
@@ -4861,8 +4863,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               };
             }
-            stage?.frame();
+            const frame = stage?.frame();
             cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+
+            // ── What the audience just saw ───────────────────────
+            // The delivered frame, reduced on the GPU to one number, a frame
+            // or two behind — as in WebGL. The reading goes back rather than
+            // the verdict: the loop folds it into the gain that reaches the
+            // next frame's view.
+            if (view.outputCfg.flashGuard && frame) {
+              if (!probe) probe = new WebGPUFrameProbe(s.device);
+              probe.measure(frame);
+              return probe.luminance;
+            }
+            if (probe) { probe.dispose(); probe = null; }
             return null;
           },
           debug: () => ({
@@ -4876,6 +4890,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             grabFrame: () => stage?.grabFrame() ?? null,
             /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
             kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+            /** The guard's own state, and the luminance it is being fed. */
+            flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
+            /**
+             * The reduction, against a frame whose mean is known by
+             * construction: white rectangles on black, measured with a stall.
+             */
+            probeSelfTest: async (rects: [number, number, number, number][]) => {
+              if (!stage) return null;
+              if (!probe) probe = new WebGPUFrameProbe(s.device);
+              const painted = stage.frame(probe.painter(stage.format, rects));
+              const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
+              return { mean: await probe.measureNow(painted), lit };
+            },
             gpuFailure,
           }),
         };
@@ -4888,6 +4915,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         camera = null;
         projector?.dispose();
         projector = null;
+        probe?.dispose();
+        probe = null;
         stage?.dispose();
         stage = null;
       };

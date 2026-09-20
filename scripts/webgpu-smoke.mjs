@@ -152,6 +152,58 @@ const watch = (page) => {
         await settle(3);
         return { floor, on, timed };
       });
+      // The flash guard's probe: a compute reduction over the frame the wall
+      // just got. It is measured the way `npm run fx` measures the WebGL
+      // one — against frames whose true mean is known by construction —
+      // because a probe that reads a lit patch as anything other than its
+      // share of the frame is a guard that fires at the wrong time.
+      const probe = await page.evaluate(async () => {
+        const dbg = window.chromaglassDebug();
+        const c = document.querySelector('canvas');
+        const w = c.width, h = c.height;
+        const cases = [
+          ['a quarter of the frame', [[0, 0, Math.floor(w / 2), Math.floor(h / 2)]]],
+          ['a one-pixel line across the frame', [[0, Math.floor(h / 2), w, 1]]],
+          ['a scatter of small patches', [[10, 10, 40, 40], [w - 90, h - 70, 60, 50], [Math.floor(w / 3), 20, 25, 25]]],
+          ['the whole frame', [[0, 0, w, h]]],
+        ];
+        const read = [];
+        for (const [name, rects] of cases) {
+          const r = await dbg.probeSelfTest(rects);
+          read.push({ name, mean: r?.mean ?? null, lit: r?.lit ?? null });
+        }
+        return read;
+      });
+      for (const r of probe) {
+        check(`probe: ${r.name}`,
+          r.mean !== null && Math.abs(r.mean - r.lit) <= 0.002,
+          r.mean === null ? 'no probe' : `read ${r.mean.toFixed(4)}, lit ${r.lit.toFixed(4)}`);
+      }
+      // And that what it is fed is the frame the wall gets rather than the
+      // plate before the projector had its way with it — which the grade
+      // settles, because that happens in the last pass of all.
+      const guard = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const base = { ...dbg().outputConfig, flashGuard: true };
+        const lumAt = async (gain) => {
+          window.chromaglassOutput?.({ ...base, gain });
+          await settle(10);
+          return dbg().flash().luminance;
+        };
+        const plain = await lumAt(1);
+        const dark = await lumAt(0.3);
+        const bright = await lumAt(2.4);
+        const state = dbg().flash();
+        window.chromaglassOutput?.(base);
+        return { plain, dark, bright, gain: state.gain, rate: state.rate };
+      });
+      check('the guard is fed a reading of the frame the wall gets',
+        typeof guard.plain === 'number' && guard.plain > 0 && guard.plain <= 1 &&
+        guard.dark < guard.plain && guard.bright > guard.plain && guard.gain === 1,
+        `${guard.dark?.toFixed(3)} dim / ${guard.plain?.toFixed(3)} plain / ${guard.bright?.toFixed(3)} lifted, ` +
+        `the guard idle at gain ${guard.gain}`);
+
       // The projector. `npm run output` proves the shader against the GLSL's
       // over every shape and pin; what is asked here is that the app runs it,
       // by the two answers a mapping has that nothing else does: a pin that
