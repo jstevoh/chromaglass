@@ -102,10 +102,22 @@ export class QualityGovernor {
   /**
    * Feed one frame. `frameS` is the interval since the previous frame,
    * `workMs` the JavaScript time this frame took; `now` in seconds; `held`
-   * true while a tool is being held on the plate. Returns true when the rung
+   * true while a tool is being held on the plate; `gpuMs` what the GPU spent
+   * on this frame, where the engine can say (WebGPU's timestamp queries —
+   * WebGL's timer queries count queue waits on ANGLE and lie, so that path
+   * passes nothing and nothing changes for it). Returns true when the rung
    * changed and the caller should reconfigure.
+   *
+   * The budget is spent by whichever of the two is larger. On the WebGL path
+   * the JavaScript time is a fair stand-in for the frame's cost, because the
+   * draw calls are made from it. On WebGPU it is not: a frame is half a
+   * millisecond of encoding whatever the machine is actually doing, so the
+   * climb gate — "only go up when there is room to spare" — was satisfied at
+   * every rung, and the governor would climb into a grid the GPU could not
+   * hold, discover it a second and a half later, and come back down. With
+   * the real number it does not set off.
    */
-  sample(frameS: number, workMs: number, now: number, held = false): boolean {
+  sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
     if (frameMs > HUGE_MS) {
@@ -118,7 +130,7 @@ export class QualityGovernor {
     // smoothness has to be sustained to count.
     const k = frameMs > this.emaFrame ? 0.25 : 0.08;
     this.emaFrame += (frameMs - this.emaFrame) * k;
-    this.emaWork += (workMs - this.emaWork) * 0.1;
+    this.emaWork += (Math.max(workMs, gpuMs) - this.emaWork) * 0.1;
 
     if (now < this.settleUntil) return false;
 

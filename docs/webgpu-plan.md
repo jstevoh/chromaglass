@@ -254,9 +254,26 @@ plate pass, in a 37.9 ms frame. The spike's 58-pass core was 3.74 ms at the
 same grid, so most of the app's step is what the spike did not include —
 the chemistry, the splats, the forced velocity and the measurements.
 
-**Still to do in P4:** the governor on timestamp queries. The numbers it
-needs are now all reachable: `stage.profiler.ms` for the drawing and each
-layer's `gpu.profiler.ms` for the solver.
+**The governor is judged on the GPU's own number now.** Its climb gate is a
+work budget, and on this path the work was half a millisecond of encoding
+whatever the machine was doing — so the gate was satisfied at every rung and
+it would climb into a grid the GPU could not hold, find out a second and a
+half later, and come back down. What it is fed now is the drawing plus the
+solver's steps, from the timestamp queries. Forty-five seconds on this M4, one
+reading every five:
+
+| | 5 s | 10 s | 15 s | 20 s | 25 s | 45 s |
+|---|---|---|---|---|---|---|
+| **WebGL**, unchanged | 512² | 512² | **768²** | 768², 27 ms | back to 512² | 512² |
+| **WebGPU**, with the GPU's number | 512² | 512² | 512² | 512² | 512² | 512² |
+
+The WebGL row is what the hunt looks like: up at fifteen seconds, a 27 ms
+frame, down again at twenty-five, and round again ninety seconds later. It
+keeps that behaviour — its timer queries count queue waits on ANGLE and lie,
+so that path passes nothing and nothing changes for it — and loses it at the
+cutover, when the honest numbers are the only ones left.
+
+**P4 is done** but for the harness work that belongs to P5.
 
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today

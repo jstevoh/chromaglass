@@ -2347,6 +2347,13 @@ interface PlateRenderer {
   /** One frame. Returns what the flash guard read, or null when it is off. */
   drawFrame(view: FrameView, fluids: FluidSimulation[]): number | null;
   /**
+   * What the GPU spent on a frame that took `steps` solver steps, in
+   * milliseconds — the drawing and the solver together, from timestamp
+   * queries. Absent on an engine that cannot say (WebGL's timer queries count
+   * queue waits on ANGLE and lie), and 0 until the first timings land.
+   */
+  gpuFrameMs?(steps: number): number;
+  /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for
    * `chromaglassDebug().gl` finds it exactly where it always was.
@@ -3327,6 +3334,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
       const workStart = performance.now();
       let frameS = 0;
+      /** How many solver steps this frame took, for the governor's GPU budget. */
+      let stepsThisFrame = 0;
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
@@ -3432,6 +3441,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
         simAccumRef.current -= simSteps * SIM_STEP;
+        stepsThisFrame = simSteps;
 
         // How many steps a second that is actually producing.
         //
@@ -4634,7 +4644,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (frameS > 0 && governorRef.current) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
-        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current);
+        // What this frame cost the GPU, where the engine can say. Without it
+        // the budget is JavaScript time, which on the WebGPU path is half a
+        // millisecond of encoding and says nothing about the machine's load.
+        const gpuMs = renderer?.gpuFrameMs?.(stepsThisFrame) ?? 0;
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -4917,6 +4931,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
             if (probe) { probe.dispose(); probe = null; }
             return null;
+          },
+          /**
+           * The drawing, plus one solver step per layer for each step the
+           * loop took. The profiler's numbers are per pass and per step, so
+           * the steps are what turns them into the cost of a frame.
+           */
+          gpuFrameMs: (steps: number) => {
+            if (!stage) return 0;
+            let ms = 0;
+            for (const v of stage.profiler.ms.values()) ms += v;
+            if (steps > 0) {
+              for (const f of fluidsRef.current) {
+                if (!(f.gpu instanceof WebGPUFluid)) continue;
+                for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
+              }
+            }
+            return ms;
           },
           debug: () => ({
             webgpu: stage && {

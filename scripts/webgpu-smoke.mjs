@@ -152,6 +152,23 @@ const watch = (page) => {
         await settle(3);
         return { floor, on, timed };
       });
+      // The governor's budget. On this path a frame is half a millisecond of
+      // encoding whatever the machine is doing, so a budget spent in
+      // JavaScript time would be satisfied at every rung — which is how the
+      // governor used to climb into a grid the GPU could not hold, find out a
+      // second and a half later, and come back down. What it is fed now is
+      // the drawing and the solver's own steps, from timestamp queries.
+      if (started.timestamps) {
+        const judged = await page.evaluate(() => {
+          const d = window.chromaglassDebug();
+          return { work: d.governor.emaWork, cpuMs: d.webgpu.cpuMs, frameMs: d.governor.frameMs };
+        });
+        check('the governor is judged on what the GPU spent, not on the encoding',
+          judged.work > 3 && judged.work > judged.cpuMs * 3,
+          `${judged.work?.toFixed(1)} ms of budget against ${judged.cpuMs} ms of encoding, ` +
+          `in a ${judged.frameMs?.toFixed(1)} ms frame`);
+      }
+
       // The flash guard's probe: a compute reduction over the frame the wall
       // just got. It is measured the way `npm run fx` measures the WebGL
       // one — against frames whose true mean is known by construction —
@@ -281,10 +298,17 @@ const watch = (page) => {
         }).catch(() => null);
         const before = await lit();
         const framesBefore = await page.evaluate(() => window.chromaglassDebug().webgpu?.frames ?? 0);
+        // Watched rather than polled for: the rebuild can be quick enough
+        // that the notice is on screen for a frame or two, and a poll that
+        // arrives after it has gone reports that it never came.
+        await page.evaluate(() => {
+          window.__sawLost = !!document.querySelector('[data-testid="gl-lost"]');
+          const seen = new MutationObserver(() => {
+            if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
+          });
+          seen.observe(document.body, { childList: true, subtree: true });
+        });
         await page.evaluate(() => window.chromaglassDebug().loseDevice());
-        const noticed = await page.locator('[data-testid="gl-lost"]').first()
-          .waitFor({ timeout: 5_000 }).then(() => true).catch(() => false);
-        check('a lost device is noticed and said so', noticed);
         // The rebuild is a new device, a new stage, a new solver and a plate
         // laid again; it is given room, and then asked whether it drew.
         const back = await page.waitForFunction(() => {
@@ -296,6 +320,9 @@ const watch = (page) => {
           await page.waitForTimeout(500);
           after = await lit();
         }
+        const sawLost = await page.evaluate(() => window.__sawLost);
+        check('a lost device is noticed and said so', sawLost,
+          sawLost ? 'the plate said it was rebuilding' : 'no notice ever appeared');
         check('and the show comes back by itself',
           !!back && after !== null && after > 0.3 && (await page.locator('[data-testid="gl-lost"]').count()) === 0,
           `${((before ?? 0) * 100).toFixed(0)}% lit before (${framesBefore} frames), ` +
