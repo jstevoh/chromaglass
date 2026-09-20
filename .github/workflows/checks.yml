@@ -160,7 +160,7 @@ jobs:
       # spike). These runners have Metal, so it also runs at the real device
       # pixel ratio and on the GPU solver, which the ubuntu job cannot.
       - name: A show night, on WebGPU
-        run: QA_RENDERER=webgpu QA_DPR=1 QA_GPU=mid npm run qa
+        run: CG_RENDERER=webgpu QA_DPR=1 QA_GPU=mid npm run qa
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.

@@ -26,6 +26,7 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
+import { engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -96,8 +97,8 @@ const DPR = process.env.QA_DPR ?? '0.35';
   runner's software WebGPU can compute but cannot present a canvas, which is
   what the P0 spike measured.
 */
-const RENDERER = process.env.QA_RENDERER ?? '';
-const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${RENDERER ? `&renderer=${encodeURIComponent(RENDERER)}` : ''}`;
+const RENDERER = process.env.CG_RENDERER ?? process.env.QA_RENDERER ?? '';
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${engineQuery()}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
@@ -206,40 +207,12 @@ page.on('pageerror', e => note(`uncaught: ${e.message}`));
 
 // Count every device the page opens, and never auto-accept a prompt silently:
 // a show that asks for a microphone on load is the bug we are watching for.
+await installFrameReader(page);
 await page.addInitScript(() => {
   window.__media = [];
   const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   navigator.mediaDevices.getUserMedia = (c) => { window.__media.push(JSON.stringify(c)); return gum(c); };
 
-  /*
-    The plate, at whatever size the check wants it, whichever engine drew it
-    (docs/webgpu-plan.md, P5).
-
-    A WebGL canvas keeps its drawing buffer and can be copied straight out. A
-    presented WebGPU canvas cannot: it reads black to `drawImage`, which is
-    not an error and not a black plate — it is the same reading either way,
-    which is the worst kind. So on that path the frame is photographed by the
-    stage, in the task that draws it, and scaled down here.
-  */
-  window.__qaFrame = async (w, h) => {
-    const canvas = document.querySelector('#liquid-canvas');
-    if (!canvas) return null;
-    const out = document.createElement('canvas');
-    out.width = w; out.height = h;
-    const ctx = out.getContext('2d', { willReadFrequently: true });
-    const grab = window.chromaglassDebug?.().grabFrame;
-    if (grab) {
-      const g = await grab();
-      if (!g) return null;
-      const full = document.createElement('canvas');
-      full.width = g.width; full.height = g.height;
-      full.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height), 0, 0);
-      ctx.drawImage(full, 0, 0, w, h);
-    } else {
-      ctx.drawImage(canvas, 0, 0, w, h);
-    }
-    return [...ctx.getImageData(0, 0, w, h).data];
-  };
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
@@ -434,6 +407,31 @@ try {
       JSON.stringify(await page.evaluate(() => window.__media)));
   }
 
+  /*
+    Can this run see the plate at all?
+
+    Six checks below read pixels, and every way of getting them wrong ends in
+    an array of zeros: a canvas that answers black, a `grabFrame` that is not
+    there, one that returns nothing. Zeros then read as "the plate is dark",
+    which is a sentence each of those checks is willing to say. So the
+    instrument is proved once, here, before anything is measured with it, and
+    its own account of the read goes in the line.
+  */
+  {
+    await settle(600);
+    const read = await page.evaluate(() => window.__cgFrame(32, 18));
+    const note = await lastFrameRead(page);
+    const lit = read ? read.filter((_, i) => i % 4 === 0).filter((v, i) => Math.max(v, read[i * 4 + 1], read[i * 4 + 2]) > 8).length / (read.length / 4) : 0;
+    check('the plate can be photographed',
+      !!read && (note?.scaled ?? 0) > 0.01 && (!RENDERER || note?.via === 'grabFrame'),
+      note ? `${note.via}${note.size ? ` ${note.size[0]}×${note.size[1]}` : ''}, ` +
+        `${note.lit !== undefined ? `${(note.lit * 100).toFixed(0)}% lit, ` : ''}` +
+        `alpha ${note.alpha ? note.alpha.join('–') : 'n/a'}, scaled ${note.scaled ?? 'n/a'}` +
+        `${note.threw ? ` — threw ${note.threw}` : ''}${note.got ? ` — got ${note.got}` : ''}`
+        : 'the reader was never installed');
+    void lit;
+  }
+
   // Which solver did this run actually measure? A suite that is green on the
   // CPU fallback has said nothing about the GPU shaders, and the line above
   // it would look identical either way.
@@ -605,7 +603,7 @@ try {
       for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
       return sum / (a.length * 0.75);
     };
-    const frame = () => page.evaluate(() => window.__qaFrame(96, 54));
+    const frame = () => page.evaluate(() => window.__cgFrame(96, 54));
     /**
      * Set the zoom and wait for the picture to stop moving, rather than for a
      * clock. The camera eases toward a new zoom over about a second, and how
@@ -693,7 +691,7 @@ try {
     // canvas cannot be the liquid having a moment.
     const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
     const magentaShare = () => page.evaluate(async () => {
-      const d = await window.__qaFrame(160, 90);
+      const d = await window.__cgFrame(160, 90);
       if (!d) return -1;
       let n = 0;
       for (let i = 0; i < d.length; i += 4) {
@@ -938,7 +936,7 @@ try {
   // would see: the wall is lit before, and it is lit again afterwards.
   {
     const litness = () => page.evaluate(async () => {
-      const d = await window.__qaFrame(16, 9);
+      const d = await window.__cgFrame(16, 9);
       if (!d) return null;
       let sum = 0;
       for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
