@@ -4924,6 +4924,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
               cpuMs: +cpuMs.toFixed(3),
               timings: Object.fromEntries(stage.profiler.ms),
+              /**
+               * The solver's own passes, per layer. It keeps a profiler of
+               * its own — the stage's only sees what the stage encodes — and
+               * without this the expensive half of a frame at the top rungs
+               * was the half nothing reported.
+               */
+              solver: fluidsRef.current.map((f) => (
+                f.gpu instanceof WebGPUFluid ? Object.fromEntries(f.gpu.profiler.ms) : null
+              )),
             },
             /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
             grabFrame: () => stage?.grabFrame() ?? null,

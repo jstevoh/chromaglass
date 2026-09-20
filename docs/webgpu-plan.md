@@ -245,8 +245,18 @@ it is untimed.
 under the flag every rung the sweep actually reached was recorded as one it
 never reached — "the solver never reached 256² (it stayed on 256²)".
 
-**Still to do in P4:** the governor on timestamp queries, once the solver's
-passes are timed.
+**The solver's passes were timed all along** — `WebGPUFluid` keeps a profiler
+of its own, and the stage's only sees what the stage encodes, so the debug
+surface reported the 2 ms of drawing and nothing about the 18 ms underneath
+it. `chromaglassDebug().webgpu.solver` is that profiler now, per layer. At
+768², per step: 9.18 ms and 8.71 ms for the two layers, against a 2.13 ms
+plate pass, in a 37.9 ms frame. The spike's 58-pass core was 3.74 ms at the
+same grid, so most of the app's step is what the spike did not include —
+the chemistry, the splats, the forced velocity and the measurements.
+
+**Still to do in P4:** the governor on timestamp queries. The numbers it
+needs are now all reachable: `stage.profiler.ms` for the drawing and each
+layer's `gpu.profiler.ms` for the solver.
 
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today
