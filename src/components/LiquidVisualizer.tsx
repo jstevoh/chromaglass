@@ -4900,14 +4900,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
                 const size = { width: canvas.width, height: canvas.height };
-                // The chain, in the order a frame goes through it: the plate,
-                // the camera if there is one, the projector if there is one,
-                // and whatever is last draws onto the canvas.
+                /*
+                  The fields are read here rather than taken from the frame
+                  that set this painter, because the painter outlives that
+                  frame: `grabFrame` runs it again later, and by then a rung
+                  change may have disposed the solver those textures belonged
+                  to. A submit answers that with "Destroyed texture used in a
+                  submit" — which is what CI's show night found on the first
+                  run that had a machine slow enough to change rung while a
+                  harness was photographing the plate.
+                */
+                const live = fluidsRef.current
+                  .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
+                  .filter((f): f is NonNullable<typeof f> => !!f);
+                if (!live.length) return;
+                // A rebuild may also have changed the grid the uniforms were
+                // filled for; the shader samples by that number.
+                if (live[0].dye.width !== fields[0].dye.width) {
+                  plate.pack.set('gridSize', live[0].dye.width);
+                }
                 const screen = out ? out.sceneView(size.width, size.height) : target;
                 plate.draw(
                   encoder,
                   cam ? cam.sceneView(size.width, size.height) : screen,
-                  size, fields, Math.max(view.velRange, 1e-6),
+                  size, live, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
                 );
                 if (cam && plate.auxTarget) {

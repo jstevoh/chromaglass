@@ -307,8 +307,22 @@ it cannot answer. That a pour deposits the same dye whichever solver takes it
 is `npm run parity`'s business already: it pours the same drop through both
 and they agree to 4e-5 of rms.
 
-**Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag,
-the thresholds re-baselined, and `qa`'s CPU default removed at the cutover.
+**And it found a real one on its first CI run.** "Destroyed texture [Texture
+"grain a"] used in a submit", over and over. The painter the renderer hands
+the stage outlives the frame that set it — `grabFrame` runs it again — and a
+rung change in between disposes the solver whose textures it was drawing. It
+never happens on this Mac, because the governor now holds 512² here; it
+happens on a runner under load, where the governor steps down while a harness
+is photographing the plate, and the new show night photographs the plate
+constantly. The painter reads the live fields now, and corrects the grid the
+uniforms were filled for if the rebuild changed it. `npm run webgpu` drops the
+solver on purpose and photographs with no frame in between, which is that
+window exactly.
+
+**Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag —
+none of them reaches for a GL context, so it is the same two moves each time
+(an engine hook on the URL, and the frame read through `grabFrame`) — the
+thresholds re-baselined, and `qa`'s CPU default removed at the cutover.
 
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today
