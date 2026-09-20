@@ -3294,902 +3294,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // ── WebGPU, under ?renderer=webgpu ────────────────────────────────
-    // Before anything else: a canvas holds one kind of context for life, and
-    // the WebGL path below would claim it. P1 draws the black plate; the
-    // solver (P2) and the compositor (P3) move in behind this branch.
-    if (WEBGPU) {
-      let stage: WebGPUStage | null = null;
-      let raf = 0;
-      let cancelled = false;
-      // What the frame costs us, as opposed to how often the display asks for
-      // one: a CI runner's display rate says nothing about the stage.
-      let cpuMs = 0;
-      const tier = detectTier();
-      const size = () => {
-        const dpr = devicePixels();
-        const stagePx = stageRef.current;
-        canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
-        canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
-        return dpr;
-      };
-      void WebGPUStage.start(canvas).then((s) => {
-        if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
-        if (isGpuFailure(s)) {
-          console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
-          setGpuFailure(s);
-          return;
-        }
-        stage = s;
-        s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
-        let last = performance.now(), frameMs = 16.7, reported = 0;
-        const loop = () => {
-          if (!stage) return;
-          const now = performance.now();
-          frameMs += (now - last - frameMs) * 0.05;
-          last = now;
-          const dpr = size();
-          const t0 = performance.now();
-          stage.frame();
-          cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
-          if (now - reported > 500) {
-            reported = now;
-            const status: EngineStatus = {
-              label: `WebGPU · ${s.gpu.label}`,
-              engine: 'webgpu', grid: 0, dpr, tier, gpu: s.gpu.gpuClass, renderer: s.gpu.label,
-              governed: false, steppedDown: false, gpuUnavailable: false,
-              frameMs, simMs: 0, layers: 0, stepsPerSec: 0, otherMs: frameMs,
-            };
-            engineStatusRef.current = status;
-            onEngineStatusRef.current?.(status);
-          }
-          raf = requestAnimationFrame(loop);
-        };
-        loop();
-      });
-      if (new URLSearchParams(window.location.search).has('debug')) {
-        (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
-          engine: engineStatusRef.current?.label ?? 'WebGPU · starting',
-          status: engineStatusRef.current,
-          webgpu: stage && {
-            label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
-            timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
-            cpuMs: +cpuMs.toFixed(3),
-            timings: Object.fromEntries(stage.profiler.ms),
-          },
-          /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
-          grabFrame: () => stage?.grabFrame() ?? null,
-          /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
-          kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
-          gpuFailure,
-          settings: settingsRef.current,
-        });
-      }
-      return () => { cancelled = true; cancelAnimationFrame(raf); stage?.dispose(); stage = null; };
-    }
-
-    // ── WebGL2 initialization ──────────────────────────────────────────
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
-    if (!gl) { console.error('WebGL2 not supported'); return; }
-
-    // Platform: where this build is running and on what, for the governor's
-    // starting guess. The renderer string is the only cheap read of the GPU.
-    const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    const rendererString = String(
-      (dbgInfo && gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '',
-    );
+    // ── The show's own frame loop ─────────────────────────────────────
+    // Engine-free: it decides what a frame is and hands it to whichever
+    // renderer started (docs/webgpu-plan.md, P3). Both branches below build
+    // one and call `startWith`.
     const tier = detectTier();
-    const gpuClass = classifyGpu(rendererString);
-    const ladder = qualityLadder(tier, gpuClass);
-    governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
-
-    const vertSrc = PLATE_VERT;
-    const fragSrc = PLATE_FRAG;
-
-    const compileShader = (type: number, src: string): WebGLShader | null => {
-      const sh = gl.createShader(type)!;
-      gl.shaderSource(sh, src);
-      gl.compileShader(sh);
-      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(sh));
-        gl.deleteShader(sh);
-        return null;
-      }
-      return sh;
-    };
-
-    const vert = compileShader(gl.VERTEX_SHADER, vertSrc);
-    const frag = compileShader(gl.FRAGMENT_SHADER, fragSrc);
-    if (!vert || !frag) return;
-
-    const program = gl.createProgram()!;
-    gl.attachShader(program, vert);
-    gl.attachShader(program, frag);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Program link error:', gl.getProgramInfoLog(program));
-      return;
-    }
-    gl.deleteShader(vert);
-    gl.deleteShader(frag);
-
-    // Full-screen quad
-    const vao = gl.createVertexArray()!;
-    gl.bindVertexArray(vao);
-    const posBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(program, 'a_pos');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
-
-    // The derive pass: the display's own source with a different main, so the
-    // neighbourhood it works out once per texel is the one the display worked
-    // out per pixel. Its target is half float — the gradient is signed and
-    // the interface sum runs past one — and without float targets the display
-    // goes on working the neighbourhood out per pixel.
-    let derive: GLResources['derive'] = null;
-    if (gl.getExtension('EXT_color_buffer_float')) {
-      const dv = compileShader(gl.VERTEX_SHADER, vertSrc);
-      const df = compileShader(gl.FRAGMENT_SHADER, fragSrc.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n'));
-      if (dv && df) {
-        const dp = gl.createProgram()!;
-        gl.attachShader(dp, dv);
-        gl.attachShader(dp, df);
-        gl.bindAttribLocation(dp, aPos, 'a_pos');
-        gl.linkProgram(dp);
-        gl.deleteShader(dv);
-        gl.deleteShader(df);
-        if (gl.getProgramParameter(dp, gl.LINK_STATUS)) {
-          const u: Record<string, WebGLUniformLocation | null> = {};
-          for (const name of ['u_src', 'u_gridSize', 'u_logicalGrid', 'u_bspline', 'u_filmLevel', 'u_filmGain', 'u_exposure', 'u_macro', 'u_transmission', 'u_boundaryContrast']) {
-            u[name] = gl.getUniformLocation(dp, name);
-          }
-          const textures: WebGLTexture[] = [];
-          const fbos: WebGLFramebuffer[] = [];
-          for (let i = 0; i < 2; i++) {
-            const tex = gl.createTexture()!;
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, null);
-            textures.push(tex);
-            const fbo = gl.createFramebuffer()!;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-            fbos.push(fbo);
-          }
-          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-          derive = { program: dp, u, textures, fbos, sizes: [1, 1] };
-        } else {
-          console.warn('ChromaGlass: the derive pass did not link; the display works the neighbourhood out per pixel.', gl.getProgramInfoLog(dp));
-          gl.deleteProgram(dp);
-        }
-      }
-    }
-
-    // Create textures for existing layers + 2 slots minimum
-    const maxLayers = Math.max(2, fluidsRef.current.length);
-    const textures: WebGLTexture[] = [];
-    const texData: Uint8Array[] = [];
-    for (let i = 0; i < maxLayers; i++) {
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      // Initialize with empty texture
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      textures.push(tex);
-      texData.push(new Uint8Array(GRID_AREA * 4));
-    }
-
-    // Velocity fields for the two composited layers — bound to units 6/7 and
-    // only refreshed while the macro camera is running.
-    const velTextures: WebGLTexture[] = [];
-    const velData: Uint8Array[] = [];
-    for (let i = 0; i < 2; i++) {
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      velTextures.push(tex);
-      velData.push(new Uint8Array(GRID_AREA * 4).fill(128)); // 128 = zero velocity
-    }
-
-    // Collect uniform locations
-    const uniformNames = [
-      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1','u_derived0','u_derived1','u_derivedOn',
-      'u_resolution','u_gooey','u_darkBlend','u_blendMode',
-      'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
-      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
-      'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
-      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
-      'u_filmLevel','u_filmGain','u_logicalGrid',
-      'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
-      'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
-      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_transmission','u_dimmer',
-      'u_mark','u_markOn','u_markRect','u_bspline',
-      'u_beadTex','u_beads','u_dishSpread','u_cells',
-      'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
-      'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
-      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn','u_finishInMain',
-    ];
-    const uLocs: Record<string, WebGLUniformLocation | null> = {};
-    for (const name of uniformNames) {
-      uLocs[name] = gl.getUniformLocation(program, name);
-    }
-
-    const filmTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, filmTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // The mark: a logo or title laid over the finished frame. Transparent
-    // until one is loaded, so the shader's branch is the only cost.
-    const markTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, markTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // The oil beads' mask: interiors in red, rims in green.
-    const beadTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, beadTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    webGLRef.current = {
-      gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
-      packFbos: new Map(), texSizes: new Map(),
-      maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
-      filmTexture,
-      markTexture,
-      beadTexture,
-      derive,
-    };
-
-    const resize = () => {
-      // Device pixels per CSS pixel is a quality rung, so a Retina laptop
-      // running locally renders sharp and a struggling one drops to 1x.
-      const dpr = dprRef.current;
-      const stage = stageRef.current;
-      if (stage) {
-        // A projector is mirroring this canvas: render at its pixels, with
-        // the governor's rung as a fraction of them, so the mirror shows the
-        // real picture and this window only a scaled copy.
-        const frac = Math.min(1, dpr / devicePixels());
-        const cap = webGLRef.current?.maxTexture ?? 8192;
-        canvas.width = Math.max(1, Math.min(cap, Math.round(stage.width * frac)));
-        canvas.height = Math.max(1, Math.min(cap, Math.round(stage.height * frac)));
-      } else {
-        canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
-        canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
-      }
-      gl.viewport(0, 0, canvas.width, canvas.height);
-    };
-    resizeRef.current = resize;
-    window.addEventListener('resize', resize);
-    resize();
-
-    // ── Mouse / touch handlers ─────────────────────────────────────
-    // Where the picture actually sits in the element: the whole box, unless a
-    // stage is attached and the canvas is letterboxed inside it.
-    const drawnRect = (): DOMRect => {
-      const box = canvas.getBoundingClientRect();
-      // `objectFit: contain` is set for a stage *and* for the desk's preview,
-      // so both letterbox and both need the same correction. Only the stage
-      // used to get it, which put the brush wherever the letterbox bars moved
-      // it to — on a 1200x800 buffer shown in a 582x606 hole that is 109px of
-      // vertical error and a 2x scale error.
-      if ((!stageRef.current && !frameRef.current) || canvas.width === 0 || canvas.height === 0) return box;
-      const s = Math.min(box.width / canvas.width, box.height / canvas.height);
-      const w = canvas.width * s, h = canvas.height * s;
-      return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
-    };
-    drawnRectRef.current = drawnRect;
-    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
-      const cxp = clientX - rect.left - rect.width / 2;
-      const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
-      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
-      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-      const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
-      const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
-      // Mirror the shader's camera transform so the brush lands under the
-      // cursor at any magnification.
-      const shot = macroShotRef.current;
-      const z = Math.max(0.0001, shot.zoom);
-      const spread = settingsRef.current.macroMode ? 0 : Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0));
-      if (spread > 0.001) {
-        // The layers are spread into dishes: this layer's dish is its whole plate.
-        const layer = activeLayerRef.current;
-        const aspect = rect.width / Math.max(1, rect.height);
-        const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
-        const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
-        const u = (clientX - rect.left) / rect.width, v = 1 - (clientY - rect.top) / rect.height;
-        let dx = (u - cen[0]) * aspect / (rad * 0.5), dy = (v - cen[1]) / (rad * 0.5);
-        const ca = Math.cos(-angle), sa = Math.sin(-angle);
-        const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
-        dx = px; dy = py;
-        return { x: Math.floor((0.5 + dx * 0.5) * GRID_SIZE), y: Math.floor((0.5 + dy * 0.5) * GRID_SIZE) };
-      }
-      let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
-      let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
-      // The second layer is viewed through its own zoom and drift.
-      const view = layer1ViewRef.current;
-      if (activeLayerRef.current === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
-        fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
-        fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
-      }
-      return { x: Math.floor(fx), y: Math.floor(fy) };
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = drawnRect();
-      const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
-      lastMousePosRef.current = { ...mousePosRef.current };
-      mousePosRef.current = { x, y };
-      const activeFluid = fluidsRef.current[activeLayerRef.current];
-      if (!activeFluid) return;
-      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        activeFluid.applySquish(x, y, 8, 0.005);
-        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
-        const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
-        const my = (e.movementX * Math.sin(-angle) + e.movementY * Math.cos(-angle)) / scale * 5;
-        activeFluid.addVelocity(x, y, mx, my);
-      }
-    };
-
-    const handleMouseDown = () => { isMouseDownRef.current = true; };
-    const handleMouseUp = () => { isMouseDownRef.current = false; };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      isMouseDownRef.current = true;
-      if (e.touches[0]) {
-        const rect = drawnRect();
-        mousePosRef.current = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
-      }
-    };
-    const handleTouchEnd = () => { isMouseDownRef.current = false; };
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!e.touches[0]) return;
-      const rect = drawnRect();
-      const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
-      mousePosRef.current = { x, y };
-      const activeFluid = fluidsRef.current[activeLayerRef.current];
-      if (activeFluid && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        activeFluid.applySquish(x, y, 8, 0.005);
-      }
-    };
-
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('touchstart', handleTouchStart);
-    canvas.addEventListener('touchend', handleTouchEnd);
-    canvas.addEventListener('touchmove', handleTouchMove);
-
-    // ── Main render loop ──────────────────────────────────────────
-    let animationFrameId: number;
-
-    /**
-     * One frame, drawn in WebGL (docs/webgpu-plan.md, P3).
-     *
-     * Everything here is the renderer's: the programs, the textures, the
-     * uniforms, the passes. What the show decided this frame arrives in
-     * `view`, and nothing else crosses — which is what lets a WebGPU
-     * renderer take the same call when its compositor lands.
-     */
-    const drawFrame = (view: FrameView, fluids: FluidSimulation[]): number | null => {
-      const glr = webGLRef.current;
-      if (!glr) return null;
-      const { settings: currentSettings, time, shot } = view;
-      const { macroOn, macroAmount, isDarkBlend, velRange, flowRate } = view;
-      const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
-
-      // Expand texture arrays if layer count increased
-      while (texs.length < fluids.length) {
-        const tex = glCtx.createTexture()!;
-        glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MIN_FILTER, glCtx.LINEAR);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MAG_FILTER, glCtx.LINEAR);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_S, glCtx.CLAMP_TO_EDGE);
-        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_T, glCtx.CLAMP_TO_EDGE);
-        glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
-        texs.push(tex);
-        tData.push(new Uint8Array(GRID_AREA * 4));
-      }
-
-      // An RGBA8 texture at the given edge, with a framebuffer so the GPU
-      // solver can render into it. Reallocates when the resolution changes.
-      const ensureRenderTarget = (tex: WebGLTexture, size: number): WebGLFramebuffer => {
-        if (glr.texSizes.get(tex) !== size) {
-          glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, size, size, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
-          glr.texSizes.set(tex, size);
-        }
-        let fbo = glr.packFbos.get(tex);
-        if (!fbo) {
-          fbo = glCtx.createFramebuffer()!;
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, fbo);
-          glCtx.framebufferTexture2D(glCtx.FRAMEBUFFER, glCtx.COLOR_ATTACHMENT0, glCtx.TEXTURE_2D, tex, 0);
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-          glr.packFbos.set(tex, fbo);
-        }
-        return fbo;
-      };
-
-      // ── Pack each layer into the renderer's textures ───────
-      const inv8 = 1 / 8.0;
-      const encode = 127.5 / velRange;
-      for (let l = 0; l < fluids.length; l++) {
-        const fluid = fluids[l];
-        const wantVel = (macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2;
-
-        if (fluid.gpu) {
-          // The field never leaves the GPU: sqrt-encode straight into the
-          // layer texture, and the velocity texture when macro needs it.
-          const layerFbo = ensureRenderTarget(texs[l], fluid.gpu.N);
-          const velFbo = wantVel ? ensureRenderTarget(glr.velTextures[l], fluid.gpu.N) : null;
-          fluid.gpu.packInto(layerFbo, velFbo, velRange);
-        } else {
-          // CPU path: sqrt-encoded for extra precision at low densities
-          // (the shader squares on decode). Kills banding.
-          const td = tData[l];
-          for (let i = 0; i < GRID_AREA; i++) {
-            const i4 = i * 4;
-            td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
-            td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
-            td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
-            td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
-          }
-          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
-          glr.texSizes.set(texs[l], GRID_SIZE);
-
-          if (wantVel) {
-            const vd = glr.velData[l];
-            for (let i = 0; i < GRID_AREA; i++) {
-              const i4 = i * 4;
-              vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
-              vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
-            }
-            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
-            glr.texSizes.set(glr.velTextures[l], GRID_SIZE);
-          }
-        }
-
-      }
-
-      // ── Each plate's neighbourhood, once per texel ─────────
-      // See DERIVE_PASS in the shader. Its inputs are the display's own
-      // uniforms, set here from the same values the display gets below.
-      const derive = glr.derive && !view.perPixel ? glr.derive : null;
-      if (derive) {
-        const du = derive.u;
-        glCtx.useProgram(derive.program);
-        glCtx.bindVertexArray(vaoObj);
-        glCtx.uniform1i(du.u_src, 0);
-        glCtx.uniform1f(du.u_gridSize, fluids[0]?.gpu?.N ?? GRID_SIZE);
-        glCtx.uniform1f(du.u_logicalGrid, GRID_SIZE);
-        glCtx.uniform1f(du.u_bspline, view.oldSampler ? 1 : 0);
-        glCtx.uniform1f(du.u_filmLevel, view.filmLevel);
-        glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, view.filmGain)));
-        glCtx.uniform1f(du.u_exposure, Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-        glCtx.uniform1f(du.u_macro, macroAmount);
-        glCtx.uniform1f(du.u_transmission, Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
-        glCtx.uniform1f(du.u_boundaryContrast, currentSettings.boundaryContrast ?? 0.35);
-        glCtx.activeTexture(glCtx.TEXTURE0);
-        for (let l = 0; l < Math.min(2, fluids.length); l++) {
-          const size = glr.texSizes.get(texs[l]) ?? GRID_SIZE;
-          if (derive.sizes[l] !== size) {
-            glCtx.bindTexture(glCtx.TEXTURE_2D, derive.textures[l]);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA16F, size, size, 0, glCtx.RGBA, glCtx.HALF_FLOAT, null);
-            derive.sizes[l] = size;
-          }
-          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, derive.fbos[l]);
-          glCtx.viewport(0, 0, size, size);
-          glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
-        }
-        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-        glCtx.viewport(0, 0, canvas.width, canvas.height);
-        glCtx.bindVertexArray(null);
-      }
-
-      // Bind the renderer's samplers only once every layer is packed: the
-      // GPU solver's pack pass uses unit 0 for its own source texture, so
-      // packing layer 1 would otherwise unbind layer 0 from the unit the
-      // renderer reads it from. The derive pass reads through unit 0 too.
-      for (let l = 0; l < fluids.length; l++) {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.layer0 + l);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
-        if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
-          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.vel0 + l);
-          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
-        }
-      }
-      for (let l = 0; l < 2; l++) {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.derived0 + l);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, derive ? derive.textures[l] : null);
-      }
-
-      // Pigment coordinates, one plate per unit (12 and 13). A layer without
-      // them (the CPU solver, or a context without float render targets)
-      // leaves the unit on the bead mask and the shader falls back to a
-      // screen-fixed grain, which is why u_grainOn is per-frame, not per-layer.
-      let grainOn = 0;
-      {
-        const lead = fluids[0];
-        const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
-        if (gran > 0.002) {
-          for (let l = 0; l < 2; l++) {
-            const tex = fluids[l]?.gpu?.grainTexture ?? null;
-            if (!tex) continue;
-            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
-            if (l === 0) grainOn = 1;
-          }
-          // The second plate borrows the lead's coordinates when it has none.
-          if (grainOn && !fluids[1]?.gpu?.grainTexture) {
-            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
-          }
-        }
-      }
-
-      // The oil beads' mask: bound every frame on its own unit (see
-      // textureUnits.ts), uploaded when the beads moved. A unit left
-      // pointing at the camera's scene texture made every draw with the
-      // camera on a feedback loop, and the photograph and closeup presets
-      // drew black; the output pass on this same unit did it again.
-      {
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
-        const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
-        if (beadAmt > 0) {
-          const cv = beadsRef.current.render();
-          if (cv) {
-            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
-          }
-        }
-      }
-
-      // The mark, if one is loaded. Uploaded once, on the frame after it
-      // arrives, and then just bound: a logo does not change sixty times a
-      // second and re-uploading it would be the most expensive thing in
-      // the frame.
-      let markOn = 0;
-      const markRect = [0.5, 0.5, 0.5, 0.5];
-      {
-        const mk = view.mark;
-        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.mark);
-        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
-        if (mk) {
-          if (mk.dirty) {
-            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-            glCtx.pixelStorei(glCtx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, mk.source as TexImageSource);
-            mk.dirty = false;
-          }
-          const mix = Math.max(0, Math.min(1, currentSettings.markMix ?? 1));
-          if (mix > 0.002) {
-            markOn = mix;
-            // Width is the setting; height follows the image's own aspect
-            // against the frame's, so a wide logo is not stretched tall on
-            // a 16:9 wall and squat on a 4:3 one.
-            const halfW = Math.max(0.002, (currentSettings.markScale ?? 0.22)) * 0.5;
-            const frameAspect = canvas.width / Math.max(1, canvas.height);
-            markRect[0] = Math.max(0, Math.min(1, currentSettings.markX ?? 0.5));
-            markRect[1] = Math.max(0, Math.min(1, currentSettings.markY ?? 0.12));
-            markRect[2] = halfW;
-            markRect[3] = halfW * (frameAspect / Math.max(0.01, mk.aspect));
-          }
-        }
-      }
-
-      // The film projector's frame, if one is playing.
-      let filmOn = 0;
-      let filmScaleX = 1, filmScaleY = 1;
-      {
-        const f = view.film;
-        const v = f.video;
-        if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
-          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.film);
-          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.filmTexture);
-          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, v);
-          filmOn = 1;
-          // Cover-fit: crop whichever axis the frame has too much of.
-          const va = v.videoWidth / v.videoHeight, ca = canvas.width / canvas.height;
-          if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
-        }
-      }
-
-      // Set uniforms and draw
-      glCtx.useProgram(prog);
-      glCtx.bindVertexArray(vaoObj);
-
-      glCtx.uniform1i(uLocs['u_layer0'], UNIT.layer0);
-      glCtx.uniform1i(uLocs['u_layer1'], UNIT.layer1);
-      glCtx.uniform1i(uLocs['u_derived0'], UNIT.derived0);
-      glCtx.uniform1i(uLocs['u_derived1'], UNIT.derived1);
-      glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
-      glCtx.uniform1i(uLocs['u_layerCount'], fluids.length);
-      glCtx.uniform1f(uLocs['u_rotation0'], view.rotations[0] ?? 0);
-      glCtx.uniform1f(uLocs['u_rotation1'], view.rotations[1] ?? 0);
-      glCtx.uniform2f(uLocs['u_resolution'], canvas.width, canvas.height);
-      glCtx.uniform1f(uLocs['u_gooey'], currentSettings.gooeyEffect ?? 0);
-      glCtx.uniform1i(uLocs['u_darkBlend'], isDarkBlend ? 1 : 0);
-
-      // Map blend mode string to int: screen=0, lighter=1, exclusion=2, multiply=3, overlay=4
-      const blendModeMap: Record<string, number> = {
-        'screen': 0, 'lighter': 1, 'exclusion': 2, 'multiply': 3, 'overlay': 4,
-      };
-      glCtx.uniform1i(uLocs['u_blendMode'], blendModeMap[currentSettings.blendMode] ?? 0);
-
-      glCtx.uniform1i(uLocs['u_ledPlatform'], currentSettings.ledPlatform ? 1 : 0);
-      const ledModeMap: Record<string, number> = { 'single': 0, 'ocean': 1, 'fire': 2, 'cyberpunk': 3, 'rainbow': 4 };
-      glCtx.uniform1i(uLocs['u_ledMode'], ledModeMap[currentSettings.ledMode] ?? 0);
-
-      // Parse ledColor hex to vec3
-      const lcRgb = hexToRgb(currentSettings.ledColor ?? '#ffffff');
-      glCtx.uniform3f(uLocs['u_ledColor'], lcRgb.r, lcRgb.g, lcRgb.b);
-
-      const ledAngle = time * (currentSettings.ledSpeed ?? 1) * 0.5 / (2 * Math.PI);
-      glCtx.uniform1f(uLocs['u_ledAngle'], ledAngle);
-      glCtx.uniform1f(uLocs['u_time'], time);
-      glCtx.uniform1f(uLocs['u_glossiness'], currentSettings.glossiness ?? 0);
-      glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
-      glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
-      glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
-      glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
-      glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
-      glCtx.uniform1f(uLocs['u_transmission'], Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
-      // The dimmer, with the flash guard's correction folded in. Riding the
-      // dimmer rather than adding a pass is what lets one implementation
-      // cover the laptop, the projector, a network display and the
-      // recorder: every material is already lit through this number.
-      const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * view.dimmerGain;
-      glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
-      glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
-      glCtx.uniform1f(uLocs['u_bspline'], view.oldSampler ? 1 : 0);
-      glCtx.uniform1i(uLocs['u_mark'], UNIT.mark);
-      glCtx.uniform1f(uLocs['u_markOn'], markOn);
-      glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
-      {
-        const k = Math.round(currentSettings.kaleidoscope ?? 0);
-        glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
-        glCtx.uniform1f(uLocs['u_kaleidoPhase'], view.kaleidoPhase);
-        glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
-      }
-      glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
-      {
-        const lamp = view.lamp;
-        glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
-        glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
-        glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
-        glCtx.uniform1f(uLocs['u_iridescence'], Math.max(0, Math.min(1, currentSettings.iridescence ?? 0)));
-      }
-      {
-        const photo = currentSettings.renderStyle === 'photo';
-        glCtx.uniform1f(uLocs['u_photo'], photo ? 1 : 0);
-        const pa = hexToRgb(currentSettings.paperA ?? '#1e5fb8');
-        const pb = hexToRgb(currentSettings.paperB ?? '#f4c04a');
-        glCtx.uniform3f(uLocs['u_paperA'], pa.r, pa.g, pa.b);
-        glCtx.uniform3f(uLocs['u_paperB'], pb.r, pb.g, pb.b);
-        glCtx.uniform1f(uLocs['u_droplets'], Math.max(0, Math.min(1, currentSettings.microDroplets ?? 0)));
-        glCtx.uniform1f(uLocs['u_thinFilm'], Math.max(0, Math.min(1, currentSettings.thinFilm ?? 0)));
-      }
-      {
-        // Lumia and gel colours come from the working harmony, so they
-        // stay inside the preset's dyes.
-        const h = view.harmony;
-        const hc = (i: number) => PALETTE_RGB[h[i % h.length]];
-        const a = hc(0), b = hc(1), c2 = hc(2), d = hc(3);
-        glCtx.uniform1f(uLocs['u_lumia'], Math.max(0, Math.min(1, currentSettings.lumia ?? 0)));
-        glCtx.uniform3f(uLocs['u_lumiaA'], a.r, a.g, a.b);
-        glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
-        const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
-        glCtx.uniform1f(uLocs['u_gelWheel'], gel);
-        glCtx.uniform1f(uLocs['u_gelAngle'], view.gelAngle);
-        glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
-        glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
-        glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
-        glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
-        glCtx.uniform1i(uLocs['u_film'], UNIT.film);
-        glCtx.uniform1i(uLocs['u_beadTex'], UNIT.beads);
-        glCtx.uniform1i(uLocs['u_grain0'], UNIT.grain0);
-        glCtx.uniform1i(uLocs['u_grain1'], UNIT.grain1);
-        glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
-        glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
-        glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
-        glCtx.uniform1i(uLocs['u_filmOn'], filmOn);
-        glCtx.uniform1f(uLocs['u_filmMix'], Math.max(0, Math.min(1, currentSettings.filmMix ?? 0.7)));
-        glCtx.uniform1f(uLocs['u_filmKey'], Math.max(0, Math.min(0.9, currentSettings.filmKey ?? 0.18)));
-        glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
-      }
-      {
-        const throw1 = view.layer1;
-        glCtx.uniform1f(uLocs['u_layerZoom1'], throw1.zoom);
-        glCtx.uniform2f(uLocs['u_layerDrift1'], throw1.dx, throw1.dy);
-        const bubbles = view.bubbles;
-        glCtx.uniform4fv(uLocs['u_bubbles'], view.bubblePack.packed);
-        glCtx.uniform4fv(uLocs['u_bubbleShape'], view.bubblePack.shape);
-        glCtx.uniform1i(uLocs['u_bubbleCount'], bubbles.count);
-        glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbles.strength);
-      }
-      glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
-      // Sampling math follows the texture actually bound; the tuned look
-      // (normals, edge lines, macro cells) stays on the logical 192 grid.
-      glCtx.uniform1f(uLocs['u_gridSize'], fluids[0]?.gpu?.N ?? GRID_SIZE);
-      glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
-
-      // Macro closeup
-      glCtx.uniform1i(uLocs['u_vel0'], UNIT.vel0);
-      glCtx.uniform1i(uLocs['u_vel1'], UNIT.vel1);
-      glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
-      glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
-      glCtx.uniform1f(uLocs['u_macro'], macroAmount);
-      glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
-      glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
-      glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
-      glCtx.uniform1f(uLocs['u_macroDepth'], currentSettings.macroDepth ?? 0.5);
-      glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
-      glCtx.uniform1f(uLocs['u_macroRelief'], currentSettings.macroRelief ?? 0.7);
-      glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
-      glCtx.uniform1f(uLocs['u_filmLevel'], view.filmLevel);
-      glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, view.filmGain)));
-
-      // ── Two passes when the camera is on ───────────────────
-      // The plate is drawn to a texture and the camera looks at it:
-      // refraction, depth of field, bloom and the sensor's roll-off
-      // all need the finished picture to sample from.
-      const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
-      if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
-      const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
-
-      // ── The projector, last ────────────────────────────────
-      // Flip, corner pin, blanking and grade. Built the first frame it
-      // would change anything, and dropped again when the operator resets
-      // it, so the common case — no projector, nothing set — never pays
-      // for the extra target or the extra draw.
-      const outCfg = view.outputCfg;
-      const wantOut = !outputIsIdentity(outCfg);
-      if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
-      else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
-      const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
-      glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
-      glCtx.uniform1f(uLocs['u_grainMix'], fluids[0]?.gpu?.grainMix ?? 0);
-      glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
-      glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
-      glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
-
-      // ── The post chain ─────────────────────────────────────
-      // Only while an effect is on (none yet; the harness can force it,
-      // or run its test effect). Off, the plate finishes the frame itself
-      // and none of this is allocated.
-      const postTest = view.postTest;
-      const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
-      if (wantPost && !postRef.current) postRef.current = new PostChain(glCtx);
-      else if (!wantPost && postRef.current) { postRef.current.dispose(); postRef.current = null; }
-      const chain = wantPost && postRef.current?.ok ? postRef.current : null;
-      // Into the chain's half floats nothing; into the camera's 8-bit texture
-      // still a dither, or a dark ramp bands before the camera sees it.
-      glCtx.uniform1i(uLocs['u_finishInMain'], !chain ? 1 : cam ? 2 : 0);
-
-      // The output pass is prepared whenever it exists, even when the
-      // camera is the thing the plate draws into — the camera renders
-      // *through* it, so its texture has to be allocated and attached
-      // first. Preparing it only in the `else` branch meant that with a
-      // camera on (which is every photographic preset: Oil on Water,
-      // Colorful Cosmos, Sunny Side Up) the camera drew into a framebuffer
-      // with nothing attached and the output pass then sampled a texture
-      // with no storage. A keystone on those presets was a black wall.
-      if (out) out.bindTarget(canvas.width, canvas.height);
-      if (cam) {
-        cam.bindTarget(canvas.width, canvas.height);
-      } else if (chain) {
-        chain.bindScene(canvas.width, canvas.height);
-      } else if (!out) {
-        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
-        glCtx.viewport(0, 0, canvas.width, canvas.height);
-      }
-      // The plate's own program and vertex array, again. A pass built this
-      // frame (the camera, the output pass, the chain) binds its own vertex
-      // array in its constructor and leaves none bound, and the plate then
-      // drew with no vertices: nothing, for one frame, whenever the camera
-      // or a projector control was first touched.
-      glCtx.useProgram(prog);
-      glCtx.bindVertexArray(vaoObj);
-      glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
-      glCtx.bindVertexArray(null);
-      if (cam) {
-        cam.draw(canvas.width, canvas.height, {
-          time,
-          amount: camAmt,
-          refraction: Math.max(0, Math.min(1, currentSettings.refraction ?? 0)),
-          chromatic: Math.max(0, Math.min(1, currentSettings.chromaticAberration ?? 0)),
-          focus: Math.max(0, Math.min(1, currentSettings.focus ?? 0.5)),
-          aperture: Math.max(0, Math.min(1, currentSettings.aperture ?? 0)),
-          bloom: Math.max(0, Math.min(1, currentSettings.bloom ?? 0)),
-          filmic: 1,
-          vignette: 0.6,
-          grain: 0.6,
-          // Into the chain's half floats, the finish dithers once, at the end.
-          dither: chain ? 0 : 1,
-        }, chain ? chain.sceneTarget(canvas.width, canvas.height) : out ? out.fbo : null);
-      }
-      if (chain) {
-        chain.effects(view.fxFrame, view.fxSeed, postTest);
-        if (out) out.bindTarget(canvas.width, canvas.height);
-        chain.finishTo(out ? out.fbo : null, { dimmer: dimmerNow, markOn, markRect: markRect as [number, number, number, number] });
-      }
-      if (out) out.draw(canvas.width, canvas.height, outCfg);
-
-      // ── What the audience just saw ─────────────────────────
-      // Last, with the finished frame still in the default framebuffer.
-      // The read is one frame behind, which does not matter for a question
-      // about the last second. What to do about it is the show's business,
-      // so the reading goes back rather than the verdict: the loop folds it
-      // into the gain that reaches the *next* frame's view, which is exactly
-      // where it reached before.
-      if (outCfg.flashGuard) {
-        if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
-        probeRef.current.measure(canvas.width, canvas.height);
-        return probeRef.current.luminance;
-      }
-      if (probeRef.current) {
-        probeRef.current.dispose();
-        probeRef.current = null;
-      }
-      return null;
-    };
-
-    /**
-     * WebGL's side of the bargain. Everything above this point built it; this
-     * is the handle the loop holds, and the WebGPU stage will hand over the
-     * same shape once its compositor is wired (docs/webgpu-plan.md, P3).
-     */
-    const renderer: PlateRenderer = {
-      info: { renderer: rendererString, gpuClass },
-      get maxTexture() { return webGLRef.current?.maxTexture ?? 0; },
-      resize,
-      attachSolver(fluid, wantRes) {
-        const glr = webGLRef.current;
-        if (!glr || wantRes <= 0) {
-          if (fluid.gpu) fluid.detachGpu();
-          return true;
-        }
-        if (fluid.gpu && fluid.gpu.N === wantRes) return true;
-        try {
-          if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
-          if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
-          return gpuSupportedRef.current;
-        } catch (err) {
-          console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
-          fluid.dropGpu();
-          return false;
-        }
-      },
-      drawFrame,
-    };
+    let animationFrameId = 0;
+    let renderer: PlateRenderer | null = null;
 
     const render = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
@@ -4222,7 +3333,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // setting the render pass reads is global whatever it was aimed at,
       // which is why the panel will not let you aim one at a layer.
       const currentSettings = patch.global;
-      const glr = webGLRef.current;
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
         const now = Date.now() * 0.001;
@@ -4409,7 +3519,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const wantDpr = (governed ? governor.rung.dpr : 1) * renderScale();
         if (wantDpr !== dprRef.current) {
           dprRef.current = wantDpr;
-          resize();
+          renderer?.resize();
         }
         const wantRes = renderer ? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture) : 0;
         for (const fluid of fluidsRef.current) {
@@ -4427,7 +3537,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             engine: lead?.gpu ? 'gpu' : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
             dpr: dprRef.current,
-            tier, gpu: gpuClass, renderer: rendererString,
+            tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
             governed,
             steppedDown: governed && governor.steppedDown,
             gpuUnavailable,
@@ -5455,10 +4565,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
         // ── The frame, handed to whatever draws it ────────────
-        // Everything below is the WebGL renderer's half of the frame. It reads
-        // the show's state through `view` and nothing else, which is what lets
-        // a second renderer take the same call (docs/webgpu-plan.md, P3).
-        const lum = drawFrame({
+        // The renderer reads the show's state through `view` and nothing
+        // else, which is what lets a second one take the same call
+        // (docs/webgpu-plan.md, P3).
+        const lum = renderer?.drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
           velRange, flowRate,
@@ -5482,7 +4592,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           postTest: postTestRef.current,
           fxFrame: fxFrameRef.current,
           fxSeed: fxSeedRef.current,
-        }, fluidsRef.current);
+        }, fluidsRef.current) ?? null;
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
@@ -5502,7 +4612,910 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       animationFrameId = requestAnimationFrame(render);
     };
 
-    render();
+    /** The renderer is up: size it, give the governor its ladder, and go. */
+    const startWith = (r: PlateRenderer) => {
+      renderer = r;
+      const ladder = qualityLadder(tier, r.info.gpuClass);
+      governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
+      r.resize();
+      render();
+    };
+
+
+    // ── WebGPU, under ?renderer=webgpu ────────────────────────────────
+    // Before anything else: a canvas holds one kind of context for life, and
+    // the WebGL path below would claim it. P1 draws the black plate; the
+    // solver (P2) and the compositor (P3) move in behind this branch.
+    if (WEBGPU) {
+      let stage: WebGPUStage | null = null;
+      let raf = 0;
+      let cancelled = false;
+      // What the frame costs us, as opposed to how often the display asks for
+      // one: a CI runner's display rate says nothing about the stage.
+      let cpuMs = 0;
+      const tier = detectTier();
+      const size = () => {
+        const dpr = devicePixels();
+        const stagePx = stageRef.current;
+        canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
+        canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
+        return dpr;
+      };
+      void WebGPUStage.start(canvas).then((s) => {
+        if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
+        if (isGpuFailure(s)) {
+          console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
+          setGpuFailure(s);
+          return;
+        }
+        stage = s;
+        s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
+        let last = performance.now(), frameMs = 16.7, reported = 0;
+        const loop = () => {
+          if (!stage) return;
+          const now = performance.now();
+          frameMs += (now - last - frameMs) * 0.05;
+          last = now;
+          const dpr = size();
+          const t0 = performance.now();
+          stage.frame();
+          cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+          if (now - reported > 500) {
+            reported = now;
+            const status: EngineStatus = {
+              label: `WebGPU · ${s.gpu.label}`,
+              engine: 'webgpu', grid: 0, dpr, tier, gpu: s.gpu.gpuClass, renderer: s.gpu.label,
+              governed: false, steppedDown: false, gpuUnavailable: false,
+              frameMs, simMs: 0, layers: 0, stepsPerSec: 0, otherMs: frameMs,
+            };
+            engineStatusRef.current = status;
+            onEngineStatusRef.current?.(status);
+          }
+          raf = requestAnimationFrame(loop);
+        };
+        loop();
+      });
+      if (new URLSearchParams(window.location.search).has('debug')) {
+        (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+          engine: engineStatusRef.current?.label ?? 'WebGPU · starting',
+          status: engineStatusRef.current,
+          webgpu: stage && {
+            label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
+            timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
+            cpuMs: +cpuMs.toFixed(3),
+            timings: Object.fromEntries(stage.profiler.ms),
+          },
+          /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
+          grabFrame: () => stage?.grabFrame() ?? null,
+          /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
+          kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+          gpuFailure,
+          settings: settingsRef.current,
+        });
+      }
+      return () => { cancelled = true; cancelAnimationFrame(raf); stage?.dispose(); stage = null; };
+    }
+
+    // ── WebGL2 initialization ──────────────────────────────────────────
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true }) as WebGL2RenderingContext | null;
+    if (!gl) { console.error('WebGL2 not supported'); return; }
+
+    // Platform: where this build is running and on what, for the governor's
+    // starting guess. The renderer string is the only cheap read of the GPU.
+    const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const rendererString = String(
+      (dbgInfo && gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '',
+    );
+    const gpuClass = classifyGpu(rendererString);
+
+    const vertSrc = PLATE_VERT;
+    const fragSrc = PLATE_FRAG;
+
+    const compileShader = (type: number, src: string): WebGLShader | null => {
+      const sh = gl.createShader(type)!;
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(sh));
+        gl.deleteShader(sh);
+        return null;
+      }
+      return sh;
+    };
+
+    const vert = compileShader(gl.VERTEX_SHADER, vertSrc);
+    const frag = compileShader(gl.FRAGMENT_SHADER, fragSrc);
+    if (!vert || !frag) return;
+
+    const program = gl.createProgram()!;
+    gl.attachShader(program, vert);
+    gl.attachShader(program, frag);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      return;
+    }
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
+
+    // Full-screen quad
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const posBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(program, 'a_pos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    // The derive pass: the display's own source with a different main, so the
+    // neighbourhood it works out once per texel is the one the display worked
+    // out per pixel. Its target is half float — the gradient is signed and
+    // the interface sum runs past one — and without float targets the display
+    // goes on working the neighbourhood out per pixel.
+    let derive: GLResources['derive'] = null;
+    if (gl.getExtension('EXT_color_buffer_float')) {
+      const dv = compileShader(gl.VERTEX_SHADER, vertSrc);
+      const df = compileShader(gl.FRAGMENT_SHADER, fragSrc.replace('#version 300 es\n', '#version 300 es\n#define DERIVE_PASS\n'));
+      if (dv && df) {
+        const dp = gl.createProgram()!;
+        gl.attachShader(dp, dv);
+        gl.attachShader(dp, df);
+        gl.bindAttribLocation(dp, aPos, 'a_pos');
+        gl.linkProgram(dp);
+        gl.deleteShader(dv);
+        gl.deleteShader(df);
+        if (gl.getProgramParameter(dp, gl.LINK_STATUS)) {
+          const u: Record<string, WebGLUniformLocation | null> = {};
+          for (const name of ['u_src', 'u_gridSize', 'u_logicalGrid', 'u_bspline', 'u_filmLevel', 'u_filmGain', 'u_exposure', 'u_macro', 'u_transmission', 'u_boundaryContrast']) {
+            u[name] = gl.getUniformLocation(dp, name);
+          }
+          const textures: WebGLTexture[] = [];
+          const fbos: WebGLFramebuffer[] = [];
+          for (let i = 0; i < 2; i++) {
+            const tex = gl.createTexture()!;
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, null);
+            textures.push(tex);
+            const fbo = gl.createFramebuffer()!;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+            fbos.push(fbo);
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          derive = { program: dp, u, textures, fbos, sizes: [1, 1] };
+        } else {
+          console.warn('ChromaGlass: the derive pass did not link; the display works the neighbourhood out per pixel.', gl.getProgramInfoLog(dp));
+          gl.deleteProgram(dp);
+        }
+      }
+    }
+
+    // Create textures for existing layers + 2 slots minimum
+    const maxLayers = Math.max(2, fluidsRef.current.length);
+    const textures: WebGLTexture[] = [];
+    const texData: Uint8Array[] = [];
+    for (let i = 0; i < maxLayers; i++) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      // Initialize with empty texture
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      textures.push(tex);
+      texData.push(new Uint8Array(GRID_AREA * 4));
+    }
+
+    // Velocity fields for the two composited layers — bound to units 6/7 and
+    // only refreshed while the macro camera is running.
+    const velTextures: WebGLTexture[] = [];
+    const velData: Uint8Array[] = [];
+    for (let i = 0; i < 2; i++) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID_SIZE, GRID_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      velTextures.push(tex);
+      velData.push(new Uint8Array(GRID_AREA * 4).fill(128)); // 128 = zero velocity
+    }
+
+    // Collect uniform locations
+    const uniformNames = [
+      'u_layer0','u_layer1','u_layerCount','u_rotation0','u_rotation1','u_derived0','u_derived1','u_derivedOn',
+      'u_resolution','u_gooey','u_darkBlend','u_blendMode',
+      'u_ledPlatform','u_ledMode','u_ledColor','u_ledAngle','u_time',
+      'u_glossiness','u_saturation','u_boundaryContrast','u_postBlur','u_gridSize',
+      'u_vel0','u_vel1','u_camCenter','u_camZoom','u_macro','u_macroCells',
+      'u_macroCellScale','u_macroLacing','u_macroDepth','u_macroEdge','u_macroRelief','u_flowRate',
+      'u_filmLevel','u_filmGain','u_logicalGrid',
+      'u_edgeRelief','u_lacing','u_layerZoom1','u_layerDrift1','u_bubbles','u_bubbleShape','u_bubbleCount','u_bubbleStrength',
+      'u_lumia','u_lumiaA','u_lumiaB','u_gelWheel','u_gelAngle','u_gel0','u_gel1','u_gel2','u_gel3',
+      'u_film','u_filmOn','u_filmMix','u_filmKey','u_filmScale','u_lampWarmth','u_exposure','u_transmission','u_dimmer',
+      'u_mark','u_markOn','u_markRect','u_bspline',
+      'u_beadTex','u_beads','u_dishSpread','u_cells',
+      'u_grain0','u_grain1','u_grainOn','u_grainMix','u_granulation','u_grainScale',
+      'u_kaleido','u_kaleidoPhase','u_kaleidoZoom','u_dish','u_lamp','u_lamp2','u_lightPlay','u_iridescence',
+      'u_photo','u_paperA','u_paperB','u_droplets','u_thinFilm','u_cameraOn','u_finishInMain',
+    ];
+    const uLocs: Record<string, WebGLUniformLocation | null> = {};
+    for (const name of uniformNames) {
+      uLocs[name] = gl.getUniformLocation(program, name);
+    }
+
+    const filmTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, filmTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // The mark: a logo or title laid over the finished frame. Transparent
+    // until one is loaded, so the shader's branch is the only cost.
+    const markTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, markTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // The oil beads' mask: interiors in red, rims in green.
+    const beadTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, beadTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    webGLRef.current = {
+      gl, program, vao, posBuffer, textures, texData, velTextures, velData, uLocs,
+      packFbos: new Map(), texSizes: new Map(),
+      maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+      filmTexture,
+      markTexture,
+      beadTexture,
+      derive,
+    };
+
+    const resize = () => {
+      // Device pixels per CSS pixel is a quality rung, so a Retina laptop
+      // running locally renders sharp and a struggling one drops to 1x.
+      const dpr = dprRef.current;
+      const stage = stageRef.current;
+      if (stage) {
+        // A projector is mirroring this canvas: render at its pixels, with
+        // the governor's rung as a fraction of them, so the mirror shows the
+        // real picture and this window only a scaled copy.
+        const frac = Math.min(1, dpr / devicePixels());
+        const cap = webGLRef.current?.maxTexture ?? 8192;
+        canvas.width = Math.max(1, Math.min(cap, Math.round(stage.width * frac)));
+        canvas.height = Math.max(1, Math.min(cap, Math.round(stage.height * frac)));
+      } else {
+        canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+        canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    };
+    resizeRef.current = resize;
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ── Mouse / touch handlers ─────────────────────────────────────
+    // Where the picture actually sits in the element: the whole box, unless a
+    // stage is attached and the canvas is letterboxed inside it.
+    const drawnRect = (): DOMRect => {
+      const box = canvas.getBoundingClientRect();
+      // `objectFit: contain` is set for a stage *and* for the desk's preview,
+      // so both letterbox and both need the same correction. Only the stage
+      // used to get it, which put the brush wherever the letterbox bars moved
+      // it to — on a 1200x800 buffer shown in a 582x606 hole that is 109px of
+      // vertical error and a 2x scale error.
+      if ((!stageRef.current && !frameRef.current) || canvas.width === 0 || canvas.height === 0) return box;
+      const s = Math.min(box.width / canvas.width, box.height / canvas.height);
+      const w = canvas.width * s, h = canvas.height * s;
+      return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
+    };
+    drawnRectRef.current = drawnRect;
+    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
+      const cxp = clientX - rect.left - rect.width / 2;
+      const cyp = -(clientY - rect.top - rect.height / 2); // WebGL UV y=0 is bottom, CSS y=0 is top
+      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
+      const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
+      // Mirror the shader's camera transform so the brush lands under the
+      // cursor at any magnification.
+      const shot = macroShotRef.current;
+      const z = Math.max(0.0001, shot.zoom);
+      const spread = settingsRef.current.macroMode ? 0 : Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0));
+      if (spread > 0.001) {
+        // The layers are spread into dishes: this layer's dish is its whole plate.
+        const layer = activeLayerRef.current;
+        const aspect = rect.width / Math.max(1, rect.height);
+        const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
+        const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
+        const u = (clientX - rect.left) / rect.width, v = 1 - (clientY - rect.top) / rect.height;
+        let dx = (u - cen[0]) * aspect / (rad * 0.5), dy = (v - cen[1]) / (rad * 0.5);
+        const ca = Math.cos(-angle), sa = Math.sin(-angle);
+        const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
+        dx = px; dy = py;
+        return { x: Math.floor((0.5 + dx * 0.5) * GRID_SIZE), y: Math.floor((0.5 + dy * 0.5) * GRID_SIZE) };
+      }
+      let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
+      let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
+      // The second layer is viewed through its own zoom and drift.
+      const view = layer1ViewRef.current;
+      if (activeLayerRef.current === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
+        fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
+        fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
+      }
+      return { x: Math.floor(fx), y: Math.floor(fy) };
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = drawnRect();
+      const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
+      lastMousePosRef.current = { ...mousePosRef.current };
+      mousePosRef.current = { x, y };
+      const activeFluid = fluidsRef.current[activeLayerRef.current];
+      if (!activeFluid) return;
+      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+        activeFluid.applySquish(x, y, 8, 0.005);
+        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
+        const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
+        const my = (e.movementX * Math.sin(-angle) + e.movementY * Math.cos(-angle)) / scale * 5;
+        activeFluid.addVelocity(x, y, mx, my);
+      }
+    };
+
+    const handleMouseDown = () => { isMouseDownRef.current = true; };
+    const handleMouseUp = () => { isMouseDownRef.current = false; };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      isMouseDownRef.current = true;
+      if (e.touches[0]) {
+        const rect = drawnRect();
+        mousePosRef.current = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
+      }
+    };
+    const handleTouchEnd = () => { isMouseDownRef.current = false; };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!e.touches[0]) return;
+      const rect = drawnRect();
+      const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
+      mousePosRef.current = { x, y };
+      const activeFluid = fluidsRef.current[activeLayerRef.current];
+      if (activeFluid && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+        activeFluid.applySquish(x, y, 8, 0.005);
+      }
+    };
+
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchmove', handleTouchMove);
+
+    /**
+     * One frame, drawn in WebGL (docs/webgpu-plan.md, P3).
+     *
+     * Everything here is the renderer's: the programs, the textures, the
+     * uniforms, the passes. What the show decided this frame arrives in
+     * `view`, and nothing else crosses — which is what lets a WebGPU
+     * renderer take the same call when its compositor lands.
+     */
+    const drawFrame = (view: FrameView, fluids: FluidSimulation[]): number | null => {
+      const glr = webGLRef.current;
+      if (!glr) return null;
+      const { settings: currentSettings, time, shot } = view;
+      const { macroOn, macroAmount, isDarkBlend, velRange, flowRate } = view;
+      const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
+
+      // Expand texture arrays if layer count increased
+      while (texs.length < fluids.length) {
+        const tex = glCtx.createTexture()!;
+        glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MIN_FILTER, glCtx.LINEAR);
+        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MAG_FILTER, glCtx.LINEAR);
+        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_S, glCtx.CLAMP_TO_EDGE);
+        glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_WRAP_T, glCtx.CLAMP_TO_EDGE);
+        glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
+        texs.push(tex);
+        tData.push(new Uint8Array(GRID_AREA * 4));
+      }
+
+      // An RGBA8 texture at the given edge, with a framebuffer so the GPU
+      // solver can render into it. Reallocates when the resolution changes.
+      const ensureRenderTarget = (tex: WebGLTexture, size: number): WebGLFramebuffer => {
+        if (glr.texSizes.get(tex) !== size) {
+          glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, size, size, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, null);
+          glr.texSizes.set(tex, size);
+        }
+        let fbo = glr.packFbos.get(tex);
+        if (!fbo) {
+          fbo = glCtx.createFramebuffer()!;
+          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, fbo);
+          glCtx.framebufferTexture2D(glCtx.FRAMEBUFFER, glCtx.COLOR_ATTACHMENT0, glCtx.TEXTURE_2D, tex, 0);
+          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+          glr.packFbos.set(tex, fbo);
+        }
+        return fbo;
+      };
+
+      // ── Pack each layer into the renderer's textures ───────
+      const inv8 = 1 / 8.0;
+      const encode = 127.5 / velRange;
+      for (let l = 0; l < fluids.length; l++) {
+        const fluid = fluids[l];
+        const wantVel = (macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2;
+
+        if (fluid.gpu) {
+          // The field never leaves the GPU: sqrt-encode straight into the
+          // layer texture, and the velocity texture when macro needs it.
+          const layerFbo = ensureRenderTarget(texs[l], fluid.gpu.N);
+          const velFbo = wantVel ? ensureRenderTarget(glr.velTextures[l], fluid.gpu.N) : null;
+          fluid.gpu.packInto(layerFbo, velFbo, velRange);
+        } else {
+          // CPU path: sqrt-encoded for extra precision at low densities
+          // (the shader squares on decode). Kills banding.
+          const td = tData[l];
+          for (let i = 0; i < GRID_AREA; i++) {
+            const i4 = i * 4;
+            td[i4]     = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityR[i]) * inv8) * 255 + 0.5));
+            td[i4 + 1] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityG[i]) * inv8) * 255 + 0.5));
+            td[i4 + 2] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.densityB[i]) * inv8) * 255 + 0.5));
+            td[i4 + 3] = Math.max(0, Math.min(255, Math.sqrt(Math.max(0, fluid.density[i])  * inv8) * 255 + 0.5));
+          }
+          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, td);
+          glr.texSizes.set(texs[l], GRID_SIZE);
+
+          if (wantVel) {
+            const vd = glr.velData[l];
+            for (let i = 0; i < GRID_AREA; i++) {
+              const i4 = i * 4;
+              vd[i4]     = Math.max(0, Math.min(255, 127.5 + fluid.vx[i] * encode));
+              vd[i4 + 1] = Math.max(0, Math.min(255, 127.5 + fluid.vy[i] * encode));
+            }
+            glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, GRID_SIZE, GRID_SIZE, 0, glCtx.RGBA, glCtx.UNSIGNED_BYTE, vd);
+            glr.texSizes.set(glr.velTextures[l], GRID_SIZE);
+          }
+        }
+
+      }
+
+      // ── Each plate's neighbourhood, once per texel ─────────
+      // See DERIVE_PASS in the shader. Its inputs are the display's own
+      // uniforms, set here from the same values the display gets below.
+      const derive = glr.derive && !view.perPixel ? glr.derive : null;
+      if (derive) {
+        const du = derive.u;
+        glCtx.useProgram(derive.program);
+        glCtx.bindVertexArray(vaoObj);
+        glCtx.uniform1i(du.u_src, 0);
+        glCtx.uniform1f(du.u_gridSize, fluids[0]?.gpu?.N ?? GRID_SIZE);
+        glCtx.uniform1f(du.u_logicalGrid, GRID_SIZE);
+        glCtx.uniform1f(du.u_bspline, view.oldSampler ? 1 : 0);
+        glCtx.uniform1f(du.u_filmLevel, view.filmLevel);
+        glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, view.filmGain)));
+        glCtx.uniform1f(du.u_exposure, Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+        glCtx.uniform1f(du.u_macro, macroAmount);
+        glCtx.uniform1f(du.u_transmission, Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
+        glCtx.uniform1f(du.u_boundaryContrast, currentSettings.boundaryContrast ?? 0.35);
+        glCtx.activeTexture(glCtx.TEXTURE0);
+        for (let l = 0; l < Math.min(2, fluids.length); l++) {
+          const size = glr.texSizes.get(texs[l]) ?? GRID_SIZE;
+          if (derive.sizes[l] !== size) {
+            glCtx.bindTexture(glCtx.TEXTURE_2D, derive.textures[l]);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA16F, size, size, 0, glCtx.RGBA, glCtx.HALF_FLOAT, null);
+            derive.sizes[l] = size;
+          }
+          glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+          glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, derive.fbos[l]);
+          glCtx.viewport(0, 0, size, size);
+          glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
+        }
+        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+        glCtx.viewport(0, 0, canvas.width, canvas.height);
+        glCtx.bindVertexArray(null);
+      }
+
+      // Bind the renderer's samplers only once every layer is packed: the
+      // GPU solver's pack pass uses unit 0 for its own source texture, so
+      // packing layer 1 would otherwise unbind layer 0 from the unit the
+      // renderer reads it from. The derive pass reads through unit 0 too.
+      for (let l = 0; l < fluids.length; l++) {
+        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.layer0 + l);
+        glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
+        if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
+          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.vel0 + l);
+          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.velTextures[l]);
+        }
+      }
+      for (let l = 0; l < 2; l++) {
+        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.derived0 + l);
+        glCtx.bindTexture(glCtx.TEXTURE_2D, derive ? derive.textures[l] : null);
+      }
+
+      // Pigment coordinates, one plate per unit (12 and 13). A layer without
+      // them (the CPU solver, or a context without float render targets)
+      // leaves the unit on the bead mask and the shader falls back to a
+      // screen-fixed grain, which is why u_grainOn is per-frame, not per-layer.
+      let grainOn = 0;
+      {
+        const lead = fluids[0];
+        const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
+        if (gran > 0.002) {
+          for (let l = 0; l < 2; l++) {
+            const tex = fluids[l]?.gpu?.grainTexture ?? null;
+            if (!tex) continue;
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
+            if (l === 0) grainOn = 1;
+          }
+          // The second plate borrows the lead's coordinates when it has none.
+          if (grainOn && !fluids[1]?.gpu?.grainTexture) {
+            glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
+          }
+        }
+      }
+
+      // The oil beads' mask: bound every frame on its own unit (see
+      // textureUnits.ts), uploaded when the beads moved. A unit left
+      // pointing at the camera's scene texture made every draw with the
+      // camera on a feedback loop, and the photograph and closeup presets
+      // drew black; the output pass on this same unit did it again.
+      {
+        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
+        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
+        const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
+        if (beadAmt > 0) {
+          const cv = beadsRef.current.render();
+          if (cv) {
+            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
+          }
+        }
+      }
+
+      // The mark, if one is loaded. Uploaded once, on the frame after it
+      // arrives, and then just bound: a logo does not change sixty times a
+      // second and re-uploading it would be the most expensive thing in
+      // the frame.
+      let markOn = 0;
+      const markRect = [0.5, 0.5, 0.5, 0.5];
+      {
+        const mk = view.mark;
+        glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.mark);
+        glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
+        if (mk) {
+          if (mk.dirty) {
+            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+            glCtx.pixelStorei(glCtx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, mk.source as TexImageSource);
+            mk.dirty = false;
+          }
+          const mix = Math.max(0, Math.min(1, currentSettings.markMix ?? 1));
+          if (mix > 0.002) {
+            markOn = mix;
+            // Width is the setting; height follows the image's own aspect
+            // against the frame's, so a wide logo is not stretched tall on
+            // a 16:9 wall and squat on a 4:3 one.
+            const halfW = Math.max(0.002, (currentSettings.markScale ?? 0.22)) * 0.5;
+            const frameAspect = canvas.width / Math.max(1, canvas.height);
+            markRect[0] = Math.max(0, Math.min(1, currentSettings.markX ?? 0.5));
+            markRect[1] = Math.max(0, Math.min(1, currentSettings.markY ?? 0.12));
+            markRect[2] = halfW;
+            markRect[3] = halfW * (frameAspect / Math.max(0.01, mk.aspect));
+          }
+        }
+      }
+
+      // The film projector's frame, if one is playing.
+      let filmOn = 0;
+      let filmScaleX = 1, filmScaleY = 1;
+      {
+        const f = view.film;
+        const v = f.video;
+        if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
+          glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.film);
+          glCtx.bindTexture(glCtx.TEXTURE_2D, glr.filmTexture);
+          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, v);
+          filmOn = 1;
+          // Cover-fit: crop whichever axis the frame has too much of.
+          const va = v.videoWidth / v.videoHeight, ca = canvas.width / canvas.height;
+          if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+        }
+      }
+
+      // Set uniforms and draw
+      glCtx.useProgram(prog);
+      glCtx.bindVertexArray(vaoObj);
+
+      glCtx.uniform1i(uLocs['u_layer0'], UNIT.layer0);
+      glCtx.uniform1i(uLocs['u_layer1'], UNIT.layer1);
+      glCtx.uniform1i(uLocs['u_derived0'], UNIT.derived0);
+      glCtx.uniform1i(uLocs['u_derived1'], UNIT.derived1);
+      glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
+      glCtx.uniform1i(uLocs['u_layerCount'], fluids.length);
+      glCtx.uniform1f(uLocs['u_rotation0'], view.rotations[0] ?? 0);
+      glCtx.uniform1f(uLocs['u_rotation1'], view.rotations[1] ?? 0);
+      glCtx.uniform2f(uLocs['u_resolution'], canvas.width, canvas.height);
+      glCtx.uniform1f(uLocs['u_gooey'], currentSettings.gooeyEffect ?? 0);
+      glCtx.uniform1i(uLocs['u_darkBlend'], isDarkBlend ? 1 : 0);
+
+      // Map blend mode string to int: screen=0, lighter=1, exclusion=2, multiply=3, overlay=4
+      const blendModeMap: Record<string, number> = {
+        'screen': 0, 'lighter': 1, 'exclusion': 2, 'multiply': 3, 'overlay': 4,
+      };
+      glCtx.uniform1i(uLocs['u_blendMode'], blendModeMap[currentSettings.blendMode] ?? 0);
+
+      glCtx.uniform1i(uLocs['u_ledPlatform'], currentSettings.ledPlatform ? 1 : 0);
+      const ledModeMap: Record<string, number> = { 'single': 0, 'ocean': 1, 'fire': 2, 'cyberpunk': 3, 'rainbow': 4 };
+      glCtx.uniform1i(uLocs['u_ledMode'], ledModeMap[currentSettings.ledMode] ?? 0);
+
+      // Parse ledColor hex to vec3
+      const lcRgb = hexToRgb(currentSettings.ledColor ?? '#ffffff');
+      glCtx.uniform3f(uLocs['u_ledColor'], lcRgb.r, lcRgb.g, lcRgb.b);
+
+      const ledAngle = time * (currentSettings.ledSpeed ?? 1) * 0.5 / (2 * Math.PI);
+      glCtx.uniform1f(uLocs['u_ledAngle'], ledAngle);
+      glCtx.uniform1f(uLocs['u_time'], time);
+      glCtx.uniform1f(uLocs['u_glossiness'], currentSettings.glossiness ?? 0);
+      glCtx.uniform1f(uLocs['u_saturation'], currentSettings.saturationBoost ?? 1.35);
+      glCtx.uniform1f(uLocs['u_boundaryContrast'], currentSettings.boundaryContrast ?? 0.35);
+      glCtx.uniform1f(uLocs['u_edgeRelief'], currentSettings.edgeRelief ?? 0);
+      glCtx.uniform1f(uLocs['u_lacing'], Math.max(0, Math.min(1, currentSettings.lacing ?? 0)));
+      glCtx.uniform1f(uLocs['u_exposure'], Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
+      glCtx.uniform1f(uLocs['u_transmission'], Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
+      // The dimmer, with the flash guard's correction folded in. Riding the
+      // dimmer rather than adding a pass is what lets one implementation
+      // cover the laptop, the projector, a network display and the
+      // recorder: every material is already lit through this number.
+      const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * view.dimmerGain;
+      glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
+      glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
+      glCtx.uniform1f(uLocs['u_bspline'], view.oldSampler ? 1 : 0);
+      glCtx.uniform1i(uLocs['u_mark'], UNIT.mark);
+      glCtx.uniform1f(uLocs['u_markOn'], markOn);
+      glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
+      {
+        const k = Math.round(currentSettings.kaleidoscope ?? 0);
+        glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
+        glCtx.uniform1f(uLocs['u_kaleidoPhase'], view.kaleidoPhase);
+        glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
+      }
+      glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
+      {
+        const lamp = view.lamp;
+        glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
+        glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
+        glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
+        glCtx.uniform1f(uLocs['u_iridescence'], Math.max(0, Math.min(1, currentSettings.iridescence ?? 0)));
+      }
+      {
+        const photo = currentSettings.renderStyle === 'photo';
+        glCtx.uniform1f(uLocs['u_photo'], photo ? 1 : 0);
+        const pa = hexToRgb(currentSettings.paperA ?? '#1e5fb8');
+        const pb = hexToRgb(currentSettings.paperB ?? '#f4c04a');
+        glCtx.uniform3f(uLocs['u_paperA'], pa.r, pa.g, pa.b);
+        glCtx.uniform3f(uLocs['u_paperB'], pb.r, pb.g, pb.b);
+        glCtx.uniform1f(uLocs['u_droplets'], Math.max(0, Math.min(1, currentSettings.microDroplets ?? 0)));
+        glCtx.uniform1f(uLocs['u_thinFilm'], Math.max(0, Math.min(1, currentSettings.thinFilm ?? 0)));
+      }
+      {
+        // Lumia and gel colours come from the working harmony, so they
+        // stay inside the preset's dyes.
+        const h = view.harmony;
+        const hc = (i: number) => PALETTE_RGB[h[i % h.length]];
+        const a = hc(0), b = hc(1), c2 = hc(2), d = hc(3);
+        glCtx.uniform1f(uLocs['u_lumia'], Math.max(0, Math.min(1, currentSettings.lumia ?? 0)));
+        glCtx.uniform3f(uLocs['u_lumiaA'], a.r, a.g, a.b);
+        glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
+        const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
+        glCtx.uniform1f(uLocs['u_gelWheel'], gel);
+        glCtx.uniform1f(uLocs['u_gelAngle'], view.gelAngle);
+        glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
+        glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
+        glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
+        glCtx.uniform3f(uLocs['u_gel3'], d.r, d.g, d.b);
+        glCtx.uniform1i(uLocs['u_film'], UNIT.film);
+        glCtx.uniform1i(uLocs['u_beadTex'], UNIT.beads);
+        glCtx.uniform1i(uLocs['u_grain0'], UNIT.grain0);
+        glCtx.uniform1i(uLocs['u_grain1'], UNIT.grain1);
+        glCtx.uniform1f(uLocs['u_beads'], Math.max(0, Math.min(1, currentSettings.beads ?? 0)));
+        glCtx.uniform1f(uLocs['u_dishSpread'], Math.max(0, Math.min(1, currentSettings.dishSpread ?? 0)));
+        glCtx.uniform1f(uLocs['u_cells'], Math.max(0, Math.min(1, currentSettings.cells ?? 0)));
+        glCtx.uniform1i(uLocs['u_filmOn'], filmOn);
+        glCtx.uniform1f(uLocs['u_filmMix'], Math.max(0, Math.min(1, currentSettings.filmMix ?? 0.7)));
+        glCtx.uniform1f(uLocs['u_filmKey'], Math.max(0, Math.min(0.9, currentSettings.filmKey ?? 0.18)));
+        glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
+      }
+      {
+        const throw1 = view.layer1;
+        glCtx.uniform1f(uLocs['u_layerZoom1'], throw1.zoom);
+        glCtx.uniform2f(uLocs['u_layerDrift1'], throw1.dx, throw1.dy);
+        const bubbles = view.bubbles;
+        glCtx.uniform4fv(uLocs['u_bubbles'], view.bubblePack.packed);
+        glCtx.uniform4fv(uLocs['u_bubbleShape'], view.bubblePack.shape);
+        glCtx.uniform1i(uLocs['u_bubbleCount'], bubbles.count);
+        glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbles.strength);
+      }
+      glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
+      // Sampling math follows the texture actually bound; the tuned look
+      // (normals, edge lines, macro cells) stays on the logical 192 grid.
+      glCtx.uniform1f(uLocs['u_gridSize'], fluids[0]?.gpu?.N ?? GRID_SIZE);
+      glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
+
+      // Macro closeup
+      glCtx.uniform1i(uLocs['u_vel0'], UNIT.vel0);
+      glCtx.uniform1i(uLocs['u_vel1'], UNIT.vel1);
+      glCtx.uniform2f(uLocs['u_camCenter'], shot.cx, shot.cy);
+      glCtx.uniform1f(uLocs['u_camZoom'], shot.zoom);
+      glCtx.uniform1f(uLocs['u_macro'], macroAmount);
+      glCtx.uniform1f(uLocs['u_macroCells'], currentSettings.macroCells ?? 0.75);
+      glCtx.uniform1f(uLocs['u_macroCellScale'], currentSettings.macroCellScale ?? 0.5);
+      glCtx.uniform1f(uLocs['u_macroLacing'], currentSettings.macroLacing ?? 0.55);
+      glCtx.uniform1f(uLocs['u_macroDepth'], currentSettings.macroDepth ?? 0.5);
+      glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
+      glCtx.uniform1f(uLocs['u_macroRelief'], currentSettings.macroRelief ?? 0.7);
+      glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
+      glCtx.uniform1f(uLocs['u_filmLevel'], view.filmLevel);
+      glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, view.filmGain)));
+
+      // ── Two passes when the camera is on ───────────────────
+      // The plate is drawn to a texture and the camera looks at it:
+      // refraction, depth of field, bloom and the sensor's roll-off
+      // all need the finished picture to sample from.
+      const camAmt = Math.max(0, Math.min(1, currentSettings.camera ?? 0));
+      if (camAmt > 0.001 && !cameraRef.current) cameraRef.current = new CameraPass(glCtx);
+      const cam = camAmt > 0.001 && cameraRef.current?.ok ? cameraRef.current : null;
+
+      // ── The projector, last ────────────────────────────────
+      // Flip, corner pin, blanking and grade. Built the first frame it
+      // would change anything, and dropped again when the operator resets
+      // it, so the common case — no projector, nothing set — never pays
+      // for the extra target or the extra draw.
+      const outCfg = view.outputCfg;
+      const wantOut = !outputIsIdentity(outCfg);
+      if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
+      else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
+      const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
+      glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
+      glCtx.uniform1f(uLocs['u_grainMix'], fluids[0]?.gpu?.grainMix ?? 0);
+      glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
+      glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
+      glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
+
+      // ── The post chain ─────────────────────────────────────
+      // Only while an effect is on (none yet; the harness can force it,
+      // or run its test effect). Off, the plate finishes the frame itself
+      // and none of this is allocated.
+      const postTest = view.postTest;
+      const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
+      if (wantPost && !postRef.current) postRef.current = new PostChain(glCtx);
+      else if (!wantPost && postRef.current) { postRef.current.dispose(); postRef.current = null; }
+      const chain = wantPost && postRef.current?.ok ? postRef.current : null;
+      // Into the chain's half floats nothing; into the camera's 8-bit texture
+      // still a dither, or a dark ramp bands before the camera sees it.
+      glCtx.uniform1i(uLocs['u_finishInMain'], !chain ? 1 : cam ? 2 : 0);
+
+      // The output pass is prepared whenever it exists, even when the
+      // camera is the thing the plate draws into — the camera renders
+      // *through* it, so its texture has to be allocated and attached
+      // first. Preparing it only in the `else` branch meant that with a
+      // camera on (which is every photographic preset: Oil on Water,
+      // Colorful Cosmos, Sunny Side Up) the camera drew into a framebuffer
+      // with nothing attached and the output pass then sampled a texture
+      // with no storage. A keystone on those presets was a black wall.
+      if (out) out.bindTarget(canvas.width, canvas.height);
+      if (cam) {
+        cam.bindTarget(canvas.width, canvas.height);
+      } else if (chain) {
+        chain.bindScene(canvas.width, canvas.height);
+      } else if (!out) {
+        glCtx.bindFramebuffer(glCtx.FRAMEBUFFER, null);
+        glCtx.viewport(0, 0, canvas.width, canvas.height);
+      }
+      // The plate's own program and vertex array, again. A pass built this
+      // frame (the camera, the output pass, the chain) binds its own vertex
+      // array in its constructor and leaves none bound, and the plate then
+      // drew with no vertices: nothing, for one frame, whenever the camera
+      // or a projector control was first touched.
+      glCtx.useProgram(prog);
+      glCtx.bindVertexArray(vaoObj);
+      glCtx.drawArrays(glCtx.TRIANGLE_STRIP, 0, 4);
+      glCtx.bindVertexArray(null);
+      if (cam) {
+        cam.draw(canvas.width, canvas.height, {
+          time,
+          amount: camAmt,
+          refraction: Math.max(0, Math.min(1, currentSettings.refraction ?? 0)),
+          chromatic: Math.max(0, Math.min(1, currentSettings.chromaticAberration ?? 0)),
+          focus: Math.max(0, Math.min(1, currentSettings.focus ?? 0.5)),
+          aperture: Math.max(0, Math.min(1, currentSettings.aperture ?? 0)),
+          bloom: Math.max(0, Math.min(1, currentSettings.bloom ?? 0)),
+          filmic: 1,
+          vignette: 0.6,
+          grain: 0.6,
+          // Into the chain's half floats, the finish dithers once, at the end.
+          dither: chain ? 0 : 1,
+        }, chain ? chain.sceneTarget(canvas.width, canvas.height) : out ? out.fbo : null);
+      }
+      if (chain) {
+        chain.effects(view.fxFrame, view.fxSeed, postTest);
+        if (out) out.bindTarget(canvas.width, canvas.height);
+        chain.finishTo(out ? out.fbo : null, { dimmer: dimmerNow, markOn, markRect: markRect as [number, number, number, number] });
+      }
+      if (out) out.draw(canvas.width, canvas.height, outCfg);
+
+      // ── What the audience just saw ─────────────────────────
+      // Last, with the finished frame still in the default framebuffer.
+      // The read is one frame behind, which does not matter for a question
+      // about the last second. What to do about it is the show's business,
+      // so the reading goes back rather than the verdict: the loop folds it
+      // into the gain that reaches the *next* frame's view, which is exactly
+      // where it reached before.
+      if (outCfg.flashGuard) {
+        if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
+        probeRef.current.measure(canvas.width, canvas.height);
+        return probeRef.current.luminance;
+      }
+      if (probeRef.current) {
+        probeRef.current.dispose();
+        probeRef.current = null;
+      }
+      return null;
+    };
+
+    /**
+     * WebGL's side of the bargain. Everything above this point built it; this
+     * is the handle the loop holds, and the WebGPU stage will hand over the
+     * same shape once its compositor is wired (docs/webgpu-plan.md, P3).
+     */
+    const webglRenderer: PlateRenderer = {
+      info: { renderer: rendererString, gpuClass },
+      get maxTexture() { return webGLRef.current?.maxTexture ?? 0; },
+      resize,
+      attachSolver(fluid, wantRes) {
+        const glr = webGLRef.current;
+        if (!glr || wantRes <= 0) {
+          if (fluid.gpu) fluid.detachGpu();
+          return true;
+        }
+        if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+        try {
+          if (gpuSupportedRef.current === null) gpuSupportedRef.current = GpuFluid.isSupported(glr.gl);
+          if (gpuSupportedRef.current) fluid.attachGpu(new GpuFluid(glr.gl, wantRes, GRID_SIZE));
+          return gpuSupportedRef.current;
+        } catch (err) {
+          console.warn('ChromaGlass: GPU fluid solver unavailable, using the CPU solver.', err);
+          fluid.dropGpu();
+          return false;
+        }
+      },
+      drawFrame,
+    };
+
+    startWith(webglRenderer);
+
+
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
