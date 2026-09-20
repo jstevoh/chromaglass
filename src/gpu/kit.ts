@@ -91,6 +91,11 @@ export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, 
     else if (type.startsWith('texture_storage_2d')) {
       const format = type.slice(type.indexOf('<') + 1).split(',')[0].trim() as GPUTextureFormat;
       entries.push({ binding, visibility, storageTexture: { access: 'write-only', format } });
+    } else if (type.startsWith('texture_2d_array')) {
+      // The history ring is a stack of frames, and `texture_2d` is a prefix of
+      // `texture_2d_array`: matched the other way round, the layout asks for a
+      // flat texture and the entry point does not match it.
+      entries.push({ binding, visibility, texture: { sampleType: 'float', viewDimension: '2d-array' } });
     } else if (type.startsWith('texture_2d')) {
       // Is it read through the sampler? A compute pass usually names the
       // texture at the sample site, so the regex can tell. A fragment shader
