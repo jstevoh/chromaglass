@@ -121,12 +121,408 @@ const watch = (page) => {
 
       const timings = await page.evaluate(() => window.chromaglassDebug().webgpu.timings);
       if (started.timestamps) check('the frame is timed on the GPU', typeof timings.plate === 'number', JSON.stringify(timings));
+
+      // The camera. `npm run camera` proves the shader against the GLSL's;
+      // what is asked here is that the app runs it — a pass of its own,
+      // timed on the GPU, taking a photograph that is not the plate as drawn.
+      const lens = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const shot = async () => (await dbg().grabFrame())?.pixels ?? null;
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const share = (a, b) => {
+          let hits = 0;
+          for (let i = 0; i < a.length; i += 4) {
+            const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+            if (d >= 8) hits++;
+          }
+          return hits / (a.length / 4);
+        };
+        const d = dbg();
+        d.settings.camera = 0;
+        await settle(4);
+        const a = await shot();
+        await settle(2);
+        const b = await shot();
+        const floor = share(a, b);
+        Object.assign(d.settings, { camera: 0.9, aperture: 0.6, bloom: 0.8, refraction: 0.6, focus: 0.3 });
+        await settle(3);
+        const on = share(b, await shot());
+        const timed = typeof dbg().webgpu.timings.camera === 'number';
+        d.settings.camera = 0;
+        await settle(3);
+        return { floor, on, timed };
+      });
+      // The governor's budget. On this path a frame is half a millisecond of
+      // encoding whatever the machine is doing, so a budget spent in
+      // JavaScript time would be satisfied at every rung — which is how the
+      // governor used to climb into a grid the GPU could not hold, find out a
+      // second and a half later, and come back down. What it is fed now is
+      // the drawing and the solver's own steps, from timestamp queries.
+      if (started.timestamps) {
+        const judged = await page.evaluate(() => {
+          const d = window.chromaglassDebug();
+          return { work: d.governor.emaWork, cpuMs: d.webgpu.cpuMs, frameMs: d.governor.frameMs };
+        });
+        check('the governor is judged on what the GPU spent, not on the encoding',
+          judged.work > 3 && judged.work > judged.cpuMs * 3,
+          `${judged.work?.toFixed(1)} ms of budget against ${judged.cpuMs} ms of encoding, ` +
+          `in a ${judged.frameMs?.toFixed(1)} ms frame`);
+      }
+
+      // The flash guard's probe: a compute reduction over the frame the wall
+      // just got. It is measured the way `npm run fx` measures the WebGL
+      // one — against frames whose true mean is known by construction —
+      // because a probe that reads a lit patch as anything other than its
+      // share of the frame is a guard that fires at the wrong time.
+      const probe = await page.evaluate(async () => {
+        const dbg = window.chromaglassDebug();
+        const c = document.querySelector('canvas');
+        const w = c.width, h = c.height;
+        const cases = [
+          ['a quarter of the frame', [[0, 0, Math.floor(w / 2), Math.floor(h / 2)]]],
+          ['a one-pixel line across the frame', [[0, Math.floor(h / 2), w, 1]]],
+          ['a scatter of small patches', [[10, 10, 40, 40], [w - 90, h - 70, 60, 50], [Math.floor(w / 3), 20, 25, 25]]],
+          ['the whole frame', [[0, 0, w, h]]],
+        ];
+        const read = [];
+        for (const [name, rects] of cases) {
+          const r = await dbg.probeSelfTest(rects);
+          read.push({ name, mean: r?.mean ?? null, lit: r?.lit ?? null });
+        }
+        return read;
+      });
+      for (const r of probe) {
+        check(`probe: ${r.name}`,
+          r.mean !== null && Math.abs(r.mean - r.lit) <= 0.002,
+          r.mean === null ? 'no probe' : `read ${r.mean.toFixed(4)}, lit ${r.lit.toFixed(4)}`);
+      }
+      // And that what it is fed is the frame the wall gets rather than the
+      // plate before the projector had its way with it — which the grade
+      // settles, because that happens in the last pass of all.
+      const guard = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const base = { ...dbg().outputConfig, flashGuard: true };
+        const lumAt = async (gain) => {
+          window.chromaglassOutput?.({ ...base, gain });
+          await settle(10);
+          return dbg().flash().luminance;
+        };
+        const plain = await lumAt(1);
+        const dark = await lumAt(0.3);
+        const bright = await lumAt(2.4);
+        const state = dbg().flash();
+        window.chromaglassOutput?.(base);
+        return { plain, dark, bright, gain: state.gain, rate: state.rate };
+      });
+      check('the guard is fed a reading of the frame the wall gets',
+        typeof guard.plain === 'number' && guard.plain > 0 && guard.plain <= 1 &&
+        guard.dark < guard.plain && guard.bright > guard.plain && guard.gain === 1,
+        `${guard.dark?.toFixed(3)} dim / ${guard.plain?.toFixed(3)} plain / ${guard.bright?.toFixed(3)} lifted, ` +
+        `the guard idle at gain ${guard.gain}`);
+
+      // The projector. `npm run output` proves the shader against the GLSL's
+      // over every shape and pin; what is asked here is that the app runs it,
+      // by the two answers a mapping has that nothing else does: a pin that
+      // empties the edge of the frame, and a blackout that empties all of it.
+      const wall = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const lit = async (x0, x1, y0, y1) => {
+          const g = await dbg().grabFrame();
+          if (!g) return 0;
+          let on = 0, n = 0;
+          for (let y = Math.floor(y0 * g.height); y < Math.floor(y1 * g.height); y++) {
+            for (let x = Math.floor(x0 * g.width); x < Math.floor(x1 * g.width); x++) {
+              const i = (y * g.width + x) * 4;
+              n++;
+              if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+            }
+          }
+          return on / Math.max(1, n);
+        };
+        const base = {
+          flipX: false, flipY: false, corners: [0, 0, 1, 0, 1, 1, 0, 1],
+          maskTop: 0, maskRight: 0, maskBottom: 0, maskLeft: 0, maskFeather: 0,
+          gain: 1, gamma: 1, surfaces: [],
+        };
+        const apply = async (cfg) => {
+          window.chromaglassOutput?.({ ...base, ...cfg });
+          await settle(6);
+        };
+        await apply({});
+        const plain = { middle: await lit(0.4, 0.6, 0.4, 0.6), edge: await lit(0, 1, 0, 0.04) };
+        // Pinned inside the frame: the picture moves off the top rows.
+        await apply({ corners: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8] });
+        const pinned = { middle: await lit(0.4, 0.6, 0.4, 0.6), edge: await lit(0, 1, 0, 0.04) };
+        const timed = typeof dbg().webgpu.timings.output === 'number';
+        // Every shape switched off is a blackout, not an absence of mapping.
+        await apply({
+          surfaces: [{
+            id: 'a', shape: 'rect', enabled: false, opacity: 1, feather: 0,
+            corners: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8], src: [0, 0, 1, 1],
+          }],
+        });
+        const dark = await lit(0, 1, 0, 1);
+        await apply({});
+        return { plain, pinned, dark, timed };
+      });
+      check('the projector places the picture on the wall',
+        wall.plain.edge > 0.5 && wall.pinned.edge < 0.02 && wall.pinned.middle > 0.5 &&
+        wall.dark < 0.001 && (!started.timestamps || wall.timed),
+        `unpinned, ${(wall.plain.edge * 100).toFixed(0)}% of the top rows are lit; pinned inside the frame, ` +
+        `${(wall.pinned.edge * 100).toFixed(0)}% are, with the middle still at ${(wall.pinned.middle * 100).toFixed(0)}%; ` +
+        `every shape off, ${(wall.dark * 100).toFixed(2)}% of the frame` +
+        (started.timestamps ? `, its pass ${wall.timed ? 'timed' : 'never timed'} on the GPU` : ''));
+
+      check('the camera takes the picture when it is on',
+        lens.on > 0.3 && lens.on > lens.floor * 5 && (!started.timestamps || lens.timed),
+        `${(lens.on * 100).toFixed(0)}% of the frame against a floor of ${(lens.floor * 100).toFixed(1)}%` +
+        (started.timestamps ? `, its pass ${lens.timed ? 'timed' : 'never timed'} on the GPU` : ''));
     }
-    check('no errors in the console', errors.length === 0, errors.slice(0, 3).join(' | '));
+      // ── The GPU, taken away ────────────────────────────────────────
+      // `device.destroy()` is what a driver reset leaves behind, so this is
+      // the real path rather than a simulation of it. WebGPU has no restore
+      // event — there is no getting the device back, only asking for a new
+      // one — so what is checked is what an audience would see: the wall is
+      // lit, it goes, and it is lit again without anyone touching anything.
+      {
+        const lit = async () => page.evaluate(async () => {
+          const g = await window.chromaglassDebug?.().grabFrame?.();
+          if (!g) return null;
+          let on = 0;
+          for (let i = 0; i < g.pixels.length; i += 4) {
+            if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+          }
+          return on / (g.pixels.length / 4);
+        }).catch(() => null);
+        const before = await lit();
+        const framesBefore = await page.evaluate(() => window.chromaglassDebug().webgpu?.frames ?? 0);
+        // Watched rather than polled for: the rebuild can be quick enough
+        // that the notice is on screen for a frame or two, and a poll that
+        // arrives after it has gone reports that it never came.
+        await page.evaluate(() => {
+          window.__sawLost = !!document.querySelector('[data-testid="gl-lost"]');
+          const seen = new MutationObserver(() => {
+            if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
+          });
+          seen.observe(document.body, { childList: true, subtree: true });
+        });
+        await page.evaluate(() => window.chromaglassDebug().loseDevice());
+        // The rebuild is a new device, a new stage, a new solver and a plate
+        // laid again; it is given room, and then asked whether it drew.
+        const back = await page.waitForFunction(() => {
+          const d = window.chromaglassDebug?.();
+          return d?.webgpu && d.webgpu.frames > 30 ? d.webgpu.frames : null;
+        }, null, { timeout: 30_000 }).then((h) => h.jsonValue()).catch(() => null);
+        let after = null;
+        for (let i = 0; i < 20 && !(after > 0.3); i++) {
+          await page.waitForTimeout(500);
+          after = await lit();
+        }
+        const sawLost = await page.evaluate(() => window.__sawLost);
+        check('a lost device is noticed and said so', sawLost,
+          sawLost ? 'the plate said it was rebuilding' : 'no notice ever appeared');
+        check('and the show comes back by itself',
+          !!back && after !== null && after > 0.3 && (await page.locator('[data-testid="gl-lost"]').count()) === 0,
+          `${((before ?? 0) * 100).toFixed(0)}% lit before (${framesBefore} frames), ` +
+          `${((after ?? 0) * 100).toFixed(0)}% after, on a stage that has drawn ${back ?? 0}`);
+      }
+
+    // The device loss above is deliberate and says so on the way out; that
+    // line is the app reporting what happened, not something going wrong.
+    const unexpected = errors.filter((e) => !/WebGPU device lost/.test(e));
+    check('no errors in the console', unexpected.length === 0, unexpected.slice(0, 3).join(' | '));
   } finally {
     await browser.close();
   }
 }
+
+// ── The pictures the plate is given ──────────────────────────────────
+/**
+ * The mark, the film's frame and the beads' mask are pictures the page hands
+ * the compositor each frame. `npm run composite` proves the WGSL *samples*
+ * them as the GLSL does — it feeds both shaders the same bytes — but it
+ * cannot see the upload: whether a picture reaches its texture at all, and
+ * which way up it lands there. So each engine is asked to lay the same mark
+ * over its own plate, and the two are compared.
+ *
+ * The mark is `markTest`'s gradient, white at its left edge and transparent
+ * at its right, which makes the answer directional: uploaded mirrored, the
+ * bright end is at the other side; uploaded upside down, the lit rows are.
+ * Both engines run their own show, so the liquid underneath is never the
+ * same twice — what is compared is where the picture landed, never a pixel.
+ */
+const laidOver = (page) => page.evaluate(async () => {
+  const dbg = () => window.chromaglassDebug();
+  /** The frame as it stands: WebGPU is photographed, WebGL's buffer is kept. */
+  const shot = async () => {
+    const d = dbg();
+    if (d.grabFrame) {
+      const g = await d.grabFrame();
+      return g && { w: g.width, h: g.height, px: g.pixels };
+    }
+    const c = document.querySelector('canvas');
+    const off = document.createElement('canvas');
+    off.width = c.width; off.height = c.height;
+    const ctx = off.getContext('2d');
+    ctx.drawImage(c, 0, 0);
+    return { w: off.width, h: off.height, px: ctx.getImageData(0, 0, off.width, off.height).data };
+  };
+  const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+
+  /**
+   * How much two frames differ, inside a rectangle and outside it. The
+   * rectangle is where the picture was asked to go, so "inside" is the
+   * picture and "outside" is the liquid moving on its own — which is the
+   * floor every one of these readings is judged against.
+   */
+  const changed = (a, b, rect) => {
+    let inHit = 0, inN = 0, outHit = 0, outN = 0, left = 0, ln = 0, right = 0, rn = 0;
+    for (let i = 0, p = 0; i < a.px.length; i += 4, p++) {
+      const d = Math.max(
+        Math.abs(a.px[i] - b.px[i]),
+        Math.abs(a.px[i + 1] - b.px[i + 1]),
+        Math.abs(a.px[i + 2] - b.px[i + 2]),
+      );
+      const x = (p % a.w) / a.w, y = ((p / a.w) | 0) / a.h;
+      if (rect && Math.abs(x - rect.cx) <= rect.hw && Math.abs(y - rect.cy) <= rect.hh) {
+        inN++; if (d >= 24) inHit++;
+        if (x < rect.cx) { left += d; ln++; } else { right += d; rn++; }
+      } else {
+        outN++; if (d >= 24) outHit++;
+      }
+    }
+    return {
+      inside: inHit / Math.max(1, inN),
+      outside: outHit / Math.max(1, outN),
+      lean: (left / Math.max(1, ln)) / Math.max(0.5, right / Math.max(1, rn)),
+    };
+  };
+
+  const d = dbg();
+  const MARK = { scale: 0.4, x: 0.5, y: 0.3, aspect: 4 };   // markTest draws 128×32
+  Object.assign(d.settings, { beads: 0, markMix: 0, markScale: MARK.scale, markX: MARK.x, markY: MARK.y });
+  d.markTest(true);
+  await settle(4);
+
+  const a = await shot();
+  // Where the mark was sent: `markY` is measured up from the bottom of the
+  // frame, and the height follows the picture's own aspect against the
+  // frame's, which is the arithmetic the shader is given.
+  const rect = {
+    cx: MARK.x, cy: 1 - MARK.y,
+    hw: MARK.scale / 2,
+    hh: (MARK.scale / 2) * ((a.w / a.h) / MARK.aspect),
+  };
+  await settle(2);
+  const b = await shot();
+  const floor = changed(a, b, rect);
+  d.settings.markMix = 1;
+  await settle(2);
+  const mark = changed(b, await shot(), rect);
+
+  // The beads. Their field is cleared when the setting reaches zero, so the
+  // picture is taken away by turning them down to nothing instead: the same
+  // beads, in the same places, no longer drawn. The field repopulates every
+  // thirtieth frame, which two frames cannot reach.
+  d.settings.markMix = 0;
+  d.settings.beads = 0.8;
+  await settle(120);
+  const withBeads = await shot();
+  await settle(2);
+  const beadFloor = changed(withBeads, await shot(), null);
+  const count = dbg().beads;
+  const before = await shot();
+  d.settings.beads = 0.001;
+  await settle(2);
+  const beads = changed(before, await shot(), null);
+
+  // The film, which is the one picture that arrives every frame rather than
+  // once: a video, here a canvas of flat blue streaming to itself, because a
+  // headless browser has no projector and no camera. Only its colour is
+  // asked about — that a blue film makes a blue frame is enough to know the
+  // video reached the texture.
+  const mean = (f) => {
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < f.px.length; i += 4) { r += f.px[i]; g += f.px[i + 1]; b += f.px[i + 2]; }
+    const n = f.px.length / 4;
+    return { r: r / n, g: g / n, b: b / n };
+  };
+  d.settings.beads = 0;
+  Object.assign(d.settings, { filmMix: 0 });
+  await settle(4);
+  const dry = mean(await shot());
+  const reel = document.createElement('canvas');
+  reel.width = 320; reel.height = 180;
+  const ctx2 = reel.getContext('2d');
+  const paint = () => { ctx2.fillStyle = '#00b4ff'; ctx2.fillRect(0, 0, reel.width, reel.height); requestAnimationFrame(paint); };
+  paint();
+  const reelVideo = document.createElement('video');
+  reelVideo.srcObject = reel.captureStream(30);
+  reelVideo.muted = true; reelVideo.playsInline = true;
+  await reelVideo.play().catch(() => {});
+  await settle(8);
+  const playing = { readyState: reelVideo.readyState, width: reelVideo.videoWidth };
+  d.film.video = reelVideo; d.film.kind = 'file';
+  d.settings.filmMix = 0.9;
+  await settle(24);
+  const lit = mean(await shot());
+  d.settings.filmMix = 0; d.film.kind = 'none'; d.film.video = null;
+
+  return { size: [a.w, a.h], floor, mark, beadFloor, beads, count, film: { dry, lit, playing } };
+});
+
+{
+  const browser = await chromium.launch({ headless: true, channel: 'chromium', args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] });
+  const read = async (query) => {
+    const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+    await page.goto(`${URL_BASE}${query}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => {
+      const d = window.chromaglassDebug?.();
+      return d && d.engine && d.engine !== 'WebGPU · starting' && (d.webgpu ? d.webgpu.frames > 30 : true);
+    }, null, { timeout: 30_000 });
+    const out = await laidOver(page);
+    await page.close();
+    return out;
+  };
+  try {
+    const seen = {};
+    for (const [engine, query] of [['WebGPU', '&renderer=webgpu'], ['WebGL', '']]) {
+      const m = await read(query);
+      seen[engine] = m;
+      const pc = (v) => `${(v * 100).toFixed(1)}%`;
+      check(`${engine}: the mark lands in its own rectangle, the right way round`,
+        m.mark.inside > 0.35 && m.mark.inside > m.mark.outside * 5 &&
+        m.mark.inside > m.floor.inside * 5 && m.mark.lean > 1.5,
+        `${pc(m.mark.inside)} of the rectangle changed against ${pc(m.mark.outside)} of the rest, ` +
+        `${m.mark.lean.toFixed(2)}× brighter at its left end (the floor was ${pc(m.floor.inside)})`);
+      // What the beads are worth, over what the liquid was doing anyway. A
+      // difference rather than a ratio: how much of the frame they change
+      // depends on the dye under them, and how much it moves on its own
+      // depends on the moment — one run had them at 1.0% over a floor of
+      // 0.0%, another at 2.1% over 0.9%, and both are the beads arriving.
+      check(`${engine}: the beads' mask reaches the plate`,
+        m.count > 0 && m.beads.outside - m.beadFloor.outside > 0.004,
+        `${m.count} beads, worth ${pc(m.beads.outside)} of the frame, against ${pc(m.beadFloor.outside)} of it moving on its own`);
+      const blue = (c) => c.b - c.r;
+      check(`${engine}: a blue film makes a blue frame`,
+        m.film.playing.readyState >= 2 && m.film.playing.width > 0 &&
+        blue(m.film.lit) > blue(m.film.dry) + 12,
+        `blue led red by ${blue(m.film.dry).toFixed(1)} without the film and ${blue(m.film.lit).toFixed(1)} with it`);
+    }
+    // The picture belongs to the page, not to the engine: the same mark, the
+    // same rectangle, leaning the same way.
+    const g = seen.WebGPU, w = seen.WebGL;
+    check('both engines lay the mark the same way',
+      Math.abs(g.mark.inside - w.mark.inside) < 0.15 && g.mark.lean > 1.5 && w.mark.lean > 1.5,
+      `WebGPU ${(g.mark.inside * 100).toFixed(1)}% at ${g.mark.lean.toFixed(2)}×, ` +
+      `WebGL ${(w.mark.inside * 100).toFixed(1)}% at ${w.mark.lean.toFixed(2)}×`);
+  } finally {
+    await browser.close();
+  }
+}
+
 
 // ── Without an adapter ───────────────────────────────────────────────
 // The default headless shell has no WebGPU adapter: the stand-in for a

@@ -58,8 +58,11 @@ export class WebGPUStage {
       device: this.gpu.device,
       format: this.format,
       alphaMode: 'opaque',
-      // COPY_SRC so grabFrame can read the frame: WebGPU has no preserveDrawingBuffer.
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      // COPY_SRC so grabFrame can read the frame: WebGPU has no
+      // preserveDrawingBuffer. TEXTURE_BINDING so the flash probe can reduce
+      // the frame the wall just got, which is the only luminance worth
+      // guarding against.
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
     });
   }
 

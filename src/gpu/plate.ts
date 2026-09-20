@@ -38,6 +38,21 @@ interface Source {
 
 const PACK_ARGS = 16;
 
+/**
+ * How big a picture is, whichever kind the page hands over: a video is its
+ * frame and not the element, an image its own pixels and not the box CSS
+ * gave it, and a canvas carries its size directly. An SVG image reports a
+ * length object rather than a number, which is why each is taken only when
+ * it is one.
+ */
+export function pictureSize(image: CanvasImageSource): [number, number] {
+  const it = image as unknown as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && v > 0 ? Math.round(v) : 0);
+  const w = num(it.videoWidth) || num(it.naturalWidth) || num(it.displayWidth) || num(it.width);
+  const h = num(it.videoHeight) || num(it.naturalHeight) || num(it.displayHeight) || num(it.height);
+  return [w, h];
+}
+
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -101,9 +116,13 @@ export class WebGPUPlate {
 
   /**
    * A picture from the page — the mark, a film frame, the bead mask — copied
-   * into a texture of its own. Give it null to drop one.
+   * into a texture of its own. Give it null to drop one. Its size is its own
+   * unless one is given: a caller holding a logo or a playing video knows the
+   * picture, not its pixels, and asking each kind for its own measurement in
+   * every caller is how the two engines would come to disagree about one.
    */
   setSource(name: string, image: CanvasImageSource | null, width = 0, height = 0): void {
+    if (image && (width <= 0 || height <= 0)) [width, height] = pictureSize(image);
     const have = this.sources.get(name);
     if (!image || width <= 0 || height <= 0) {
       if (have) { this.disposer.release(have.texture); this.sources.delete(name); }
@@ -127,6 +146,13 @@ export class WebGPUPlate {
   private source(name: string): GPUTexture {
     return this.sources.get(name)?.texture ?? this.blank;
   }
+
+  /**
+   * The display's second target — the normal, the dye's height and the bubble
+   * mask, per pixel — which is what the camera pass reads. Null until a frame
+   * has been drawn, because it is allocated at the frame's own size.
+   */
+  get auxTarget(): GPUTexture | null { return this.aux; }
 
   // ── The frame ─────────────────────────────────────────────────────
 
@@ -216,8 +242,8 @@ export class WebGPUPlate {
     }));
 
     // The second target is what the camera pass reads: the normal, the dye's
-    // height and the bubble mask. Nothing samples it yet, but the shader
-    // writes it, and a render pass has to be given somewhere to put it.
+    // height and the bubble mask. It is written whether or not that pass is
+    // on, because a render pass has to be given somewhere to put it.
     if (!this.aux || this.auxSize[0] !== size.width || this.auxSize[1] !== size.height) {
       if (this.aux) this.disposer.release(this.aux);
       this.aux = this.disposer.track(this.device.createTexture({

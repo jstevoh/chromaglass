@@ -68,7 +68,10 @@ const browser = await launchChromium(chromium);
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
-  await page.goto(`http://localhost:${PORT}/?debug&tier=local`, { waitUntil: 'load' });
+  // `--webgpu` sweeps the WebGPU stage instead of WebGL, which is the only
+  // way to find out what the port costs on a machine that has a GPU.
+  const ENGINE = process.argv.includes('--webgpu') ? '&renderer=webgpu' : '';
+  await page.goto(`http://localhost:${PORT}/?debug&tier=local${ENGINE}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);
   await page.waitForTimeout(4000);
 

@@ -10,6 +10,9 @@ import { WebGPUStage } from '../gpu/stage';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
+import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
+import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
+import { WebGPUFrameProbe } from '../gpu/probe';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -2305,6 +2308,13 @@ interface FrameView {
   /** The mark laid over the finished frame, and the film projected through it. */
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
+  /**
+   * The oil beads' mask, on the frames the beads moved and it was redrawn —
+   * null on every other frame, and whenever the beads are off. The show
+   * decides when it changes so that both engines upload the same picture on
+   * the same frames rather than each asking the bead field in its own way.
+   */
+  beadMask: CanvasImageSource | null;
   /** Where the frame is going: the projector's shape, and the effects. */
   outputCfg: OutputConfig;
   postForce: boolean;
@@ -2336,6 +2346,13 @@ interface PlateRenderer {
   attachSolver(fluid: FluidSimulation, wantRes: number): boolean;
   /** One frame. Returns what the flash guard read, or null when it is off. */
   drawFrame(view: FrameView, fluids: FluidSimulation[]): number | null;
+  /**
+   * What the GPU spent on a frame that took `steps` solver steps, in
+   * milliseconds — the drawing and the solver together, from timestamp
+   * queries. Absent on an engine that cannot say (WebGL's timer queries count
+   * queue waits on ANGLE and lie), and 0 until the first timings land.
+   */
+  gpuFrameMs?(steps: number): number;
   /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for
@@ -3317,6 +3334,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
       const workStart = performance.now();
       let frameS = 0;
+      /** How many solver steps this frame took, for the governor's GPU budget. */
+      let stepsThisFrame = 0;
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
@@ -3422,6 +3441,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
         const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
         simAccumRef.current -= simSteps * SIM_STEP;
+        stepsThisFrame = simSteps;
 
         // How many steps a second that is actually producing.
         //
@@ -4576,6 +4596,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The frame the effects run on.
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
+        // The beads' mask: redrawn only on the frames they moved, which is
+        // what `render()` answers with — null means the last upload still
+        // stands. Off, it is not drawn at all, and the shader is told 0.
+        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.render() : null;
+
         // ── The frame, handed to whatever draws it ────────────
         // The renderer reads the show's state through `view` and nothing
         // else, which is what lets a second one take the same call
@@ -4599,6 +4624,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           oldSampler: oldSamplerRef.current,
           mark: markRef.current,
           film: filmRef.current,
+          beadMask,
           outputCfg: outputCfgRef.current,
           postForce: postForceRef.current,
           postTest: postTestRef.current,
@@ -4618,7 +4644,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (frameS > 0 && governorRef.current) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
-        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current);
+        // What this frame cost the GPU, where the engine can say. Without it
+        // the budget is JavaScript time, which on the WebGPU path is half a
+        // millisecond of encoding and says nothing about the machine's load.
+        const gpuMs = renderer?.gpuFrameMs?.(stepsThisFrame) ?? 0;
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -4700,6 +4730,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // solver (P2) and the compositor (P3) move in behind this branch.
     if (WEBGPU) {
       let stage: WebGPUStage | null = null;
+      let camera: WebGPUCamera | null = null;
+      let projector: WebGPUOutput | null = null;
+      let probe: WebGPUFrameProbe | null = null;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
@@ -4719,17 +4752,58 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           return;
         }
         stage = s;
-        s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
+
+        /**
+         * The GPU, taken away (docs/webgpu-plan.md, P4).
+         *
+         * A projector plugged into a running laptop, a Mac switching between
+         * its GPUs, a driver resetting under load: the device is lost and
+         * every texture, buffer and pipeline with it. WebGPU has no event to
+         * say it is back — there is no restore, only a new device — so the
+         * recovery is to ask for one, which is what bumping the epoch does:
+         * this effect runs again from the top.
+         *
+         * `cancelled` is already set by then if the loss is our own teardown
+         * destroying the device, so a normal unmount goes quietly.
+         */
+        s.lost.then((info) => {
+          if (cancelled) return;
+          console.error('WebGPU device lost:', info.reason, info.message);
+          // Dropping rather than detaching skips a readback from a dead
+          // device and leaves the CPU's own state alone.
+          for (const fluid of fluidsRef.current) fluid.dropGpu();
+          camera = null;
+          projector = null;
+          probe = null;
+          stage = null;
+          flashRef.current.reset();
+          flashGainRef.current = 1;
+          glLostRef.current = true;
+          setGlLost(true);
+          setGlEpoch((n) => n + 1);
+        });
+
+        // Coming back from one. The plate did not survive — the dye lives in
+        // the solver's textures, and they died with the device — so the look
+        // is laid again: not the identical plate, which is not possible, but
+        // the same look, back within a second.
+        if (glLostRef.current) {
+          layPlateRef.current(livePresetRef.current);
+          glLostRef.current = false;
+          setGlLost(false);
+        }
 
         /**
          * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
          *
-         * The solver is wired: the show's own loop runs, the plate is poured
-         * on and stepped, and the fields live in `gpu/fluid.ts`. What is not
-         * wired yet is the picture — the WGSL composite is proved against the
-         * GLSL (`npm run composite`) but nothing samples the solver's textures
-         * with it, so the canvas stays black and `drawFrame` reads nothing
-         * back. That is the next piece.
+         * The solver is wired and so is the picture: the show's own loop
+         * runs, the fields live in `gpu/fluid.ts`, and the WGSL composite —
+         * the GLSL's twin, checked against it pixel for pixel by
+         * `npm run composite` — draws them, over the three pictures the page
+         * hands across each frame. What is still WebGL's alone is what comes
+         * after the plate: the camera pass, the output pass, the post chain
+         * and the flash probe, which is why `drawFrame` reads back no
+         * luminance yet.
          */
         const plate = new WebGPUPlate(s.device, s.format);
         const gpuRenderer: PlateRenderer = {
@@ -4763,25 +4837,117 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
               .filter((f): f is NonNullable<typeof f> => !!f);
             if (fields.length && stage) {
+              // The three pictures the page hands over, on the frames they
+              // change: the beads' mask when they moved, the mark on the
+              // frame it arrives, and the film's frame every frame it plays.
+              // The uniforms are told about each of them in `plateUniforms`,
+              // under the same conditions, or the shader would be drawing a
+              // picture it had not been given.
+              if (view.beadMask) plate.setSource('beads', view.beadMask);
+              const mk = view.mark;
+              if (!mk) plate.setSource('mark', null);
+              else if (mk.dirty) { plate.setSource('mark', mk.source); mk.dirty = false; }
+              const film = view.film;
+              if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
+                plate.setSource('film', film.video);
+              }
+              // Two passes when the camera is on, as in WebGL: the plate is
+              // drawn into a texture and the camera looks at it, because
+              // refraction, depth of field, bloom and the sensor's roll-off
+              // all need the finished picture to sample from. Built the first
+              // frame it would do anything and dropped when it would not, so
+              // a show without a camera never pays for the second target.
+              const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
+              if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
+              else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
+              const cam = camera;
+
+              // The projector, last: flip, corner pin, blanking and grade.
+              // Built the first frame it would change anything and dropped
+              // when the operator resets it, so the common case — no
+              // projector, nothing set — never pays for the extra target or
+              // the extra draw.
+              const wantOut = !outputIsIdentity(view.outputCfg);
+              if (wantOut && !projector) projector = new WebGPUOutput(s.device, s.format);
+              else if (!wantOut && projector) { projector.dispose(); projector = null; }
+              const out = projector;
+              const quads = out ? fillOutputUniforms(out.pack, view.outputCfg, canvas.width, canvas.height) : 0;
               fillPlateUniforms(plate.pack, {
                 view, fluids,
                 width: canvas.width, height: canvas.height,
                 derived: true,
                 grid: fields[0].dye.width,
+                // The plate leaves the grain to the camera when it is on, and
+                // still dithers into its 8-bit texture, or a dark ramp bands
+                // before the camera ever sees it.
+                cameraOn: !!cam,
               });
+              if (cam) {
+                fillCameraUniforms(cam.pack, {
+                  time: view.time,
+                  amount: camAmt,
+                  refraction: view.settings.refraction ?? 0,
+                  chromatic: view.settings.chromaticAberration ?? 0,
+                  focus: view.settings.focus ?? 0.5,
+                  aperture: view.settings.aperture ?? 0,
+                  bloom: view.settings.bloom ?? 0,
+                  // Nothing follows it yet under this flag; when the post
+                  // chain lands, the finish dithers once, at the end.
+                  dither: 1,
+                }, canvas.width, canvas.height);
+              }
               // The painter stays set, so `grabFrame` photographs the picture
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
+                const size = { width: canvas.width, height: canvas.height };
+                // The chain, in the order a frame goes through it: the plate,
+                // the camera if there is one, the projector if there is one,
+                // and whatever is last draws onto the canvas.
+                const screen = out ? out.sceneView(size.width, size.height) : target;
                 plate.draw(
-                  encoder, target, { width: canvas.width, height: canvas.height },
-                  fields, Math.max(view.velRange, 1e-6),
+                  encoder,
+                  cam ? cam.sceneView(size.width, size.height) : screen,
+                  size, fields, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
                 );
+                if (cam && plate.auxTarget) {
+                  cam.draw(encoder, screen, plate.auxTarget, stage?.profiler.renderPass('camera'));
+                }
+                if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               };
             }
-            stage?.frame();
+            const frame = stage?.frame();
             cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+
+            // ── What the audience just saw ───────────────────────
+            // The delivered frame, reduced on the GPU to one number, a frame
+            // or two behind — as in WebGL. The reading goes back rather than
+            // the verdict: the loop folds it into the gain that reaches the
+            // next frame's view.
+            if (view.outputCfg.flashGuard && frame) {
+              if (!probe) probe = new WebGPUFrameProbe(s.device);
+              probe.measure(frame);
+              return probe.luminance;
+            }
+            if (probe) { probe.dispose(); probe = null; }
             return null;
+          },
+          /**
+           * The drawing, plus one solver step per layer for each step the
+           * loop took. The profiler's numbers are per pass and per step, so
+           * the steps are what turns them into the cost of a frame.
+           */
+          gpuFrameMs: (steps: number) => {
+            if (!stage) return 0;
+            let ms = 0;
+            for (const v of stage.profiler.ms.values()) ms += v;
+            if (steps > 0) {
+              for (const f of fluidsRef.current) {
+                if (!(f.gpu instanceof WebGPUFluid)) continue;
+                for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
+              }
+            }
+            return ms;
           },
           debug: () => ({
             webgpu: stage && {
@@ -4789,11 +4955,38 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
               cpuMs: +cpuMs.toFixed(3),
               timings: Object.fromEntries(stage.profiler.ms),
+              /**
+               * The solver's own passes, per layer. It keeps a profiler of
+               * its own — the stage's only sees what the stage encodes — and
+               * without this the expensive half of a frame at the top rungs
+               * was the half nothing reported.
+               */
+              solver: fluidsRef.current.map((f) => (
+                f.gpu instanceof WebGPUFluid ? Object.fromEntries(f.gpu.profiler.ms) : null
+              )),
             },
             /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
             grabFrame: () => stage?.grabFrame() ?? null,
             /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
             kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+            /**
+             * Take the device away, as a driver would. The recovery is the
+             * app's own: a new device, a rebuilt stage, the look laid again.
+             */
+            loseDevice: () => { stage?.device.destroy(); },
+            /** The guard's own state, and the luminance it is being fed. */
+            flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
+            /**
+             * The reduction, against a frame whose mean is known by
+             * construction: white rectangles on black, measured with a stall.
+             */
+            probeSelfTest: async (rects: [number, number, number, number][]) => {
+              if (!stage) return null;
+              if (!probe) probe = new WebGPUFrameProbe(s.device);
+              const painted = stage.frame(probe.painter(stage.format, rects));
+              const lit = rects.reduce((a, [, , w, h]) => a + w * h, 0) / (canvas.width * canvas.height);
+              return { mean: await probe.measureNow(painted), lit };
+            },
             gpuFailure,
           }),
         };
@@ -4802,6 +4995,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return () => {
         cancelled = true;
         cancelAnimationFrame(animationFrameId);
+        camera?.dispose();
+        camera = null;
+        projector?.dispose();
+        projector = null;
+        probe?.dispose();
+        probe = null;
         stage?.dispose();
         stage = null;
       };
@@ -5291,20 +5490,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
 
       // The oil beads' mask: bound every frame on its own unit (see
-      // textureUnits.ts), uploaded when the beads moved. A unit left
-      // pointing at the camera's scene texture made every draw with the
+      // textureUnits.ts), uploaded on the frames the show redrew it. A unit
+      // left pointing at the camera's scene texture made every draw with the
       // camera on a feedback loop, and the photograph and closeup presets
       // drew black; the output pass on this same unit did it again.
       {
         glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
         glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
-        const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
-        if (beadAmt > 0) {
-          const cv = beadsRef.current.render();
-          if (cv) {
-            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
-          }
+        const cv = view.beadMask;
+        if (cv) {
+          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
         }
       }
 

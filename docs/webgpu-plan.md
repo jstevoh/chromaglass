@@ -1,8 +1,9 @@
 # Plan: WebGPU only
 
 *Written 2026-09-19 against `origin/main` at `b5574eb` (#91). Line numbers drift, so the
-symbol names are what to search for. **In flight**: P0–P3 have landed (#93, #94, #95) —
-see the results sections below. [The roadmap](roadmap.md) says where this sits.*
+symbol names are what to search for. **In flight**: P0–P3 have landed (#93, #94, #95,
+#96, #97), and P4 has its two safety pieces — see the results sections below. [The
+roadmap](roadmap.md) says where this sits.*
 
 ## P0 results, 2026-09-19
 
@@ -156,6 +157,127 @@ own file turned `plate` and `panel` red: both read the shader out of
 `LiquidVisualizer.tsx` to prove the reconstruction weights and the
 kaleidoscope's settings are still there. Harnesses that read source are worth
 having and worth grepping for before moving anything.
+
+## P3, the rest of the chain, 2026-09-20
+
+The split landed (#96): the six state advances, the flash guard's verdict, a
+`PlateRenderer` in place of a context, the loop above both engines, and then
+the plate drawn on WebGPU — 768² on the M4, 2.06 ms of GPU at 512².
+
+Since then, everything between the plate and the canvas (#97):
+
+- **The pictures the compositor is handed.** The mark, the film and the beads'
+  mask were never uploaded under the flag, and `npm run composite` cannot see
+  that: it feeds both shaders the same bytes, so it proves the sampling and
+  nothing about the upload. The bead mask is part of the frame's view now, so
+  the show decides once when it is redrawn and both engines upload on the same
+  frames. `npm run webgpu` asks both engines to lay the same mark and compares
+  where it landed — 89.8% of its rectangle against 89.4%, leaning 3.04×
+  against 3.06×.
+- **The camera** (`gpu/wgsl/camera.ts`, gate `npm run camera`): 13 cases, 9
+  pixel-identical, the rest within 1 of 255 except the two with grain.
+- **The projector** (`gpu/wgsl/output.ts`, gate `npm run output`): 14 cases,
+  every one within 1 of 255. The geometry is not ported — both sides call
+  `cornerPinMatrix` and `composeOntoPin` — so a difference there is a
+  difference in the drawing.
+
+**Three things worth knowing for the passes still to come.**
+
+- **A hash of an interpolated coordinate will not match.** The camera's grain
+  hashes `v_uv * u_resolution`, and two compilers' interpolators do not agree
+  on its last bit at every pixel; where they differ the grain is a different
+  sample, ±5 of 255 on 0.3% of them. A hash of the *fragment* coordinate
+  matches to within 1. Any future pass that wants pixel equality should hash
+  the fragment coordinate, and `gl_FragCoord` in WGSL is
+  `U.resolution.y - pos.y`.
+- **Uniforms read by the vertex stage need the visibility to say so.** The
+  projector puts each quad's corners in the buffer and builds its triangles
+  from `vertex_index`, which means `layoutFromWgsl(…, VERTEX | FRAGMENT)`;
+  with FRAGMENT alone the entry point does not match the layout and nothing
+  draws.
+- **Sixteen draws become one.** There is no setting a uniform between draws in
+  a pass. Every quad goes in the buffer at once and the shader reads its own
+  by `instance_index`, which keeps the blending order and costs one draw.
+
+## P4 so far, 2026-09-20
+
+- **The flash guard has its eyes.** The probe is a compute reduction over the
+  canvas's own texture, encoded after the picture in the same task — the one
+  moment a WebGPU frame can be read. It is also exact where the WebGL one
+  approximates: a quarter of the frame reads 0.2500, a one-pixel line 0.0019
+  of 0.0019, the whole frame 1.0000. Through the projector's grade it reads
+  0.018 dim / 0.063 plain / 0.119 lifted, which is `wall`'s own check of the
+  WebGL probe.
+- **The device can be taken away.** There is no restore event in WebGPU, so
+  the recovery is to ask for a new device: the loss drops the solvers, lets go
+  of the passes, resets the guard and bumps the epoch, and the effect runs
+  again from the top. The plate does not survive — the dye is in the solver's
+  textures — so the look is laid again. `npm run webgpu` proves it with
+  `device.destroy()`: 99% lit, the notice, 99% lit again, nobody touching
+  anything.
+
+**The sweep reaches 1024² now, and both engines.** `npm run bench --full
+--webgpu` puts the sweep on the WebGPU stage; the rungs go one past the top of
+the ladder so the report says what the machine *could* do rather than only
+what the app will ask it for. Two layers, dpr 1, 1280×800, on this M4:
+
+| Grid | WebGL | WebGPU |
+|---|---|---|
+| 256² | 59 fps | 58 |
+| 384² | 59 | 58 |
+| 512² | 59 | 59 |
+| 768² | **36** | **27** |
+| 1024² | 24 | 22 |
+| CPU 192² | 24 | 24 |
+
+**At the top rungs the port is behind, and the profiler says it is not the
+drawing.** At 768² the WebGPU frame is 37.9 ms, of which the plate pass — the
+pack, the derive and the whole WGSL composite — is 2.0 ms of GPU and the
+encoding is 0.5 ms of CPU. The rest is the solver, whose compute passes are
+the ones `GpuProfiler` does not yet time. P0 measured the two solvers' cores
+as about equal at 768² (3.78 ms against 3.74), so what is costing the
+difference is in the app's solver rather than in the arithmetic the spike
+compared. **Timing the solver's passes is what the governor item needs first**
+— judging a frame by real GPU cost is worth little while the expensive half of
+it is untimed.
+
+`bench` also had a bug this found: `onRung` asked for `engine === 'gpu'`, so
+under the flag every rung the sweep actually reached was recorded as one it
+never reached — "the solver never reached 256² (it stayed on 256²)".
+
+**The solver's passes were timed all along** — `WebGPUFluid` keeps a profiler
+of its own, and the stage's only sees what the stage encodes, so the debug
+surface reported the 2 ms of drawing and nothing about the 18 ms underneath
+it. `chromaglassDebug().webgpu.solver` is that profiler now, per layer. At
+768², per step: 9.18 ms and 8.71 ms for the two layers, against a 2.13 ms
+plate pass, in a 37.9 ms frame. The spike's 58-pass core was 3.74 ms at the
+same grid, so most of the app's step is what the spike did not include —
+the chemistry, the splats, the forced velocity and the measurements.
+
+**The governor is judged on the GPU's own number now.** Its climb gate is a
+work budget, and on this path the work was half a millisecond of encoding
+whatever the machine was doing — so the gate was satisfied at every rung and
+it would climb into a grid the GPU could not hold, find out a second and a
+half later, and come back down. What it is fed now is the drawing plus the
+solver's steps, from the timestamp queries. Forty-five seconds on this M4, one
+reading every five:
+
+| | 5 s | 10 s | 15 s | 20 s | 25 s | 45 s |
+|---|---|---|---|---|---|---|
+| **WebGL**, unchanged | 512² | 512² | **768²** | 768², 27 ms | back to 512² | 512² |
+| **WebGPU**, with the GPU's number | 512² | 512² | 512² | 512² | 512² | 512² |
+
+The WebGL row is what the hunt looks like: up at fifteen seconds, a 27 ms
+frame, down again at twenty-five, and round again ninety seconds later. It
+keeps that behaviour — its timer queries count queue waits on ANGLE and lie,
+so that path passes nothing and nothing changes for it — and loses it at the
+cutover, when the honest numbers are the only ones left.
+
+**P4 is done** but for the harness work that belongs to P5.
+
+**What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
+and `importExternalTexture` for zero-copy video. The film goes up today
+through `copyExternalImageToTexture`, which is the parity route.
 
 ## P3, the shape of the split
 

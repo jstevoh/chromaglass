@@ -129,6 +129,24 @@ export class UniformPack {
     return this.set(name, ...Array.from(values));
   }
 
+  /**
+   * One element of an array field, leaving the rest alone — for a list built
+   * an entry at a time, where `set` would want the whole thing at once.
+   */
+  setAt(name: string, index: number, ...values: number[]): this {
+    const f = this.layout.byName.get(name);
+    if (!f) throw new Error(`no such uniform: ${name}`);
+    if (index < 0 || index >= f.count) throw new Error(`${name} has ${f.count} elements, asked for ${index}`);
+    const width = WIDTH[f.type];
+    if (values.length > width) throw new Error(`${name} takes ${width} numbers an element, got ${values.length}`);
+    const stride = roundUp(SIZE[f.type], ALIGN[f.type]) / 4;
+    const target = f.type === 'i32' ? this.i32 : this.f32;
+    const base = f.offset / 4 + index * stride;
+    for (let i = 0; i < values.length; i++) target[base + i] = values[i];
+    this.seen.add(name);
+    return this;
+  }
+
   get(name: string): number[] {
     const f = this.layout.byName.get(name);
     if (!f) throw new Error(`no such uniform: ${name}`);

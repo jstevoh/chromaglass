@@ -101,7 +101,7 @@ export interface BenchOptions {
   rebuildMs?: number;
 }
 
-export const BENCH_RUNGS: SimResolution[] = [256, 384, 512, 768, 'cpu'];
+export const BENCH_RUNGS: SimResolution[] = [256, 384, 512, 768, 1024, 'cpu'];
 
 /**
  * Long enough for the frame-time average to forget the rung before it.
@@ -129,9 +129,16 @@ const median = (xs: number[]): number => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-/** Whether the engine is now running what was asked for. */
+/**
+ * Whether the engine is now running what was asked for.
+ *
+ * "Not the CPU solver", rather than "the WebGL one": under
+ * `?renderer=webgpu` the engine is `webgpu`, and asking for `gpu` recorded
+ * every rung the sweep actually reached as a rung it never reached — the
+ * report said "the solver never reached 256² (it stayed on 256²)".
+ */
 const onRung = (s: EngineStatus, want: SimResolution): boolean =>
-  want === 'cpu' ? s.engine === 'cpu' : s.engine === 'gpu' && s.grid === want;
+  want === 'cpu' ? s.engine === 'cpu' : s.engine !== 'cpu' && s.grid === want;
 
 export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promise<BenchReport> {
   const rungs = opts.rungs ?? BENCH_RUNGS;
