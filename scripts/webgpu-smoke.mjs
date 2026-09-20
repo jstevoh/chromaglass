@@ -403,9 +403,54 @@ const watch = (page) => {
           `${((after ?? 0) * 100).toFixed(0)}% after, on a stage that has drawn ${back ?? 0}`);
       }
 
+    const unexpected = errors.filter((e) => !/WebGPU device lost/.test(e));
+      /*
+        The projector window — which is what a show actually looks at.
+
+        It used to run its own clock and `drawImage` the show's canvas, which
+        a presented WebGPU canvas answers with black: a dark wall, no error
+        anywhere. The show pushes into it now, inside the frame task that drew
+        it, so this asks the only question worth asking — is there a picture
+        on the projector?
+      */
+      {
+        const opened = await Promise.all([
+          page.context().waitForEvent('page', { timeout: 20_000 }).catch(() => null),
+          (async () => {
+            await page.keyboard.press('Meta+k');
+            await page.waitForTimeout(700);
+            await page.keyboard.type('Send the show to a window');
+            await page.waitForTimeout(600);
+            await page.keyboard.press('Enter');
+          })(),
+        ]).then(([p]) => p);
+        if (!opened) {
+          check('the projector window opens', false, 'no window ever opened');
+        } else {
+          await opened.waitForLoadState('load').catch(() => {});
+          const lit = await opened.waitForFunction(() => {
+            const c = document.querySelector('#stage-canvas');
+            if (!c || !c.width) return null;
+            const o = document.createElement('canvas');
+            o.width = 32; o.height = 18;
+            const x = o.getContext('2d', { willReadFrequently: true });
+            x.drawImage(c, 0, 0, 32, 18);
+            const d = x.getImageData(0, 0, 32, 18).data;
+            let on = 0;
+            for (let i = 0; i < d.length; i += 4) {
+              if (Math.max(d[i], d[i + 1], d[i + 2]) > 8) on++;
+            }
+            const share = on / (d.length / 4);
+            return share > 0.3 ? share : null;
+          }, null, { timeout: 25_000 }).then((h) => h.jsonValue()).catch(() => null);
+          check('the projector window is given a picture',
+            lit !== null, lit === null ? 'the wall stayed dark' : `${(lit * 100).toFixed(0)}% of it lit`);
+          await opened.close();
+        }
+      }
+
     // The device loss above is deliberate and says so on the way out; that
     // line is the app reporting what happened, not something going wrong.
-    const unexpected = errors.filter((e) => !/WebGPU device lost/.test(e));
     check('no errors in the console', unexpected.length === 0, unexpected.slice(0, 3).join(' | '));
   } finally {
     await browser.close();
@@ -501,8 +546,12 @@ const laidOver = (page) => page.evaluate(async () => {
   // beads, in the same places, no longer drawn. The field repopulates every
   // thirtieth frame, which two frames cannot reach.
   d.settings.markMix = 0;
+  // Seed first: what the beads are worth depends on the dye under them, and
+  // a plate that has drifted pale makes them worth almost nothing — one run
+  // measured 0.3% of the frame where another measured 4.6%.
+  window.chromaglassAction?.('seed');
   d.settings.beads = 0.8;
-  await settle(120);
+  await settle(150);
   const withBeads = await shot();
   await settle(2);
   const beadFloor = changed(withBeads, await shot(), null);
