@@ -34,6 +34,9 @@ import net from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import { launchChromium } from './chromium.mjs';
+import { engineName, engineQuery, installFrameReader } from './frame.mjs';
+
+const RENDERER = engineName();
 
 const PORT = Number(process.env.FX_PORT ?? 4326);
 /** As the wall harness: a fraction of the window, so SwiftShader keeps up. FX_DPR=1 for full size. */
@@ -137,7 +140,8 @@ try {
   page = await browser.newPage({ viewport: { width: 960, height: 540 } });
   // The solver grid pinned: a governor that moved it would lay a new plate
   // under a comparison.
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
+  await installFrameReader(page);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
 
   const wired = await page.evaluate(() => typeof window.chromaglassDebug?.().post?.force === 'function');
@@ -151,17 +155,20 @@ try {
     requestAnimationFrame(tick);
   }), n);
   /** Keep the canvas as it is now, under `name`, in the page. */
-  const grab = (name) => page.evaluate((name) => {
-    const src = document.querySelector('#liquid-canvas');
-    const c = document.createElement('canvas');
-    c.width = src.width; c.height = src.height;
-    const g = c.getContext('2d', { willReadFrequently: true });
-    g.drawImage(src, 0, 0);
-    (window.__fx ??= {})[name] = g.getImageData(0, 0, c.width, c.height).data;
+  /*
+    Through the shared reader (scripts/frame.mjs), because a presented WebGPU
+    canvas answers `drawImage` with black — and a chain compared against
+    itself on black frames agrees perfectly, which is how this suite would
+    have reported identity checks passing while measuring nothing at all.
+  */
+  const grab = (name) => page.evaluate(async (name) => {
+    const shot = await window.__cgShot(name);
+    if (!shot) return null;
+    const d = window.__shots[name].data;
+    (window.__fx ??= {})[name] = d;
     let sum = 0;
-    const d = window.__fx[name];
     for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-    return { w: c.width, h: c.height, lum: sum / (d.length / 4) / 255 };
+    return { w: shot.w, h: shot.h, lum: sum / (d.length / 4) / 255 };
   }, name);
   /**
    * How far apart two kept frames are, in 8-bit steps: the worst channel, the
@@ -247,7 +254,32 @@ try {
     await frames(4);
     await after();
     const d = await diff('off', 'on');
-    check(`identity: ${label}`, d.max <= 2 && d.blockMax <= 1 && Math.abs(d.bias) < 0.05,
+    /*
+      What "the chain changes nothing" is allowed to mean.
+
+      On WebGL both paths draw the plate the same way and differ only by a
+      dither: two steps at worst, half a step over a 4×4 block.
+
+      On WebGPU the plate draws mirrored when it draws into a texture rather
+      than onto the canvas (FLIP_Y, in `gpu/wgsl/plate.ts`), because that is
+      how a picture is stored the way the next pass reads it. Mirroring the
+      geometry perturbs the *interpolated* uv in its last bit, and the
+      composite's film grain is `hash(uv * resolution)` — a hash turns a
+      last-bit difference into a different sample. Its amplitude is 0.03 of
+      the picture at the full, so ±3.8 of 255 per draw and ±7.6 between two,
+      which is what is measured: worst 9, and a 4×4 block averaging 3.4 of
+      noise that has no sign to it.
+
+      The signal that would mean the chain really changed the picture is the
+      bias, and it stays where WebGL's is: 0.011 against a limit of 0.05.
+
+      The grain's coordinate wants to be the pixel rather than the
+      interpolator, which would remove this entirely — but that is a GLSL
+      change as well as a WGSL one, and the GLSL is frozen until the cutover.
+    */
+    const grainRoll = RENDERER === 'webgpu';
+    const limit = grainRoll ? { max: 10, block: 4.5 } : { max: 2, block: 1 };
+    check(`identity: ${label}`, d.max <= limit.max && d.blockMax <= limit.block && Math.abs(d.bias) < 0.05,
       `worst pixel ${d.max} steps, worst 4x4 block ${d.blockMax.toFixed(2)}, bias ${d.bias.toFixed(3)}, targets ${st.float ? 'RGBA16F' : 'RGBA8'}`);
   };
   await identity('plain', async () => {}, async () => {});
@@ -293,8 +325,9 @@ try {
   // The first frame drawn with the output pass: before the fix, its target
   // sat on the bead mask's unit, the plate's draw into it was a feedback
   // loop, and the wall got a black frame.
+  const hasGl = await page.evaluate(() => typeof window.chromaglassDebug().glError === 'function');
   const built = await page.evaluate(() => !!window.chromaglassDebug().outputPass);
-  const first = await page.evaluate((cfg) => new Promise((resolve) => {
+  const first = hasGl ? await page.evaluate((cfg) => new Promise((resolve) => {
     const d0 = window.chromaglassDebug();
     while (d0.glError()) { /* drain */ }
     window.chromaglassOutput({ ...cfg, flipX: true });
@@ -312,10 +345,17 @@ try {
       resolve({ err: d.glError(), lum: sum / (px.length / 4) / 255 });
     };
     requestAnimationFrame(tick);
-  }), PLAIN_OUT);
+  }), PLAIN_OUT) : null;
   check('unit 11: the output pass was not built before the flip', !built);
-  check('unit 11: the first frame through the output pass is a picture', first.err === 0 && first.lum > a0.lum * 0.5,
-    `GL error ${first.err}, mean luminance ${first.lum.toFixed(3)} (plain ${a0.lum.toFixed(3)})`);
+  if (first) {
+    check('unit 11: the first frame through the output pass is a picture', first.err === 0 && first.lum > a0.lum * 0.5,
+      `GL error ${first.err}, mean luminance ${first.lum.toFixed(3)} (plain ${a0.lum.toFixed(3)})`);
+  } else {
+    // The bug this guards was a texture unit shared between the output pass
+    // and the bead mask. WebGPU has no texture units (docs/webgpu-plan.md),
+    // and no `glError` to ask either, so there is nothing here to ask it.
+    console.log('     unit 11 is a texture-unit clash, and this engine has no texture units');
+  }
   await output({});
 
   // ── The probe ──────────────────────────────────────────────────────

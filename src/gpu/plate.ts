@@ -168,6 +168,15 @@ export class WebGPUPlate {
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null }[],
     velRange: number,
     timestamps?: GPURenderPassTimestampWrites,
+    /** True when this frame goes into a texture another pass will sample. */
+    toTexture = false,
+    /**
+     * What it is drawing into. The chain's picture is half float and the
+     * canvas is not, and a pipeline is built for one attachment state: given
+     * the wrong one, the pass is rejected and the frame is a black screen
+     * with an error behind it.
+     */
+    format = this.format,
   ): void {
     if (!fields.length) return;
     const grid = fields[0].dye.width;
@@ -229,14 +238,14 @@ export class WebGPUPlate {
 
     // ── Display ─────────────────────────────────────────────────────
     const code = plateWgsl(DISPLAY_MAIN);
-    const display = this.pipelines.renderPipeline('display', (module) => ({
+    const display = this.pipelines.renderPipeline(`display ${format}${toTexture ? ' flipped' : ''}`, (module) => ({
       layout: this.device.createPipelineLayout({
         bindGroupLayouts: [layoutFromWgsl(this.device, code, 'display', GPUShaderStage.FRAGMENT)],
       }),
-      vertex: { module: module(code), entryPoint: 'vs' },
+      vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
       fragment: {
         module: module(code), entryPoint: 'fs',
-        targets: [{ format: this.format }, { format: 'rgba8unorm' as GPUTextureFormat }],
+        targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     }));

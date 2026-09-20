@@ -122,7 +122,7 @@ float fxRand(uvec2 pixel, uint frame, uint seed) {
   return float(fxPcg(pixel.x ^ fxPcg(pixel.y ^ fxPcg(frame ^ fxPcg(seed))))) / 4294967295.0;
 }`;
 
-const VERT = `#version 300 es
+export const POST_VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
 void main() {
@@ -130,7 +130,7 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
-const FINISH_FRAG = `#version 300 es
+export const FINISH_FRAG = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 layout(location = 0) out vec4 fragColor;
@@ -150,7 +150,7 @@ void main() {
  * picture (mode 1), or the picture from `u_delay` frames ago out of the
  * history ring (mode 2).
  */
-const TEST_FRAG = `#version 300 es
+export const TEST_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2DArray;
 in vec2 v_uv;
@@ -203,7 +203,7 @@ export class PostPass {
       }
       return sh;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const vs = compile(gl.VERTEX_SHADER, POST_VERT);
     const fs = compile(gl.FRAGMENT_SHADER, frag);
     this.program = gl.createProgram()!;
     let ok = !!vs && !!fs;

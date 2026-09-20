@@ -154,6 +154,8 @@ jobs:
       - run: npm run camera
       # Both projectors: the same mapping, placed on the same wall.
       - run: npm run output
+      # Both post chains: the same picture, finished the same way.
+      - run: npm run post
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's
       # software WebGPU can compute but cannot present a canvas (the P0
@@ -161,6 +163,11 @@ jobs:
       # pixel ratio and on the GPU solver, which the ubuntu job cannot.
       - name: A show night, on WebGPU
         run: CG_RENDERER=webgpu QA_DPR=1 QA_GPU=mid npm run qa
+      # The post chain in the app, on the stage: the chain with nothing in it
+      # draws the plate's own picture, the ring keeps what it was given, and
+      # the effects' randomness is the same twice.
+      - name: The post chain, on WebGPU
+        run: CG_RENDERER=webgpu npm run fx
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.

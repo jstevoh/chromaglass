@@ -99,15 +99,19 @@ export class WebGPUCamera {
     target: GPUTextureView,
     aux: GPUTexture,
     timestamps?: GPURenderPassTimestampWrites,
+    /** True when this frame goes into a texture another pass will sample. */
+    toTexture = false,
+    /** What it is drawing into: the chain's half floats, or the canvas. */
+    format = this.format,
   ): void {
     if (!this.scene) return;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
-    const pipeline = this.pipelines.renderPipeline('camera', (module) => ({
+    const pipeline = this.pipelines.renderPipeline(`camera ${format}${toTexture ? ' flipped' : ''}`, (module) => ({
       layout: this.device.createPipelineLayout({
         bindGroupLayouts: [layoutFromWgsl(this.device, CAMERA_WGSL, 'camera', GPUShaderStage.FRAGMENT)],
       }),
-      vertex: { module: module(CAMERA_WGSL), entryPoint: 'vs' },
-      fragment: { module: module(CAMERA_WGSL), entryPoint: 'fs', targets: [{ format: this.format }] },
+      vertex: { module: module(CAMERA_WGSL), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
+      fragment: { module: module(CAMERA_WGSL), entryPoint: 'fs', targets: [{ format }] },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     }));
     const pass = encoder.beginRenderPass({

@@ -16,7 +16,7 @@
  * size rounds up to its largest alignment.
  */
 
-export type ScalarType = 'f32' | 'i32';
+export type ScalarType = 'f32' | 'i32' | 'u32';
 export type VectorType = 'vec2f' | 'vec3f' | 'vec4f';
 export type FieldType = ScalarType | VectorType;
 
@@ -35,10 +35,10 @@ export interface Field {
   glsl?: string;
 }
 
-const ALIGN: Record<FieldType, number> = { f32: 4, i32: 4, vec2f: 8, vec3f: 16, vec4f: 16 };
-const SIZE: Record<FieldType, number> = { f32: 4, i32: 4, vec2f: 8, vec3f: 12, vec4f: 16 };
+const ALIGN: Record<FieldType, number> = { f32: 4, i32: 4, u32: 4, vec2f: 8, vec3f: 16, vec4f: 16 };
+const SIZE: Record<FieldType, number> = { f32: 4, i32: 4, u32: 4, vec2f: 8, vec3f: 12, vec4f: 16 };
 /** Floats in one of them, for the writer. */
-const WIDTH: Record<FieldType, number> = { f32: 1, i32: 1, vec2f: 2, vec3f: 3, vec4f: 4 };
+const WIDTH: Record<FieldType, number> = { f32: 1, i32: 1, u32: 1, vec2f: 2, vec3f: 3, vec4f: 4 };
 
 export interface Placed extends Field {
   /** Byte offset into the buffer. */
@@ -98,6 +98,8 @@ export class UniformPack {
   readonly bytes: ArrayBuffer;
   private readonly f32: Float32Array;
   private readonly i32: Int32Array;
+  /** The effects' frame counter and seed are unsigned: PCG hashing wants the wrap. */
+  private readonly u32: Uint32Array;
   /** Names set since the last `clearSeen`, for a harness that checks coverage. */
   private readonly seen = new Set<string>();
 
@@ -105,6 +107,7 @@ export class UniformPack {
     this.bytes = new ArrayBuffer(layout.size);
     this.f32 = new Float32Array(this.bytes);
     this.i32 = new Int32Array(this.bytes);
+    this.u32 = new Uint32Array(this.bytes);
   }
 
   set(name: string, ...values: number[]): this {
@@ -114,7 +117,7 @@ export class UniformPack {
     const stride = f.count > 1 ? roundUp(SIZE[f.type], ALIGN[f.type]) / 4 : width;
     const want = f.count > 1 ? f.count * width : width;
     if (values.length > want) throw new Error(`${name} takes ${want} numbers, got ${values.length}`);
-    const target = f.type === 'i32' ? this.i32 : this.f32;
+    const target = f.type === 'i32' ? this.i32 : f.type === 'u32' ? this.u32 : this.f32;
     const base = f.offset / 4;
     for (let i = 0; i < values.length; i++) {
       const el = Math.floor(i / width);
@@ -140,7 +143,7 @@ export class UniformPack {
     const width = WIDTH[f.type];
     if (values.length > width) throw new Error(`${name} takes ${width} numbers an element, got ${values.length}`);
     const stride = roundUp(SIZE[f.type], ALIGN[f.type]) / 4;
-    const target = f.type === 'i32' ? this.i32 : this.f32;
+    const target = f.type === 'i32' ? this.i32 : f.type === 'u32' ? this.u32 : this.f32;
     const base = f.offset / 4 + index * stride;
     for (let i = 0; i < values.length; i++) target[base + i] = values[i];
     this.seen.add(name);
@@ -152,7 +155,7 @@ export class UniformPack {
     if (!f) throw new Error(`no such uniform: ${name}`);
     const width = WIDTH[f.type];
     const stride = f.count > 1 ? roundUp(SIZE[f.type], ALIGN[f.type]) / 4 : width;
-    const target = f.type === 'i32' ? this.i32 : this.f32;
+    const target = f.type === 'i32' ? this.i32 : f.type === 'u32' ? this.u32 : this.f32;
     const base = f.offset / 4;
     const out: number[] = [];
     for (let el = 0; el < f.count; el++) for (let i = 0; i < width; i++) out.push(target[base + el * stride + i]);
