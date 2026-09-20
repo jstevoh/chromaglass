@@ -2305,6 +2305,13 @@ interface FrameView {
   /** The mark laid over the finished frame, and the film projected through it. */
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
+  /**
+   * The oil beads' mask, on the frames the beads moved and it was redrawn —
+   * null on every other frame, and whenever the beads are off. The show
+   * decides when it changes so that both engines upload the same picture on
+   * the same frames rather than each asking the bead field in its own way.
+   */
+  beadMask: CanvasImageSource | null;
   /** Where the frame is going: the projector's shape, and the effects. */
   outputCfg: OutputConfig;
   postForce: boolean;
@@ -4576,6 +4583,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The frame the effects run on.
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
+        // The beads' mask: redrawn only on the frames they moved, which is
+        // what `render()` answers with — null means the last upload still
+        // stands. Off, it is not drawn at all, and the shader is told 0.
+        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.render() : null;
+
         // ── The frame, handed to whatever draws it ────────────
         // The renderer reads the show's state through `view` and nothing
         // else, which is what lets a second one take the same call
@@ -4599,6 +4611,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           oldSampler: oldSamplerRef.current,
           mark: markRef.current,
           film: filmRef.current,
+          beadMask,
           outputCfg: outputCfgRef.current,
           postForce: postForceRef.current,
           postTest: postTestRef.current,
@@ -4724,12 +4737,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /**
          * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
          *
-         * The solver is wired: the show's own loop runs, the plate is poured
-         * on and stepped, and the fields live in `gpu/fluid.ts`. What is not
-         * wired yet is the picture — the WGSL composite is proved against the
-         * GLSL (`npm run composite`) but nothing samples the solver's textures
-         * with it, so the canvas stays black and `drawFrame` reads nothing
-         * back. That is the next piece.
+         * The solver is wired and so is the picture: the show's own loop
+         * runs, the fields live in `gpu/fluid.ts`, and the WGSL composite —
+         * the GLSL's twin, checked against it pixel for pixel by
+         * `npm run composite` — draws them, over the three pictures the page
+         * hands across each frame. What is still WebGL's alone is what comes
+         * after the plate: the camera pass, the output pass, the post chain
+         * and the flash probe, which is why `drawFrame` reads back no
+         * luminance yet.
          */
         const plate = new WebGPUPlate(s.device, s.format);
         const gpuRenderer: PlateRenderer = {
@@ -4763,6 +4778,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
               .filter((f): f is NonNullable<typeof f> => !!f);
             if (fields.length && stage) {
+              // The three pictures the page hands over, on the frames they
+              // change: the beads' mask when they moved, the mark on the
+              // frame it arrives, and the film's frame every frame it plays.
+              // The uniforms are told about each of them in `plateUniforms`,
+              // under the same conditions, or the shader would be drawing a
+              // picture it had not been given.
+              if (view.beadMask) plate.setSource('beads', view.beadMask);
+              const mk = view.mark;
+              if (!mk) plate.setSource('mark', null);
+              else if (mk.dirty) { plate.setSource('mark', mk.source); mk.dirty = false; }
+              const film = view.film;
+              if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
+                plate.setSource('film', film.video);
+              }
               fillPlateUniforms(plate.pack, {
                 view, fluids,
                 width: canvas.width, height: canvas.height,
@@ -5291,20 +5320,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
 
       // The oil beads' mask: bound every frame on its own unit (see
-      // textureUnits.ts), uploaded when the beads moved. A unit left
-      // pointing at the camera's scene texture made every draw with the
+      // textureUnits.ts), uploaded on the frames the show redrew it. A unit
+      // left pointing at the camera's scene texture made every draw with the
       // camera on a feedback loop, and the photograph and closeup presets
       // drew black; the output pass on this same unit did it again.
       {
         glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.beads);
         glCtx.bindTexture(glCtx.TEXTURE_2D, glr.beadTexture);
-        const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
-        if (beadAmt > 0) {
-          const cv = beadsRef.current.render();
-          if (cv) {
-            glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
-            glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
-          }
+        const cv = view.beadMask;
+        if (cv) {
+          glCtx.pixelStorei(glCtx.UNPACK_FLIP_Y_WEBGL, false);
+          glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, glCtx.RGBA, glCtx.UNSIGNED_BYTE, cv as HTMLCanvasElement);
         }
       }
 
