@@ -389,6 +389,34 @@ thresholds re-baselined, and `qa`'s CPU default removed at the cutover.
 and `importExternalTexture` for zero-copy video. The film goes up today
 through `copyExternalImageToTexture`, which is the parity route.
 
+## P6, the cutover, 2026-09-20
+
+WebGPU is what the app runs on. `?renderer=webgl` is the way back for the
+transition — a show tonight on a machine with a bad driver should not be a
+reason to redeploy — and it goes with the WebGL renderer at P7.
+
+**A browser without WebGPU gets the screen, not a lesser show.** That was
+already true for a browser with no adapter; it is true now for a machine
+whose *solver* will not start as well. That path used to drop to the CPU
+solver, which this stage cannot draw — the plate would simulate perfectly
+well behind a black screen, which is the failure CI found on the ladder's
+bottom rung, arriving by another road.
+
+**CI splits along the same line.** A Linux runner can compute WebGPU and
+cannot present its canvas (P0), so the ubuntu jobs run `CG_RENDERER=webgl`
+and gate the path being kept; the macOS job runs what a visitor gets — the
+parity gates, a show night at the real device pixel ratio on the GPU solver,
+the post chain, and the wall.
+
+**What an empty chain costs, measured.** Every render pass on this GPU costs
+about the same whatever is in it: on an M4, the plate's 1,500-line composite
+2.76 ms, the finish 2.83, the projector 2.54. So the chain is two passes and
+a half-float round trip, not shader work — invisible at 60 Hz on a display
+that caps there, and 54 fps against 37 on a runner already GPU-bound. That is
+the cost the governor's post level exists to spend, and `fx` now allows it
+proportionally on this engine while still catching an empty chain that costs
+more than the two passes it is.
+
 ## P3, the shape of the split
 
 The render effect in `LiquidVisualizer.tsx` is 3,838 lines: the WebGPU branch,

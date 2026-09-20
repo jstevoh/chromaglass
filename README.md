@@ -543,7 +543,8 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 - **Framer Motion** (via `motion/react`) for UI animations
 - **simplex-noise** for coherent noise fields
 - **Web Audio API** for real-time FFT analysis (1024-point)
-- **WebGL2** for both the fluid solve (float ping-pong textures, Jacobi pressure iterations) and the lit, relief-shaded render
+- **WebGPU** for the whole picture: the fluid solve as compute passes, and the compositor, camera, post chain and projector as WGSL render passes. A browser without WebGPU is told so plainly rather than given a lesser show — it needs Chrome or Edge on the desktop, Safari 26, or Firefox on Windows
+- **WebGL2** is still there behind `?renderer=webgl` while the port settles, and goes when it does (docs/webgpu-plan.md, P7)
 
 ## Project Structure
 

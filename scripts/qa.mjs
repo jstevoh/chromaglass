@@ -26,7 +26,7 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
+import { engineName, engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -92,12 +92,14 @@ const DPR = process.env.QA_DPR ?? '0.35';
   look it happened to get. Every harness that measures pixels pins it.
 */
 /*
-  `QA_RENDERER=webgpu npm run qa` walks the same show night on the WebGPU
-  stage (docs/webgpu-plan.md, P5). It needs a machine with a GPU: a Linux
-  runner's software WebGPU can compute but cannot present a canvas, which is
-  what the P0 spike measured.
+  The show night runs on whatever the app runs on, which since the cutover is
+  WebGPU (docs/webgpu-plan.md, P6). `CG_RENDERER=webgl` walks the old path
+  instead, which is what the Linux jobs do: a runner with no GPU can compute
+  WebGPU but cannot present its canvas, as the P0 spike measured.
 */
-const RENDERER = process.env.CG_RENDERER ?? process.env.QA_RENDERER ?? '';
+const RENDERER = engineName();
+/** True on the engine the app now defaults to. */
+const ON_WEBGPU = RENDERER !== 'webgl';
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${engineQuery()}`;
 const HEADED = process.argv.includes('--head');
 
@@ -455,7 +457,7 @@ try {
     const note = await lastFrameRead(page);
     const lit = read ? read.filter((_, i) => i % 4 === 0).filter((v, i) => Math.max(v, read[i * 4 + 1], read[i * 4 + 2]) > 8).length / (read.length / 4) : 0;
     check('the plate can be photographed',
-      !!read && (note?.scaled ?? 0) > 0.01 && (!RENDERER || note?.via === 'grabFrame'),
+      !!read && (note?.scaled ?? 0) > 0.01 && (!ON_WEBGPU || note?.via === 'grabFrame'),
       note ? `${note.via}${note.size ? ` ${note.size[0]}×${note.size[1]}` : ''}, ` +
         `${note.lit !== undefined ? `${(note.lit * 100).toFixed(0)}% lit, ` : ''}` +
         `alpha ${note.alpha ? note.alpha.join('–') : 'n/a'}, scaled ${note.scaled ?? 'n/a'}` +
@@ -894,7 +896,7 @@ try {
       they agree to 4e-5 of rms. What is asked here is the staging, which
       only one of them does where the CPU can see it.
     */
-    if (RENDERER === 'webgpu') {
+    if (ON_WEBGPU) {
       console.log('     the drag is staged on the GPU under this flag — `npm run parity` is what proves a pour lands');
     } else {
       check('and a drag across it lays down dye',

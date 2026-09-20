@@ -13,10 +13,18 @@
  * the difference rather than one per harness.
  */
 
-/** `&renderer=webgpu` when the environment asks for it, else nothing. */
+/**
+ * Which engine a run asks for, and the query that asks for it.
+ *
+ * WebGPU is the app's default since the cutover (docs/webgpu-plan.md, P6), so
+ * a run that says nothing gets it. `CG_RENDERER=webgl` asks for the old path,
+ * which is still there until P7 deletes it — and is what the Linux jobs use,
+ * because a runner with no GPU can compute WebGPU but cannot present its
+ * canvas.
+ */
 export const engineQuery = (env = process.env) => {
-  const want = env.CG_RENDERER ?? env.QA_RENDERER ?? '';
-  return want ? `&renderer=${encodeURIComponent(want)}` : '';
+  const want = engineName(env);
+  return want === 'webgl' ? '&renderer=webgl' : '';
 };
 
 /**
@@ -29,8 +37,7 @@ export const engineQuery = (env = process.env) => {
  */
 export const isGpuEngine = (label) => /^(GPU|WebGPU)\b/.test(label ?? '');
 
-/** Which engine this run is asking for, for a harness's own header line. */
-export const engineName = (env = process.env) => env.CG_RENDERER ?? env.QA_RENDERER ?? 'webgl';
+export const engineName = (env = process.env) => env.CG_RENDERER ?? env.QA_RENDERER ?? 'webgpu';
 
 /**
  * Install `window.__cgFrame(w, h)` for every navigation on this page. It

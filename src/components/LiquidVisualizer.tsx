@@ -198,8 +198,21 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
  * `?renderer=webgpu`: the WebGPU stage instead of WebGL (docs/webgpu-plan.md).
  * It grows on main behind this flag until the cutover, then WebGL goes.
  */
+/**
+ * Which engine draws the show (docs/webgpu-plan.md, P6 — the cutover).
+ *
+ * WebGPU, unless asked otherwise. A browser without it gets the "ChromaGlass
+ * needs WebGPU" screen rather than a degraded show: the plate is a fluid
+ * solver and a 1,500-line compositor, and the WebGL path was not a lighter
+ * version of it but a second one, which is the thing this port exists to stop
+ * maintaining.
+ *
+ * `?renderer=webgl` is the way back for the transition — a show tonight on a
+ * machine that turns out to have a bad WebGPU driver should not be a reason
+ * to redeploy. It goes, with the WebGL renderer itself, at P7.
+ */
 const WEBGPU = (() => {
-  try { return new URLSearchParams(window.location.search).get('renderer') === 'webgpu'; } catch { return false; }
+  try { return new URLSearchParams(window.location.search).get('renderer') !== 'webgl'; } catch { return true; }
 })();
 
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
@@ -4844,8 +4857,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }));
               return true;
             } catch (err) {
-              console.warn('ChromaGlass: the WebGPU solver would not start, using the CPU solver.', err);
+              /*
+                No degraded show (docs/webgpu-plan.md, the decision).
+
+                Dropping to the CPU solver is what this used to do, and while
+                WebGPU was behind a flag that was a reasonable way to keep
+                drawing. It is not one now: this stage samples the solver's
+                textures, so a field on the CPU is a field it cannot draw —
+                the plate would simulate perfectly well behind a black screen,
+                which is the failure CI found on the ladder's bottom rung.
+
+                So say so instead. A machine that cannot run the solver gets
+                the same screen as a machine with no WebGPU at all.
+              */
+              console.error('ChromaGlass: the WebGPU solver would not start.', err);
               fluid.dropGpu();
+              setGpuFailure({
+                failure: 'no-adapter',
+                detail: `the solver would not start at ${wantRes}²: ${String(err).slice(0, 120)}`,
+              });
               return false;
             }
           },

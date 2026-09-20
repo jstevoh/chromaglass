@@ -13,8 +13,14 @@ name: Checks
 # is worth more than a slow one:
 #
 #   measure   the pure-logic harnesses. Half a minute, no browser.
-#   wall      the projector's geometry and the flash guard. Ten minutes.
-#   show      a browser walked through a show night. The long one.
+#   wall      the projector's geometry and the flash guard, on the old path.
+#   webgpu    what a visitor gets: the parity gates, a show night and the
+#             post chain on a runner with a GPU.
+#   show      a browser walked through a show night on the old path.
+#
+# Since the cutover (docs/webgpu-plan.md, P6) the ubuntu jobs run
+# `CG_RENDERER=webgl`: a runner with no GPU can compute WebGPU but cannot
+# present its canvas, so what they gate is the path being kept until P7.
 #
 # `wall` and `show` used to be two steps of one job, which meant the gate took
 # as long as both of them added together — measured at 9.8 + 34.3 minutes, so
@@ -110,7 +116,7 @@ jobs:
   # The projector's geometry and the flash guard: which pixels are black, and
   # how many times a second the whole screen is allowed to change.
   wall:
-    name: The wall
+    name: The wall (WebGL)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -124,10 +130,14 @@ jobs:
       # path, then whatever Playwright downloaded — which is this.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - run: npm run wall
+      # `CG_RENDERER=webgl` from the cutover on (docs/webgpu-plan.md, P6):
+      # this runner has no GPU, and software WebGPU can compute but cannot
+      # present a canvas. What it gates now is the old path, until P7 deletes
+      # it; what a visitor gets is gated on the macOS job.
+      - run: CG_RENDERER=webgl npm run wall
       # The post chain the effects run in (docs/filters-plan.md, F0), on the
       # build the wall step just made.
-      - run: node scripts/fx.mjs
+      - run: CG_RENDERER=webgl node scripts/fx.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -161,18 +171,24 @@ jobs:
       # software WebGPU can compute but cannot present a canvas (the P0
       # spike). These runners have Metal, so it also runs at the real device
       # pixel ratio and on the GPU solver, which the ubuntu job cannot.
-      - name: A show night, on WebGPU
-        run: CG_RENDERER=webgpu QA_DPR=1 QA_GPU=mid npm run qa
-      # The post chain in the app, on the stage: the chain with nothing in it
-      # draws the plate's own picture, the ring keeps what it was given, and
-      # the effects' randomness is the same twice.
-      - name: The post chain, on WebGPU
-        run: CG_RENDERER=webgpu npm run fx
+      # A show night on what a visitor actually gets, at the real device pixel
+      # ratio and on the GPU solver — neither of which the ubuntu job can do.
+      - name: A show night
+        run: QA_DPR=1 QA_GPU=mid npm run qa
+      # The post chain in the app: the chain with nothing in it draws the
+      # plate's own picture, the ring keeps what it was given, and the
+      # effects' randomness is the same twice.
+      - name: The post chain
+        run: npm run fx
+      # And the projector's geometry, on a GPU: which pixels are black, and
+      # how many times a second the whole screen is allowed to change.
+      - name: The wall
+        run: npm run wall
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.
   show:
-    name: A show night
+    name: A show night (WebGL)
     runs-on: ubuntu-latest
     # Generous on purpose. A GitHub runner has no GPU, so everything here runs
     # through SwiftShader at a handful of frames a second; the harness waits on
@@ -187,4 +203,5 @@ jobs:
       - run: npm ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - run: npm run qa
+      # The old path, on the runner that can still draw it.
+      - run: CG_RENDERER=webgl npm run qa
