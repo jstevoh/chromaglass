@@ -19,6 +19,16 @@ export const engineQuery = (env = process.env) => {
   return want ? `&renderer=${encodeURIComponent(want)}` : '';
 };
 
+/**
+ * Is this label a GPU solver's?
+ *
+ * Three harnesses had `/^GPU/` written into them, and the stage says
+ * `WebGPU`, so each of them decided in turn that a run on the port was a run
+ * on the CPU fallback — `bench` recorded every rung it reached as one it
+ * never reached, and `bubbles` refused to start.
+ */
+export const isGpuEngine = (label) => /^(GPU|WebGPU)\b/.test(label ?? '');
+
 /** Which engine this run is asking for, for a harness's own header line. */
 export const engineName = (env = process.env) => env.CG_RENDERER ?? env.QA_RENDERER ?? 'webgl';
 
@@ -80,6 +90,45 @@ export const installFrameReader = (page) => page.addInitScript(() => {
     note.scaled = +(scaled / (data.length / 4) / 255).toFixed(4);
     window.__cgFrameLast = note;
     return data;
+  };
+  /**
+   * The plate at its own size, kept in the page as `ImageData` under
+   * `window.__shots[slot]`.
+   *
+   * Some harnesses compare whole frames and do the arithmetic in the page,
+   * because what crosses the wire otherwise is two million numbers. They get
+   * the same engine-awareness as `__cgFrame` and the same account of the
+   * read; what they keep is the picture itself.
+   */
+  window.__cgShot = async (slot) => {
+    const canvas = document.querySelector('#liquid-canvas') ?? document.querySelector('canvas');
+    if (!canvas) { window.__cgFrameLast = { via: 'no canvas' }; return null; }
+    const dbg = window.chromaglassDebug?.();
+    const grab = dbg?.grabFrame;
+    const note = { via: grab ? 'grabFrame' : 'drawImage', engine: dbg?.engine ?? null, slot };
+    let image;
+    if (grab) {
+      let g = null;
+      try { g = await grab(); } catch (e) { note.threw = String(e).slice(0, 120); }
+      if (!g) { window.__cgFrameLast = { ...note, got: 'nothing' }; return null; }
+      for (let i = 3; i < g.pixels.length; i += 4) g.pixels[i] = 255;
+      image = new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height);
+      note.size = [g.width, g.height];
+    } else {
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width; copy.height = canvas.height;
+      copy.getContext('2d').drawImage(canvas, 0, 0);
+      image = copy.getContext('2d').getImageData(0, 0, copy.width, copy.height);
+      note.size = [copy.width, copy.height];
+    }
+    let lit = 0;
+    for (let i = 0; i < image.data.length; i += 4) {
+      if (Math.max(image.data[i], image.data[i + 1], image.data[i + 2]) > 8) lit++;
+    }
+    note.lit = +(lit / (image.data.length / 4)).toFixed(3);
+    window.__cgFrameLast = note;
+    (window.__shots ??= {})[slot] = image;
+    return { w: image.width, h: image.height };
   };
 });
 

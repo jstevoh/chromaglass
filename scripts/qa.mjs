@@ -218,6 +218,38 @@ await page.addInitScript(() => {
 const settle = (ms = 900) => page.waitForTimeout(ms);
 
 /**
+ * What the show was doing, for a check that read a frame it did not expect.
+ *
+ * A frame that will not change and a frame that cannot be read look the same
+ * from the pixels — and so does a show whose solver has stopped stepping. The
+ * reader's own account says which of the three it was, and this says what the
+ * engine was doing while it happened.
+ */
+const showState = async () => {
+  const [state, read] = await Promise.all([
+    page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      if (!d) return null;
+      const s = d.solver?.();
+      return {
+        engine: d.engine,
+        frames: d.webgpu?.frames ?? null,
+        steps: s ? +s.stepsPerSec.toFixed(1) : null,
+        layers: s?.layers ?? null,
+        dye: +(d.fluids?.[0]?.meanDensity ?? 0).toFixed(3),
+        grid: d.status?.grid ?? null,
+        frameMs: +(d.status?.frameMs ?? 0).toFixed(1),
+      };
+    }),
+    lastFrameRead(page),
+  ]);
+  if (!state) return 'no debug hook';
+  return `${state.engine}, ${state.steps} steps/s over ${state.layers} layer(s), dye ${state.dye}, ` +
+    `${state.frameMs} ms/frame${state.frames !== null ? `, ${state.frames} frames drawn` : ''}` +
+    `${read ? ` · read via ${read.via}${read.lit !== undefined ? `, ${(read.lit * 100).toFixed(0)}% lit` : ''}` : ''}`;
+};
+
+/**
  * Press Escape and wait for a panel to actually be gone.
  *
  * Not `settle(n)` and then look. A panel closing is a React state change
@@ -646,7 +678,9 @@ try {
     // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
     const far = apart(plate, await at(9));
     check('the zoom alone moves the picture, with no switch thrown',
-      far > Math.max(6, drift * 4), `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift`);
+      far > Math.max(6, drift * 4),
+      `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift` +
+      (far > Math.max(6, drift * 4) ? '' : ` — ${await showState()}`));
 
     // That it is a *travel* and not a cut is checked in `npm run plate`, on
     // the ramp itself, because it cannot honestly be checked here. This asked
@@ -711,14 +745,17 @@ try {
     // business rather than ours. See `reaches`.
     const after = await reaches(magentaShare, v => v > 0.15);
     check('a loaded mark reaches the canvas, not just the page',
-      before < 0.02 && after > 0.15, `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame`);
+      before < 0.02 && after > 0.15,
+      `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame` +
+      (before < 0.02 && after > 0.15 ? '' : ` — ${await showState()}`));
 
     // The house dimmer is the lamp. Taking the lamp out should not take the
     // sponsor's logo off the wall with it.
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 0 }));
     const blacked = await reaches(magentaShare, v => v > 0.15);
     check('and a blackout leaves it on the wall', blacked > 0.15,
-      `${(blacked * 100).toFixed(1)}% with the dimmer at zero`);
+      `${(blacked * 100).toFixed(1)}% with the dimmer at zero` +
+      (blacked > 0.15 ? '' : ` — ${await showState()}`));
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 1 }));
 
     // Its own opacity is the control for taking it off, and it has to reach 0.
@@ -951,7 +988,8 @@ try {
     await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
     let before = 0;
     for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
-    check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
+    check('the wall is lit before the GPU goes away', before > 0.01,
+      `luminance ${before?.toFixed(3)}` + (before > 0.01 ? '' : ` — ${await showState()}`));
 
     // How a GPU is taken away depends on which one it is. WebGL has an
     // extension that stages the browser's own event and a `restoreContext` to

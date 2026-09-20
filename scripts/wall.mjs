@@ -35,6 +35,7 @@ import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { FlashGuard } from '../src/lib/flashGuard.ts';
+import { engineQuery, installFrameReader } from './frame.mjs';
 
 const PORT = Number(process.env.WALL_PORT ?? 4324);
 
@@ -240,7 +241,8 @@ let failed = 0;
 
 try {
   page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
+  await installFrameReader(page);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
   // Long enough for the governor to settle and the plate to have something on
   // it: a bare plate is black everywhere and every gate below would pass for
   // the wrong reason.
@@ -298,7 +300,7 @@ try {
    * the picture is and where it is not, and it is a few hundred numbers over
    * the wire instead of three million.
    */
-  const gridOf = (cols = 32, rows = 18) => page.evaluate(({ cols, rows }) => {
+  const gridOf = (cols = 32, rows = 18) => page.evaluate(async ({ cols, rows }) => {
     const src = document.querySelector('#liquid-canvas');
     if (!src || !src.width) return null;
     const c = document.createElement('canvas');
@@ -306,7 +308,17 @@ try {
     const ctx = c.getContext('2d', { willReadFrequently: true });
     // drawImage downsamples with the browser's own box filter: every output
     // cell is the mean of the block under it, which is exactly what is wanted.
-    ctx.drawImage(src, 0, 0, cols, rows);
+    // What it is given depends on the engine: a presented WebGPU canvas is
+    // not readable, so the stage photographs it for us (scripts/frame.mjs).
+    const shot = await window.__cgShot('wall');
+    if (shot) {
+      const full = document.createElement('canvas');
+      full.width = shot.w; full.height = shot.h;
+      full.getContext('2d').putImageData(window.__shots.wall, 0, 0);
+      ctx.drawImage(full, 0, 0, cols, rows);
+    } else {
+      ctx.drawImage(src, 0, 0, cols, rows);
+    }
     const d = ctx.getImageData(0, 0, cols, rows).data;
     const out = [];
     for (let i = 0; i < cols * rows; i++) {

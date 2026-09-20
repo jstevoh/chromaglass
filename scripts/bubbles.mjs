@@ -31,6 +31,7 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
+import { engineQuery, installFrameReader, isGpuEngine } from './frame.mjs';
 
 const PORT = 4321;
 const checks = [];
@@ -85,7 +86,8 @@ const browser = await launchChromium(chromium);
 
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
+  await installFrameReader(page);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   // The bundle the page loaded must be the one just built. `bubbleUniforms`
@@ -103,8 +105,8 @@ try {
     somewhere to fall to, so it stays on the GPU.
   */
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
-  check('the GPU solver is the one being measured', /^GPU/.test(engine ?? ''), engine ?? 'no debug hook');
-  if (!/^GPU/.test(engine ?? '')) throw new Error('not on the GPU path — nothing below would mean anything');
+  check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
+  if (!isGpuEngine(engine)) throw new Error('not on the GPU path — nothing below would mean anything');
 
   /*
     What does a bubble do to the picture?
@@ -170,15 +172,11 @@ try {
 
     What crosses the wire now is a handful of numbers.
   */
-  const grab = (slot) => page.evaluate((slot) => {
-    const c = document.getElementById('liquid-canvas');
-    const s = document.createElement('canvas');
-    s.width = c.width; s.height = c.height;
-    const ctx = s.getContext('2d');
-    ctx.drawImage(c, 0, 0);
-    (window.__shots ??= {})[slot] = ctx.getImageData(0, 0, s.width, s.height);
-    return { w: s.width, h: s.height };
-  }, slot);
+  // `scripts/frame.mjs` keeps the picture in the page under the same name
+  // this harness has always used, and photographs it the way the engine in
+  // front of it requires — a presented WebGPU canvas answers `drawImage`
+  // with black, which is the fifth way this could have gone wrong.
+  const grab = (slot) => page.evaluate((s) => window.__cgShot(s), slot);
 
   const movedBetween = (a, b) => page.evaluate(({ a, b }) => {
     const A = window.__shots[a].data, B = window.__shots[b].data;

@@ -4990,6 +4990,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
              * app's own: a new device, a rebuilt stage, the look laid again.
              */
             loseDevice: () => { stage?.device.destroy(); },
+            /**
+             * The projector's pass, as the WebGL renderer publishes it: built
+             * only when it would change a pixel, so a harness asking whether
+             * a mapping reached the engine asks this. One surface, one
+             * question, either engine.
+             */
+            outputPass: projector,
             /** The guard's own state, and the luminance it is being fed. */
             flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
             /**
