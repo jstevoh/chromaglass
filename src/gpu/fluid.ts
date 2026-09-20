@@ -26,7 +26,7 @@ import { kernel } from './wgsl/fluid';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
-import type { GpuStepParams } from '../lib/gpuFluid';
+import type { GpuStepParams } from './solverTypes';
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -263,7 +263,7 @@ export class WebGPUFluid {
   /**
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
-   * L² (1 = no change) — the same arrays the WebGL solver takes.
+   * L² (1 = no change).
    */
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
     const q = this.device.queue;
@@ -740,7 +740,7 @@ export class WebGPUFluid {
     return out;
   }
 
-  /** The pigment coordinates' crossfade, as the WebGL solver computes it. */
+  /** The pigment coordinates' crossfade. */
   get grainMix(): number {
     const c = Math.cos(Math.PI * (this.grainAge / GRAIN_PERIOD));
     return c * c;

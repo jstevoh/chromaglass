@@ -310,7 +310,7 @@ one piece of taste.
 Independent of batches 1–4 and of 6, so it can be built while the Mac is judging a
 look.
 
-**Sensing** (`sceneSense.ts`, pure: pixels in, a reading out, no DOM and no WebGL, so
+**Sensing** (`sceneSense.ts`, pure: pixels in, a reading out, no DOM and no GPU, so
 it can be measured without a browser). The video is drawn to a 96² canvas and read
 back as luma. From two consecutive frames:
 

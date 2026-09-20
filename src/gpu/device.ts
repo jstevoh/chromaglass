@@ -4,7 +4,7 @@
  *
  * Asynchronous by nature — WebGPU hands out adapters and devices as promises —
  * which is why the show starts on a "starting the GPU" frame instead of
- * inside the component's effect, as the WebGL path does.
+ * inside the component's effect.
  */
 
 import type { GpuClass } from '../lib/platform';
@@ -35,7 +35,7 @@ export type GpuFailure =
 /**
  * Strong, mid, weak or software, from what the adapter says it is.
  *
- * `?gpu=` still overrides it, as it does for the WebGL renderer string, so a
+ * `?gpu=` still overrides it, so a
  * tier can be tested on the wrong machine.
  */
 export function classifyAdapter(info: Gpu['info'], fallback: boolean): GpuClass {

@@ -61,8 +61,6 @@ export interface PlateView {
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
-  /** `?filter=bspline` — the old sampler, kept reachable. */
-  oldSampler: boolean;
   /**
    * The mark laid over the finished frame, and its own aspect. Null when none
    * is loaded, which is what keeps `markOn` at 0 and the rect at its default.
@@ -104,14 +102,15 @@ export interface PlateContext {
   height: number;
   /**
    * The derive pass ran, so the composite reads each plate's neighbourhood
-   * from a texture instead of working it out per screen pixel. WebGL's
-   * `glr.derive && !view.perPixel`; the WebGPU plate always has one.
+   * from a texture instead of working it out per screen pixel. The plate
+   * always has one, so this is always true; it stays a field because the
+   * shader still takes it and an effect may one day want it off.
    */
   derived: boolean;
   /**
-   * The grid actually sitting in the layer textures — WebGL's
-   * `fluids[0].gpu.N`, WebGPU's packed texture width. Left out, it falls back
-   * to exactly what WebGL reads: the lead solver's N, or the logical grid.
+   * The grid actually sitting in the layer textures: the packed texture's
+   * width. Left out, it falls back to the lead solver's N, or the logical
+   * grid.
    */
   grid?: number;
   /** The 192-cell grid the look was tuned on. Only a harness changes it. */
@@ -228,7 +227,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   const dimmerNow = clamp01(s.dimmer ?? 1) * view.dimmerGain;
   pack.set('dimmer', dimmerNow);
   pack.set('lampWarmth', clamp01(s.lampWarmth ?? 0));
-  pack.set('bspline', view.oldSampler ? 1 : 0);
   pack.set('markOn', markOn);
   pack.set('markRect', markRect[0], markRect[1], markRect[2], markRect[3]);
   {

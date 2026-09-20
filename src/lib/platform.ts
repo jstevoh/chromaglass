@@ -49,7 +49,7 @@ export function classifyGpu(renderer: string): GpuClass {
   const r = renderer.toLowerCase();
   if (/swiftshader|llvmpipe|softpipe|software|mesa offscreen|basic render/.test(r)) return 'software';
   if (/apple m\d|apple gpu|geforce (rtx|gtx)|radeon (rx|pro)|arc a\d/.test(r)) return 'strong';
-  if (/intel|mali|adreno|powervr|iris|uhd|hd graphics|videocore/.test(r)) return 'weak';
+  if (/intel|mali|adreno|powervr|iris|uhd|hd graphics/.test(r)) return 'weak';
   return 'mid';
 }
 
@@ -166,8 +166,8 @@ export function qualityLadder(
 export interface EngineStatus {
   /** Short readout, e.g. "GPU · 512² · 1.0x". */
   label: string;
-  /** WebGL's GPU solver, the CPU solver, or the WebGPU stage (?renderer=webgpu, until the cutover). */
-  engine: 'gpu' | 'cpu' | 'webgpu';
+  /** The stage's solver, or the CPU one while the plate is being carried across. */
+  engine: 'webgpu' | 'cpu';
   grid: number;
   dpr: number;
   tier: PlatformTier;

@@ -13,23 +13,12 @@ name: Checks
 # is worth more than a slow one:
 #
 #   measure   the pure-logic harnesses. Half a minute, no browser.
-#   wall      the projector's geometry and the flash guard, on the old path.
-#   webgpu    what a visitor gets: the parity gates, a show night and the
-#             post chain on a runner with a GPU.
-#   show      a browser walked through a show night on the old path.
+#   webgpu    everything with a picture in it, on a runner with a GPU: the
+#             stage, a show night, the post chain and the wall.
 #
-# Since the cutover (docs/webgpu-plan.md, P6) the ubuntu jobs run
-# `CG_RENDERER=webgl`: a runner with no GPU can compute WebGPU but cannot
-# present its canvas, so what they gate is the path being kept until P7.
-#
-# `wall` and `show` used to be two steps of one job, which meant the gate took
-# as long as both of them added together — measured at 9.8 + 34.3 minutes, so
-# the ten minutes were pure latency on top of the thirty-four. They share
-# nothing but the build, so they are two jobs now and the gate costs whatever
-# the slower one costs.
-#
-# Called by `deploy.yml` before it publishes, and run directly on every pull
-# request.
+# There is one engine since P7, and a runner without a GPU can compute WebGPU
+# but cannot present its canvas (the P0 spike) — so every check that needs a
+# picture runs on macOS, and ubuntu keeps the ones that need only arithmetic.
 
 on:
   workflow_call:
@@ -113,32 +102,6 @@ jobs:
       - name: The mapping
         run: npm run map
 
-  # The projector's geometry and the flash guard: which pixels are black, and
-  # how many times a second the whole screen is allowed to change.
-  wall:
-    name: The wall (WebGL)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      # `scripts/chromium.mjs` prefers PW_CHROMIUM, then the sandbox's fixed
-      # path, then whatever Playwright downloaded — which is this.
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      # `CG_RENDERER=webgl` from the cutover on (docs/webgpu-plan.md, P6):
-      # this runner has no GPU, and software WebGPU can compute but cannot
-      # present a canvas. What it gates now is the old path, until P7 deletes
-      # it; what a visitor gets is gated on the macOS job.
-      - run: CG_RENDERER=webgl npm run wall
-      # The post chain the effects run in (docs/filters-plan.md, F0), on the
-      # build the wall step just made.
-      - run: CG_RENDERER=webgl node scripts/fx.mjs
-
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).
@@ -156,16 +119,6 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
       - run: npm run webgpu
-      # Both solvers, the same inputs, compared field by field.
-      - run: npm run parity
-      # Both composites, the same textures, compared pixel by pixel.
-      - run: npm run composite
-      # Both cameras, the same scene, compared the same way.
-      - run: npm run camera
-      # Both projectors: the same mapping, placed on the same wall.
-      - run: npm run output
-      # Both post chains: the same picture, finished the same way.
-      - run: npm run post
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's
       # software WebGPU can compute but cannot present a canvas (the P0
@@ -184,24 +137,3 @@ jobs:
       # how many times a second the whole screen is allowed to change.
       - name: The wall
         run: npm run wall
-
-  # The app itself: it builds, it serves, and a browser is walked through a
-  # show night with the console watched the whole way.
-  show:
-    name: A show night (WebGL)
-    runs-on: ubuntu-latest
-    # Generous on purpose. A GitHub runner has no GPU, so everything here runs
-    # through SwiftShader at a handful of frames a second; the harness waits on
-    # the renderer rather than on a timer for exactly that reason.
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      # The old path, on the runner that can still draw it.
-      - run: CG_RENDERER=webgl npm run qa

@@ -964,15 +964,16 @@ check('and can be pinned so a harness is not random', /get\('look'\)/.test(app))
   somebody simplified it.
 */
 // The rig is half in the component and half in the shader — the phase is
-// integrated on the CPU and spent in the GLSL — and the GLSL moved to its own
-// file for the WebGPU port (docs/webgpu-plan.md, P3), so both are read.
-const vis = panel0 + readFileSync(join(root, 'src/lib/plateShader.ts'), 'utf8');
+// integrated on the CPU and spent in the shader, which is WGSL since the
+// cutover (docs/webgpu-plan.md, P7) — so both are read.
+const vis = panel0 + readFileSync(join(root, 'src/gpu/wgsl/plate.ts'), 'utf8')
+  + readFileSync(join(root, 'src/gpu/wgsl/plateFields.ts'), 'utf8');
 check('the mirror rig turns at a rate somebody can set',
-  /uniform float u_kaleidoPhase/.test(vis) && !/a \+= u_time \* 0\.02/.test(vis));
+  /name: 'kaleidoPhase'/.test(vis) && !/a \+= U\.time \* 0\.02/.test(vis));
 check('and its phase is integrated, not multiplied out of elapsed time',
   /kaleidoPhaseRef\.current \+= \(currentSettings\.kaleidoSpin/.test(vis) && /realDt/.test(vis));
 check('and how much plate feeds a wedge is a setting too',
-  /uniform float u_kaleidoZoom/.test(vis) && !/rad \* 0\.72/.test(vis));
+  /name: 'kaleidoZoom'/.test(vis) && !/rad \* 0\.72/.test(vis));
 check('and all three can reach a controller',
   ['kaleidoscope', 'kaleidoSpin', 'kaleidoZoom'].every(k => PIN_RANGE.has(k)));
 check('and they live together rather than in the Show drawer',

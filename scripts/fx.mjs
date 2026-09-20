@@ -16,8 +16,6 @@
  *   test fx    a seeded effect changes the picture, draws the same frame twice
  *              for the same frame and seed, and a different one for another seed
  *   ring       the history ring gives back what was pushed, by delay
- *   unit 11    the first frame after the output pass is built is a picture, with
- *              no GL error (it was a feedback loop against the bead mask: black)
  *   probe      the flash guard's probe reads a lit patch as the share of the
  *              frame it covers, wherever it falls
  *   governor   the post level is spent before any rung while a heavy effect is on,
@@ -34,9 +32,7 @@ import net from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import { launchChromium } from './chromium.mjs';
-import { engineName, engineQuery, installFrameReader } from './frame.mjs';
-
-const RENDERER = engineName();
+import { installFrameReader } from './frame.mjs';
 
 const PORT = Number(process.env.FX_PORT ?? 4326);
 /** As the wall harness: a fraction of the window, so SwiftShader keeps up. FX_DPR=1 for full size. */
@@ -141,7 +137,7 @@ try {
   // The solver grid pinned: a governor that moved it would lay a new plate
   // under a comparison.
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
 
   const wired = await page.evaluate(() => typeof window.chromaglassDebug?.().post?.force === 'function');
@@ -257,11 +253,8 @@ try {
     /*
       What "the chain changes nothing" is allowed to mean.
 
-      On WebGL both paths draw the plate the same way and differ only by a
-      dither: two steps at worst, half a step over a 4×4 block.
-
-      On WebGPU the plate draws mirrored when it draws into a texture rather
-      than onto the canvas (FLIP_Y, in `gpu/wgsl/plate.ts`), because that is
+      The plate draws mirrored when it draws into a texture rather than onto
+      the canvas (FLIP_Y, in `gpu/wgsl/plate.ts`), because that is
       how a picture is stored the way the next pass reads it. Mirroring the
       geometry perturbs the *interpolated* uv in its last bit, and the
       composite's film grain is `hash(uv * resolution)` — a hash turns a
@@ -271,14 +264,13 @@ try {
       noise that has no sign to it.
 
       The signal that would mean the chain really changed the picture is the
-      bias, and it stays where WebGL's is: 0.011 against a limit of 0.05.
+      bias, and it stays at 0.011 against a limit of 0.05.
 
       The grain's coordinate wants to be the pixel rather than the
       interpolator, which would remove this entirely — but that is a GLSL
       change as well as a WGSL one, and the GLSL is frozen until the cutover.
     */
-    const grainRoll = RENDERER !== 'webgl';
-    const limit = grainRoll ? { max: 10, block: 4.5 } : { max: 2, block: 1 };
+    const limit = { max: 10, block: 4.5 };
     check(`identity: ${label}`, d.max <= limit.max && d.blockMax <= limit.block && Math.abs(d.bias) < 0.05,
       `worst pixel ${d.max} steps, worst 4x4 block ${d.blockMax.toFixed(2)}, bias ${d.bias.toFixed(3)}, targets ${st.float ? 'RGBA16F' : 'RGBA8'}`);
   };
@@ -321,41 +313,15 @@ try {
   await post('hold', null);
   await frames(4);
 
-  // ── Unit 11 ────────────────────────────────────────────────────────
-  // The first frame drawn with the output pass: before the fix, its target
-  // sat on the bead mask's unit, the plate's draw into it was a feedback
-  // loop, and the wall got a black frame.
-  const hasGl = await page.evaluate(() => typeof window.chromaglassDebug().glError === 'function');
-  const built = await page.evaluate(() => !!window.chromaglassDebug().outputPass);
-  const first = hasGl ? await page.evaluate((cfg) => new Promise((resolve) => {
-    const d0 = window.chromaglassDebug();
-    while (d0.glError()) { /* drain */ }
-    window.chromaglassOutput({ ...cfg, flipX: true });
-    const tick = () => {
-      const d = window.chromaglassDebug();
-      if (!d.outputPass) { requestAnimationFrame(tick); return; }
-      const src = document.querySelector('#liquid-canvas');
-      const c = document.createElement('canvas');
-      c.width = 48; c.height = 27;
-      const g = c.getContext('2d', { willReadFrequently: true });
-      g.drawImage(src, 0, 0, 48, 27);
-      const px = g.getImageData(0, 0, 48, 27).data;
-      let sum = 0;
-      for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-      resolve({ err: d.glError(), lum: sum / (px.length / 4) / 255 });
-    };
-    requestAnimationFrame(tick);
-  }), PLAIN_OUT) : null;
-  check('unit 11: the output pass was not built before the flip', !built);
-  if (first) {
-    check('unit 11: the first frame through the output pass is a picture', first.err === 0 && first.lum > a0.lum * 0.5,
-      `GL error ${first.err}, mean luminance ${first.lum.toFixed(3)} (plain ${a0.lum.toFixed(3)})`);
-  } else {
-    // The bug this guards was a texture unit shared between the output pass
-    // and the bead mask. WebGPU has no texture units (docs/webgpu-plan.md),
-    // and no `glError` to ask either, so there is nothing here to ask it.
-    console.log('     unit 11 is a texture-unit clash, and this engine has no texture units');
-  }
+  /*
+    The unit-11 regression is gone with the thing it regressed.
+
+    It was a texture unit shared between the output pass and the bead mask:
+    the first frame drawn through the projector was a feedback loop, and the
+    wall got black. WebGPU has no texture units — a bind group names its own
+    resources — so the bug it guarded cannot be written any more, and the
+    check went with the engine at P7.
+  */
   await output({});
 
   // ── The probe ──────────────────────────────────────────────────────
@@ -415,7 +381,7 @@ try {
       thing worth catching: an empty chain that costs *more* than the two
       passes it is.
     */
-    const allowed = RENDERER === 'webgl' ? off - 2 : off * 0.6;
+    const allowed = off * 0.6;
     check('cost: the chain with nothing in it holds the frame rate', on >= allowed,
       `${off.toFixed(1)} fps off, ${on.toFixed(1)} on, allowed ${allowed.toFixed(1)} (${renderer.replace(/^ANGLE \(|\)$/g, '')})`);
   }

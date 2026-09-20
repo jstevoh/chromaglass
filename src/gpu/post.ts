@@ -22,7 +22,15 @@ import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
 import { BLIT_WGSL, FINISH_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
-import type { PostTest } from '../lib/postChain';
+/**
+ * What the harness can ask the chain to do; never set by a look. It was
+ * declared with the WebGL chain, which is gone (P7).
+ */
+export interface PostTest {
+  /** 0 off, 1 seeded noise, 2 the picture from `delay` frames ago. */
+  mode: 0 | 1 | 2;
+  delay: number;
+}
 
 /** As the GLSL's ring keeps: about half a second at sixty frames a second. */
 const RING_FRAMES = 32;

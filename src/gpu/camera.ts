@@ -32,9 +32,8 @@ export interface CameraView {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
- * The uniforms, from the settings the show folded — the same arithmetic the
- * WebGL draw does at its `cam.draw` call, in one place so the two engines
- * cannot be told different things about the same lens.
+ * The uniforms, from the settings the show folded — worked out in one place, so nothing
+ * downstream can be told a different thing about the same lens.
  */
 export function fillCameraUniforms(pack: UniformPack, view: CameraView, width: number, height: number): void {
   pack.set('resolution', width, height);
@@ -45,8 +44,8 @@ export function fillCameraUniforms(pack: UniformPack, view: CameraView, width: n
   pack.set('focus', clamp01(view.focus));
   pack.set('aperture', clamp01(view.aperture));
   pack.set('bloom', clamp01(view.bloom));
-  // As the WebGL call has them: the sensor's roll-off always on, the vignette
-  // and the grain at fixed strengths that no setting reaches.
+  // The sensor's roll-off always on, the vignette and the grain at fixed
+  // strengths that no setting reaches.
   pack.set('filmic', 1);
   pack.set('vignette', 0.6);
   pack.set('grain', 0.6);

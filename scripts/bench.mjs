@@ -68,9 +68,7 @@ const browser = await launchChromium(chromium);
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
-  // `--webgpu` sweeps the WebGPU stage instead of WebGL, which is the only
-  // way to find out what the port costs on a machine that has a GPU.
-  const ENGINE = process.argv.includes('--webgpu') ? '&renderer=webgpu' : '';
+  const ENGINE = '';
   await page.goto(`http://localhost:${PORT}/?debug&tier=local${ENGINE}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);
   await page.waitForTimeout(4000);
@@ -81,7 +79,7 @@ try {
   // than hanging the run), and the CPU fallback. Asking a software rasteriser
   // for 768² costs minutes a frame for a number nobody would quote.
   await page.evaluate((full) => window.chromaglassBench(
-    full ? {} : { rungs: [256, 99999, 'cpu'], settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500 },
+    full ? {} : { rungs: [256, 99999], settleMs: 600, sampleMs: 600, everyMs: 150, rebuildMs: 2500 },
   ), FULL);
 
   await page.waitForSelector('[data-bench-text]', { timeout: FULL ? 600000 : 180000 });
@@ -105,7 +103,7 @@ try {
   // numbers are asserted on. Whether a *GPU* rung runs depends on the host —
   // a container rasterising in software may refuse them all, and that is a
   // fact about the container, not a failure of this code.
-  check(/cpu192\s+\d/.test(text ?? ''), 'the CPU rung produced numbers', 'the CPU rung produced no numbers');
+  check(/256²\s+\d/.test(text ?? ''), 'the smallest rung produced numbers', 'the smallest rung produced no numbers');
 
   if (!FULL) {
     check(/99999.*—/.test(text ?? ''),

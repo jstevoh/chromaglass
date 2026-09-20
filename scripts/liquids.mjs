@@ -3,7 +3,7 @@
  * Do the liquids actually do anything, and do they leave the plate alone?
  *
  * `liquidPhase` is the field the plate carries to remember what liquid is
- * where. It has no DOM and no WebGL in it, so it can be driven here on a
+ * where. It has no DOM and no GPU in it, so it can be driven here on a
  * stand-in plate rather than by dropping soap on a projector and squinting.
  *
  *   npm run liquids

@@ -19,7 +19,7 @@ ones.
 ## Features
 
 - **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
-- **GPU solver with a frame-time governor** — the whole solve runs in WebGL2 fragment shaders on a 256–768² grid; a governor measures the real frame rate and picks the largest grid and pixel density the machine holds at 60 fps, and falls back to the 192² CPU solver where float render targets are missing (Settings → Simulation → Fluid Grid)
+- **GPU solver with a frame-time governor** — the whole solve runs as WGSL compute passes on a 256–768² grid; a governor measures the real frame rate and what the GPU spent on it, and picks the largest grid and pixel density the machine holds at 60 fps (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Beats ahead of the microphone** — a phase-locked beat clock listens to the onsets, settles on the tempo, and once confident fires every kick a little before the onset would be heard, absorbing the real onset when it arrives; a breakdown or silence hands back to plain detection (Settings → Sound → Beat Prediction and Beat Lead)
 - **A new song, a new look** — when a new song starts (heard as a gap of a few seconds between tracks, or named by track identification) the show switches to another preset or rolls a random look; Settings → Sound → On a New Song, with Keep to turn it off
@@ -126,11 +126,11 @@ Playing the visuals for a band is a different job from running them in a living 
 
 - **The film as a force, not only a light.** The projector used to be a slide: light through the dye and nothing else. **Film Drive** puts the reel's own motion into the liquid — a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot does nothing, because nothing is moving. A patch can take any of the film's features onto any control (Settings → Patches), so *how busy → Turbulence* works off a reel as well as off a floor, and **Film Impact** is the master over those patches. It is the same analysis on both: one sensor, two sources. Both default to zero, so a look saved before this shows the same picture and moves the same way. One warning: capture this app's own window with Film Drive up and you have built a feedback loop — it saturates rather than runs away, since the stir is capped per cell, but a plate stirred by a picture of itself is a plate stirred by nothing in particular.
 
-- **A film that is not on your laptop.** The film projector's third source (Settings → Film) is **Window**: press it, pick a tab, and whatever is playing there goes through the dye. It reaches what a link cannot — a video from another site will play in a page but taints the texture the moment WebGL reads it back, and almost nothing on the web sends the header that would allow it (the Internet Archive does not: no CORS on `/download/`, none on its data nodes, and no preflight). A captured window has no origin, only pixels. The Archive's Prelinger collection is thousands of public-domain reels from exactly this era; open one in a tab, mute it, and let the room's own sound drive the plate.
+- **A film that is not on your laptop.** The film projector's third source (Settings → Film) is **Window**: press it, pick a tab, and whatever is playing there goes through the dye. It reaches what a link cannot — a video from another site will play in a page but taints the texture the moment the GPU reads it back, and almost nothing on the web sends the header that would allow it (the Internet Archive does not: no CORS on `/download/`, none on its data nodes, and no preflight). A captured window has no origin, only pixels. The Archive's Prelinger collection is thousands of public-domain reels from exactly this era; open one in a tab, mute it, and let the room's own sound drive the plate.
 
 - **The wall, squared and masked.** **Settings → Wall** is load-in: **Rear** mirrors the picture for projection through a screen or a gauze from behind (which is how most of these shows were rigged, and the surest way to keep the light off the band's faces), the four **corners** pull a projector that could not be hung on axis back into a rectangle, and the **masks** are tape on the light — pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, with **Mask Edge** deciding whether that stop is a hard line or a fade. **Output Gain** and **Gamma** are for the room, so **Dimmer** stays free for riding the song. None of it is saved into a preset and no fader can reach it: it describes the venue, not the look, and nothing here should move during a song.
 - **Nothing dims, sleeps or screensaves.** The show window holds a screen wake lock while the plate is running, and the projector window always. (It needs a secure context, so it works from the hosted site and from `localhost` — where the show is run — and the panel says plainly when an address cannot have it.)
-- **A lost GPU comes back by itself.** Plugging a projector into a running laptop, a Mac switching between its integrated and discrete GPU, a driver resetting under load: the browser takes the WebGL context away and everything in it. The app catches that, keeps the plate (the dye lives in the CPU arrays too), rebuilds against the new context and carries on — rather than going black until someone reloads and loses the cue list and the sequencer's place with it.
+- **A lost GPU comes back by itself.** Plugging a projector into a running laptop, a Mac switching between its integrated and discrete GPU, a driver resetting under load: the device is lost and everything in it. WebGPU has no event for getting it back — so the app asks for a new one, lays the look again and carries on, rather than going black until someone reloads and loses the cue list and the sequencer's place with it.
 - **Three flashes a second, and no more.** A probe reads back what actually reached the screen and holds the whole field under the clinical limit for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left completely alone and only a sustained strobe is pulled back. On by default, in Settings → Wall (and beside the Dimmer in Settings → Master), and out of reach of every preset and every fader — because no look should be able to switch off a safety.
 - **Someone else's rig.** A browser cannot output Syphon, NDI or Spout, but the projector window is a plain window: **Cast → Second display**, then capture it in OBS (Window Capture) and send it on with the NDI or Syphon plugin into Resolume, HeavyM, MadMapper or whatever the house runs. A **network display** address (`?cast=true&key=…`) is the same picture in any browser on the network, which some capture cards and media servers will take directly.
 - **Fewer things to go wrong.** Install the app (below), turn off sleep and updates on the laptop, run the show from `npm run remote`, and put the phone or the controller in charge so nobody has to reach for the trackpad in the dark.
@@ -179,12 +179,6 @@ another screen, a recording, and another machine capturing this window — and
 not merely the laptop's own display. It sits below the house dimmer, so a
 blackout leaves the mark on the wall; its own opacity is the control for
 taking it off.
-
-## Run it as a box
-
-A Pi or a mini PC behind the screen, powered on, showing the plate: no laptop,
-nothing to click. Same build, two systemd units and a browser told to get out
-of the way. See [docs/appliance.md](docs/appliance.md).
 
 ## Timecode
 
@@ -406,7 +400,7 @@ term for the plate pressure, immiscibility and fingering forces, curl-noise
 turbulence and a self-regulating dye budget. Two things are worth knowing:
 
 - **Where it runs.** On `auto` (the default) the solve moves onto the GPU as a
-  chain of WebGL2 fragment passes, and a frame-time governor picks the grid:
+  chain of WGSL passes, and a frame-time governor picks the grid:
   it starts from a guess for the hardware, steps down within a couple of
   seconds if frames are being dropped, and climbs one rung at a time when
   there is sustained room. Machines whose GPU can't render to float textures
@@ -544,7 +538,6 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 - **simplex-noise** for coherent noise fields
 - **Web Audio API** for real-time FFT analysis (1024-point)
 - **WebGPU** for the whole picture: the fluid solve as compute passes, and the compositor, camera, post chain and projector as WGSL render passes. A browser without WebGPU is told so plainly rather than given a lesser show — it needs Chrome or Edge on the desktop, Safari 26, or Firefox on Windows
-- **WebGL2** is still there behind `?renderer=webgl` while the port settles, and goes when it does (docs/webgpu-plan.md, P7)
 
 ## Project Structure
 
@@ -566,7 +559,6 @@ src/
     musicTypes.ts              # Music intelligence interfaces
     musicDb.ts                 # IndexedDB persistence (song maps, track evolution)
     evolution.ts               # ISRC-seeded visual identity + per-listen evolution
-    gpuFluid.ts                # WebGL2 fluid solver: the CPU pipeline as fragment passes
     outputConfig.ts            # The projector and the wall: flip, corner pin, masks, grade — per machine, never in a preset
     outputPass.ts              # The last pass before the light: the corner-pin warp, the blanking and the grade
     frameProbe.ts              # What the frame that just went to the wall actually looked like
@@ -589,7 +581,7 @@ src/
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
     lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
-    LiquidVisualizer.tsx       # CPU fluid solver, GPU solver driver + WebGL2 renderer
+    LiquidVisualizer.tsx       # the plate's own state, the show's frame loop, and the stage
     SettingsPanel.tsx          # Full settings UI panel
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
@@ -603,8 +595,6 @@ server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)
   artnet.js                    # Art-Net packet and patch: the plate's colour out to the rig, a desk's faders in
-  chromaglass.service          # systemd: the show server on a box (docs/appliance.md)
-  chromaglass-kiosk.service    # systemd: the browser, full screen, on the box's HDMI
 public/
   manifest.webmanifest         # PWA manifest: installable, standalone window
   sw.js                        # Service worker: light cache, never the relay

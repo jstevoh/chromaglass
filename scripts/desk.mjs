@@ -23,7 +23,7 @@
  * of one, both on purpose. What must never happen is the middle of a fade
  * being darker than either end, which is the sag a room reads as a flicker.
  *
- * `lookFade.ts` is pure, so all of this runs here with no DOM and no WebGL.
+ * `lookFade.ts` is pure, so all of this runs here with no DOM and no GPU.
  */
 
 import { PRESETS } from '../src/presets.ts';

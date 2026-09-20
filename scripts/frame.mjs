@@ -2,30 +2,26 @@
  * One way to photograph the plate, whichever engine drew it
  * (docs/webgpu-plan.md, P5).
  *
- * A WebGL canvas keeps its drawing buffer and can be copied straight out with
- * `drawImage`. A presented WebGPU canvas cannot: it answers black, which is
- * not an error and not distinguishable from a black plate — the worst kind of
- * wrong reading, because every check that takes it goes on to measure nothing
- * and say so confidently. On that path the frame is photographed by the stage
- * instead, in the task that draws it, through `chromaglassDebug().grabFrame`.
+ * A presented WebGPU canvas cannot be copied out with `drawImage`: it answers
+ * black, which is not an error and not distinguishable from a black plate —
+ * the worst kind of wrong reading, because every check that takes it goes on
+ * to measure nothing and say so confidently. So the frame is photographed by
+ * the stage instead, in the task that draws it, through
+ * `chromaglassDebug().grabFrame`.
  *
  * Every harness that reads pixels uses this, so there is one implementation of
  * the difference rather than one per harness.
  */
 
 /**
- * Which engine a run asks for, and the query that asks for it.
- *
- * WebGPU is the app's default since the cutover (docs/webgpu-plan.md, P6), so
- * a run that says nothing gets it. `CG_RENDERER=webgl` asks for the old path,
- * which is still there until P7 deletes it — and is what the Linux jobs use,
- * because a runner with no GPU can compute WebGPU but cannot present its
- * canvas.
+ * There is one engine (docs/webgpu-plan.md, P7), so a harness no longer
+ * chooses: these two are kept as the seam where a second one would arrive,
+ * and they say the same thing every time.
  */
-export const engineQuery = (env = process.env) => {
-  const want = engineName(env);
-  return want === 'webgl' ? '&renderer=webgl' : '';
-};
+export const engineName = () => 'webgpu';
+
+/** Nothing: the app has no renderer flag any more. */
+export const engineQuery = () => '';
 
 /**
  * Is this label a GPU solver's?
@@ -37,7 +33,6 @@ export const engineQuery = (env = process.env) => {
  */
 export const isGpuEngine = (label) => /^(GPU|WebGPU)\b/.test(label ?? '');
 
-export const engineName = (env = process.env) => env.CG_RENDERER ?? env.QA_RENDERER ?? 'webgpu';
 
 /**
  * Install `window.__cgFrame(w, h)` for every navigation on this page. It
@@ -87,9 +82,12 @@ export const installFrameReader = (page) => page.addInitScript(() => {
       full.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height), 0, 0);
       ctx.drawImage(full, 0, 0, w, h);
     } else {
-      // A presented WebGPU canvas answers this with black, so a run that
-      // lands here under the flag is reading nothing and should say so.
-      ctx.drawImage(canvas, 0, 0, w, h);
+      // No `grabFrame` means the show has not started yet, or the debug hook
+      // is off. Reading the canvas directly answers black on this engine, so
+      // it is left for the caller's account to report rather than quietly
+      // producing a frame that means nothing.
+      window.__cgFrameLast = { ...note, got: 'no grabFrame — nothing to read' };
+      return null;
     }
     const data = [...ctx.getImageData(0, 0, w, h).data];
     let scaled = 0;
@@ -122,11 +120,8 @@ export const installFrameReader = (page) => page.addInitScript(() => {
       image = new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height);
       note.size = [g.width, g.height];
     } else {
-      const copy = document.createElement('canvas');
-      copy.width = canvas.width; copy.height = canvas.height;
-      copy.getContext('2d').drawImage(canvas, 0, 0);
-      image = copy.getContext('2d').getImageData(0, 0, copy.width, copy.height);
-      note.size = [copy.width, copy.height];
+      window.__cgFrameLast = { ...note, got: 'no grabFrame — nothing to read' };
+      return null;
     }
     let lit = 0;
     for (let i = 0; i < image.data.length; i += 4) {
