@@ -97,23 +97,45 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     announce();
     window.addEventListener('resize', announce);
     document.addEventListener('fullscreenchange', announce);
-    let anim = 0;
-    const draw = () => {
-      anim = requestAnimationFrame(draw);
-      const opener = window.opener as Window | null;
-      if (!opener || opener.closed) { setGone(true); return; }
-      const sw = source.width, sh = source.height;
-      if (sw === 0 || sh === 0) return;
-      // Letterbox in case the show window has not caught up with our size yet.
+    /*
+      The show pushes; this window does not pull (docs/webgpu-plan.md, P3).
+
+      This used to run its own rAF and `drawImage` the opener's canvas, which
+      is exactly what a presented WebGPU canvas cannot serve: once the frame
+      is out, reading it gives black — not an error, just a dark projector.
+      So the drawing moves to the show window, into the frame task that drew
+      it, where the canvas is still readable on either engine.
+
+      It costs nothing and removes something: there is one clock now instead
+      of two that could tear against each other. What stays here is the
+      letterbox — this window knows its own size — and announcing that size,
+      which is how the show knows how many pixels to render.
+    */
+    const opener = window.opener as (Window & { __chromaglassMirror?: unknown }) | null;
+    const paint = (frame: HTMLCanvasElement) => {
+      const sw = frame.width, sh = frame.height;
+      if (sw === 0 || sh === 0 || lastW === 0 || lastH === 0) return;
       const s = Math.min(lastW / sw, lastH / sh);
       const dw = Math.round(sw * s), dh = Math.round(sh * s);
       const dx = (lastW - dw) >> 1, dy = (lastH - dh) >> 1;
       if (dw !== lastW || dh !== lastH) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, lastW, lastH); }
-      ctx.drawImage(source, 0, 0, sw, sh, dx, dy, dw, dh);
+      ctx.drawImage(frame, 0, 0, sw, sh, dx, dy, dw, dh);
     };
-    draw();
+    if (opener && !opener.closed) opener.__chromaglassMirror = paint;
+
+    // The show window closing is the one thing this window still has to
+    // notice for itself, and twice a second is often enough to say so.
+    const watch = window.setInterval(() => {
+      const o = window.opener as Window | null;
+      if (!o || o.closed) setGone(true);
+    }, 500);
+
     return () => {
-      cancelAnimationFrame(anim);
+      window.clearInterval(watch);
+      try {
+        const o = window.opener as (Window & { __chromaglassMirror?: unknown }) | null;
+        if (o && !o.closed && o.__chromaglassMirror === paint) o.__chromaglassMirror = undefined;
+      } catch { /* the show window is gone */ }
       window.removeEventListener('resize', announce);
       document.removeEventListener('fullscreenchange', announce);
       bc?.close();

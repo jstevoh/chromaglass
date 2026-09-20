@@ -4636,6 +4636,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           fxSeed: fxSeedRef.current,
         }, fluidsRef.current) ?? null;
 
+        /*
+          The projector window, in this task (docs/webgpu-plan.md, P3).
+
+          It used to pull: its own rAF, drawing this canvas into its own. A
+          presented WebGPU canvas answers that with black, so the projector
+          draws it here instead — in the frame task that drew it, where the
+          canvas is readable on either engine — and the mirror keeps only the
+          letterbox and its own size.
+        */
+        const mirror = (window as unknown as { __chromaglassMirror?: (c: HTMLCanvasElement) => void }).__chromaglassMirror;
+        if (mirror) {
+          try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
+        }
+
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
         if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
