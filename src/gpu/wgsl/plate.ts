@@ -787,6 +787,28 @@ struct VsOut {
   @location(0) uv: vec2f,
 };
 
+/*
+  Which way up this pass stores its picture (docs/webgpu-plan.md, P3).
+
+  A WebGPU render target's first row is its top, and a full-screen quad's
+  uv.y of 1 lands there — so a pass that samples at uv.y 1 reads the *last*
+  row, and a picture handed from one pass to the next comes out upside down. Drawn straight to the canvas that never shows, which is why it took
+  the camera being switched on to see it: the mark moved from seven tenths
+  down the screen to two tenths.
+
+  So a pass writing into a texture another pass will sample flips its clip
+  space, which puts uv.y 0 in row 0 — the convention WebGL's own framebuffers
+  have, and the one every consumer here and in the parity harnesses already
+  assumes. Drawing to the canvas, it does not flip.
+
+  (No backticks in this comment: one inside a WGSL comment ends the
+  TypeScript template literal holding it.)
+
+  An override constant rather than a uniform: the two pipelines differ by a
+  sign that never changes within a pass, and the harnesses go on compiling
+  the unflipped one without knowing this exists.
+*/
+override FLIP_Y: f32 = 1.0;
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VsOut {
   // Two triangles' worth of corners, as the quad the GLSL draws.
   var p = array<vec2f, 6>(
@@ -795,7 +817,7 @@ struct VsOut {
   );
   let xy = p[i];
   var out: VsOut;
-  out.pos = vec4f(xy, 0.0, 1.0);
+  out.pos = vec4f(xy.x, xy.y * FLIP_Y, 0.0, 1.0);
   // The same uv the GLSL's vertex stage produces, not flipped: the film grain
   // hashes it, so a flip here would be a different grain. WebGPU's frame comes
   // out of memory the other way up, which the harness turns over when it
@@ -1279,7 +1301,12 @@ struct FsOut {
     // GL counts framebuffer rows up and WebGPU counts them down, so dpdy is
     // the other way round from dFdy: without the sign the dome's slope faces
     // the wrong way and every bead catches the lamp on its wrong side.
-    let slope = vec2f(dpdx(ramp), -dpdy(ramp));
+    //
+    // And FLIP_Y mirrors the geometry when this pass draws into a texture, so
+    // it mirrors the derivative too — which would put the lamp back on the
+    // wrong side for exactly the frames that go through the camera or the
+    // post chain. The sign carries it.
+    let slope = vec2f(dpdx(ramp), -FLIP_Y * dpdy(ramp));
     let sl = length(slope);
     let Lb = lampDir(fuvBase, U.lamp);
     let lampS = Lb.xy / max(length(Lb.xy), 0.06);

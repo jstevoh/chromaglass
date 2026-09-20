@@ -341,6 +341,45 @@ where the governor holds 512² and never walks down. Four CI runs went into
 it, and what ended it was the harness reporting the show's own state next to
 the pixels it did not like rather than another guess from here.
 
+## The post chain, 2026-09-20
+
+F0's chain is on the stage (`gpu/post.ts`), with `npm run post` as its gate —
+11 cases, six of them pixel-identical, the rest within 1 of 255 — and
+`npm run fx` running the app's own F0 suite under the flag, 24 of 24.
+
+The finish is not written twice: it is `FINISH_WGSL` from the plate's own
+shader, as the GLSL shares `FINISH_GLSL` between the plate and the chain.
+
+**Wiring it up found a flip that was already shipping.** A WebGPU render
+target's first row is its top, and a full-screen quad's uv.y of 1 lands
+there — so a pass sampling at uv.y 1 reads the *last* row, and a picture
+handed from one pass to the next comes out upside down. The camera has done
+this since it landed: measured, the mark moved from seven tenths down the
+screen to two tenths the moment the camera came on. Nothing caught it,
+because a parity harness feeds both engines a texture and both read it the
+same way; the flip only exists when one WebGPU pass samples what another
+*rendered*.
+
+Every pass that writes a texture another pass will sample now flips its clip
+space (`FLIP_Y`, an override constant, so the harnesses go on compiling the
+unflipped pipeline). Two things follow from mirroring the geometry, and both
+are handled: the beads' `dpdy` compensation inverts with it, and the effects'
+noise takes its pixel from the uv rather than the position.
+
+**What it costs is one thing, measured.** Mirroring perturbs the interpolated
+uv in its last bit, and the composite's film grain is `hash(uv * resolution)`,
+so the grain re-rolls: ±3.8 of 255 per draw, ±7.6 between two, mean 0.6 over
+the frame. `fx`'s identity check allows that on this engine and holds the
+bias — the number that would mean the chain really changed the picture — to
+0.011 against a limit of 0.05, which is where WebGL's sits. The grain's
+coordinate wants to be the pixel rather than the interpolator, which removes
+it entirely; that is a GLSL change too, so it waits for the cutover.
+
+**Also found:** a pipeline is built for one attachment state, and the plate's
+was built for the canvas. Drawing into the chain's half floats with it is
+rejected, the frame is black, and the render loop stops — so each pass is now
+told the format it is drawing into as well as which way up.
+
 **Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag —
 none of them reaches for a GL context, so it is the same two moves each time
 (an engine hook on the URL, and the frame read through `grabFrame`) — the

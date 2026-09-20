@@ -8,11 +8,12 @@ import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
 import { WebGPUStage } from '../gpu/stage';
 import { WebGPUFluid } from '../gpu/fluid';
-import { WebGPUPlate } from '../gpu/plate';
+import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
+import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -4738,6 +4739,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let camera: WebGPUCamera | null = null;
       let projector: WebGPUOutput | null = null;
       let probe: WebGPUFrameProbe | null = null;
+      let chain: WebGPUPostChain | null = null;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
@@ -4850,8 +4852,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // picture it had not been given.
               if (view.beadMask) plate.setSource('beads', view.beadMask);
               const mk = view.mark;
-              if (!mk) plate.setSource('mark', null);
-              else if (mk.dirty) { plate.setSource('mark', mk.source); mk.dirty = false; }
+              if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
+              else if (mk.dirty) {
+                plate.setSource('mark', mk.source);
+                // The chain's finish lays the mark over the frame when it is
+                // the one finishing, so it needs the picture as well.
+                const [mw, mh] = pictureSize(mk.source);
+                chain?.setMark(mk.source, mw, mh);
+                mk.dirty = false;
+              }
               const film = view.film;
               if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
                 plate.setSource('film', film.video);
@@ -4866,6 +4875,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
               else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
               const cam = camera;
+
+              // The post chain, when an effect is on. None exist yet; the
+              // harness's test effect is what runs (docs/filters-plan.md,
+              // F0). Off, none of it is built and the plate finishes the
+              // frame itself, exactly as before there was a chain.
+              const postTest = view.postTest;
+              const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
+              if (wantPost && !chain) {
+                chain = new WebGPUPostChain(s.device, s.format);
+                // A mark that arrived before the chain did: it is uploaded on
+                // the frame it arrives and never again, so a chain built
+                // later would finish every frame without it.
+                if (view.mark) {
+                  const [mw, mh] = pictureSize(view.mark.source);
+                  chain.setMark(view.mark.source, mw, mh);
+                }
+              } else if (!wantPost && chain) { chain.dispose(); chain = null; }
+              const post = chain;
 
               // The projector, last: flip, corner pin, blanking and grade.
               // Built the first frame it would change anything and dropped
@@ -4886,7 +4913,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // still dithers into its 8-bit texture, or a dark ramp bands
                 // before the camera ever sees it.
                 cameraOn: !!cam,
+                // With a chain, the finish happens at the end of it instead.
+                postChain: !!post,
               });
+              // What the finish needs, taken from the uniforms the plate was
+              // just given rather than worked out a second time here: the
+              // dimmer with the flash guard folded in, and the mark's fader
+              // and rectangle. One mapping, so the two cannot drift.
+              const [dimmerNow] = plate.pack.get('dimmer');
+              const [markOnNow] = plate.pack.get('markOn');
+              const markRectNow = plate.pack.get('markRect') as [number, number, number, number];
               if (cam) {
                 fillCameraUniforms(cam.pack, {
                   time: view.time,
@@ -4896,9 +4932,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   focus: view.settings.focus ?? 0.5,
                   aperture: view.settings.aperture ?? 0,
                   bloom: view.settings.bloom ?? 0,
-                  // Nothing follows it yet under this flag; when the post
-                  // chain lands, the finish dithers once, at the end.
-                  dither: 1,
+                  // Into the chain's half floats, nothing: its finish
+                  // dithers once, at the end.
+                  dither: post ? 0 : 1,
                 }, canvas.width, canvas.height);
               }
               // The painter stays set, so `grabFrame` photographs the picture
@@ -4924,15 +4960,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (live[0].dye.width !== fields[0].dye.width) {
                   plate.pack.set('gridSize', live[0].dye.width);
                 }
+                // Where each pass hands the frame on: the projector's texture
+                // if there is one, else the canvas; the chain's picture if
+                // there is one, else that; and the camera's scene if there is
+                // one, else that. Read inside out, it is the chain in order.
                 const screen = out ? out.sceneView(size.width, size.height) : target;
+                const afterEffects = post ? post.sceneView(size.width, size.height) : screen;
+                // Each pass is told whether it is writing a texture or the
+                // canvas, because a picture handed on has to be stored the
+                // way the next pass reads it (FLIP_Y, in `wgsl/plate.ts`).
+                // And what each one is drawing into, since the chain's
+                // picture is half float where the canvas and the projector's
+                // texture are not.
+                const stageFormat = s.format;
+                const plateFormat = cam ? stageFormat : post ? post.pictureFormat : stageFormat;
                 plate.draw(
                   encoder,
-                  cam ? cam.sceneView(size.width, size.height) : screen,
+                  cam ? cam.sceneView(size.width, size.height) : afterEffects,
                   size, live, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
+                  !!cam || !!post || !!out,
+                  plateFormat,
                 );
                 if (cam && plate.auxTarget) {
-                  cam.draw(encoder, screen, plate.auxTarget, stage?.profiler.renderPass('camera'));
+                  cam.draw(
+                    encoder, afterEffects, plate.auxTarget,
+                    stage?.profiler.renderPass('camera'), !!post || !!out,
+                    post ? post.pictureFormat : stageFormat,
+                  );
+                }
+                if (post) {
+                  post.effects(encoder, view.fxFrame, view.fxSeed, postTest);
+                  post.finish(encoder, screen, {
+                    dimmer: dimmerNow,
+                    markOn: markOnNow,
+                    markRect: markRectNow,
+                  }, stage?.profiler.renderPass('finish'), !!out);
                 }
                 if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               };
@@ -5002,6 +5065,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
              * question, either engine.
              */
             outputPass: projector,
+            /**
+             * The post chain, under the names the WebGL renderer publishes:
+             * `npm run fx` asks these of whichever engine is running, and the
+             * four that set something write the show's own refs, which both
+             * engines read.
+             */
+            post: {
+              active: !!chain,
+              float: chain?.float ?? null,
+              history: chain?.historySize ?? null,
+              frame: fxFrameRef.current,
+              force: (on: boolean) => { postForceRef.current = !!on; },
+              test: (mode: 0 | 1 | 2, delay = 1) => { postTestRef.current = mode ? { mode, delay } : null; },
+              seed: (n: number) => { fxSeedRef.current = n >>> 0; },
+              /** Hold the effects' clock at one frame (null lets it run), so a frame can be drawn twice. */
+              hold: (frame: number | null) => { fxHoldRef.current = frame === null ? null : frame >>> 0; },
+              ringSelfTest: () => chain?.ringSelfTest() ?? null,
+            },
             /** The guard's own state, and the luminance it is being fed. */
             flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
             /**
@@ -5029,6 +5110,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         projector = null;
         probe?.dispose();
         probe = null;
+        chain?.dispose();
+        chain = null;
         stage?.dispose();
         stage = null;
       };

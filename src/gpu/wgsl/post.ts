@@ -31,6 +31,15 @@ ${POST_STRUCT}
 
 fn tex2(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureSampleLevel(t, samp, uv, 0.0); }
 
+/*
+  Which way up this pass stores its picture: see FLIP_Y in wgsl/plate.ts.
+  The effects and the ring's blit always write a texture, so the chain always
+  compiles them flipped; the finish may write the canvas instead, and takes
+  whichever it is given. (No backticks in here: one inside a WGSL comment
+  ends the TypeScript template literal holding it.)
+*/
+override FLIP_Y: f32 = 1.0;
+
 struct VsOut {
   @builtin(position) pos: vec4f,
   @location(0) uv: vec2f,
@@ -43,7 +52,7 @@ struct VsOut {
   );
   let xy = p[i];
   var out: VsOut;
-  out.pos = vec4f(xy, 0.0, 1.0);
+  out.pos = vec4f(xy.x, xy.y * FLIP_Y, 0.0, 1.0);
   // Unflipped, as the plate's own vertex stage leaves it: the dither and the
   // grain hash coordinates, and a flip here would be a different pattern.
   out.uv = xy * 0.5 + 0.5;
@@ -92,12 +101,50 @@ export const TEST_PASS_WGSL = `${HEAD}${FX_RANDOM_WGSL}
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
   var c = tex2(picture, in.uv).rgb;
   if (U.mode == 1) {
-    // The GL's fragment coordinate again: the noise is hashed from the pixel.
-    let px = vec2u(u32(in.pos.x), u32(U.resolution.y - in.pos.y));
+    // The GL's fragment coordinate, taken from the uv rather than from the
+    // position: they are the same number unflipped, and this one stays the
+    // same number when FLIP_Y mirrors the geometry. An effect's randomness
+    // has to be the pixel's, not the row's, or a frame drawn into a texture
+    // and the same frame drawn to the canvas are different pictures.
+    let px = vec2u(in.uv * U.resolution);
     c = mix(c, vec3f(fxRand(px, U.frame, U.seed)), 0.5);
   } else if (U.mode == 2) {
     c = textureSampleLevel(history, samp, in.uv, i32(U.layer), 0.0).rgb;
   }
   return vec4f(c, 1.0);
+}
+`;
+
+/**
+ * A copy, for the history ring: the picture into one layer of it, scaled
+ * down on the way. The ring is a stack of past frames and this pass writes
+ * one of them, so it cannot be the test effect's shader with the mode off —
+ * that one samples the ring, and a texture cannot be read and written in the
+ * same pass.
+ */
+export const BLIT_WGSL = /* wgsl */ `
+override FLIP_Y: f32 = 1.0;
+@group(0) @binding(0) var samp: sampler;
+@group(0) @binding(1) var picture: texture_2d<f32>;
+
+struct BlitOut {
+  @builtin(position) pos: vec4f,
+  @location(0) uv: vec2f,
+};
+
+@vertex fn vs(@builtin(vertex_index) i: u32) -> BlitOut {
+  var p = array<vec2f, 6>(
+    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0),
+  );
+  let xy = p[i];
+  var out: BlitOut;
+  out.pos = vec4f(xy.x, xy.y * FLIP_Y, 0.0, 1.0);
+  out.uv = xy * 0.5 + 0.5;
+  return out;
+}
+
+@fragment fn fs(in: BlitOut) -> @location(0) vec4f {
+  return textureSampleLevel(picture, samp, in.uv, 0.0);
 }
 `;

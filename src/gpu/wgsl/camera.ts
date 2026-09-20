@@ -51,6 +51,28 @@ struct VsOut {
   @location(0) uv: vec2f,
 };
 
+/*
+  Which way up this pass stores its picture (docs/webgpu-plan.md, P3).
+
+  A WebGPU render target's first row is its top, and a full-screen quad's
+  uv.y of 1 lands there — so a pass that samples at uv.y 1 reads the *last*
+  row, and a picture handed from one pass to the next comes out upside down. Drawn straight to the canvas that never shows, which is why it took
+  the camera being switched on to see it: the mark moved from seven tenths
+  down the screen to two tenths.
+
+  So a pass writing into a texture another pass will sample flips its clip
+  space, which puts uv.y 0 in row 0 — the convention WebGL's own framebuffers
+  have, and the one every consumer here and in the parity harnesses already
+  assumes. Drawing to the canvas, it does not flip.
+
+  (No backticks in this comment: one inside a WGSL comment ends the
+  TypeScript template literal holding it.)
+
+  An override constant rather than a uniform: the two pipelines differ by a
+  sign that never changes within a pass, and the harnesses go on compiling
+  the unflipped one without knowing this exists.
+*/
+override FLIP_Y: f32 = 1.0;
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VsOut {
   var p = array<vec2f, 6>(
     vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
@@ -58,7 +80,7 @@ struct VsOut {
   );
   let xy = p[i];
   var out: VsOut;
-  out.pos = vec4f(xy, 0.0, 1.0);
+  out.pos = vec4f(xy.x, xy.y * FLIP_Y, 0.0, 1.0);
   out.uv = xy * 0.5 + 0.5;
   return out;
 }
