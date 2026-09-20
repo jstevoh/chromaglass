@@ -17,7 +17,7 @@
 
 import { UNIT } from './textureUnits';
 
-const VERT = `#version 300 es
+export const CAMERA_VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
 void main() {
@@ -25,7 +25,7 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
-const FRAG = `#version 300 es
+export const CAMERA_FRAG = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 out vec4 fragColor;
@@ -182,8 +182,8 @@ export class CameraPass {
       }
       return sh;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    const vs = compile(gl.VERTEX_SHADER, CAMERA_VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, CAMERA_FRAG);
     this.program = gl.createProgram()!;
     let ok = !!vs && !!fs;
     if (vs && fs) {

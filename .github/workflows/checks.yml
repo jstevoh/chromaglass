@@ -150,6 +150,8 @@ jobs:
       - run: npm run parity
       # Both composites, the same textures, compared pixel by pixel.
       - run: npm run composite
+      # Both cameras, the same scene, compared the same way.
+      - run: npm run camera
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.
