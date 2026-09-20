@@ -8,6 +8,8 @@ import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
 import { WebGPUStage } from '../gpu/stage';
 import { WebGPUFluid } from '../gpu/fluid';
+import { WebGPUPlate } from '../gpu/plate';
+import { fillPlateUniforms } from '../gpu/plateUniforms';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -4729,6 +4731,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
          * with it, so the canvas stays black and `drawFrame` reads nothing
          * back. That is the next piece.
          */
+        const plate = new WebGPUPlate(s.device, s.format);
         const gpuRenderer: PlateRenderer = {
           info: { api: 'webgpu', renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
           maxTexture: s.device.limits.maxTextureDimension2D,
@@ -4751,8 +4754,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               return false;
             }
           },
-          drawFrame: () => {
+          drawFrame: (view, fluids) => {
             const t0 = performance.now();
+            // Every layer whose solver is the WebGPU one. A field still on
+            // the CPU has nothing for the compositor to sample, so it sits
+            // this frame out rather than drawing a stale plate.
+            const fields = fluids
+              .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
+              .filter((f): f is NonNullable<typeof f> => !!f);
+            if (fields.length && stage) {
+              fillPlateUniforms(plate.pack, {
+                view, fluids,
+                width: canvas.width, height: canvas.height,
+                derived: true,
+                grid: fields[0].dye.width,
+              });
+              // The painter stays set, so `grabFrame` photographs the picture
+              // rather than an empty pass.
+              stage.paint = (encoder, target) => {
+                plate.draw(encoder, target, { width: canvas.width, height: canvas.height }, fields, Math.max(view.velRange, 1e-6));
+              };
+            }
             stage?.frame();
             cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
             return null;
@@ -4773,7 +4795,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         };
         startWith(gpuRenderer);
       });
-      return () => { cancelled = true; cancelAnimationFrame(animationFrameId); stage?.dispose(); stage = null; };
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(animationFrameId);
+        stage?.dispose();
+        stage = null;
+      };
     }
 
     // ── WebGL2 initialization ──────────────────────────────────────────

@@ -746,6 +746,13 @@ export class WebGPUFluid {
     return c * c;
   }
 
+  /**
+   * The pigment's coordinates, where the device can carry them. Named as the
+   * WebGL solver names it, because that is what the plate asks both of them
+   * for (`PlateSolver` in `lib/gpuFluid.ts`).
+   */
+  get grainTexture(): GPUTexture | null { return this.grain?.read ?? null; }
+
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
     return { dye: this.dye.read, vel: this.vel.read, velForced: this.velForced, grain: this.grain?.read ?? null };

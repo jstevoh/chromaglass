@@ -18,6 +18,12 @@ export class WebGPUStage {
   readonly profiler: GpuProfiler;
   /** Frames drawn since the start. */
   frames = 0;
+  /**
+   * What puts the picture in a frame. The renderer sets it once; `frame` and
+   * `grabFrame` both use it, so what a harness photographs is what the wall
+   * gets rather than an empty pass.
+   */
+  paint: ((encoder: GPUCommandEncoder, target: GPUTextureView) => void) | null = null;
   private disposed = false;
 
   private constructor(readonly gpu: Gpu, readonly canvas: HTMLCanvasElement, context: GPUCanvasContext) {
@@ -57,17 +63,27 @@ export class WebGPUStage {
     });
   }
 
-  /** Encode and submit one frame into the canvas's current texture. */
-  frame(): GPUTexture {
+  /**
+   * Encode and submit one frame into the canvas's current texture.
+   *
+   * The painter is given the encoder and the frame's target and puts the
+   * picture there; with none set the frame is a clear, which is what the black
+   * plate was before the compositor arrived.
+   */
+  frame(paint = this.paint): GPUTexture {
     const device = this.gpu.device;
     const target = this.context.getCurrentTexture();
     const encoder = device.createCommandEncoder({ label: 'frame' });
-    const pass = encoder.beginRenderPass({
-      label: 'plate',
-      colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
-      timestampWrites: this.profiler.pass('plate'),
-    });
-    pass.end();
+    if (paint) {
+      paint(encoder, target.createView());
+    } else {
+      const pass = encoder.beginRenderPass({
+        label: 'plate',
+        colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+        timestampWrites: this.profiler.pass('plate'),
+      });
+      pass.end();
+    }
     this.profiler.resolveInto(encoder);
     device.queue.submit([encoder.finish()]);
     this.profiler.afterSubmit();
