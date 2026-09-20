@@ -204,7 +204,10 @@ const WEBGPU = (() => {
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
-  if (want === 'cpu') return 0;
+  // Under the WebGPU flag there is nothing to draw a CPU-held plate with, so
+  // a pin there becomes the smallest grid the stage can draw rather than a
+  // black screen. The pin itself goes when the CPU solver does (P7).
+  if (want === 'cpu') return WEBGPU ? 256 : 0;
   return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
@@ -4717,7 +4720,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
-      const ladder = qualityLadder(tier, r.info.gpuClass);
+      // The WebGPU stage cannot draw a plate the CPU solver holds, so its
+      // ladder has no rung there (docs/webgpu-plan.md, P5).
+      const ladder = qualityLadder(tier, r.info.gpuClass, r.info.api !== 'webgpu');
       governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
       r.resize();
       render();

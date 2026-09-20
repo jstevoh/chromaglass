@@ -154,6 +154,42 @@ const watch = (page) => {
           lit !== null, lit === null ? 'never lit again' : `${(lit * 100).toFixed(0)}% lit`);
       }
 
+      /*
+        The bottom of the ladder.
+
+        The WebGL renderer packs the CPU solver's arrays into its own textures
+        and draws them, so its lowest rung is a working show on a machine that
+        can afford no GPU grid. This stage samples the solver's textures, and
+        a field that is not on the GPU has none — so that rung is not a slower
+        show here but a black one. CI found it before this check existed: a
+        stage drawing 1,676 frames of nothing over a plate that was simulating
+        perfectly well, on a runner slow enough for the governor to walk all
+        the way down.
+      */
+      {
+        const rungs = await page.evaluate(() => window.chromaglassDebug().governor.rungs.map((r) => r.grid));
+        check('no rung on this ladder is one the stage cannot draw',
+          rungs.length > 0 && !rungs.includes('cpu'), rungs.join(' → '));
+
+        const pinned = await page.evaluate(async () => {
+          const d = window.chromaglassDebug();
+          const was = d.settings.simResolution;
+          d.settings.simResolution = 'cpu';
+          for (let i = 0; i < 180; i++) await new Promise((r) => requestAnimationFrame(r));
+          const g = await d.grabFrame();
+          let on = 0;
+          if (g) for (let i = 0; i < g.pixels.length; i += 4) {
+            if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+          }
+          const out = { engine: d.engine, lit: g ? on / (g.pixels.length / 4) : 0 };
+          d.settings.simResolution = was ?? 'auto';
+          return out;
+        });
+        check('and a plate pinned to the CPU solver is still drawn',
+          pinned.lit > 0.5 && !/^CPU/.test(pinned.engine),
+          `${pinned.engine}, ${(pinned.lit * 100).toFixed(0)}% lit`);
+      }
+
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');
 

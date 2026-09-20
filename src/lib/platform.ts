@@ -102,9 +102,33 @@ export function renderScale(): number {
  * float render targets are far slower than the JavaScript solver and the
  * governor would only find that out the slow way.
  */
-export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: QualityRung[]; start: number } {
+export function qualityLadder(
+  tier: PlatformTier,
+  gpu: GpuClass,
+  /**
+   * Whether the engine can draw a plate the CPU solver is holding
+   * (docs/webgpu-plan.md, P5).
+   *
+   * The WebGL renderer packs the CPU's arrays into its own textures and draws
+   * them, so the bottom of its ladder is a working show on a machine that
+   * cannot afford any GPU grid. The WebGPU stage has no such path: its
+   * compositor samples the solver's textures, and a field that is not on the
+   * GPU has none. Left in, that rung is not a slower show but a black one —
+   * which is what CI found, a stage drawing 1,676 frames of nothing over a
+   * plate that was simulating perfectly well.
+   *
+   * So that engine's ladder stops at the smallest GPU grid. A machine that
+   * cannot hold it gets a slow show rather than no show, which is the right
+   * way round, and the rung goes for good when the CPU solver does (P7).
+   */
+  cpuFallback = true,
+): { rungs: QualityRung[]; start: number } {
   const dpr = devicePixels();
-  if (gpu === 'software') return { rungs: [{ grid: 'cpu', dpr: 1 }], start: 0 };
+  if (gpu === 'software') {
+    return cpuFallback
+      ? { rungs: [{ grid: 'cpu', dpr: 1 }], start: 0 }
+      : { rungs: [{ grid: 256, dpr: 1 }], start: 0 };
+  }
 
   const rungs: QualityRung[] =
     tier === 'hosted'
@@ -123,6 +147,11 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
           { grid: 256, dpr: 1 },
           { grid: 'cpu', dpr: 1 },
         ];
+
+  if (!cpuFallback) {
+    const i = rungs.findIndex((r) => r.grid === 'cpu');
+    if (i >= 0) rungs.splice(i, 1);
+  }
 
   // Start one step below the best guess for the hardware so the first seconds
   // are smooth; the governor climbs within ~10 s if the machine has room.

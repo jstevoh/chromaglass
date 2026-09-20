@@ -319,6 +319,28 @@ uniforms were filled for if the rebuild changed it. `npm run webgpu` drops the
 solver on purpose and photographs with no frame in between, which is that
 window exactly.
 
+**And the show night found the thing worth finding.** On the runner, four
+checks read a frame that never changed, and the state they printed when they
+failed said why: `CPU · 192², 17.3 steps/s over 1 layer, dye 1.125, 60.5
+ms/frame, 353 frames drawn · read via grabFrame, 0% lit`. The governor had
+walked down the ladder under load and reached its bottom rung, which is the
+CPU solver — and the WebGPU stage has no way to draw a plate the CPU is
+holding. Its compositor samples the solver's textures, and a field that is
+not on the GPU has none. The plate was simulating perfectly well and the
+stage was drawing sixteen hundred frames of nothing over it.
+
+So that rung is not on this engine's ladder: it stops at 256², and a machine
+that cannot hold it gets a slow show rather than no show. A pinned `cpu` grid
+becomes the smallest the stage can draw, for the same reason. Both go for
+good with the CPU solver itself (P7). `npm run webgpu` holds the line —
+"no rung on this ladder is one the stage cannot draw — 768 → 512 → 512 → 384
+→ 256" — and pins the grid to `cpu` to see a plate anyway.
+
+It is worth saying how long that took to see: it cannot happen on this Mac,
+where the governor holds 512² and never walks down. Four CI runs went into
+it, and what ended it was the harness reporting the show's own state next to
+the pixels it did not like rather than another guess from here.
+
 **Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag —
 none of them reaches for a GL context, so it is the same two moves each time
 (an engine hook on the URL, and the frame read through `grabFrame`) — the
