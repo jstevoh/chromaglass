@@ -116,6 +116,80 @@ const watch = (page) => {
           ? `${frame.width}×${frame.height}, brightest ${frame.max}, ${(frame.lit * 100).toFixed(0)}% lit, ${(frame.colour * 100).toFixed(0)}% in colour`
           : 'nothing read');
 
+      /*
+        A painter outlives the frame that set it: `grabFrame` runs it again
+        later, and a rung change in between disposes the solver whose
+        textures it was drawing. Held ones give "Destroyed texture used in a
+        submit", which CI's show night found on the first runner slow enough
+        to change rung while a harness was photographing the plate — and
+        which this machine never does, because its governor holds 512².
+
+        So the solver is dropped on purpose and the plate photographed with
+        no frame in between, which is that window exactly.
+      */
+      {
+        const before = errors.length;
+        await page.evaluate(async () => {
+          const d = window.chromaglassDebug();
+          d.fluids[0].detachGpu();
+          await d.grabFrame();
+          await d.grabFrame();
+        });
+        await page.waitForTimeout(800);
+        const raised = errors.slice(before);
+        check('photographing the plate after the solver is dropped draws nothing dead',
+          raised.length === 0, raised.slice(0, 2).join(' | ') || 'no errors');
+        // And the show carries on: the loop attaches a solver again.
+        const lit = await page.waitForFunction(async () => {
+          const g = await window.chromaglassDebug().grabFrame();
+          if (!g) return null;
+          let on = 0;
+          for (let i = 0; i < g.pixels.length; i += 4) {
+            if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+          }
+          const share = on / (g.pixels.length / 4);
+          return share > 0.5 ? share : null;
+        }, null, { timeout: 20_000 }).then((h) => h.jsonValue()).catch(() => null);
+        check('and the plate comes back on the solver the loop attaches next',
+          lit !== null, lit === null ? 'never lit again' : `${(lit * 100).toFixed(0)}% lit`);
+      }
+
+      /*
+        The bottom of the ladder.
+
+        The WebGL renderer packs the CPU solver's arrays into its own textures
+        and draws them, so its lowest rung is a working show on a machine that
+        can afford no GPU grid. This stage samples the solver's textures, and
+        a field that is not on the GPU has none — so that rung is not a slower
+        show here but a black one. CI found it before this check existed: a
+        stage drawing 1,676 frames of nothing over a plate that was simulating
+        perfectly well, on a runner slow enough for the governor to walk all
+        the way down.
+      */
+      {
+        const rungs = await page.evaluate(() => window.chromaglassDebug().governor.rungs.map((r) => r.grid));
+        check('no rung on this ladder is one the stage cannot draw',
+          rungs.length > 0 && !rungs.includes('cpu'), rungs.join(' → '));
+
+        const pinned = await page.evaluate(async () => {
+          const d = window.chromaglassDebug();
+          const was = d.settings.simResolution;
+          d.settings.simResolution = 'cpu';
+          for (let i = 0; i < 180; i++) await new Promise((r) => requestAnimationFrame(r));
+          const g = await d.grabFrame();
+          let on = 0;
+          if (g) for (let i = 0; i < g.pixels.length; i += 4) {
+            if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+          }
+          const out = { engine: d.engine, lit: g ? on / (g.pixels.length / 4) : 0 };
+          d.settings.simResolution = was ?? 'auto';
+          return out;
+        });
+        check('and a plate pinned to the CPU solver is still drawn',
+          pinned.lit > 0.5 && !/^CPU/.test(pinned.engine),
+          `${pinned.engine}, ${(pinned.lit * 100).toFixed(0)}% lit`);
+      }
+
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');
 

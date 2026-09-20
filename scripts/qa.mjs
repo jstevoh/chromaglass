@@ -26,6 +26,7 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
+import { engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -90,11 +91,21 @@ const DPR = process.env.QA_DPR ?? '0.35';
   1.19x where the check wants 1.25x, so the suite started failing on which
   look it happened to get. Every harness that measures pixels pins it.
 */
-const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
+/*
+  `QA_RENDERER=webgpu npm run qa` walks the same show night on the WebGPU
+  stage (docs/webgpu-plan.md, P5). It needs a machine with a GPU: a Linux
+  runner's software WebGPU can compute but cannot present a canvas, which is
+  what the P0 spike measured.
+*/
+const RENDERER = process.env.CG_RENDERER ?? process.env.QA_RENDERER ?? '';
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${engineQuery()}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
 const IGNORED = [
+  // The context-loss section takes the GPU away on purpose, and the app
+  // reports it. That line is the check working, not the app misbehaving.
+  /WebGPU device lost/i,
   /GPU stall due to ReadPixels/i,
   /GL Driver Message/i,
   /Automatic fallback to software WebGL/i,
@@ -196,13 +207,47 @@ page.on('pageerror', e => note(`uncaught: ${e.message}`));
 
 // Count every device the page opens, and never auto-accept a prompt silently:
 // a show that asks for a microphone on load is the bug we are watching for.
+await installFrameReader(page);
 await page.addInitScript(() => {
   window.__media = [];
   const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   navigator.mediaDevices.getUserMedia = (c) => { window.__media.push(JSON.stringify(c)); return gum(c); };
+
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
+
+/**
+ * What the show was doing, for a check that read a frame it did not expect.
+ *
+ * A frame that will not change and a frame that cannot be read look the same
+ * from the pixels — and so does a show whose solver has stopped stepping. The
+ * reader's own account says which of the three it was, and this says what the
+ * engine was doing while it happened.
+ */
+const showState = async () => {
+  const [state, read] = await Promise.all([
+    page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      if (!d) return null;
+      const s = d.solver?.();
+      return {
+        engine: d.engine,
+        frames: d.webgpu?.frames ?? null,
+        steps: s ? +s.stepsPerSec.toFixed(1) : null,
+        layers: s?.layers ?? null,
+        dye: +(d.fluids?.[0]?.meanDensity ?? 0).toFixed(3),
+        grid: d.status?.grid ?? null,
+        frameMs: +(d.status?.frameMs ?? 0).toFixed(1),
+      };
+    }),
+    lastFrameRead(page),
+  ]);
+  if (!state) return 'no debug hook';
+  return `${state.engine}, ${state.steps} steps/s over ${state.layers} layer(s), dye ${state.dye}, ` +
+    `${state.frameMs} ms/frame${state.frames !== null ? `, ${state.frames} frames drawn` : ''}` +
+    `${read ? ` · read via ${read.via}${read.lit !== undefined ? `, ${(read.lit * 100).toFixed(0)}% lit` : ''}` : ''}`;
+};
 
 /**
  * Press Escape and wait for a panel to actually be gone.
@@ -394,13 +439,39 @@ try {
       JSON.stringify(await page.evaluate(() => window.__media)));
   }
 
+  /*
+    Can this run see the plate at all?
+
+    Six checks below read pixels, and every way of getting them wrong ends in
+    an array of zeros: a canvas that answers black, a `grabFrame` that is not
+    there, one that returns nothing. Zeros then read as "the plate is dark",
+    which is a sentence each of those checks is willing to say. So the
+    instrument is proved once, here, before anything is measured with it, and
+    its own account of the read goes in the line.
+  */
+  {
+    await settle(600);
+    const read = await page.evaluate(() => window.__cgFrame(32, 18));
+    const note = await lastFrameRead(page);
+    const lit = read ? read.filter((_, i) => i % 4 === 0).filter((v, i) => Math.max(v, read[i * 4 + 1], read[i * 4 + 2]) > 8).length / (read.length / 4) : 0;
+    check('the plate can be photographed',
+      !!read && (note?.scaled ?? 0) > 0.01 && (!RENDERER || note?.via === 'grabFrame'),
+      note ? `${note.via}${note.size ? ` ${note.size[0]}×${note.size[1]}` : ''}, ` +
+        `${note.lit !== undefined ? `${(note.lit * 100).toFixed(0)}% lit, ` : ''}` +
+        `alpha ${note.alpha ? note.alpha.join('–') : 'n/a'}, scaled ${note.scaled ?? 'n/a'}` +
+        `${note.threw ? ` — threw ${note.threw}` : ''}${note.got ? ` — got ${note.got}` : ''}`
+        : 'the reader was never installed');
+    void lit;
+  }
+
   // Which solver did this run actually measure? A suite that is green on the
   // CPU fallback has said nothing about the GPU shaders, and the line above
   // it would look identical either way.
   {
     const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
     if (GPU) {
-      check('the GPU solver is the one being measured', /^GPU/.test(engine ?? ''), engine ?? 'no debug hook');
+      check('the GPU solver is the one being measured',
+        /^(GPU|WebGPU)/.test(engine ?? ''), engine ?? 'no debug hook');
     } else {
       console.log(`     solver: ${engine ?? 'unknown'} — set QA_GPU=mid to run this suite on the GPU path`);
     }
@@ -564,14 +635,7 @@ try {
       for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
       return sum / (a.length * 0.75);
     };
-    const frame = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      const o = document.createElement('canvas');
-      o.width = 96; o.height = 54;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, o.width, o.height);
-      return [...x.getImageData(0, 0, o.width, o.height).data];
-    });
+    const frame = () => page.evaluate(() => window.__cgFrame(96, 54));
     /**
      * Set the zoom and wait for the picture to stop moving, rather than for a
      * clock. The camera eases toward a new zoom over about a second, and how
@@ -614,7 +678,9 @@ try {
     // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
     const far = apart(plate, await at(9));
     check('the zoom alone moves the picture, with no switch thrown',
-      far > Math.max(6, drift * 4), `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift`);
+      far > Math.max(6, drift * 4),
+      `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift` +
+      (far > Math.max(6, drift * 4) ? '' : ` — ${await showState()}`));
 
     // That it is a *travel* and not a cut is checked in `npm run plate`, on
     // the ramp itself, because it cannot honestly be checked here. This asked
@@ -658,19 +724,14 @@ try {
     // is full red and full blue with no green at all, so finding it on the
     // canvas cannot be the liquid having a moment.
     const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
-    const magentaShare = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      if (!c) return -1;
-      const o = document.createElement('canvas');
-      o.width = 160; o.height = 90;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, o.width, o.height);
-      const d = x.getImageData(0, 0, o.width, o.height).data;
+    const magentaShare = () => page.evaluate(async () => {
+      const d = await window.__cgFrame(160, 90);
+      if (!d) return -1;
       let n = 0;
       for (let i = 0; i < d.length; i += 4) {
         if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
       }
-      return n / (o.width * o.height);
+      return n / (d.length / 4);
     });
 
     const before = await magentaShare();
@@ -684,14 +745,17 @@ try {
     // business rather than ours. See `reaches`.
     const after = await reaches(magentaShare, v => v > 0.15);
     check('a loaded mark reaches the canvas, not just the page',
-      before < 0.02 && after > 0.15, `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame`);
+      before < 0.02 && after > 0.15,
+      `${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the frame` +
+      (before < 0.02 && after > 0.15 ? '' : ` — ${await showState()}`));
 
     // The house dimmer is the lamp. Taking the lamp out should not take the
     // sponsor's logo off the wall with it.
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 0 }));
     const blacked = await reaches(magentaShare, v => v > 0.15);
     check('and a blackout leaves it on the wall', blacked > 0.15,
-      `${(blacked * 100).toFixed(1)}% with the dimmer at zero`);
+      `${(blacked * 100).toFixed(1)}% with the dimmer at zero` +
+      (blacked > 0.15 ? '' : ` — ${await showState()}`));
     await page.evaluate(() => window.chromaglassSettings?.({ dimmer: 1 }));
 
     // Its own opacity is the control for taking it off, and it has to reach 0.
@@ -816,11 +880,29 @@ try {
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
     });
     if (canPause) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
-    check('and a drag across it lays down dye',
-      canPause && before !== null && after !== null && after - before > 1,
-      !canPause ? 'no transport to pause with — the plate could not be stilled'
-        : before === null ? 'no debug hook — run with ?debug'
-        : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
+    /*
+      Stilled, the two engines stage a gesture in different places. WebGL
+      leaves it in the CPU delta array this reads — measured, a drag stages
+      39.6 there with the transport paused and the plate untouched. WebGPU's
+      goes into a buffer the next step consumes, so there is nothing on the
+      CPU to count and the plate does not change either: both readings are
+      zero, and a check asking for a rise would be asking the wrong path a
+      question it cannot answer.
+
+      That a pour deposits the same dye whichever solver takes it is
+      `npm run parity`'s business — it pours the same drop through both and
+      they agree to 4e-5 of rms. What is asked here is the staging, which
+      only one of them does where the CPU can see it.
+    */
+    if (RENDERER === 'webgpu') {
+      console.log('     the drag is staged on the GPU under this flag — `npm run parity` is what proves a pour lands');
+    } else {
+      check('and a drag across it lays down dye',
+        canPause && before !== null && after !== null && after - before > 1,
+        !canPause ? 'no transport to pause with — the plate could not be stilled'
+          : before === null ? 'no debug hook — run with ?debug'
+          : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
+    }
   }
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
@@ -890,14 +972,9 @@ try {
   // real path and not a simulation of it. What is checked is what an audience
   // would see: the wall is lit before, and it is lit again afterwards.
   {
-    const litness = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      if (!c) return null;
-      const o = document.createElement('canvas');
-      o.width = 16; o.height = 9;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, 16, 9);
-      const d = x.getImageData(0, 0, 16, 9).data;
+    const litness = () => page.evaluate(async () => {
+      const d = await window.__cgFrame(16, 9);
+      if (!d) return null;
       let sum = 0;
       for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
       return sum / (16 * 9 * 255);
@@ -911,20 +988,33 @@ try {
     await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
     let before = 0;
     for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
-    check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
+    check('the wall is lit before the GPU goes away', before > 0.01,
+      `luminance ${before?.toFixed(3)}` + (before > 0.01 ? '' : ` — ${await showState()}`));
 
+    // How a GPU is taken away depends on which one it is. WebGL has an
+    // extension that stages the browser's own event and a `restoreContext` to
+    // hand it back; WebGPU has `device.destroy()` and no giving back at all —
+    // the app asks for a new device instead — so there is nothing to call
+    // afterwards and the notice can come and go while a poll is between
+    // looks. Both are the real path rather than a simulation of it.
     await page.evaluate(() => {
+      window.__sawLost = false;
+      new MutationObserver(() => {
+        if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
+      }).observe(document.body, { childList: true, subtree: true });
+      const d = window.chromaglassDebug?.();
+      if (d?.loseDevice) { d.loseDevice(); return; }
       const gl = document.querySelector('#liquid-canvas').getContext('webgl2');
       window.__lose = gl.getExtension('WEBGL_lose_context');
       window.__lose?.loseContext();
     });
     await settle(1500);
     check('a lost context is noticed and said so',
-      (await page.locator('[data-testid="gl-lost"]').count()) === 1);
+      await page.evaluate(() => window.__sawLost || !!document.querySelector('[data-testid="gl-lost"]')));
 
     await page.evaluate(() => window.__lose?.restoreContext());
-    // Generous: the rebuild is a whole GL setup and then a plate laid again,
-    // on a machine rasterising in software.
+    // Generous: the rebuild is a whole engine setup and then a plate laid
+    // again, on a machine that may be rasterising in software.
     let after = 0;
     for (let i = 0; i < 20 && !(after > 0.01); i++) { await settle(1500); after = await litness(); }
     check('and the show comes back by itself', after > 0.01, `luminance ${after?.toFixed(3)}`);

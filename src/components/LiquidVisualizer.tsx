@@ -204,7 +204,10 @@ const WEBGPU = (() => {
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
-  if (want === 'cpu') return 0;
+  // Under the WebGPU flag there is nothing to draw a CPU-held plate with, so
+  // a pin there becomes the smallest grid the stage can draw rather than a
+  // black screen. The pin itself goes when the CPU solver does (P7).
+  if (want === 'cpu') return WEBGPU ? 256 : 0;
   return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
@@ -4717,7 +4720,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
-      const ladder = qualityLadder(tier, r.info.gpuClass);
+      // The WebGPU stage cannot draw a plate the CPU solver holds, so its
+      // ladder has no rung there (docs/webgpu-plan.md, P5).
+      const ladder = qualityLadder(tier, r.info.gpuClass, r.info.api !== 'webgpu');
       governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
       r.resize();
       render();
@@ -4900,14 +4905,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
                 const size = { width: canvas.width, height: canvas.height };
-                // The chain, in the order a frame goes through it: the plate,
-                // the camera if there is one, the projector if there is one,
-                // and whatever is last draws onto the canvas.
+                /*
+                  The fields are read here rather than taken from the frame
+                  that set this painter, because the painter outlives that
+                  frame: `grabFrame` runs it again later, and by then a rung
+                  change may have disposed the solver those textures belonged
+                  to. A submit answers that with "Destroyed texture used in a
+                  submit" — which is what CI's show night found on the first
+                  run that had a machine slow enough to change rung while a
+                  harness was photographing the plate.
+                */
+                const live = fluidsRef.current
+                  .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
+                  .filter((f): f is NonNullable<typeof f> => !!f);
+                if (!live.length) return;
+                // A rebuild may also have changed the grid the uniforms were
+                // filled for; the shader samples by that number.
+                if (live[0].dye.width !== fields[0].dye.width) {
+                  plate.pack.set('gridSize', live[0].dye.width);
+                }
                 const screen = out ? out.sceneView(size.width, size.height) : target;
                 plate.draw(
                   encoder,
                   cam ? cam.sceneView(size.width, size.height) : screen,
-                  size, fields, Math.max(view.velRange, 1e-6),
+                  size, live, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
                 );
                 if (cam && plate.auxTarget) {
@@ -4974,6 +4995,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
              * app's own: a new device, a rebuilt stage, the look laid again.
              */
             loseDevice: () => { stage?.device.destroy(); },
+            /**
+             * The projector's pass, as the WebGL renderer publishes it: built
+             * only when it would change a pixel, so a harness asking whether
+             * a mapping reached the engine asks this. One surface, one
+             * question, either engine.
+             */
+            outputPass: projector,
             /** The guard's own state, and the luminance it is being fed. */
             flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
             /**

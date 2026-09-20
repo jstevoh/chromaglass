@@ -29,6 +29,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { engineQuery, installFrameReader } from './frame.mjs';
 
 const PORT = 4326;
 const OUT = 'docs/shots';
@@ -112,7 +113,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
   // The band drives it, so the plate is doing what it does in front of music
   // rather than sitting in whatever state automation happens to leave it.
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic`, { waitUntil: 'load' });
+  await installFrameReader(page);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);              // the gesture the band needs
   await page.waitForTimeout(6000);
 
@@ -150,7 +152,7 @@ try {
     // context is created with `preserveDrawingBuffer`, so the canvas can just
     // be read at any moment. The downscale happens in the page too, which
     // keeps this script free of an image library.
-    const dataUrl = await page.evaluate(({ width, png }) => {
+    const dataUrl = await page.evaluate(async ({ width, png }) => {
       const c = document.querySelector('#liquid-canvas');
       if (!c) return null;
       const scale = Math.min(1, width / c.width);
@@ -159,7 +161,17 @@ try {
       out.height = Math.round(c.height * scale);
       const ctx = out.getContext('2d');
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(c, 0, 0, out.width, out.height);
+      // Through the shared reader, because a presented WebGPU canvas hands
+      // `drawImage` a black frame and these are pictures somebody looks at.
+      const shot = await window.__cgShot('still');
+      if (shot) {
+        const full = document.createElement('canvas');
+        full.width = shot.w; full.height = shot.h;
+        full.getContext('2d').putImageData(window.__shots.still, 0, 0);
+        ctx.drawImage(full, 0, 0, out.width, out.height);
+      } else {
+        ctx.drawImage(c, 0, 0, out.width, out.height);
+      }
       return png ? out.toDataURL('image/png') : out.toDataURL('image/jpeg', 0.92);
     }, { width: WIDTH, png: PNG });
     if (!dataUrl) { console.error(`  no canvas to read for ${shot.name}`); process.exitCode = 1; continue; }

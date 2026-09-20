@@ -275,6 +275,77 @@ cutover, when the honest numbers are the only ones left.
 
 **P4 is done** but for the harness work that belongs to P5.
 
+## P5 so far, 2026-09-20
+
+**The show night runs on the stage.** `QA_RENDERER=webgpu npm run qa` walks
+the same 125 checks under the flag, and CI runs it on the macOS job where
+there is a GPU to run it on — at the real device pixel ratio and on the GPU
+solver, neither of which the ubuntu job can do. It went from 39 of 46 and a
+crash to 125 of 125; what it took was four things, and all four were the
+harness's assumptions rather than the app's behaviour:
+
+- **One way to photograph the plate.** Three checks read the canvas with
+  `drawImage`, which a presented WebGPU canvas answers with black — not an
+  error, and indistinguishable from a black plate. `window.__qaFrame(w, h)`
+  is installed for every navigation and uses `grabFrame` where there is one.
+- **The engine check** asked for a label starting `GPU`; the stage says
+  `WebGPU`.
+- **Taking the GPU away.** `WEBGL_lose_context` does not exist here, so the
+  section uses `chromaglassDebug().loseDevice()` where it is offered — and
+  watches for the "rebuilding the plate…" notice with a MutationObserver
+  rather than polling, because the rebuild can outrun a poll.
+- **The deliberate loss says so in the console**, which the error watch had
+  to be told is the check working.
+
+**And one check does not transfer, for a reason worth keeping.** "A drag
+across it lays down dye" stills the transport and reads the CPU delta array.
+WebGL stages a gesture there — measured, 39.6 with the plate untouched —
+while WebGPU's goes into a buffer the next step consumes, where nothing on
+the CPU can see it and the plate does not move either. Both readings are
+zero, and a check asking for a rise would be asking the wrong path a question
+it cannot answer. That a pour deposits the same dye whichever solver takes it
+is `npm run parity`'s business already: it pours the same drop through both
+and they agree to 4e-5 of rms.
+
+**And it found a real one on its first CI run.** "Destroyed texture [Texture
+"grain a"] used in a submit", over and over. The painter the renderer hands
+the stage outlives the frame that set it — `grabFrame` runs it again — and a
+rung change in between disposes the solver whose textures it was drawing. It
+never happens on this Mac, because the governor now holds 512² here; it
+happens on a runner under load, where the governor steps down while a harness
+is photographing the plate, and the new show night photographs the plate
+constantly. The painter reads the live fields now, and corrects the grid the
+uniforms were filled for if the rebuild changed it. `npm run webgpu` drops the
+solver on purpose and photographs with no frame in between, which is that
+window exactly.
+
+**And the show night found the thing worth finding.** On the runner, four
+checks read a frame that never changed, and the state they printed when they
+failed said why: `CPU · 192², 17.3 steps/s over 1 layer, dye 1.125, 60.5
+ms/frame, 353 frames drawn · read via grabFrame, 0% lit`. The governor had
+walked down the ladder under load and reached its bottom rung, which is the
+CPU solver — and the WebGPU stage has no way to draw a plate the CPU is
+holding. Its compositor samples the solver's textures, and a field that is
+not on the GPU has none. The plate was simulating perfectly well and the
+stage was drawing sixteen hundred frames of nothing over it.
+
+So that rung is not on this engine's ladder: it stops at 256², and a machine
+that cannot hold it gets a slow show rather than no show. A pinned `cpu` grid
+becomes the smallest the stage can draw, for the same reason. Both go for
+good with the CPU solver itself (P7). `npm run webgpu` holds the line —
+"no rung on this ladder is one the stage cannot draw — 768 → 512 → 512 → 384
+→ 256" — and pins the grid to `cpu` to see a plate anyway.
+
+It is worth saying how long that took to see: it cannot happen on this Mac,
+where the governor holds 512² and never walks down. Four CI runs went into
+it, and what ended it was the harness reporting the show's own state next to
+the pixels it did not like rather than another guess from here.
+
+**Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag —
+none of them reaches for a GL context, so it is the same two moves each time
+(an engine hook on the URL, and the frame read through `grabFrame`) — the
+thresholds re-baselined, and `qa`'s CPU default removed at the cutover.
+
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today
 through `copyExternalImageToTexture`, which is the parity route.
