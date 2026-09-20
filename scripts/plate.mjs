@@ -127,7 +127,9 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // tell the two families apart with no tuning in them at all: the weights at a
 // texel centre, and how steeply the kernel can reconstruct a step edge.
 {
-  const src = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
+  // The plate's GLSL lives in its own file since the WebGPU port needed a
+  // second copy of it to compare against (docs/webgpu-plan.md, P3).
+  const src = fs.readFileSync(process.cwd() + '/src/lib/plateShader.ts', 'utf8');
   // The weights live in bicubicSigned, which the derive pass's signed fields are
   // read through; textureBicubic is the same reconstruction clamped at zero.
   check('the dye is still read through the one reconstruction',

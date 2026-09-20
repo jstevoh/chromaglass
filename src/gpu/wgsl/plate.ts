@@ -1,0 +1,1351 @@
+/**
+ * The composite in WGSL (docs/webgpu-plan.md, P3), twin of the GLSL in
+ * `src/lib/plateShader.ts`.
+ *
+ * The two have to draw the same picture: `npm run composite` runs both over
+ * the same textures and the same uniforms and compares the frames. Read the
+ * GLSL for why a line is the way it is — the comments here cover only what the
+ * port changes.
+ *
+ * What the port changes, everywhere:
+ * - Sampling is always `textureSampleLevel(t, samp, uv, 0.0)`. The composite
+ *   samples inside per-pixel branches, where WGSL forbids the implicit
+ *   derivatives `textureSample` needs, and none of these textures carry mips,
+ *   so nothing is lost by saying so.
+ * - The uniforms are one buffer, `U`, with the `u_` prefix dropped:
+ *   `u_camZoom` is `U.camZoom`. The struct is generated from the table in
+ *   `plateFields.ts`, so there is no second list to keep in step.
+ * - GLSL's `a ? b : c` is `select(c, b, a)`, whose arguments are the other way
+ *   round. Read those twice.
+ * - `mod(a, b)` is not WGSL's `%`, which truncates towards zero for negatives;
+ *   `modf2` below is GLSL's.
+ */
+
+import { PLATE_STRUCT } from './plateFields';
+
+/** Bindings every plate shader shares. */
+const HEAD = /* wgsl */ `
+${PLATE_STRUCT}
+@group(0) @binding(0) var<uniform> U: Plate;
+@group(0) @binding(1) var samp: sampler;
+
+const PI = 3.14159265359;
+const DENSITY_SCALE = 8.0;
+
+fn tex2(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureSampleLevel(t, samp, uv, 0.0); }
+fn modf2(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
+`;
+
+/**
+ * Catmull-Rom, which passes through its samples, with the old B-spline kept
+ * reachable through `U.bspline`. See the long note in the GLSL for why the
+ * difference is the whole of why the plate used to look soft.
+ */
+const SAMPLING = /* wgsl */ `
+fn bicubicSigned(t: texture_2d<f32>, uv: vec2f) -> vec4f {
+  let texSize = vec2f(U.gridSize);
+  if (U.bspline > 0.5) {
+    let inv = 1.0 / texSize;
+    var tt = uv * texSize - 0.5;
+    let f = fract(tt);
+    tt -= f;
+    let nx = vec4f(1.0, 2.0, 3.0, 4.0) - f.x;
+    let qx = nx * nx * nx;
+    let ax = qx.x;
+    let bx = qx.y - 4.0 * qx.x;
+    let cx = qx.z - 4.0 * qx.y + 6.0 * qx.x;
+    let wx = vec4f(ax, bx, cx, 6.0 - ax - bx - cx) * (1.0 / 6.0);
+    let ny = vec4f(1.0, 2.0, 3.0, 4.0) - f.y;
+    let qy = ny * ny * ny;
+    let ay = qy.x;
+    let by = qy.y - 4.0 * qy.x;
+    let cy = qy.z - 4.0 * qy.y + 6.0 * qy.x;
+    let wy = vec4f(ay, by, cy, 6.0 - ay - by - cy) * (1.0 / 6.0);
+    let c = tt.xxyy + vec2f(-0.5, 1.5).xyxy;
+    let sw = vec4f(wx.xz + wx.yw, wy.xz + wy.yw);
+    let off = (c + vec4f(wx.yw, wy.yw) / sw) * inv.xxyy;
+    let s0 = tex2(t, off.xz);
+    let s1 = tex2(t, off.yz);
+    let s2 = tex2(t, off.xw);
+    let s3 = tex2(t, off.yw);
+    return mix(mix(s3, s2, sw.x / (sw.x + sw.y)), mix(s1, s0, sw.x / (sw.x + sw.y)), sw.z / (sw.z + sw.w));
+  }
+  let samplePos = uv * texSize;
+  let texPos1 = floor(samplePos - 0.5) + 0.5;
+  let f = samplePos - texPos1;
+
+  let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  let w3 = f * f * (-0.5 + 0.5 * f);
+  let w12 = w1 + w2;
+  let off12 = w2 / w12;
+
+  let p0 = (texPos1 - 1.0) / texSize;
+  let p3 = (texPos1 + 2.0) / texSize;
+  let p12 = (texPos1 + off12) / texSize;
+
+  let acc = tex2(t, vec2f(p12.x, p0.y)) * (w12.x * w0.y)
+          + tex2(t, vec2f(p0.x, p12.y)) * (w0.x * w12.y)
+          + tex2(t, vec2f(p12.x, p12.y)) * (w12.x * w12.y)
+          + tex2(t, vec2f(p3.x, p12.y)) * (w3.x * w12.y)
+          + tex2(t, vec2f(p12.x, p3.y)) * (w12.x * w3.y);
+  let wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  return acc / wsum;
+}
+
+fn textureBicubic(t: texture_2d<f32>, uv: vec2f) -> vec4f {
+  return max(bicubicSigned(t, uv), vec4f(0.0));
+}
+
+fn decodeDensity(a: f32) -> f32 { return a * a * DENSITY_SCALE; }
+
+fn lightThrough(unit: vec3f, thickness: f32) -> vec3f {
+  if (U.transmission <= 0.001) { return unit; }
+  let t = pow(max(unit, vec3f(1e-4)), vec3f(clamp(thickness, 0.35, 4.0)));
+  return mix(unit, t, U.transmission);
+}
+
+fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t, uv); }
+`;
+
+/** The blur the gooey edge is made of, and the decode every plate goes through. */
+const DECODE = /* wgsl */ `
+const W5 = array<f32, 25>(
+  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902,
+  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+  0.02193823, 0.09832033, 0.16210282, 0.09832033, 0.02193823,
+  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902
+);
+
+fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
+  if (U.derivedOn > 0.5 && blurFluid * U.gridSize < 0.5) {
+    let d = blurFluid * 1.554;
+    let k = vec3f(0.19138, 0.61724, 0.19138);
+    var acc = 0.0;
+    for (var j = 0; j < 3; j++) {
+      for (var i = 0; i < 3; i++) {
+        acc += k[i] * k[j] * tex2(t, fuv + vec2f(f32(i - 1), f32(j - 1)) * d).a;
+      }
+    }
+    return acc;
+  }
+  var result = 0.0;
+  for (var j = -2; j <= 2; j++) {
+    for (var i = -2; i <= 2; i++) {
+      let offset = vec2f(f32(i), f32(j)) * blurFluid;
+      // Plain bilinear here, not the bicubic: twenty-five taps whose whole
+      // purpose is to blur.
+      let a = tex2(t, fuv + offset).a;
+      result += a * W5[(j + 2) * 5 + (i + 2)];
+    }
+  }
+  return result;
+}
+
+fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
+  let raw = textureBicubic(t, fuv);
+  var rawAlpha = raw.a;
+  if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
+
+  let totalDensity = decodeDensity(rawAlpha);
+  if (totalDensity < 0.001 / DENSITY_SCALE) { return vec4f(0.0); }
+
+  let absTotalDensity = decodeDensity(raw.a);
+  if (absTotalDensity < 0.001 / DENSITY_SCALE) { return vec4f(0.0); }
+
+  let norm = 1.0 / absTotalDensity;
+  let lt = lightThrough(vec3f(
+    exp(-decodeDensity(raw.r) * norm),
+    exp(-decodeDensity(raw.g) * norm),
+    exp(-decodeDensity(raw.b) * norm),
+  ), absTotalDensity);
+
+  let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
+  let exposed = max(0.0, totalDensity - U.filmLevel) * U.filmGain;
+  let m = clamp(U.macroOn, 0.0, 1.0);
+  let thickness = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7);
+  var alpha = 1.0 - exp(-thickness);
+  alpha = min(mix(0.95, 0.995, m), alpha);
+
+  return vec4f(lt, alpha);
+}
+
+fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
+  let ts = 3.0 / U.logicalGrid;
+  let d00 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, -ts)).a);
+  let d10 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, -ts)).a);
+  let d20 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, -ts)).a);
+  let d01 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, 0.0)).a);
+  let d21 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, 0.0)).a);
+  let d02 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, ts)).a);
+  let d12 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, ts)).a);
+  let d22 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, ts)).a);
+  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
+  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
+  return vec2f(gradX, gradY);
+}
+
+fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
+
+fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
+  let cC = decodeFluid(t, fuv, 0.0, false);
+  if (cC.a < 0.03) { return 0.0; }
+  let e = (3.0 / U.logicalGrid) * 0.55;
+  let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
+  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
+  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
+  let maskX = min(cR.a, cL.a);
+  let maskY = min(cT.a, cB.a);
+  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
+  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
+  return diffX + diffY;
+}
+`;
+
+/** One lamp for every material, and what a dye edge does with it. */
+const LIGHTING = /* wgsl */ `
+fn sobelNormal(t: texture_2d<f32>, fuv: vec2f) -> vec3f { return gradNormal(sobelGrad(t, fuv)); }
+
+fn lampDir(fuv: vec2f, lamp: vec4f) -> vec3f {
+  return normalize(vec3f(lamp.xy - fuv, max(0.15, lamp.z)));
+}
+
+fn thinFilmColour(t: f32) -> vec3f {
+  return 0.5 + 0.5 * cos(6.28318530718 * (t + vec3f(0.0, 0.33, 0.67)));
+}
+
+fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> vec3f {
+  if (U.glossiness < 0.005) { return color; }
+  let L = lampDir(fuv, U.lamp);
+  let V = vec3f(0.0, 0.0, 1.0);
+  let H = normalize(L + V);
+  let diffuse = max(0.0, dot(normal, L));
+  let specNdotH = max(0.0, dot(normal, H));
+  let specular = pow(specNdotH, 48.0) * 0.25;
+  let cosTheta = max(0.0, normal.z);
+  let f0 = 0.04;
+  let fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+  let specularTotal = specular + fresnel * 0.12;
+
+  var lit: vec3f;
+  if (darkBlend) {
+    lit = color * (0.6 + 0.4 * diffuse);
+  } else {
+    lit = color * (0.5 + 0.5 * diffuse) + specularTotal;
+  }
+  return mix(color, lit, U.glossiness);
+}
+
+fn boundaryLine(diff: f32) -> f32 { return smoothstep(0.12, 0.75, diff); }
+
+fn boundaryEdge(t: texture_2d<f32>, fuv: vec2f) -> f32 { return boundaryLine(boundaryDiff(t, fuv)); }
+
+fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f) -> vec3f {
+  let rim = clamp((1.0 - n.z) * 6.0, 0.0, 1.0) * smoothstep(0.02, 0.2, a);
+  let L = lampDir(fuv, U.lamp);
+  let spec = pow(max(dot(n, L), 0.0), mix(10.0, 24.0, U.photo)) * mix(1.0, 0.3, U.photo);
+  let nd = n.xy / max(length(n.xy), 1e-4);
+  let facing = clamp(dot(nd, L.xy) * 3.0, -1.0, 1.0);
+  let play = U.lightPlay;
+  var c = color * (1.0 - rim * (0.55 + 0.3 * max(0.0, -facing) * play));
+  c += color * rim * max(0.0, facing) * 0.7 * play;
+  c += vec3f(1.0, 0.98, 0.92) * spec * rim * 1.1;
+  if (U.lamp2.w > 0.001) {
+    let L2 = lampDir(fuv, U.lamp2);
+    let facing2 = clamp(dot(nd, L2.xy) * 3.0, -1.0, 1.0);
+    let spec2 = pow(max(dot(n, L2), 0.0), 10.0);
+    c += (vec3f(0.72, 0.84, 1.0) * spec2 * rim * 1.0 + mix(color, vec3f(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * U.lamp2.w;
+  }
+  return mix(color, c, U.edgeRelief);
+}
+
+// Screen uv to the plate's own uv. u_camZoom magnifies about u_camCenter,
+// which the macro camera parks on a bead.
+fn uvToFluid(uv: vec2f, c: f32, s: f32) -> vec2f {
+  var p = (uv - 0.5) * U.resolution;
+  p = vec2f(c * p.x - s * p.y, s * p.x + c * p.y);
+  let scale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
+  return p / (scale * 128.0 * U.camZoom) + U.camCenter;
+}
+
+/** Local dye velocity in fluid-UV per second — macro detail rides the paint. */
+fn fluidFlow(vtex: texture_2d<f32>, fuv: vec2f) -> vec2f {
+  return (tex2(vtex, fuv).rg * 2.0 - 1.0) * U.flowRate;
+}
+`;
+
+/** Value noise, the pigment's speckle, and the satellite droplets. */
+const NOISE = /* wgsl */ `
+// The two-component hash microDrops jitters its grid with.
+fn hash22(p: vec2f) -> vec2f {
+  var p3 = fract(vec3f(p.xyx) * vec3f(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+fn hash12(p: vec2f) -> f32 {
+  var p3 = fract(vec3f(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+fn vnoise(p: vec2f) -> f32 {
+  let i = floor(p);
+  let f = fract(p);
+  let u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2f(1.0, 0.0)), u.x),
+             mix(hash12(i + vec2f(0.0, 1.0)), hash12(i + vec2f(1.0, 1.0)), u.x), u.y);
+}
+
+fn fbm3(p: vec2f) -> f32 {
+  var a = 0.5;
+  var sum = 0.0;
+  // A parameter cannot be written to in WGSL, so the walk is its own var.
+  var q = p;
+  for (var i = 0; i < 3; i++) { sum += a * vnoise(q); q *= 2.07; a *= 0.5; }
+  return sum * 1.14;   // ~0..1
+}
+
+/**
+ * Pigment texture, painted on the liquid rather than on the glass.
+ *
+ * Heavy pigment does not stay in suspension: it separates into a fine speckle
+ * that is part of why a filmed pour carries texture everywhere and not only at
+ * its boundaries. The coordinates come from the solver, which carries them
+ * along with the flow, so the speckle travels with the dye instead of swimming
+ * under it. Two phases are blended because coordinates advected for long enough
+ * stretch into streaks; see seedGrain in gpuFluid.ts.
+ */
+fn grainAt(p: vec2f) -> f32 {
+  // Mostly one octave: an fbm puts its energy two octaves up, which lands the
+  // speckle at a pixel or two and reads as video noise rather than as pigment.
+  return vnoise(p) * 0.78 + vnoise(p * 2.13 + 11.7) * 0.22;
+}
+
+fn pigmentGrain(grainTex: texture_2d<f32>, fuv: vec2f) -> f32 {
+  var a = fuv;
+  var b = fuv;
+  if (U.grainOn > 0.5) { let g = tex2(grainTex, fuv); a = g.rg; b = g.ba; }
+  return mix(grainAt(a * U.grainScale), grainAt(b * U.grainScale), U.grainMix) - 0.5;
+}
+
+// Satellite droplets: the hundreds of tiny beads that sit on the glass around
+// every drop in a macro photograph. Each cell of a jittered grid holds one
+// small lens, shaded like the big bubbles — dim toward the lamp, bright away
+// from it, a point of the lamp on its dome.
+fn microDrops(c: vec3f, p: vec2f, lampSide: vec2f, ground: f32, keep: f32) -> vec3f {
+  let i = floor(p);
+  let f = fract(p);
+  var outc = c;
+  for (var y = -1; y <= 1; y++) {
+    for (var x = -1; x <= 1; x++) {
+      let g = vec2f(f32(x), f32(y));
+      let h = hash22(i + g);
+      if (h.x > keep) { continue; }
+      let centre = g + 0.2 + h * 0.6;
+      let rad = 0.10 + hash12(i + g + 7.7) * 0.2;
+      let d = (f - centre) / rad;
+      let q = dot(d, d);
+      if (q > 1.0) { continue; }
+      let rim = smoothstep(0.5, 1.0, q);
+      let toward = dot(d / max(sqrt(q), 1e-3), lampSide);
+      var dc = c * (1.06 + 0.18 * max(0.0, -toward) * (1.0 - rim));
+      dc = mix(dc, c * c * 1.15, rim * (0.5 + 0.35 * max(0.0, toward)));
+      let hd = d - lampSide * 0.4;
+      dc += vec3f(1.0, 0.98, 0.95) * exp(-dot(hd, hd) * 14.0) * (0.25 + 0.4 * ground);
+      outc = mix(outc, dc, smoothstep(1.0, 0.85, q));
+    }
+  }
+  return outc;
+}
+`;
+
+/** The paint's cells, and the lacing that outlines every colour boundary. */
+const CELLS = /* wgsl */ `
+struct Cell {
+  core: f32,    // interior mask
+  rim: f32,     // bright ring, negative just outside (the dark outline)
+  id: f32,      // per-bubble random
+  slope: vec2f, // 2D gradient of the cell's surface height
+};
+
+// Surface height across one cell, as a function of the signed distance to its
+// edge: the film is thin over the sunken core and piles into a meniscus ridge
+// at the rim. Differentiating this along the radial direction gives an exact
+// normal — screen-space derivatives of the same field come out blocky, because
+// they are evaluated per 2x2 quad over hard-edged masks.
+fn cellHeight(d: f32, rimWidth: f32) -> f32 {
+  let sunk = 1.0 - smoothstep(-rimWidth * 1.6, rimWidth * 0.1, d);
+  let ridge = exp(-pow((d - rimWidth * 0.25) / (rimWidth * 1.2), 2.0));
+  return ridge * 0.55 - sunk * 0.85;
+}
+
+// One generation of cells: born, carried along by the dye, dissolved again.
+//
+// Every cell in the 3x3 neighbourhood is evaluated against its own profile and
+// the strongest wins per feature, so each one keeps a complete circular ring
+// even where its neighbours crowd it. (Assigning each pixel to its nearest
+// centre instead — a plain Voronoi — clips those rings along the cell
+// boundaries and turns round cells into polygons.)
+//
+// Cross-fading two offsets of the *same* pattern would average two distance
+// fields into mush, so instead each generation is its own pattern under a
+// sin^2 envelope; two generations half a cycle apart sum to exactly 1, giving
+// continuous cover with no ghosting and no reset pop.
+fn cellField(p0: vec2f, flow: vec2f, seed: f32, period: f32, phase: f32, rimWidth: f32) -> Cell {
+  let a = fract(U.time / period + phase);
+  var env = sin(3.14159265 * a);
+  env *= env;
+
+  let p = p0 - flow * (a * period);
+  let ip = floor(p);
+  let fp = fract(p);
+
+  var core = 0.0;
+  var bright = 0.0;
+  var outline = 0.0;
+  var id = 0.0;
+  var bestW = -1.0;
+  var bestD = 1.0;
+  var bestDir = vec2f(1.0, 0.0);
+
+  for (var j = -1; j <= 1; j++) {
+    for (var i = -1; i <= 1; i++) {
+      let g = vec2f(f32(i), f32(j));
+      let h = hash22(ip + g + seed);
+      let c = g + 0.5 + (h - 0.5) * 0.62;
+      let r = 0.16 + h.x * 0.22;
+      let delta = fp - c;
+      let dist = length(delta);
+      let d = dist - r;
+      if (d > rimWidth * 3.5) { continue; }               // nowhere near this cell
+
+      let cr = 1.0 - smoothstep(-rimWidth * 0.8, -rimWidth * 0.15, d);
+      let br = 1.0 - smoothstep(rimWidth * 0.35, rimWidth * 1.15, abs(d));
+      let ol = 1.0 - smoothstep(rimWidth * 0.5, rimWidth * 1.3, abs(d - rimWidth * 2.0));
+
+      core = max(core, cr);
+      bright = max(bright, br);
+      outline = max(outline, ol);
+
+      let w = max(cr, br);
+      if (w > bestW) { bestW = w; bestD = d; bestDir = delta / max(dist, 1e-4); id = h.y; }
+    }
+  }
+
+  // Slope only for the cell that owns this pixel — two profile evaluations
+  // per generation instead of eighteen.
+  let e = rimWidth * 0.35;
+  let dh = (cellHeight(bestD + e, rimWidth) - cellHeight(bestD - e, rimWidth)) / (2.0 * e);
+
+  // A bright ring covers the dark outline of whatever it overlaps.
+  let rim = bright - outline * 0.7 * (1.0 - bright);
+  return Cell(core * env, rim * env, id, bestDir * dh * env);
+}
+
+/**
+ * Lacing: the pale hair-thin threads that outline every colour boundary in a
+ * poured film. See the GLSL for the whole of why it is built this way — the
+ * level line, the span, the walk and the curvature that sets the width.
+ *
+ * WGSL only allows the derivative builtins where every pixel of the quad is
+ * still running, so the two widths this measures with fwidth are taken at
+ * the top, above the early exits, and the caller masks the result rather than
+ * branching around the call on a per-pixel test.
+ */
+fn lacing(color: vec3f, t: texture_2d<f32>, fuv: vec2f, alpha: f32, amount: f32) -> vec3f {
+  let e = 3.0 / U.logicalGrid;       // one solver cell, in fluid uv
+  let cR = decodeFluid(t, fuv + vec2f( e, 0.0), 0.0, false);
+  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let cT = decodeFluid(t, fuv + vec2f(0.0,  e), 0.0, false);
+  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
+  // Which way is across the boundary: the principal axis of the colour
+  // structure tensor, which keeps the sign a pair of lengths would lose.
+  let dx = (cR.rgb - cL.rgb) * smoothstep(0.02, 0.2, min(cR.a, cL.a));
+  let dy = (cT.rgb - cB.rgb) * smoothstep(0.02, 0.2, min(cT.a, cB.a));
+  let jxx = dot(dx, dx);
+  let jyy = dot(dy, dy);
+  let jxy = dot(dx, dy);
+  let jd = jxx - jyy;
+  let gm = sqrt(0.5 * (jxx + jyy + sqrt(jd * jd + 4.0 * jxy * jxy)));
+  let th = select(0.0, 0.5 * atan2(2.0 * jxy, jd), abs(jxy) + abs(jd) > 1e-9);
+  let n = vec2f(cos(th), sin(th));              // across the boundary
+  let tang = vec2f(-n.y, n.x);                  // along it
+  var axis = (cR.rgb - cL.rgb) * n.x + (cT.rgb - cB.rgb) * n.y;
+  let al = length(axis);
+  axis /= max(al, 1e-4);                        // the max only bites on the way out, below
+  // The axis, the colour along it and the two pixel widths are worked out here,
+  // above every exit, because WGSL forbids fwidth once part of the quad has
+  // returned: a derivative is read across all four pixels or not at all.
+  let fC = dot(color, axis);
+  let px = max(fwidth(fuv.x), fwidth(fuv.y)) + 1e-6;
+  let fwC = fwidth(fC);
+  if (gm < 0.004) { return color; }
+  if (al < 1e-4) { return color; }
+  // The whole colour change across the boundary, not the change per cell.
+  let fAhead = decodeFluid(t, fuv + n * e * 4.0, 0.0, false);
+  let fBack  = decodeFluid(t, fuv - n * e * 4.0, 0.0, false);
+  let span = abs(dot(fAhead.rgb - fBack.rgb, axis)) * smoothstep(0.02, 0.2, min(fAhead.a, fBack.a));
+  let band = smoothstep(0.05, 0.3, span) * smoothstep(0.08, 0.20, al);
+  if (band < 0.004) { return color; }
+  // Whether the boundary here is folding or being drawn out, from its own
+  // curvature rather than from the velocity field.
+  let t2 = e * 2.0;
+  let bend = abs(dot(decodeFluid(t, fuv + tang * t2, 0.0, false).rgb, axis)
+               + dot(decodeFluid(t, fuv - tang * t2, 0.0, false).rgb, axis)
+               - 2.0 * fC) / max(al, 1e-3);
+  let fold = max(smoothstep(0.15, 1.6, bend), 0.4);                  // 1 curling, 0.4 straight
+  // One thread, at the middle of the change — walked out along the normal
+  // until the colour stops changing at a boundary's rate, stopping on a
+  // fractional step so the thread has no stair-steps in it.
+  var fP = fC;
+  var fM = fC;
+  let stepRate = al * 0.35;                     // still changing at a boundary's rate
+  var goP = true;
+  var goM = true;
+  var prevP = color;
+  var prevM = color;
+  for (var i = 1; i <= 5; i++) {
+    let o = n * e * 2.0 * f32(i);
+    if (goP) {
+      let cp = decodeFluid(t, fuv + o, 0.0, false).rgb;
+      let d = length(cp - prevP);
+      if (d < stepRate) { fP = mix(fP, dot(cp, axis), d / max(stepRate, 1e-5)); goP = false; }
+      else { fP = dot(cp, axis); prevP = cp; }
+    }
+    if (goM) {
+      let cm = decodeFluid(t, fuv - o, 0.0, false).rgb;
+      let d = length(cm - prevM);
+      if (d < stepRate) { fM = mix(fM, dot(cm, axis), d / max(stepRate, 1e-5)); goM = false; }
+      else { fM = dot(cm, axis); prevM = cm; }
+    }
+  }
+  let reach = abs(fP - fM);                     // the whole change, in colour
+  if (reach < 0.02) { return color; }
+  // The level to draw at: the middle of that change, jittered toward the
+  // brighter side rather than along n, which turns round as a boundary passes
+  // through vertical.
+  let toward = clamp(dot(axis, vec3f(0.299, 0.587, 0.114)) * 8.0, -1.0, 1.0);
+  let mid = 0.5 * (fP + fM) + (fbm3(fuv * U.logicalGrid * 0.16 + U.time * 0.015) - 0.5) * 0.14 * reach * toward;
+  let lvl = abs(fC - mid);
+  // A thread is a few pixels wide on a rim and on a fifty-cell ramp alike, so
+  // the width is set in pixels and only then capped by the change.
+  let perPixel = al * px / e;                   // colour change per screen pixel
+  let wide = min(max(mix(1.6, 4.5, fold) * perPixel, fwC * 0.75),
+                 mix(0.10, 0.30, fold) * reach);
+  let line = 1.0 - smoothstep(0.0, wide, lvl);
+  let thread = line * band * mix(0.55, 1.0, fold);
+  let pale = mix(vec3f(1.0), color, 0.18) * mix(0.85, 1.2, fold);
+  return mix(color, pale, clamp(thread * amount, 0.0, 1.0) * smoothstep(0.02, 0.16, alpha));
+}
+`;
+
+/** The dishes, the blends, and the LED platform's wheel. */
+const GEOMETRY = /* wgsl */ `
+// Each layer's own dish when the layers are spread: the lead plate large and
+// a little right of centre, the second smaller at the left, the way three
+// projectors overlap on one screen. Returns (inside, rim).
+fn layerDish(uvScreen: vec2f, layer: i32, aspect: f32) -> vec2f {
+  // Both dishes stay inside the plate's inscribed circle (radius 0.5 of the
+  // frame height), so the square plate's corners never show through a dish.
+  let s = U.dishSpread;
+  let c = select(vec2f(0.5 - 0.304 * s / aspect, 0.5 + 0.06 * s), vec2f(0.5 + 0.144 * s / aspect, 0.5 - 0.02 * s), layer == 0);
+  let rad = select(mix(0.98, 0.36, s), mix(0.98, 0.66, s), layer == 0);
+  let d = (uvScreen - c) * vec2f(aspect, 1.0);
+  let dr = length(d) / 0.5;
+  let inside = 1.0 - smoothstep(rad - 0.02, rad + 0.012, dr);
+  let rim = smoothstep(rad - 0.03, rad - 0.01, dr) * (1.0 - smoothstep(rad - 0.004, rad + 0.012, dr));
+  return vec2f(inside, rim);
+}
+
+// With the layers spread, each dish is a whole plate: the dish's disc is the
+// plate's inscribed circle, so the corners of the square glass stay hidden
+// and everything on the plate is in the picture, rotated with the plate.
+fn dishToPlate(uvScreen: vec2f, layer: i32, aspect: f32, c: f32, s: f32) -> vec2f {
+  let sp = U.dishSpread;
+  let cen = select(vec2f(0.5 - 0.304 * sp / aspect, 0.5 + 0.06 * sp), vec2f(0.5 + 0.144 * sp / aspect, 0.5 - 0.02 * sp), layer == 0);
+  let rad = select(mix(0.98, 0.36, sp), mix(0.98, 0.66, sp), layer == 0);
+  var d = (uvScreen - cen) * vec2f(aspect, 1.0) / (rad * 0.5);   // dish edge at |d| = 1
+  d = vec2f(c * d.x - s * d.y, s * d.x + c * d.y);
+  return 0.5 + d * 0.5;
+}
+
+// Blend mode functions
+fn blendScreen(a: vec3f, b: vec3f) -> vec3f    { return 1.0 - (1.0 - a) * (1.0 - b); }
+fn blendLighter(a: vec3f, b: vec3f) -> vec3f   { return max(a, b); }
+fn blendExclusion(a: vec3f, b: vec3f) -> vec3f { return a + b - 2.0 * a * b; }
+fn blendMultiply(a: vec3f, b: vec3f) -> vec3f  { return a * b; }
+fn blendOverlay(a: vec3f, b: vec3f) -> vec3f {
+  return mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(vec3f(0.5), b));
+}
+
+fn applyBlend(dst: vec3f, src: vec3f, mode: i32) -> vec3f {
+  if (mode == 0) { return blendScreen(dst, src); }
+  if (mode == 1) { return blendLighter(dst, src); }
+  if (mode == 2) { return blendExclusion(dst, src); }
+  if (mode == 3) { return blendMultiply(dst, src); }
+  if (mode == 4) { return blendOverlay(dst, src); }
+  return blendScreen(dst, src);
+}
+
+// LED platform analytical conic gradient
+fn ledColor(t: f32) -> vec3f {
+  // ledMode: 0=single, 1=ocean, 2=fire, 3=cyberpunk, 4=rainbow
+  if (U.ledMode == 0) {
+    return U.ledColor;
+  } else if (U.ledMode == 1) {
+    // ocean
+    if (t < 0.25) { return mix(vec3f(0.0, 0.0, 0.2), vec3f(0.0, 0.2, 0.4), t * 4.0); }
+    if (t < 0.5)  { return mix(vec3f(0.0, 0.2, 0.4), vec3f(0.0, 0.4, 0.6), (t - 0.25) * 4.0); }
+    if (t < 0.75) { return mix(vec3f(0.0, 0.4, 0.6), vec3f(0.0, 0.6, 0.8), (t - 0.5) * 4.0); }
+    return mix(vec3f(0.0, 0.6, 0.8), vec3f(0.0, 0.0, 0.2), (t - 0.75) * 4.0);
+  } else if (U.ledMode == 2) {
+    // fire
+    if (t < 0.25) { return mix(vec3f(0.2, 0.0, 0.0), vec3f(0.8, 0.0, 0.0), t * 4.0); }
+    if (t < 0.5)  { return mix(vec3f(0.8, 0.0, 0.0), vec3f(1.0, 0.4, 0.0), (t - 0.25) * 4.0); }
+    if (t < 0.75) { return mix(vec3f(1.0, 0.4, 0.0), vec3f(1.0, 0.8, 0.0), (t - 0.5) * 4.0); }
+    return mix(vec3f(1.0, 0.8, 0.0), vec3f(0.2, 0.0, 0.0), (t - 0.75) * 4.0);
+  } else if (U.ledMode == 3) {
+    // cyberpunk
+    if (t < 0.33) { return mix(vec3f(1.0, 0.0, 0.235), vec3f(0.0, 0.94, 1.0), t / 0.33); }
+    if (t < 0.66) { return mix(vec3f(0.0, 0.94, 1.0), vec3f(0.988, 0.933, 0.039), (t - 0.33) / 0.33); }
+    return mix(vec3f(0.988, 0.933, 0.039), vec3f(1.0, 0.0, 0.235), (t - 0.66) / 0.34);
+  } else {
+    // rainbow
+    if (t < 0.16667) { return mix(vec3f(1.0, 0.0, 0.0), vec3f(1.0, 1.0, 0.0), t * 6.0); }
+    if (t < 0.33333) { return mix(vec3f(1.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), (t - 0.16667) * 6.0); }
+    if (t < 0.5)     { return mix(vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 1.0), (t - 0.33333) * 6.0); }
+    if (t < 0.66667) { return mix(vec3f(0.0, 1.0, 1.0), vec3f(0.0, 0.0, 1.0), (t - 0.5) * 6.0); }
+    if (t < 0.83333) { return mix(vec3f(0.0, 0.0, 1.0), vec3f(1.0, 0.0, 1.0), (t - 0.66667) * 6.0); }
+    return mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.0, 0.0), (t - 0.83333) * 6.0);
+  }
+}
+`;
+
+/** The closeup: the silhouette warp, the defocus, and the paint's own detail. */
+const MACRO = /* wgsl */ `
+// Crinkle the sampled position so bicubic-smooth silhouettes gain sub-cell
+// structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
+fn macroWarpOffset(fuv: vec2f) -> vec2f {
+  if (U.macroEdge < 0.005) { return vec2f(0.0); }
+  let f = U.logicalGrid * 0.85;
+  let t = vec2f(U.time * 0.012, U.time * -0.009);
+  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - 0.5;
+  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
+  // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
+  // plate-wide frame is noise, and on a bead it is the silhouette.
+  return w * (U.macroEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
+}
+
+fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
+
+// Decode an already-fetched texel — the defocused path doesn't need bicubic
+// filtering or a gooey blur, so it costs 5 plain fetches instead of 5 decodes.
+fn decodeFluidRaw(raw: vec4f) -> vec4f {
+  let totalDensity = decodeDensity(raw.a);
+  if (totalDensity < 0.001 / DENSITY_SCALE) { return vec4f(0.0); }
+  let norm = 1.0 / totalDensity;
+  let c = lightThrough(exp(-vec3f(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) * norm), totalDensity);
+  let darkness = 1.0 - max(c.r, max(c.g, c.b));
+  let thickness = mix(totalDensity * 2.8, max(0.0, totalDensity - U.filmLevel) * U.filmGain, clamp(U.macroOn, 0.0, 1.0))
+                * (1.0 + darkness * 1.7);
+  return vec4f(c, min(mix(0.95, 0.995, clamp(U.macroOn, 0.0, 1.0)), 1.0 - exp(-thickness)));
+}
+
+// 5-tap defocus. The blur radius is constant in screen space, so the
+// out-of-focus surround holds still as the camera zooms.
+fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
+  if (dof < 0.02) { return decodeFluid(t, fuv, blurFluid, useBlur); }
+  let r = dof * 0.022 / (1.5 * U.camZoom);
+  let raw = (tex2(t, fuv)
+           + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
+           + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
+  return decodeFluidRaw(raw);
+}
+
+// Paint cells, lacing and relief lighting for one layer's decoded dye.
+//   grad  — silhouette/interface gradient strength, 0..1
+//   dof   — defocus at this pixel, 0..1 (detail dissolves out of focus)
+// Returns shaded colour in .rgb and a corrected opacity in .a.
+//
+// Control flow here is uniform (branches test uniforms only, masks do the
+// per-pixel work) because the relief pass takes screen-space derivatives of
+// the height field, which are undefined inside divergent branches.
+fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32) -> vec4f {
+  var col = colIn;
+  // The silhouette warp is meant to crinkle blob outlines, not to deform the
+  // cells themselves — bent circles read as lumps rather than as bubbles.
+  let cuv = fuv - macroWarpOffset(fuv) * 0.75;
+  let focus = 1.0 - dof * 0.85;
+  let paint = smoothstep(0.02, 0.20, alpha);
+
+  // ── Packed cells ────────────────────────────────────────────────
+  var core = 0.0; var rim = 0.0; var fineCore = 0.0; var fineRim = 0.0; var id = 0.0; var k = 0.0;
+  var cellSlope = vec2f(0.0);
+  if (U.macroCells > 0.005) {
+    let freq = U.logicalGrid / max(0.15, U.macroCellScale * 8.0);
+    let p = cuv * freq;
+    let f = flow * freq;
+
+    // Cells cluster in patches, the way pouring medium breaks out unevenly.
+    // Larger, higher-contrast patches: a real pour breaks out in cell-covered
+    // areas next to smooth ones, rather than pebbling the whole frame evenly.
+    let clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.26, 0.60, fbm3(cuv * 8.0 + U.time * 0.015));
+    k = U.macroCells * focus * clumping;
+
+    // Coarse cells: two generations, half a cycle apart
+    let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13);
+    let g1 = cellField(p, f, 17.0, 3.2, 0.5, 0.13);
+    // Union, not sum: adding two generations' masks welds their circles into
+    // compound blobs, while taking the stronger of the two keeps every cell
+    // round as it fades in over the one it replaces.
+    core = max(g0.core, g1.core);
+    rim = max(g0.rim, g1.rim);
+    id = select(g1.id, g0.id, g0.core > g1.core);
+
+    // Fine cells crowd into the gaps between the big ones, as they do in a
+    // real pour, and read as the grain of the film rather than as bubbles.
+    let h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
+    let h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
+    let gap = clamp(1.0 - core * 1.6, 0.0, 1.0);
+    fineCore = max(h0.core, h1.core) * gap;
+    fineRim = max(h0.rim, h1.rim) * gap;
+    cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap;
+
+    let dark = col * 0.03;
+    let ring = mix(col, vec3f(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
+
+    // Cell cores are holes in the film, not a tint over it: darken them the
+    // whole way rather than scaling the darkening down with the patch mask.
+    col = mix(col, dark, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
+    col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
+  }
+
+  // ── Lacing — thin dark filaments streaming along the flow ───────
+  var lace = 0.0;
+  if (U.macroLacing > 0.005) {
+    var dir = vec2f(1.0, 0.0);
+    if (length(flow) > 1e-5) { dir = normalize(flow); }
+    let nrm = vec2f(-dir.y, dir.x);
+    let q = vec2f(dot(cuv, dir) * U.logicalGrid * 0.35, dot(cuv, nrm) * U.logicalGrid * 3.2);
+    let n = fbm3(q + U.time * 0.03) - 0.5;
+    let line = 1.0 - smoothstep(0.0, 0.055, abs(n));
+    let edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
+    lace = line * edgeMask * U.macroLacing * focus;
+    col = mix(col, col * 0.04, lace);
+  }
+
+  // ── Relief ──────────────────────────────────────────────────────
+  // The surface normal is assembled from three scales: the bead's own dome
+  // (from the solver-grid normal), the meniscus of every cell (analytic, from
+  // each cell's radial slope) and grooves where the lacing cuts in. Lit, this
+  // is what makes the frame read as a wet surface with depth instead of as
+  // flat colour.
+  if (U.macroRelief > 0.005) {
+    let r3 = U.macroRelief;
+    let tilt = cellSlope * k * 1.6 + vec2f(0.0, lace * 0.6);
+    // The grid normal is a gentle slope over many sim cells; scaled up it
+    // becomes the dome of the bead, which is what carries the large-scale
+    // sense of volume under the cell detail.
+    let n = normalize(vec3f(gridNormal.xy * 3.2 - tilt * r3, 1.0));
+
+    let L = lampDir(fuv, U.lamp);
+    let H = normalize(L + vec3f(0.0, 0.0, 1.0));
+    let diff = max(0.0, dot(n, L));
+    let spec = pow(max(0.0, dot(n, H)), 46.0);
+    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    // Recessed cores and grooves sit in their own shadow.
+    let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
+
+    // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
+    // without darkening it overall.
+    col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
+    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 0.7;    // wet highlight on the domes
+    col += col * fres * r3 * paint * 0.35;                      // bright refracting edge
+  }
+
+  // ── Dome shading — thickness across the bead as a whole ─────────
+  if (U.macroDepth > 0.005) {
+    let belly = smoothstep(0.05, 0.45, alpha);
+    col *= mix(1.0, 0.74 + 0.42 * belly, U.macroDepth * 0.8);
+  }
+
+  // Ink pooled in a cell core is opaque — let it read as true black rather
+  // than as the lit ground showing through.
+  let aOut = clamp(alpha + clamp(core * k, 0.0, 1.0) * 0.5 * paint, 0.0, 1.0);
+  return vec4f(col, aOut);
+}
+`;
+
+/** A full-screen triangle, and the uv the GLSL's vertex stage produced. */
+const VERT = /* wgsl */ `
+struct VsOut {
+  @builtin(position) pos: vec4f,
+  @location(0) uv: vec2f,
+};
+
+@vertex fn vs(@builtin(vertex_index) i: u32) -> VsOut {
+  // Two triangles' worth of corners, as the quad the GLSL draws.
+  var p = array<vec2f, 6>(
+    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0),
+  );
+  let xy = p[i];
+  var out: VsOut;
+  out.pos = vec4f(xy, 0.0, 1.0);
+  // The same uv the GLSL's vertex stage produces, not flipped: the film grain
+  // hashes it, so a flip here would be a different grain. WebGPU's frame comes
+  // out of memory the other way up, which the harness turns over when it
+  // compares.
+  out.uv = xy * 0.5 + 0.5;
+  return out;
+}
+`;
+
+/**
+ * The derive pass: the neighbourhood of each texel, worked out once a frame at
+ * the plate's own resolution. The display interpolates it.
+ */
+export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
+@group(0) @binding(2) var src: texture_2d<f32>;
+
+@fragment fn fs(in: VsOut) -> @location(0) vec4f {
+  let g = sobelGrad(src, in.uv);
+  var diff = 0.0;
+  if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
+  return vec4f(g, diff, 0.0);
+}
+`;
+
+/**
+ * The whole composite, in the order a WGSL module wants it: the bindings and
+ * the helpers, then the pass's own main.
+ */
+export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
+  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${FINISH_WGSL}${VERT}${main}`;
+}
+
+/** The pieces, for the slices still being ported to build on. */
+export const PLATE_PARTS = { HEAD, SAMPLING, DECODE, NOISE, CELLS, GEOMETRY, LIGHTING, MACRO, VERT };
+
+/**
+ * The dimmer, the mark and the dither — the GLSL's FINISH_GLSL, which the
+ * plate shares with the post chain's finish.
+ *
+ * `gl_FragCoord` counts rows up from the bottom and WebGPU's `position`
+ * counts them down from the top, so the dither's hash is given the GL's
+ * coordinate: the pattern is fixed per pixel and a frame drawn either way has
+ * to dither the same.
+ */
+export const FINISH_WGSL = /* wgsl */ `
+fn hashFinish(p: vec2f) -> f32 {
+  var q = fract(p * vec2f(234.34, 435.345));
+  q += dot(q, q + 34.23);
+  return fract(q.x * q.y);
+}
+
+fn finishLight(color: vec3f, uvScreen: vec2f, markTex: texture_2d<f32>) -> vec3f {
+  var outColor = color * U.dimmer;
+  if (U.markOn > 0.001) {
+    let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + 0.5;
+    if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
+      let mark = tex2(markTex, vec2f(m.x, 1.0 - m.y));
+      outColor = mix(outColor, mark.rgb, mark.a * U.markOn);
+    }
+  }
+  return outColor;
+}
+
+fn ditherOut(outColor: vec3f, fragGl: vec2f) -> vec4f {
+  let dth = hashFinish(fragGl) + hashFinish(fragGl + vec2f(17.31, 5.73)) - 1.0;
+  let lit = step(1.0 / 255.0, max(outColor.r, max(outColor.g, outColor.b)));
+  return vec4f(outColor + dth * lit / 255.0, 1.0);
+}
+
+fn finishFrame(outColor: vec3f, uvScreen: vec2f, fragGl: vec2f, markTex: texture_2d<f32>) -> vec4f {
+  return ditherOut(finishLight(outColor, uvScreen, markTex), fragGl);
+}
+`;
+
+/** The textures the display pass reads, in the order the harness binds them. */
+export const DISPLAY_BINDINGS = /* wgsl */ `
+@group(0) @binding(2) var layer0: texture_2d<f32>;
+@group(0) @binding(3) var layer1: texture_2d<f32>;
+@group(0) @binding(4) var derived0: texture_2d<f32>;
+@group(0) @binding(5) var derived1: texture_2d<f32>;
+@group(0) @binding(6) var vel0: texture_2d<f32>;
+@group(0) @binding(7) var vel1: texture_2d<f32>;
+@group(0) @binding(8) var grain0: texture_2d<f32>;
+@group(0) @binding(9) var grain1: texture_2d<f32>;
+@group(0) @binding(10) var film: texture_2d<f32>;
+@group(0) @binding(11) var markTex: texture_2d<f32>;
+@group(0) @binding(12) var beadTex: texture_2d<f32>;
+`;
+
+/** The display pass: the plate as it reaches the wall. */
+export const DISPLAY_MAIN = /* wgsl */ `
+struct FsOut {
+  @location(0) color: vec4f,
+  @location(1) aux: vec4f,     // for the camera: normal.xy (biased), dye height, bubble mask
+};
+
+@fragment fn fs(in: VsOut) -> FsOut {
+  var uv = in.uv;
+  let darkBlend = U.darkBlend != 0;
+  // GL counts fragment rows up from the bottom; the dither hashes that.
+  let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
+
+  let macroAmt = clamp(U.macroOn, 0.0, 1.0);
+  let closeup = macroAmt > 0.1;   // not 'macro': that is a reserved word in WGSL
+  let aspect = U.resolution.x / max(1.0, U.resolution.y);
+  let uvScreen = uv;
+
+  // ── Kaleidoscope ─────────────────────────────────────────────────
+  if (U.kaleido >= 2.0) {
+    var c = (uv - 0.5) * vec2f(aspect, 1.0);
+    let ang = atan2(c.y, c.x);
+    let rad = length(c);
+    let wedge = 6.28318530718 / U.kaleido;
+    var a = modf2(ang, wedge);
+    if (a > wedge * 0.5) { a = wedge - a; }
+    a += U.kaleidoPhase;
+    c = vec2f(cos(a), sin(a)) * rad * U.kaleidoZoom;
+    uv = clamp(c / vec2f(aspect, 1.0) + 0.5, vec2f(0.001), vec2f(0.999));
+  }
+
+  var dof = 0.0;
+  if (closeup) {
+    let rad = length((uv - 0.5) * vec2f(aspect, 1.0));
+    dof = clamp((rad - 0.30) * 1.6, 0.0, 1.0) * U.macroDepth * macroAmt;
+  }
+
+  // ── LED platform, the photograph's paper, the gel wheel, the lumia ──
+  var bgColor = select(vec3f(0.0), vec3f(1.0), darkBlend);
+  if (U.photo > 0.5) {
+    let pp = uv * vec2f(aspect, 1.0);
+    let g = smoothstep(-0.15, 1.15, uv.x * 0.55 + uv.y * 0.65 + (fbm3(pp * 2.2 + 3.1) - 0.5) * 0.5 - 0.1);
+    bgColor = mix(U.paperA, U.paperB, g) * (0.82 + 0.08 * fbm3(pp * 60.0));
+  }
+  var auxN = vec2f(0.0);
+  var auxH = 0.0;
+  var auxB = 0.0;
+  if (U.ledPlatform != 0) {
+    let centered = (uv - 0.5) * U.resolution;
+    let t = fract(atan2(centered.y, centered.x) / (2.0 * PI) + 0.5 + U.ledAngle);
+    let lc = ledColor(t);
+    let dist = length(centered);
+    let maxR = max(U.resolution.x, U.resolution.y) * 0.8;
+    let bevel = 1.0 - smoothstep(maxR * 0.5, maxR, dist) * 0.8;
+    bgColor = lc * bevel;
+  }
+
+  if (U.gelWheel > 0.001) {
+    let gc = (uv - 0.5) * vec2f(aspect, 1.0);
+    let ga = fract(atan2(gc.y, gc.x) / (2.0 * PI) + U.gelAngle);
+    let seg = ga * 4.0;
+    let gi = i32(floor(seg));
+    let gf = fract(seg);
+    var g0 = U.gel3;
+    var g1 = U.gel0;
+    if (gi == 0) { g0 = U.gel0; g1 = U.gel1; }
+    else if (gi == 1) { g0 = U.gel1; g1 = U.gel2; }
+    else if (gi == 2) { g0 = U.gel2; g1 = U.gel3; }
+    let gel = mix(g0, g1, smoothstep(0.86, 1.0, gf));
+    bgColor = mix(bgColor, max(bgColor, vec3f(0.10)) * gel * 1.5, U.gelWheel);
+  }
+
+  if (U.lumia > 0.001) {
+    let lp = uv * vec2f(aspect, 1.0) * 1.35;
+    let lt = U.time * 0.035;
+    let h = fbm3(lp + vec2f(lt * 0.7, -lt * 0.4)) * 0.6 + fbm3(lp * 2.1 - vec2f(lt * 0.3, lt * 0.5)) * 0.4;
+    let sheet = pow(abs(sin(h * 9.42 + lt)), 3.0);
+    let veil = 0.25 + 0.75 * fbm3(lp * 0.6 + vec2f(lt * 0.2, lt * 0.15));
+    let lcol = mix(U.lumiaA, U.lumiaB, smoothstep(0.25, 0.75, fbm3(lp * 0.7 + lt)));
+    bgColor += lcol * (0.12 + 0.9 * sheet) * veil * U.lumia;
+  }
+
+  // ── Gooey blur parameters ─────────────────────────────────────────
+  let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
+  let blurFluid = U.gooey * U.postBlur * 10.0 / (fluidScale * 128.0);
+  let useBlur = U.gooey * U.postBlur > 0.01;
+
+  // ── Layer 0 ──────────────────────────────────────────────────────
+  let c0 = cos(-U.rotation0);
+  let s0 = sin(-U.rotation0);
+  var fuv0 = uvToFluid(uv, c0, s0);
+  if (U.dishSpread > 0.001 && !closeup) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
+  let fuvBase = fuv0;
+
+  var flow0 = vec2f(0.0);
+  if (closeup) {
+    flow0 = fluidFlow(vel0, fuv0) * macroAmt;
+    fuv0 = macroWarp(fuv0);
+  }
+  var fluid0 = decodeFluidDof(layer0, fuv0, blurFluid, useBlur, dof);
+  var dish0 = vec2f(1.0, 0.0);
+  var dish1 = vec2f(1.0, 0.0);
+  if (U.dishSpread > 0.001 && !closeup) {
+    dish0 = layerDish(uvScreen, 0, U.resolution.x / U.resolution.y);
+    fluid0.a *= dish0.x;
+  }
+
+  if (U.granulation > 0.002 && fluid0.a > 0.004) {
+    fluid0.a = max(0.0, fluid0.a * (1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6));
+  }
+
+  if (useBlur && fluid0.a > 0.0) {
+    let contrast = 1.2 + U.gooey * 4.0;
+    fluid0.a = clamp((fluid0.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+  }
+
+  let sharp0 = dof < 0.55;
+  var near0 = vec4f(0.0);
+  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, fuv0); }
+  var normal0 = vec3f(0.0, 0.0, 1.0);
+  if (sharp0) {
+    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
+  }
+  fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
+  if (darkBlend) { fluid0.a *= 0.6; }
+
+  if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
+    var edge0 = boundaryLine(near0.z);
+    if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
+    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+  }
+  // The per-pixel tests mask the result instead of branching around the
+  // call: lacing measures two widths with fwidth, and WGSL reads a
+  // derivative across the whole quad or not at all.
+  if (U.lacing > 0.005) {
+    let laced0 = lacing(fluid0.rgb, layer0, fuv0, fluid0.a, U.lacing);
+    if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
+  }
+  if (!closeup && U.edgeRelief > 0.005 && sharp0) {
+    fluid0 = vec4f(meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), fluid0.a);
+  }
+
+  // ── Plate cells ───────────────────────────────────────────────
+  if (!closeup && U.cells > 0.005 && fluid0.a > 0.03) {
+    let cfreq = U.logicalGrid / 3.2;
+    let cflow = fluidFlow(vel0, fuv0) * cfreq;
+    let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13);
+    let cg1 = cellField(fuv0 * cfreq, cflow, 17.0, 3.2, 0.5, 0.13);
+    let ccore = max(cg0.core, cg1.core);
+    var crim = cg1.rim;
+    if (abs(cg0.rim) > abs(cg1.rim)) { crim = cg0.rim; }
+    var centreW = 1.0;
+    if (U.dishSpread > 0.001) {
+      let casp = U.resolution.x / U.resolution.y;
+      let cc = vec2f(0.5 + 0.144 * U.dishSpread / casp, 0.5 - 0.02 * U.dishSpread);
+      centreW = 1.0 - smoothstep(0.25, 0.7, length((uvScreen - cc) * vec2f(casp, 1.0)) / (0.5 * mix(0.98, 0.66, U.dishSpread)));
+    }
+    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW;
+    var rgb = fluid0.rgb * (1.0 - max(0.0, -crim) * 0.7 * kc);
+    rgb *= 1.0 + max(0.0, crim) * 0.35 * kc;
+    rgb = mix(rgb, rgb * 1.1 + vec3f(0.02), ccore * kc * 0.4);
+    fluid0 = vec4f(rgb, fluid0.a);
+  }
+
+  if (closeup) {
+    let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
+    fluid0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+  }
+
+  // ── Substrate grain + contact shadow ──────────────────────────────
+  if (closeup && U.macroDepth * macroAmt > 0.005) {
+    let depth = U.macroDepth * macroAmt;
+    let fiber = fbm3(uv * vec2f(aspect, 1.0) * 230.0);
+    bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
+    let shA = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.008, -0.008), c0, s0)).a) * 2.6);
+    let shB = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.022, -0.022), c0, s0)).a) * 1.6);
+    let shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
+    bgColor *= mix(1.0, 0.18, shadow * depth);
+  }
+
+  var outColor = bgColor;
+  if (U.photo > 0.5) {
+    let a = fluid0.a;
+    var tr = pow(fluid0.rgb, vec3f(1.0 + 0.9 * a));
+    let trl = dot(tr, vec3f(0.299, 0.587, 0.114));
+    tr = clamp(mix(vec3f(trl), tr, 1.3), vec3f(0.0), vec3f(1.0));
+    let lit = tr * mix(outColor, vec3f(1.0), 0.22 * smoothstep(0.1, 0.6, a)) * (1.0 + 0.2 * a);
+    outColor = mix(outColor, lit, a);
+    let n = normal0;
+    let S = lampDir(fuv0, U.lamp);
+    let R = 2.0 * n.z * n.xy;
+    let sb = smoothstep(0.42, 0.12, abs(R.x - S.x * 0.6)) * smoothstep(0.26, 0.06, abs(R.y - S.y * 0.6));
+    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    let rimDark = clamp((1.0 - n.z) * 5.0, 0.0, 1.0);
+    let facing = clamp(dot(n.xy, S.xy) * 3.0, -1.0, 1.0);
+    outColor *= 1.0 - rimDark * a * (0.35 + 0.3 * max(0.0, -facing));
+    outColor *= 1.0 - a * a * 0.22;
+    outColor += vec3f(1.0, 0.98, 0.95) * sb * a * (0.35 + 0.6 * fres);
+    outColor += vec3f(0.95, 0.97, 1.0) * fres * a * 0.18;
+  } else {
+    outColor = mix(outColor, fluid0.rgb, fluid0.a);
+  }
+  auxN = -normal0.xy * fluid0.a;
+  auxH = fluid0.a;
+
+  if (U.thinFilm > 0.001 && fluid0.a > 0.004 && fluid0.a < 0.4) {
+    let thin = smoothstep(0.4, 0.04, fluid0.a) * smoothstep(0.004, 0.03, fluid0.a);
+    let filmC = thinFilmColour(fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4 + U.time * 0.02);
+    outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
+  }
+
+  // ── Layer 1 (if present) ──────────────────────────────────────────
+  if (U.layerCount > 1) {
+    let c1 = cos(-U.rotation1);
+    let s1 = sin(-U.rotation1);
+    var fuv1 = uvToFluid(uv, c1, s1);
+    if (U.dishSpread > 0.001 && !closeup) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
+    if (!closeup && U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
+    var flow1 = vec2f(0.0);
+    if (closeup) {
+      flow1 = fluidFlow(vel1, fuv1) * macroAmt;
+      fuv1 = macroWarp(fuv1);
+    }
+    var fluid1 = decodeFluidDof(layer1, fuv1, blurFluid, useBlur, dof);
+    if (U.dishSpread > 0.001 && !closeup) {
+      dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
+      fluid1.a *= dish1.x;
+    }
+
+    if (U.granulation > 0.002 && fluid1.a > 0.004) {
+      fluid1.a = max(0.0, fluid1.a * (1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6));
+    }
+
+    if (useBlur && fluid1.a > 0.0) {
+      let contrast = 1.2 + U.gooey * 4.0;
+      fluid1.a = clamp((fluid1.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+    }
+
+    let sharp1 = dof < 0.55;
+    var near1 = vec4f(0.0);
+    if (sharp1 && U.derivedOn > 0.5) { near1 = bicubicSigned(derived1, fuv1); }
+    var normal1 = vec3f(0.0, 0.0, 1.0);
+    if (sharp1) {
+      if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
+    }
+    fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
+    if (darkBlend) { fluid1.a *= 0.6; }
+
+    if (U.boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
+      var edge1 = boundaryLine(near1.z);
+      if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
+      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+    }
+    // The per-pixel tests mask the result instead of branching around the
+    // call: lacing measures two widths with fwidth, and WGSL reads a
+    // derivative across the whole quad or not at all.
+    if (U.lacing > 0.005) {
+      let laced1 = lacing(fluid1.rgb, layer1, fuv1, fluid1.a, U.lacing);
+      if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
+    }
+    if (!closeup && U.edgeRelief > 0.005 && sharp1) {
+      fluid1 = vec4f(meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), fluid1.a);
+    }
+
+    if (closeup) {
+      let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
+      fluid1 = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
+    }
+
+    if (U.photo > 0.5) {
+      let lit1 = pow(fluid1.rgb, vec3f(1.0 + 0.9 * fluid1.a)) * mix(outColor, vec3f(1.0), 0.22 * smoothstep(0.1, 0.6, fluid1.a)) * (1.0 + 0.2 * fluid1.a);
+      outColor = mix(outColor, lit1, fluid1.a);
+      let rim1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
+      outColor *= 1.0 - rim1 * fluid1.a * 0.4;
+      outColor += vec3f(0.95, 0.97, 1.0) * pow(1.0 - clamp(normal1.z, 0.0, 1.0), 3.0) * fluid1.a * 0.15;
+    } else {
+      let blended = applyBlend(outColor, fluid1.rgb, U.blendMode);
+      outColor = mix(outColor, blended, fluid1.a);
+    }
+    auxN = mix(auxN, -normal1.xy, fluid1.a * 0.5);
+    auxH = max(auxH, fluid1.a);
+  }
+
+  // ── The lamp's hot-spot ──────────────────────────────────────────
+  if (U.lamp.w > 0.001) {
+    let dl = length(fuvBase - U.lamp.xy);
+    let glow = exp(-dl * dl * 3.5);
+    let pool = mix(vec3f(1.0), vec3f(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow);
+    outColor *= mix(vec3f(1.0), pool, U.lamp.w);
+    if (U.lamp2.w > 0.001) {
+      let d2 = length(fuvBase - U.lamp2.xy);
+      let glow2 = exp(-d2 * d2 * 3.5);
+      outColor *= mix(vec3f(1.0), mix(vec3f(1.0), vec3f(0.9, 0.97, 1.12) * 1.25, glow2), U.lamp2.w * U.lamp.w);
+    }
+  }
+
+  // ── Satellite droplets ───────────────────────────────────────────
+  if (U.droplets > 0.001 && !closeup) {
+    let Ld = lampDir(fuvBase, U.lamp);
+    let sideD = Ld.xy / max(length(Ld.xy), 0.06);
+    let groundD = dot(outColor, vec3f(0.299, 0.587, 0.114));
+    let keep = U.droplets * (0.18 + 0.32 * fluid0.a);
+    var dropped = microDrops(outColor, fuvBase * U.logicalGrid * 0.55 + 17.0, sideD, groundD, keep);
+    dropped = microDrops(dropped, fuvBase * U.logicalGrid * 1.1 + 5.0, sideD, groundD, keep * 0.6);
+    outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5));
+  }
+
+  // ── Bubbles ──────────────────────────────────────────────────────
+  if (U.bubbleCount > 0 && U.bubbleStrength > 0.001) {
+    var field = 0.0;
+    var opac = 0.0;
+    var best = 0.0;
+    var bestRad = 0.01;
+    var bestD = vec2f(0.0);
+    for (var i = 0; i < 40; i++) {
+      if (i >= U.bubbleCount) { break; }
+      let bb = U.bubbles[i];
+      let sh = U.bubbleShape[i];
+      let rad = max(bb.z, 1e-4);
+      var d = (fuvBase - bb.xy) / rad;
+      if (dot(d, d) > 4.0) { continue; }
+      let s = length(sh.xy);
+      if (s > 1e-4) {
+        let ax = sh.xy / s;
+        let loc = vec2f(dot(d, ax), dot(d, vec2f(-ax.y, ax.x)));
+        d = vec2f(loc.x / (1.0 + s), loc.y * (1.0 + s));
+      }
+      let phi = atan2(d.y, d.x);
+      let rEff = 1.0 + sh.z * (cos(2.0 * phi + sh.w) + 0.55 * cos(3.0 * phi - 1.7 * sh.w));
+      let q2 = dot(d, d) / max(rEff * rEff, 0.04);
+      var f = 1.0 / max(q2, 1e-4);
+      f = f * f;
+      field += f * bb.w;
+      opac = max(opac, bb.w * smoothstep(0.25, 1.0, f));
+      if (f > best) { best = f; bestD = d; bestRad = rad; }
+    }
+    if (field > 0.2) {
+      let edge = field;
+      let membrane = smoothstep(0.86, 1.0, edge) * (1.0 - smoothstep(1.0, 1.22, edge));
+      let inside = smoothstep(1.0, 1.3, edge);
+      let centre = smoothstep(1.3, 3.0, edge);
+      let play = U.lightPlay;
+      let Lb = lampDir(fuvBase, U.lamp);
+      let lampSide = Lb.xy / max(length(Lb.xy), 0.06);
+      let nd = normalize(bestD + vec2f(1e-5));
+      let toward = dot(nd, lampSide);
+      let ground = dot(outColor, vec3f(0.299, 0.587, 0.114));
+      let rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
+      var c = outColor;
+      let filmT = smoothstep(0.02, 0.28, fluid0.a);
+      let tint = mix(vec3f(1.0), outColor / max(max(outColor.r, max(outColor.g, outColor.b)), 1e-3), filmT);
+      let lensUv = fuvBase - bestD * bestRad * (0.15 + 0.35 * play);
+      let lensF = decodeFluid(layer0, lensUv, 0.0, false);
+      let lensCol = mix(bgColor, lensF.rgb, lensF.a);
+      c = mix(c, lensCol, inside * 0.45 * play);
+      c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);
+      c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
+      let arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));
+      c += (c * 0.9 + tint * 0.16) * arcBand * max(0.0, -toward) * 0.9 * play;
+      let halo = smoothstep(0.3, 0.7, edge) * (1.0 - smoothstep(0.7, 0.92, edge));
+      c *= 1.0 - halo * max(0.0, -toward) * 0.22 * play;
+      c = mix(c, c * c * 1.1, membrane * (rimK + 0.35 * max(0.0, toward) * play));
+      if (U.iridescence > 0.001) {
+        let filmC = thinFilmColour(edge * 2.2 + atan2(bestD.y, bestD.x) * 0.5 + U.time * 0.05);
+        c = mix(c, c * (0.55 + 1.2 * filmC), membrane * U.iridescence * 0.7 * (0.35 + 0.65 * ground));
+      }
+      let hd = bestD - lampSide * 0.36;
+      let hl = exp(-dot(hd, hd) * 26.0) * inside;
+      c += mix(vec3f(1.0, 0.98, 0.92), tint, 0.65 * filmT) * hl * (0.18 + 0.24 * ground);
+      if (U.lamp2.w > 0.001) {
+        let L2 = lampDir(fuvBase, U.lamp2);
+        let side2 = L2.xy / max(length(L2.xy), 0.06);
+        let toward2 = dot(nd, side2);
+        c += tint * vec3f(0.72, 0.86, 1.0) * (0.12 + ground * 0.38) * arcBand * max(0.0, -toward2) * play * U.lamp2.w;
+        let hd2 = bestD - side2 * 0.36;
+        c += mix(vec3f(0.75, 0.86, 1.0), tint, 0.6 * filmT) * exp(-dot(hd2, hd2) * 26.0) * inside * 0.22 * U.lamp2.w;
+      }
+      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.6, 1.0, filmT));
+      auxN = mix(auxN, -bestD * 0.8, opac * inside);
+      auxB = max(auxB, opac * inside);
+    }
+  }
+
+  // ── Oil beads ────────────────────────────────────────────────────
+  if (U.beads > 0.001 && !closeup) {
+    let bm = tex2(beadTex, fuvBase);
+    let inner = bm.r;
+    let ring = bm.g;
+    let ramp = bm.b;
+    let inDye = smoothstep(0.015, 0.2, auxH);
+    let k = U.beads * inDye;
+    // GL counts framebuffer rows up and WebGPU counts them down, so dpdy is
+    // the other way round from dFdy: without the sign the dome's slope faces
+    // the wrong way and every bead catches the lamp on its wrong side.
+    let slope = vec2f(dpdx(ramp), -dpdy(ramp));
+    let sl = length(slope);
+    let Lb = lampDir(fuvBase, U.lamp);
+    let lampS = Lb.xy / max(length(Lb.xy), 0.06);
+    var facing = 0.0;
+    if (sl > 1e-5) { facing = dot(slope / sl, lampS); }
+    let dome = 0.78 + 0.32 * ramp;
+    let catchL = max(0.0, facing) * (1.0 - ramp) * smoothstep(0.0, 0.5, ramp) * 0.5;
+    outColor *= 1.0 - ring * 0.7 * k;
+    outColor = mix(outColor, outColor * dome + vec3f(0.9, 0.85, 0.75) * catchL * 0.35, inner * (1.0 - ring) * k);
+    auxB = max(auxB, inner * 0.4 * k);
+  }
+
+  // ── The projectors' rims ─────────────────────────────────────────
+  if (U.dishSpread > 0.001 && !closeup) {
+    var other = 0.0;
+    if (U.layerCount > 1) { other = dish1.x; }
+    let anyIn = max(dish0.x, other);
+    outColor *= mix(1.0, anyIn, U.dishSpread);
+    var rims = dish0.y;
+    if (U.layerCount > 1) { rims += dish1.y; }
+    outColor += vec3f(0.95, 0.8, 0.55) * rims * 0.16 * U.dishSpread;
+  }
+
+  // ── Film projector ───────────────────────────────────────────────
+  if (U.filmOn != 0 && U.filmMix > 0.001) {
+    let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
+    let filmC = tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb;
+    let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
+    let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
+    let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
+    outColor = mix(outColor, outColor * 0.35 + tinted * 0.95, key * U.filmMix);
+  }
+
+  // ── Lamp warmth ──────────────────────────────────────────────────
+  if (U.lampWarmth > 0.001) {
+    let vc = (uv - 0.5) * vec2f(aspect, 1.0);
+    let vig = 1.0 - smoothstep(0.45, 1.05, length(vc) * 1.25) * 0.45;
+    outColor = mix(outColor, outColor * vec3f(1.06, 0.9, 0.7) * vig, U.lampWarmth);
+  }
+
+  // ── The dish ─────────────────────────────────────────────────────
+  if (U.dish > 0.001) {
+    let dc = (uvScreen - 0.5) * vec2f(aspect, 1.0);
+    let dr = length(dc) / 0.5;
+    let rimR = mix(1.9, 0.98, U.dish);
+    let inside = 1.0 - smoothstep(rimR - 0.015, rimR + 0.01, dr);
+    let rim = smoothstep(rimR - 0.035, rimR - 0.01, dr) * (1.0 - smoothstep(rimR - 0.005, rimR + 0.012, dr));
+    let shade = 1.0 - smoothstep(rimR * 0.55, rimR, dr) * 0.35 * U.dish;
+    outColor = outColor * inside * shade + vec3f(0.9, 0.85, 0.7) * rim * 0.35 * U.dish;
+  }
+
+  // ── Saturation grade ──────────────────────────────────────────────
+  let luma = dot(outColor, vec3f(0.299, 0.587, 0.114));
+  outColor = clamp(mix(vec3f(luma), outColor, U.saturation), vec3f(0.0), vec3f(1.0));
+
+  // ── Film grain ────────────────────────────────────────────────────
+  let grainLuma = dot(outColor, vec3f(0.299, 0.587, 0.114));
+  let grain = (hashFinish(in.uv * U.resolution + fract(U.time * 47.3)) - 0.5) * 0.03
+            * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
+  if (U.cameraOn == 0) { outColor = clamp(outColor + grain, vec3f(0.0), vec3f(1.0)); }
+
+  var result: FsOut;
+  if (U.finishInMain == 1) { result.color = finishFrame(outColor, uvScreen, fragGl, markTex); }
+  else if (U.finishInMain == 2) { result.color = ditherOut(outColor, fragGl); }
+  else { result.color = vec4f(outColor, 1.0); }
+  result.aux = vec4f(clamp(auxN, vec2f(-1.0), vec2f(1.0)) * 0.5 + 0.5, auxH, auxB);
+  return result;
+}
+`;

@@ -74,7 +74,7 @@ export class PipelineCache {
  * where the shader samples them through a sampler), storage textures with
  * their format, and samplers.
  */
-export function layoutFromWgsl(device: GPUDevice, code: string, label?: string): GPUBindGroupLayout {
+export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, stage = GPUShaderStage.COMPUTE): GPUBindGroupLayout {
   const entries: GPUBindGroupLayoutEntry[] = [];
   const re = /@group\(0\)\s*@binding\((\d+)\)\s*var(?:<(\w+)(?:,\s*\w+)?>)?\s+(\w+)\s*:\s*([^;]+);/g;
   for (const m of code.matchAll(re)) {
@@ -82,7 +82,7 @@ export function layoutFromWgsl(device: GPUDevice, code: string, label?: string):
     const space = m[2];
     const name = m[3];
     const type = m[4].trim();
-    const visibility = GPUShaderStage.COMPUTE;
+    const visibility = stage;
     if (space === 'uniform') entries.push({ binding, visibility, buffer: { type: 'uniform' } });
     else if (space === 'storage') {
       const writable = /read_write/.test(m[0]);
@@ -92,7 +92,13 @@ export function layoutFromWgsl(device: GPUDevice, code: string, label?: string):
       const format = type.slice(type.indexOf('<') + 1).split(',')[0].trim() as GPUTextureFormat;
       entries.push({ binding, visibility, storageTexture: { access: 'write-only', format } });
     } else if (type.startsWith('texture_2d')) {
-      const sampled = new RegExp(`textureSampleLevel\\(\\s*${name}\\b`).test(code);
+      // Is it read through the sampler? A compute pass usually names the
+      // texture at the sample site, so the regex can tell. A fragment shader
+      // hands its textures to helper functions, where no regex can follow, so
+      // there every texture is taken to be sampled — and they are: the plate
+      // is drawn by sampling it.
+      const sampled = stage === GPUShaderStage.FRAGMENT
+        || new RegExp(`textureSample(Level)?\\(\\s*${name}\\b`).test(code);
       entries.push({ binding, visibility, texture: { sampleType: sampled ? 'float' : 'unfilterable-float' } });
     } else if (type === 'sampler') entries.push({ binding, visibility, sampler: { type: 'filtering' } });
   }

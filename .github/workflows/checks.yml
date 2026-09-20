@@ -148,6 +148,8 @@ jobs:
       - run: npm run webgpu
       # Both solvers, the same inputs, compared field by field.
       - run: npm run parity
+      # Both composites, the same textures, compared pixel by pixel.
+      - run: npm run composite
 
   # The app itself: it builds, it serves, and a browser is walked through a
   # show night with the console watched the whole way.
