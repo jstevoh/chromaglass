@@ -2275,6 +2275,37 @@ interface FrameView {
   /** The frame's own peak speed, and what it works out to in cells a second. */
   velRange: number;
   flowRate: number;
+
+  // What the show worked out this frame and the renderer only spends.
+  /** Where each plate has turned to. */
+  rotations: number[];
+  /** The working harmony, as hues. */
+  harmony: number[];
+  /** Where the lamp and its second have wandered to, under the plate. */
+  lamp: { x: number; y: number; x2: number; y2: number };
+  gelAngle: number;
+  kaleidoPhase: number;
+  /** The second plate's throw: how magnified, and how far it has drifted. */
+  layer1: { zoom: number; dx: number; dy: number };
+  /** How many bubbles are on the plate and how strongly they read. */
+  bubbles: { count: number; strength: number; amount: number };
+  /** Their geometry, packed for the shader. */
+  bubblePack: { packed: Float32Array; shape: Float32Array };
+  /** The exposure the film histogram settled on. */
+  filmLevel: number;
+  filmGain: number;
+  /** ?derived=0, and ?filter=bspline: the old ways, kept reachable. */
+  perPixel: boolean | null;
+  oldSampler: boolean;
+  /** The mark laid over the finished frame, and the film projected through it. */
+  mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
+  film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
+  /** Where the frame is going: the projector's shape, and the effects. */
+  outputCfg: OutputConfig;
+  postForce: boolean;
+  postTest: PostTest | null;
+  fxFrame: number;
+  fxSeed: number;
 }
 
 interface GLResources {
@@ -3636,7 +3667,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      * `view`, and nothing else crosses — which is what lets a WebGPU
      * renderer take the same call when its compositor lands.
      */
-    const drawFrame = (view: FrameView) => {
+    const drawFrame = (view: FrameView, fluids: FluidSimulation[]) => {
       const glr = webGLRef.current;
       if (!glr) return;
       const { settings: currentSettings, time, shot } = view;
@@ -3644,7 +3675,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
 
       // Expand texture arrays if layer count increased
-      while (texs.length < fluidsRef.current.length) {
+      while (texs.length < fluids.length) {
         const tex = glCtx.createTexture()!;
         glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
         glCtx.texParameteri(glCtx.TEXTURE_2D, glCtx.TEXTURE_MIN_FILTER, glCtx.LINEAR);
@@ -3678,8 +3709,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // ── Pack each layer into the renderer's textures ───────
       const inv8 = 1 / 8.0;
       const encode = 127.5 / velRange;
-      for (let l = 0; l < fluidsRef.current.length; l++) {
-        const fluid = fluidsRef.current[l];
+      for (let l = 0; l < fluids.length; l++) {
+        const fluid = fluids[l];
         const wantVel = (macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2;
 
         if (fluid.gpu) {
@@ -3721,23 +3752,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // ── Each plate's neighbourhood, once per texel ─────────
       // See DERIVE_PASS in the shader. Its inputs are the display's own
       // uniforms, set here from the same values the display gets below.
-      const derive = glr.derive && !perPixelRef.current ? glr.derive : null;
+      const derive = glr.derive && !view.perPixel ? glr.derive : null;
       if (derive) {
         const du = derive.u;
         glCtx.useProgram(derive.program);
         glCtx.bindVertexArray(vaoObj);
         glCtx.uniform1i(du.u_src, 0);
-        glCtx.uniform1f(du.u_gridSize, fluidsRef.current[0]?.gpu?.N ?? GRID_SIZE);
+        glCtx.uniform1f(du.u_gridSize, fluids[0]?.gpu?.N ?? GRID_SIZE);
         glCtx.uniform1f(du.u_logicalGrid, GRID_SIZE);
-        glCtx.uniform1f(du.u_bspline, oldSamplerRef.current ? 1 : 0);
-        glCtx.uniform1f(du.u_filmLevel, filmLevelRef.current);
-        glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, filmGainRef.current)));
+        glCtx.uniform1f(du.u_bspline, view.oldSampler ? 1 : 0);
+        glCtx.uniform1f(du.u_filmLevel, view.filmLevel);
+        glCtx.uniform1f(du.u_filmGain, Math.max(0.5, Math.min(12, view.filmGain)));
         glCtx.uniform1f(du.u_exposure, Math.max(0, Math.min(1, currentSettings.exposure ?? 0)));
         glCtx.uniform1f(du.u_macro, macroAmount);
         glCtx.uniform1f(du.u_transmission, Math.max(0, Math.min(1, currentSettings.transmission ?? 0.5)));
         glCtx.uniform1f(du.u_boundaryContrast, currentSettings.boundaryContrast ?? 0.35);
         glCtx.activeTexture(glCtx.TEXTURE0);
-        for (let l = 0; l < Math.min(2, fluidsRef.current.length); l++) {
+        for (let l = 0; l < Math.min(2, fluids.length); l++) {
           const size = glr.texSizes.get(texs[l]) ?? GRID_SIZE;
           if (derive.sizes[l] !== size) {
             glCtx.bindTexture(glCtx.TEXTURE_2D, derive.textures[l]);
@@ -3758,7 +3789,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // GPU solver's pack pass uses unit 0 for its own source texture, so
       // packing layer 1 would otherwise unbind layer 0 from the unit the
       // renderer reads it from. The derive pass reads through unit 0 too.
-      for (let l = 0; l < fluidsRef.current.length; l++) {
+      for (let l = 0; l < fluids.length; l++) {
         glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.layer0 + l);
         glCtx.bindTexture(glCtx.TEXTURE_2D, texs[l]);
         if ((macroOn || (currentSettings.cells ?? 0) > 0.005) && l < 2) {
@@ -3777,18 +3808,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // screen-fixed grain, which is why u_grainOn is per-frame, not per-layer.
       let grainOn = 0;
       {
-        const lead = fluidsRef.current[0];
+        const lead = fluids[0];
         const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
         if (gran > 0.002) {
           for (let l = 0; l < 2; l++) {
-            const tex = fluidsRef.current[l]?.gpu?.grainTexture ?? null;
+            const tex = fluids[l]?.gpu?.grainTexture ?? null;
             if (!tex) continue;
             glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
             if (l === 0) grainOn = 1;
           }
           // The second plate borrows the lead's coordinates when it has none.
-          if (grainOn && !fluidsRef.current[1]?.gpu?.grainTexture) {
+          if (grainOn && !fluids[1]?.gpu?.grainTexture) {
             glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
             glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
           }
@@ -3820,7 +3851,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let markOn = 0;
       const markRect = [0.5, 0.5, 0.5, 0.5];
       {
-        const mk = markRef.current;
+        const mk = view.mark;
         glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.mark);
         glCtx.bindTexture(glCtx.TEXTURE_2D, glr.markTexture);
         if (mk) {
@@ -3850,7 +3881,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let filmOn = 0;
       let filmScaleX = 1, filmScaleY = 1;
       {
-        const f = filmRef.current;
+        const f = view.film;
         const v = f.video;
         if (f.kind !== 'none' && v && v.readyState >= 2 && v.videoWidth > 0) {
           glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.film);
@@ -3873,9 +3904,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       glCtx.uniform1i(uLocs['u_derived0'], UNIT.derived0);
       glCtx.uniform1i(uLocs['u_derived1'], UNIT.derived1);
       glCtx.uniform1f(uLocs['u_derivedOn'], derive ? 1 : 0);
-      glCtx.uniform1i(uLocs['u_layerCount'], fluidsRef.current.length);
-      glCtx.uniform1f(uLocs['u_rotation0'], rotationAnglesRef.current[0] ?? 0);
-      glCtx.uniform1f(uLocs['u_rotation1'], rotationAnglesRef.current[1] ?? 0);
+      glCtx.uniform1i(uLocs['u_layerCount'], fluids.length);
+      glCtx.uniform1f(uLocs['u_rotation0'], view.rotations[0] ?? 0);
+      glCtx.uniform1f(uLocs['u_rotation1'], view.rotations[1] ?? 0);
       glCtx.uniform2f(uLocs['u_resolution'], canvas.width, canvas.height);
       glCtx.uniform1f(uLocs['u_gooey'], currentSettings.gooeyEffect ?? 0);
       glCtx.uniform1i(uLocs['u_darkBlend'], isDarkBlend ? 1 : 0);
@@ -3911,19 +3942,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current;
       glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
       glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
-      glCtx.uniform1f(uLocs['u_bspline'], oldSamplerRef.current ? 1 : 0);
+      glCtx.uniform1f(uLocs['u_bspline'], view.oldSampler ? 1 : 0);
       glCtx.uniform1i(uLocs['u_mark'], UNIT.mark);
       glCtx.uniform1f(uLocs['u_markOn'], markOn);
       glCtx.uniform4f(uLocs['u_markRect'], markRect[0], markRect[1], markRect[2], markRect[3]);
       {
         const k = Math.round(currentSettings.kaleidoscope ?? 0);
         glCtx.uniform1f(uLocs['u_kaleido'], k >= 2 ? Math.min(12, k) : 0);
-        glCtx.uniform1f(uLocs['u_kaleidoPhase'], kaleidoPhaseRef.current);
+        glCtx.uniform1f(uLocs['u_kaleidoPhase'], view.kaleidoPhase);
         glCtx.uniform1f(uLocs['u_kaleidoZoom'], Math.max(0.2, Math.min(2, currentSettings.kaleidoZoom ?? 0.72)));
       }
       glCtx.uniform1f(uLocs['u_dish'], Math.max(0, Math.min(1, currentSettings.dishVignette ?? 0)));
       {
-        const lamp = lampRef.current;
+        const lamp = view.lamp;
         glCtx.uniform4f(uLocs['u_lamp'], lamp.x, lamp.y, 0.55, Math.max(0, Math.min(1, currentSettings.lampHotspot ?? 0)));
         glCtx.uniform4f(uLocs['u_lamp2'], lamp.x2, lamp.y2, 0.45, Math.max(0, Math.min(1, currentSettings.secondLamp ?? 0)));
         glCtx.uniform1f(uLocs['u_lightPlay'], Math.max(0, Math.min(1, currentSettings.lightPlay ?? 0)));
@@ -3942,7 +3973,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       {
         // Lumia and gel colours come from the working harmony, so they
         // stay inside the preset's dyes.
-        const h = harmonyRef.current;
+        const h = view.harmony;
         const hc = (i: number) => PALETTE_RGB[h[i % h.length]];
         const a = hc(0), b = hc(1), c2 = hc(2), d = hc(3);
         glCtx.uniform1f(uLocs['u_lumia'], Math.max(0, Math.min(1, currentSettings.lumia ?? 0)));
@@ -3950,7 +3981,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         glCtx.uniform3f(uLocs['u_lumiaB'], b.r, b.g, b.b);
         const gel = Math.max(0, Math.min(1, currentSettings.gelWheel ?? 0));
         glCtx.uniform1f(uLocs['u_gelWheel'], gel);
-        glCtx.uniform1f(uLocs['u_gelAngle'], gelAngleRef.current);
+        glCtx.uniform1f(uLocs['u_gelAngle'], view.gelAngle);
         glCtx.uniform3f(uLocs['u_gel0'], a.r, a.g, a.b);
         glCtx.uniform3f(uLocs['u_gel1'], b.r, b.g, b.b);
         glCtx.uniform3f(uLocs['u_gel2'], c2.r, c2.g, c2.b);
@@ -3968,19 +3999,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         glCtx.uniform2f(uLocs['u_filmScale'], filmScaleX, filmScaleY);
       }
       {
-        const view = layer1ViewRef.current;
-        glCtx.uniform1f(uLocs['u_layerZoom1'], view.zoom);
-        glCtx.uniform2f(uLocs['u_layerDrift1'], view.dx, view.dy);
-        const bubbles = bubbleDebugRef.current;
-        glCtx.uniform4fv(uLocs['u_bubbles'], bubblesRef.current.packed);
-        glCtx.uniform4fv(uLocs['u_bubbleShape'], bubblesRef.current.packedShape);
+        const throw1 = view.layer1;
+        glCtx.uniform1f(uLocs['u_layerZoom1'], throw1.zoom);
+        glCtx.uniform2f(uLocs['u_layerDrift1'], throw1.dx, throw1.dy);
+        const bubbles = view.bubbles;
+        glCtx.uniform4fv(uLocs['u_bubbles'], view.bubblePack.packed);
+        glCtx.uniform4fv(uLocs['u_bubbleShape'], view.bubblePack.shape);
         glCtx.uniform1i(uLocs['u_bubbleCount'], bubbles.count);
         glCtx.uniform1f(uLocs['u_bubbleStrength'], bubbles.strength);
       }
       glCtx.uniform1f(uLocs['u_postBlur'], currentSettings.postBlurRadius ?? 0.35);
       // Sampling math follows the texture actually bound; the tuned look
       // (normals, edge lines, macro cells) stays on the logical 192 grid.
-      glCtx.uniform1f(uLocs['u_gridSize'], fluidsRef.current[0]?.gpu?.N ?? GRID_SIZE);
+      glCtx.uniform1f(uLocs['u_gridSize'], fluids[0]?.gpu?.N ?? GRID_SIZE);
       glCtx.uniform1f(uLocs['u_logicalGrid'], GRID_SIZE);
 
       // Macro closeup
@@ -3996,8 +4027,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       glCtx.uniform1f(uLocs['u_macroEdge'], currentSettings.macroEdgeDetail ?? 0.6);
       glCtx.uniform1f(uLocs['u_macroRelief'], currentSettings.macroRelief ?? 0.7);
       glCtx.uniform1f(uLocs['u_flowRate'], flowRate);
-      glCtx.uniform1f(uLocs['u_filmLevel'], filmLevelRef.current);
-      glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, filmGainRef.current)));
+      glCtx.uniform1f(uLocs['u_filmLevel'], view.filmLevel);
+      glCtx.uniform1f(uLocs['u_filmGain'], Math.max(0.5, Math.min(12, view.filmGain)));
 
       // ── Two passes when the camera is on ───────────────────
       // The plate is drawn to a texture and the camera looks at it:
@@ -4012,13 +4043,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // would change anything, and dropped again when the operator resets
       // it, so the common case — no projector, nothing set — never pays
       // for the extra target or the extra draw.
-      const outCfg = outputCfgRef.current;
+      const outCfg = view.outputCfg;
       const wantOut = !outputIsIdentity(outCfg);
       if (wantOut && !outputRef.current) outputRef.current = new OutputPass(glCtx);
       else if (!wantOut && outputRef.current) { outputRef.current.dispose(); outputRef.current = null; }
       const out = wantOut && outputRef.current?.ok ? outputRef.current : null;
       glCtx.uniform1f(uLocs['u_grainOn'], grainOn);
-      glCtx.uniform1f(uLocs['u_grainMix'], fluidsRef.current[0]?.gpu?.grainMix ?? 0);
+      glCtx.uniform1f(uLocs['u_grainMix'], fluids[0]?.gpu?.grainMix ?? 0);
       glCtx.uniform1f(uLocs['u_granulation'], Math.max(0, Math.min(1, currentSettings.granulation ?? 0)));
       glCtx.uniform1f(uLocs['u_grainScale'], Math.max(20, Math.min(1200, currentSettings.grainScale ?? 320)));
       glCtx.uniform1i(uLocs['u_cameraOn'], cam ? 1 : 0);
@@ -4027,8 +4058,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Only while an effect is on (none yet; the harness can force it,
       // or run its test effect). Off, the plate finishes the frame itself
       // and none of this is allocated.
-      const postTest = postTestRef.current;
-      const wantPost = postForceRef.current || (postTest?.mode ?? 0) > 0;
+      const postTest = view.postTest;
+      const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
       if (wantPost && !postRef.current) postRef.current = new PostChain(glCtx);
       else if (!wantPost && postRef.current) { postRef.current.dispose(); postRef.current = null; }
       const chain = wantPost && postRef.current?.ok ? postRef.current : null;
@@ -4079,7 +4110,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }, chain ? chain.sceneTarget(canvas.width, canvas.height) : out ? out.fbo : null);
       }
       if (chain) {
-        chain.effects(fxFrameRef.current, fxSeedRef.current, postTest);
+        chain.effects(view.fxFrame, view.fxSeed, postTest);
         if (out) out.bindTarget(canvas.width, canvas.height);
         chain.finishTo(out ? out.fbo : null, { dimmer: dimmerNow, markOn, markRect: markRect as [number, number, number, number] });
       }
@@ -5385,7 +5416,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
           velRange, flowRate,
-        });
+          rotations: rotationAnglesRef.current,
+          harmony: harmonyRef.current,
+          lamp: lampRef.current,
+          gelAngle: gelAngleRef.current,
+          kaleidoPhase: kaleidoPhaseRef.current,
+          layer1: layer1ViewRef.current,
+          bubbles: bubbleDebugRef.current,
+          bubblePack: { packed: bubblesRef.current.packed, shape: bubblesRef.current.packedShape },
+          filmLevel: filmLevelRef.current,
+          filmGain: filmGainRef.current,
+          perPixel: perPixelRef.current,
+          oldSampler: oldSamplerRef.current,
+          mark: markRef.current,
+          film: filmRef.current,
+          outputCfg: outputCfgRef.current,
+          postForce: postForceRef.current,
+          postTest: postTestRef.current,
+          fxFrame: fxFrameRef.current,
+          fxSeed: fxSeedRef.current,
+        }, fluidsRef.current);
       }
 
       // Governor: judge this frame. A rung change takes effect through the
