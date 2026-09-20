@@ -216,9 +216,37 @@ Since then, everything between the plate and the canvas (#97):
   `device.destroy()`: 99% lit, the notice, 99% lit again, nobody touching
   anything.
 
-**Still to do in P4:** the governor on timestamp queries (the numbers are
-already there in `stage.profiler.ms`), and `bench` on adapter info with rungs
-to 1024².
+**The sweep reaches 1024² now, and both engines.** `npm run bench --full
+--webgpu` puts the sweep on the WebGPU stage; the rungs go one past the top of
+the ladder so the report says what the machine *could* do rather than only
+what the app will ask it for. Two layers, dpr 1, 1280×800, on this M4:
+
+| Grid | WebGL | WebGPU |
+|---|---|---|
+| 256² | 59 fps | 58 |
+| 384² | 59 | 58 |
+| 512² | 59 | 59 |
+| 768² | **36** | **27** |
+| 1024² | 24 | 22 |
+| CPU 192² | 24 | 24 |
+
+**At the top rungs the port is behind, and the profiler says it is not the
+drawing.** At 768² the WebGPU frame is 37.9 ms, of which the plate pass — the
+pack, the derive and the whole WGSL composite — is 2.0 ms of GPU and the
+encoding is 0.5 ms of CPU. The rest is the solver, whose compute passes are
+the ones `GpuProfiler` does not yet time. P0 measured the two solvers' cores
+as about equal at 768² (3.78 ms against 3.74), so what is costing the
+difference is in the app's solver rather than in the arithmetic the spike
+compared. **Timing the solver's passes is what the governor item needs first**
+— judging a frame by real GPU cost is worth little while the expensive half of
+it is untimed.
+
+`bench` also had a bug this found: `onRung` asked for `engine === 'gpu'`, so
+under the flag every rung the sweep actually reached was recorded as one it
+never reached — "the solver never reached 256² (it stayed on 256²)".
+
+**Still to do in P4:** the governor on timestamp queries, once the solver's
+passes are timed.
 
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today
