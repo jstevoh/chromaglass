@@ -53,7 +53,7 @@ interface LiquidVisualizerProps {
    * The desk needs the plate to be a preview in the corner of a control
    * surface rather than the whole window, and the canvas cannot simply be
    * moved to a different place in the tree to achieve that — a remount takes
-   * the WebGL context with it and the show restarts. So the canvas stays
+   * the GPU context with it and the show restarts. So the canvas stays
    * exactly where it is and this moves the box it is painted in.
    *
    * It does not change what is rendered. With a projector attached the render
@@ -190,8 +190,7 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
 }
 
 /**
- * `?renderer=webgpu`: the WebGPU stage instead of WebGL (docs/webgpu-plan.md).
- * It grows on main behind this flag until the cutover, then WebGL goes.
+ * The stage draws the show (docs/webgpu-plan.md): there is one engine.
  */
 
 // choice to the frame-time governor; 'cpu' is the 192² fallback.
@@ -2254,7 +2253,6 @@ class FluidSimulation {
 }
 
 
-// ─── WebGL2 resource types ────────────────────────────────────────────
 
 /**
  * What the show decided this frame, for whoever draws it
@@ -2300,9 +2298,6 @@ interface FrameView {
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
-  /** ?derived=0, and ?filter=bspline: the old ways, kept reachable. */
-  perPixel: boolean | null;
-  oldSampler: boolean;
   /** The mark laid over the finished frame, and the film projected through it. */
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
@@ -2617,20 +2612,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
   /** When the last flood pour landed, so gusts cannot stack into a wash. */
   const lastFloodRef = useRef(-1e9);
-  /** `?filter=bspline` restores the sampler the Catmull-Rom one replaced. See docs/judging.md. */
-  const oldSamplerRef = useRef(false);
-  if (!oldSamplerRef.current) {
-    try { oldSamplerRef.current = new URLSearchParams(window.location.search).get('filter') === 'bspline'; } catch { /* no query */ }
-  }
-  /**
-   * `?derived=0` works each plate's neighbourhood out per pixel again, as it
-   * was before the derive pass, to compare against. A ref, so a check can flip
-   * it on a frozen frame through chromaglassDebug().
-   */
-  const perPixelRef = useRef<boolean | null>(null);
-  if (perPixelRef.current === null) {
-    try { perPixelRef.current = new URLSearchParams(window.location.search).get('derived') === '0'; } catch { perPixelRef.current = false; }
-  }
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -2974,7 +2955,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       deck, another copy of this app. The frames arrive through the browser's
       own capture, which is why this reaches things a URL cannot — a
       cross-origin video can be played in a page but not read back into a
-      WebGL texture, and almost nothing on the web sends the header that would
+      texture on the GPU, and almost nothing on the web sends the header that would
       allow it. A window has no origin.
 
       Nothing is requested until the button is pressed, and the browser's
@@ -4511,8 +4492,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           dimmerGain: flashGainRef.current,
           filmLevel: filmLevelRef.current,
           filmGain: filmGainRef.current,
-          perPixel: perPixelRef.current,
-          oldSampler: oldSamplerRef.current,
           mark: markRef.current,
           film: filmRef.current,
           beadMask,
@@ -4590,8 +4569,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         film: filmRef.current,
         fluids: fluidsRef.current,
         rotation: rotationAnglesRef,
-        /** The derive pass's switch, live: `perPixel.current = true` draws as ?derived=0 does. */
-        perPixel: perPixelRef,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputConfig: outputCfgRef.current,
         markTest: (on: boolean) => {
@@ -4606,7 +4583,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           g2.fillRect(0, 0, 128, 32);
           markRef.current = { source: c, aspect: 4, dirty: true };
         },
-        /** WebGL's error flag; reading it clears it. */
         shot: macroShotRef.current,
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
@@ -4633,7 +4609,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     // ── WebGPU, under ?renderer=webgpu ────────────────────────────────
     // Before anything else: a canvas holds one kind of context for life, and
-    // the WebGL path below would claim it. P1 draws the black plate; the
     // solver (P2) and the compositor (P3) move in behind this branch.
     let stage: WebGPUStage | null = null;
     let camera: WebGPUCamera | null = null;
@@ -4704,13 +4679,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
        * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
        *
        * The solver is wired and so is the picture: the show's own loop
-       * runs, the fields live in `gpu/fluid.ts`, and the WGSL composite —
-       * the GLSL's twin, checked against it pixel for pixel by
-       * `npm run composite` — draws them, over the three pictures the page
-       * hands across each frame. What is still WebGL's alone is what comes
-       * after the plate: the camera pass, the output pass, the post chain
-       * and the flash probe, which is why `drawFrame` reads back no
-       * luminance yet.
+       * runs, the fields live in `gpu/fluid.ts`, and the composite draws
+       * them over the three pictures the page hands across each frame —
+       * then the camera, the post chain and the projector in turn, and the
+       * flash probe reads back what the wall got.
        */
       const plate = new WebGPUPlate(s.device, s.format);
       const gpuRenderer: PlateRenderer = {
@@ -4782,7 +4754,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
               plate.setSource('film', film.video);
             }
-            // Two passes when the camera is on, as in WebGL: the plate is
+            // Two passes when the camera is on: the plate is
             // drawn into a texture and the camera looks at it, because
             // refraction, depth of field, bloom and the sensor's roll-off
             // all need the finished picture to sample from. Built the first
@@ -4922,7 +4894,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           // ── What the audience just saw ───────────────────────
           // The delivered frame, reduced on the GPU to one number, a frame
-          // or two behind — as in WebGL. The reading goes back rather than
+          // or two behind. The reading goes back rather than
           // the verdict: the loop folds it into the gain that reaches the
           // next frame's view.
           if (view.outputCfg.flashGuard && frame) {
@@ -4976,17 +4948,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
            */
           loseDevice: () => { stage?.device.destroy(); },
           /**
-           * The projector's pass, as the WebGL renderer publishes it: built
+           * The projector's pass: built
            * only when it would change a pixel, so a harness asking whether
            * a mapping reached the engine asks this. One surface, one
            * question, either engine.
            */
           outputPass: projector,
           /**
-           * The post chain, under the names the WebGL renderer publishes:
-           * `npm run fx` asks these of whichever engine is running, and the
-           * four that set something write the show's own refs, which both
-           * engines read.
+           * The post chain, for `npm run fx`: what it is doing, and the four
+           * hooks that set something, which write the show's own refs.
            */
           post: {
             active: !!chain,
@@ -5150,7 +5120,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     canvas.addEventListener('touchmove', handleTouchMove);
 
     /**
-     * One frame, drawn in WebGL (docs/webgpu-plan.md, P3).
+     * One frame (docs/webgpu-plan.md, P3).
      *
      * Everything here is the renderer's: the programs, the textures, the
      * uniforms, the passes. What the show decided this frame arrives in

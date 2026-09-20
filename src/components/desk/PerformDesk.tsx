@@ -227,7 +227,7 @@ export function PerformDesk(p: PerformDeskProps) {
             testId="layer-segmented"
           />
         </div>
-        {/* The hole the WebGL canvas is painted over — it is never re-parented. */}
+        {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
         <div className="mt-3 flex h-9 shrink-0 items-center justify-between gap-3">
           <Segmented

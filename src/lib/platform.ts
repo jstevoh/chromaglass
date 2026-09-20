@@ -49,7 +49,7 @@ export function classifyGpu(renderer: string): GpuClass {
   const r = renderer.toLowerCase();
   if (/swiftshader|llvmpipe|softpipe|software|mesa offscreen|basic render/.test(r)) return 'software';
   if (/apple m\d|apple gpu|geforce (rtx|gtx)|radeon (rx|pro)|arc a\d/.test(r)) return 'strong';
-  if (/intel|mali|adreno|powervr|iris|uhd|hd graphics|videocore/.test(r)) return 'weak';
+  if (/intel|mali|adreno|powervr|iris|uhd|hd graphics/.test(r)) return 'weak';
   return 'mid';
 }
 

@@ -253,11 +253,8 @@ try {
     /*
       What "the chain changes nothing" is allowed to mean.
 
-      On WebGL both paths draw the plate the same way and differ only by a
-      dither: two steps at worst, half a step over a 4×4 block.
-
-      On WebGPU the plate draws mirrored when it draws into a texture rather
-      than onto the canvas (FLIP_Y, in `gpu/wgsl/plate.ts`), because that is
+      The plate draws mirrored when it draws into a texture rather than onto
+      the canvas (FLIP_Y, in `gpu/wgsl/plate.ts`), because that is
       how a picture is stored the way the next pass reads it. Mirroring the
       geometry perturbs the *interpolated* uv in its last bit, and the
       composite's film grain is `hash(uv * resolution)` — a hash turns a
@@ -267,7 +264,7 @@ try {
       noise that has no sign to it.
 
       The signal that would mean the chain really changed the picture is the
-      bias, and it stays where WebGL's is: 0.011 against a limit of 0.05.
+      bias, and it stays at 0.011 against a limit of 0.05.
 
       The grain's coordinate wants to be the pixel rather than the
       interpolator, which would remove this entirely — but that is a GLSL

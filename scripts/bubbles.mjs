@@ -129,9 +129,8 @@ try {
     Photographs come from Playwright, and the arithmetic happens in the page.
 
     Three earlier versions of this got it wrong in ways worth recording.
-    The first read the canvas back with `drawImage`: a WebGL canvas without
-    `preserveDrawingBuffer` has no readable contents between frames, so it
-    returned pure black and the gates dutifully reported "100% of the
+    The first read the canvas back with `drawImage`, which a presented canvas
+    answers with black, so the gates dutifully reported "100% of the
     saturation lost". The second shipped both images back over CDP as plain
     arrays — 2.2 million JSON numbers, twice — and never finished. The third
     froze the plate with F to hold it still, and froze it so completely that

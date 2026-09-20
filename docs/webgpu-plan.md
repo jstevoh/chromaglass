@@ -417,6 +417,51 @@ the cost the governor's post level exists to spend, and `fx` now allows it
 proportionally on this engine while still catching an empty chain that costs
 more than the two passes it is.
 
+## P7, the deletion, 2026-09-20
+
+The WebGL renderer, the GLSL, the solver that ran it, the passes that went
+with it and the five harnesses that existed to compare the two are gone —
+8,500 lines out. What is left draws the show one way.
+
+**Merging the paths fixed three faults, all of them the same fault.** The
+WebGPU branch returned from the setup effect before the shared setup ran, so
+on the engine that had just become the default: the plate could not be
+painted on (no mousedown, no mousemove, no touch — a drag staged 63.3 of dye
+on WebGL and 0.0 here), a window that changed size kept the pixels it started
+with, and the ladder's dpr rungs did nothing because the stage sized the
+canvas from the raw device ratio.
+
+The first of those had a check and it was excused. `qa`'s "a drag across it
+lays down dye" read zero under the flag, and the reasoning written into the
+harness — that the two engines stage a gesture in different places — was
+wrong: nothing was staged anywhere. `npm run dye` was excused on the same
+wrong reasoning and needed no excuse either; it had the fourth copy of
+`/^GPU/`. Both are back, unexcused, at 127/127 and 17/17.
+
+**What the parity harnesses proved goes with them.** `parity`, `composite`,
+`camera`, `output` and `post` each ran two implementations over the same
+inputs. There is one now, and what gates it is the app's own suites: `qa`,
+`fx`, `wall`, `bubbles`, `dye`, `shots` and `webgpu`. The source-text checks
+in `plate` and `panel` moved from the GLSL to the WGSL.
+
+**CI keeps arithmetic on ubuntu and everything with a picture on macOS**,
+because a runner without a GPU can compute WebGPU and cannot present its
+canvas, and there is no second engine to fall back to.
+
+**Two deviations from the plan, both deliberate.** `?kiosk=1` stays: it is
+engine-neutral and a venue mini-PC still wants it. And `git grep -i webgl`
+finds 40 lines in `src` rather than none — every one a comment where the
+reference *is* the explanation ("WebGL's timer queries counted queue waits on
+ANGLE and lied, which is why the governor reads timestamps"). Decoration was
+pruned; reasons were kept.
+
+**Still to do:** the CPU solver's stepping. It is unreachable — there is no
+rung, no pin and no fallback that leads to it — but the class is threaded
+with `if (this.gpu)` pairs whose other halves are the CPU maths, and pulling
+them out is surgery on the simulation's core rather than a sweep. The arrays
+themselves stay whatever happens: the deltas, the readback mirrors, the
+beads, the bubbles, the macro camera and `liquidPhase` all live there.
+
 ## P3, the shape of the split
 
 The render effect in `LiquidVisualizer.tsx` is 3,838 lines: the WebGPU branch,

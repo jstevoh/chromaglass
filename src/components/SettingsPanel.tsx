@@ -2131,7 +2131,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             behind a console command typed once per reading.
 
             `solver` is the CPU time to submit one step across every layer,
-            not the GPU time to run it: WebGL2 has no portable way to ask.
+            not the GPU time to run it, which the governor now reads from
+            timestamp queries instead.
           */}
           {showFrameSplit && engineStatus && (
             <div className="text-[11px] font-mono opacity-40 leading-relaxed">

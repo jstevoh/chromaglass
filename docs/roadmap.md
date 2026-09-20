@@ -15,7 +15,7 @@ this repo.
 | | Plan | State |
 |---|---|---|
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
-| **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Cut over.** P0–P6 are done: the kit, the solver, the compositor, the renderer split, the camera, the projector, the post chain, the flash guard, device loss, the harnesses and CI — and the app runs on WebGPU, with `?renderer=webgl` kept until P7 deletes the old path |
+| **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
 | **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | Waiting for the cutover, so each is written once, in WGSL |
 | **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | Waiting for the same, then H6–H8 below |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the new renderer; the rest of §5 is independent |

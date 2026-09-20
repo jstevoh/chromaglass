@@ -13,13 +13,13 @@
  *
  * Two things worth knowing before reading a failure.
  *
- * There is no GPU here. Chromium falls back to software WebGL, which runs the
+ * There is no GPU on the runner this was written for. What runs there now is
  * plate at well under a frame a second, so anything timed against the render
  * loop needs patience that would be absurd on real hardware. Checks are
  * written against the DOM and against state, not against pixels, for that
  * reason.
  *
- * And the console is held to a standard the app should meet anyway: a WebGL
+ * And the console is held to a standard the app should meet anyway: a GPU
  * performance warning from the software renderer is the environment talking,
  * and is ignored by name. Everything else counts.
  */
@@ -108,7 +108,6 @@ const IGNORED = [
   /WebGPU device lost/i,
   /GPU stall due to ReadPixels/i,
   /GL Driver Message/i,
-  /Automatic fallback to software WebGL/i,
   /SwiftShader/i,
   /\[Violation\]/i,
 ];
@@ -960,9 +959,8 @@ try {
   // reload — which mid-set also loses the plate, the cue list and the
   // sequencer's place.
   //
-  // `WEBGL_lose_context` is the same event the driver sends, so this is the
-  // real path and not a simulation of it. What is checked is what an audience
-  // would see: the wall is lit before, and it is lit again afterwards.
+  // What is checked is what an audience would see: the wall is lit before
+  // the GPU goes away, and it is lit again afterwards.
   {
     const litness = () => page.evaluate(async () => {
       const d = await window.__cgFrame(16, 9);
@@ -983,28 +981,22 @@ try {
     check('the wall is lit before the GPU goes away', before > 0.01,
       `luminance ${before?.toFixed(3)}` + (before > 0.01 ? '' : ` — ${await showState()}`));
 
-    // How a GPU is taken away depends on which one it is. WebGL has an
-    // extension that stages the browser's own event and a `restoreContext` to
-    // hand it back; WebGPU has `device.destroy()` and no giving back at all —
-    // the app asks for a new device instead — so there is nothing to call
-    // afterwards and the notice can come and go while a poll is between
-    // looks. Both are the real path rather than a simulation of it.
+    // `device.destroy()` is what a driver reset leaves behind, so this is the
+    // real path rather than a simulation of it. There is no giving it back —
+    // the app asks for a new device instead — so nothing is called afterwards,
+    // and the notice can come and go while a poll is between looks, which is
+    // why it is watched for.
     await page.evaluate(() => {
       window.__sawLost = false;
       new MutationObserver(() => {
         if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
       }).observe(document.body, { childList: true, subtree: true });
-      const d = window.chromaglassDebug?.();
-      if (d?.loseDevice) { d.loseDevice(); return; }
-      const gl = document.querySelector('#liquid-canvas').getContext('webgl2');
-      window.__lose = gl.getExtension('WEBGL_lose_context');
-      window.__lose?.loseContext();
+      window.chromaglassDebug().loseDevice();
     });
     await settle(1500);
     check('a lost context is noticed and said so',
       await page.evaluate(() => window.__sawLost || !!document.querySelector('[data-testid="gl-lost"]')));
 
-    await page.evaluate(() => window.__lose?.restoreContext());
     // Generous: the rebuild is a whole engine setup and then a plate laid
     // again, on a machine that may be rasterising in software.
     let after = 0;
@@ -1307,7 +1299,7 @@ try {
         machine. A window reaches everything else — a tab playing a reel off
         the Internet Archive, a media player — and is the only way that can
         work: a cross-origin video plays in a page but taints the texture the
-        moment WebGL reads it, and the Archive's file responses carry no CORS
+        moment the GPU reads it, and the Archive's file responses carry no CORS
         header (checked: none on /download/, none on the data node, OPTIONS
         405). A captured window has no origin.
 
@@ -1666,7 +1658,7 @@ try {
 
       Seed is a counter the render loop compares against what it last acted
       on, exactly like Drain and Clear — but unlike them it *worked*, because
-      it was in the dependency list of the effect that owns WebGL. Which meant
+      it was in the dependency list of the effect that owns the stage. Which meant
       every press tore the context down and built it again: every shader
       compiled, every framebuffer reallocated, every simulation rebuilt, on a
       button people press repeatedly while building a look. Nothing in that

@@ -840,7 +840,7 @@ export default function App() {
     The projector fed by another tab, window or screen: a film off the
     Internet Archive, a media player, a slide deck. It reaches what a URL
     cannot — a cross-origin video plays in a page but cannot be read back into
-    a WebGL texture, and the Archive's own file responses carry no header that
+    a texture on the GPU, and the Archive's own file responses carry no header that
     would allow it — because a captured window has no origin, only pixels.
 
     The browser's picker decides what is shared, and the cancel case is a
@@ -1246,7 +1246,7 @@ export default function App() {
   // a hidden tab stops animating. A Go fired from a MIDI pad while the
   // operator is watching the wall would otherwise freeze half-way through the
   // crossfade and stay there. (rAF also runs at the compositor's rate, which
-  // on a machine falling back to software WebGL is under a frame a second —
+  // on a machine with no GPU worth the name is under a frame a second —
   // the fade would arrive in three steps.)
   const lookFadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** The look before the last Go, so one step back is always available. */
@@ -3459,7 +3459,7 @@ export default function App() {
       {/* ── The desk ───────────────────────────────────────────── */}
       {/*
         A layout with a hole in it. The plate is a `position: fixed` canvas
-        that must never be re-parented — a remount takes the WebGL context and
+        that must never be re-parented — a remount takes the GPU context and
         the show restarts, mid-song — so the desk lays out normally around an
         empty box and the canvas is painted over that box's rectangle.
 

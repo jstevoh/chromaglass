@@ -37,39 +37,16 @@ fn modf2(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
 `;
 
 /**
- * Catmull-Rom, which passes through its samples, with the old B-spline kept
- * reachable through `U.bspline`. See the long note in the GLSL for why the
- * difference is the whole of why the plate used to look soft.
+ * Catmull-Rom, which passes through its samples.
+ *
+ * The B-spline it replaced was reachable through `U.bspline` for as long as
+ * there was something to compare against; the difference between them is
+ * most of why the plate used to look soft, and `npm run plate` measures the
+ * weights themselves rather than the two side by side.
  */
 const SAMPLING = /* wgsl */ `
 fn bicubicSigned(t: texture_2d<f32>, uv: vec2f) -> vec4f {
   let texSize = vec2f(U.gridSize);
-  if (U.bspline > 0.5) {
-    let inv = 1.0 / texSize;
-    var tt = uv * texSize - 0.5;
-    let f = fract(tt);
-    tt -= f;
-    let nx = vec4f(1.0, 2.0, 3.0, 4.0) - f.x;
-    let qx = nx * nx * nx;
-    let ax = qx.x;
-    let bx = qx.y - 4.0 * qx.x;
-    let cx = qx.z - 4.0 * qx.y + 6.0 * qx.x;
-    let wx = vec4f(ax, bx, cx, 6.0 - ax - bx - cx) * (1.0 / 6.0);
-    let ny = vec4f(1.0, 2.0, 3.0, 4.0) - f.y;
-    let qy = ny * ny * ny;
-    let ay = qy.x;
-    let by = qy.y - 4.0 * qy.x;
-    let cy = qy.z - 4.0 * qy.y + 6.0 * qy.x;
-    let wy = vec4f(ay, by, cy, 6.0 - ay - by - cy) * (1.0 / 6.0);
-    let c = tt.xxyy + vec2f(-0.5, 1.5).xyxy;
-    let sw = vec4f(wx.xz + wx.yw, wy.xz + wy.yw);
-    let off = (c + vec4f(wx.yw, wy.yw) / sw) * inv.xxyy;
-    let s0 = tex2(t, off.xz);
-    let s1 = tex2(t, off.yz);
-    let s2 = tex2(t, off.xw);
-    let s3 = tex2(t, off.yw);
-    return mix(mix(s3, s2, sw.x / (sw.x + sw.y)), mix(s1, s0, sw.x / (sw.x + sw.y)), sw.z / (sw.z + sw.w));
-  }
   let samplePos = uv * texSize;
   let texPos1 = floor(samplePos - 0.5) + 0.5;
   let f = samplePos - texPos1;

@@ -2,12 +2,12 @@
  * One way to photograph the plate, whichever engine drew it
  * (docs/webgpu-plan.md, P5).
  *
- * A WebGL canvas keeps its drawing buffer and can be copied straight out with
- * `drawImage`. A presented WebGPU canvas cannot: it answers black, which is
- * not an error and not distinguishable from a black plate — the worst kind of
- * wrong reading, because every check that takes it goes on to measure nothing
- * and say so confidently. On that path the frame is photographed by the stage
- * instead, in the task that draws it, through `chromaglassDebug().grabFrame`.
+ * A presented WebGPU canvas cannot be copied out with `drawImage`: it answers
+ * black, which is not an error and not distinguishable from a black plate —
+ * the worst kind of wrong reading, because every check that takes it goes on
+ * to measure nothing and say so confidently. So the frame is photographed by
+ * the stage instead, in the task that draws it, through
+ * `chromaglassDebug().grabFrame`.
  *
  * Every harness that reads pixels uses this, so there is one implementation of
  * the difference rather than one per harness.
