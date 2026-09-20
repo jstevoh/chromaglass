@@ -701,6 +701,18 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(groups);
   }
 
+  /**
+   * The fields as the CPU last saw them. WebGPU cannot read a texture back
+   * without waiting for the queue, and the callers of this — carrying the
+   * plate across a resolution change, and detaching — would rather have the
+   * frame-old copy the ring already holds than stall the show for a fresh
+   * one. Call `readbackAsync` first if the age matters.
+   */
+  readback(): { dye: Float32Array; vel: Float32Array } {
+    this.readbackAsync();
+    return { dye: this.rbDye, vel: this.rbVel };
+  }
+
   get rbDyeView(): Float32Array { return this.rbDye; }
   get rbVelView(): Float32Array { return this.rbVel; }
 

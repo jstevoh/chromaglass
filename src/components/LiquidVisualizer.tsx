@@ -7,6 +7,7 @@ import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pi
 import { CameraPass } from '../lib/cameraPass';
 import { OutputPass } from '../lib/outputPass';
 import { WebGPUStage } from '../gpu/stage';
+import { WebGPUFluid } from '../gpu/fluid';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -18,7 +19,7 @@ import { FrameProbe } from '../lib/frameProbe';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
-import { GpuFluid, type GpuStepParams } from '../lib/gpuFluid';
+import { GpuFluid, type GpuStepParams, type PlateSolver } from '../lib/gpuFluid';
 import { classifyGpu, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -444,7 +445,7 @@ class FluidSimulation {
   // writers added since the last step — and `gap` holds gap deltas. They are
   // flushed into the high-res field each step and zeroed. Readers use the
   // read* accessors, which serve a 192² downsample of the GPU field.
-  gpu: GpuFluid | null = null;
+  gpu: PlateSolver | null = null;
   private dirty = false;
   private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
@@ -524,7 +525,7 @@ class FluidSimulation {
   // ── GPU solver lifecycle ───────────────────────────────────────────
 
   /** Move the simulation onto the GPU. Whatever the CPU arrays hold becomes the opening state. */
-  attachGpu(gpu: GpuFluid) {
+  attachGpu(gpu: PlateSolver) {
     if (this.gpu) {                       // resolution change: carry the field across
       this.pullStateFromGpu();
       this.gpu.dispose();
@@ -2319,8 +2320,8 @@ interface FrameView {
  * taken out of the draw first.
  */
 interface PlateRenderer {
-  /** For the engine badge: what this is running on. */
-  readonly info: { renderer: string; gpuClass: GpuClass };
+  /** For the engine badge: which API this is, and what it is running on. */
+  readonly info: { api: 'webgl' | 'webgpu'; renderer: string; gpuClass: GpuClass };
   /** The biggest texture this device will take, which decides the solver's grid. */
   readonly maxTexture: number;
   /** Size the canvas to the stage, at this device-pixel ratio. */
@@ -2333,6 +2334,12 @@ interface PlateRenderer {
   attachSolver(fluid: FluidSimulation, wantRes: number): boolean;
   /** One frame. Returns what the flash guard read, or null when it is off. */
   drawFrame(view: FrameView, fluids: FluidSimulation[]): number | null;
+  /**
+   * What `?debug` should show about this engine in particular. It is spread
+   * into `chromaglassDebug()` at the top level, so a harness reaching for
+   * `chromaglassDebug().gl` finds it exactly where it always was.
+   */
+  debug?(): Record<string, unknown>;
 }
 
 interface GLResources {
@@ -3530,11 +3537,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
+          // The badge says which API is carrying the show, because that is the
+          // thing being changed underneath it.
+          const api = renderer?.info.api === 'webgpu' ? 'WebGPU' : 'GPU';
           const status: EngineStatus = {
             label: lead?.gpu
-              ? `GPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
+              ? `${api} · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
               : `CPU · ${GRID_SIZE}²${gpuUnavailable ? ' · GPU unavailable' : ''}`,
-            engine: lead?.gpu ? 'gpu' : 'cpu',
+            engine: lead?.gpu ? (renderer?.info.api === 'webgpu' ? 'webgpu' : 'gpu') : 'cpu',
             grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
@@ -4612,6 +4622,66 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       animationFrameId = requestAnimationFrame(render);
     };
 
+    // ── What `?debug` shows ───────────────────────────────────────────
+    // One surface whichever engine is drawing: the show's own state here, and
+    // whatever the renderer wants to add spread in at the top level, so a
+    // harness reaching for `chromaglassDebug().gl` finds it where it always
+    // was (docs/webgpu-plan.md, P3).
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+        engine: engineStatusRef.current?.label ?? '',
+        status: engineStatusRef.current,
+        governor: governorRef.current,
+        /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
+        solver: () => ({
+          simMs: simMsRef.current,
+          stepsPerSec: stepsPerSecRef.current,
+          catchUp: catchUpRef.current,
+          layers: fluidsRef.current.length,
+        }),
+        externalTilt: externalTiltRef.current,
+        bubbles: bubblesRef.current,
+        // What the shader was actually told about them last frame: a bubble
+        // that is on the plate but not in these two numbers is not on screen.
+        bubbleUniforms: () => ({ ...bubbleDebugRef.current }),
+        // The phrasing, so a check can watch the signal rather than guess from
+        // the picture whether it is arriving.
+        phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
+        beads: beadsRef.current.beads.length,
+        beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
+        chemistry: chemRef.current,
+        film: filmRef.current,
+        fluids: fluidsRef.current,
+        rotation: rotationAnglesRef,
+        /** The derive pass's switch, live: `perPixel.current = true` draws as ?derived=0 does. */
+        perPixel: perPixelRef,
+        /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
+        outputConfig: outputCfgRef.current,
+        markTest: (on: boolean) => {
+          if (!on) { markRef.current = null; return; }
+          const c = document.createElement('canvas');
+          c.width = 128; c.height = 32;
+          const g2 = c.getContext('2d')!;
+          const ramp = g2.createLinearGradient(0, 0, 128, 0);
+          ramp.addColorStop(0, 'rgba(255,255,255,1)');
+          ramp.addColorStop(1, 'rgba(255,255,255,0)');
+          g2.fillStyle = ramp;
+          g2.fillRect(0, 0, 128, 32);
+          markRef.current = { source: c, aspect: 4, dirty: true };
+        },
+        /** WebGL's error flag; reading it clears it. */
+        shot: macroShotRef.current,
+        gridSize: GRID_SIZE,
+        harmony: harmonyRef.current,
+        contract: presetContractRef.current,
+        paletteWindow: paletteWindowRef.current,
+        journey: journeyRef.current,
+        lamp: lampRef.current,
+        settings: settingsRef.current,
+        ...(renderer?.debug?.() ?? {}),
+      });
+    }
+
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
@@ -4628,12 +4698,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // solver (P2) and the compositor (P3) move in behind this branch.
     if (WEBGPU) {
       let stage: WebGPUStage | null = null;
-      let raf = 0;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
       let cpuMs = 0;
-      const tier = detectTier();
       const size = () => {
         const dpr = devicePixels();
         const stagePx = stageRef.current;
@@ -4650,50 +4718,62 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
         stage = s;
         s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
-        let last = performance.now(), frameMs = 16.7, reported = 0;
-        const loop = () => {
-          if (!stage) return;
-          const now = performance.now();
-          frameMs += (now - last - frameMs) * 0.05;
-          last = now;
-          const dpr = size();
-          const t0 = performance.now();
-          stage.frame();
-          cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
-          if (now - reported > 500) {
-            reported = now;
-            const status: EngineStatus = {
-              label: `WebGPU · ${s.gpu.label}`,
-              engine: 'webgpu', grid: 0, dpr, tier, gpu: s.gpu.gpuClass, renderer: s.gpu.label,
-              governed: false, steppedDown: false, gpuUnavailable: false,
-              frameMs, simMs: 0, layers: 0, stepsPerSec: 0, otherMs: frameMs,
-            };
-            engineStatusRef.current = status;
-            onEngineStatusRef.current?.(status);
-          }
-          raf = requestAnimationFrame(loop);
-        };
-        loop();
-      });
-      if (new URLSearchParams(window.location.search).has('debug')) {
-        (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
-          engine: engineStatusRef.current?.label ?? 'WebGPU · starting',
-          status: engineStatusRef.current,
-          webgpu: stage && {
-            label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
-            timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
-            cpuMs: +cpuMs.toFixed(3),
-            timings: Object.fromEntries(stage.profiler.ms),
+
+        /**
+         * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
+         *
+         * The solver is wired: the show's own loop runs, the plate is poured
+         * on and stepped, and the fields live in `gpu/fluid.ts`. What is not
+         * wired yet is the picture — the WGSL composite is proved against the
+         * GLSL (`npm run composite`) but nothing samples the solver's textures
+         * with it, so the canvas stays black and `drawFrame` reads nothing
+         * back. That is the next piece.
+         */
+        const gpuRenderer: PlateRenderer = {
+          info: { api: 'webgpu', renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
+          maxTexture: s.device.limits.maxTextureDimension2D,
+          resize: () => { size(); },
+          attachSolver(fluid, wantRes) {
+            if (wantRes <= 0) {
+              if (fluid.gpu) fluid.detachGpu();
+              return true;
+            }
+            if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+            try {
+              fluid.attachGpu(new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
+                float32Filterable: s.gpu.float32Filterable,
+                timestamps: s.gpu.timestamps,
+              }));
+              return true;
+            } catch (err) {
+              console.warn('ChromaGlass: the WebGPU solver would not start, using the CPU solver.', err);
+              fluid.dropGpu();
+              return false;
+            }
           },
-          /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
-          grabFrame: () => stage?.grabFrame() ?? null,
-          /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
-          kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
-          gpuFailure,
-          settings: settingsRef.current,
-        });
-      }
-      return () => { cancelled = true; cancelAnimationFrame(raf); stage?.dispose(); stage = null; };
+          drawFrame: () => {
+            const t0 = performance.now();
+            stage?.frame();
+            cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+            return null;
+          },
+          debug: () => ({
+            webgpu: stage && {
+              label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
+              timestamps: stage.gpu.timestamps, format: stage.format, frames: stage.frames,
+              cpuMs: +cpuMs.toFixed(3),
+              timings: Object.fromEntries(stage.profiler.ms),
+            },
+            /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
+            grabFrame: () => stage?.grabFrame() ?? null,
+            /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
+            kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+            gpuFailure,
+          }),
+        };
+        startWith(gpuRenderer);
+      });
+      return () => { cancelled = true; cancelAnimationFrame(animationFrameId); stage?.dispose(); stage = null; };
     }
 
     // ── WebGL2 initialization ──────────────────────────────────────────
@@ -5067,7 +5147,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // layer texture, and the velocity texture when macro needs it.
           const layerFbo = ensureRenderTarget(texs[l], fluid.gpu.N);
           const velFbo = wantVel ? ensureRenderTarget(glr.velTextures[l], fluid.gpu.N) : null;
-          fluid.gpu.packInto(layerFbo, velFbo, velRange);
+          // Rendering into a framebuffer is WebGL's alone; the WebGPU
+          // renderer samples the solver's own textures instead.
+          if (fluid.gpu instanceof GpuFluid) fluid.gpu.packInto(layerFbo, velFbo, velRange);
         } else {
           // CPU path: sqrt-encoded for extra precision at low densities
           // (the shader squares on decode). Kills banding.
@@ -5161,16 +5243,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const gran = Math.max(0, Math.min(1, currentSettings.granulation ?? 0));
         if (gran > 0.002) {
           for (let l = 0; l < 2; l++) {
-            const tex = fluids[l]?.gpu?.grainTexture ?? null;
+            const g = fluids[l]?.gpu;
+            const tex = (g instanceof GpuFluid ? g.grainTexture : null) ?? null;
             if (!tex) continue;
             glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain0 + l);
             glCtx.bindTexture(glCtx.TEXTURE_2D, tex);
             if (l === 0) grainOn = 1;
           }
           // The second plate borrows the lead's coordinates when it has none.
-          if (grainOn && !fluids[1]?.gpu?.grainTexture) {
+          const lead1 = fluids[1]?.gpu;
+          if (grainOn && !(lead1 instanceof GpuFluid && lead1.grainTexture)) {
             glCtx.activeTexture(glCtx.TEXTURE0 + UNIT.grain1);
-            glCtx.bindTexture(glCtx.TEXTURE_2D, lead!.gpu!.grainTexture!);
+            glCtx.bindTexture(glCtx.TEXTURE_2D, (lead!.gpu as GpuFluid).grainTexture!);
           }
         }
       }
@@ -5490,7 +5574,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      * same shape once its compositor is wired (docs/webgpu-plan.md, P3).
      */
     const webglRenderer: PlateRenderer = {
-      info: { renderer: rendererString, gpuClass },
+      info: { api: 'webgl', renderer: rendererString, gpuClass },
       get maxTexture() { return webGLRef.current?.maxTexture ?? 0; },
       resize,
       attachSolver(fluid, wantRes) {
@@ -5511,49 +5595,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
       },
       drawFrame,
-    };
-
-    startWith(webglRenderer);
-
-
-
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
-        engine: engineStatusRef.current?.label ?? '',
-        status: engineStatusRef.current,
-        governor: governorRef.current,
-        /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
-        solver: () => ({
-          simMs: simMsRef.current,
-          stepsPerSec: stepsPerSecRef.current,
-          catchUp: catchUpRef.current,
-          layers: fluidsRef.current.length,
-        }),
-        externalTilt: externalTiltRef.current,
-        bubbles: bubblesRef.current,
-        // What the shader was actually told about them last frame: a bubble
-        // that is on the plate but not in these two numbers is not on screen.
-        bubbleUniforms: () => ({ ...bubbleDebugRef.current }),
-        // The phrasing, so a check can watch the signal rather than guess from
-        // the picture whether it is arriving.
-        phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
-        beads: beadsRef.current.beads.length,
-        beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
-        chemistry: chemRef.current,
-        film: filmRef.current,
-        fluids: fluidsRef.current,
+      debug: () => ({
         gl: webGLRef.current,
         /**
          * Each plate's rotation, live. The clip tool squares a plate up before
          * it pours a title into it, or the words come out at whatever angle the
          * plate was laid at (a random one) and turn with it.
          */
-        rotation: rotationAnglesRef,
-        /** The derive pass's switch, live: `perPixel.current = true` draws as ?derived=0 does. */
-        perPixel: perPixelRef,
-        /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputPass: outputRef.current,
-        outputConfig: outputCfgRef.current,
         flash: () => ({ ...flashRef.current.state, luminance: probeRef.current?.luminance ?? null }),
         /**
          * The post chain, for `npm run fx`: whether it runs and at what depth,
@@ -5599,31 +5648,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           return { mean: probe.measureNow(canvas.width, canvas.height), lit };
         },
         /** A test mark (a white bar fading out to the right), or none, for the finish's identity check. */
-        markTest: (on: boolean) => {
-          if (!on) { markRef.current = null; return; }
-          const c = document.createElement('canvas');
-          c.width = 128; c.height = 32;
-          const g2 = c.getContext('2d')!;
-          const ramp = g2.createLinearGradient(0, 0, 128, 0);
-          ramp.addColorStop(0, 'rgba(255,255,255,1)');
-          ramp.addColorStop(1, 'rgba(255,255,255,0)');
-          g2.fillStyle = ramp;
-          g2.fillRect(0, 0, 128, 32);
-          markRef.current = { source: c, aspect: 4, dirty: true };
-        },
-        /** WebGL's error flag; reading it clears it. */
         glError: () => webGLRef.current?.gl.getError() ?? null,
         glLost: glLostRef.current,
-        shot: macroShotRef.current,
-        gridSize: GRID_SIZE,
-        harmony: harmonyRef.current,
-        contract: presetContractRef.current,
-        paletteWindow: paletteWindowRef.current,
-        journey: journeyRef.current,
-        lamp: lampRef.current,
-        settings: settingsRef.current,
-      });
-    }
+      }),
+    };
+
+    startWith(webglRenderer);
 
     return () => {
       stopFilm();

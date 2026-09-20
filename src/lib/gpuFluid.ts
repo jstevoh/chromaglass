@@ -657,6 +657,36 @@ type ShaderName = keyof typeof SHADERS;
 
 // ─── Solver ───────────────────────────────────────────────────────────
 
+/**
+ * What the plate needs of a solver, whichever API it runs on
+ * (docs/webgpu-plan.md, P3).
+ *
+ * `GpuFluid` below and `gpu/fluid.ts`'s `WebGPUFluid` both satisfy this, so
+ * `FluidSimulation` can hold either without knowing which. What is *not* here
+ * is anything one of them cannot do: `packInto` renders into a framebuffer,
+ * which is WebGL's alone, so the WebGL renderer narrows to its own class at
+ * the one place it needs it.
+ */
+export interface PlateSolver {
+  /** The physical grid it is solving on. */
+  readonly N: number;
+  /** The crossfade between the pigment's two phases. */
+  readonly grainMix: number;
+  /** The coordinates the pigment rides, where the device can carry them. */
+  readonly grainTexture?: unknown;
+  step(p: GpuStepParams, deltasApplied: boolean): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
+  /** Start a read and take whatever has landed; false before the first. */
+  readbackAsync(): boolean;
+  readonly rbDyeView: Float32Array;
+  readonly rbVelView: Float32Array;
+  /** The fields as the CPU last saw them, for carrying state across a change. */
+  readback(): { dye: Float32Array; vel: Float32Array };
+  drainStep(t: number): void;
+  clear(): void;
+  dispose(): void;
+}
+
 export class GpuFluid {
   readonly N: number;
   readonly L: number;
