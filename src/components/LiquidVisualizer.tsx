@@ -4738,7 +4738,46 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           return;
         }
         stage = s;
-        s.lost.then((info) => { if (!cancelled) console.error('WebGPU device lost:', info.reason, info.message); });
+
+        /**
+         * The GPU, taken away (docs/webgpu-plan.md, P4).
+         *
+         * A projector plugged into a running laptop, a Mac switching between
+         * its GPUs, a driver resetting under load: the device is lost and
+         * every texture, buffer and pipeline with it. WebGPU has no event to
+         * say it is back — there is no restore, only a new device — so the
+         * recovery is to ask for one, which is what bumping the epoch does:
+         * this effect runs again from the top.
+         *
+         * `cancelled` is already set by then if the loss is our own teardown
+         * destroying the device, so a normal unmount goes quietly.
+         */
+        s.lost.then((info) => {
+          if (cancelled) return;
+          console.error('WebGPU device lost:', info.reason, info.message);
+          // Dropping rather than detaching skips a readback from a dead
+          // device and leaves the CPU's own state alone.
+          for (const fluid of fluidsRef.current) fluid.dropGpu();
+          camera = null;
+          projector = null;
+          probe = null;
+          stage = null;
+          flashRef.current.reset();
+          flashGainRef.current = 1;
+          glLostRef.current = true;
+          setGlLost(true);
+          setGlEpoch((n) => n + 1);
+        });
+
+        // Coming back from one. The plate did not survive — the dye lives in
+        // the solver's textures, and they died with the device — so the look
+        // is laid again: not the identical plate, which is not possible, but
+        // the same look, back within a second.
+        if (glLostRef.current) {
+          layPlateRef.current(livePresetRef.current);
+          glLostRef.current = false;
+          setGlLost(false);
+        }
 
         /**
          * WebGPU's side of the bargain (docs/webgpu-plan.md, P3).
@@ -4890,6 +4929,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             grabFrame: () => stage?.grabFrame() ?? null,
             /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
             kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+            /**
+             * Take the device away, as a driver would. The recovery is the
+             * app's own: a new device, a rebuilt stage, the look laid again.
+             */
+            loseDevice: () => { stage?.device.destroy(); },
             /** The guard's own state, and the luminance it is being fed. */
             flash: () => ({ ...flashRef.current.state, luminance: probe?.luminance ?? null }),
             /**
