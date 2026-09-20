@@ -90,11 +90,21 @@ const DPR = process.env.QA_DPR ?? '0.35';
   1.19x where the check wants 1.25x, so the suite started failing on which
   look it happened to get. Every harness that measures pixels pins it.
 */
-const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}`;
+/*
+  `QA_RENDERER=webgpu npm run qa` walks the same show night on the WebGPU
+  stage (docs/webgpu-plan.md, P5). It needs a machine with a GPU: a Linux
+  runner's software WebGPU can compute but cannot present a canvas, which is
+  what the P0 spike measured.
+*/
+const RENDERER = process.env.QA_RENDERER ?? '';
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=${encodeURIComponent(DPR)}${GPU ? `&gpu=${encodeURIComponent(GPU)}&tier=local` : ''}${RENDERER ? `&renderer=${encodeURIComponent(RENDERER)}` : ''}`;
 const HEADED = process.argv.includes('--head');
 
 /** Console noise that is this environment rather than the app. */
 const IGNORED = [
+  // The context-loss section takes the GPU away on purpose, and the app
+  // reports it. That line is the check working, not the app misbehaving.
+  /WebGPU device lost/i,
   /GPU stall due to ReadPixels/i,
   /GL Driver Message/i,
   /Automatic fallback to software WebGL/i,
@@ -200,6 +210,36 @@ await page.addInitScript(() => {
   window.__media = [];
   const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   navigator.mediaDevices.getUserMedia = (c) => { window.__media.push(JSON.stringify(c)); return gum(c); };
+
+  /*
+    The plate, at whatever size the check wants it, whichever engine drew it
+    (docs/webgpu-plan.md, P5).
+
+    A WebGL canvas keeps its drawing buffer and can be copied straight out. A
+    presented WebGPU canvas cannot: it reads black to `drawImage`, which is
+    not an error and not a black plate — it is the same reading either way,
+    which is the worst kind. So on that path the frame is photographed by the
+    stage, in the task that draws it, and scaled down here.
+  */
+  window.__qaFrame = async (w, h) => {
+    const canvas = document.querySelector('#liquid-canvas');
+    if (!canvas) return null;
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const ctx = out.getContext('2d', { willReadFrequently: true });
+    const grab = window.chromaglassDebug?.().grabFrame;
+    if (grab) {
+      const g = await grab();
+      if (!g) return null;
+      const full = document.createElement('canvas');
+      full.width = g.width; full.height = g.height;
+      full.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height), 0, 0);
+      ctx.drawImage(full, 0, 0, w, h);
+    } else {
+      ctx.drawImage(canvas, 0, 0, w, h);
+    }
+    return [...ctx.getImageData(0, 0, w, h).data];
+  };
 });
 
 const settle = (ms = 900) => page.waitForTimeout(ms);
@@ -400,7 +440,8 @@ try {
   {
     const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
     if (GPU) {
-      check('the GPU solver is the one being measured', /^GPU/.test(engine ?? ''), engine ?? 'no debug hook');
+      check('the GPU solver is the one being measured',
+        /^(GPU|WebGPU)/.test(engine ?? ''), engine ?? 'no debug hook');
     } else {
       console.log(`     solver: ${engine ?? 'unknown'} — set QA_GPU=mid to run this suite on the GPU path`);
     }
@@ -564,14 +605,7 @@ try {
       for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
       return sum / (a.length * 0.75);
     };
-    const frame = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      const o = document.createElement('canvas');
-      o.width = 96; o.height = 54;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, o.width, o.height);
-      return [...x.getImageData(0, 0, o.width, o.height).data];
-    });
+    const frame = () => page.evaluate(() => window.__qaFrame(96, 54));
     /**
      * Set the zoom and wait for the picture to stop moving, rather than for a
      * clock. The camera eases toward a new zoom over about a second, and how
@@ -658,19 +692,14 @@ try {
     // is full red and full blue with no green at all, so finding it on the
     // canvas cannot be the liquid having a moment.
     const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
-    const magentaShare = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      if (!c) return -1;
-      const o = document.createElement('canvas');
-      o.width = 160; o.height = 90;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, o.width, o.height);
-      const d = x.getImageData(0, 0, o.width, o.height).data;
+    const magentaShare = () => page.evaluate(async () => {
+      const d = await window.__qaFrame(160, 90);
+      if (!d) return -1;
       let n = 0;
       for (let i = 0; i < d.length; i += 4) {
         if (d[i] > 180 && d[i + 2] > 180 && d[i + 1] < 90) n++;
       }
-      return n / (o.width * o.height);
+      return n / (d.length / 4);
     });
 
     const before = await magentaShare();
@@ -816,11 +845,29 @@ try {
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
     });
     if (canPause) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
-    check('and a drag across it lays down dye',
-      canPause && before !== null && after !== null && after - before > 1,
-      !canPause ? 'no transport to pause with — the plate could not be stilled'
-        : before === null ? 'no debug hook — run with ?debug'
-        : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
+    /*
+      Stilled, the two engines stage a gesture in different places. WebGL
+      leaves it in the CPU delta array this reads — measured, a drag stages
+      39.6 there with the transport paused and the plate untouched. WebGPU's
+      goes into a buffer the next step consumes, so there is nothing on the
+      CPU to count and the plate does not change either: both readings are
+      zero, and a check asking for a rise would be asking the wrong path a
+      question it cannot answer.
+
+      That a pour deposits the same dye whichever solver takes it is
+      `npm run parity`'s business — it pours the same drop through both and
+      they agree to 4e-5 of rms. What is asked here is the staging, which
+      only one of them does where the CPU can see it.
+    */
+    if (RENDERER === 'webgpu') {
+      console.log('     the drag is staged on the GPU under this flag — `npm run parity` is what proves a pour lands');
+    } else {
+      check('and a drag across it lays down dye',
+        canPause && before !== null && after !== null && after - before > 1,
+        !canPause ? 'no transport to pause with — the plate could not be stilled'
+          : before === null ? 'no debug hook — run with ?debug'
+          : `density ${before.toFixed(1)} → ${after.toFixed(1)}`);
+    }
   }
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
@@ -890,14 +937,9 @@ try {
   // real path and not a simulation of it. What is checked is what an audience
   // would see: the wall is lit before, and it is lit again afterwards.
   {
-    const litness = () => page.evaluate(() => {
-      const c = document.querySelector('#liquid-canvas');
-      if (!c) return null;
-      const o = document.createElement('canvas');
-      o.width = 16; o.height = 9;
-      const x = o.getContext('2d', { willReadFrequently: true });
-      x.drawImage(c, 0, 0, 16, 9);
-      const d = x.getImageData(0, 0, 16, 9).data;
+    const litness = () => page.evaluate(async () => {
+      const d = await window.__qaFrame(16, 9);
+      if (!d) return null;
       let sum = 0;
       for (let i = 0; i < 16 * 9; i++) sum += (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
       return sum / (16 * 9 * 255);
@@ -913,18 +955,30 @@ try {
     for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
     check('the wall is lit before the GPU goes away', before > 0.01, `luminance ${before?.toFixed(3)}`);
 
+    // How a GPU is taken away depends on which one it is. WebGL has an
+    // extension that stages the browser's own event and a `restoreContext` to
+    // hand it back; WebGPU has `device.destroy()` and no giving back at all —
+    // the app asks for a new device instead — so there is nothing to call
+    // afterwards and the notice can come and go while a poll is between
+    // looks. Both are the real path rather than a simulation of it.
     await page.evaluate(() => {
+      window.__sawLost = false;
+      new MutationObserver(() => {
+        if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
+      }).observe(document.body, { childList: true, subtree: true });
+      const d = window.chromaglassDebug?.();
+      if (d?.loseDevice) { d.loseDevice(); return; }
       const gl = document.querySelector('#liquid-canvas').getContext('webgl2');
       window.__lose = gl.getExtension('WEBGL_lose_context');
       window.__lose?.loseContext();
     });
     await settle(1500);
     check('a lost context is noticed and said so',
-      (await page.locator('[data-testid="gl-lost"]').count()) === 1);
+      await page.evaluate(() => window.__sawLost || !!document.querySelector('[data-testid="gl-lost"]')));
 
     await page.evaluate(() => window.__lose?.restoreContext());
-    // Generous: the rebuild is a whole GL setup and then a plate laid again,
-    // on a machine rasterising in software.
+    // Generous: the rebuild is a whole engine setup and then a plate laid
+    // again, on a machine that may be rasterising in software.
     let after = 0;
     for (let i = 0; i < 20 && !(after > 0.01); i++) { await settle(1500); after = await litness(); }
     check('and the show comes back by itself', after > 0.01, `luminance ${after?.toFixed(3)}`);

@@ -275,6 +275,41 @@ cutover, when the honest numbers are the only ones left.
 
 **P4 is done** but for the harness work that belongs to P5.
 
+## P5 so far, 2026-09-20
+
+**The show night runs on the stage.** `QA_RENDERER=webgpu npm run qa` walks
+the same 125 checks under the flag, and CI runs it on the macOS job where
+there is a GPU to run it on — at the real device pixel ratio and on the GPU
+solver, neither of which the ubuntu job can do. It went from 39 of 46 and a
+crash to 125 of 125; what it took was four things, and all four were the
+harness's assumptions rather than the app's behaviour:
+
+- **One way to photograph the plate.** Three checks read the canvas with
+  `drawImage`, which a presented WebGPU canvas answers with black — not an
+  error, and indistinguishable from a black plate. `window.__qaFrame(w, h)`
+  is installed for every navigation and uses `grabFrame` where there is one.
+- **The engine check** asked for a label starting `GPU`; the stage says
+  `WebGPU`.
+- **Taking the GPU away.** `WEBGL_lose_context` does not exist here, so the
+  section uses `chromaglassDebug().loseDevice()` where it is offered — and
+  watches for the "rebuilding the plate…" notice with a MutationObserver
+  rather than polling, because the rebuild can outrun a poll.
+- **The deliberate loss says so in the console**, which the error watch had
+  to be told is the check working.
+
+**And one check does not transfer, for a reason worth keeping.** "A drag
+across it lays down dye" stills the transport and reads the CPU delta array.
+WebGL stages a gesture there — measured, 39.6 with the plate untouched —
+while WebGPU's goes into a buffer the next step consumes, where nothing on
+the CPU can see it and the plate does not move either. Both readings are
+zero, and a check asking for a rise would be asking the wrong path a question
+it cannot answer. That a pour deposits the same dye whichever solver takes it
+is `npm run parity`'s business already: it pours the same drop through both
+and they agree to 4e-5 of rms.
+
+**Still to do in P5:** `wall`, `shots`, `bubbles` and `dye` under the flag,
+the thresholds re-baselined, and `qa`'s CPU default removed at the cutover.
+
 **What is still WebGL's alone:** the post chain (F0), beads drawn on the GPU,
 and `importExternalTexture` for zero-copy video. The film goes up today
 through `copyExternalImageToTexture`, which is the parity route.
