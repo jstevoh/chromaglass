@@ -2291,6 +2291,8 @@ interface FrameView {
   bubbles: { count: number; strength: number; amount: number };
   /** Their geometry, packed for the shader. */
   bubblePack: { packed: Float32Array; shape: Float32Array };
+  /** The flash guard's gain, from the luminance the last frame read back. */
+  dimmerGain: number;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
@@ -3667,9 +3669,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      * `view`, and nothing else crosses — which is what lets a WebGPU
      * renderer take the same call when its compositor lands.
      */
-    const drawFrame = (view: FrameView, fluids: FluidSimulation[]) => {
+    const drawFrame = (view: FrameView, fluids: FluidSimulation[]): number | null => {
       const glr = webGLRef.current;
-      if (!glr) return;
+      if (!glr) return null;
       const { settings: currentSettings, time, shot } = view;
       const { macroOn, macroAmount, isDarkBlend, velRange, flowRate } = view;
       const { gl: glCtx, program: prog, vao: vaoObj, textures: texs, texData: tData, uLocs } = glr;
@@ -3939,7 +3941,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // dimmer rather than adding a pass is what lets one implementation
       // cover the laptop, the projector, a network display and the
       // recorder: every material is already lit through this number.
-      const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * flashGainRef.current;
+      const dimmerNow = Math.max(0, Math.min(1, currentSettings.dimmer ?? 1)) * view.dimmerGain;
       glCtx.uniform1f(uLocs['u_dimmer'], dimmerNow);
       glCtx.uniform1f(uLocs['u_lampWarmth'], Math.max(0, Math.min(1, currentSettings.lampWarmth ?? 0)));
       glCtx.uniform1f(uLocs['u_bspline'], view.oldSampler ? 1 : 0);
@@ -4119,19 +4121,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // ── What the audience just saw ─────────────────────────
       // Last, with the finished frame still in the default framebuffer.
       // The read is one frame behind, which does not matter for a question
-      // about the last second.
+      // about the last second. What to do about it is the show's business,
+      // so the reading goes back rather than the verdict: the loop folds it
+      // into the gain that reaches the *next* frame's view, which is exactly
+      // where it reached before.
       if (outCfg.flashGuard) {
         if (!probeRef.current) probeRef.current = new FrameProbe(glCtx);
-        const probe = probeRef.current;
-        probe.measure(canvas.width, canvas.height);
-        const lum = probe.luminance;
-        if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
-      } else if (probeRef.current) {
+        probeRef.current.measure(canvas.width, canvas.height);
+        return probeRef.current.luminance;
+      }
+      if (probeRef.current) {
         probeRef.current.dispose();
         probeRef.current = null;
-        flashRef.current.reset();
-        flashGainRef.current = 1;
       }
+      return null;
     };
 
     const render = () => {
@@ -5412,7 +5415,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Everything below is the WebGL renderer's half of the frame. It reads
         // the show's state through `view` and nothing else, which is what lets
         // a second renderer take the same call (docs/webgpu-plan.md, P3).
-        drawFrame({
+        const lum = drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
           velRange, flowRate,
@@ -5424,6 +5427,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,
           bubblePack: { packed: bubblesRef.current.packed, shape: bubblesRef.current.packedShape },
+          dimmerGain: flashGainRef.current,
           filmLevel: filmLevelRef.current,
           filmGain: filmGainRef.current,
           perPixel: perPixelRef.current,
@@ -5436,6 +5440,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           fxFrame: fxFrameRef.current,
           fxSeed: fxSeedRef.current,
         }, fluidsRef.current);
+
+        // The flash guard: what the frame just read, folded into the gain the
+        // next one is drawn with.
+        if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
+        else if (flashGainRef.current !== 1) { flashRef.current.reset(); flashGainRef.current = 1; }
       }
 
       // Governor: judge this frame. A rung change takes effect through the
