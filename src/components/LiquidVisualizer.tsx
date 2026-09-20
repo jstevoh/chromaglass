@@ -10,6 +10,7 @@ import { WebGPUStage } from '../gpu/stage';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
+import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -4713,6 +4714,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // solver (P2) and the compositor (P3) move in behind this branch.
     if (WEBGPU) {
       let stage: WebGPUStage | null = null;
+      let camera: WebGPUCamera | null = null;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
@@ -4792,20 +4794,53 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
                 plate.setSource('film', film.video);
               }
+              // Two passes when the camera is on, as in WebGL: the plate is
+              // drawn into a texture and the camera looks at it, because
+              // refraction, depth of field, bloom and the sensor's roll-off
+              // all need the finished picture to sample from. Built the first
+              // frame it would do anything and dropped when it would not, so
+              // a show without a camera never pays for the second target.
+              const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
+              if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
+              else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
+              const cam = camera;
               fillPlateUniforms(plate.pack, {
                 view, fluids,
                 width: canvas.width, height: canvas.height,
                 derived: true,
                 grid: fields[0].dye.width,
+                // The plate leaves the grain to the camera when it is on, and
+                // still dithers into its 8-bit texture, or a dark ramp bands
+                // before the camera ever sees it.
+                cameraOn: !!cam,
               });
+              if (cam) {
+                fillCameraUniforms(cam.pack, {
+                  time: view.time,
+                  amount: camAmt,
+                  refraction: view.settings.refraction ?? 0,
+                  chromatic: view.settings.chromaticAberration ?? 0,
+                  focus: view.settings.focus ?? 0.5,
+                  aperture: view.settings.aperture ?? 0,
+                  bloom: view.settings.bloom ?? 0,
+                  // Nothing follows it yet under this flag; when the post
+                  // chain lands, the finish dithers once, at the end.
+                  dither: 1,
+                }, canvas.width, canvas.height);
+              }
               // The painter stays set, so `grabFrame` photographs the picture
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
+                const size = { width: canvas.width, height: canvas.height };
                 plate.draw(
-                  encoder, target, { width: canvas.width, height: canvas.height },
-                  fields, Math.max(view.velRange, 1e-6),
+                  encoder,
+                  cam ? cam.sceneView(size.width, size.height) : target,
+                  size, fields, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
                 );
+                if (cam && plate.auxTarget) {
+                  cam.draw(encoder, target, plate.auxTarget, stage?.profiler.renderPass('camera'));
+                }
               };
             }
             stage?.frame();
@@ -4831,6 +4866,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return () => {
         cancelled = true;
         cancelAnimationFrame(animationFrameId);
+        camera?.dispose();
+        camera = null;
         stage?.dispose();
         stage = null;
       };

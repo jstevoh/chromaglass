@@ -147,6 +147,13 @@ export class WebGPUPlate {
     return this.sources.get(name)?.texture ?? this.blank;
   }
 
+  /**
+   * The display's second target — the normal, the dye's height and the bubble
+   * mask, per pixel — which is what the camera pass reads. Null until a frame
+   * has been drawn, because it is allocated at the frame's own size.
+   */
+  get auxTarget(): GPUTexture | null { return this.aux; }
+
   // ── The frame ─────────────────────────────────────────────────────
 
   /**
@@ -235,8 +242,8 @@ export class WebGPUPlate {
     }));
 
     // The second target is what the camera pass reads: the normal, the dye's
-    // height and the bubble mask. Nothing samples it yet, but the shader
-    // writes it, and a render pass has to be given somewhere to put it.
+    // height and the bubble mask. It is written whether or not that pass is
+    // on, because a render pass has to be given somewhere to put it.
     if (!this.aux || this.auxSize[0] !== size.width || this.auxSize[1] !== size.height) {
       if (this.aux) this.disposer.release(this.aux);
       this.aux = this.disposer.track(this.device.createTexture({

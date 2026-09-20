@@ -121,6 +121,41 @@ const watch = (page) => {
 
       const timings = await page.evaluate(() => window.chromaglassDebug().webgpu.timings);
       if (started.timestamps) check('the frame is timed on the GPU', typeof timings.plate === 'number', JSON.stringify(timings));
+
+      // The camera. `npm run camera` proves the shader against the GLSL's;
+      // what is asked here is that the app runs it — a pass of its own,
+      // timed on the GPU, taking a photograph that is not the plate as drawn.
+      const lens = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const shot = async () => (await dbg().grabFrame())?.pixels ?? null;
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const share = (a, b) => {
+          let hits = 0;
+          for (let i = 0; i < a.length; i += 4) {
+            const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+            if (d >= 8) hits++;
+          }
+          return hits / (a.length / 4);
+        };
+        const d = dbg();
+        d.settings.camera = 0;
+        await settle(4);
+        const a = await shot();
+        await settle(2);
+        const b = await shot();
+        const floor = share(a, b);
+        Object.assign(d.settings, { camera: 0.9, aperture: 0.6, bloom: 0.8, refraction: 0.6, focus: 0.3 });
+        await settle(3);
+        const on = share(b, await shot());
+        const timed = typeof dbg().webgpu.timings.camera === 'number';
+        d.settings.camera = 0;
+        await settle(3);
+        return { floor, on, timed };
+      });
+      check('the camera takes the picture when it is on',
+        lens.on > 0.3 && lens.on > lens.floor * 5 && (!started.timestamps || lens.timed),
+        `${(lens.on * 100).toFixed(0)}% of the frame against a floor of ${(lens.floor * 100).toFixed(1)}%` +
+        (started.timestamps ? `, its pass ${lens.timed ? 'timed' : 'never timed'} on the GPU` : ''));
     }
     check('no errors in the console', errors.length === 0, errors.slice(0, 3).join(' | '));
   } finally {
