@@ -25,6 +25,12 @@ screen capture.
 `npm run detail` (`scripts/detail.mjs`) produces this table, so every batch is judged
 the same way rather than by eye.
 
+> **This is the plate's own running order.** The engine work it now sits on — the
+> WebGPU port, the effects, air and the second liquid — is in
+> [docs/roadmap.md](docs/roadmap.md), which says what comes first and links the
+> plans behind each piece. Note the **shader freeze**: the GLSL does not change
+> until the port cuts over.
+
 ## Running order
 
 Each batch is one PR: build, test in the sandbox, merge, deploy, then a GPU look on
