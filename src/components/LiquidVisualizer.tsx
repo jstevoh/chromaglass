@@ -4772,7 +4772,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // The painter stays set, so `grabFrame` photographs the picture
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
-                plate.draw(encoder, target, { width: canvas.width, height: canvas.height }, fields, Math.max(view.velRange, 1e-6));
+                plate.draw(
+                  encoder, target, { width: canvas.width, height: canvas.height },
+                  fields, Math.max(view.velRange, 1e-6),
+                  stage?.profiler.renderPass('plate'),
+                );
               };
             }
             stage?.frame();

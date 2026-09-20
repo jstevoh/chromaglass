@@ -243,6 +243,14 @@ export class GpuProfiler {
     return { querySet: this.query, beginningOfPassWriteIndex: i * 2, endOfPassWriteIndex: i * 2 + 1 };
   }
 
+  /**
+   * The same, for a render pass. The two descriptors have the same shape and
+   * the same query set; they are separate types only because WebGPU says so.
+   */
+  renderPass(label: string): GPURenderPassTimestampWrites | undefined {
+    return this.pass(label) as GPURenderPassTimestampWrites | undefined;
+  }
+
   /** At the end of the frame's encoding: resolve what was written this frame. */
   resolveInto(encoder: GPUCommandEncoder): void {
     if (!this.query || !this.resolve || !this.ring || !this.labels.length) { this.labels = []; return; }

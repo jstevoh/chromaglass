@@ -141,6 +141,7 @@ export class WebGPUPlate {
     size: { width: number; height: number },
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null }[],
     velRange: number,
+    timestamps?: GPURenderPassTimestampWrites,
   ): void {
     if (!fields.length) return;
     const grid = fields[0].dye.width;
@@ -235,6 +236,9 @@ export class WebGPUPlate {
         { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
         { view: this.aux.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } },
       ],
+      // The frame's own timing goes on the pass that draws it, not on the
+      // clear that used to stand in for it.
+      timestampWrites: timestamps,
     });
     pass.setPipeline(display);
     pass.setBindGroup(0, this.device.createBindGroup({
