@@ -2145,17 +2145,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
               const v = e.target.value;
-              onUpdate({ simResolution: (v === 'auto' || v === 'cpu' ? v : Number(v)) as SimResolution });
+              onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
-            title="Grid the fluid is solved on. Finer grids resolve thinner filaments and real cell structure; the CPU solver is the fallback for machines without float render targets."
+            title="Grid the fluid is solved on. Finer grids resolve thinner filaments and real cell structure; Auto leaves the choice to the governor, which measures the GPU's own frame cost."
           >
             <option value="auto">Auto</option>
             <option value="256">GPU · 256² (light)</option>
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
-            <option value="cpu">CPU · 192²</option>
           </select>
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — one engine: the app runs on WebGPU
+
+**The renderer is WebGPU, and nothing else is.** The WebGL2 renderer, every line
+of GLSL and the CPU solver's fallback rung are gone; the solver is compute
+shaders, the composite is one WGSL pass, and the post chain, the camera, the
+projector and the flash probe are passes beside it. A browser without WebGPU
+gets a screen that says so rather than a slower show. The port ran as P0–P7 of
+`docs/webgpu-plan.md`, over #93–#103.
+
+**What it bought.** The flash guard is a true average over the frame instead of
+a sample of it. The governor judges a rung by the GPU's own timestamps rather
+than by how long the CPU spent submitting work — it was being told half a
+millisecond of encoding and climbing into grids the card could not hold. Splats,
+image and text pours and the plate's measurements are all on the GPU, so a pour
+is no longer bounded by what could be read back to JavaScript. The device can be
+taken away and the show comes back.
+
+**Nine bugs surfaced during the port, and one of them was in a shader.** The
+other eight were in the wiring between passes: canvas input that never
+registered its listeners, a pipeline built for the wrong attachment format, a
+painter reading fields a rung change had already disposed of, a quality ladder
+offering a rung the stage could not draw, and four harness checks that had
+quietly started measuring nothing. The lesson is written into the plan: the
+harnesses that compared shader against shader proved every shader correct and
+could not see any of it, because both engines were handed the same inputs. What
+found them was the app's own suite, moved onto a real GPU in CI.
+
+**The suite runs where there is a picture.** CI is two jobs now: arithmetic on
+Ubuntu, and everything with a frame in it on macOS, where the canvas can
+actually be presented.
+
+**Gone with it:** the `?renderer=` flag, `?sim=cpu`, the CPU · 192² option in
+the settings, `?filter=bspline`, `?derived=0`, the five shader-parity harnesses,
+and the Raspberry Pi appliance and its service files.
+
 ### Changed — a new mark: the press
 
 **The icon is a press on the glass.** Blue and green dye fingering outward

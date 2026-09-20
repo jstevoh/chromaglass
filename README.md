@@ -399,16 +399,16 @@ project — with the extras a liquid light show needs: a Hele-Shaw squeeze-film
 term for the plate pressure, immiscibility and fingering forces, curl-noise
 turbulence and a self-regulating dye budget. Two things are worth knowing:
 
-- **Where it runs.** On `auto` (the default) the solve moves onto the GPU as a
-  chain of WGSL passes, and a frame-time governor picks the grid:
-  it starts from a guess for the hardware, steps down within a couple of
-  seconds if frames are being dropped, and climbs one rung at a time when
-  there is sustained room. Machines whose GPU can't render to float textures
-  use the 192² CPU solver. Settings → Simulation → Fluid Grid pins a size or
-  forces the CPU path, and shows which engine is live and the frame rate.
-- **Advection.** Both paths use MacCormack advection (a forward and a backward
-  semi-Lagrangian pass, corrected and clamped), which is what lets a thin
-  filament of dye survive more than a few steps instead of blurring away.
+- **Where it runs.** On the GPU, as a chain of WGSL compute passes — there is
+  no second path. On `auto` (the default) a governor picks the grid from what
+  the GPU's own timestamps say a frame costs: it starts from a guess for the
+  hardware, steps down within a couple of seconds if frames are being dropped,
+  and climbs one rung at a time when there is sustained room. Settings →
+  Simulation → Fluid Grid pins a size instead, and shows the live grid and
+  frame rate. A browser without WebGPU gets a screen saying so.
+- **Advection.** MacCormack advection (a forward and a backward semi-Lagrangian
+  pass, corrected and clamped), which is what lets a thin filament of dye
+  survive more than a few steps instead of blurring away.
 
 ### One build, three tiers
 
@@ -422,10 +422,10 @@ The same build serves three situations, and only the assumed headroom differs:
 
 The tier is detected from where the page was loaded (`localhost`, a private
 LAN address or `.local` is local; an Electron/Tauri shell is native), and the
-GPU class from the renderer string. When the hosted page has had to step
-down, it shows a card with the three commands to run the show locally.
+GPU class from the adapter's own description. When the hosted page has had to
+step down, it shows a card with the three commands to run the show locally.
 
-For testing, `?sim=cpu|auto|<size>`, `?tier=hosted|local|native` and
+For testing, `?sim=auto|<size>`, `?tier=hosted|local|native` and
 `?gpu=software|weak|mid|strong` override detection for that page load,
 `?warp=N` lifts the solver's catch-up cap (steps per frame) so a slow renderer
 still keeps up with wall-clock time, and `?debug` exposes

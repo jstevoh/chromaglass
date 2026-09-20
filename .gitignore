@@ -29,3 +29,8 @@ dist-dev/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
+
+# A second checkout of this repo, nested inside it. Not part of the tree, but
+# `git add -A` has swept it into a commit twice; ignoring it is cheaper than
+# remembering.
+/chromaglass/

@@ -32,12 +32,23 @@ import path from 'node:path';
 import { engineQuery, installFrameReader } from './frame.mjs';
 
 const PORT = 4326;
-const OUT = 'docs/shots';
 
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
+
+/*
+  Where the pictures land.
+
+  The default is the four tracked README shots, because replacing those is
+  what this script is for. It is also the whole hazard: running it to *look*
+  at something rewrites tracked files, and twice now a set shot in passing
+  has had to be backed out of a commit by hand. `--out <dir>` sends a run
+  somewhere else, which is what to reach for when the question is "what does
+  this look like now" rather than "these are the new README shots".
+*/
+const OUT = argOf('out', 'docs/shots');
 
 /**
  * What to photograph.

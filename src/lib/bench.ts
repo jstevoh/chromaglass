@@ -32,10 +32,10 @@ export interface BenchRow {
   want: SimResolution;
   /** What the solver actually ran — a grid can be clamped by the texture limit. */
   grid: number;
-  engine: 'webgpu' | 'cpu';
+  engine: 'webgpu' | 'none';
   frameMs: number;
   fps: number;
-  /** One solver step across every layer. CPU submission time on the GPU path. */
+  /** One solver step across every layer — the CPU time to submit it. */
   simMs: number;
   /** The frame minus the solver: renderer, readback, React, everything else. */
   otherMs: number;
@@ -137,13 +137,14 @@ const median = (xs: number[]): number => {
 /**
  * Whether the engine is now running what was asked for.
  *
- * "Not the CPU solver", rather than "the WebGL one": under
- * `?renderer=webgpu` the engine is `webgpu`, and asking for `gpu` recorded
- * every rung the sweep actually reached as a rung it never reached — the
- * report said "the solver never reached 256² (it stayed on 256²)".
+ * Asked as "is it webgpu, on this grid" rather than as a string test on the
+ * engine's name, which is how this went wrong once: the check read `engine
+ * === 'gpu'`, the flag made it `webgpu`, and every rung the sweep actually
+ * reached was recorded as one it never reached — "the solver never reached
+ * 256² (it stayed on 256²)".
  */
 const onRung = (s: EngineStatus, want: SimResolution): boolean =>
-  want === 'cpu' ? s.engine === 'cpu' : s.engine !== 'cpu' && s.grid === want;
+  s.engine === 'webgpu' && s.grid === want;
 
 export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promise<BenchReport> {
   const rungs = opts.rungs ?? BENCH_RUNGS;
@@ -158,7 +159,7 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
 
   for (let i = 0; i < rungs.length; i++) {
     const want = rungs[i];
-    const label = want === 'cpu' ? 'CPU 192²' : `${want}²`;
+    const label = `${want}²`;
     deps.onProgress?.(i, rungs.length, label);
     deps.setGrid(want);
 
@@ -176,7 +177,7 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
     if (!arrived) {
       const s = deps.read();
       rows.push({
-        want, grid: s?.grid ?? 0, engine: s?.engine ?? 'cpu',
+        want, grid: s?.grid ?? 0, engine: s?.engine ?? 'none',
         frameMs: 0, fps: 0, simMs: 0, otherMs: 0, stepsPerSec: 0,
         skipped: s?.gpuUnavailable
           ? 'no float render targets — the GPU solver is unavailable here'
@@ -206,7 +207,7 @@ export async function runBench(deps: BenchDeps, opts: BenchOptions = {}): Promis
     rows.push({
       want,
       grid: s?.grid ?? 0,
-      engine: s?.engine ?? 'cpu',
+      engine: s?.engine ?? 'none',
       frameMs,
       fps: frameMs > 0 ? 1000 / frameMs : 0,
       simMs: median(sim),
@@ -250,7 +251,7 @@ export function formatBench(r: BenchReport): string {
     cells.map((c, i) => (i === 0 ? pad(c, widths[i]) : padL(c, widths[i]))).join('');
   const out = [...head, line(cols)];
   for (const row of r.rows) {
-    const name = row.want === 'cpu' ? 'cpu192' : `${row.want}²`;
+    const name = `${row.want}²`;
     if (row.skipped) { out.push(`${pad(name, widths[0])}  — ${row.skipped}`); continue; }
     out.push(line([
       name,

@@ -60,10 +60,12 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**
- * Fluid solver grid. 'cpu' is the 192² JavaScript solver; the numbers run the
- * same scheme on the GPU at that edge length. 'auto' picks by machine class.
+ * Fluid solver grid: an edge length the solver runs at, or 'auto' to leave it
+ * to the governor. There was a 'cpu' member here for the 192² JavaScript
+ * solver; that solver went with the WebGL renderer in P7, and the option went
+ * with it rather than quietly resolving to 256².
  */
-export type SimResolution = 'auto' | 'cpu' | number;
+export type SimResolution = 'auto' | number;
 export type AudioFeature = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
 
 export interface AudioMappings {

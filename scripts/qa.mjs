@@ -35,13 +35,12 @@ const PORT = Number(process.env.QA_PORT ?? 4178);
 /*
   The whole suite, on the GPU solver:  QA_GPU=mid npm run qa
 
-  Without it every check here exercises the CPU fallback, because
-  `classifyGpu()` maps SwiftShader and llvmpipe to 'software' and
-  `qualityLadder()` gives that class a ladder with only the CPU rung on it.
-  That is the right policy for a real machine — emulated float render targets
-  are slower than the JavaScript solver — but it means a headless suite tests
-  a renderer nobody runs, which is how four hypotheses about a dye bug were
-  chased on the wrong code path.
+  Without it every check here runs on the smallest grid there is, because
+  `classifyAdapter()` maps a fallback adapter — SwiftShader, llvmpipe — to
+  'software' and `qualityLadder()` gives that class one 256² rung and nothing
+  above it. That is the right policy for a real machine, but it means a
+  headless suite measures a plate at the bottom of its range, which is how
+  four hypotheses about a dye bug were chased on the wrong code path.
 
   The override is deliberately not the default. Under software rasterisation
   a 384² plate renders at about six frames a second and every step here
@@ -1665,18 +1664,24 @@ try {
       setup reads the counter — the seeding happens in the loop — so the
       rebuild was never doing the work, only delivering the news.
 
-      Counted rather than asserted, by watching for a WebGL2 context being
+      Counted rather than asserted, by watching for a drawing context being
       taken out. The same canvas handing back the same context does not count:
       `getContext` is only called again when the effect runs again, which is
       the thing being measured. Four presses, because one could be a fluke of
       ordering and four cannot.
+
+      It watched for `webgl2` until P7 deleted the engine that asked for one,
+      at which point it was counting something nothing does any more: always
+      zero, always green, whatever the effect did. It watches for `webgpu`
+      now — and for `webgl2` as well, so that a context nobody should be
+      taking out at all is still a failure if one appears.
     */
     await page.evaluate(() => {
       window.__glGrabs = 0;
       const real = HTMLCanvasElement.prototype.getContext;
       window.__realGetContext = real;
       HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
-        if (kind === 'webgl2') window.__glGrabs++;
+        if (kind === 'webgpu' || kind === 'webgl2') window.__glGrabs++;
         return real.call(this, kind, ...rest);
       };
     });

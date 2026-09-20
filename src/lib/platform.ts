@@ -11,13 +11,13 @@
 
 export type PlatformTier = 'hosted' | 'local' | 'native';
 
-/** A coarse read of the GPU, from its renderer string. */
+/** A coarse read of the GPU, from its adapter — `classifyAdapter` in `gpu/device.ts`. */
 export type GpuClass = 'software' | 'weak' | 'mid' | 'strong';
 
 /** One quality level: which solver grid, and how many device pixels to render. */
 export interface QualityRung {
-  /** Solver edge length, or the 192² CPU solver. */
-  grid: number | 'cpu';
+  /** Solver edge length. */
+  grid: number;
   /** Canvas pixels per CSS pixel, capped at the device's own ratio. */
   dpr: number;
 }
@@ -40,17 +40,6 @@ export function detectTier(): PlatformTier {
   if (w.__CHROMAGLASS_NATIVE__ || w.__TAURI__ || /Electron/i.test(navigator.userAgent)) return 'native';
   if (PRIVATE_HOST.test(window.location.hostname)) return 'local';
   return 'hosted';
-}
-
-/** Classify a WebGL renderer string. Unknown hardware is assumed mid-range. */
-export function classifyGpu(renderer: string): GpuClass {
-  const forced = override('gpu');
-  if (forced === 'software' || forced === 'weak' || forced === 'mid' || forced === 'strong') return forced;
-  const r = renderer.toLowerCase();
-  if (/swiftshader|llvmpipe|softpipe|software|mesa offscreen|basic render/.test(r)) return 'software';
-  if (/apple m\d|apple gpu|geforce (rtx|gtx)|radeon (rx|pro)|arc a\d/.test(r)) return 'strong';
-  if (/intel|mali|adreno|powervr|iris|uhd|hd graphics/.test(r)) return 'weak';
-  return 'mid';
 }
 
 /** The device's pixel ratio, held to a sane range. */
@@ -98,37 +87,22 @@ export function renderScale(): number {
  * where a first visit on an unknown laptop starts costing more than it returns.
  *
  * Local and native run the full ladder — the point of running it yourself is
- * to use the whole machine. Software GL gets only the CPU solver; emulated
- * float render targets are far slower than the JavaScript solver and the
- * governor would only find that out the slow way.
+ * to use the whole machine. A software adapter gets the smallest grid and
+ * nothing else: it will be slow, but a slow show is the right failure, and the
+ * governor would only find the rest out one rung at a time.
+ *
+ * There was a CPU rung under all of this until P7. It was the WebGL
+ * renderer's floor — that engine packed the JavaScript solver's arrays into
+ * its own textures and drew them, so a machine with no usable float targets
+ * still got a show. The WebGPU stage cannot: its compositor samples the
+ * solver's textures, and a field that is not on the GPU has none. Left in, the
+ * rung was not a slower show but a black one, which is what CI found — 1,676
+ * frames of nothing over a plate that was simulating perfectly well. The
+ * solver it fell back to is gone now, and so is the rung.
  */
-export function qualityLadder(
-  tier: PlatformTier,
-  gpu: GpuClass,
-  /**
-   * Whether the engine can draw a plate the CPU solver is holding
-   * (docs/webgpu-plan.md, P5).
-   *
-   * The WebGL renderer packs the CPU's arrays into its own textures and draws
-   * them, so the bottom of its ladder is a working show on a machine that
-   * cannot afford any GPU grid. The WebGPU stage has no such path: its
-   * compositor samples the solver's textures, and a field that is not on the
-   * GPU has none. Left in, that rung is not a slower show but a black one —
-   * which is what CI found, a stage drawing 1,676 frames of nothing over a
-   * plate that was simulating perfectly well.
-   *
-   * So that engine's ladder stops at the smallest GPU grid. A machine that
-   * cannot hold it gets a slow show rather than no show, which is the right
-   * way round, and the rung goes for good when the CPU solver does (P7).
-   */
-  cpuFallback = true,
-): { rungs: QualityRung[]; start: number } {
+export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: QualityRung[]; start: number } {
   const dpr = devicePixels();
-  if (gpu === 'software') {
-    return cpuFallback
-      ? { rungs: [{ grid: 'cpu', dpr: 1 }], start: 0 }
-      : { rungs: [{ grid: 256, dpr: 1 }], start: 0 };
-  }
+  if (gpu === 'software') return { rungs: [{ grid: 256, dpr: 1 }], start: 0 };
 
   const rungs: QualityRung[] =
     tier === 'hosted'
@@ -137,7 +111,6 @@ export function qualityLadder(
           { grid: 512, dpr: 1 },
           { grid: 384, dpr: 1 },
           { grid: 256, dpr: 1 },
-          { grid: 'cpu', dpr: 1 },
         ]
       : [
           { grid: 768, dpr },
@@ -145,29 +118,22 @@ export function qualityLadder(
           { grid: 512, dpr: 1 },
           { grid: 384, dpr: 1 },
           { grid: 256, dpr: 1 },
-          { grid: 'cpu', dpr: 1 },
         ];
-
-  if (!cpuFallback) {
-    const i = rungs.findIndex((r) => r.grid === 'cpu');
-    if (i >= 0) rungs.splice(i, 1);
-  }
 
   // Start one step below the best guess for the hardware so the first seconds
   // are smooth; the governor climbs within ~10 s if the machine has room.
-  const wanted: number | 'cpu' = gpu === 'strong' ? 512 : gpu === 'mid' ? 384 : 256;
-  let start = rungs.findIndex((r) => r.grid !== 'cpu' && r.grid <= wanted && r.dpr === 1);
-  if (start < 0) start = rungs.findIndex((r) => r.grid === wanted);
-  if (start < 0) start = Math.max(0, rungs.length - 2);
+  const wanted = gpu === 'strong' ? 512 : gpu === 'mid' ? 384 : 256;
+  let start = rungs.findIndex((r) => r.grid <= wanted && r.dpr === 1);
+  if (start < 0) start = rungs.length - 1;
   return { rungs, start };
 }
 
 /** What the visualizer reports about the engine it is running. */
 export interface EngineStatus {
-  /** Short readout, e.g. "GPU · 512² · 1.0x". */
+  /** Short readout, e.g. "WebGPU · 512² · 1.0x". */
   label: string;
-  /** The stage's solver, or the CPU one while the plate is being carried across. */
-  engine: 'webgpu' | 'cpu';
+  /** The stage's solver, or 'none' before one is attached and after a device loss. */
+  engine: 'webgpu' | 'none';
   grid: number;
   dpr: number;
   tier: PlatformTier;

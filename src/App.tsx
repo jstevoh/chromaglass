@@ -403,10 +403,10 @@ export default function App() {
   const [settings, setSettings] = useState<VisualizerSettings>(() => {
     const opening = PRESETS.find(p => p.id === OPENING_LOOK);
     const base = opening ? { ...DEFAULT_SETTINGS, ...opening.settings } : { ...DEFAULT_SETTINGS };
-    // Diagnostic override for this page load only: ?sim=cpu | auto | <edge>.
+    // Diagnostic override for this page load only: ?sim=auto | <edge>.
     // Lets a device be pinned to a solver grid without touching its settings.
     const sim = new URLSearchParams(window.location.search).get('sim');
-    if (sim === 'cpu' || sim === 'auto') base.simResolution = sim;
+    if (sim === 'auto') base.simResolution = sim;
     else if (sim && Number.isFinite(Number(sim))) base.simResolution = Number(sim);
     // ?set=key=value;key=value pins any setting for this load (testing a look).
     const set = new URLSearchParams(window.location.search).get('set');

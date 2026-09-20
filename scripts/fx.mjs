@@ -267,8 +267,10 @@ try {
       bias, and it stays at 0.011 against a limit of 0.05.
 
       The grain's coordinate wants to be the pixel rather than the
-      interpolator, which would remove this entirely — but that is a GLSL
-      change as well as a WGSL one, and the GLSL is frozen until the cutover.
+      interpolator, which would remove this entirely. That was held off while
+      the GLSL was frozen, because it would have been two changes; the freeze
+      is over and there is one shader now, so it is a WGSL change waiting for
+      someone to make it rather than one that is blocked.
     */
     const limit = { max: 10, block: 4.5 };
     check(`identity: ${label}`, d.max <= limit.max && d.blockMax <= limit.block && Math.abs(d.bias) < 0.05,

@@ -21,10 +21,11 @@
  * saturation, nor shift the hue more than 25°. Luminance is deliberately not
  * gated — a bubble is *supposed* to be brighter.
  *
- * Runs on the GPU path (`?gpu=mid`). Software rasterisation classifies as
- * `software`, which the quality ladder pins to the CPU solver — so the GPU
- * shaders, which is where the bubbles are drawn, would never be exercised at
- * all without the override.
+ * Runs on the GPU path (`?gpu=mid`). A software adapter classifies as
+ * `software`, which the quality ladder pins to a single 256² rung on a
+ * machine measuring software-rasterised frame times — so the override is
+ * what keeps the run on a grid fine enough for the bubbles to be worth
+ * measuring.
  */
 
 import { chromium } from 'playwright';
@@ -98,11 +99,11 @@ try {
     fresh ? 'bubbleUniforms present' : 'stale bundle — rebuild, or a stray preview server is answering');
 
   /*
-    `gpu=mid`, not `gpu=weak`. Both name the GPU solver, but weak starts the
-    quality ladder at 256², whose only lower rung is the CPU one — so the
-    governor, measuring software-rasterised frame times, immediately steps
-    down to it and the run ends up measuring the CPU solver again. 384² has
-    somewhere to fall to, so it stays on the GPU.
+    `gpu=mid`, not `gpu=weak`: weak starts the quality ladder at its bottom
+    rung, so a governor measuring software-rasterised frame times has nowhere
+    to step down to and the run spends its whole length at 256², where a
+    bubble is a handful of cells across. `mid` starts at 384², which has
+    somewhere to fall to and is fine enough to measure.
   */
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
   check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');

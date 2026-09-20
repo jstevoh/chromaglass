@@ -107,7 +107,7 @@ function drive({ from, to, seconds, clearing }) {
   check('a blend mode is one of the two, never a third',
     [from.blendMode, to.blendMode].includes(half.blendMode), half.blendMode);
   check('the machine keeps its own solver grid',
-    blendLooks({ ...from, simResolution: 'cpu' }, { ...to, simResolution: 1024 }, 1).simResolution === 'cpu');
+    blendLooks({ ...from, simResolution: 'auto' }, { ...to, simResolution: 1024 }, 1).simResolution === 'auto');
 }
 
 // ── 3. A preset that says nothing gets the base, not the last look ───
@@ -158,7 +158,7 @@ function drive({ from, to, seconds, clearing }) {
   console.log(`     the old way, a look laid over the last one: ${oldLeaks} settings depended on what came before`);
   check('and the old way really did leak', oldLeaks > 0, 'if this passes, the check above is measuring nothing');
 
-  const room = { ...DEFAULT_SETTINGS, sensitivity: 0.9, bassBoost: 2, dimmer: 0.3, markX: 0.2, filmMix: 0.1, scenePeople: false, simResolution: 'cpu' };
+  const room = { ...DEFAULT_SETTINGS, sensitivity: 0.9, bassBoost: 2, dimmer: 0.3, markX: 0.2, filmMix: 0.1, scenePeople: false, simResolution: 256 };
   const moved = [];
   for (const p of PRESETS) {
     const t = targetLook(room, p.settings);

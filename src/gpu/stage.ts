@@ -1,10 +1,11 @@
 /**
  * The WebGPU stage: the canvas, the device, and one frame at a time
- * (docs/webgpu-plan.md). Under `?renderer=webgpu` only, until the cutover.
+ * (docs/webgpu-plan.md). The only stage there is, since the cutover.
  *
- * P1 draws the black plate: the kit, the start-up and the frame loop, proved
- * before anything is drawn with them. The solver arrives in P2 and the
- * compositor in P3, as passes encoded into this same frame.
+ * It started as P1's black plate — the kit, the start-up and the frame loop,
+ * proved before anything was drawn with them. The solver, the compositor, the
+ * camera, the post chain, the projector and the probe are all passes encoded
+ * into this same frame now.
  */
 
 import { requestGpu, type Gpu, type GpuFailure, isGpuFailure } from './device';

@@ -18,6 +18,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
+import { isGpuEngine } from './frame.mjs';
 
 const PORT = Number(process.env.WEBGPU_PORT ?? 4327);
 const checks = [];
@@ -157,37 +158,54 @@ const watch = (page) => {
       /*
         The bottom of the ladder.
 
-        The WebGL renderer packs the CPU solver's arrays into its own textures
-        and draws them, so its lowest rung is a working show on a machine that
-        can afford no GPU grid. This stage samples the solver's textures, and
-        a field that is not on the GPU has none — so that rung is not a slower
-        show here but a black one. CI found it before this check existed: a
-        stage drawing 1,676 frames of nothing over a plate that was simulating
-        perfectly well, on a runner slow enough for the governor to walk all
-        the way down.
+        The WebGL renderer packed the CPU solver's arrays into its own
+        textures and drew them, so its lowest rung was a working show on a
+        machine that could afford no GPU grid. This stage samples the solver's
+        textures, and a field that is not on the GPU has none — so that rung
+        was not a slower show here but a black one. CI found it before this
+        check existed: a stage drawing 1,676 frames of nothing over a plate
+        that was simulating perfectly well, on a runner slow enough for the
+        governor to walk all the way down.
+
+        The rung and the solver under it are both gone now (P7), so what is
+        left to check is the shape of the rule rather than that one rung:
+        every rung on the ladder is a grid this stage can draw, and a pin to
+        a grid it cannot allocate is clamped to one it can rather than left
+        black. 4096² is past `MAX_PINNED_GRID` on any machine.
       */
       {
         const rungs = await page.evaluate(() => window.chromaglassDebug().governor.rungs.map((r) => r.grid));
-        check('no rung on this ladder is one the stage cannot draw',
-          rungs.length > 0 && !rungs.includes('cpu'), rungs.join(' → '));
+        check('every rung on this ladder is a grid the stage can draw',
+          rungs.length > 0 && rungs.every((g) => Number.isFinite(g) && g >= 64), rungs.join(' → '));
 
         const pinned = await page.evaluate(async () => {
           const d = window.chromaglassDebug();
-          const was = d.settings.simResolution;
-          d.settings.simResolution = 'cpu';
-          for (let i = 0; i < 180; i++) await new Promise((r) => requestAnimationFrame(r));
+          const was = d.settings.simResolution ?? 'auto';
+          // Through `chromaglassSettings`, not by writing `debug().settings`:
+          // the grid reaches the solver through React's state, and a write to
+          // the ref is read by the passes that sample it every frame but not
+          // by the one that decides how big the textures are. The check this
+          // replaced set the ref and asserted something that was true either
+          // way, so it never noticed it was pinning nothing.
+          window.chromaglassSettings({ simResolution: 4096 });
+          for (let i = 0; i < 240; i++) await new Promise((r) => requestAnimationFrame(r));
           const g = await d.grabFrame();
           let on = 0;
           if (g) for (let i = 0; i < g.pixels.length; i += 4) {
             if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
           }
-          const out = { engine: d.engine, lit: g ? on / (g.pixels.length / 4) : 0 };
-          d.settings.simResolution = was ?? 'auto';
+          // A fresh `chromaglassDebug()`: the one above is a snapshot, and
+          // its `status` is the object the loop had built when it was taken —
+          // which is the grid from before the pin, and reads as a pin that
+          // never landed.
+          const now = window.chromaglassDebug();
+          const out = { engine: now.engine, grid: now.status?.grid ?? 0, lit: g ? on / (g.pixels.length / 4) : 0 };
+          window.chromaglassSettings({ simResolution: was });
           return out;
         });
-        check('and a plate pinned to the CPU solver is still drawn',
-          pinned.lit > 0.5 && !/^CPU/.test(pinned.engine),
-          `${pinned.engine}, ${(pinned.lit * 100).toFixed(0)}% lit`);
+        check('and a pin past what the GPU can allocate is clamped, not black',
+          pinned.grid === 1024 && pinned.lit > 0.5 && isGpuEngine(pinned.engine),
+          `${pinned.engine}, grid ${pinned.grid}, ${(pinned.lit * 100).toFixed(0)}% lit`);
       }
 
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
