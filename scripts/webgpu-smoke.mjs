@@ -91,19 +91,30 @@ const watch = (page) => {
       const cpuMs = await page.evaluate(() => window.chromaglassDebug().webgpu.cpuMs);
       check('a frame costs little to encode', cpuMs > 0 && cpuMs < 8, `${cpuMs} ms of CPU in frame()`);
 
+      // A presented WebGPU canvas reads black, so the frame is drawn and
+      // copied in one task. What it should show is a plate: lit, and carrying
+      // colour rather than a grey wash. (Until P3 it was a clear, and this
+      // check asked for black.)
       const frame = await page.evaluate(async () => {
         const g = await window.chromaglassDebug().grabFrame();
         if (!g) return null;
-        let max = 0, sum = 0;
+        let max = 0, sum = 0, lit = 0, colour = 0;
         for (let i = 0; i < g.pixels.length; i += 4) {
-          const v = Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]);
-          if (v > max) max = v;
-          sum += v;
+          const hi = Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]);
+          const lo = Math.min(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]);
+          if (hi > max) max = hi;
+          sum += hi;
+          if (hi > 8) lit++;
+          if (hi > 40 && (hi - lo) / hi > 0.25) colour++;
         }
-        return { width: g.width, height: g.height, max, mean: sum / (g.pixels.length / 4) };
+        const n = g.pixels.length / 4;
+        return { width: g.width, height: g.height, max, mean: sum / n, lit: lit / n, colour: colour / n };
       });
-      check('grabFrame reads the frame, and the plate is black', !!frame && frame.max === 0,
-        frame ? `${frame.width}×${frame.height}, brightest ${frame.max}` : 'nothing read');
+      check('grabFrame reads a plate with paint on it',
+        !!frame && frame.max > 64 && frame.lit > 0.5 && frame.colour > 0.05,
+        frame
+          ? `${frame.width}×${frame.height}, brightest ${frame.max}, ${(frame.lit * 100).toFixed(0)}% lit, ${(frame.colour * 100).toFixed(0)}% in colour`
+          : 'nothing read');
 
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');
