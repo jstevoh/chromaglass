@@ -30,7 +30,7 @@ import { composeOntoPin, cornerPinMatrix, type OutputConfig, type Surface, type 
 // space corner handles are dragged in — rather than in clip space, because
 // every quad this draws is a set of dragged corners and converting them here
 // costs two multiplies and saves a conversion at every call site.
-const VERT = `#version 300 es
+export const OUTPUT_VERT = `#version 300 es
 in vec2 a_screen;
 out vec2 v_screen;
 void main() {
@@ -38,7 +38,7 @@ void main() {
   gl_Position = vec4(a_screen.x * 2.0 - 1.0, 1.0 - a_screen.y * 2.0, 0.0, 1.0);
 }`;
 
-const FRAG = `#version 300 es
+export const OUTPUT_FRAG = `#version 300 es
 precision highp float;
 in vec2 v_screen;
 out vec4 fragColor;
@@ -173,8 +173,8 @@ export class OutputPass {
       }
       return sh;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    const vs = compile(gl.VERTEX_SHADER, OUTPUT_VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, OUTPUT_FRAG);
     this.program = gl.createProgram()!;
     let ok = !!vs && !!fs;
     if (vs && fs) {

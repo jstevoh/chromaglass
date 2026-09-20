@@ -152,6 +152,60 @@ const watch = (page) => {
         await settle(3);
         return { floor, on, timed };
       });
+      // The projector. `npm run output` proves the shader against the GLSL's
+      // over every shape and pin; what is asked here is that the app runs it,
+      // by the two answers a mapping has that nothing else does: a pin that
+      // empties the edge of the frame, and a blackout that empties all of it.
+      const wall = await page.evaluate(async () => {
+        const dbg = () => window.chromaglassDebug();
+        const settle = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+        const lit = async (x0, x1, y0, y1) => {
+          const g = await dbg().grabFrame();
+          if (!g) return 0;
+          let on = 0, n = 0;
+          for (let y = Math.floor(y0 * g.height); y < Math.floor(y1 * g.height); y++) {
+            for (let x = Math.floor(x0 * g.width); x < Math.floor(x1 * g.width); x++) {
+              const i = (y * g.width + x) * 4;
+              n++;
+              if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) on++;
+            }
+          }
+          return on / Math.max(1, n);
+        };
+        const base = {
+          flipX: false, flipY: false, corners: [0, 0, 1, 0, 1, 1, 0, 1],
+          maskTop: 0, maskRight: 0, maskBottom: 0, maskLeft: 0, maskFeather: 0,
+          gain: 1, gamma: 1, surfaces: [],
+        };
+        const apply = async (cfg) => {
+          window.chromaglassOutput?.({ ...base, ...cfg });
+          await settle(6);
+        };
+        await apply({});
+        const plain = { middle: await lit(0.4, 0.6, 0.4, 0.6), edge: await lit(0, 1, 0, 0.04) };
+        // Pinned inside the frame: the picture moves off the top rows.
+        await apply({ corners: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8] });
+        const pinned = { middle: await lit(0.4, 0.6, 0.4, 0.6), edge: await lit(0, 1, 0, 0.04) };
+        const timed = typeof dbg().webgpu.timings.output === 'number';
+        // Every shape switched off is a blackout, not an absence of mapping.
+        await apply({
+          surfaces: [{
+            id: 'a', shape: 'rect', enabled: false, opacity: 1, feather: 0,
+            corners: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8], src: [0, 0, 1, 1],
+          }],
+        });
+        const dark = await lit(0, 1, 0, 1);
+        await apply({});
+        return { plain, pinned, dark, timed };
+      });
+      check('the projector places the picture on the wall',
+        wall.plain.edge > 0.5 && wall.pinned.edge < 0.02 && wall.pinned.middle > 0.5 &&
+        wall.dark < 0.001 && (!started.timestamps || wall.timed),
+        `unpinned, ${(wall.plain.edge * 100).toFixed(0)}% of the top rows are lit; pinned inside the frame, ` +
+        `${(wall.pinned.edge * 100).toFixed(0)}% are, with the middle still at ${(wall.pinned.middle * 100).toFixed(0)}%; ` +
+        `every shape off, ${(wall.dark * 100).toFixed(2)}% of the frame` +
+        (started.timestamps ? `, its pass ${wall.timed ? 'timed' : 'never timed'} on the GPU` : ''));
+
       check('the camera takes the picture when it is on',
         lens.on > 0.3 && lens.on > lens.floor * 5 && (!started.timestamps || lens.timed),
         `${(lens.on * 100).toFixed(0)}% of the frame against a floor of ${(lens.floor * 100).toFixed(1)}%` +

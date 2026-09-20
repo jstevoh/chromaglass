@@ -11,6 +11,7 @@ import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
+import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest } from '../gpu/selftest';
 import { PostChain, type PostTest } from '../lib/postChain';
@@ -4715,6 +4716,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (WEBGPU) {
       let stage: WebGPUStage | null = null;
       let camera: WebGPUCamera | null = null;
+      let projector: WebGPUOutput | null = null;
       let cancelled = false;
       // What the frame costs us, as opposed to how often the display asks for
       // one: a CI runner's display rate says nothing about the stage.
@@ -4804,6 +4806,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
               else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
               const cam = camera;
+
+              // The projector, last: flip, corner pin, blanking and grade.
+              // Built the first frame it would change anything and dropped
+              // when the operator resets it, so the common case — no
+              // projector, nothing set — never pays for the extra target or
+              // the extra draw.
+              const wantOut = !outputIsIdentity(view.outputCfg);
+              if (wantOut && !projector) projector = new WebGPUOutput(s.device, s.format);
+              else if (!wantOut && projector) { projector.dispose(); projector = null; }
+              const out = projector;
+              const quads = out ? fillOutputUniforms(out.pack, view.outputCfg, canvas.width, canvas.height) : 0;
               fillPlateUniforms(plate.pack, {
                 view, fluids,
                 width: canvas.width, height: canvas.height,
@@ -4832,15 +4845,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // rather than an empty pass.
               stage.paint = (encoder, target) => {
                 const size = { width: canvas.width, height: canvas.height };
+                // The chain, in the order a frame goes through it: the plate,
+                // the camera if there is one, the projector if there is one,
+                // and whatever is last draws onto the canvas.
+                const screen = out ? out.sceneView(size.width, size.height) : target;
                 plate.draw(
                   encoder,
-                  cam ? cam.sceneView(size.width, size.height) : target,
+                  cam ? cam.sceneView(size.width, size.height) : screen,
                   size, fields, Math.max(view.velRange, 1e-6),
                   stage?.profiler.renderPass('plate'),
                 );
                 if (cam && plate.auxTarget) {
-                  cam.draw(encoder, target, plate.auxTarget, stage?.profiler.renderPass('camera'));
+                  cam.draw(encoder, screen, plate.auxTarget, stage?.profiler.renderPass('camera'));
                 }
+                if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               };
             }
             stage?.frame();
@@ -4868,6 +4886,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         cancelAnimationFrame(animationFrameId);
         camera?.dispose();
         camera = null;
+        projector?.dispose();
+        projector = null;
         stage?.dispose();
         stage = null;
       };
