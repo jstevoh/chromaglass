@@ -102,6 +102,9 @@ const SET = (() => {
   }));
 })();
 
+/** `--url k=v&k=v` — extra query parameters, for the diagnostics. */
+const EXTRA = argOf('url', null);
+
 const only = argOf('preset', null);
 const extra = Number(argOf('seconds', 0)) || 0;
 const shots = only ? SHOTS.filter(s => s.id === only) : SHOTS;
@@ -139,7 +142,7 @@ try {
   // The band drives it, so the plate is doing what it does in front of music
   // rather than sitting in whatever state automation happens to leave it.
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic${engineQuery()}${EXTRA ? `&${EXTRA}` : ''}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);              // the gesture the band needs
   await page.waitForTimeout(6000);
 

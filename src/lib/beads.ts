@@ -126,6 +126,33 @@ export class BeadField {
       b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + (Math.random() - 0.5) * 0.15;
       b.age += dt;
     }
+    /*
+      A bead that has gone to NaN is dropped, here, before anything draws it.
+
+      Nothing in this class can bring one back. `b.x += …` keeps NaN forever,
+      and the sampler the caller passes clamps with
+      `Math.max(0, Math.min(N - 1, Math.round(x)))` — which looks like it
+      would catch this and does not: `Math.round(NaN)` is NaN, `Math.min` and
+      `Math.max` pass NaN straight through, an array indexed by NaN is
+      `undefined`, and `undefined * k` is NaN again. So one bad bead is bad
+      for the rest of the show.
+
+      And it took the show with it. `render` asks for a radial gradient at the
+      bead's centre, `createRadialGradient` throws on a non-finite argument,
+      and that throw is inside the frame loop: the canvas stops and React
+      carries on, so the desk still works and the plate is frozen. That is the
+      failure this guard exists to prevent — the picture should lose a bead,
+      not stop.
+    */
+    let bad = 0;
+    for (let i = bs.length - 1; i >= 0; i--) {
+      const b = bs[i];
+      if (!Number.isFinite(b.x) || !Number.isFinite(b.y) || !Number.isFinite(b.r)) { bs.splice(i, 1); bad++; }
+    }
+    if (bad > 0) {
+      this.dirty = true;
+      console.warn(`ChromaGlass: dropped ${bad} bead(s) that went non-finite.`);
+    }
     // Crowding: beads touching push apart; two pressed hard together merge.
     const cell = 8;
     const buckets = new Map<number, Bead[]>();
@@ -183,8 +210,20 @@ export class BeadField {
     const S = this.size, k = S / this.grid;
     ctx.clearRect(0, 0, S, S);
     ctx.lineJoin = 'round';
+    /*
+      Belt as well as braces: `step` drops a non-finite bead, and this is
+      what happens if one arrives another way.
+
+      `createRadialGradient` throws on a non-finite argument, and this runs
+      inside the frame loop, so that throw does not lose a bead — it stops the
+      canvas. React keeps going, so the desk stays live and the picture
+      freezes, which is a very confusing thing to be looking at.
+    */
+    const drawable = (b: Bead): boolean =>
+      Number.isFinite(b.x) && Number.isFinite(b.y) && Number.isFinite(b.r) && Number.isFinite(k);
     // Interiors first, then rims over them; the texture's y is flipped on upload.
     for (const b of this.beads) {
+      if (!drawable(b)) continue;
       const fade = Math.min(1, b.age / 0.6);
       const rr = Math.max(1, b.r * k);
       ctx.globalAlpha = fade;
@@ -196,6 +235,7 @@ export class BeadField {
     }
     ctx.strokeStyle = 'rgb(0,255,0)';
     for (const b of this.beads) {
+      if (!drawable(b)) continue;
       const fade = Math.min(1, b.age / 0.6);
       const rr = Math.max(1, b.r * k);
       ctx.globalAlpha = fade * (0.8 + 0.2 * b.seed);

@@ -130,6 +130,23 @@ export function settingLed(value: number, min: number, max: number, curve = 1): 
  * before, and a binding learned before this existed picks up the curve from
  * the table rather than from what it saved.
  */
+/**
+ * The setting a `midiKey` names, or null if it names something else.
+ *
+ * A desk labels its controls by what a controller reaches them through —
+ * `setting:globalSpeed`, `preset:classic`, `action:go`, `dye:2` — so a
+ * surface that wants the *setting* has to take the prefix off. It lives here
+ * because it went wrong once by living nowhere: the desk's Speed ride looked
+ * its curve up under the full `setting:globalSpeed`, matched nothing, and was
+ * the one Speed slider in the app with no curve on it while the panel and the
+ * phone had one.
+ */
+export const settingKeyOf = (midiKey: string | null | undefined): keyof VisualizerSettings | null => {
+  if (!midiKey) return null;
+  const bare = midiKey.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
+  return LEARNABLE_SETTINGS.some((s) => s.key === bare) ? (bare as keyof VisualizerSettings) : null;
+};
+
 export const curveOf = (key: keyof VisualizerSettings): number =>
   LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? 1;
 

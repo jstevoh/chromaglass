@@ -214,12 +214,25 @@ export interface EngineStatus {
   /** How many plates are being solved — the solver's cost is per layer. */
   layers: number;
   /**
-   * Solver steps actually being taken per second, against the 60 the show
-   * asks for. Below that the plate is in slow motion: the frames are fine and
-   * the liquid is evolving slower than wall-clock, which a frame rate cannot
-   * show you. See the catch-up rule in LiquidVisualizer.
+   * Solver steps actually being taken per second, against `stepRate`. Below
+   * that the plate is in slow motion: the frames are fine and the liquid is
+   * evolving slower than wall-clock, which a frame rate cannot show you. See
+   * the catch-up rule in LiquidVisualizer.
    */
   stepsPerSec: number;
+  /**
+   * Steps a second the loop is *asking* for — sixty unless `?steps=` says
+   * otherwise (H2b).
+   *
+   * It is here because the readout compared against a hard-coded sixty, and
+   * the loop no longer always wants sixty. Thirty steps at twice the timestep
+   * is the same liquid at the same speed, and the panel reported it as "50%
+   * speed" in amber — the warning that exists to catch the plate silently
+   * running slow, fired at a plate running exactly on time. A warning that
+   * cries wolf is worse than no warning, because the operator learns to read
+   * past it.
+   */
+  stepRate: number;
   /**
    * Frame time that is not the solver — renderer, readback, React, the bead
    * camera, everything else. The number that says whether a finer grid is

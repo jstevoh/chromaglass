@@ -2165,9 +2165,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                   is always 60 and would be noise.
                 */}
                 {(() => {
-                  const sps = (live ?? engineStatus).stepsPerSec;
-                  if (!(sps > 0) || sps >= 57) return null;
-                  return <span className="text-amber-300/80"> · {Math.round((sps / 60) * 100)}% speed</span>;
+                  const st = live ?? engineStatus;
+                  const sps = st.stepsPerSec;
+                  // Against what the loop asked for, not a hard sixty. Thirty
+                  // steps at twice the timestep is the same liquid at the same
+                  // speed, and this read it as "50% speed" in amber — the one
+                  // warning that catches a plate silently running slow, fired
+                  // at a plate running exactly on time.
+                  const want = st.stepRate > 0 ? st.stepRate : 60;
+                  if (!(sps > 0) || sps >= want * 0.95) return null;
+                  return <span className="text-amber-300/80"> · {Math.round((sps / want) * 100)}% speed</span>;
                 })()}
               </span>
             )}
@@ -2187,7 +2194,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div className="text-[11px] font-mono opacity-40 leading-relaxed">
               solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
               {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
-              {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of 60 steps/s
+              {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s
             </div>
           )}
           <select

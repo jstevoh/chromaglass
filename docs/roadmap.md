@@ -64,7 +64,17 @@ job: nothing was written twice. There is one shading language in the tree now �
      a 1024² rung on strong machines — which is two lines in `qualityLadder` and a
      governor that already judges by real GPU timings, so it is this item's test rather
      than an item of its own.
-   - **H2b · Make slow cheap: fewer steps, not smaller ones.** The largest saving
+   - **H2b · Make slow cheap: fewer steps, not smaller ones.** *The mechanism landed
+     2026-09-21, the policy did not.* `?steps=N` stretches `dt` to hold `rate × dt`
+     constant, and the stretch is exact (ratio 1.9988 over four runs). At 768² with
+     two layers, thirty steps a second against sixty: the frame goes **38.6 ms → 16.8**
+     and the plate keeps *better* time — 29.8 of 30 where sixty managed only 45.3 of
+     60. At that rung the plate today is both slower and jerkier than it would be
+     taking half as many steps. Structure is unchanged.
+     *What is left is the policy,* and it needs an eye rather than a harness: whether
+     thirty steps a second flows or steps. The obvious rule is that a machine failing
+     to sustain the target rate is already in slow motion, so lowering the target is
+     strictly better than what happens now — but somebody has to watch one first. The largest saving
      measured so far, and it is free of any visual cost. Motion per second is
      `steps/s × dt`, and the app holds steps/s at 60 and shrinks `dt` — so a plate at
      Speed 0.012 costs exactly what one at 0.3 costs, because the GPU runs the same

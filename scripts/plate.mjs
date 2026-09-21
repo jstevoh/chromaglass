@@ -26,6 +26,7 @@ import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
+import { BeadField } from '../src/lib/beads.ts';
 import fs from 'node:fs';
 
 const STYLES = ['drop', 'pour', 'spray', 'splatter', 'streak'];
@@ -325,6 +326,93 @@ console.log('');
 console.log(`     ${withPhysics}/${PRESETS.length} presets carry a liquid that changes the plate`);
 check('most of the app takes advantage of them', withPhysics >= PRESETS.length - 2,
   `${PRESETS.length - withPhysics} plate${PRESETS.length - withPhysics === 1 ? '' : 's'} of plain dye`);
+
+// ── A bead that goes non-finite loses a bead, not the show ───────────
+//
+// Reported as "the UI works, just the visuals are frozen", with one line in
+// the console saying why:
+//
+//   Uncaught TypeError: Failed to execute 'createRadialGradient' on
+//   'OffscreenCanvasRenderingContext2D': The provided double value is
+//   non-finite.
+//
+// `BeadField.render` asks for a radial gradient at a bead's centre, and that
+// throws on NaN. It runs inside the frame loop, so the throw did not lose a
+// bead — it stopped the canvas while React carried on, leaving a fully
+// working desk over a frozen picture.
+//
+// Nothing could bring the bead back either. The sampler clamped with
+// `Math.max(0, Math.min(N - 1, Math.round(x)))`, which looks defensive and is
+// NaN-transparent: `Math.round(NaN)` is NaN, min and max pass it through, an
+// array indexed by NaN is `undefined`, and `undefined * k` is NaN again.
+{
+  const field = new BeadField(192);
+  field.populate(2);
+  check('a plate with beads on it has beads', field.beads.length > 0, `${field.beads.length}`);
+
+  // A solver that has gone unstable hands back NaN. That is the way in.
+  const had = field.beads.length;
+  field.step(1 / 60, () => [NaN, NaN], 0, 0);
+  check('a bead fed NaN is dropped rather than kept for ever',
+    field.beads.length === 0, `${field.beads.length} left of ${had}`);
+
+  /*
+    And one that arrives another way must never reach the gradient.
+
+    Node has no canvas, so this stands one up — with a
+    `createRadialGradient` that refuses a non-finite argument exactly as
+    Chrome's does, because that refusal *is* the bug. A stub that quietly
+    accepted NaN would make this check pass over the very thing it is here
+    to catch.
+  */
+  const ctxStub = () => ({
+    createRadialGradient: (...args) => {
+      if (args.some((v) => !Number.isFinite(v))) {
+        throw new TypeError("Failed to execute 'createRadialGradient': The provided double value is non-finite.");
+      }
+      return { addColorStop() {} };
+    },
+    arc: (...args) => {
+      if (args.some((v) => !Number.isFinite(v))) throw new TypeError('arc: non-finite');
+    },
+    clearRect() {}, beginPath() {}, fill() {}, stroke() {},
+    // Stored as well as checked. Written as setters alone they read back
+    // `undefined`, and `rr - undefined * 0.5` is NaN — the stub would then
+    // fail the very code it is testing, which it did.
+    _alpha: 1,
+    set globalAlpha(v) { if (!Number.isFinite(v)) throw new TypeError('globalAlpha: non-finite'); this._alpha = v; },
+    get globalAlpha() { return this._alpha; },
+    _lw: 1,
+    set lineWidth(v) { if (!Number.isFinite(v)) throw new TypeError('lineWidth: non-finite'); this._lw = v; },
+    get lineWidth() { return this._lw; },
+    lineJoin: '', strokeStyle: '', fillStyle: null,
+  });
+  globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return ctxStub(); } };
+
+  const sneaky = new BeadField(192);
+  sneaky.populate(2);
+  sneaky.beads[0].x = NaN;
+  let threw = null;
+  try { sneaky.render(); } catch (e) { threw = String(e).slice(0, 140); }
+  check('and drawing one never throws', threw === null, threw ?? '');
+
+  // The stub has to be able to fail, or the check above proves nothing.
+  let stubBites = null;
+  try { ctxStub().createRadialGradient(NaN, 0, 0, 0, 0, 1); } catch (e) { stubBites = String(e).slice(0, 60); }
+  check('and the stub would have caught it', stubBites !== null, stubBites ?? 'the stub accepts NaN — this check is measuring nothing');
+
+  // A good bead is untouched by any of this.
+  const fine = new BeadField(192);
+  fine.populate(2);
+  const kept = fine.beads.length;
+  fine.step(1 / 60, () => [0.01, 0.01], 0, 0);
+  check('a bead in a healthy field survives', fine.beads.length === kept, `${fine.beads.length} of ${kept}`);
+
+  // The clamp that did not work, kept so the reason stays visible.
+  check('the obvious clamp really is NaN-transparent',
+    Number.isNaN(Math.max(0, Math.min(191, Math.round(NaN)))),
+    'which is why the sampler tests Number.isFinite first');
+}
 
 console.log('');
 const failed = checks.filter(c => !c.ok);

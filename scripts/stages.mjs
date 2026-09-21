@@ -60,7 +60,7 @@ await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] 
 
 // `?stages` from the first frame, a pinned grid so the governor is not also
 // moving, and the classic look so the plate is the same plate every run.
-await page.goto(`http://localhost:${PORT}/?debug&stages&look=classic&tier=local&sim=${GRID}`, { waitUntil: 'load' });
+await page.goto(`http://localhost:${PORT}/?debug&stages&look=classic&tier=local&sim=${GRID}${argOf('steps', null) ? `&steps=${argOf('steps', '')}` : ''}`, { waitUntil: 'load' });
 await page.waitForFunction((g) => window.chromaglassDebug?.().status?.grid === g, GRID, { timeout: 60_000 });
 if (SET) {
   const patch = Object.fromEntries(SET.split(';').map((kv) => {
@@ -82,6 +82,13 @@ const read = async () => page.evaluate(() => {
     stage: d.webgpu?.timings ?? {},
     steps: d.solver().stepsPerSec,
     layers: d.solver().layers,
+    // The timestep itself: what the loop is stepping the liquid by. Motion a
+    // second is this times the rate, and H2b's whole claim is that the
+    // product holds while the rate falls.
+    dt: d.fluids?.[0]?.dt ?? 0,
+    lean: d.fluids?.[0]?.clockLean ?? 1,
+    drive: d.phrase?.().drive ?? 1,
+    speed: d.settings?.globalSpeed ?? 0,
     frameMs: d.status?.frameMs ?? 0,
   };
 });
@@ -112,6 +119,8 @@ const drawing = Object.entries(whole.stage).reduce((a, [, ms]) => a + ms, 0);
 const stepMs = whole.solver.reduce((a, s) => a + (s?.['solver step'] ?? 0), 0);
 console.log(`a frame at ${GRID}²: ${whole.frameMs.toFixed(1)} ms, ` +
   `${whole.steps.toFixed(1)} steps/s over ${whole.layers} layer(s)`);
+console.log(`  dt ${whole.dt.toExponential(3)} — ${(whole.steps * whole.dt).toExponential(3)} of liquid a second` +
+  `  (speed ${whole.speed}, clock lean ${whole.lean.toFixed(3)}, phrase drive ${whole.drive.toFixed(3)})`);
 console.log(`  the solver   ${stepMs.toFixed(2)} ms a step, every layer`);
 console.log(`  the drawing  ${drawing.toFixed(2)} ms a frame`);
 

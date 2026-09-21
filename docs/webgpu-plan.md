@@ -463,6 +463,77 @@ rungs now differ.
 rung, that a step down gives something up, that halving a rung's pixels
 quarters the canvas — and it runs in CI beside the other arithmetic.
 
+## H2b — making slow cheap, measured
+
+How far the liquid travels in a second is `steps per second × dt`, and the
+loop has always held the first at sixty and scaled the second with the Speed
+control. So a plate at Speed 0.012 runs the same hundred-odd dispatches a
+step, sixty times a second, as one at 0.3. Slow costs exactly what fast
+costs.
+
+`?steps=N` takes N steps a second instead and stretches `dt` to match, so the
+liquid travels the same distance for proportionally less work. **The stretch
+is exact.** Measured four times at 512², dividing `dt` by the clock lean that
+also modulates it:
+
+| rate | dt | clock lean | dt ÷ lean |
+|---|---|---|---|
+| 60/s | 1.010e-3 | 1.273 | 7.9340e-4 |
+| 30/s | 2.347e-3 | 1.480 | 1.5858e-3 |
+| 60/s | 1.076e-3 | 1.356 | 7.9351e-4 |
+| 30/s | 2.073e-3 | 1.307 | 1.5861e-3 |
+
+Ratio 1.9988. The liquid is stepped by exactly twice as much, half as often.
+
+**What it is worth, at 768² with two layers:**
+
+| | frame | fps | steps a second |
+|---|---|---|---|
+| 60 steps/s | 38.6, 40.1 ms | 25–26 | **45.3, 44.9** |
+| 30 steps/s | 16.8, 16.9 ms | **59** | 29.8, 29.8 |
+
+Note the last column. At sixty the machine *cannot keep up* — it manages 45
+and the plate runs at three quarters speed, which no frame rate can show. At
+thirty it keeps time. So this is not a trade of motion for smoothness: at
+this rung the plate today is **both slower and jerkier** than it would be
+taking half as many steps. 768² is a rung this machine could not hold and now
+could.
+
+The structure is unchanged — hard edges 10.8% against 11.3%, every detail
+scale within run-to-run variation — and the plate has no smearing or
+streaking in it at the larger timestep.
+
+**And it reported itself wrongly at first.** The panel's amber "% speed"
+warning — the one thing that catches a plate silently running slow — compared
+the achieved rate against a hard-coded sixty. So a plate at thirty steps and
+twice the timestep, running at exactly the right speed, was labelled "50%
+speed" in amber. On the machine this was measured on, side by side:
+
+| `?steps=` | fps | steps achieved | the plate's real speed |
+|---|---|---|---|
+| 60 | 27 | 44 of 60 | **73%** — genuinely slow |
+| 30 | 59 | 30 of 30 | **100%** — on time |
+
+The warning was right in the first row and wrong in the second, which is the
+worst way for a warning to be wrong: an operator who sees it cry wolf once
+reads past it the time it matters. `EngineStatus` carries `stepRate` now and
+the readout compares against what the loop asked for.
+
+That table is also the clearest statement of what H2b is worth. At sixty this
+machine cannot keep up, so the liquid runs at 73% speed *and* stutters at 27
+fps. At thirty it is full speed and smooth. Not a trade.
+
+**What is not measured is judder.** Whether a plate stepped thirty times a
+second *flows* or *steps* is a question about motion over time, and no still
+can answer it. The mechanism is in and the default is unchanged at sixty
+until somebody watches one.
+
+**And one near miss.** Four readings in a row put the clock lean at 1.26 at
+thirty steps and 1.04 at sixty, which looked like the step rate changing the
+show's speed. It does not: the lean wanders between 1.27 and 1.48 at *both*
+rates, and those four had simply clustered. That is the fifth time in this
+work that a handful of runs of a chaotic plate nearly became a finding.
+
 **And the plate is in slow motion at the top rung.** 45.3 steps a second
 against the 60 the show asks for, inside a 38.6 ms frame. A frame rate cannot
 show you that: the liquid is simply evolving at three quarters of wall-clock
