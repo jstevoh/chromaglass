@@ -113,6 +113,21 @@ quantity the solver carries, exactly like dye. Everything else follows from that
   a plausible field in the wrong place, and every conclusion drawn from it is about
   the reader.
 
+**Three mechanisms tried for the interior, all measured, none sufficient.**
+The number below is the dye left under a bubble as a fraction of the liquid
+around it; a hole should be near zero.
+
+| | result |
+|---|---|
+| Flow between neighbours by the difference in air | **0.70** — empties the rim, cannot touch the middle |
+| The same, down a *blurred* air field so the middle has a slope | **0.84**, worse: the hill is shallow, adjacent cells barely differ, almost nothing flows |
+| A velocity down the air gradient | **no effect at all** (see below) |
+
+A local, conserving exchange is diffusion, and diffusion is far too slow to
+clear a bubble thirteen cells across in the time one exists. The transport has
+to be advection — a velocity field the dye rides — which is the divergence
+source, below.
+
 **The divergence source is not optional, and a velocity will not do.**
 Conserving the dye by flowing it between cells — from more air to less, in
 proportion to the difference — works at the rim and cannot touch the middle of

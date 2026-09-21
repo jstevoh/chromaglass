@@ -314,6 +314,7 @@ fn airAt(p: vec2i, n: i32) -> f32 {
   let c = clamp(p, vec2i(0), vec2i(n - 1, n - 1));
   return clamp(textureLoad(air, c, 0).r, 0.0, 1.0);
 }
+
 fn dyeAt(p: vec2i, n: i32) -> vec4f {
   return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1, n - 1)), 0);
 }
