@@ -489,11 +489,31 @@ the liquid is the same liquid):
 Eleven per cent of a frame, spent making the picture worse.
 
 **It is binary, not a dial.** The stage is skipped only when the rate is
-exactly zero — `jacobi` returns early when every coefficient is — so halving
-a preset's rate buys the look and none of the speed. And all thirty-two
-presets set their own rate, from 0.00003 to 0.001, so the default does not
-reach any of them. That makes it a decision about thirty-two looks rather
-than a code change, which is why it is written down here rather than done.
+exactly zero — `jacobi` returns early when every coefficient is — so a
+ceiling buys the look and none of the speed. All thirty-two presets set their
+own rate, so the default reaches none of them.
+
+**A ceiling, at 0.0002, down from 0.001.** Some looks do lean on a little
+diffusion, so the call was to cap rather than switch off. Measured where a
+ceiling bites hardest: Boiling Point, the heaviest diffuser there was at
+0.001, is still recognisably itself at the ceiling — the same hot gradient
+and the same soft character — and carries *more* of the filament structure a
+boiling plate should have. Hard edges went from 0.6% of pixels to 1.3%, and
+the structure at 16 px from 0.2% to 0.5%. Nine presets came down; the other
+twenty-three were already under it.
+
+The ceiling is the control's own maximum, in `deskPins.ts` and in the
+settings panel, because a ceiling anywhere else is a range with a dead end on
+it — which is the fault the Speed control had, where thirty of thirty-two
+looks lived in the bottom quarter of the throw. `npm run panel` holds the
+two declarations together and caught the second one being missed.
+
+**And no look may now carry a value its own control cannot reach.**
+`lace-run` carried Speed 0.45 where the control stopped at 0.3, so the desk
+could not show that look's own speed and touching the slider snapped it to a
+different show; diffusion had nine presets above its ceiling for the same
+reason. `npm run plate` checks every number in every preset against the
+control that plays it.
 
 **The profiler was reporting the cost of work that was not happening.** With
 diffusion off the solver measurably took 14% more steps a second, and the

@@ -27,6 +27,7 @@ import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/p
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
 import { BeadField } from '../src/lib/beads.ts';
+import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import fs from 'node:fs';
 
 const STYLES = ['drop', 'pour', 'spray', 'splatter', 'streak'];
@@ -326,6 +327,32 @@ console.log('');
 console.log(`     ${withPhysics}/${PRESETS.length} presets carry a liquid that changes the plate`);
 check('most of the app takes advantage of them', withPhysics >= PRESETS.length - 2,
   `${PRESETS.length - withPhysics} plate${PRESETS.length - withPhysics === 1 ? '' : 's'} of plain dye`);
+
+// ── No look carries a value its own control cannot reach ────────────
+//
+// A preset is a set of numbers and a control is a range, and nothing held
+// them together. `lace-run` carried Speed 0.45 where the control stops at
+// 0.3: the desk could not show that look's own speed, and touching the
+// slider at all snapped it to a different show. Diffusion had nine presets
+// above its ceiling for the same reason.
+//
+// A look outside its control's range is a look you cannot play, which is a
+// strange thing for a light show to ship.
+{
+  const outside = [];
+  for (const preset of PRESETS) {
+    for (const [key, value] of Object.entries(preset.settings ?? {})) {
+      if (typeof value !== 'number') continue;
+      const spec = PIN_RANGE.get(key);
+      if (!spec) continue;
+      if (value < spec.min || value > spec.max) {
+        outside.push(`${preset.id}.${key} = ${value} (the control is ${spec.min}..${spec.max})`);
+      }
+    }
+  }
+  check('no look sets a value its own control cannot reach', outside.length === 0,
+    outside.slice(0, 4).join('; ') || `${PRESETS.length} looks checked`);
+}
 
 // ── A bead that goes non-finite loses a bead, not the show ───────────
 //
