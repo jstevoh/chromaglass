@@ -26,7 +26,7 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { installFrameReader, lastFrameRead } from './frame.mjs';
+import { installFrameReader, isGpuEngine, lastFrameRead } from './frame.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -402,6 +402,46 @@ try {
   await page.goto(URL, { waitUntil: 'networkidle' });
   await settle(2500);
   check('the app loads and paints a plate', (await page.locator('canvas').count()) > 0);
+
+  /*
+    Whether this machine can finish the run it has been asked for.
+
+    At `QA_DPR=1` on a machine with no GPU this suite takes about
+    **thirty-four minutes** — the note at the top of this file measured it,
+    and found three of four cores shading fragments in software with every
+    step here queueing behind them. The macOS job that runs it allows
+    twenty.
+
+    So on a runner without a GPU the job does not fail, it is *cancelled* at
+    the timeout — and GitHub keeps no logs for a cancelled job. The whole
+    account of it is a duration: five minutes on the runs that had a GPU,
+    twenty-five on the one that did not. That took a while to work out from
+    the outside, and it would have taken the same while every time, which is
+    how a red check becomes "just press it again".
+
+    Ten seconds and a sentence is the alternative. This does not adapt the
+    resolution to rescue the run: the checks below would then be measuring
+    something other than what was asked for, quietly, which is the same
+    failure wearing a friendlier face.
+  */
+  {
+    const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    if (!isGpuEngine(engine) && Number(DPR) >= 1) {
+      console.error(
+        `\n  This runner has no GPU — the solver reports "${engine ?? 'nothing'}".\n` +
+        `  QA_DPR=${DPR} asks for full resolution, which under software rasterisation\n` +
+        `  takes about 34 minutes; the job allows 20, so it would be cancelled with no\n` +
+        `  logs rather than failing with a reason.\n\n` +
+        `  Nothing is wrong with the code. Run the job again to land on an agent with a\n` +
+        `  GPU, or set QA_DPR=0.35 to run the suite the fast way.\n`);
+      stopServer(server);
+      await browser.close();
+      process.exit(1);
+    }
+    if (!isGpuEngine(engine)) {
+      console.log(`     software rasterisation (${engine ?? 'unknown'}) at dpr ${DPR} — slow, but it will finish`);
+    }
+  }
   check('nothing is asked for on a cold load',
     (await page.evaluate(() => window.__media.length)) === 0,
     JSON.stringify(await page.evaluate(() => window.__media)));
