@@ -28,8 +28,8 @@ the same way rather than by eye.
 > **This is the plate's own running order.** The engine work it now sits on — the
 > WebGPU port, the effects, air and the second liquid — is in
 > [docs/roadmap.md](docs/roadmap.md), which says what comes first and links the
-> plans behind each piece. Note the **shader freeze**: the GLSL does not change
-> until the port cuts over.
+> plans behind each piece. The port landed on 2026-09-20 and the shader freeze with
+> it: there is one shading language in the tree now, WGSL in `src/gpu/wgsl/`.
 
 ## Running order
 
@@ -39,7 +39,8 @@ and by what would otherwise force a rebase later.
 
 ### 1. Sharp liquid, and pigment in it
 
-`src/lib/gpuFluid.ts`, `src/components/LiquidVisualizer.tsx`, `src/types.ts`
+`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid.ts`, `src/components/LiquidVisualizer.tsx`,
+`src/types.ts` — `lib/gpuFluid.ts` was the WebGL solver and went with it in P7
 
 - **Interface sharpening** (`sharpness`, 0–1). A counter-diffusion term along the dye
   gradient, applied each step after advection, that restores the step at a boundary
@@ -51,9 +52,10 @@ and by what would otherwise force a rebase later.
   instead of sitting on the screen, modulated by dye thickness and by how slowly the
   cell is moving (pigment settles where the flow is slack).
 
-Both land in the GPU and CPU solvers so the two engines still agree. Shipped as two
-PRs rather than one, so the first improvement reaches the projector sooner: sharpening
-first, granulation second. Both are in.
+Both landed in the GPU and CPU solvers, which is what "so the two engines still agree"
+meant while there were two. There is one now. Shipped as two PRs rather than one, so the
+first improvement reached the projector sooner: sharpening first, granulation second.
+Both are in.
 
 **Sharpening is retired, on the sixth look.** The test this plan called for has been run
 at the grid the show actually falls to. At 256², where a solver cell is nearly three
@@ -62,9 +64,10 @@ pixels and the pass should matter most, switching it on and off on one plate mov
 at 1.0. Across pages it narrows edges by a pixel in two captures of five and not at the
 same frame count in either set, and at 384° the sign flips. What it does add over hundreds
 of frames is pale terraces and torn lips, which is the old fault arriving slowly on a
-coarse grid. It is off in the defaults and in every preset; the control stays, because on
-the CPU solver at 192² it measurably steepens (mean gradient 0.091 → 0.104), and that is
-the engine a weak machine runs. Batch 1's other half, granulation, stands: it now works
+coarse grid. It is off in the defaults and in every preset; the control was kept because
+on the CPU solver at 192² it measurably steepened (mean gradient 0.091 → 0.104), and that
+was the engine a weak machine ran — a reason that went when the CPU solver did (P7), so
+the control is now a knob with no measured case for it. Batch 1's other half, granulation, stands: it now works
 from the first frame, and its default of 0.5 at grain scale 110 is the measured choice.
 
 **Gate:** typical local contrast ≥ 3.0 on the Fillmore plate at the preset's default,
@@ -152,7 +155,7 @@ always did and the whole pass is skipped; that is the first thing `npm run liqui
 checks, because a field that changes every existing look is a regression with a menu
 entry rather than a feature. It needs no GPU work: with the GPU solver attached the
 CPU arrays are the next step's deltas, so a force written as a velocity delta and a
-thinning written as a dye multiplier reach both engines through a path that exists.
+thinning written as a dye multiplier reach the solver through a path that exists.
 
 What each one measures at, on a stand-in plate:
 
@@ -329,7 +332,7 @@ does for the microphone, because a dark venue with a strobe and a lit rehearsal 
 are four orders of magnitude apart and no fixed threshold serves both.
 
 **The room stirs the plate** (`sceneDrive`). The lattice is bilinearly upsampled to the
-sim grid and added as velocity each frame. One loop, both engines. This is the piece
+sim grid and added as velocity each frame. One loop. This is the piece
 that delivers the idea, and it is the smallest of the three.
 
 **People as hands** (`sceneHands`). Connected components on the presence mask, the
@@ -480,8 +483,9 @@ Two things decide the order above, and both can be moved.
 
 ## Operating rules
 
-- The sandbox runs the CPU solver under SwiftShader, so every look is judged on the
-  Mac's GPU before the next batch starts.
+- A sandbox has no GPU worth the name, so a WebGPU fallback adapter classifies as
+  `software` and gets one 256² rung. Every look is still judged on the Mac's GPU before
+  the next batch starts.
 - One Mac session at a time, committing from a worktree, never while a show is
   running: two sessions in one checkout have already trodden on each other's server
   and files.

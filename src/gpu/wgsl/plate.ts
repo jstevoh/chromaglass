@@ -824,7 +824,12 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
  * the helpers, then the pass's own main.
  */
 export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
-  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${FINISH_WGSL}${VERT}${main}`;
+  // `PARTICLE_FOLD` only where the bindings carry the splat: a slice that
+  // binds its own shorter list has no `parts0` for it to read. It goes after
+  // MACRO because WGSL wants a function declared before it is called and
+  // `decodeFluidDof`, which it falls back to, is declared in there.
+  const particles = bindings === DISPLAY_BINDINGS ? PARTICLE_FOLD : '';
+  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${FINISH_WGSL}${VERT}${main}`;
 }
 
 /** The pieces, for the slices still being ported to build on. */
@@ -882,6 +887,98 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 @group(0) @binding(10) var film: texture_2d<f32>;
 @group(0) @binding(11) var markTex: texture_2d<f32>;
 @group(0) @binding(12) var beadTex: texture_2d<f32>;
+@group(0) @binding(13) var parts0: texture_2d<f32>;
+@group(0) @binding(14) var parts1: texture_2d<f32>;
+`;
+
+/*
+  Dye carried by particles, folded into a layer (H1, docs/roadmap.md).
+
+  **In the dye's own space, before the decode, and that is the whole point.**
+  The first version folded after it and washed the plate out to a pale cyan,
+  for a reason worth writing down: what comes back from `decodeFluid` is
+  `lt`, the light *transmitted* through the dye, and an opacity already put
+  through `1 − exp(−thickness)`. A particle carries the opposite — a per
+  channel *absorbance*, which is what the raw texture stores. Mixing one into
+  the other is not a wrong weighting, it is a category error, and it looks
+  exactly like one.
+
+  So the fold happens on the raw sample. The splat holds the sum of every
+  particle that landed on a texel: its carried spectrum times its weight in
+  rgb, the weight alone in a. `acc.rgb / acc.a` is therefore the spectrum
+  they carry, in the same encoded space `raw.rgb / raw.a` is in, because that
+  is where it was read at birth. Multiplying it back by the local total gives
+  an encoded rgb that decodes through the same Beer–Lambert path as anything
+  else on the plate.
+
+  Two things come out of it. The spectrum is pulled toward what the particles
+  carry, which is the part that does not smear: a filament the grid has
+  blurred away is still a line of particles holding the colour they were born
+  with. And the total is modulated by how they have piled up, mean preserving
+  — `cov − 1` is zero where coverage is what it should be — so the plate
+  gains structure at the texel scale without getting brighter or dimmer
+  overall. The modulation is gentle because `raw.a` is the *square root* of
+  density (`decodeDensity` squares it), so a tenth here is a fifth of the
+  density it stands for.
+
+  Gated on weight rather than on the setting, because a texel with nothing on
+  it has nothing to say and dividing by its zero would say it loudly.
+*/
+export const PARTICLE_FOLD = /* wgsl */ `
+fn foldRaw(raw: vec4f, pt: texture_2d<f32>, uv: vec2f) -> vec4f {
+  if (raw.a <= 1e-5) { return raw; }
+  let acc = textureSampleLevel(pt, samp, uv, 0.0);
+  if (acc.a <= 1e-4) { return raw; }
+
+  /*
+    Spectrum and total, and they have to move together.
+
+    decodeFluidRaw divides the channels by the total to get the absorbance
+    spectrum, so raw.rgb and raw.a are a ratio and not two independent
+    numbers. Scaling one without the other does not make the dye thicker, it
+    changes what colour the dye is: scale the total up alone and every
+    channel's share falls, which decodes to white; scale it down alone and
+    they all rise, which decodes to black. Both were on the plate before this
+    was written down — a macro closeup came out as a flat dark red field with
+    the picture gone out of it.
+
+    So the spectrum is taken first, mixed toward the particles' carried one,
+    and written back multiplied by whatever the total ends up being.
+  */
+  let spectrum = raw.rgb / raw.a;
+  let carried = acc.rgb / acc.a;
+  let cov = clamp(acc.a / U.particleNorm, 0.0, 2.0);
+  let k = U.particleMix * min(cov, 1.0);
+  let total = max(0.0, raw.a * (1.0 + U.particles * (cov - 1.0) * 0.25));
+  return vec4f(mix(spectrum, carried, k) * total, total);
+}
+
+/*
+  The decode, with the particles in it.
+
+  It fetches what decodeFluidDof would have fetched — bicubic and the gooey
+  blur below the defocus threshold, five taps above it — folds, and hands the
+  result to the shared tail. Off, it is decodeFluidDof and nothing else, so
+  a look with no particles goes down exactly the path it always did.
+
+  The neighbour samples that lacing, the edge and the relief take are left on
+  the plain decode: they are asking about the dye's shape, and a boundary
+  found on particle speckle would be a noisy boundary rather than a finer one.
+*/
+fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
+  if (U.particles <= 0.001) { return decodeFluidDof(t, fuv, blurFluid, useBlur, dof); }
+  var raw: vec4f;
+  if (dof < 0.02) {
+    raw = textureBicubic(t, fuv);
+    if (useBlur) { raw.a = blurAlpha(t, fuv, blurFluid); }
+  } else {
+    let r = dof * 0.022 / (1.5 * U.camZoom);
+    raw = (tex2(t, fuv)
+         + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
+         + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
+  }
+  return decodeFluidRaw(foldRaw(raw, pt, fuv));
+}
 `;
 
 /** The display pass: the plate as it reaches the wall. */
@@ -983,7 +1080,7 @@ struct FsOut {
     flow0 = fluidFlow(vel0, fuv0) * macroAmt;
     fuv0 = macroWarp(fuv0);
   }
-  var fluid0 = decodeFluidDof(layer0, fuv0, blurFluid, useBlur, dof);
+  var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
   if (U.dishSpread > 0.001 && !closeup) {
@@ -1107,7 +1204,7 @@ struct FsOut {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
       fuv1 = macroWarp(fuv1);
     }
-    var fluid1 = decodeFluidDof(layer1, fuv1, blurFluid, useBlur, dof);
+    var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
     if (U.dishSpread > 0.001 && !closeup) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;

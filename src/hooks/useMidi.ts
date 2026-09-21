@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
-  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, settingLed,
+  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, settingLed, curveOf, valueAt, travelOf,
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
 } from '../lib/midi';
@@ -236,6 +236,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           if (e.kind === 'noteoff') break;
           const span = t.max - t.min || 1;
           /*
+            The fader's travel, which is not always the value's: Speed's is
+            cubed, so the bottom third of a throw covers the slow end where
+            almost every look actually sits (`curveOf` in `midi.ts`). The
+            curve comes from the setting rather than from the binding, so a
+            map learned before it existed gets it too.
+          */
+          const curve = curveOf(t.key);
+          /*
             A control that only takes whole steps — the folds — rides them as
             detents: the sheet offers Off, 2, 4, 6 and 8, so a fader lands on
             those and nothing between. The step is the registry's; the travel
@@ -244,7 +252,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           */
           const stepped = { min: t.min, max: t.max, step: PIN_RANGE.get(String(t.key))?.step };
           const cur = h.getSetting(t.key);
-          const cur01 = cur === undefined ? 0 : Math.max(0, Math.min(1, (cur - t.min) / span));
+          const cur01 = cur === undefined ? 0 : travelOf(cur, t.min, t.max, curve);
           if (b.mode === 'relative') {
             const d = relativeDelta(e.value);
             if (d === 0) break;
@@ -262,7 +270,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           // actually hold. Snapped afterwards instead, a fader resting between
           // two steps would sit a fraction away from a value it had written
           // itself, and takeover would read its own write as somebody else's.
-          if (stepped.step) in01 = (onStep(stepped, t.min + in01 * span) - t.min) / span;
+          if (stepped.step) in01 = travelOf(onStep(stepped, valueAt(in01, t.min, t.max, curve)), t.min, t.max, curve);
           if (softRef.current) {
             const v = takeover.ride(b.id, in01, cur01);
             if (v === null) {
@@ -280,7 +288,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
             }
             in01 = v;
           }
-          h.setSetting(t.key, onStep(stepped, t.min + in01 * span));
+          h.setSetting(t.key, onStep(stepped, valueAt(in01, t.min, t.max, curve)));
           break;
         }
         case 'action': if (pressed) h.action(t.action); break;
@@ -514,7 +522,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         */
         const cur = hostRef.current.getSetting(t.key);
         if (cur === undefined) continue;
-        level = settingLed(cur, t.min, t.max);
+        level = settingLed(cur, t.min, t.max, curveOf(t.key));
       }
       if (level === null) continue;
       write(b.source, level);

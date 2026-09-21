@@ -27,6 +27,7 @@ import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
+import { WebGPUParticles } from './particles';
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -134,6 +135,13 @@ export class WebGPUFluid {
    * the shares, not the sum.
    */
   stageTimings = false;
+  /**
+   * Dye carried by particles (H1, `gpu/particles.ts`), or null until a step
+   * asks for some. Built on demand and released when the amount goes back to
+   * 0: a population at this grid is several megabytes, and every look made
+   * before H1 wants none of it.
+   */
+  private particles: WebGPUParticles | null = null;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -550,9 +558,57 @@ export class WebGPUFluid {
     });
 
     shared?.end();
+
+    /*
+      And the particles, after everything that moves the field they ride.
+
+      In this encoder, not one of their own: they read `velForced` and the
+      dye as the stages above have just left them, and a separate submit
+      would put a frame of slack between the flow and what is carried by it.
+    */
+    this.stepParticles(enc, p);
+
     this.profiler.resolveInto(enc);
     this.device.queue.submit([enc.finish()]);
     this.profiler.afterSubmit();
+  }
+
+  /**
+   * Birth and motion for the particle population, building or releasing it
+   * as the amount crosses zero.
+   *
+   * The population is sized by the grid, so a rung change takes it with the
+   * rest of the solver — a new `WebGPUFluid` is built and this one is
+   * disposed, and the particles go with it. They do not survive the change,
+   * which is right: they carry positions in a field that no longer exists.
+   */
+  private stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    const want = Math.max(0, Math.min(1, p.particles ?? 0));
+    if (want <= 0) {
+      if (this.particles) { this.particles.dispose(); this.particles = null; }
+      return;
+    }
+    if (!this.particles) this.particles = new WebGPUParticles(this.device, this.N);
+    this.particles.step(enc, this.dye.read, this.velForced, {
+      amount: want,
+      life: p.particleLife,
+      // Born only where there is dye worth carrying. Below this a particle
+      // would pick up a colour that is mostly the plate's own floor and lay
+      // it back down as a haze.
+      floor: 0.02,
+      disp: p.dt * p.advection * ((this.N - 2) / this.N),
+      dt: p.dt,
+      seed: 0x9e3779b9,
+    }, this.stageTimings ? (label) => this.profiler.pass(label) : undefined);
+  }
+
+  /**
+   * The splat, once a frame: the population drawn into the texture the
+   * compositor adds. Encoded into the *frame's* encoder rather than a step's,
+   * because several steps happen per frame and only the last one is seen.
+   */
+  splatParticles(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
+    this.particles?.splat(enc, timing);
   }
 
   private jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
@@ -804,12 +860,21 @@ export class WebGPUFluid {
 
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
-    return { dye: this.dye.read, vel: this.vel.read, velForced: this.velForced, grain: this.grain?.read ?? null };
+    return {
+      dye: this.dye.read,
+      vel: this.vel.read,
+      velForced: this.velForced,
+      grain: this.grain?.read ?? null,
+      /** The particle splat, or null when the amount is 0 and none exist. */
+      particles: this.particles && !this.particles.idle ? this.particles.target : null,
+    };
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.particles?.dispose();
+    this.particles = null;
     this.disposer.dispose();
     this.groups.clear();
   }

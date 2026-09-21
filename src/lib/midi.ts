@@ -107,11 +107,43 @@ export const sourceKey = (s: MidiSource): string => `${s.kind}:${s.channel}:${s.
  * learned over: a fader taught across 0–1 and a look that sets 1.4 would
  * otherwise send 178, which is not a MIDI value at all.
  */
-export function settingLed(value: number, min: number, max: number): number {
-  const span = max - min || 1;
-  const at = Math.round(((value - min) / span) * 127);
+export function settingLed(value: number, min: number, max: number, curve = 1): number {
+  const at = Math.round(travelOf(value, min, max, curve) * 127);
   return at < 0 ? 0 : at > 127 ? 127 : at;
 }
+
+/**
+ * Where a control's travel is not the value's.
+ *
+ * Speed is the case this exists for. Its range is 0 to 0.3 and thirty of the
+ * thirty-two built-in looks sit at or below 0.08 — the bottom 27% of a fader
+ * — with the median at 10% of the way along. So the useful part of the
+ * control was a centimetre of a ten-centimetre throw, on screen and worse on
+ * a hardware fader, where it was CC 0 to 34 of 127. Everything above was a
+ * region the plate cannot usefully be played in.
+ *
+ * `curve` is the exponent on the travel: value = min + span · tᶜ. At 3, half
+ * the travel is 0.0375, which is where the looks actually live, and the
+ * bottom third of the fader is the slow end that had no resolution at all.
+ * It is a property of the *control*, not of the setting — the stored value is
+ * unchanged, so a look, a patch or a song cue means exactly what it meant
+ * before, and a binding learned before this existed picks up the curve from
+ * the table rather than from what it saved.
+ */
+export const curveOf = (key: keyof VisualizerSettings): number =>
+  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? 1;
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** A control at `t` of its travel, as a value. */
+export const valueAt = (t: number, min: number, max: number, curve = 1): number =>
+  min + (max - min) * (curve === 1 ? clamp01(t) : Math.pow(clamp01(t), curve));
+
+/** The inverse: where a value sits on the control, 0..1. */
+export const travelOf = (value: number, min: number, max: number, curve = 1): number => {
+  const at = clamp01((value - min) / (max - min || 1));
+  return curve === 1 ? at : Math.pow(at, 1 / curve);
+};
 export const sourceLabel = (s: MidiSource): string => `${s.kind === 'cc' ? 'CC' : 'Note'} ${s.number} ch ${s.channel + 1}`;
 
 export function targetLabel(t: MidiTarget, presetName?: (id: string) => string | undefined): string {
@@ -157,11 +189,11 @@ export const MIDI_BANKS = 4;
  *
  * `step` marks a control that only takes whole steps; see `deskPins.ts`.
  */
-export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number }[] = [
+export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number }[] = [
   { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
   { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
-  { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3 },
+  { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
@@ -184,6 +216,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'aperture',        label: 'Aperture',         min: 0, max: 1 },
   { key: 'bloom',           label: 'Bloom',            min: 0, max: 1 },
   { key: 'sharpness',       label: 'Sharpness',        min: 0, max: 1 },
+  { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
+  { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },

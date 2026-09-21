@@ -150,6 +150,23 @@ export interface VisualizerSettings {
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
   beatLead: number;
   globalSpeed: number;
+  /**
+   * Dye carried by particles (H1, docs/roadmap.md), 0–1.
+   *
+   * The dye lives in a grid that is resampled every solver step, so structure
+   * finer than about eight cells is gone within a second — the oldest
+   * measured shortfall in PLAN.md, and the reason a settled plate carries a
+   * fifth of the fine detail filmed liquid does. A particle is not resampled:
+   * it takes a colour once and carries it wherever the flow goes.
+   *
+   * This is how much of the picture they are, *on top of* the grid rather
+   * than instead of it. At 0 none are allocated and the plate is exactly the
+   * plate it was, which is why every look written before this still means
+   * what it meant.
+   */
+  particles: number;
+  /** How far a particle's colour is trusted against the grid's: 0–1, of `particles`. */
+  particleMix: number;
   audioMappings: AudioMappings;
   
   // Squish Plate
@@ -324,7 +341,25 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   onNewSong: 'preset',      // a new song gets a new look
   beatPrediction: 0.7,
   beatLead: 80,
-  globalSpeed: 0.025,       // slow viscous crawl, visibly moving
+  /*
+    Slower than it was, on purpose.
+
+    This was 0.025 and every built-in look was tuned around it, and the plate
+    read as hurried on a wall: a liquid light show is a thing people watch for
+    minutes, and the reference footage the detail measurements come from moves
+    far slower than this plate did. Every preset came down by the same factor
+    (0.6) so the relative feel each was tuned with survives, and the Speed
+    control's travel is cubed now so the slow end has somewhere to go —
+    `curveOf` in `lib/midi.ts`.
+
+    This is the *timestep*, not the step rate: the solver still takes sixty
+    steps a second whatever this says, so a slower plate costs exactly what a
+    fast one does. Making slow cheap is its own piece of work (docs/roadmap.md,
+    H2b), and it is the largest saving measured so far.
+  */
+  globalSpeed: 0.015,       // a slow viscous crawl, visibly moving
+  particles: 0,             // off: every look predates them, and they cost a pass
+  particleMix: 0.6,
   audioMappings: {
     velocity: 'bass',
     density: 'bass',

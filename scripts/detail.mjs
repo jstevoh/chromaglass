@@ -13,6 +13,10 @@
  * Every image is centre-cropped square and scaled to 512 px, so a 4K still and
  * a laptop screenshot are comparable. Reported per image:
  *
+ *   lit%    how much of the crop is plate rather than the black around it.
+ *           `p50g` is the *median* pixel's gradient, so on a frame that is
+ *           half background it is a reading of the background. Read it
+ *           against this, or measure a preset that fills the frame.
  *   edge%   pixels whose local gradient exceeds 30 (hard boundaries)
  *   p50g    the typical local gradient (texture everywhere, not just at edges)
  *   p99g    how hard the hardest edges are
@@ -102,10 +106,22 @@ for (const f of files) {
     for (let i = 0; i < S * S; i++) { const r = d[i * 4] / 255, gg = d[i * 4 + 1] / 255, bb = d[i * 4 + 2] / 255;
       const mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb); const s = mx === 0 ? 0 : (mx - mn) / mx; sat += s;
       if (s > 0.15) { let h = 0; const dd = mx - mn; if (dd > 0) { h = mx === r ? ((gg - bb) / dd % 6) : mx === gg ? ((bb - r) / dd + 2) : ((r - gg) / dd + 4); h = (h * 60 + 360) % 360; } hb[Math.floor(h / 10)]++; } }
-    return { edge: +(edge * 100).toFixed(1), p50: +q(0.5).toFixed(1), p99: +q(0.99).toFixed(1), oct, sat: +(sat / (S * S)).toFixed(2), hues: hb.filter(v => v > S * S * 0.01).length };
+    // How much of the crop is plate at all.
+    //
+    // Without it `p50g` is a trap. Half of a Fillmore frame is the black
+    // around the dishes, so the median pixel's gradient is the background's
+    // and a change that moves the covered fraction a little moves p50g from
+    // 0.7 to 0 while the plate itself gains structure — which is exactly
+    // what happened the first time particles were measured on it. On a
+    // frame-filling preset the same plate reads p50g 23. Read p50g against
+    // this column, or on a crop that is all plate.
+    let litPx = 0;
+    for (let i = 0; i < S * S; i++) if (lum[i] > 8) litPx++;
+    const lit = litPx / (S * S);
+    return { edge: +(edge * 100).toFixed(1), p50: +q(0.5).toFixed(1), p99: +q(0.99).toFixed(1), oct, sat: +(sat / (S * S)).toFixed(2), hues: hb.filter(v => v > S * S * 0.01).length, lit: +(lit * 100).toFixed(0) };
   }, { b64, ext });
   rows.push({ file: f.split('/').pop(), ...r });
 }
 await browser.close();
-console.log('file'.padEnd(26), 'edge%', 'p50g', 'p99g', 'sat', 'hues', ' detail by scale (1,2,4,8,16,32 px, % of variance)');
-for (const r of rows) console.log(r.file.padEnd(26), String(r.edge).padStart(5), String(r.p50).padStart(4), String(r.p99).padStart(4), String(r.sat).padStart(4), String(r.hues).padStart(4), ' ', [1,2,4,8,16,32].map(k => String(r.oct[k]).padStart(5)).join(''));
+console.log('file'.padEnd(26), 'lit%', 'edge%', 'p50g', 'p99g', 'sat', 'hues', ' detail by scale (1,2,4,8,16,32 px, % of variance)');
+for (const r of rows) console.log(r.file.padEnd(26), String(r.lit).padStart(4), String(r.edge).padStart(5), String(r.p50).padStart(4), String(r.p99).padStart(4), String(r.sat).padStart(4), String(r.hues).padStart(4), ' ', [1,2,4,8,16,32].map(k => String(r.oct[k]).padStart(5)).join(''));

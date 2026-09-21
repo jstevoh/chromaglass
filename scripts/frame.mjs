@@ -26,10 +26,13 @@ export const engineQuery = () => '';
 /**
  * Is this label a GPU solver's?
  *
- * Three harnesses had `/^GPU/` written into them, and the stage says
+ * Five harnesses had `/^GPU/` written into them, and the stage says
  * `WebGPU`, so each of them decided in turn that a run on the port was a run
  * on the CPU fallback — `bench` recorded every rung it reached as one it
- * never reached, and `bubbles` refused to start.
+ * never reached, `bubbles` refused to start, and `shots` printed "software
+ * rasterisation — these will not look like the app on a real machine" over
+ * pictures taken on an M4. Use this, not a prefix test of your own; the
+ * fifth one was found two sweeps after the first four.
  */
 export const isGpuEngine = (label) => /^(GPU|WebGPU)\b/.test(label ?? '');
 
