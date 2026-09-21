@@ -10,10 +10,11 @@ import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { luckyLook } from './lib/lucky';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
-import { blendLooks, targetLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1385,21 +1386,21 @@ export default function App() {
    * ⇧⏎ in the palette send one that was never armed — arming it first and
    * then calling Go would read a `cued` that this render does not have yet.
    */
-  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
+  /**
+   * Crossfade the settings from where the plate is now to `to`, over
+   * `seconds`. The one fade loop — Go, Revert and a new song all run through
+   * it, and there were three copies of it before there were three callers.
+   *
+   * ~30 a second: a crossfade over seconds does not need sixty settings
+   * objects a second, and the solver is the expensive part of a settings
+   * change rather than React.
+   */
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
     if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
-
     const from = settingsRef.current;
-    const to = targetLook(from, next.settings);
-    previousLook.current = { id: pinnedPresetId, settings: from };
-    adoptPreset(next.id);
-    setCued(null);
-
     if (seconds <= 0) { setSettings(to); setFading(0); return; }
     const started = performance.now();
     const ms = seconds * 1000;
-    // ~30 a second: a crossfade over seconds does not need sixty settings
-    // objects a second, and the solver is the expensive part of a settings
-    // change rather than React.
     lookFadeRef.current = setInterval(() => {
       const t = Math.min(1, (performance.now() - started) / ms);
       if (t >= 1) {
@@ -1412,8 +1413,17 @@ export default function App() {
       setSettings(blendLooks(from, to, t));
       setFading(t);
     }, 33);
+  }, []);
+
+  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
+    const from = settingsRef.current;
+    previousLook.current = { id: pinnedPresetId, settings: from };
+    adoptPreset(next.id);
+    setCued(null);
+    // Pressing Go is a decision: the whole look, structure and all.
+    fadeSettingsTo(targetLook(from, next.settings), seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinnedPresetId, adoptPreset]);
+  }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
   /** Go: the armed look, at the chosen fade. */
   const goLook = useCallback((seconds = fadeSeconds) => {
@@ -1434,25 +1444,9 @@ export default function App() {
     const prev = previousLook.current;
     if (!prev) return;
     previousLook.current = null;
-    const from = settingsRef.current;
     if (prev.id) adoptPreset(prev.id);
-    if (fadeSeconds <= 0) { setSettings(prev.settings); return; }
-    const started = performance.now();
-    const ms = fadeSeconds * 1000;
-    if (lookFadeRef.current) clearInterval(lookFadeRef.current);
-    lookFadeRef.current = setInterval(() => {
-      const t = Math.min(1, (performance.now() - started) / ms);
-      if (t >= 1) {
-        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
-        lookFadeRef.current = null;
-        setSettings(prev.settings);
-        setFading(0);
-        return;
-      }
-      setSettings(blendLooks(from, prev.settings, t));
-      setFading(t);
-    }, 33);
-  }, [fadeSeconds, adoptPreset]);
+    fadeSettingsTo(prev.settings, fadeSeconds);
+  }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
 
@@ -1583,92 +1577,7 @@ export default function App() {
 
   const triggerLucky = () => {
     previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
-    const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
-    const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];
-    const audioFeatures: ('none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity')[] = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'];
-    const randomFeature = () => audioFeatures[Math.floor(Math.random() * audioFeatures.length)];
-
-    setSettings({
-      sensitivity: Math.random() * 0.8 + 0.2,
-      bassBoost: Math.random() * 1.5 + 0.5,
-      autoCalibrate: settings.autoCalibrate,
-      globalSpeed: Math.random() * 0.048 + 0.012,
-      audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
-      platePressure: Math.random(), glassSmear: Math.random(), rainDrip: Math.random(),
-      viscosity: Math.random() > 0.5 ? 'thick' : 'thin', polarity: Math.random(),
-      heatIntensity: Math.random() * 0.5, boilingPoint: Math.random(), evaporationRate: Math.random() * 0.05,
-      airVelocity: Math.random() * 0.5, vibrationFrequency: Math.random(),
-      layerCount: Math.random() > 0.5 ? 2 : 1,
-      blendMode: blendModes[Math.floor(Math.random() * blendModes.length)],
-      gooeyEffect: Math.random(), rotationSpeed: Math.random() * 0.1, centerGravity: Math.random(),
-      ledPlatform: Math.random() > 0.5,
-      ledMode: ledModes[Math.floor(Math.random() * ledModes.length)],
-      ledColor: liquidTypes[Math.floor(Math.random() * liquidTypes.length)].color,
-      ledSpeed: Math.random() * 0.5,
-      surfaceTension: Math.random() * 0.2, diffusionRate: Math.random() * 0.002,
-      buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
-      damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
-      automateRate: Math.random() * 0.2,
-      audioImpact: settings.audioImpact,
-      turbulenceScale: Math.random() * 0.7,
-      turbulenceDetail: 1 + Math.floor(Math.random() * 4),
-      blobSurfaceTension: Math.random(),
-      boundaryContrast: Math.random() * 0.7,
-      saturationBoost: 1.0 + Math.random() * 0.8,
-      dyeBudget: 0.4 + Math.random() * 0.6,
-      edgeRelief: Math.random() * 0.8,
-      bubbles: Math.random() < 0.2 ? 0 : 0.2 + Math.random() * 0.8,
-      plateRock: Math.random() * 0.9,
-      layerScaleVariety: Math.random(),
-      macroSync: Math.random(),
-      hueJourney: Math.random() < 0.7 ? 1 + Math.round(Math.random() * 8) * 0.5 : 0,
-      beatSqueeze: Math.random(),
-      backgroundLoop: Math.random(),
-      kaleidoscope: Math.random() < 0.2 ? [2, 4, 6][Math.floor(Math.random() * 3)] : 0,
-      dishVignette: Math.random() < 0.3 ? 0.4 + Math.random() * 0.6 : 0,
-      lightPlay: 0.3 + Math.random() * 0.7,
-      lampMotion: Math.random(),
-      lampHotspot: Math.random() * 0.7,
-      secondLamp: Math.random() < 0.35 ? 0.4 + Math.random() * 0.6 : 0,
-      iridescence: Math.random() * 0.6,
-      renderStyle: Math.random() < 0.25 ? 'photo' : 'show',
-      paperA: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
-      paperB: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
-      camera: Math.random() < 0.4 ? 0.5 + Math.random() * 0.5 : 0,
-      focus: Math.random(),
-      aperture: Math.random() * 0.8,
-      bloom: Math.random() * 0.7,
-      chromaticAberration: Math.random() * 0.6,
-      refraction: 0.3 + Math.random() * 0.7,
-      microDroplets: Math.random() < 0.4 ? Math.random() : 0,
-      thinFilm: Math.random() < 0.4 ? Math.random() : 0,
-      // The other projectors come out one roll in five, one at a time
-      lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
-      chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,
-      gelWheel: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
-      gelSpeed: 0.2 + Math.random() * 1.5,
-      lampWarmth: Math.random() < 0.3 ? Math.random() * 0.8 : 0,
-      exposure: Math.random() < 0.25 ? Math.random() * 0.8 : 0,
-      filmMix: settings.filmMix,
-      filmKey: settings.filmKey,
-      glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
-      postBlurRadius: Math.random() * 0.7,
-      // One roll in four goes closeup — a magnified chase is its own happy
-      // accident. The zoom decides now, so the roll lands on the zoom and the
-      // flag follows it rather than the two disagreeing.
-      ...(Math.random() < 0.25
-        ? { macroMode: true, macroZoom: 4 + Math.random() * 8 }
-        : { macroMode: false, macroZoom: 1 }),
-      macroChase: 0.35 + Math.random() * 0.65,
-      macroHold: 2.5 + Math.random() * 7,
-      macroCells: Math.random(),
-      macroCellScale: 0.25 + Math.random() * 0.7,
-      macroLacing: Math.random(),
-      macroDepth: 0.25 + Math.random() * 0.6,
-      macroEdgeDetail: 0.3 + Math.random() * 0.7,
-      macroRelief: 0.4 + Math.random() * 0.6,
-      simResolution: settings.simResolution,
-    });
+    setSettings(luckyLook(settings, liquidTypes.map(t => t.color)));
     setPinnedPresetId(null);
     // Randomize inject style for the evolve
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
@@ -1697,10 +1606,38 @@ export default function App() {
     if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
     // And so does a song's own show, when the Songs sheet is following songs.
     if (song && followSongs && showFor(songShowsRef.current, song)) return;
-    if (mode === 'random') { triggerLucky(); return; }
+    /*
+      A look change nobody asked for behaves differently from one somebody
+      pressed, in three ways that were all the same bug wearing three hats.
+
+      It used to reach for `applyPreset`, which **clears every layer and
+      reseeds** — right when you are building a look on clean glass, wrong
+      when a song ends in front of a room, because it takes the dye with it.
+      It now adopts: the new look's dyes, injection styles and liquids, with
+      the plate left where it is.
+
+      It used to snap all eighty settings at once. It fades now, at the same
+      fade the desk's Go uses.
+
+      And it used to carry the structure — so a song boundary could put an LED
+      wheel on the plate, or a second layer, or fold the picture into a
+      kaleidoscope. Those have no halfway, so fading cannot soften them; they
+      are held instead. See `STRUCTURE` in `lookFade.ts`. Structure holds,
+      character drifts.
+    */
+    const from = settingsRef.current;
+    if (mode === 'random') {
+      previousLook.current = { id: pinnedPresetId, settings: from };
+      setPinnedPresetId(null);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color))), fadeSeconds);
+      return;
+    }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
     const next = pool[Math.floor(Math.random() * pool.length)];
-    if (next) applyPreset(next.id, next.settings);
+    if (!next) return;
+    previousLook.current = { id: pinnedPresetId, settings: from };
+    adoptPreset(next.id);
+    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 

@@ -30,6 +30,7 @@
 
 import { qualityLadder, canvasPixelsFor } from '../src/lib/platform';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf } from '../src/lib/midi';
+import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
 
 const checks = [];
 const check = (what, ok, detail = '') => checks.push([what, ok, detail]);
@@ -168,6 +169,121 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     const mid = valueAt(0.5, spec.min, spec.max, spec.curve);
     check(`${key}: half the travel is ${mid.toFixed(4)}, not ${((spec.min + spec.max) / 2).toFixed(4)}`,
       mid < (spec.min + spec.max) / 2);
+  }
+}
+
+// ── What the governor spends, and in what order ──────────────────────
+//
+// The ladder above is what it can spend; this is the policy. It matters
+// because the three things it can give up are not alike: a rung costs
+// resolution and a post level costs an effect, both of them visible and both
+// of them lasting until the machine gets faster — while halving the step rate
+// costs nothing at all, because the liquid covers the same distance in the
+// same second taking steps twice as long.
+//
+// So the order is the whole point, and it is the kind of thing that is easy
+// to get backwards and never notice: a governor that drops a rung first still
+// produces a smooth plate, just a coarser one than the machine had to settle
+// for. None of this needs a GPU — it is a state machine fed frame intervals.
+{
+  const { rungs } = ladderAt('local', 'strong', 2);
+  /**
+   * Where a rung sits on the ladder. `g.rung` hands back the array element
+   * itself, so this is exact — and it is the only unambiguous way to say
+   * which direction a move went. Comparing grids alone calls 512²@2 → 512²@1
+   * "no move", and comparing either half alone cannot tell a climb from a
+   * drop. A lower index is a better rung.
+   */
+  const at = (r) => rungs.indexOf(r);
+  const seen = (r) => `${r.grid}²@${r.dpr.toFixed(2)}`;
+
+  /** Feed `seconds` of frames at a fixed interval; hand back every move it made. */
+  const feed = (g, frameMs, gpuMs, seconds, from) => {
+    const dt = frameMs / 1000;
+    const moves = [];
+    let now = from;
+    const until = from + seconds;
+    while (now < until) {
+      now += dt;
+      if (g.sample(dt, 1, now, false, gpuMs)) {
+        moves.push({ rung: g.rung, index: at(g.rung), stepRate: g.stepRate, post: g.postLevel });
+      }
+    }
+    return { moves, now };
+  };
+
+  check('every step rate divides a 60 Hz refresh evenly',
+    STEP_RATES.every((r) => 60 % r === 0), STEP_RATES.join(', ') +
+    ' — a rate that does not is uneven in a way the number hides: at 45 on a 60 Hz' +
+    ' screen three frames in four advance the liquid and the fourth does not');
+  check('and every step down the step ladder is a step down',
+    STEP_RATES.every((r, i) => i === 0 || r < STEP_RATES[i - 1]), STEP_RATES.join(' → '));
+  check('the floor is 30 — below about 20–25 a plate steps rather than flows',
+    Math.min(...STEP_RATES) >= 30, `floor ${Math.min(...STEP_RATES)}`);
+
+  {
+    // A machine holding 25 fps with the GPU busy: it cannot sustain sixty
+    // steps a second, so it is already dropping them, which is slow motion.
+    const g = new QualityGovernor(rungs, 0, 0);
+    const from = { index: at(g.rung), rate: g.stepRate };
+    const { moves } = feed(g, 40, 35, 12, 0);
+    check('a machine that cannot hold the rate gives up the rate first', moves.length > 0 &&
+      moves[0].stepRate < from.rate && moves[0].index === from.index,
+      moves.length === 0 ? 'it never moved at all'
+        : `first move: ${from.rate} → ${moves[0].stepRate} steps/s, still on ${seen(moves[0].rung)}`);
+    check('and only then starts giving up the picture',
+      moves.length > 1 && moves[1].index > moves[0].index && moves[1].stepRate === moves[0].stepRate,
+      moves.slice(0, 3).map((m) => `${seen(m.rung)} ${m.stepRate}/s`).join('  →  '));
+    check('the rate never goes below the floor, however long it struggles',
+      moves.every((m) => m.stepRate >= Math.min(...STEP_RATES)),
+      `lowest ${Math.min(...moves.map((m) => m.stepRate))}`);
+  }
+
+  {
+    // The same machine, freed: whatever is visible comes back before the
+    // thing nobody can see. Going back to sixty spends the headroom and buys
+    // no picture, so it waits until the rungs have been bought back.
+    const g = new QualityGovernor(rungs, 0, 0);
+    const down = feed(g, 40, 35, 12, 0);
+    check('it did in fact both slow down and shrink before being let go',
+      g.stepRate < STEP_RATES[0] && at(g.rung) > 0, `${seen(g.rung)} at ${g.stepRate} steps/s`);
+
+    /*
+      Five seconds of fast frames before anything is recorded.
+
+      The slow verdict outlives the feed that produced it: `slowSince` was set
+      a second and a half before the fast frames started, and the average is
+      still up, so the very first fast sample can fire one more *downward*
+      move. Reading that as the first climb is how this check passed while
+      asserting nothing — a drop changes the rung and leaves the rate alone
+      too. A climb needs eight seconds of fast frames, so nothing in this
+      window can be one.
+    */
+    const quiet = feed(g, 16.0, 3, 5, down.now);
+    const sank = at(g.rung);
+    const slowed = g.stepRate;
+    check('and the settling window holds no climb to mistake for one',
+      quiet.moves.every((m) => m.index >= sank), `${quiet.moves.length} move(s), all downward or none`);
+
+    const up = feed(g, 16.0, 3, 200, quiet.now);
+    const first = up.moves[0];
+    check('coming back, the picture is restored before the step rate',
+      first !== undefined && first.index < sank && first.stepRate === slowed,
+      first === undefined ? 'it never climbed'
+        : `first climb: ${seen(rungs[sank])} → ${seen(first.rung)}, still at ${first.stepRate} steps/s`);
+    check('but the step rate does come back, given long enough',
+      g.stepRate === STEP_RATES[0], `ended at ${g.stepRate} steps/s on ${seen(g.rung)}`);
+  }
+
+  {
+    // `?rung=` holds the whole rung for measuring. It has to hold the rate
+    // too, or a measurement of a rung is a measurement of something else.
+    const g = new QualityGovernor(rungs, 1, 0, true);
+    const before = { at: seen(g.rung), rate: g.stepRate };
+    feed(g, 60, 55, 30, 0);
+    check('a pinned governor holds the step rate as well as the rung',
+      seen(g.rung) === before.at && g.stepRate === before.rate,
+      `${before.at} at ${before.rate}/s → ${seen(g.rung)} at ${g.stepRate}/s`);
   }
 }
 

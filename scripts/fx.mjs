@@ -62,38 +62,63 @@ const check = (name, ok, detail = '') => {
     return now;
   };
 
-  // Nothing heavy on: slowness costs a rung, as it always did.
-  let g = new QualityGovernor(rungs, 0, 0);
-  let t = feed(g, 0, 3, 16.7, false);
-  t = feed(g, t, 4, 30, false);
-  check('governor: with no heavy effect, a slow machine loses a rung', g.rung.grid === 384 && g.postLevel === 0, `grid ${g.rung.grid}, post ${g.postLevel}`);
+  /*
+    What a slow machine gives up, and in what order (H2b).
 
-  // A heavy effect on: the effects give first, twice, and only then the solver.
-  g = new QualityGovernor(rungs, 0, 0);
-  t = feed(g, 0, 3, 16.7, true);
-  t = feed(g, t, 4, 30, true);
-  const first = { grid: g.rung.grid, post: g.postLevel };
-  t = feed(g, t, 4, 30, true);
-  const second = { grid: g.rung.grid, post: g.postLevel };
-  t = feed(g, t, 4, 30, true);
-  const third = { grid: g.rung.grid, post: g.postLevel };
+    Three things can be spent and they are not alike. A rung costs
+    resolution and a post level costs an effect — both visible, both lasting
+    until the machine gets faster. Halving the step rate costs nothing: the
+    liquid covers the same distance in the same second, in steps twice as
+    long. So the free one goes first and comes back last, and the order is
+    the whole of the policy.
+
+    Each block below is four seconds, which is one move: a second and a half
+    for the verdict to hold, then two and a half settling.
+  */
+  const spend = (heavy, blocks) => {
+    const g = new QualityGovernor(rungs, 0, 0);
+    let t = feed(g, 0, 3, 16.7, heavy);
+    const seen = [];
+    for (let i = 0; i < blocks; i++) {
+      t = feed(g, t, 4, 30, heavy);
+      seen.push(`${g.rung.grid}/${g.postLevel}/${g.stepRate}`);
+    }
+    return { g, t, seen };
+  };
+
+  // Nothing heavy on: the rate, and only then the solver's rung.
+  {
+    const { seen } = spend(false, 2);
+    check('governor: a slow machine gives up the step rate before a rung',
+      seen.join(' → ') === '512/0/30 → 384/0/30', `grid/post/rate: ${seen.join(' → ')}`);
+  }
+
+  // A heavy effect on: the rate, then the effects twice, and only then the
+  // solver. The effects still come before any rung — they are fill-bound and
+  // a smaller grid does nothing for them — but the free thing is tried first.
+  const heavy = spend(true, 4);
   check('governor: a heavy effect spends the post level before any rung',
-    first.grid === 512 && first.post === 1 && second.grid === 512 && second.post === 2 && third.grid === 384 && third.post === 2,
-    `after 1: ${first.grid}/${first.post}, 2: ${second.grid}/${second.post}, 3: ${third.grid}/${third.post}`);
+    heavy.seen.join(' → ') === '512/0/30 → 512/1/30 → 512/2/30 → 384/2/30',
+    `grid/post/rate: ${heavy.seen.join(' → ')}`);
 
-  // Fast again: the solver's rung comes back first, then the effects, each
-  // after the governor's own wait on a level that failed (90 s).
+  // Fast again: the rung comes back, then the effects, and the step rate
+  // last of all — going back to sixty spends the headroom and buys no
+  // picture, so it waits until everything visible has been bought back.
+  // Each after the governor's own wait on a level that failed (90 s).
+  let g = heavy.g;
+  let t = heavy.t;
   const moves = [];
-  let last = `${g.rung.grid}/${g.postLevel}`;
-  for (let i = 0; i < 300 * 60; i++) {
+  let last = `${g.rung.grid}/${g.postLevel}/${g.stepRate}`;
+  for (let i = 0; i < 400 * 60; i++) {
     g.heavyPost = true;
     g.sample(16.7 / 1000, 3, t);
     t += 16.7 / 1000;
-    const now = `${g.rung.grid}/${g.postLevel}`;
+    const now = `${g.rung.grid}/${g.postLevel}/${g.stepRate}`;
     if (now !== last) { moves.push(now); last = now; }
   }
-  check('governor: fast frames give back the rung, then the effects', moves.join(' → ') === '512/2 → 512/1 → 512/0',
-    `from 384/2: ${moves.join(' → ') || 'no move in 5 minutes'}`);
+  check('governor: fast frames give back the rung, then the effects, then the rate',
+    moves.join(' → ') === '512/2/30 → 512/1/30 → 512/0/30 → 512/0/60',
+    `from 384/2/30: ${moves.join(' → ') || 'no move in nearly seven minutes'}`);
 
   // The effect switched off: nothing to spend, so the level reads full.
   g.heavyPost = false;

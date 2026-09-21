@@ -111,6 +111,50 @@ export function targetLook(current: VisualizerSettings, look: Partial<Visualizer
   return { ...current, ...lookOf(look) } as VisualizerSettings;
 }
 
+/**
+ * What an *unattended* look change leaves alone.
+ *
+ * A look change nobody asked for is a different thing from one somebody
+ * pressed. Pressing Go is a decision — you meant that look, all of it. A new
+ * song arriving is not: the plate in front of the room is the one you set up,
+ * and it should still be that plate afterwards.
+ *
+ * These are the settings with no halfway. A number can drift and nobody
+ * notices the moment it moved; a second layer cannot arrive gradually, and
+ * `blendLooks` has to switch them at a single point in the fade — so an
+ * unattended change that carried them would put an LED wheel on the plate
+ * mid-song, or take one off, or fold the whole picture into a kaleidoscope.
+ * That is what "it makes giant jarring changes" means, and it is not fixed by
+ * fading, because there is nothing between `false` and `true` to fade through.
+ *
+ * So structure is held and character drifts. Speed, turbulence, dye budget,
+ * saturation, the lamps, the camera, the palette — all of those travel, and a
+ * look does genuinely become another look over the fade. What it does not do
+ * is change shape.
+ *
+ * Pressing Go, arming a look, opening one, the sequencer and the randomiser
+ * all still take the whole thing. This is only for the automatic path.
+ */
+export const STRUCTURE: ReadonlySet<keyof VisualizerSettings> = new Set<keyof VisualizerSettings>([
+  'ledPlatform', 'ledMode',
+  'layerCount',
+  'blendMode',
+  'macroMode',
+  'renderStyle',
+  'viscosity',
+  'kaleidoscope',
+]);
+
+/**
+ * Where an unattended look change is aiming: the look, with this plate's own
+ * structure kept over the top of it.
+ */
+export function evolvedLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {
+  const held: Partial<VisualizerSettings> = {};
+  for (const key of STRUCTURE) Object.assign(held, { [key]: current[key] });
+  return { ...targetLook(current, look), ...held };
+}
+
 /** Ease in and out: a fade that starts and stops gently reads as a hand, not a switch. */
 export const ease = (t: number): number => {
   const x = t < 0 ? 0 : t > 1 ? 1 : t;

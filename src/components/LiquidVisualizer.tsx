@@ -263,22 +263,18 @@ const SIM_STEP = 1 / 60;
  * larger displacement per step, which semi-Lagrangian advection survives but
  * does not render faithfully.
  *
- * So this is the diagnostic that measures where that line is, before
- * anything is done automatically. Read from the query string and nothing
- * else; `SIM_STEP` stays the rate the show runs at.
+ * The governor owns that choice now (`QualityGovernor.stepRate`): it lowers
+ * the rate before it gives up a rung or an effect, because this is the only
+ * thing it can spend that costs nothing to look at. `?steps=` overrides it,
+ * which is how the line above was found in the first place and how it can be
+ * found again on a machine that is not this one. `SIM_STEP` stays the rate
+ * the show was written against, and the stretch is measured from it.
  */
-const SIM_STEP_RATE = (() => {
-  if (typeof window === 'undefined') return 60;
+const PINNED_STEP_RATE = (() => {
+  if (typeof window === 'undefined') return null;
   const n = Number(new URLSearchParams(window.location.search).get('steps'));
-  return Number.isFinite(n) && n >= 5 && n <= 240 ? n : 60;
+  return Number.isFinite(n) && n >= 5 && n <= 240 ? n : null;
 })();
-/** Seconds of wall-clock one solver step stands for. */
-const SIM_STEP_S = 1 / SIM_STEP_RATE;
-/**
- * How much bigger each step's `dt` must be so the liquid travels the same
- * distance per second at the lower rate. One when nothing is asked for.
- */
-const SIM_STEP_STRETCH = SIM_STEP_S / SIM_STEP;
 // `?warp=N` (diagnostic) lifts the catch-up cap so a slow renderer can still
 // take many solver steps per frame: the sim never runs ahead of wall-clock,
 // it just stops falling behind. Used to capture developed frames on machines
@@ -1609,11 +1605,15 @@ class FluidSimulation {
       The timestep, stretched to whatever rate the loop is stepping at (H2b).
 
       How far the liquid travels in a second is `steps per second × dt`. The
-      loop holds the first at sixty and this scales the second, so halving the
-      rate and doubling `dt` is the same motion for half the work. The stretch
-      is one unless `?steps=` asks otherwise, so this is exactly what it was.
+      loop sets the first and this scales the second, so halving the rate and
+      doubling `dt` is the same motion for half the work.
+
+      `dtSeconds` is what the frame told this plate one step stands for, so
+      the stretch is measured rather than assumed: it is one while the loop
+      runs at sixty, and follows the governor down without this needing to
+      know the governor exists.
     */
-    this.dt = Math.min(Math.max(dynamicSpeed * 0.2 * SIM_STEP_STRETCH, 0.0000001), 0.05);
+    this.dt = Math.min(Math.max(dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP), 0.0000001), 0.05);
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
@@ -3290,6 +3290,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let frameS = 0;
       /** How many solver steps this frame took, for the governor's GPU budget. */
       let stepsThisFrame = 0;
+      /*
+        How many steps a second this frame is aiming for, and what one of them
+        stands for in wall-clock seconds (H2b). Read once, here, so everything
+        downstream that counts steps where it means seconds — the accumulator,
+        the beads, the bubbles, the rocks, the room and film stirs, the liquid
+        chemistry — agrees with the solver about how long a step is.
+      */
+      const stepRate = PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
+      const simStepS = 1 / stepRate;
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
@@ -3365,7 +3374,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
           );
           for (const f of fluidsRef.current) if (f) {
-            f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP_S;
+            f.phrase = phraseRef.current; f.dtSeconds = simStepS;
             f.dropHeight = currentSettings.dropHeight ?? 0;
             f.dropFingering = currentSettings.fingering ?? 0;
           }
@@ -3392,10 +3401,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP_S * catchUp);
-        const simSteps = Math.floor(simAccumRef.current / SIM_STEP_S);
-        simAccumRef.current -= simSteps * SIM_STEP_S;
+        simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
+        const simSteps = Math.floor(simAccumRef.current / simStepS);
+        simAccumRef.current -= simSteps * simStepS;
         stepsThisFrame = simSteps;
+        /*
+          The same elapsed time, counted in sixtieths of a second (H2b).
+
+          A handful of things downstream were written when a step was always
+          1/60 s and so count steps where they mean time: the drain's
+          progress, and the chemistry's growth rate and deposit. Left alone
+          they change pace the moment the governor lowers the rate — the
+          drain finishing a third faster, the reaction growing two thirds as
+          quickly — which is a look changing because a machine got busy.
+
+          This is `simSteps` exactly while the loop runs at sixty, so at the
+          default nothing downstream sees any difference at all.
+        */
+        const sixtieths = simSteps * simStepS * 60;
 
         // How many steps a second that is actually producing.
         //
@@ -3476,7 +3499,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
 
-          drainFrameRef.current += Math.max(1, simSteps);
+          // Sixtieths, not steps: `DRAIN_FRAMES` is five sixths of a second and
+          // has to stay five sixths of a second at any rate. The floor this
+          // used to carry made a frame that took no step advance the drain
+          // anyway, which at thirty steps on a 60 Hz screen finished it a
+          // third early.
+          drainFrameRef.current += sixtieths;
           if (drainFrameRef.current > DRAIN_FRAMES) {
             for (const af of fluidsRef.current) af.clearAll();
             drainFrameRef.current = 0;
@@ -3528,7 +3556,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             simMs: simMsRef.current,
             layers: fluidsRef.current.length,
             stepsPerSec: stepsPerSecRef.current,
-            stepRate: SIM_STEP_RATE,
+            stepRate,
             // The solver's share of a frame is one step's cost times the steps
             // that frame owed; what is left is everything that is not the
             // solver, and does not fall when the grid does.
@@ -3557,10 +3585,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
             }
             // The dividing regime grows at a pace a show can watch; coral is slower than a set.
-            chem.step(Math.max(1, Math.min(10, Math.round(simSteps * 2.5))), 0.042, 0.062);
+            chem.step(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), 0.042, 0.062);
             const v = chem.activator;
             const c = harmonyCycle(harmonyRef.current, time * 0.08);
-            const amount = chemAmt * 0.02 * Math.max(1, simSteps);
+            // No floor here, unlike the iteration count above: a frame that
+            // took no step has no time in it to deposit over, and floored it
+            // would lay down half as much again at thirty steps a second.
+            const amount = chemAmt * 0.02 * sixtieths;
             for (let y = 1; y < GRID_SIZE - 1; y++) {
               for (let x = 1; x < GRID_SIZE - 1; x++) {
                 const a = v[x + y * GRID_SIZE];
@@ -3659,8 +3690,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // separate baselines and the per-cell cap is per stir, so two
               // sources can add more than one — which is the point of turning
               // the second one up.
-              if (roomReading) roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP_S);
-              if (filmReading) filmStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, filmReading, filmDrive, SIM_STEP_S);
+              if (roomReading) roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, simStepS);
+              if (filmReading) filmStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, filmReading, filmDrive, simStepS);
               lead.markDirty();
             }
           }
@@ -4188,8 +4219,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const w = 2 * Math.PI * 0.9, z = 0.22;
             const ax = -w * w * rock.x - 2 * z * w * rock.vx;
             const ay = -w * w * rock.y - 2 * z * w * rock.vy;
-            rock.vx += ax * SIM_STEP_S; rock.vy += ay * SIM_STEP_S;
-            rock.x += rock.vx * SIM_STEP_S; rock.y += rock.vy * SIM_STEP_S;
+            rock.vx += ax * simStepS; rock.vy += ay * simStepS;
+            rock.x += rock.vx * simStepS; rock.y += rock.vy * simStepS;
             const swayX = noise2D(time * 0.11, 3.7) * 0.35 * R;
             const swayY = noise2D(7.1, time * 0.09) * 0.35 * R;
             // A phone held by the projectionist: its tilt is the plate's, fading
@@ -4225,7 +4256,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const lead0 = fluidsRef.current[0];
                   const bvx = lead0?.readVx, bvy = lead0?.readVy;
                   const bk = particleFlowScale(lead0, currentSettings);
-                  beads.step(SIM_STEP_S, (bx, by) => {
+                  beads.step(simStepS, (bx, by) => {
                     if (!bvx || !bvy) return [0, 0];
                     /*
                       The clamp has to reject NaN, which the obvious one does
@@ -4283,7 +4314,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
-              bubbles.step(SIM_STEP_S, (bx, by) => {
+              bubbles.step(simStepS, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
@@ -4323,7 +4354,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // the dye rides (see readVx), the wall-clock rate carried the soap
             // across the plate ahead of the dye it is meant to be thinning.
             const adv = currentSettings.advection ?? 0.45;
-            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP_S, fluid.dt * adv * (GRID_SIZE - 2));
+            for (const fluid of fluidsRef.current) fluid.stepLiquid(simStepS, fluid.dt * adv * (GRID_SIZE - 2));
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
@@ -4648,8 +4679,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         solver: () => ({
           simMs: simMsRef.current,
           stepsPerSec: stepsPerSecRef.current,
-          /** What it is asking for — sixty unless `?steps=` says otherwise. */
-          stepRate: SIM_STEP_RATE,
+          /** What it is asking for: the governor's rate, or `?steps=` over the top of it. */
+          stepRate: PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60,
           catchUp: catchUpRef.current,
           layers: fluidsRef.current.length,
         }),

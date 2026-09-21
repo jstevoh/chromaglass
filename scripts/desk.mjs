@@ -28,7 +28,7 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
-import { blendLooks, targetLook, ease, LOOK_BASE, RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
+import { blendLooks, targetLook, evolvedLook, STRUCTURE, ease, LOOK_BASE, RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -233,6 +233,75 @@ function drive({ from, to, seconds, clearing }) {
   const end = blendLooks(from, to, 1);
   const wrong = Object.keys(to).filter(k => k !== 'simResolution' && JSON.stringify(end[k]) !== JSON.stringify(to[k]));
   check('and the look it lands on is the one that was cued', wrong.length === 0, wrong.slice(0, 6).join(', '));
+}
+
+// ── A look change nobody asked for ──────────────────────────────────
+//
+// A new song changing the look is not the same act as somebody pressing Go.
+// Go is a decision — you meant that look, all of it. A song ending is not:
+// the plate in front of the room is the one you set up, and it should still
+// be that plate afterwards.
+//
+// The settings with no halfway are what make the difference. A number can
+// drift and nobody sees the moment it moved; a second layer cannot arrive
+// gradually, so `blendLooks` switches it at a single point in the fade. An
+// unattended change that carried those put an LED wheel on the plate
+// mid-song, or took one off, or folded the picture into a kaleidoscope —
+// and fading cannot soften any of it, because there is nothing between
+// `false` and `true` to fade through.
+{
+  const keys = [...STRUCTURE];
+  check('the structure a song change holds is made of real settings',
+    keys.every(k => k in DEFAULT_SETTINGS), keys.filter(k => !(k in DEFAULT_SETTINGS)).join(', ') || keys.join(', '));
+  check('and none of it belongs to the room instead',
+    keys.every(k => !RIG_KEYS.has(k)), keys.filter(k => RIG_KEYS.has(k)).join(', ') || 'structure and rig are different things');
+
+  /*
+    Every look against every other, which is 992 pairs and costs nothing —
+    and it has to be every pair, because the question is whether *any* two
+    looks differ in a structural setting, and most pairs do not.
+  */
+  let held = 0, drifted = 0;
+  const broke = [];
+  const flat = [];
+  for (const a of PRESETS) {
+    const from = targetLook(DEFAULT_SETTINGS, a.settings);
+    for (const b of PRESETS) {
+      if (a.id === b.id) continue;
+      const to = evolvedLook(from, b.settings);
+      // 1. The structure is this plate's, at both ends and everywhere between.
+      for (const k of keys) {
+        if (JSON.stringify(to[k]) !== JSON.stringify(from[k])) { broke.push(`${a.id}→${b.id}: ${k}`); continue; }
+        held++;
+        for (const t of [0.25, 0.49, 0.5, 0.51, 0.75]) {
+          const mid = blendLooks(from, to, t);
+          if (JSON.stringify(mid[k]) !== JSON.stringify(from[k])) broke.push(`${a.id}→${b.id}: ${k} at t=${t}`);
+        }
+      }
+      // 2. But the look still travels: the character has to arrive.
+      if (typeof b.settings.globalSpeed === 'number' && b.settings.globalSpeed !== from.globalSpeed) {
+        if (to.globalSpeed === b.settings.globalSpeed) drifted++; else flat.push(`${a.id}→${b.id}`);
+      }
+    }
+  }
+  check('a song change never moves one, at either end or halfway through the fade',
+    broke.length === 0, broke.length ? `${broke.length} moved, e.g. ${broke.slice(0, 4).join('; ')}`
+      : `${held} held across ${PRESETS.length * (PRESETS.length - 1)} pairs, checked at five points in the fade`);
+  check('but the look it becomes is still the look it was going to be',
+    flat.length === 0 && drifted > 0, flat.length ? `${flat.length} never arrived` : `${drifted} pairs arrive on the new speed`);
+
+  // 3. And the difference is real: pressing Go still takes the whole thing,
+  //    or this check is measuring a distinction that does not exist.
+  const wheel = PRESETS.find(p => p.settings.ledPlatform === true);
+  const bare = PRESETS.find(p => p.settings.ledPlatform === false);
+  if (wheel && bare) {
+    const from = targetLook(DEFAULT_SETTINGS, bare.settings);
+    check('pressing Go still takes the structure with it',
+      targetLook(from, wheel.settings).ledPlatform === true && evolvedLook(from, wheel.settings).ledPlatform === false,
+      `${bare.id} → ${wheel.id}: Go brings the wheel, a song change does not`);
+  } else {
+    check('pressing Go still takes the structure with it', false, 'no preset pair to compare');
+  }
 }
 
 console.log('');
