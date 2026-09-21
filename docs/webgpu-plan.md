@@ -327,6 +327,55 @@ would is splitting the kernel, or shrinking its worst path.
 would have got it wrong: the single-branch numbers look like six cheap
 branches, and only the all-off number shows 0.44 ms sitting somewhere.
 
+## H2 — the pressure solve, halved and not halved
+
+Twenty-four Jacobi passes became twelve red-black Gauss-Seidel sweeps. The
+pressure left its texture for a storage buffer to allow it: Gauss-Seidel
+updates in place, a shader cannot write a texture it is reading, and
+read-write storage textures need a language extension that is not broadly
+available. Red-black is what makes the in-place update safe — colour the grid
+like a chessboard and no two cells of a colour are neighbours.
+
+**The quality is the same, and that is measured rather than assumed.**
+`chromaglassDebug().webgpu.pressureSelfTest()` runs both solvers on one
+divergence field and compares the residual each leaves, which is what the
+projection is actually for: 24 Jacobi 6.8866e-2, 12 red-black 6.8953e-2 —
+**0.13% more residual for half the arithmetic**. `npm run webgpu` gates it.
+
+**The test was wrong before it was right**, in a way worth keeping. Its first
+divergence field was a Gaussian blob, all positive, and every solver at every
+iteration count reported exactly 4.5239e-2 — which is the mean of the blob. A
+Poisson problem with Neumann walls everywhere has no solution unless its
+source integrates to zero, because the discrete Laplacian sums to zero over
+the domain; whatever the source sums to is a residual no iteration can
+remove. A real divergence field is zero-mean for the same reason in reverse.
+Both solvers had been working the whole time; the problem was not a problem.
+
+**Half the arithmetic bought 18% of the stage, not 50%.** At 768², two layers:
+
+| | before | after |
+|---|---|---|
+| project 1 | 1.332 ms | 1.120 |
+| project 2 | 1.351 ms | 1.146 |
+| a step | 9.14 ms | 8.64 |
+| a frame | 38.6 ms | 35.9 |
+| steps a second | 45.3 | 46.9 |
+
+Running it at four sweeps as well gives the slope: a projection's fixed cost —
+the divergence, the clear, the gradient — is 164 µs, and each red-black sweep
+is **79.6 µs** against a Jacobi pass's **48.6 µs**. A sweep is two
+half-sized dispatches doing exactly the same number of cell updates as one
+Jacobi pass, and it costs **1.64×**.
+
+**Which says the pressure kernel is bound by its memory pattern, not its
+arithmetic.** Consecutive threads in a checkerboard sweep touch cells two
+apart, so a half-dispatch reads about the same cache lines a full one would
+and halving the threads halves almost nothing. The remedy is the standard
+one and it is the next thing here: pack the two colours into contiguous
+halves of the buffer so each sweep is dense. If a sweep then costs what a
+Jacobi pass costs, the projection falls by half as the arithmetic always said
+it should — worth about another 6% of a frame.
+
 **And the plate is in slow motion at the top rung.** 45.3 steps a second
 against the 60 the show asks for, inside a 38.6 ms frame. A frame rate cannot
 show you that: the liquid is simply evolving at three quarters of wall-clock

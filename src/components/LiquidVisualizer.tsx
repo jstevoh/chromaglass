@@ -13,7 +13,7 @@ import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
-import { kitSelfTest } from '../gpu/selftest';
+import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
 import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { FlashGuard } from '../lib/flashGuard';
@@ -211,7 +211,13 @@ const resolveSimResolution = (setting: SimResolution | undefined, governor: Qual
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
   // A pin is held to what this GPU can actually allocate, so an old saved
   // look or a hand-typed query cannot ask for a texture the device refuses.
-  return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
+  //
+  // And to an even number: the pressure solve colours the grid like a
+  // chessboard and sweeps each colour in a half-sized dispatch (H2), which
+  // only divides evenly if the edge does. Every rung on every ladder is even
+  // already; this is for `?sim=513` and for a saved look that carries one.
+  const held = Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
+  return held - (held % 2);
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
@@ -4986,6 +4992,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           grabFrame: () => stage?.grabFrame() ?? null,
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
+          /**
+           * Twelve red-black sweeps against twenty-four Jacobi passes on one
+           * divergence field, by the residual each leaves (H2). The claim
+           * that halving the projection costs nothing is a textbook one
+           * about someone else's problem until this is run on this GPU.
+           */
+          pressureSelfTest: () => (stage ? pressureSelfTest(stage.device) : null),
           /**
            * Take the device away, as a driver would. The recovery is the
            * app's own: a new device, a rebuilt stage, the look laid again.

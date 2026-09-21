@@ -45,7 +45,17 @@ export interface FieldStats {
   at: number;
 }
 
-const PRESSURE_ITERS = 24;
+/**
+ * Red-black Gauss-Seidel sweeps in the projection (H2).
+ *
+ * Twelve where there were twenty-four Jacobi passes, because Gauss-Seidel
+ * converges about twice as fast per unit of arithmetic and a sweep is two
+ * half-grid dispatches — the same work as one Jacobi pass. The residual
+ * after twelve sweeps is measured against the residual after twenty-four
+ * Jacobi passes by `chromaglassDebug().webgpu.pressureSelfTest()`, which is
+ * the only honest way to claim the two are equivalent.
+ */
+const PRESSURE_SWEEPS = 12;
 const CURRENT_ITERS = 10;
 const SQUEEZE_ITERS = 10;
 const VISC_ITERS = 4;
@@ -74,7 +84,16 @@ export class WebGPUFluid {
   private readonly dye: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
-  private readonly press: PingPong;
+  /**
+   * The pressure, in a storage buffer rather than a texture (H2).
+   *
+   * Red-black Gauss-Seidel updates a cell in place, and a shader cannot
+   * write a texture it is also reading — read-write storage textures need a
+   * language extension that is not broadly available. A storage buffer can,
+   * everywhere, and the pressure is a single scalar per cell, so nothing is
+   * lost by keeping it as one.
+   */
+  private readonly press: GPUBuffer;
   private readonly spress: PingPong;
   private readonly cur: PingPong;
   private readonly curP: PingPong;
@@ -163,7 +182,11 @@ export class WebGPUFluid {
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.vel = pp(this.N, VEL, 'vel');
     this.squeeze = pp(this.N, RG32, 'squeeze');
-    this.press = pp(this.N, R32, 'pressure');
+    this.press = this.disposer.track(device.createBuffer({
+      label: 'pressure',
+      size: this.N * this.N * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    }));
     this.spress = pp(this.N, R32, 'squeeze pressure');
     this.cur = pp(this.M, VEL, 'current');
     this.curP = pp(this.M, R32, 'current pressure');
@@ -269,7 +292,8 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    for (const t of [this.press.a, this.press.b, this.spress.a, this.spress.b, this.div]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    for (const t of [this.spress.a, this.spress.b, this.div]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.clearPressure(pass);
     for (const t of [this.squeeze.a, this.squeeze.b]) this.fill(pass, t, [0.03, 0, 0, 0], this.N);
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
@@ -624,15 +648,66 @@ export class WebGPUFluid {
     }
   }
 
+  /** Zero the pressure between projections, as the Jacobi's `fill` did. */
+  private clearPressure(pass: GPUComputePassEncoder): void {
+    const pipe = this.pipelines.computePipeline('pressureClear', kernel('pressureClear', 'r32float'));
+    const key = 'pressureClear';
+    let group = this.groups.get(key);
+    if (!group) {
+      // The Sim, then the Args, then the buffer: every kernel here takes
+      // bindings 0 and 1 from HEAD whether it reads them or not, and a group
+      // that skips the Args puts the pressure on a uniform slot.
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), this.press]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(Math.ceil((this.N * this.N) / 64));
+  }
+
+  /**
+   * Make the velocity divergence-free: find the pressure whose gradient
+   * cancels the divergence, and subtract it.
+   *
+   * `PRESSURE_SWEEPS` red-black Gauss-Seidel sweeps where this was
+   * `PRESSURE_ITERS` Jacobi passes. Each sweep is two dispatches over half
+   * the grid — the same arithmetic as one Jacobi pass — and converges about
+   * twice as fast, because the second half of a sweep reads a first half
+   * that has already moved. See the kernel in `wgsl/fluid.ts` for why the
+   * pressure had to leave its texture to allow it.
+   */
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
     this.run(pass, 'divergence', this.div, [this.vel.read], none);
-    this.fill(pass, this.press.read, [0, 0, 0, 0], this.N);
-    for (let k = 0; k < PRESSURE_ITERS; k++) {
-      this.run(pass, 'pressureJacobi', this.press.write, [this.press.read, this.div], none);
-      this.press.swap();
+    this.clearPressure(pass);
+
+    const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
+    const half = Math.ceil((this.N * (this.N / 2)) / 64);
+    for (let k = 0; k < PRESSURE_SWEEPS; k++) {
+      for (const parity of [0, 1]) {
+        const args = this.arg(`pressure ${parity}`, [parity, 0, 0, 0]);
+        const key = `pressureRedBlack:${parity}`;
+        let group = this.groups.get(key);
+        if (!group) {
+          group = bindGroup(this.device, pipe, [this.sim, args, this.div, this.press]);
+          this.groups.set(key, group);
+        }
+        pass.setPipeline(pipe);
+        pass.setBindGroup(0, group);
+        pass.dispatchWorkgroups(half);
+      }
     }
-    this.run(pass, 'gradientSubtract', this.vel.write, [this.vel.read, this.press.read], none);
+
+    const grad = this.pipelines.computePipeline('gradientSubtractBuf', kernel('gradientSubtractBuf', 'rgba16float'));
+    const gkey = `gradientSubtractBuf:${this.vel.write.label}`;
+    let ggroup = this.groups.get(gkey);
+    if (!ggroup) {
+      ggroup = bindGroup(this.device, grad, [this.sim, none, this.vel.read, this.vel.write, this.press]);
+      this.groups.set(gkey, ggroup);
+    }
+    pass.setPipeline(grad);
+    pass.setBindGroup(0, ggroup);
+    pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
     this.vel.swap();
   }
 
