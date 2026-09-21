@@ -29,7 +29,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
       surfaceTension: 0.14,      // blobs hold shape, merge slowly
-      diffusionRate: 0.00012,    // colors bleed softly at boundaries
+      diffusionRate: 0,          // measured: the bleed cost more edge than it bought
       buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
       advection: 0.35,           // smooth transport, no turbulence
       damping: 0.988,            // very slow energy loss — movements persist gracefully
@@ -166,7 +166,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'cyberpunk',
       ledSpeed: 0.3,
       surfaceTension: 0.01,
-      diffusionRate: 0.0005,
+      diffusionRate: 0.0002,
       buoyancy: 0.8,
       advection: 0.6,
       damping: 0.95,
@@ -314,7 +314,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.4,
       ledPlatform: false,
       surfaceTension: 0.08,
-      diffusionRate: 0.0005,
+      diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.5,
       damping: 0.94,
@@ -395,7 +395,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'fire',
       ledSpeed: 0.3,
       surfaceTension: 0.1,
-      diffusionRate: 0.001,
+      diffusionRate: 0.0002,
       buoyancy: 1.0,
       advection: 0.8,
       damping: 0.9,
@@ -482,7 +482,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'ocean',
       ledSpeed: 0.03,
       surfaceTension: 0.12,
-      diffusionRate: 0.0003,
+      diffusionRate: 0.0002,
       buoyancy: 0.65,
       advection: 0.35,
       damping: 0.985,
@@ -529,7 +529,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'fire',
       ledSpeed: 0.15,
       surfaceTension: 0.03,
-      diffusionRate: 0.0008,
+      diffusionRate: 0.0002,
       buoyancy: 0.85,
       advection: 0.7,
       damping: 0.93,
@@ -611,7 +611,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'rainbow',
       ledSpeed: 0.25,
       surfaceTension: 0.08,
-      diffusionRate: 0.0004,
+      diffusionRate: 0.0002,
       buoyancy: 0.5,
       advection: 0.55,
       damping: 0.96,
@@ -738,7 +738,7 @@ export const PRESETS: Preset[] = [
       ledMode: 'rainbow',
       ledSpeed: 0.35,
       surfaceTension: 0.01,
-      diffusionRate: 0.0003,     // a spark stays a spark
+      diffusionRate: 0.0002,     // a spark stays a spark
       buoyancy: 0.7,
       advection: 0.9,
       damping: 0.92,
@@ -787,7 +787,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#05030c',
       ledSpeed: 0.0,
       surfaceTension: 0.1,
-      diffusionRate: 0.0004,
+      diffusionRate: 0.0002,
       buoyancy: 0.2,
       advection: 0.3,
       damping: 0.99,
@@ -835,7 +835,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#f3ecdc',
       ledSpeed: 0.0,
       surfaceTension: 0.15,
-      diffusionRate: 0.0004,
+      diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.4,
       damping: 0.985,
@@ -1373,7 +1373,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#000000',
       ledSpeed: 0.0,
       surfaceTension: 0.2,
-      diffusionRate: 0.00006,
+      diffusionRate: 0,          // measured: sharper without it, and a pass cheaper
       buoyancy: 0.3,
       advection: 0.55,
       damping: 0.975,

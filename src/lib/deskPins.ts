@@ -159,7 +159,26 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
   { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
-  { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: 0.001, section: 'physics' },
+  /*
+    The ceiling is the control's own maximum, which is the only place a
+    ceiling can honestly live.
+
+    Dye diffusion costs 1.34 ms of a step and takes structure *out* of the
+    plate — switched off on one running plate at 768², hard edges went from
+    11.1% and 12.5% of pixels to 13.1% and 14.6%, the typical local gradient
+    from 1.3 and 1.4 to 1.6 and 1.9, and the frame from 36.8 ms to 32.9
+    (docs/webgpu-plan.md). It is not worth what it cost above about this, and
+    the nine presets that were above it have come down.
+
+    Lowered to 0.0002 from 0.001, measured at the top of the old range:
+    Boiling Point, the heaviest diffuser there was, is still recognisably
+    itself at the ceiling and carries *more* of the filament structure a
+    boiling plate should have. What is kept is that some looks do lean on a
+    little diffusion, so this is a ceiling rather than a switch — and the
+    saving only arrives at exactly zero, where the solver skips the stage, so
+    a look that wants none should say none.
+  */
+  { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: 0.0002, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },
   { key: 'damping', label: "Momentum", min: 0.8, max: 1, section: 'physics' },

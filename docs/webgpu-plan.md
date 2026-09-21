@@ -290,6 +290,34 @@ Classic, two layers, 768², dpr 1, on this M4:
 | decay | 0.282 | 3.0% | 2 |
 | grain | 0.234 | 2.5% | 1–2 |
 
+**Where that table stands now (2026-09-21).** It is left above as the H0
+baseline, because every decision below was taken against it and a table that
+is quietly rewritten stops being evidence. Three changes have landed since —
+the projections moved to red-black and then to packed colour planes, and
+Classic's dye diffusion went to zero, which skips that stage outright — and
+this is the same measurement afterwards, same plate, same rung:
+
+| Stage | ms | Share |
+|---|---|---|
+| squeeze | 1.129 | 16.1% |
+| advect dye | 0.918 | 13.1% |
+| viscosity | 0.914 | 13.0% |
+| **forces** | **0.818** | **11.7%** |
+| project 1 | 0.816 | 11.6% |
+| project 2 | 0.814 | 11.6% |
+| advect velocity | 0.686 | 9.8% |
+| current | 0.409 | 5.8% |
+| decay | 0.297 | 4.2% |
+| grain | 0.209 | 3.0% |
+
+A step is **9.14 ms → 6.58**. `dye diffuse` is absent rather than small: the
+stage is guarded on its own rate and Classic's is zero, which is also the
+cleanest confirmation that zeroing a look's diffusion removes work rather
+than shrinking it. The two projections together are 23.2% where they were
+28.8%, and the order has changed underneath the work that is left — the
+squeeze film is now the most expensive stage in the step, and `forces` has
+risen to fourth without moving at all, which is what H2a is about.
+
 **Cost does not track dispatch count.** That was the working assumption above
 and it is off by more than an order of magnitude in places: a pressure Jacobi
 dispatch is 0.049 ms and `forcesB` — one dispatch — is 0.808. The step is
@@ -462,6 +490,68 @@ rungs now differ.
 `npm run rungs` checks the shape without a browser — that every rung is a
 rung, that a step down gives something up, that halving a rung's pixels
 quarters the canvas — and it runs in CI beside the other arithmetic.
+
+## H2's next target, and a profiler that was lying about it
+
+`dye diffuse` is 14.2% of a step in five dispatches — 0.265 ms each, the
+dearest in the solver, because the dye is four channels of 32-bit float where
+pressure is one of 16. And it is *diffusion*, which is what `PLAN.md` blames
+for the plate's missing structure in the first place.
+
+**Turning it off is a two-for-one.** At 768², two layers, switched on one
+running plate:
+
+| | dye diffuse | steps a second | frame |
+|---|---|---|---|
+| as it ships | 1.344 ms | 46 | 36.8 ms |
+| diffusion off | 0 | **52** | **32.9 ms** |
+
+And the plate gets *better*, not worse. Two same-plate A/Bs (`npm run ab`, so
+the liquid is the same liquid):
+
+| | edge% | p50g | 1 px | 2 px | 4 px |
+|---|---|---|---|---|---|
+| on | 11.1 / 12.5 | 1.3 / 1.4 | 0.5 / 0.5 | 0.2 / 0.3 | 0.5 / 0.6 |
+| off | **13.1 / 14.6** | **1.6 / 1.9** | 0.6 / 0.7 | 0.3 / 0.3 | 0.6 / 0.6 |
+
+Eleven per cent of a frame, spent making the picture worse.
+
+**It is binary, not a dial.** The stage is skipped only when the rate is
+exactly zero — `jacobi` returns early when every coefficient is — so a
+ceiling buys the look and none of the speed. All thirty-two presets set their
+own rate, so the default reaches none of them.
+
+**A ceiling, at 0.0002, down from 0.001.** Some looks do lean on a little
+diffusion, so the call was to cap rather than switch off. Measured where a
+ceiling bites hardest: Boiling Point, the heaviest diffuser there was at
+0.001, is still recognisably itself at the ceiling — the same hot gradient
+and the same soft character — and carries *more* of the filament structure a
+boiling plate should have. Hard edges went from 0.6% of pixels to 1.3%, and
+the structure at 16 px from 0.2% to 0.5%. Nine presets came down; the other
+twenty-three were already under it.
+
+The ceiling is the control's own maximum, in `deskPins.ts` and in the
+settings panel, because a ceiling anywhere else is a range with a dead end on
+it — which is the fault the Speed control had, where thirty of thirty-two
+looks lived in the bottom quarter of the throw. `npm run panel` holds the
+two declarations together and caught the second one being missed.
+
+**And no look may now carry a value its own control cannot reach.**
+`lace-run` carried Speed 0.45 where the control stopped at 0.3, so the desk
+could not show that look's own speed and touching the slider snapped it to a
+different show; diffusion had nine presets above its ceiling for the same
+reason. `npm run plate` checks every number in every preset against the
+control that plays it.
+
+**The profiler was reporting the cost of work that was not happening.** With
+diffusion off the solver measurably took 14% more steps a second, and the
+stage went on reading 1.31 ms — the number it had been at — because a stage
+with nothing to do still opened a compute pass, an empty pass's timestamp
+pair does not yield a usable interval, the sanity check rejected it, and the
+map kept its last value. It sent me looking for why a saving had not arrived
+when it had. Two fixes: a stage with no work opens no pass, and a label that
+stops being written decays instead of holding. A profiler that reports the
+cost of work nobody is doing is worse than one that reports nothing.
 
 ## H2b — making slow cheap, measured
 

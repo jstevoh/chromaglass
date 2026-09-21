@@ -2472,11 +2472,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
           <Zap size={12} /> Fluid Physics
         </h3>
+        {/*
+          0.0002, not 0.001. Dye diffusion costs 1.34 ms of a solver step and
+          takes structure out of the plate — measured on one running plate,
+          switching it off moved hard edges from 11.1% of pixels to 13.1% and
+          the frame from 36.8 ms to 32.9 (docs/webgpu-plan.md). Above the new
+          ceiling it was buying nothing anybody wanted. A ceiling rather than
+          a switch, because some looks do lean on a little of it.
+        */}
         <Slider
           label="Diffusion Rate"
           value={settings.diffusionRate}
           min={0}
-          max={0.001}
+          max={0.0002}
           step={0.00001}
           onChange={(v: number) => onUpdate({ diffusionRate: v })}
           settingKey="diffusionRate"
