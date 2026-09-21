@@ -4227,9 +4227,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const bk = particleFlowScale(lead0, currentSettings);
                   beads.step(SIM_STEP_S, (bx, by) => {
                     if (!bvx || !bvy) return [0, 0];
-                    const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
-                    const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
-                    return [bvx[ix + iy * GRID_SIZE] * bk, bvy[ix + iy * GRID_SIZE] * bk];
+                    /*
+                      The clamp has to reject NaN, which the obvious one does
+                      not. `Math.round(NaN)` is NaN, `Math.min` and `Math.max`
+                      pass NaN through, an array indexed by NaN is `undefined`
+                      and `undefined * bk` is NaN — so a bead that went bad
+                      once was fed NaN for ever, and the gradient `beads.ts`
+                      draws it with throws inside the frame loop. The canvas
+                      stopped and the desk kept working.
+                    */
+                    const cell = (v: number): number =>
+                      Number.isFinite(v) ? Math.max(0, Math.min(GRID_SIZE - 1, Math.round(v))) : -1;
+                    const ix = cell(bx);
+                    const iy = cell(by);
+                    if (ix < 0 || iy < 0) return [0, 0];
+                    const vx = bvx[ix + iy * GRID_SIZE] * bk;
+                    const vy = bvy[ix + iy * GRID_SIZE] * bk;
+                    // And the field itself: a solver that has gone unstable
+                    // hands back NaN, and this is where it would get in.
+                    return [Number.isFinite(vx) ? vx : 0, Number.isFinite(vy) ? vy : 0];
                   }, tiltX, tiltY);
                 }
               }
