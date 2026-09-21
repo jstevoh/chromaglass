@@ -889,6 +889,9 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 @group(0) @binding(12) var beadTex: texture_2d<f32>;
 @group(0) @binding(13) var parts0: texture_2d<f32>;
 @group(0) @binding(14) var parts1: texture_2d<f32>;
+/** The air field (H6): coverage in 0–1, where a bubble has pushed the dye out. */
+@group(0) @binding(15) var air0: texture_2d<f32>;
+@group(0) @binding(16) var air1: texture_2d<f32>;
 `;
 
 /*
@@ -1289,36 +1292,52 @@ struct FsOut {
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
-  if (U.bubbleCount > 0 && U.bubbleStrength > 0.001) {
-    var field = 0.0;
-    var opac = 0.0;
-    var best = 0.0;
-    var bestRad = 0.01;
-    var bestD = vec2f(0.0);
-    for (var i = 0; i < 40; i++) {
-      if (i >= U.bubbleCount) { break; }
-      let bb = U.bubbles[i];
-      let sh = U.bubbleShape[i];
-      let rad = max(bb.z, 1e-4);
-      var d = (fuvBase - bb.xy) / rad;
-      if (dot(d, d) > 4.0) { continue; }
-      let s = length(sh.xy);
-      if (s > 1e-4) {
-        let ax = sh.xy / s;
-        let loc = vec2f(dot(d, ax), dot(d, vec2f(-ax.y, ax.x)));
-        d = vec2f(loc.x / (1.0 + s), loc.y * (1.0 + s));
-      }
-      let phi = atan2(d.y, d.x);
-      let rEff = 1.0 + sh.z * (cos(2.0 * phi + sh.w) + 0.55 * cos(3.0 * phi - 1.7 * sh.w));
-      let q2 = dot(d, d) / max(rEff * rEff, 0.04);
-      var f = 1.0 / max(q2, 1e-4);
-      f = f * f;
-      field += f * bb.w;
-      opac = max(opac, bb.w * smoothstep(0.25, 1.0, f));
-      if (f > best) { best = f; bestD = d; bestRad = rad; }
-    }
-    if (field > 0.2) {
-      let edge = field;
+  /*
+    Bubbles, from the air field (H6 · A).
+
+    This was forty uniforms and a metaball loop per pixel, and the cap of
+    forty existed because that loop was as much as a compositor could afford.
+    The field costs one sample and four more for its gradient, whatever the
+    number of bubbles.
+
+    The optics below are unchanged — they were tuned by eye against real
+    references and there is no reason to disturb them. What changed is where
+    their three inputs come from:
+
+      edge     was a metaball sum, is now coverage on the same scale, so
+               the membrane, inside and centre bands land where they did
+      opac     was the largest per-bubble opacity, is now the coverage
+               ramping in from the rim, which is the same quantity
+      bestD    was the offset from the nearest bubble centre in units of its
+               radius. The gradient of coverage points *into* a bubble, so
+               its negative points out of one, and 1 - coverage is how far
+               out — zero at the middle, one at the rim.
+
+    The interior is already the lamp through clear glass, because the solver
+    took the dye out of it before this ran. That is the whole point of H6,
+    and it is why the lens mix below now has less to do than it did.
+  */
+  if (U.bubbleStrength > 0.001) {
+    let aC = textureSampleLevel(air0, samp, fuvBase, 0.0).r;
+    if (aC > 0.02) {
+      let e = 1.5 / U.logicalGrid;
+      let gx = textureSampleLevel(air0, samp, fuvBase + vec2f(e, 0.0), 0.0).r
+             - textureSampleLevel(air0, samp, fuvBase - vec2f(e, 0.0), 0.0).r;
+      let gy = textureSampleLevel(air0, samp, fuvBase + vec2f(0.0, e), 0.0).r
+             - textureSampleLevel(air0, samp, fuvBase - vec2f(0.0, e), 0.0).r;
+      let g = vec2f(gx, gy);
+      let gl = length(g);
+      // Out of the bubble, and how far out. At the very middle the gradient
+      // vanishes and the direction is arbitrary, which is also where nothing
+      // below depends on it.
+      let outward = select(vec2f(1.0, 0.0), -g / max(gl, 1e-6), gl > 1e-5);
+      let bestD = outward * (1.0 - aC);
+      // A typical bubble is about three plate-hundredths across; the only
+      // thing this scales is how far the lens samples, and a per-bubble
+      // radius is not something a field carries.
+      let bestRad = 0.03;
+      let opac = smoothstep(0.02, 0.28, aC);
+      let edge = aC * 3.0;
       let membrane = smoothstep(0.86, 1.0, edge) * (1.0 - smoothstep(1.0, 1.22, edge));
       let inside = smoothstep(1.0, 1.3, edge);
       let centre = smoothstep(1.3, 3.0, edge);
@@ -1336,6 +1355,23 @@ struct FsOut {
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
       let lensCol = mix(bgColor, lensF.rgb, lensF.a);
       c = mix(c, lensCol, inside * 0.45 * play);
+      /*
+        The gap is clear, so the lamp comes through it (H6 · A).
+
+        The solver has already taken the dye out from under the bubble, and
+        this compositor draws dye over a background that is black — so
+        without this, a bubble is a black hole punched in the picture, which
+        is exactly what the first run of it looked like. A bubble in a
+        backlit dish is the *brightest* thing in the frame: there is nothing
+        left to absorb the lamp. Tinted a little by the liquid it sits in,
+        because the rim refracts some of that back inward.
+      */
+      let dome = clamp(1.0 - dot(bestD, bestD), 0.0, 1.0);
+      let through = mix(vec3f(1.0), tint, 0.3) * (0.62 + 0.55 * dome + 0.3 * ground);
+      // Not a flat disc: the mix falls off toward the rim so the membrane,
+      // the caustic arc and the specular dot below are still the brightest
+      // things on the bubble rather than being washed out by its middle.
+      c = mix(c, through, inside * (0.35 + 0.45 * dome));
       c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);
       c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
       let arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));

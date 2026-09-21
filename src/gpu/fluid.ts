@@ -1093,6 +1093,8 @@ export class WebGPUFluid {
       grain: this.grain?.read ?? null,
       /** The particle splat, or null when the amount is 0 and none exist. */
       particles: this.particles && !this.particles.idle ? this.particles.target : null,
+      /** The air field (H6), or null when no bubble is on this plate. */
+      air: this.air?.any ? this.air.field : null,
     };
   }
 

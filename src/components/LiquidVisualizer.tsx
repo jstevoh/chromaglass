@@ -5084,9 +5084,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             stamping them again on each of the step's iterations would pay
             for the splat several times over for one picture.
           */
-          for (const f of fluidsRef.current) {
-            if (f.gpu instanceof WebGPUFluid) {
-              f.gpu.setBubbles(bubblesRef.current.packed, Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES), 0.25);
+          {
+            // The lead plate only: bubbles sit on the front of the dish, the
+            // same plate `disturb` works on above. Giving the list to every
+            // layer would cut the same holes through the background loop.
+            const lead = fluidsRef.current[0];
+            if (lead?.gpu instanceof WebGPUFluid) {
+              lead.gpu.setBubbles(bubblesRef.current.packed, Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES), 0.25);
             }
           }
           const frame = stage?.frame();
