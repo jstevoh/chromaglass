@@ -282,30 +282,64 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    Where air is, dye is not (H6 · A).
+    Where air is, dye is not — and it went somewhere (H6 · A).
 
-    A bubble is a hole in the liquid, so the dye under it is removed rather
-    than tinted. `A.a.x` is `bubbleClear`: 1 takes all of it, which is the
-    physical answer, and lower keeps some of today's look for presets built
-    around a bubble that shades rather than empties.
+    A bubble is a hole, so the liquid under it has to leave. The first
+    version of this scaled the dye down: dye *= 1 - air. That empties a
+    bubble perfectly and it is wrong, because the dye does not go anywhere —
+    it is destroyed. A bubble that drifts on leaves a scar of clear plate
+    behind it, and a plate with bubbles on it slowly loses all its colour.
 
-    The dye texture holds absorbance per channel, so scaling it toward zero
-    is scaling toward clear glass, which is what a hole is.
+    Measured, which is how it was caught: with the bubbles cleared away, the
+    cells they had been standing on read 0.002 against 0.792 around them. The
+    dye never came back because there was none left to come back.
 
-    This does not yet put back what it took. Conserving the dye means adding
-    it to the rim, and the rim is the next piece of H6; until then a plate
-    with bubbles on it loses a little dye, and `npm run bubbles` says so
-    rather than claiming otherwise.
+    So this moves the dye instead. Between each pair of neighbouring cells,
+    liquid flows from the one with more air in it to the one with less, in
+    proportion to the difference — the same exchange in both directions, so
+    what one cell loses another gains and the total is unchanged. Run every
+    step, it walks the dye out of a bubble and piles it against the rim,
+    which is where the plan wants it: the bright ring around a bubble is
+    real dye that was pushed there, and it moves with the liquid.
+
+    A.a.x is bubbleClear, the rate. The four flows are each at most a
+    quarter of the cell, so nothing can push a cell below zero.
   */
   airExclude: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var air: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn airAt(p: vec2i, n: i32) -> f32 {
+  let c = clamp(p, vec2i(0), vec2i(n - 1, n - 1));
+  return clamp(textureLoad(air, c, 0).r, 0.0, 1.0);
+}
+fn dyeAt(p: vec2i, n: i32) -> vec4f {
+  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1, n - 1)), 0);
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
+  let n = i32(S.n);
   let p = vec2i(id.xy);
-  let a = clamp(textureLoad(air, p, 0).r, 0.0, 1.0) * clamp(A.a.x, 0.0, 1.0);
-  textureStore(dst, p, textureLoad(dye, p, 0) * (1.0 - a));
+  let rate = clamp(A.a.x, 0.0, 1.0) * 0.25;
+  let aHere = airAt(p, n);
+  var here = dyeAt(p, n);
+  var out = here;
+
+  for (var k = 0; k < 4; k++) {
+    var o = vec2i(1, 0);
+    if (k == 1) { o = vec2i(-1, 0); }
+    if (k == 2) { o = vec2i(0, 1); }
+    if (k == 3) { o = vec2i(0, -1); }
+    let q = p + o;
+    let aThere = airAt(q, n);
+    // Downhill in air: out of the bubble, toward the liquid.
+    let gain = max(0.0, aThere - aHere) * rate;
+    let loss = max(0.0, aHere - aThere) * rate;
+    out = out + dyeAt(q, n) * gain - here * loss;
+  }
+  textureStore(dst, p, max(out, vec4f(0.0)));
 }`,
 
   // x = (x0 + a Σ neighbours) / (1 + 4a), per channel. A.a is a, A.b is 1/(1+4a).

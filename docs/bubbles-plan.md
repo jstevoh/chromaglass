@@ -113,6 +113,19 @@ quantity the solver carries, exactly like dye. Everything else follows from that
   a plausible field in the wrong place, and every conclusion drawn from it is about
   the reader.
 
+**The divergence source is not optional, and a velocity will not do.**
+Conserving the dye by flowing it between cells — from more air to less, in
+proportion to the difference — works at the rim and cannot touch the middle of
+a bubble, where the air is uniform and there is no difference to flow down.
+Measured: the interior thins to about 0.7 of its surroundings and stops.
+
+Adding a velocity down the air gradient instead **does not work at all**, and
+the reason is structural: a gradient field is exactly what the pressure
+projection exists to remove, so the next projection cancels it. The source has
+to go into the divergence the projection solves. That is also what makes the
+liquid flow *around* a bubble rather than through it, so the two bullets above
+are one piece of work.
+
 **How to know it works.** `npm run bubbles` places one bubble somewhere off-centre in
 both axes and asks the field **where** the air is — near the chosen position, and *not*
 near its mirror, which is what a y-flipped field looks like — with a control that

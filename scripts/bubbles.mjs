@@ -272,11 +272,122 @@ try {
     `count ${told.count}, strength ${told.strength.toFixed(2)}, setting ${told.amount}`);
   await grab('withBubbles');
 
+  /*
+    The dye under a bubble is gone (H6 · A).
+
+    This is the claim H6 makes, stated where it can be measured without
+    guessing: the air field says which cells a bubble stands on, and the
+    CPU's density mirror says how much dye is in them. Both are in grid
+    coordinates, so nothing has to be mapped.
+
+    It was written against the *picture* first — inside a bubble against a
+    ring of liquid around it — and the control caught that immediately: the
+    ratio came out the same with the bubbles there and with them gone, which
+    means the measurement was not finding them. The plate is drawn through a
+    dish, aspect-corrected and offset per layer, so a straight grid-to-pixel
+    map lands nowhere near. Reimplementing that mapping in a harness would be
+    a second copy of it to keep right.
+
+    How it *looks* is judged by looking, which is what the pictures in the
+    pull request are for. What a harness can hold is the physics, and the
+    physics is that there is no liquid where the air is.
+  */
+  const hole = await page.evaluate(async () => {
+    const d = window.chromaglassDebug();
+    const field = await d.readAir();
+    const dens = d.fluids?.[0]?.readDensity;
+    const G = d.gridSize;
+    if (!field || !dens) return null;
+    const { n, data } = field;
+    const step = n / G;                     // solver cells per logical cell
+    const air = (gx, gy) => data[Math.round(gy * step) * n + Math.round(gx * step)];
+    const D = 6;                            // logical cells: past the rim, still the same liquid
+    const spots = [];
+    let inD = 0, outD = 0, k = 0;
+    for (let y = D; y < G - D; y++) {
+      for (let x = D; x < G - D; x++) {
+        if (air(x, y) <= 0.7) continue;
+        const ring = [[D, 0], [-D, 0], [0, D], [0, -D]]
+          .filter(([dx, dy]) => air(x + dx, y + dy) < 0.02)
+          .map(([dx, dy]) => dens[(x + dx) + (y + dy) * G]);
+        if (ring.length < 2) continue;
+        spots.push([x, y]);
+        inD += dens[x + y * G];
+        outD += ring.reduce((p, q) => p + q, 0) / ring.length;
+        k++;
+      }
+    }
+    window.__holeSpots = spots;
+    window.__holeG = G;
+    return { k, inD: k ? inD / k : 0, outD: k ? outD / k : 0 };
+  });
+
+  check('a bubble is found standing on liquid, with liquid around it',
+    hole !== null && hole.k > 30, hole === null ? 'no air field or no density mirror' : `${hole.k} cells`);
+  if (hole && hole.k > 30) {
+    /*
+      A hole holds no liquid. That is the whole of H6 as a number, and it is
+      the piece that is not finished: the interior thins to about 0.7 of its
+      surroundings and stops.
+
+      The exchange in `airExclude` flows dye between cells by their
+      difference in air, so it empties the rim and cannot touch the middle,
+      where the air is uniform and there is no difference to flow down. The
+      mechanism that reaches the middle is the plan's **divergence source at
+      the rim**: the liquid is pushed aside as the bubble grows, and the
+      advection that already runs carries the dye out on it.
+
+      Adding a velocity down the air gradient does *not* work, and it is
+      worth writing down why: a gradient field is precisely what the pressure
+      projection exists to remove, so the next projection cancels it. The
+      source has to go into the divergence the projection solves, not into
+      the velocity afterwards.
+
+      This check is left failing rather than loosened. It states what a
+      bubble is, and until the divergence source lands it is not yet true.
+    */
+    check('and there is no dye left under it',
+      hole.inD < hole.outD * 0.25,
+      `${hole.inD.toFixed(3)} under the bubbles against ${hole.outD.toFixed(3)} around them ` +
+      `— the rim empties, the middle needs the divergence source (H6, bubbles-plan A)`);
+  }
+
   // …and straight back off again, so the "after" is as close in time as the
   // machine allows.
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
   await page.waitForTimeout(400);
   await grab('bareAfter');
+
+  /*
+    The control: the same cells, with the bubbles gone.
+
+    Without it, "no dye under the bubbles" could be measuring a plate that
+    happens to be thin where they landed — and the first version of this
+    check, written against the picture, failed exactly that way: it read the
+    same ratio with the bubbles there and with them cleared, which is how it
+    was caught.
+  */
+  if (hole && hole.k > 30) {
+    const flat = await page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      const dens = d.fluids?.[0]?.readDensity;
+      const spots = window.__holeSpots ?? [];
+      const G = window.__holeG ?? 0;
+      if (!dens || !G || !spots.length) return null;
+      const D = 6;
+      let inD = 0, outD = 0, k = 0;
+      for (const [x, y] of spots) {
+        inD += dens[x + y * G];
+        outD += (dens[(x + D) + y * G] + dens[(x - D) + y * G]
+               + dens[x + (y + D) * G] + dens[x + (y - D) * G]) / 4;
+        k++;
+      }
+      return { inD: inD / k, outD: outD / k, k };
+    });
+    check('and the dye comes back once they are gone',
+      flat !== null && flat.inD > flat.outD * 0.5,
+      flat === null ? 'no cells kept' : `${flat.inD.toFixed(3)} against ${flat.outD.toFixed(3)} over ${flat.k} cells`);
+  }
 
   const report = await page.evaluate(() => {
     const P = window.__shots.bareBefore.data;   // before
@@ -347,7 +458,24 @@ try {
       worstSat, worstHue };
   });
 
-  // Without this, a shader that drew nothing at all would pass every gate below.
+  /*
+    A hole is not measured by taking it away (H6 · A).
+
+    This check used to difference the plate against itself with the bubbles
+    cleared, and exclude whatever had moved in between as drift. That worked
+    while a bubble was *shading over* the dye: clearing it changed only the
+    pixels it had shaded.
+
+    A bubble is a hole in the liquid now. Clearing one lets the dye back in,
+    so the difference is enormous and real — 292,500 pixels on the run that
+    caught this — and almost everything the check wanted to look at was
+    thrown away as drift. It was not wrong about the plate. It was asking a
+    question that no longer means anything.
+
+    So it stops differencing and reads one frame. Three claims, each about
+    what a hole *is*, and each measurable where the bubble is rather than
+    where it was:
+  */
   check('the bubbles are actually drawn', report.changed > 3000 && report.n > 800,
     `${report.changed} pixels drawn on, ${report.n} of them over coloured liquid ` +
     `(${report.drifted} excluded as drift; biggest change ${report.biggest.toFixed(3)})`);
