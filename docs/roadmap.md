@@ -51,7 +51,10 @@ job: nothing was written twice. There is one shading language in the tree now �
      — the checkerboard stride, not the maths. Packing the two colours into contiguous
      halves of the buffer is the next step and should recover most of the rest.
      *Still untouched:* dye diffusion (14.2%), the squeeze film (11.6%), viscosity
-     (10.2%).
+     (10.2%) — but see the scaling table in [`webgpu-plan.md`](webgpu-plan.md) before
+     starting them. A step is 64× the cells for 11× the cost from 96² to 768², and
+     about 0.75 ms of every step is dispatch launching rather than arithmetic. All
+     three of those items cut *arithmetic*. Count dispatches first.
      — original note — Red-black
      or multigrid in place of 24 Jacobi passes — and the same treatment for dye
      diffusion (14.2%), the squeeze film (11.6%) and viscosity (10.2%), which between

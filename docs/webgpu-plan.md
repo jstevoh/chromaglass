@@ -376,6 +376,46 @@ halves of the buffer so each sweep is dense. If a sweep then costs what a
 Jacobi pass costs, the projection falls by half as the arithmetic always said
 it should — worth about another 6% of a frame.
 
+## What a step costs at each grid, and why it is not what it looks like
+
+`npm run stages` across the ladder, two layers, Classic on this M4:
+
+| grid | cells, ×256² | ms a step | ×256² | µs per megacell |
+|---|---|---|---|---|
+| 96² | 0.14 | 0.77 | 0.33 | 83,550 |
+| 128² | 0.25 | 1.00 | 0.43 | 61,035 |
+| 192² | 0.56 | 1.72 | 0.74 | 46,658 |
+| 256² | 1.00 | 2.34 | 1.00 | 35,706 |
+| 384² | 2.25 | 3.76 | 1.61 | 25,499 |
+| 512² | 4.00 | 3.59 | 1.53 | 13,695 |
+| 768² | 9.00 | 8.72 | 3.73 | 14,784 |
+
+**Sixty-four times the cells for eleven times the cost.** A step is nowhere
+near proportional to the grid, and the efficiency column says why: a cell at
+96² costs six times what a cell at 512² costs. Below about 256² the solver is
+not doing arithmetic, it is launching dispatches — a fit over the small grids
+puts **0.75 ms of every step beyond the grid's reach**, which across ~101
+dispatches is about 7 µs each.
+
+**This is the reason the red-black sweeps returned 18% and not 50%,** and it
+is a warning about the rest of H2: dye diffusion, the squeeze film and
+viscosity are all *arithmetic* to cut, and at the grids the show actually
+runs a good deal of the step is not arithmetic. Count dispatches before
+counting operations.
+
+**512² is the best value on the ladder by a wide margin** — four times the
+cells of 256² for about half as much again — which is worth knowing when the
+governor is deciding what to give up. Dropping the grid buys much less frame
+time than its resolution loss suggests; dropping device pixels may be the
+better trade, and the governor does not currently know the difference.
+
+**One number in that table is the weather, not the code.** 384² reads slower
+than 512², which would mean a rung that costs more than the finer one above
+it. Measured again at eighteen seconds with the two alternating — the way
+this plate has to be measured — 384² is 6.60 ms against 512²'s 8.26. The
+ladder is fine. The first reading was one run of a chaotic plate, which is
+the third time in two days that has nearly become a finding.
+
 **And the plate is in slow motion at the top rung.** 45.3 steps a second
 against the 60 the show asks for, inside a 38.6 ms frame. A frame rate cannot
 show you that: the liquid is simply evolving at three quarters of wall-clock
