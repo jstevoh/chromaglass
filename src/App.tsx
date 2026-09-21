@@ -14,7 +14,7 @@ import { luckyLook } from './lib/lucky';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
-import { blendLooks, targetLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1386,21 +1386,21 @@ export default function App() {
    * ⇧⏎ in the palette send one that was never armed — arming it first and
    * then calling Go would read a `cued` that this render does not have yet.
    */
-  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
+  /**
+   * Crossfade the settings from where the plate is now to `to`, over
+   * `seconds`. The one fade loop — Go, Revert and a new song all run through
+   * it, and there were three copies of it before there were three callers.
+   *
+   * ~30 a second: a crossfade over seconds does not need sixty settings
+   * objects a second, and the solver is the expensive part of a settings
+   * change rather than React.
+   */
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
     if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
-
     const from = settingsRef.current;
-    const to = targetLook(from, next.settings);
-    previousLook.current = { id: pinnedPresetId, settings: from };
-    adoptPreset(next.id);
-    setCued(null);
-
     if (seconds <= 0) { setSettings(to); setFading(0); return; }
     const started = performance.now();
     const ms = seconds * 1000;
-    // ~30 a second: a crossfade over seconds does not need sixty settings
-    // objects a second, and the solver is the expensive part of a settings
-    // change rather than React.
     lookFadeRef.current = setInterval(() => {
       const t = Math.min(1, (performance.now() - started) / ms);
       if (t >= 1) {
@@ -1413,8 +1413,17 @@ export default function App() {
       setSettings(blendLooks(from, to, t));
       setFading(t);
     }, 33);
+  }, []);
+
+  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
+    const from = settingsRef.current;
+    previousLook.current = { id: pinnedPresetId, settings: from };
+    adoptPreset(next.id);
+    setCued(null);
+    // Pressing Go is a decision: the whole look, structure and all.
+    fadeSettingsTo(targetLook(from, next.settings), seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinnedPresetId, adoptPreset]);
+  }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
   /** Go: the armed look, at the chosen fade. */
   const goLook = useCallback((seconds = fadeSeconds) => {
@@ -1435,25 +1444,9 @@ export default function App() {
     const prev = previousLook.current;
     if (!prev) return;
     previousLook.current = null;
-    const from = settingsRef.current;
     if (prev.id) adoptPreset(prev.id);
-    if (fadeSeconds <= 0) { setSettings(prev.settings); return; }
-    const started = performance.now();
-    const ms = fadeSeconds * 1000;
-    if (lookFadeRef.current) clearInterval(lookFadeRef.current);
-    lookFadeRef.current = setInterval(() => {
-      const t = Math.min(1, (performance.now() - started) / ms);
-      if (t >= 1) {
-        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
-        lookFadeRef.current = null;
-        setSettings(prev.settings);
-        setFading(0);
-        return;
-      }
-      setSettings(blendLooks(from, prev.settings, t));
-      setFading(t);
-    }, 33);
-  }, [fadeSeconds, adoptPreset]);
+    fadeSettingsTo(prev.settings, fadeSeconds);
+  }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
 
@@ -1613,10 +1606,38 @@ export default function App() {
     if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
     // And so does a song's own show, when the Songs sheet is following songs.
     if (song && followSongs && showFor(songShowsRef.current, song)) return;
-    if (mode === 'random') { triggerLucky(); return; }
+    /*
+      A look change nobody asked for behaves differently from one somebody
+      pressed, in three ways that were all the same bug wearing three hats.
+
+      It used to reach for `applyPreset`, which **clears every layer and
+      reseeds** — right when you are building a look on clean glass, wrong
+      when a song ends in front of a room, because it takes the dye with it.
+      It now adopts: the new look's dyes, injection styles and liquids, with
+      the plate left where it is.
+
+      It used to snap all eighty settings at once. It fades now, at the same
+      fade the desk's Go uses.
+
+      And it used to carry the structure — so a song boundary could put an LED
+      wheel on the plate, or a second layer, or fold the picture into a
+      kaleidoscope. Those have no halfway, so fading cannot soften them; they
+      are held instead. See `STRUCTURE` in `lookFade.ts`. Structure holds,
+      character drifts.
+    */
+    const from = settingsRef.current;
+    if (mode === 'random') {
+      previousLook.current = { id: pinnedPresetId, settings: from };
+      setPinnedPresetId(null);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color))), fadeSeconds);
+      return;
+    }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
     const next = pool[Math.floor(Math.random() * pool.length)];
-    if (next) applyPreset(next.id, next.settings);
+    if (!next) return;
+    previousLook.current = { id: pinnedPresetId, settings: from };
+    adoptPreset(next.id);
+    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 
