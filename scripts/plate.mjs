@@ -373,8 +373,33 @@ check('most of the app takes advantage of them', withPhysics >= PRESETS.length -
 // NaN-transparent: `Math.round(NaN)` is NaN, min and max pass it through, an
 // array indexed by NaN is `undefined`, and `undefined * k` is NaN again.
 {
-  const field = new BeadField(192);
-  field.populate(2);
+  /*
+    A bead field with beads in it, whatever the dice say.
+
+    `populate` is rejection sampling: a candidate is thrown away where the
+    patch field is zero and kept only with probability `p` where it is not,
+    and it gives up after `count * 6` tries. So `populate(2)` can legitimately
+    place **nothing**, and three checks below were written as though it
+    always places something — one indexed `beads[0]` and crashed, one failed,
+    and one compared a count to itself and passed while proving nothing.
+
+    It came due on `main` rather than on a branch: the Measure job died with
+    "Cannot set properties of undefined (setting 'x')", the deploy that
+    depended on it was skipped, and the same commit passed three times in a
+    row locally. A gate that fails for reasons nobody can name teaches people
+    to press the button again.
+
+    Asking repeatedly is the fix and not a fudge — the thing under test is
+    what `render` and `step` do to a bead that has gone non-finite, and
+    getting a bead to test them with is setup, not the measurement.
+  */
+  const beaded = (count = 2) => {
+    const f = new BeadField(192);
+    for (let t = 0; t < 40 && f.beads.length === 0; t++) f.populate(count);
+    return f;
+  };
+
+  const field = beaded();
   check('a plate with beads on it has beads', field.beads.length > 0, `${field.beads.length}`);
 
   // A solver that has gone unstable hands back NaN. That is the way in.
@@ -416,8 +441,8 @@ check('most of the app takes advantage of them', withPhysics >= PRESETS.length -
   });
   globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return ctxStub(); } };
 
-  const sneaky = new BeadField(192);
-  sneaky.populate(2);
+  const sneaky = beaded();
+  check('and one to push over', sneaky.beads.length > 0, `${sneaky.beads.length} beads to work with`);
   sneaky.beads[0].x = NaN;
   let threw = null;
   try { sneaky.render(); } catch (e) { threw = String(e).slice(0, 140); }
@@ -429,11 +454,12 @@ check('most of the app takes advantage of them', withPhysics >= PRESETS.length -
   check('and the stub would have caught it', stubBites !== null, stubBites ?? 'the stub accepts NaN — this check is measuring nothing');
 
   // A good bead is untouched by any of this.
-  const fine = new BeadField(192);
-  fine.populate(2);
+  const fine = beaded();
   const kept = fine.beads.length;
   fine.step(1 / 60, () => [0.01, 0.01], 0, 0);
-  check('a bead in a healthy field survives', fine.beads.length === kept, `${fine.beads.length} of ${kept}`);
+  // `kept > 0` as well as the equality: with no beads at all this reads
+  // 0 === 0 and passes without having looked at anything.
+  check('a bead in a healthy field survives', kept > 0 && fine.beads.length === kept, `${fine.beads.length} of ${kept}`);
 
   // The clamp that did not work, kept so the reason stays visible.
   check('the obvious clamp really is NaN-transparent',
