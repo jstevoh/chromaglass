@@ -4981,7 +4981,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const live = fluidsRef.current
                 .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
                 .filter((f): f is NonNullable<typeof f> => !!f);
-              if (!live.length) return;
+              /*
+                Nothing to draw from: a rung change disposed the solver and
+                the next one is not up yet. Say so rather than returning
+                quietly — a painter that declines leaves the target exactly
+                as it was acquired, and a harness photographing it then
+                reads every channel zero and calls it a black plate. This is
+                what made `npm run wall` fail about once in a few runs on a
+                slow machine, on the one check whose whole job is to catch a
+                black frame in front of a room.
+              */
+              if (!live.length) return false;
               // A rebuild may also have changed the grid the uniforms were
               // filled for; the shader samples by that number.
               if (live[0].dye.width !== fields[0].dye.width) {
@@ -5040,6 +5050,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }, stage?.profiler.renderPass('finish'), !!out);
               }
               if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              return true;
             };
           }
           const frame = stage?.frame();

@@ -62,8 +62,20 @@ export const installFrameReader = (page) => page.addInitScript(() => {
     const note = { via: grab ? 'grabFrame' : 'drawImage', engine: dbg?.engine ?? null };
     if (grab) {
       let g = null;
-      try { g = await grab(); } catch (e) { note.threw = String(e).slice(0, 120); }
+      // A decline is waited out rather than measured; see `__cgShot` below
+      // for why a frame the stage did not paint reads as a black plate.
+      for (let tries = 0; tries < 8; tries++) {
+        g = null;
+        try { g = await grab(); } catch (e) { note.threw = String(e).slice(0, 120); break; }
+        if (!g || g.painted !== false) break;
+        note.declined = (note.declined ?? 0) + 1;
+        await new Promise((done) => requestAnimationFrame(done));
+      }
       if (!g) { window.__cgFrameLast = { ...note, got: 'nothing' }; return null; }
+      if (g.painted === false) {
+        window.__cgFrameLast = { ...note, got: 'the stage declined to paint every frame asked for' };
+        return null;
+      }
       note.size = [g.width, g.height];
       // The canvas is opaque by configuration (`alphaMode: 'opaque'`), so
       // what the shader happened to leave in alpha is not part of the
@@ -117,8 +129,37 @@ export const installFrameReader = (page) => page.addInitScript(() => {
     let image;
     if (grab) {
       let g = null;
-      try { g = await grab(); } catch (e) { note.threw = String(e).slice(0, 120); }
+      /*
+        A frame the stage declined to paint is not a black picture. It is no
+        picture.
+
+        The painter has a frame or two with nothing to draw from while a rung
+        change disposes one solver and builds the next, and it returns false
+        for those. A decline leaves the frame's target exactly as it was
+        acquired, so a grab taken then reads every channel zero — and a wall
+        harness measuring it calls that a black plate, which is the one thing
+        it exists to catch. That was `npm run wall` failing about once in a
+        few runs on a slow machine, on the corner-pin check, with the frame
+        before and the frame after both fine.
+
+        So a decline is waited out rather than measured. This is not retrying
+        until the picture is bright enough — nothing here looks at the
+        pixels. The stage is *saying* it did not draw, and a genuinely black
+        plate still comes back on the first try, painted, and is measured as
+        black.
+      */
+      for (let tries = 0; tries < 8; tries++) {
+        g = null;
+        try { g = await grab(); } catch (e) { note.threw = String(e).slice(0, 120); break; }
+        if (!g || g.painted !== false) break;
+        note.declined = (note.declined ?? 0) + 1;
+        await new Promise((done) => requestAnimationFrame(done));
+      }
       if (!g) { window.__cgFrameLast = { ...note, got: 'nothing' }; return null; }
+      if (g.painted === false) {
+        window.__cgFrameLast = { ...note, got: 'the stage declined to paint every frame asked for' };
+        return null;
+      }
       for (let i = 3; i < g.pixels.length; i += 4) g.pixels[i] = 255;
       image = new ImageData(new Uint8ClampedArray(g.pixels), g.width, g.height);
       note.size = [g.width, g.height];

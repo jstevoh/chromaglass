@@ -310,6 +310,12 @@ const watch = (page) => {
       */
       check('the packed colour planes are the same field as the row-major grid, cell for cell',
         press?.packedMatches, press?.packedDetail ?? 'not run');
+      // And at the squeeze film's counts, which are half the projection's.
+      // Gauss-Seidel's advantage over Jacobi is asymptotic, so a ratio that
+      // holds at 24 against 12 is not automatically one that holds at 10
+      // against 5 — where neither solver has got very far.
+      check('5 sweeps are worth 10 Jacobi passes too, where the squeeze film runs',
+        press?.shortOk, press?.shortDetail ?? 'not run');
 
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');

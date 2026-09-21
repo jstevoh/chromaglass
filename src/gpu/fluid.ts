@@ -57,7 +57,7 @@ export interface FieldStats {
  */
 const PRESSURE_SWEEPS = 12;
 const CURRENT_ITERS = 10;
-const SQUEEZE_ITERS = 10;
+const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
 const DYE_ITERS = 4;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
@@ -94,7 +94,8 @@ export class WebGPUFluid {
    * lost by keeping it as one.
    */
   private readonly press: GPUBuffer;
-  private readonly spress: PingPong;
+  /** The squeeze film's pressure, packed as two colour planes like `press`. */
+  private readonly spress: GPUBuffer;
   private readonly cur: PingPong;
   private readonly curP: PingPong;
   private readonly grain: PingPong | null;
@@ -187,7 +188,11 @@ export class WebGPUFluid {
       size: this.N * this.N * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
-    this.spress = pp(this.N, R32, 'squeeze pressure');
+    this.spress = this.disposer.track(device.createBuffer({
+      label: 'squeeze pressure',
+      size: this.N * this.N * 4,
+      usage: GPUBufferUsage.STORAGE,
+    }));
     this.cur = pp(this.M, VEL, 'current');
     this.curP = pp(this.M, R32, 'current pressure');
     this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
@@ -292,8 +297,9 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    for (const t of [this.spress.a, this.spress.b, this.div]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    this.clearPressure(pass);
+    this.fill(pass, this.div, [0, 0, 0, 0], this.N);
+    this.clearBuffer(pass, this.press, 'clear pressure');
+    this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     for (const t of [this.squeeze.a, this.squeeze.b]) this.fill(pass, t, [0.03, 0, 0, 0], this.N);
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
@@ -526,11 +532,41 @@ export class WebGPUFluid {
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
         this.squeeze.swap();
       }
-      for (let k = 0; k < SQUEEZE_ITERS; k++) {
-        this.run(pass, 'squeezeJacobi', this.spress.write, [this.spress.read, this.squeeze.read], none);
-        this.spress.swap();
+      /*
+        Five red-black sweeps where this was ten Jacobi passes.
+
+        The same operator as the projection in the same Neumann box, so the
+        same treatment: half the arithmetic for about the same convergence,
+        on a buffer whose two colour planes keep each sweep's writes
+        contiguous. It warm-starts, as the ping-pong did — nothing clears
+        this between steps, it carries on from where the last one left off.
+      */
+      const rb = this.pipelines.computePipeline('squeezeRedBlack', kernel('squeezeRedBlack', 'r32float'));
+      const half = Math.ceil((this.N * (this.N / 2)) / 64);
+      for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
+        for (const parity of [0, 1]) {
+          const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
+          let group = this.groups.get(key);
+          if (!group) {
+            group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
+            this.groups.set(key, group);
+          }
+          pass.setPipeline(rb);
+          pass.setBindGroup(0, group);
+          pass.dispatchWorkgroups(half);
+        }
       }
-      this.run(pass, 'squeezeVel', this.vel.write, [this.vel.read, this.spress.read, this.squeeze.read], none);
+
+      const sv = this.pipelines.computePipeline('squeezeVelBuf', kernel('squeezeVelBuf', 'rgba16float'));
+      const svKey = `squeezeVelBuf:${this.vel.write.label}:${this.squeeze.read.label}`;
+      let svGroup = this.groups.get(svKey);
+      if (!svGroup) {
+        svGroup = bindGroup(this.device, sv, [this.sim, none, this.vel.read, this.squeeze.read, this.vel.write, this.spress]);
+        this.groups.set(svKey, svGroup);
+      }
+      pass.setPipeline(sv);
+      pass.setBindGroup(0, svGroup);
+      pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
       this.vel.swap();
     });
 
@@ -663,16 +699,15 @@ export class WebGPUFluid {
     }
   }
 
-  /** Zero the pressure between projections, as the Jacobi's `fill` did. */
-  private clearPressure(pass: GPUComputePassEncoder): void {
+  /** Zero one of the packed pressure buffers, as the Jacobi's `fill` did. */
+  private clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
     const pipe = this.pipelines.computePipeline('pressureClear', kernel('pressureClear', 'r32float'));
-    const key = 'pressureClear';
     let group = this.groups.get(key);
     if (!group) {
       // The Sim, then the Args, then the buffer: every kernel here takes
       // bindings 0 and 1 from HEAD whether it reads them or not, and a group
       // that skips the Args puts the pressure on a uniform slot.
-      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), this.press]);
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), buf]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -694,7 +729,7 @@ export class WebGPUFluid {
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
     this.run(pass, 'divergence', this.div, [this.vel.read], none);
-    this.clearPressure(pass);
+    this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
