@@ -73,8 +73,20 @@ job: nothing was written twice. There is one shading language in the tree now �
      looks that were above it; Classic and Fillmore are measurably sharper with it off
      entirely — three runs across two machines for Fillmore, and checked by eye — so
      both are at zero.
-     *What is left of H2:* the squeeze film, now the most expensive stage at 16%, and
-     viscosity at 13%.
+     *The squeeze film went the same way on 2026-09-21,* since Hele-Shaw is the same
+     Poisson operator in the same Neumann box: five red-black sweeps on a packed buffer
+     where it ran ten Jacobi passes ping-ponging two textures. Eight readings at 768²
+     in two pairs with no overlap — **1.094 ms → 0.747, 32% off the stage** — and it
+     falls from first in the table back to third. The 5-against-10 ratio is gated
+     separately from the projection's 12-against-24, because Gauss-Seidel's advantage
+     is asymptotic and a ratio that holds where both solvers have converged need not
+     hold where neither has got far: measured at 0.15% more residual, against 0.13%.
+     *Where the rung stands:* 768², two layers, classic — 30.2 ms a frame at sixty
+     steps a second where H2 began at 38.6, and **17.1 ms at the thirty the governor
+     now asks for, which is the display's own refresh.** The solver has stopped being
+     what bounds this rung.
+     *What is left of H2:* viscosity at 13%, and `forcesB` by some route other than
+     splitting it (H2a below).
      — original note — Red-black
      or multigrid in place of 24 Jacobi passes — and the same treatment for dye
      diffusion (14.2%), the squeeze film (11.6%) and viscosity (10.2%), which between
@@ -112,9 +124,19 @@ job: nothing was written twice. There is one shading language in the tree now �
      every force switched off, is 0.368; the six forces together add 0.44; and
      **switching off any one of them on its own changes nothing measurable.** That is
      not a branch being expensive, it is the compiled kernel's register footprint
-     holding occupancy down whatever it executes at runtime. The fix is to split it, or
-     to shrink the worst path — not to micro-optimise a branch, which is what measuring
-     one at a time would have suggested. Sized but not started.
+     holding occupancy down whatever it executes at runtime. Not a branch to
+     micro-optimise, which is what measuring one at a time would have suggested.
+     *Splitting it was tried on 2026-09-21 and does not work.* Curl noise — four
+     octaves of simplex in a loop, the piece most likely to be setting the footprint —
+     was lifted into its own kernel, dispatched only when a look asks for turbulence.
+     Measured at 768² alternating in two pairs, the split is **worse in all four
+     readings**: 0.810 ms against 0.684. An extra pass reads and writes the whole
+     velocity texture, 9 MB a layer a step at this grid, and that costs more than the
+     occupancy it buys back. The guard that would have paid for it never fires either:
+     **none of the nineteen looks that name `turbulenceScale` have it off**, so the
+     skip is theoretical. What is left is to shrink the worst path *in place* — fewer
+     values live across the octave loop, or a cheaper noise — which keeps the one pass
+     and is a different and harder piece of work.
    - **H1 · Dye carried by particles.** *First landing 2026-09-20, off by default.*
      The measured gap in `PLAN.md` is that filmed liquid holds three to five times more
      structure at 4–8 px than ours. Particles don't smear, which is the fix.
