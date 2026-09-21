@@ -228,6 +228,22 @@ const remote = readFileSync(join(root, 'src/components/RemoteControl.tsx'), 'utf
 check('the phone keeps no range of its own',
   !/<Slider label="[^"]+" field="[A-Za-z0-9_]+"[^>]*\bmin=\{/.test(remote)
   && /PIN_RANGE\.get\(String\(field\)\)/.test(remote));
+/*
+  And every field it draws is a control the registry knows.
+
+  "Keeps no range of its own" is only half of it. The phone reads
+  `PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 }` — so a field that is
+  not in the registry does not fail, it silently becomes a 0-to-1 slider.
+  Speed would run to 1 where the control stops at 0.3, and the fader would
+  look perfectly normal doing it.
+*/
+{
+  const fields = [...new Set([...remote.matchAll(/field="([A-Za-z0-9_]+)"/g)].map(m => m[1]))];
+  const unknown = fields.filter(f => !PIN_RANGE.has(f));
+  check('and every control the phone draws is one the registry knows',
+    fields.length > 0 && unknown.length === 0,
+    unknown.length ? `${unknown.join(', ')} would silently become 0..1` : `${fields.length} fields`);
+}
 const seqPanel = readFileSync(join(root, 'src/components/SequencerPanel.tsx'), 'utf8');
 check('and neither does a sequence stage',
   GLIDES.length > 20 && GLIDES.every(([k]) => PIN_RANGE.has(String(k)))
@@ -1002,6 +1018,31 @@ check('the bench starts with controls that exist', badRecipe.length === 0, badRe
 check('and neither starts over the limit',
   DEFAULT_RIDES.length <= MAX_PINS && DEFAULT_RECIPE.length <= MAX_PINS,
   `${DEFAULT_RIDES.length} rides, ${DEFAULT_RECIPE.length} recipe, limit ${MAX_PINS}`);
+
+// ── The looks and the defaults, against the same ranges ─────────────
+//
+// The dice were one of three lists of what a setting may be. These are the
+// other two, and they drift the same way for the same reason — a range is
+// tightened in one place and the others are not edited, because nothing
+// connects them. A value outside the desk's range is not a crash: it is a
+// look that is fine until somebody pins that control, and then the first
+// touch of the fader jumps the plate to the nearest end.
+{
+  const outside = (label, entries) => {
+    const out = [];
+    for (const [owner, settings] of entries) {
+      for (const [key, v] of Object.entries(settings)) {
+        const spec = PIN_RANGE.get(key);
+        if (!spec || typeof v !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') continue;
+        const slack = Math.max(1e-9, (spec.max - spec.min) * 1e-6);
+        if (v < spec.min - slack || v > spec.max + slack) out.push(`${owner}.${key}=${v} (desk ${spec.min}..${spec.max})`);
+      }
+    }
+    check(label, out.length === 0, out.length ? `${out.length}: ${out.slice(0, 5).join('; ')}` : `${entries.length} checked`);
+  };
+  outside('every look sits inside the range the desk rides', PRESETS.map(p => [p.id, p.settings]));
+  outside('and so does every default', [['default', DEFAULT_SETTINGS]]);
+}
 
 // ── A roll of the dice, against the ranges everything else uses ─────
 //
