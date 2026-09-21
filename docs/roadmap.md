@@ -92,10 +92,24 @@ job: nothing was written twice. There is one shading language in the tree now �
      diffusion (14.2%), the squeeze film (11.6%) and viscosity (10.2%), which between
      them cost more than the projections do. Less residual divergence, livelier small
      swirls, and about two thirds of a step to aim at.
-     *Gate:* 1024² holds 30 fps on the M4 that manages 22 today. That gate is **H3** —
-     a 1024² rung on strong machines — which is two lines in `qualityLadder` and a
-     governor that already judges by real GPU timings, so it is this item's test rather
-     than an item of its own.
+     *Gate: passed 2026-09-21.* It was "1024² holds 30 fps on the M4 that manages 22
+     today", and on a display with one pixel per pixel it holds **34**, keeping 30 of
+     30 steps. What makes it possible is H2b rather than any of the solver work: at
+     sixty steps a second the same rung is 26 fps and in slow motion, because 1024² is
+     past what this machine can step sixty times a second whatever else is true. The
+     rung is offered where it was measured to hold and nowhere else —
+     `npm run ladder -- --device-pixels 2` puts it at 44.7 ms and 22 fps, since the
+     step costs the same either way (25.2 ms: it is the grid, not the pixels) and what
+     breaks it is shading four times the canvas. A rung that cannot hold is worse than
+     no rung: the governor would climb into it, spend a step-down and a settling period
+     finding out, and offer it again ninety seconds later. A show runs on a projector,
+     and a projector has one pixel per pixel.
+     *And the ladder's lower half has gone flat on this machine:* at thirty steps a
+     second, 768², 512², 384² and 256² all read 17.0 ms and 59 fps, because the frame
+     is bound by the display's refresh rather than by the solver. A step down from 768²
+     saves 0.1 ms. That is a statement about this M4 rather than about the ladder —
+     those rungs are what a weaker machine lives on — but it is why nothing below 1024²
+     is worth measuring here any more.
    - **H2b · Make slow cheap: fewer steps, not smaller ones.** *The mechanism landed
      2026-09-21, the policy did not.* `?steps=N` stretches `dt` to hold `rate × dt`
      constant, and the stretch is exact (ratio 1.9988 over four runs). At 768² with

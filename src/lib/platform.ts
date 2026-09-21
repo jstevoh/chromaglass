@@ -113,6 +113,31 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
           { grid: 256, dpr: 1 },
         ]
       : [
+          /*
+            1024², where a display has one pixel per pixel (H3).
+
+            The rung H2 was written against, and its gate was "1024² holds 30
+            fps on the M4 that manages 22 today". Measured on that M4 with
+            `npm run ladder`, at thirty steps a second — which is what makes
+            it possible, since at sixty the plate is in slow motion at this
+            grid whatever the pixels:
+
+              1024² @ 1x   30.8 ms   32 fps   29.8 of 30 steps
+              1024² @ 2x   44.7 ms   22 fps      29 of 60 steps
+
+            So it clears the gate at one device pixel and misses it at two —
+            the solver step costs the same either way (25.2 ms both times: it
+            is the grid, not the pixels), and what breaks it is shading four
+            times the canvas. A rung that cannot hold is worse than no rung:
+            the governor would climb into it, spend a step-down and a settling
+            period finding out, and offer it again ninety seconds later, for
+            about eight seconds of a degraded show every minute and a half.
+
+            So it is offered where it was measured to hold. That is also the
+            case that matters most — a show runs on a projector, and a
+            projector has one pixel per pixel.
+          */
+          ...(dpr <= 1 ? [{ grid: 1024, dpr }] : []),
           { grid: 768, dpr },
           { grid: 512, dpr },
           { grid: 512, dpr: 1 },

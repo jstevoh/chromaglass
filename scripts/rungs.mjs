@@ -79,8 +79,31 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   console.log(`\n  a 1x display's local ladder: ${rungs.map((r) => `${r.grid}²@${r.dpr.toFixed(2)}`).join('  ')}`);
   const two = ladderAt('local', 'strong', 2).rungs;
   console.log(`  a 2x display's local ladder: ${two.map((r) => `${r.grid}²@${r.dpr.toFixed(2)}`).join('  ')}\n`);
-  check('a 1x display is offered fewer rungs than a 2x one', rungs.length < two.length,
-    `${rungs.length} against ${two.length} — the pixel rungs only exist where there are pixels to give up`);
+  /*
+    Counting rungs was the old way of saying this and it stopped being true
+    the moment a 1x display gained a grid rung of its own (1024², H3): both
+    ladders are five long now, and the check passed on an arithmetic
+    coincidence rather than on the property it describes.
+
+    The property is about *what a step gives up*. A rung that differs from
+    the one above it only in pixels can only exist where there are pixels to
+    give up, so a 1x ladder must have none and a 2x ladder must have some.
+  */
+  const pixelOnly = (rs) => rs.filter((r, i) => i > 0 && rs[i - 1].grid === r.grid).length;
+  check('a step that gives up only pixels exists only where there are pixels to give up',
+    pixelOnly(rungs) === 0 && pixelOnly(two) > 0,
+    `1x has ${pixelOnly(rungs)} such steps, 2x has ${pixelOnly(two)}`);
+
+  /*
+    And 1024² is offered where it was measured to hold and nowhere else.
+    `npm run ladder --device-pixels 2` puts it at 44.7 ms and 22 fps against
+    the 30 the gate asks for, where one device pixel gives 30.8 ms and 32.
+    The step costs the same either way — it is the grid, not the pixels —
+    and what breaks it is shading four times the canvas.
+  */
+  check('1024² is offered at one device pixel and not at two',
+    rungs.some((r) => r.grid === 1024) && !two.some((r) => r.grid === 1024),
+    `1x: ${rungs.map((r) => r.grid).join(',')}  ·  2x: ${two.map((r) => r.grid).join(',')}`);
 }
 
 // ── What a rung does to the canvas ───────────────────────────────────
