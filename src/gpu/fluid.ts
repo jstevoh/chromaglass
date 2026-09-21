@@ -28,6 +28,18 @@ import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
 import { WebGPUParticles } from './particles';
+import { WebGPUAir } from './air';
+
+/*
+  How many bubbles the air field has room for.
+
+  `MAX_BUBBLES` in `lib/bubbles.ts` is 40 today, and that cap exists because
+  the compositor looped over them per pixel. The field does not care — the
+  splat costs the area the discs cover — so this is sized for where H6 is
+  going rather than for where the list is now, and raising the list's cap
+  needs nothing here.
+*/
+const AIR_CAPACITY = 512;
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -162,6 +174,8 @@ export class WebGPUFluid {
    * before H1 wants none of it.
    */
   private particles: WebGPUParticles | null = null;
+  /** The air field (H6): where the bubbles are, so the dye can be taken out of it. */
+  private air: WebGPUAir | null = null;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -492,6 +506,20 @@ export class WebGPUFluid {
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
     /*
+      The air field, before any compute pass opens (H6 · A).
+
+      It is a render pass and the stage that reads it is a compute pass, so
+      it has to be encoded first — commands run in the order they are
+      recorded, and a compute pass cannot be interrupted to draw into a
+      texture it is sampling. It is also cheap and unconditional: the load op
+      is what clears the field, so skipping it on a frame with no bubbles
+      would leave the last frame's air behind and the dye would stay missing
+      under a bubble that had already popped.
+    */
+    if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.air.splat(enc, (label) => this.profiler.renderPass(label));
+
+    /*
       One pass, or one per stage.
 
       Off (the show), everything below is encoded into a single compute pass
@@ -599,6 +627,20 @@ export class WebGPUFluid {
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
 
+    /*
+      Where air is, dye is not (H6 · A).
+
+      After the advection, so the dye that moved this step is the dye the
+      hole is cut from; before anything reads the plate, so nothing sees
+      liquid where the bubble is. Skipped entirely when no bubble is on the
+      plate, which is most looks — `stage` does not open a pass it is told
+      not to, so the profiler reads zero rather than the cost of nothing.
+    */
+    stage('air exclude', (pass) => {
+      this.run(pass, 'airExclude', this.dye.write, [this.dye.read, this.air!.field], this.arg('air clear', [p.bubbleClear ?? 1, 0, 0, 0]));
+      this.dye.swap();
+    }, !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
+
     // 9.5. Sharpen what the advection and the diffusion softened
     if (p.sharpness > 0.0001) {
       stage('sharpen', (pass) => {
@@ -657,6 +699,19 @@ export class WebGPUFluid {
    * disposed, and the particles go with it. They do not survive the change,
    * which is right: they carry positions in a field that no longer exists.
    */
+  /**
+   * The bubbles this plate is carrying, from `BubbleField.packed`.
+   *
+   * Called by the frame rather than the step: the list is the renderer's
+   * bookkeeping and moves at the frame's pace, and stamping the same
+   * positions again on every one of the step's iterations would cost the
+   * splat several times over for one picture.
+   */
+  setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
+    if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.air.setBubbles(packed, count, soft);
+  }
+
   private stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
@@ -1000,6 +1055,8 @@ export class WebGPUFluid {
     this.disposed = true;
     this.particles?.dispose();
     this.particles = null;
+    this.air?.dispose();
+    this.air = null;
     this.disposer.dispose();
     this.groups.clear();
   }

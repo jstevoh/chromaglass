@@ -11,6 +11,15 @@
 /** Everything a step needs, already derived from settings by the caller. */
 export interface GpuStepParams {
   dt: number;
+  /**
+   * How completely a bubble empties the dye under it (H6 · A).
+   *
+   * 1 is the physical answer — a bubble is a hole, and a hole holds no
+   * liquid. Lower keeps some of the old look, where a bubble shaded what was
+   * behind it rather than removing it, for presets built around that. 0
+   * skips the stage altogether.
+   */
+  bubbleClear?: number;
   visc: number;         // Hele-Shaw viscosity (thick 1.5 / thin 0.5)
   nu: number;           // kinematic viscosity for momentum diffusion
   diff: number;         // dye / heat diffusivity

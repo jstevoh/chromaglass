@@ -1827,6 +1827,16 @@ class FluidSimulation {
 
     return {
       dt, visc, nu,
+      /*
+        A bubble is a hole, so it empties the dye under it (H6 · A).
+
+        1 is the physical answer and the default: this is the change H6
+        exists to make, and every look with bubbles on it is meant to show
+        it. `bubbleClear` is a look setting in the plan, for presets that
+        want some of the old shading back; until the compositor half lands
+        there is nothing to tune it against, so it is not a slider yet.
+      */
+      bubbleClear: 1,
       diff: settings.diffusionRate,
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
@@ -5066,6 +5076,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               return true;
             };
+          }
+          /*
+            The same list the compositor is given, handed to the solver too
+            (H6 · A). Once a frame rather than once a step: the positions
+            come from `bubbles.ts`, which moves at the frame's pace, and
+            stamping them again on each of the step's iterations would pay
+            for the splat several times over for one picture.
+          */
+          for (const f of fluidsRef.current) {
+            if (f.gpu instanceof WebGPUFluid) {
+              f.gpu.setBubbles(bubblesRef.current.packed, Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES), 0.25);
+            }
           }
           const frame = stage?.frame();
           cpuMs += (performance.now() - t0 - cpuMs) * 0.1;

@@ -281,6 +281,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w));
 }`,
 
+  /*
+    Where air is, dye is not (H6 · A).
+
+    A bubble is a hole in the liquid, so the dye under it is removed rather
+    than tinted. `A.a.x` is `bubbleClear`: 1 takes all of it, which is the
+    physical answer, and lower keeps some of today's look for presets built
+    around a bubble that shades rather than empties.
+
+    The dye texture holds absorbance per channel, so scaling it toward zero
+    is scaling toward clear glass, which is what a hole is.
+
+    This does not yet put back what it took. Conserving the dye means adding
+    it to the rim, and the rim is the next piece of H6; until then a plate
+    with bubbles on it loses a little dye, and `npm run bubbles` says so
+    rather than claiming otherwise.
+  */
+  airExclude: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var air: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let a = clamp(textureLoad(air, p, 0).r, 0.0, 1.0) * clamp(A.a.x, 0.0, 1.0);
+  textureStore(dst, p, textureLoad(dye, p, 0) * (1.0 - a));
+}`,
+
   // x = (x0 + a Σ neighbours) / (1 + 4a), per channel. A.a is a, A.b is 1/(1+4a).
   jacobi: `${HEAD}
 @group(0) @binding(2) var x: texture_2d<f32>;
