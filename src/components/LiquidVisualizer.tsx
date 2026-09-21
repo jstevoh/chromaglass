@@ -5157,6 +5157,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
+          /** The air field (H6), for `npm run bubbles` to ask where the air is. */
+          readAir: async () => {
+            const lead = fluidsRef.current[0];
+            return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readAir() : null;
+          },
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
           /**

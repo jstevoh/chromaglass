@@ -65,9 +65,18 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
 fn fs(in: VOut) -> @location(0) vec4f {
   let r = length(in.local);
   if (r > 1.0) { discard; }
-  // Soft only at the very rim: a bubble has a sharp edge, and the softness is
-  // there to keep the disc from aliasing rather than to blur it.
-  let a = in.amt * smoothstep(1.0, 1.0 - max(A.soft, 0.01), r);
+  /*
+    Soft only at the very rim: a bubble has a sharp edge, and the softness is
+    there to keep the disc from aliasing rather than to blur it.
+
+    Written smoothstep(1.0, 1.0 - soft, r) first, which reads as "fall off
+    from the edge inward" and is **undefined in WGSL** — it requires the low
+    edge first, and hands back something near zero when given them the other
+    way round. The field it produced had discs in it, in the right places, at
+    a peak of 0.01: present, plausible, and useless. A check that only asked
+    whether there was air would have passed.
+  */
+  let a = in.amt * (1.0 - smoothstep(1.0 - max(A.soft, 0.01), 1.0, r));
   return vec4f(a, 0.0, 0.0, 1.0);
 }
 `;

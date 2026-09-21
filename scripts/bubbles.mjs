@@ -264,6 +264,7 @@ try {
     return put.length;
   });
   check('the bubbles are on dye, not on bare glass', placed >= 8, `${placed} placed on the thickest cells`);
+
   await page.waitForTimeout(900);
   const told = await page.evaluate(() => window.chromaglassDebug().bubbleUniforms());
   check('and the shader is told about them',
@@ -363,6 +364,77 @@ try {
       `${report.addAngle.toFixed(1)}° between added light and ground colour ` +
       `over ${report.lit} lit pixels (worst ${report.worstAngle.toFixed(1)}°)`);
     console.log(`     and it is brighter, as a lens should be: ${Math.round(report.lumGain * 100)}% more light`);
+  }
+
+  /*
+    Where the air is (H6 · A).
+
+    Last, because it clears the plate and puts a single bubble somewhere of
+    its own choosing: every check above wants the twelve that were placed on
+    the thickest dye, and this one wants to know exactly where one is.
+
+    The air field is stamped by a render pass, and a render pass writes clip
+    space, which is y-up where these textures are read y-down. A field
+    flipped in y holds exactly the right amount of air, in exactly the right
+    number of discs, of exactly the right size — and every question except
+    *where* passes on it.
+
+    So this puts one bubble somewhere deliberately off-centre in both axes,
+    reads the whole field back, and asks where the air actually landed. The
+    flipped position is named explicitly, because "near where I put it" and
+    "nowhere near the mirror of where I put it" are two different claims and
+    only the pair of them rules out the trap.
+  */
+  {
+    const air = await page.evaluate(async () => {
+      const d = window.chromaglassDebug();
+      d.bubbles.clear();
+      const N = d.gridSize;
+      // A third across, a fifth down: distinct from its own mirror in both axes.
+      const bx = Math.round(N * 0.33), by = Math.round(N * 0.20);
+      d.bubbles.spawn(bx, by, N * 0.05, 1, 0);
+      d.bubbles.bubbles[d.bubbles.bubbles.length - 1].age = 1.0;
+      await new Promise((r) => setTimeout(r, 500));
+      const field = await d.readAir();
+      if (!field) return null;
+      const { n, data } = field;
+      let peak = -1, px = -1, py = -1, total = 0;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          const v = data[y * n + x];
+          total += v;
+          if (v > peak) { peak = v; px = x; py = y; }
+        }
+      }
+      return { n, peak, px: px / n, py: py / n, want: { x: bx / N, y: by / N }, mean: total / (n * n) };
+    });
+
+    check('the air field has air in it at all', air !== null && air.peak > 0.2,
+      air === null ? 'no field — the solver is not the GPU one' : `peak ${air.peak.toFixed(2)}, mean ${air.mean.toFixed(4)}`);
+
+    if (air) {
+      const near = Math.hypot(air.px - air.want.x, air.py - air.want.y);
+      const mirrored = Math.hypot(air.px - air.want.x, air.py - (1 - air.want.y));
+      check('and it is where the bubble was put', near < 0.06,
+        `air at ${air.px.toFixed(2)},${air.py.toFixed(2)} against ${air.want.x.toFixed(2)},${air.want.y.toFixed(2)} — ${near.toFixed(3)} away`);
+      check('and not at the mirror of it, which is what a flipped field looks like',
+        mirrored > 0.12, `${mirrored.toFixed(3)} from the flipped position`);
+    }
+
+    // And the control: with nothing on the plate the field is empty. Without
+    // this, a field that is simply full of air passes everything above.
+    const empty = await page.evaluate(async () => {
+      const d = window.chromaglassDebug();
+      d.bubbles.clear();
+      await new Promise((r) => setTimeout(r, 500));
+      const field = await d.readAir();
+      if (!field) return null;
+      let peak = 0;
+      for (const v of field.data) if (v > peak) peak = v;
+      return peak;
+    });
+    check('and no air at all once the bubbles are gone', empty !== null && empty < 0.02,
+      empty === null ? 'no field' : `peak ${empty.toFixed(4)} with an empty plate`);
   }
 } finally {
   await browser.close();

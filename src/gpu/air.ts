@@ -47,15 +47,20 @@ export class WebGPUAir {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
     /*
-      r32float rather than r16float: the exclusion multiplies the dye by
-      `1 - a`, so a coarse a shows up as banding in the thinnest dye, which
-      is where a bubble's rim lives. One channel at the solver grid is 2.4 MB
-      at 768², against the 9 MB the velocity already costs.
+      r16float, because **float32 is not blendable** and this pass blends.
+
+      It was r32float first, on the reasoning that the exclusion multiplies
+      the dye by `1 - a` so a coarse `a` would band in the thinnest dye. That
+      reasoning was fine and the format was not available for it: WebGPU does
+      not blend 32-bit float targets, and the whole pipeline was rejected —
+      silently, as far as anything downstream could tell. Sixteen bits of
+      float carry a 0-to-1 coverage with about three decimal places, which is
+      finer than the dye it multiplies, and it costs half the memory.
     */
     this.field = this.disposer.track(device.createTexture({
       label: 'air',
       size: [grid, grid],
-      format: 'r32float',
+      format: 'r16float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
   }
@@ -86,14 +91,25 @@ export class WebGPUAir {
       label: 'air splat',
       layout: this.device.createPipelineLayout({
         label: 'air splat',
-        bindGroupLayouts: [layoutFromWgsl(this.device, AIR_SPLAT_WGSL, 'air splat', GPUShaderStage.VERTEX)],
+        /*
+          Both stages: `layoutFromWgsl` gives every binding the one
+          visibility it is handed, and the fragment shader reads `A.soft`
+          for the rim.
+
+          (This was my first guess at why the field was empty, and it was
+          wrong — the layout error in the console was a cascade from an
+          invalid pipeline, not its cause. It is still the correct
+          visibility, so it stays; the actual fault was the target format,
+          above.)
+        */
+        bindGroupLayouts: [layoutFromWgsl(this.device, AIR_SPLAT_WGSL, 'air splat', GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
       }),
       vertex: { module: module(AIR_SPLAT_WGSL), entryPoint: 'vs' },
       fragment: {
         module: module(AIR_SPLAT_WGSL),
         entryPoint: 'fs',
         targets: [{
-          format: 'r32float' as GPUTextureFormat,
+          format: 'r16float' as GPUTextureFormat,
           blend: {
             color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
             alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },

@@ -712,6 +712,52 @@ export class WebGPUFluid {
     this.air.setBubbles(packed, count, soft);
   }
 
+  /**
+   * The air field, read back whole. For checks, not for a frame.
+   *
+   * A field can be the right size, hold the right amount and still be wrong
+   * — flipped in y, or off by a texel — and every one of those still looks
+   * like air in the right quantity. The only question that catches it is
+   * *where*, which needs the field itself rather than a summary of it.
+   */
+  async readAir(): Promise<{ n: number; data: Float32Array } | null> {
+    if (!this.air) return null;
+    const n = this.N;
+    /*
+      Two bytes a texel, because the field is `r16float`.
+
+      This read assumed four and a `Float32Array` when the field was
+      `r32float`, and kept assuming it after the format changed. What it
+      produced was not an error: it was a field with air in it, 190 cells
+      of it, peaking at 0.01 and sitting a sixth of the plate from where the
+      bubble was. Two half floats read as one single. Every conclusion drawn
+      from it was about the reader.
+    */
+    const row = Math.ceil((n * 2) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read air', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read air' });
+    enc.copyTextureToBuffer({ texture: this.air.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const halves = new Uint16Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n);
+    const stride = row / 2;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const h = halves[y * stride + x];
+        const sign = h & 0x8000 ? -1 : 1;
+        const exp = (h >> 10) & 0x1f;
+        const man = h & 0x3ff;
+        out[y * n + x] = exp === 0 ? sign * man * 2 ** -24
+          : exp === 31 ? (man ? NaN : sign * Infinity)
+          : sign * (man + 1024) * 2 ** (exp - 25);
+      }
+    }
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
+  }
+
   private stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
