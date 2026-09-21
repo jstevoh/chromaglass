@@ -271,12 +271,33 @@ export class GpuProfiler {
     const data = this.ring?.latest;
     if (!data || !this.lastLabels.length) return;
     const t = new BigInt64Array(data);
+    const seen = new Set<string>();
     this.lastLabels.forEach((label, i) => {
+      seen.add(label);
       const ms = Number(t[i * 2 + 1] - t[i * 2]) / 1e6;
       if (!(ms >= 0 && ms < 1000)) return;
       const prev = this.ms.get(label);
       this.ms.set(label, prev === undefined ? ms : prev + (ms - prev) * 0.1);
     });
+    /*
+      A stage that stopped running has to fall to zero, not hold its last
+      reading.
+      
+      Turning dye diffusion off skips four Jacobi passes and the solver
+      measurably took 14% more steps a second for it — while this went on
+      reporting the stage at 1.31 ms, the number it had been at before,
+      because nothing was writing it any more and the map kept what it had.
+      A profiler that reports the cost of work that is not being done is
+      worse than one that reports nothing: it sent me looking for why the
+      saving had not arrived when it had.
+      
+      Decayed rather than deleted, on the same time constant as everything
+      else, so a stage that runs on alternate frames reads as half its cost
+      rather than flickering between the full number and nothing.
+    */
+    for (const [label, prev] of this.ms) {
+      if (!seen.has(label)) this.ms.set(label, prev * 0.9);
+    }
   }
   private lastLabels: string[] = [];
 }

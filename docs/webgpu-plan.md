@@ -463,6 +463,48 @@ rungs now differ.
 rung, that a step down gives something up, that halving a rung's pixels
 quarters the canvas — and it runs in CI beside the other arithmetic.
 
+## H2's next target, and a profiler that was lying about it
+
+`dye diffuse` is 14.2% of a step in five dispatches — 0.265 ms each, the
+dearest in the solver, because the dye is four channels of 32-bit float where
+pressure is one of 16. And it is *diffusion*, which is what `PLAN.md` blames
+for the plate's missing structure in the first place.
+
+**Turning it off is a two-for-one.** At 768², two layers, switched on one
+running plate:
+
+| | dye diffuse | steps a second | frame |
+|---|---|---|---|
+| as it ships | 1.344 ms | 46 | 36.8 ms |
+| diffusion off | 0 | **52** | **32.9 ms** |
+
+And the plate gets *better*, not worse. Two same-plate A/Bs (`npm run ab`, so
+the liquid is the same liquid):
+
+| | edge% | p50g | 1 px | 2 px | 4 px |
+|---|---|---|---|---|---|
+| on | 11.1 / 12.5 | 1.3 / 1.4 | 0.5 / 0.5 | 0.2 / 0.3 | 0.5 / 0.6 |
+| off | **13.1 / 14.6** | **1.6 / 1.9** | 0.6 / 0.7 | 0.3 / 0.3 | 0.6 / 0.6 |
+
+Eleven per cent of a frame, spent making the picture worse.
+
+**It is binary, not a dial.** The stage is skipped only when the rate is
+exactly zero — `jacobi` returns early when every coefficient is — so halving
+a preset's rate buys the look and none of the speed. And all thirty-two
+presets set their own rate, from 0.00003 to 0.001, so the default does not
+reach any of them. That makes it a decision about thirty-two looks rather
+than a code change, which is why it is written down here rather than done.
+
+**The profiler was reporting the cost of work that was not happening.** With
+diffusion off the solver measurably took 14% more steps a second, and the
+stage went on reading 1.31 ms — the number it had been at — because a stage
+with nothing to do still opened a compute pass, an empty pass's timestamp
+pair does not yield a usable interval, the sanity check rejected it, and the
+map kept its last value. It sent me looking for why a saving had not arrived
+when it had. Two fixes: a stage with no work opens no pass, and a label that
+stops being written decays instead of holding. A profiler that reports the
+cost of work nobody is doing is worse than one that reports nothing.
+
 ## H2b — making slow cheap, measured
 
 How far the liquid travels in a second is `steps per second × dt`, and the

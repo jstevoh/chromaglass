@@ -497,7 +497,21 @@ export class WebGPUFluid {
     const shared = this.stageTimings
       ? null
       : enc.beginComputePass({ label: 'step', timestampWrites: this.profiler.pass('solver step') });
-    const stage = (label: string, body: (pass: GPUComputePassEncoder) => void): void => {
+    /*
+      `when` is false for a stage with nothing to do, and it matters to the
+      reading as well as the cost.
+      
+      A stage that opens a pass and dispatches nothing still takes a
+      timestamp pair, and an empty pass's pair does not produce a usable
+      interval — the profiler's sanity check rejects it and leaves the label
+      at whatever it last read. So turning dye diffusion off skipped four
+      Jacobi passes, the solver took 14% more steps a second for it, and the
+      profiler went on reporting the stage at 1.31 ms as though nothing had
+      changed. Not opening the pass at all lets the entry decay to zero,
+      which is the truth.
+    */
+    const stage = (label: string, body: (pass: GPUComputePassEncoder) => void, when = true): void => {
+      if (!when) return;
       if (shared) { body(shared); return; }
       const own = enc.beginComputePass({ label, timestampWrites: this.profiler.pass(label) });
       body(own);
@@ -522,9 +536,10 @@ export class WebGPUFluid {
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
+    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0];
     stage('viscosity', (pass) => {
-      this.jacobi(pass, this.vel, [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0], VISC_ITERS, 'vel');
-    });
+      this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
+    }, visc.some((v) => v > 0));
 
     // 4. Project, 5. advect velocity by itself, 6. project again
     stage('project 1', (pass) => this.project(pass));
@@ -545,7 +560,7 @@ export class WebGPUFluid {
 
     // 9. Dye: diffuse, then advect through the forced velocity
     const a = p.dt * p.diff * n2;
-    stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'));
+    stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
 
     // 9.5. Sharpen what the advection and the diffusion softened
