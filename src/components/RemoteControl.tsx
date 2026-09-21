@@ -601,7 +601,7 @@ export default function RemoteControl() {
                   <SkipBack size={16} className="mx-auto" />
                 </button>
                 <button
-                  onClick={() => action(state.sequencer.running ? 'seq-pause' : 'seq-play')}
+                  onClick={() => action(state.sequencer?.running ? 'seq-pause' : 'seq-play')}
                   disabled={!connected}
                   className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[11px] font-bold uppercase tracking-[0.2em] disabled:opacity-30 active:scale-95 ${
                     state.sequencer.running ? 'border-white/40 bg-white text-black' : 'border-white/10 bg-white/5 text-white/80'

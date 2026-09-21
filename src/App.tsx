@@ -11,6 +11,7 @@ import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
+import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
@@ -1906,6 +1907,9 @@ export default function App() {
       case 'tempo-clear':     clearTempo(); break;
       case 'bank-next':       midiRef.current?.stepBank(1); break;
       case 'bank-prev':       midiRef.current?.stepBank(-1); break;
+      // Every action, or `tsc` names the one that is missing. A pad wired to
+      // an action nobody wrote a case for is a dead pad, and silent.
+      default: unhandled('an action', a);
     }
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. */
@@ -2015,6 +2019,11 @@ export default function App() {
             case 'record-toggle': toggleRecording(); break;
             case 'go':            goLook(); break;
             case 'back':          revertLook(); break;
+            // A phone may be a newer build than the display, so an action
+            // this one does not know is possible rather than impossible: it
+            // is said out loud instead of swallowed. `tsc` still requires a
+            // case for every action this build's own protocol declares.
+            default: unhandled('an action from the phone', message.action);
           }
           break;
         case 'blow':
@@ -2029,6 +2038,27 @@ export default function App() {
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
           break;
+        /*
+          Not this display's, and each for its own reason. Naming them is the
+          point: without these four the switch below cannot ask the compiler
+          for the rest, and "no case" reads the same whether it was decided
+          or forgotten.
+
+          `hello` goes the other way — `useRemoteLink` sends it on connect.
+          `denied` is taken by that hook too, before `onMessage` ever runs,
+          and so is `request-state`, which the hook answers for this role.
+          `lights` and `state` this display *sends*: the first a few lines
+          down from here, the second from the hook.
+          `cast` is the mirror's, and `CastDisplay` has it.
+        */
+        case 'hello':
+        case 'denied':
+        case 'request-state':
+        case 'state':
+        case 'lights':
+        case 'cast':
+          break;
+        default: unhandled('a message from the phone', message);
       }
     },
   });
@@ -2078,6 +2108,9 @@ export default function App() {
       // full, bright plate in the look's own dye does not show.
       case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
       case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+      // A show that names something this build cannot do says so, rather
+      // than running the stage and appearing to have done it.
+      default: unhandled("a song show's action", a);
     }
   }, [glideSetting, goLookNow]);
 

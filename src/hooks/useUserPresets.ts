@@ -48,7 +48,16 @@ export function useUserPresets() {
   const saveOver = useCallback((id: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null): UserPreset | null => {
     const existing = loadUserPresets().find(p => p.id === id);
     if (!existing) return null;
-    const p: UserPreset = { ...existing, settings, contract, injectStyles, liquids };
+    // `null` is how the caller says "none"; the stored shape says `undefined`
+    // for the same thing, and a saved look read back does `?? null` anyway.
+    // Writing null under an optional field meant two spellings of absent in
+    // the same file, which strict mode is what finally said out loud.
+    const p: UserPreset = {
+      ...existing, settings,
+      contract: contract ?? undefined,
+      injectStyles: injectStyles ?? undefined,
+      liquids: liquids ?? undefined,
+    };
     upsert(p);
     return p;
   }, [upsert]);

@@ -65,7 +65,21 @@ interface LiquidVisualizerProps {
   activeLayer?: number;
   clearTrigger?: number;
   drainTrigger?: number;
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak';
+  /*
+    `press` belongs here, and its absence was invisible.
+
+    The component handles it thoroughly — a hand on the top glass, the film
+    thinning under the palm — in five places, and `App.tsx` passes it: it is
+    one of `TOOL_KEYS`. The type simply never listed it, so every
+    `tool === 'press'` below compares two things that by this declaration
+    cannot be equal.
+
+    It works at run time, which is why nobody noticed: React has no type
+    declarations installed, so the prop arrives through JSX as `any` and the
+    real string gets through. Give the project `@types/react` and the
+    compiler reports all five comparisons at once as unreachable.
+  */
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
