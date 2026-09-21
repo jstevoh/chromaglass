@@ -47,6 +47,31 @@ const RETRY_AFTER_S = 90;
 const HELD_RETRY_AFTER_S = 30;
 
 /**
+ * How many solver steps a second to ask for (H2b, docs/roadmap.md).
+ *
+ * How far the liquid travels in a second is `steps per second × dt`. The loop
+ * held the first at sixty and shrank the second for a slow look, so a plate
+ * at Speed 0.012 ran the same hundred dispatches a step as one at 0.3 and
+ * cost exactly the same. Holding `dt` and halving the rate is **the same
+ * motion for half the work**, and the solver is most of a frame's GPU time.
+ * Measured at 768² with two layers: a frame goes 38.6 ms → 16.8, and the
+ * plate keeps *better* time — 29.8 of 30 steps where sixty managed 45.3 of
+ * 60. A machine that cannot sustain sixty is already dropping steps, which is
+ * slow motion; asking for thirty is not a compromise against that, it is a
+ * repair of it.
+ *
+ * Two entries, and the floor is thirty for two reasons. Below about twenty to
+ * twenty-five a plate stops flowing and starts stepping. And a rate that does
+ * not divide the display's refresh is uneven in a way the number hides: at
+ * forty-five on a 60 Hz screen three frames in four advance the liquid and
+ * the fourth does not, which reads as judder at a rate the arithmetic calls
+ * comfortable. Sixty and thirty both divide it.
+ *
+ * Thirty was watched on this M4 before it was wired to anything.
+ */
+export const STEP_RATES = [60, 30];
+
+/**
  * The post chain's own level, spent before any rung while a heavy effect is
  * on (feedback, slit-scan): those passes are fill-bound, and a smaller solver
  * grid, all the rungs can offer, does nothing for them.
@@ -72,6 +97,10 @@ export class QualityGovernor {
   private post: PostLevel = 0;
   /** Post level → when it last failed (seconds). */
   private readonly postFailed = new Map<number, number>();
+  /** Index into `STEP_RATES`. */
+  private steps = 0;
+  /** Step-rate index → when it last failed (seconds). */
+  private readonly stepsFailed = new Map<number, number>();
   /** Set each frame by the renderer: whether a heavy post pass is on. */
   heavyPost = false;
 
@@ -104,6 +133,11 @@ export class QualityGovernor {
   /** The post chain's level. Back to 0 whenever no heavy pass is on: there is nothing to spare. */
   get postLevel(): PostLevel {
     return this.heavyPost ? this.post : 0;
+  }
+
+  /** Solver steps a second to ask the loop for. */
+  get stepRate(): number {
+    return STEP_RATES[this.steps];
   }
 
   /** Below where this machine started — the signal that it has less room than it looked. */
@@ -157,7 +191,28 @@ export class QualityGovernor {
     if (this.emaFrame > SLOW_MS) {
       this.fastSince = null;
       this.slowSince ??= now;
-      // The post chain's level first, while a heavy pass is on: the rungs
+      /*
+        The step rate first, because it is the only thing here that is free.
+
+        A rung gives up resolution and a post level gives up an effect; both
+        are visible, and both are permanent until the machine gets faster.
+        Halving the step rate gives up nothing — the liquid travels the same
+        distance in the same second, in steps twice as long — so it is tried
+        before anything that costs a picture.
+
+        It does not always help. A frame held up by a fill-bound post pass is
+        not held up by the solver, and lowering the rate will not move it, so
+        the governor spends one settling period finding that out before it
+        reaches for the post level below. That is the right way round: two and
+        a half seconds is cheap next to switching off an effect that was
+        never the problem.
+      */
+      if (now - this.slowSince >= DOWN_AFTER_S && this.steps < STEP_RATES.length - 1) {
+        this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.steps += 1;
+        return this.moved(now);
+      }
+      // Then the post chain's level, while a heavy pass is on: the rungs
       // shrink the solver, and those passes are fill-bound.
       if (now - this.slowSince >= DOWN_AFTER_S && this.heavyPost && this.post < 2) {
         this.postFailed.set(this.post, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
@@ -190,6 +245,29 @@ export class QualityGovernor {
         const postFailedAt = this.postFailed.get(better);
         if (this.heavyPost && better >= 0 && (postFailedAt === undefined || now - postFailedAt >= RETRY_AFTER_S)) {
           this.post = better as PostLevel;
+          return this.moved(now);
+        }
+        /*
+          And the step rate last, for the same reason it went first: going
+          back to sixty spends the headroom and buys nothing anyone can see.
+
+          "Last" cannot be left to the retry clocks, which was the first
+          attempt at this and is wrong in a way that looks right. The rate is
+          given up first, so its ninety seconds expire first, so it is the
+          first thing eligible to come back — the intended order, inverted by
+          the very fact that it was intended. `npm run rungs` caught it.
+
+          So the condition is stated rather than timed: the rate returns only
+          when nothing visible is still given up — every rung back to where
+          this machine started, and no effect still switched off. The clock
+          stays as well, to keep it from hunting on a machine that is sitting
+          right on the line.
+        */
+        const faster = this.steps - 1;
+        const stepsFailedAt = this.stepsFailed.get(faster);
+        const pictureWhole = this.index <= this.start && this.post === 0;
+        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)) {
+          this.steps = faster;
           return this.moved(now);
         }
         if (rungFree) {
