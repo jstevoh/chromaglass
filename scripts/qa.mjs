@@ -425,7 +425,35 @@ try {
     failure wearing a friendlier face.
   */
   {
-    const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    /*
+      "Not yet" is a third answer, and the first version of this guard did not
+      have it.
+
+      It read the engine once and judged, and on a runner it read `""` — the
+      debug hook was simply not up yet — and announced "this runner has no
+      GPU", on an agent that had one. A guard written to tell "the machine had
+      nothing to give" from "the code is broken" could not tell either of them
+      from "ask again in a second", which is the whole bug class it exists to
+      catch, built into the guard.
+
+      So it waits for the solver to say what it is, and an engine that never
+      arrives is its own answer with its own sentence.
+    */
+    const engine = await page.waitForFunction(
+      () => window.chromaglassDebug?.().engine || null, null, { timeout: 30_000 },
+    ).then((h) => h.jsonValue()).catch(() => null);
+
+    if (engine === null) {
+      console.error(
+        `\n  The solver never said what engine it is, after thirty seconds.\n` +
+        `  That is not the no-GPU case below — it is the debug hook missing or the\n` +
+        `  page not reaching a plate at all, and nothing further down would mean\n` +
+        `  anything.\n`);
+      stopServer(server);
+      await browser.close();
+      process.exit(1);
+    }
+
     if (!isGpuEngine(engine) && Number(DPR) >= 1) {
       console.error(
         `\n  This runner has no GPU — the solver reports "${engine ?? 'nothing'}".\n` +
