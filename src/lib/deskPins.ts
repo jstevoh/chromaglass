@@ -43,6 +43,22 @@
 import { LEARNABLE_SETTINGS } from './midi';
 import type { VisualizerSettings } from '../types';
 
+/**
+ * The most dye diffusion any look is given (H2, docs/roadmap.md).
+ *
+ * The pass costs the same whatever rate it is handed, and it is skipped
+ * outright at zero, so a rate is a full solver stage bought for whatever
+ * softening it buys. Measured on the same plate with the rate toggled under
+ * it, the looks that leaned hardest on it were *sharper* without it — more
+ * hard edges, more structure at 1 and 4 px, the same coverage and the same
+ * colours. A fifth of where this sat before.
+ *
+ * Named here rather than written into each place that needs it because it is
+ * needed in three: this list's range, the presets, and the dice roll in
+ * `lucky.ts` — and it was the roll that was missed, at ten times over.
+ */
+export const DIFFUSION_CEILING = 0.0002;
+
 export interface DeskSpec {
   key: keyof VisualizerSettings;
   label: string;
@@ -178,7 +194,7 @@ const FROM_PANEL: DeskSpec[] = [
     saving only arrives at exactly zero, where the solver skips the stage, so
     a look that wants none should say none.
   */
-  { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: 0.0002, section: 'physics' },
+  { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: DIFFUSION_CEILING, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },
   { key: 'damping', label: "Momentum", min: 0.8, max: 1, section: 'physics' },

@@ -28,6 +28,9 @@ import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
+import { luckyLook } from '../src/lib/lucky.ts';
+import { DEFAULT_SETTINGS } from '../src/types.ts';
+import { PRESETS } from '../src/presets.ts';
 import { SettingRide } from '../src/lib/ride.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
@@ -999,6 +1002,80 @@ check('the bench starts with controls that exist', badRecipe.length === 0, badRe
 check('and neither starts over the limit',
   DEFAULT_RIDES.length <= MAX_PINS && DEFAULT_RECIPE.length <= MAX_PINS,
   `${DEFAULT_RIDES.length} rides, ${DEFAULT_RECIPE.length} recipe, limit ${MAX_PINS}`);
+
+// ── A roll of the dice, against the ranges everything else uses ─────
+//
+// "Randomise the look" is a third list of what a setting may be, beside the
+// presets and the desk's own ranges — and it is the one nobody edits when a
+// range changes, because it lives in a click handler rather than anywhere a
+// range is declared. It was an object literal inside `App.tsx` until this
+// check needed it; `src/lib/lucky.ts` exists so this can hold it.
+//
+// Two things had gone wrong in there and neither was visible from anywhere:
+// it rolled dye diffusion ten times over the ceiling every look is under,
+// which washes the dye into an even film, and it rolled speed half as far
+// again as the fastest look it could replace. Both were found by somebody
+// watching the plate, which is the expensive way.
+{
+  /** mulberry32, so a failure here is the same failure tomorrow. */
+  const seeded = (seed) => () => {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const ROLLS = 500;
+  const rolls = [];
+  for (let i = 0; i < ROLLS; i++) rolls.push(luckyLook(DEFAULT_SETTINGS, ['#ff0000', '#00ff00'], seeded(i * 7919 + 13)));
+
+  // 1. Complete. A literal naming 85 of the 118 settings leaves 33 undefined,
+  //    and because every one of them is read as `x ?? default` downstream,
+  //    that is not a crash — it is beads, cells, lacing, granulation,
+  //    sharpness, dish spread and fingering silently switching off.
+  const wanted = Object.keys(DEFAULT_SETTINGS);
+  const blank = new Set();
+  for (const r of rolls) for (const k of wanted) if (r[k] === undefined) blank.add(k);
+  check('a random look defines every setting it hands over',
+    blank.size === 0, blank.size ? `${blank.size} left undefined: ${[...blank].sort().join(', ')}` : `all ${wanted.length}`);
+
+  // 2. Finite. A NaN reaches the shader as a black plate.
+  const nan = new Set();
+  for (const r of rolls) for (const k of wanted) if (typeof r[k] === 'number' && !Number.isFinite(r[k])) nan.add(k);
+  check('and every number in it is a number', nan.size === 0, [...nan].join(', ') || 'all finite');
+
+  // 3. Inside the range the desks and MIDI ride. A roll outside it is a look
+  //    nobody can pin, reach, or get back to.
+  const out = [];
+  for (const [key, spec] of PIN_RANGE) {
+    if (typeof spec.min !== 'number' || typeof spec.max !== 'number') continue;
+    let lo = Infinity, hi = -Infinity;
+    for (const r of rolls) {
+      const v = r[key];
+      if (typeof v !== 'number') continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    if (lo === Infinity) continue;
+    // A hair of tolerance for the arithmetic, not for the range.
+    const slack = Math.max(1e-9, (spec.max - spec.min) * 1e-6);
+    if (lo < spec.min - slack || hi > spec.max + slack) {
+      out.push(`${key} rolls ${lo.toPrecision(3)}..${hi.toPrecision(3)}, desk says ${spec.min}..${spec.max}`);
+    }
+  }
+  check('every setting a roll lands on is inside the range the desk rides',
+    out.length === 0, out.join('; ') || `${PIN_RANGE.size} controls checked over ${ROLLS} rolls`);
+
+  // 4. And as fast as the looks are. Speed is the one that drifted furthest:
+  //    every preset was scaled to 0.6 of its old value and this was not, so a
+  //    roll came out faster than anything it could replace.
+  const speeds = PRESETS.map(p => p.settings.globalSpeed).filter(v => typeof v === 'number').sort((a, b) => a - b);
+  const rolled = rolls.map(r => r.globalSpeed).sort((a, b) => a - b);
+  const mid = (a) => a[Math.floor(a.length / 2)];
+  check('a random look runs at about the speed the looks run at',
+    mid(rolled) >= mid(speeds) * 0.5 && mid(rolled) <= mid(speeds) * 2,
+    `roll median ${mid(rolled).toFixed(4)}, the ${speeds.length} looks' median ${mid(speeds).toFixed(4)}` +
+    ` (looks span ${speeds[0]}..${speeds[speeds.length - 1]})`);
+}
 
 // ── Result ──────────────────────────────────────────────────────────
 const failed = checks.filter(c => !c.ok);

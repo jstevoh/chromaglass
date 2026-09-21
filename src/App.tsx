@@ -10,6 +10,7 @@ import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { luckyLook } from './lib/lucky';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
@@ -1583,92 +1584,7 @@ export default function App() {
 
   const triggerLucky = () => {
     previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
-    const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
-    const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];
-    const audioFeatures: ('none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity')[] = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'];
-    const randomFeature = () => audioFeatures[Math.floor(Math.random() * audioFeatures.length)];
-
-    setSettings({
-      sensitivity: Math.random() * 0.8 + 0.2,
-      bassBoost: Math.random() * 1.5 + 0.5,
-      autoCalibrate: settings.autoCalibrate,
-      globalSpeed: Math.random() * 0.048 + 0.012,
-      audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
-      platePressure: Math.random(), glassSmear: Math.random(), rainDrip: Math.random(),
-      viscosity: Math.random() > 0.5 ? 'thick' : 'thin', polarity: Math.random(),
-      heatIntensity: Math.random() * 0.5, boilingPoint: Math.random(), evaporationRate: Math.random() * 0.05,
-      airVelocity: Math.random() * 0.5, vibrationFrequency: Math.random(),
-      layerCount: Math.random() > 0.5 ? 2 : 1,
-      blendMode: blendModes[Math.floor(Math.random() * blendModes.length)],
-      gooeyEffect: Math.random(), rotationSpeed: Math.random() * 0.1, centerGravity: Math.random(),
-      ledPlatform: Math.random() > 0.5,
-      ledMode: ledModes[Math.floor(Math.random() * ledModes.length)],
-      ledColor: liquidTypes[Math.floor(Math.random() * liquidTypes.length)].color,
-      ledSpeed: Math.random() * 0.5,
-      surfaceTension: Math.random() * 0.2, diffusionRate: Math.random() * 0.002,
-      buoyancy: Math.random(), advection: Math.random() * 0.8 + 0.2,
-      damping: Math.random() * 0.1 + 0.9, heatDecay: Math.random() * 0.1 + 0.9,
-      automateRate: Math.random() * 0.2,
-      audioImpact: settings.audioImpact,
-      turbulenceScale: Math.random() * 0.7,
-      turbulenceDetail: 1 + Math.floor(Math.random() * 4),
-      blobSurfaceTension: Math.random(),
-      boundaryContrast: Math.random() * 0.7,
-      saturationBoost: 1.0 + Math.random() * 0.8,
-      dyeBudget: 0.4 + Math.random() * 0.6,
-      edgeRelief: Math.random() * 0.8,
-      bubbles: Math.random() < 0.2 ? 0 : 0.2 + Math.random() * 0.8,
-      plateRock: Math.random() * 0.9,
-      layerScaleVariety: Math.random(),
-      macroSync: Math.random(),
-      hueJourney: Math.random() < 0.7 ? 1 + Math.round(Math.random() * 8) * 0.5 : 0,
-      beatSqueeze: Math.random(),
-      backgroundLoop: Math.random(),
-      kaleidoscope: Math.random() < 0.2 ? [2, 4, 6][Math.floor(Math.random() * 3)] : 0,
-      dishVignette: Math.random() < 0.3 ? 0.4 + Math.random() * 0.6 : 0,
-      lightPlay: 0.3 + Math.random() * 0.7,
-      lampMotion: Math.random(),
-      lampHotspot: Math.random() * 0.7,
-      secondLamp: Math.random() < 0.35 ? 0.4 + Math.random() * 0.6 : 0,
-      iridescence: Math.random() * 0.6,
-      renderStyle: Math.random() < 0.25 ? 'photo' : 'show',
-      paperA: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
-      paperB: DROPPER_COLORS[Math.floor(Math.random() * DROPPER_COLORS.length)],
-      camera: Math.random() < 0.4 ? 0.5 + Math.random() * 0.5 : 0,
-      focus: Math.random(),
-      aperture: Math.random() * 0.8,
-      bloom: Math.random() * 0.7,
-      chromaticAberration: Math.random() * 0.6,
-      refraction: 0.3 + Math.random() * 0.7,
-      microDroplets: Math.random() < 0.4 ? Math.random() : 0,
-      thinFilm: Math.random() < 0.4 ? Math.random() : 0,
-      // The other projectors come out one roll in five, one at a time
-      lumia: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
-      chemistry: Math.random() < 0.15 ? 0.5 + Math.random() * 0.5 : 0,
-      gelWheel: Math.random() < 0.2 ? 0.4 + Math.random() * 0.6 : 0,
-      gelSpeed: 0.2 + Math.random() * 1.5,
-      lampWarmth: Math.random() < 0.3 ? Math.random() * 0.8 : 0,
-      exposure: Math.random() < 0.25 ? Math.random() * 0.8 : 0,
-      filmMix: settings.filmMix,
-      filmKey: settings.filmKey,
-      glossiness: Math.random() < 0.8 ? 0 : Math.random() * 0.4,
-      postBlurRadius: Math.random() * 0.7,
-      // One roll in four goes closeup — a magnified chase is its own happy
-      // accident. The zoom decides now, so the roll lands on the zoom and the
-      // flag follows it rather than the two disagreeing.
-      ...(Math.random() < 0.25
-        ? { macroMode: true, macroZoom: 4 + Math.random() * 8 }
-        : { macroMode: false, macroZoom: 1 }),
-      macroChase: 0.35 + Math.random() * 0.65,
-      macroHold: 2.5 + Math.random() * 7,
-      macroCells: Math.random(),
-      macroCellScale: 0.25 + Math.random() * 0.7,
-      macroLacing: Math.random(),
-      macroDepth: 0.25 + Math.random() * 0.6,
-      macroEdgeDetail: 0.3 + Math.random() * 0.7,
-      macroRelief: 0.4 + Math.random() * 0.6,
-      simResolution: settings.simResolution,
-    });
+    setSettings(luckyLook(settings, liquidTypes.map(t => t.color)));
     setPinnedPresetId(null);
     // Randomize inject style for the evolve
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
