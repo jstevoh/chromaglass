@@ -503,6 +503,26 @@ The structure is unchanged — hard edges 10.8% against 11.3%, every detail
 scale within run-to-run variation — and the plate has no smearing or
 streaking in it at the larger timestep.
 
+**And it reported itself wrongly at first.** The panel's amber "% speed"
+warning — the one thing that catches a plate silently running slow — compared
+the achieved rate against a hard-coded sixty. So a plate at thirty steps and
+twice the timestep, running at exactly the right speed, was labelled "50%
+speed" in amber. On the machine this was measured on, side by side:
+
+| `?steps=` | fps | steps achieved | the plate's real speed |
+|---|---|---|---|
+| 60 | 27 | 44 of 60 | **73%** — genuinely slow |
+| 30 | 59 | 30 of 30 | **100%** — on time |
+
+The warning was right in the first row and wrong in the second, which is the
+worst way for a warning to be wrong: an operator who sees it cry wolf once
+reads past it the time it matters. `EngineStatus` carries `stepRate` now and
+the readout compares against what the loop asked for.
+
+That table is also the clearest statement of what H2b is worth. At sixty this
+machine cannot keep up, so the liquid runs at 73% speed *and* stutters at 27
+fps. At thirty it is full speed and smooth. Not a trade.
+
 **What is not measured is judder.** Whether a plate stepped thirty times a
 second *flows* or *steps* is a question about motion over time, and no still
 can answer it. The mechanism is in and the default is unchanged at sixty

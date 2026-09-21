@@ -3528,6 +3528,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             simMs: simMsRef.current,
             layers: fluidsRef.current.length,
             stepsPerSec: stepsPerSecRef.current,
+            stepRate: SIM_STEP_RATE,
             // The solver's share of a frame is one step's cost times the steps
             // that frame owed; what is left is everything that is not the
             // solver, and does not fall when the grid does.
@@ -4631,6 +4632,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         solver: () => ({
           simMs: simMsRef.current,
           stepsPerSec: stepsPerSecRef.current,
+          /** What it is asking for — sixty unless `?steps=` says otherwise. */
+          stepRate: SIM_STEP_RATE,
           catchUp: catchUpRef.current,
           layers: fluidsRef.current.length,
         }),
