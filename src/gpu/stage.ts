@@ -23,8 +23,19 @@ export class WebGPUStage {
    * What puts the picture in a frame. The renderer sets it once; `frame` and
    * `grabFrame` both use it, so what a harness photographs is what the wall
    * gets rather than an empty pass.
+   *
+   * **It returns whether it painted.** The painter can decline — during a
+   * rung change there is a frame or two with no live solver to draw from —
+   * and a decline leaves the target exactly as it was acquired, which reads
+   * back as every channel zero. A wall harness then measures a picture that
+   * was never drawn and calls it a black plate, which is the one thing it
+   * exists to catch. Saying so is the difference between a gate that fails
+   * once in a few runs for no reason anyone can name and one that is worth
+   * believing.
    */
-  paint: ((encoder: GPUCommandEncoder, target: GPUTextureView) => void) | null = null;
+  paint: ((encoder: GPUCommandEncoder, target: GPUTextureView) => boolean) | null = null;
+  /** Whether the last frame's painter actually put a picture in the target. */
+  painted = false;
   private disposed = false;
 
   private constructor(readonly gpu: Gpu, readonly canvas: HTMLCanvasElement, context: GPUCanvasContext) {
@@ -79,8 +90,11 @@ export class WebGPUStage {
     const target = this.context.getCurrentTexture();
     const encoder = device.createCommandEncoder({ label: 'frame' });
     if (paint) {
-      paint(encoder, target.createView());
+      // `=== true` rather than a truthiness test: a painter that forgets to
+      // say is a painter that has not said, and guessing is what this is for.
+      this.painted = paint(encoder, target.createView()) === true;
     } else {
+      this.painted = false;
       const pass = encoder.beginRenderPass({
         label: 'plate',
         colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
@@ -100,9 +114,10 @@ export class WebGPUStage {
    * presented WebGPU canvas reads black to drawImage, so this draws a frame
    * and copies it out in the same task.
    */
-  async grabFrame(): Promise<{ width: number; height: number; pixels: Uint8Array }> {
+  async grabFrame(): Promise<{ width: number; height: number; pixels: Uint8Array; painted: boolean }> {
     const device = this.gpu.device;
     const tex = this.frame();
+    const painted = this.painted;
     const { width, height } = tex;
     const row = Math.ceil((width * 4) / 256) * 256;
     const buf = device.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -124,7 +139,7 @@ export class WebGPUStage {
     }
     buf.unmap();
     buf.destroy();
-    return { width, height, pixels };
+    return { width, height, pixels, painted };
   }
 
   dispose(): void {

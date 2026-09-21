@@ -119,7 +119,7 @@ export class WebGPUFrameProbe {
       fragment: { module: module(SOLID_WGSL), entryPoint: 'fs', targets: [{ format }] },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     }));
-    return (encoder: GPUCommandEncoder, target: GPUTextureView) => {
+    return (encoder: GPUCommandEncoder, target: GPUTextureView): boolean => {
       const pass = encoder.beginRenderPass({
         label: 'probe self-test',
         colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
@@ -131,6 +131,8 @@ export class WebGPUFrameProbe {
         pass.draw(3);
       }
       pass.end();
+      // It always paints: the clear is the picture when there are no rects.
+      return true;
     };
   }
 

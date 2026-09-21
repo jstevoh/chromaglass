@@ -287,6 +287,59 @@ try {
     }));
   };
 
+    /*
+      A frame the stage declined to paint must not be measured as a picture.
+
+      The painter has a frame or two with nothing to draw from while a rung
+      change disposes one solver and builds the next. A decline leaves the
+      frame's target exactly as it was acquired, so a grab taken then reads
+      every channel zero — and a harness measuring it calls that a black
+      plate, which is the one thing the wall checks exist to catch. It
+      showed up as `npm run wall` failing about once in a few runs on a
+      slow machine, with the frame before and the frame after both fine.
+
+      Three claims. That a real grab says it painted; that a decline is
+      waited out rather than measured; and that a stage which never paints
+      is reported rather than handed over as black. The last two run
+      against a faked `grabFrame`, because a real decline lasts a frame or
+      two and cannot be asked for — the fake stands in for the timing, and
+      what is under test is `__cgShot`, which is the part that was wrong.
+    */
+    const grabs = await page.evaluate(async () => {
+      const real = await window.chromaglassDebug().grabFrame();
+      const realPainted = real?.painted;
+
+      const dbg = window.chromaglassDebug;
+      const fake = (declines) => {
+        let n = 0;
+        window.chromaglassDebug = () => ({
+          ...dbg(),
+          grabFrame: async () => ({
+            width: 2, height: 1,
+            pixels: new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255]),
+            painted: n++ >= declines,
+          }),
+        });
+      };
+
+      fake(3);
+      const after = await window.__cgShot('smoke-decline');
+      const afterNote = window.__cgFrameLast;
+
+      fake(Infinity);
+      const never = await window.__cgShot('smoke-never');
+      const neverNote = window.__cgFrameLast;
+
+      window.chromaglassDebug = dbg;
+      return { realPainted, after: !!after, declined: afterNote?.declined ?? 0,
+               never: never === null, neverGot: neverNote?.got ?? '' };
+    });
+    check('a real grab says it painted the frame', grabs.realPainted === true, `painted ${grabs.realPainted}`);
+    check('a few declined frames are waited out, not measured as black',
+      grabs.after === true && grabs.declined === 3, `returned a picture after ${grabs.declined} declines`);
+    check('and a stage that never paints is reported rather than handed over',
+      grabs.never === true && /declined to paint/.test(grabs.neverGot), grabs.neverGot || 'it handed one over anyway');
+
   const wired = await page.evaluate(() => typeof window.chromaglassOutput === 'function');
   check('the page is running the build that was just made', wired,
     wired ? 'chromaglassOutput present' : 'stale bundle — rebuild, or a stray preview server is answering');
