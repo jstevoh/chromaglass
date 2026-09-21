@@ -53,7 +53,9 @@
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
-    "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs"
+    "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs",
+    "stages": "npm run build && node scripts/stages.mjs",
+    "ab": "npm run build && node scripts/ab.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

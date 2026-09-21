@@ -181,6 +181,19 @@ const PALETTE_COUNT = PALETTE_RGB.length;
  */
 const MAX_PINNED_GRID = 1024;
 
+/**
+ * `?stages` — have the solver time itself stage by stage from the first frame
+ * (H0, docs/webgpu-plan.md).
+ *
+ * The same switch as `chromaglassDebug().webgpu.stageTimings(true)`, for a
+ * measurement that wants the page to have been doing it all along rather than
+ * from whenever a console line was typed. Diagnostic only: it is read from the
+ * query string and nothing else, so no preset or saved look can reach it.
+ */
+const STAGE_TIMINGS = (() => {
+  try { return new URLSearchParams(window.location.search).has('stages'); } catch { return false; }
+})();
+
 // Which grid the solver should run on. A pinned size is honoured up to the
 // smaller of the cap above and the context's texture limit; 'auto' hands the
 /** The post chain's level in the engine label, only when it has been spent (see QualityGovernor.postLevel). */
@@ -1761,6 +1774,8 @@ class FluidSimulation {
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * CUR_TWIST * (this.layerIndex % 2 === 0 ? 1 : -1),
+      particles: settings.particles ?? 0,
+      particleLife: 4,
       meanDensity: this.meanDensity,
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
     };
@@ -4691,10 +4706,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
           if (fluid.gpu && fluid.gpu.N === wantRes) return true;
           try {
-            fluid.attachGpu(new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
+            const solver = new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
               float32Filterable: s.gpu.float32Filterable,
               timestamps: s.gpu.timestamps,
-            }));
+            });
+            solver.stageTimings = STAGE_TIMINGS;
+            fluid.attachGpu(solver);
             return true;
           } catch (err) {
             /*
@@ -4858,6 +4875,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // texture are not.
               const stageFormat = s.format;
               const plateFormat = cam ? stageFormat : post ? post.pictureFormat : stageFormat;
+              /*
+                The particles are drawn here, once, rather than in the solver
+                step that moves them (H1).
+
+                Several steps happen per frame and only the last is seen, so
+                splatting per step would draw the whole population over again
+                for each one and pay for it every time. This is also the last
+                moment before the compositor samples the target, which is
+                what makes one splat enough.
+              */
+              for (const f of fluidsRef.current) {
+                if (f.gpu instanceof WebGPUFluid) {
+                  f.gpu.splatParticles(encoder, (label) => stage?.profiler.renderPass(label));
+                }
+              }
               plate.draw(
                 encoder,
                 cam ? cam.sceneView(size.width, size.height) : afterEffects,
@@ -4932,6 +4964,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             solver: fluidsRef.current.map((f) => (
               f.gpu instanceof WebGPUFluid ? Object.fromEntries(f.gpu.profiler.ms) : null
             )),
+            /**
+             * Ask the step to time itself stage by stage (H0), or stop.
+             *
+             * `solver` above says a step costs 9 ms and nothing about which
+             * of its hundred-odd dispatches that is. Turned on, every stage
+             * gets its own pass and its own timestamps, and `solver` names
+             * them: squeeze, viscosity, project 1, advect velocity, project
+             * 2, forces, current, dye diffuse, advect dye, sharpen, grain,
+             * decay. It costs a dozen pass boundaries a step, so the total
+             * reads a little high — the shares are the point, not the sum.
+             */
+            stageTimings: (on: boolean) => {
+              for (const f of fluidsRef.current) {
+                if (f.gpu instanceof WebGPUFluid) { f.gpu.profiler.ms.clear(); f.gpu.stageTimings = on; }
+              }
+              return on;
+            },
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,

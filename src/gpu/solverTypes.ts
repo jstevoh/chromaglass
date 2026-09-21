@@ -48,6 +48,16 @@ export interface GpuStepParams {
   twist: number;            // the top glass turning: a differential rotation, fastest inside
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
+  /**
+   * Dye carried by particles (H1): how much of the picture they are, 0 = off.
+   *
+   * The grid keeps the body of colour and particles add the structure it
+   * cannot hold, so this is a dial rather than a switch between two plates,
+   * and at 0 the solver does not allocate them at all.
+   */
+  particles: number;
+  /** Seconds a particle carries its colour before it is reborn somewhere with dye. */
+  particleLife: number;
 }
 
 /**

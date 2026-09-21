@@ -165,7 +165,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null }[],
     velRange: number,
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
@@ -265,6 +265,10 @@ export class WebGPUPlate {
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
     const grain = (i: number) => fields[i]?.grain ?? this.blank;
+    // The particle splat, or a black 1×1 where a layer has none. The shader
+    // reads it unconditionally and multiplies by the amount, which is 0 when
+    // there are no particles — so the blank costs a sample and nothing else.
+    const parts = (i: number) => fields[i]?.particles ?? this.blank;
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments: [
@@ -292,6 +296,8 @@ export class WebGPUPlate {
         { binding: 10, resource: this.source('film').createView() },
         { binding: 11, resource: this.source('mark').createView() },
         { binding: 12, resource: this.source('beads').createView() },
+        { binding: 13, resource: parts(0).createView() },
+        { binding: 14, resource: parts(1).createView() },
       ],
     }));
     pass.draw(6);

@@ -9,6 +9,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
+import { curveOf, valueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
 
 /**
@@ -44,6 +45,11 @@ function Slider({ label, field, step, format, value, connected, onDrag, onChange
 }) {
   const { min, max } = PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 };
   const current = value ?? min;
+  // The same bent travel as the desk and a MIDI fader — Speed's is cubed, so
+  // the slow end where the looks live gets the bottom third of a throw that
+  // is shorter here than anywhere else. See `curveOf` in `lib/midi.ts`.
+  const curve = curveOf(field);
+  const at = curve === 1 ? current : travelOf(current, min, max, curve);
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-baseline justify-between">
@@ -53,17 +59,21 @@ function Slider({ label, field, step, format, value, connected, onDrag, onChange
       <input
         id={`remote-${String(field)}`}
         type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={current}
+        min={curve === 1 ? min : 0}
+        max={curve === 1 ? max : 1}
+        step={curve === 1 ? step : 0.001}
+        value={at}
         disabled={!connected}
         onPointerDown={() => onDrag(field, true)}
         onPointerUp={() => onDrag(field, false)}
         onPointerCancel={() => onDrag(field, false)}
-        onChange={(e) => onChange(field, parseFloat(e.target.value))}
+        onChange={(e) => {
+          const raw = parseFloat(e.target.value);
+          if (curve === 1) { onChange(field, raw); return; }
+          onChange(field, Math.round(valueAt(raw, min, max, curve) / step) * step);
+        }}
         className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
-        style={{ ['--fill' as string]: `${((current - min) / (max - min)) * 100}%` }}
+        style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}
       />
     </div>
   );

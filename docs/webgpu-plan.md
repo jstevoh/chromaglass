@@ -263,11 +263,74 @@ doing 74% more dispatches, not by doing dearer ones. **Forty-eight of those
 101 are pressure Jacobi**, twenty-four in each of the two projections, and
 that is the single largest block of work in the frame by a wide margin.
 
-It is still an inference rather than a measurement: one timestamp pair spans
-the whole step, so the split above is arithmetic over the dispatch list, not
-something the GPU has been asked. Splitting the step into labelled passes is
-what H0 in [`roadmap.md`](roadmap.md) is for, and it is what decides whether
-the pressure solver (H2) is worth doing before the particles (H1).
+It was still an inference rather than a measurement: one timestamp pair spans
+the whole step, so the split above was arithmetic over the dispatch list, not
+something the GPU had been asked. **H0 asked it, and the arithmetic was wrong
+too.**
+
+## H0 — where a step's time actually goes
+
+`?stages` (or `chromaglassDebug().webgpu.stageTimings(true)`) gives every
+named stage its own compute pass and its own timestamp pair; `npm run stages`
+reads them back. Splitting costs about a dozen pass boundaries a step and
+**2%** — 9.34 ms split against 9.14 ms whole — so the shares can be trusted.
+Classic, two layers, 768², dpr 1, on this M4:
+
+| Stage | ms | Share | Dispatches |
+|---|---|---|---|
+| project 2 | 1.351 | 14.5% | 27 |
+| project 1 | 1.332 | 14.3% | 27 |
+| dye diffuse | 1.325 | 14.2% | 5 |
+| squeeze | 1.086 | 11.6% | 12 |
+| viscosity | 0.955 | 10.2% | 5 |
+| advect dye | 0.902 | 9.7% | 3 |
+| **forces** | **0.808** | **8.6%** | **1** |
+| advect velocity | 0.667 | 7.1% | 3 |
+| current | 0.402 | 4.3% | 13 (coarse) |
+| decay | 0.282 | 3.0% | 2 |
+| grain | 0.234 | 2.5% | 1–2 |
+
+**Cost does not track dispatch count.** That was the working assumption above
+and it is off by more than an order of magnitude in places: a pressure Jacobi
+dispatch is 0.049 ms and `forcesB` — one dispatch — is 0.808. The step is
+bound by what each kernel does per pixel, not by how many kernels there are,
+so counting passes predicts nothing.
+
+**What it means for H2.** The two projections are 28.8% of a step, not the 48%
+the dispatch count suggested and not the 5% the spike's core suggested. Both
+earlier readings were wrong, in opposite directions. Halving the Jacobi count
+would save about 14% of a step, which is 2.6 ms of a 38.6 ms frame at two
+layers — worth doing, and no longer the thing everything else should wait for.
+
+**The larger target is iterative solves as a class:** project ×2, dye diffuse,
+squeeze and viscosity are **64.5%** of a step between them. Whatever replaces
+24 Jacobi passes should replace the other four solves at the same time.
+
+**`forcesB` is the most expensive kernel per dispatch in the solver**, and the
+reason is not the one it looks like. Switching turbulence, spin, tension,
+fingering, drip and air all off takes it from 0.808 to 0.368 ms on the lead
+layer — so the forces are worth 0.44 ms between them. But switching off any
+one of them alone changes nothing measurable: turbulence alone is 0.808 →
+0.792, tension alone 0.818, fingering alone 0.799, all within the run-to-run
+drift.
+
+Costs that vanish together and not separately are not branches being
+expensive. The kernel's register allocation is static — the compiler sizes it
+for the worst path whether or not that path runs — so what the forces cost is
+occupancy, and removing one branch's *execution* leaves the allocation where
+it was. The first guess written here was that the turbulence loop's four
+`snoise` calls per octave were the cost and an analytic-derivative noise was
+the fix. The measurement says a cheaper noise would have bought nothing. What
+would is splitting the kernel, or shrinking its worst path.
+
+**Measuring one thing at a time is what caught this**, and it is also what
+would have got it wrong: the single-branch numbers look like six cheap
+branches, and only the all-off number shows 0.44 ms sitting somewhere.
+
+**And the plate is in slow motion at the top rung.** 45.3 steps a second
+against the 60 the show asks for, inside a 38.6 ms frame. A frame rate cannot
+show you that: the liquid is simply evolving at three quarters of wall-clock
+speed. 768² is a rung this machine can draw and cannot keep time on.
 
 **The governor is judged on the GPU's own number now.** Its climb gate is a
 work budget, and on this path the work was half a millisecond of encoding

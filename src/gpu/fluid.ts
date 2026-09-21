@@ -27,6 +27,7 @@ import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
+import { WebGPUParticles } from './particles';
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -117,6 +118,30 @@ export class WebGPUFluid {
   private disposed = false;
   /** Per-pass GPU times under ?debug. */
   readonly profiler: GpuProfiler;
+  /**
+   * Time a step stage by stage instead of as one number (H0).
+   *
+   * A step is one compute pass carrying one timestamp pair, so what comes
+   * back is 9 ms for about a hundred dispatches and no way to tell which of
+   * them it is. `timestampWrites` is per pass, so the only way to ask is to
+   * open a pass per stage — which costs a little, and is why this is off
+   * unless something asks for it (`?stages`, or
+   * `chromaglassDebug().webgpu.stageTimings(true)`).
+   *
+   * Splitting is safe: WebGPU orders dispatches within a pass and between
+   * passes alike, so the same work happens in the same order either way.
+   * What changes is about a dozen pass boundaries per step, which is what
+   * makes the total under this flag a little higher than the real one — read
+   * the shares, not the sum.
+   */
+  stageTimings = false;
+  /**
+   * Dye carried by particles (H1, `gpu/particles.ts`), or null until a step
+   * asks for some. Built on demand and released when the amount goes back to
+   * 0: a population at this grid is several megabytes, and every look made
+   * before H1 wants none of it.
+   */
+  private particles: WebGPUParticles | null = null;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -435,75 +460,155 @@ export class WebGPUFluid {
     const disp = p.dt * p.advection * ((N - 2) / N);
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
-    const pass = enc.beginComputePass({ label: 'step', timestampWrites: this.profiler.pass('solver step') });
 
-    if (!deltasApplied) {
-      this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
-      this.squeeze.swap();
-    }
+    /*
+      One pass, or one per stage.
+
+      Off (the show), everything below is encoded into a single compute pass
+      with one timestamp pair around it — the cheapest thing to submit. On
+      (`stageTimings`), each named stage gets its own pass and its own pair,
+      so the profiler can say which of the hundred-odd dispatches the time is
+      in. The stages are the same dispatches in the same order either way.
+    */
+    const shared = this.stageTimings
+      ? null
+      : enc.beginComputePass({ label: 'step', timestampWrites: this.profiler.pass('solver step') });
+    const stage = (label: string, body: (pass: GPUComputePassEncoder) => void): void => {
+      if (shared) { body(shared); return; }
+      const own = enc.beginComputePass({ label, timestampWrites: this.profiler.pass(label) });
+      body(own);
+      own.end();
+    };
+
+    const none = this.arg('none', [0, 0, 0, 0]);
 
     // 1. Hele-Shaw squeeze-film flow
-    const none = this.arg('none', [0, 0, 0, 0]);
-    for (let k = 0; k < SQUEEZE_ITERS; k++) {
-      this.run(pass, 'squeezeJacobi', this.spress.write, [this.spress.read, this.squeeze.read], none);
-      this.spress.swap();
-    }
-    this.run(pass, 'squeezeVel', this.vel.write, [this.vel.read, this.spress.read, this.squeeze.read], none);
-    this.vel.swap();
+    stage('squeeze', (pass) => {
+      if (!deltasApplied) {
+        this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
+        this.squeeze.swap();
+      }
+      for (let k = 0; k < SQUEEZE_ITERS; k++) {
+        this.run(pass, 'squeezeJacobi', this.spress.write, [this.spress.read, this.squeeze.read], none);
+        this.spress.swap();
+      }
+      this.run(pass, 'squeezeVel', this.vel.write, [this.vel.read, this.spress.read, this.squeeze.read], none);
+      this.vel.swap();
+    });
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
-    this.jacobi(pass, this.vel, [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0], VISC_ITERS, 'vel');
+    stage('viscosity', (pass) => {
+      this.jacobi(pass, this.vel, [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0], VISC_ITERS, 'vel');
+    });
 
     // 4. Project, 5. advect velocity by itself, 6. project again
-    this.project(pass);
-    this.macCormack(pass, this.vel, this.vel.read, disp, 'vel');
-    this.project(pass);
+    stage('project 1', (pass) => this.project(pass));
+    stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
+    stage('project 2', (pass) => this.project(pass));
 
     // 6.5–8.7 The post-projection forces
-    this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
-    this.vel.swap();
+    stage('forces', (pass) => {
+      this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
+      this.vel.swap();
+    });
 
     // 8.9. The lasting current, and the flow the dye rides
-    this.stepCurrent(pass);
-    this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read], this.arg('current grid', [0, this.M, 0, 0]));
+    stage('current', (pass) => {
+      this.stepCurrent(pass);
+      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read], this.arg('current grid', [0, this.M, 0, 0]));
+    });
 
     // 9. Dye: diffuse, then advect through the forced velocity
     const a = p.dt * p.diff * n2;
-    this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
-    this.macCormack(pass, this.dye, this.velForced, disp, 'dye');
+    stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'));
+    stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
 
     // 9.5. Sharpen what the advection and the diffusion softened
     if (p.sharpness > 0.0001) {
-      this.run(pass, 'sharpenDye', this.dye.write, [this.dye.read], none);
-      this.dye.swap();
+      stage('sharpen', (pass) => {
+        this.run(pass, 'sharpenDye', this.dye.write, [this.dye.read], none);
+        this.dye.swap();
+      });
     }
 
     // 9.6. Pigment coordinates ride along with the dye
     if (this.grain) {
-      this.run(pass, 'advect', this.grain.write, [this.grain.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
-      this.grain.swap();
-      const before = this.grainAge;
-      this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
-      const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
-      const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
-      const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
-      if (keepA === 0 || keepB === 0) {
-        this.run(pass, 'seedGrain', this.grain.write, [this.grain.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
-        this.grain.swap();
-      }
+      stage('grain', (pass) => {
+        this.run(pass, 'advect', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
+        this.grain!.swap();
+        const before = this.grainAge;
+        this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
+        const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
+        const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
+        const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
+        if (keepA === 0 || keepB === 0) {
+          this.run(pass, 'seedGrain', this.grain!.write, [this.grain!.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
+          this.grain!.swap();
+        }
+      });
     }
 
     // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
-    this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
-    this.dye.swap();
-    this.run(pass, 'decayVel', this.vel.write, [this.vel.read], none);
-    this.vel.swap();
+    stage('decay', (pass) => {
+      this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
+      this.dye.swap();
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read], none);
+      this.vel.swap();
+    });
 
-    pass.end();
+    shared?.end();
+
+    /*
+      And the particles, after everything that moves the field they ride.
+
+      In this encoder, not one of their own: they read `velForced` and the
+      dye as the stages above have just left them, and a separate submit
+      would put a frame of slack between the flow and what is carried by it.
+    */
+    this.stepParticles(enc, p);
+
     this.profiler.resolveInto(enc);
     this.device.queue.submit([enc.finish()]);
     this.profiler.afterSubmit();
+  }
+
+  /**
+   * Birth and motion for the particle population, building or releasing it
+   * as the amount crosses zero.
+   *
+   * The population is sized by the grid, so a rung change takes it with the
+   * rest of the solver — a new `WebGPUFluid` is built and this one is
+   * disposed, and the particles go with it. They do not survive the change,
+   * which is right: they carry positions in a field that no longer exists.
+   */
+  private stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    const want = Math.max(0, Math.min(1, p.particles ?? 0));
+    if (want <= 0) {
+      if (this.particles) { this.particles.dispose(); this.particles = null; }
+      return;
+    }
+    if (!this.particles) this.particles = new WebGPUParticles(this.device, this.N);
+    this.particles.step(enc, this.dye.read, this.velForced, {
+      amount: want,
+      life: p.particleLife,
+      // Born only where there is dye worth carrying. Below this a particle
+      // would pick up a colour that is mostly the plate's own floor and lay
+      // it back down as a haze.
+      floor: 0.02,
+      disp: p.dt * p.advection * ((this.N - 2) / this.N),
+      dt: p.dt,
+      seed: 0x9e3779b9,
+    }, this.stageTimings ? (label) => this.profiler.pass(label) : undefined);
+  }
+
+  /**
+   * The splat, once a frame: the population drawn into the texture the
+   * compositor adds. Encoded into the *frame's* encoder rather than a step's,
+   * because several steps happen per frame and only the last one is seen.
+   */
+  splatParticles(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
+    this.particles?.splat(enc, timing);
   }
 
   private jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
@@ -755,12 +860,21 @@ export class WebGPUFluid {
 
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
-    return { dye: this.dye.read, vel: this.vel.read, velForced: this.velForced, grain: this.grain?.read ?? null };
+    return {
+      dye: this.dye.read,
+      vel: this.vel.read,
+      velForced: this.velForced,
+      grain: this.grain?.read ?? null,
+      /** The particle splat, or null when the amount is 0 and none exist. */
+      particles: this.particles && !this.particles.idle ? this.particles.target : null,
+    };
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.particles?.dispose();
+    this.particles = null;
     this.disposer.dispose();
     this.groups.clear();
   }

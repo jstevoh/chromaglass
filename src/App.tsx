@@ -1592,7 +1592,7 @@ export default function App() {
       sensitivity: Math.random() * 0.8 + 0.2,
       bassBoost: Math.random() * 1.5 + 0.5,
       autoCalibrate: settings.autoCalibrate,
-      globalSpeed: Math.random() * 0.08 + 0.02,
+      globalSpeed: Math.random() * 0.048 + 0.012,
       audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
       platePressure: Math.random(), glassSmear: Math.random(), rainDrip: Math.random(),
       viscosity: Math.random() > 0.5 ? 'thick' : 'thin', polarity: Math.random(),

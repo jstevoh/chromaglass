@@ -208,6 +208,57 @@ const watch = (page) => {
           `${pinned.engine}, grid ${pinned.grid}, ${(pinned.lit * 100).toFixed(0)}% lit`);
       }
 
+      /*
+        Dye carried by particles (H1).
+
+        Off in every look and every default, which means every other check
+        here runs with the amount at 0 and the whole pass — three shaders, a
+        storage buffer, a render target four times the solver's grid —
+        untouched by anything that would notice it breaking. A feature with
+        no gate is a feature that rots quietly, and this one has already had
+        three bugs that only a picture could show.
+
+        So: turn it on, let a life go by so the population is there, and ask
+        for the two things that would matter. The plate is still drawn — a
+        pass that fails validation takes the frame with it, and the failure
+        is a black screen rather than an error. And the splat is actually
+        being drawn, which `particles` in the solver's own profiler says: at
+        0 the stage is not encoded at all.
+      */
+      {
+        const was = await page.evaluate(() => window.chromaglassDebug().settings.particles ?? 0);
+        const on = await page.evaluate(async () => {
+          window.chromaglassSettings({ particles: 0.5 });
+          for (let i = 0; i < 300; i++) await new Promise((r) => requestAnimationFrame(r));
+          const d = window.chromaglassDebug();
+          const g = await d.grabFrame();
+          let lit = 0;
+          if (g) for (let i = 0; i < g.pixels.length; i += 4) {
+            if (Math.max(g.pixels[i], g.pixels[i + 1], g.pixels[i + 2]) > 8) lit++;
+          }
+          return {
+            lit: g ? lit / (g.pixels.length / 4) : 0,
+            engine: d.engine,
+            timestamps: !!d.webgpu?.timestamps,
+            drawn: Object.keys(d.webgpu?.timings ?? {}).some((k) => k.startsWith('particle')),
+          };
+        });
+        check('the plate is still drawn with dye particles on it',
+          on.lit > 0.2 && isGpuEngine(on.engine),
+          `${on.engine}, ${(on.lit * 100).toFixed(0)}% lit`);
+        // The profiler is the only witness that the splat ran at all, and it
+        // is silent on an adapter without `timestamp-query`. Skipped rather
+        // than failed there: a check that cannot see is not a check that
+        // found something.
+        if (on.timestamps) {
+          check('and the splat is a pass that actually ran', on.drawn,
+            on.drawn ? '' : 'no particle pass in the stage profiler');
+        } else {
+          console.log('  --  the splat pass: skipped, this adapter has no timestamp queries');
+        }
+        await page.evaluate((v) => window.chromaglassSettings({ particles: v }), was);
+      }
+
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');
 

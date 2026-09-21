@@ -89,6 +89,21 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'macroLacing', type: 'f32', note: 'dark lacing filaments along dye boundaries' },
   { name: 'macroRelief', type: 'f32', note: 'surface relief: per-pixel normals, specular, occlusion' },
   { name: 'markOn', type: 'f32', note: '1 when there is one loaded' },
+  {
+    name: 'particles',
+    type: 'f32',
+    note: 'dye carried by particles (H1): how much of the picture they are, 0 = off',
+  },
+  {
+    name: 'particleMix',
+    type: 'f32',
+    note: 'how far a particle\u2019s carried colour is trusted over the grid\u2019s',
+  },
+  {
+    name: 'particleNorm',
+    type: 'f32',
+    note: 'the splat weight a fully populated texel carries, so coverage reads 1 there',
+  },
   { name: 'photo', type: 'f32' },
   { name: 'postBlur', type: 'f32', note: 'gooey blur radius multiplier' },
   { name: 'rotation0', type: 'f32' },

@@ -183,8 +183,19 @@ check('a fader swept across the folds lands on every fold, and only those',
 check('and snapping after takeover instead would strand it',
   sweepFolds(false).held > 0, 'if this passes, the check above is measuring nothing');
 const hookSrc = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
+/*
+  Asserted as a shape rather than as a spelling.
+
+  This read `in01 = (onStep(stepped` exactly, and then the curve went in —
+  the travel of a fader is no longer the value's, so the line became
+  `in01 = travelOf(onStep(stepped, valueAt(...)))`. Same ordering, same two
+  write sites, same detent before takeover; different words. A check that
+  fails a refactor it agrees with is a check that teaches people to edit the
+  check, so what it looks for now is that `in01` is put back through
+  `onStep` on that line at all.
+*/
 check('and the hook puts the detent on first, on a fader and an encoder alike',
-  /if \(stepped\.step\) in01 = \(onStep\(stepped/.test(hookSrc)
+  /if \(stepped\.step\) in01 = [^;]*onStep\(stepped/.test(hookSrc)
   && /const by = stepped\.step \?\? span \/ 100/.test(hookSrc)
   && (hookSrc.match(/h\.setSetting\(t\.key, onStep\(stepped, /g) ?? []).length === 2);
 

@@ -89,6 +89,8 @@ const SECTION_OF: Record<string, string> = {
   markY: 'mark',
   markScale: 'mark',
   sharpness: 'look',
+  particles: 'look',
+  particleMix: 'look',
   granulation: 'look',
   macroZoom: 'macro',
   macroSync: 'macro',
