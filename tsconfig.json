@@ -21,6 +21,14 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "strict": true
+  },
+  "//": "Without an exclude, `tsc` walks everything under the root. There is a git-ignored 267 MB copy of this repo at ./chromaglass (an old clone), and every .ts and .tsx in it was being typechecked on every `npm run lint` \u2014 a stale duplicate reporting errors under a path that looks almost like the real one.",
+  "exclude": [
+    "chromaglass",
+    "node_modules",
+    "dist"
+  ],
+  "//strict": "Measured, not aspirational: with @types/react installed this costs zero errors. Without those types it looked like 3774, and 3133 of them were 'no JSX.IntrinsicElements' - the missing declarations, not the code. With strict off, every React API and every JSX element was `any`: useState<VisualizerSettings> handed back an `any` setter, which is why a settings object missing 33 required keys typechecked and shipped, and useRef(map) left the whole MIDI dispatch switch unchecked. One line to dial back if it ever gets in the way."
 }

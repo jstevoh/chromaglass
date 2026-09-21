@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { unhandled } from '../lib/unhandled';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
@@ -118,7 +119,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
   const accessRef = useRef<MidiAccessLike | null>(null);
   const hostRef = useRef(host); hostRef.current = host;
-  const mapRef = useRef(map); mapRef.current = map;
+  const mapRef = useRef<MidiMap>(map); mapRef.current = map;
   const learningRef = useRef(learning); learningRef.current = learning;
   /** What each control was last told to show, so nothing is sent twice. */
   const ledRef = useRef(new Map<string, number>());
@@ -223,7 +224,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const onThisBank = matching.filter(b => b.bank === bankRef.current);
     const live = onThisBank.length ? onThisBank : matching.filter(b => b.bank === undefined);
     for (const b of live) {
-      const t = b.target;
+      // Annotated, and that is not decoration: without it `t` is `any` here,
+      // so nothing in the switch below was checked at all — not the property
+      // names it reads off each kind, not a misspelt case, not a missing one.
+      const t: MidiTarget = b.target;
+
       const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
       /**
        * Set when soft takeover held this fader back, so the report below does
@@ -294,6 +299,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         case 'action': if (pressed) h.action(t.action); break;
         case 'preset': if (pressed) h.applyPreset(t.presetId); break;
         case 'dye':    if (pressed) h.selectDye(t.paletteIndex); break;
+        // A binding whose kind has no case here is a control that does
+        // nothing when it is touched, and says nothing about why.
+        default: unhandled('a MIDI binding', t);
       }
       /*
         Say on screen that this was hit.

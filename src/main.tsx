@@ -52,10 +52,6 @@ async function startOver(): Promise<boolean> {
  * that has already been tried.
  */
 class Boot extends Component<{ children: any }, { failed: any; recovering: boolean }> {
-  // Declared by hand: this project carries no @types/react, so the base
-  // class's own members are invisible to tsc.
-  declare props: { children: any };
-  declare setState: (patch: { failed?: any; recovering?: boolean }) => void;
   state = { failed: null as any, recovering: false };
   static getDerivedStateFromError(failed: any) { return { failed, recovering: false }; }
   componentDidCatch(failed: any) {

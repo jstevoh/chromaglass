@@ -285,7 +285,7 @@ function CastReceiver() {
 
   // Hide the cursor after a few seconds still.
   const [showCursor, setShowCursor] = useState(true);
-  const cursorTimer = useRef<ReturnType<typeof setTimeout>>();
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     const handleMove = () => {
       setShowCursor(true);
