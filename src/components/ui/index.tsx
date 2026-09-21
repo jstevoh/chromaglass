@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
-import { curveOf, valueAt, travelOf } from '../../lib/midi';
+import { curveOf, settingKeyOf, valueAt, travelOf } from '../../lib/midi';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -259,7 +259,19 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     and a MIDI fader all bend the same way. `midiKey` is the setting's name
     here, which is what the curve is looked up by.
   */
-  const curve = midiKey ? curveOf(midiKey as keyof VisualizerSettings) : 1;
+  /*
+    The desk names a ride `setting:globalSpeed`, not `globalSpeed`.
+
+    `midiKey` is what a controller reaches this by, and its settings are
+    prefixed to keep them apart from `preset:`, `action:` and `dye:`. Looked
+    up unprefixed it matched nothing, so `curveOf` returned 1 and the Speed
+    ride on the Perform desk was the one control that did *not* get the
+    curved travel — handle hard against the left stop at a value the curve
+    would put a third of the way along. The panel and the phone were right
+    and the desk was wrong, which is the hardest kind of wrong to notice.
+  */
+  const settingKey = settingKeyOf(midiKey);
+  const curve = settingKey ? curveOf(settingKey) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
   /*

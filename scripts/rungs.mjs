@@ -29,6 +29,7 @@
  */
 
 import { qualityLadder, canvasPixelsFor } from '../src/lib/platform';
+import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf } from '../src/lib/midi';
 
 const checks = [];
 const check = (what, ok, detail = '') => checks.push([what, ok, detail]);
@@ -134,6 +135,40 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   }
   console.log('');
   check('and no two rungs in a row are the same grid at the same pixels', allDiffer);
+}
+
+// ── The curved controls reach every surface ──────────────────────────
+//
+// Speed's travel is cubed because thirty of the thirty-two looks sit in the
+// bottom quarter of its range. Three surfaces draw that slider — the settings
+// panel, the phone and the desks — and each looks the curve up its own way.
+// The desk names a ride `setting:globalSpeed` where the other two use
+// `globalSpeed`, so the desk's Speed handle sat against the left stop at a
+// value the curve puts a third of the way along, while the other two were
+// right. A control that disagrees with itself across two screens reads as two
+// different programs.
+{
+  const curved = LEARNABLE_SETTINGS.filter((x) => (x.curve ?? 1) !== 1);
+  check('something is curved at all', curved.length > 0,
+    curved.map((x) => `${String(x.key)}^${x.curve}`).join(', ') || 'nothing');
+  for (const spec of curved) {
+    const key = String(spec.key);
+    // Through the same function the sliders use, so this is the mapping and
+    // not a copy of it.
+    check(`${key}: the desk's own name for it finds the curve`,
+      curveOf(settingKeyOf(`setting:${key}`)) === spec.curve, `setting:${key}`);
+    check(`${key}: and the panel's plain name finds it too`,
+      curveOf(settingKeyOf(key)) === spec.curve, key);
+    check(`${key}: a value round-trips through the travel`,
+      [spec.min, (spec.min + spec.max) / 2, spec.max].every((v) =>
+        Math.abs(valueAt(travelOf(v, spec.min, spec.max, spec.curve), spec.min, spec.max, spec.curve) - v) < 1e-9),
+      `${spec.min}..${spec.max}`);
+    // The whole point: the middle of the throw is near where the looks live,
+    // not near the middle of the range.
+    const mid = valueAt(0.5, spec.min, spec.max, spec.curve);
+    check(`${key}: half the travel is ${mid.toFixed(4)}, not ${((spec.min + spec.max) / 2).toFixed(4)}`,
+      mid < (spec.min + spec.max) / 2);
+  }
 }
 
 let failed = 0;
