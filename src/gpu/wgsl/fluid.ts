@@ -263,6 +263,83 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, vec4f((textureLoad(dv, p, 0).r + s) * 0.25, 0.0, 0.0, 0.0));
 }`,
 
+  /*
+    The pressure solve, as red-black Gauss-Seidel (H2, docs/roadmap.md).
+
+    Twenty-four Jacobi passes were 48 of a step's hundred-odd dispatches and
+    28.8% of its time, which H0 measured and which makes this the largest
+    single block of work in the frame. Jacobi reads the whole field from last
+    iteration and writes a new one; Gauss-Seidel reads neighbours that have
+    already been updated this sweep, which converges about twice as fast for
+    the same arithmetic. The catch is that it has to write in place, and a
+    cell cannot read a texture it is writing.
+
+    So the pressure lives in a storage buffer here rather than a texture.
+    Red-black is what makes that safe: colour the grid like a chessboard and
+    no two cells of the same colour are neighbours, so a sweep over the red
+    cells reads only black ones and can write itself without a hazard. Two
+    dispatches an iteration, each over half the grid — the same total work as
+    one Jacobi pass, for twice the convergence.
+
+    `A.a.x` is the parity: 0 sweeps red, 1 sweeps black. The thread index is
+    mapped onto its own colour rather than dispatched over the whole grid and
+    turned away at the door, which would spend half the threads doing
+    nothing and give back the factor this exists to win.
+  */
+  pressureRedBlack: `${HEAD}
+@group(0) @binding(2) var dv: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read_write> pr: array<f32>;
+
+fn prAt(x: i32, y: i32, n: i32) -> f32 {
+  // Neumann at the wall, as the Jacobi did through clampP: the pressure
+  // outside is the pressure at the edge, so the gradient across it is zero.
+  let cx = clamp(x, 0, n - 1);
+  let cy = clamp(y, 0, n - 1);
+  return pr[cy * n + cx];
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(S.n);
+  let half = n / 2;
+  let i = i32(id.x);
+  if (i >= n * half) { return; }
+  let y = i / half;
+  // The row's own colour decides which column this thread owns, so the two
+  // sweeps together cover every cell exactly once.
+  let x = 2 * (i % half) + ((y + i32(A.a.x)) & 1);
+  let s = prAt(x - 1, y, n) + prAt(x + 1, y, n) + prAt(x, y - 1, n) + prAt(x, y + 1, n);
+  pr[y * n + x] = (textureLoad(dv, vec2i(x, y), 0).r + s) * 0.25;
+}`,
+
+  /** Zero the pressure buffer between projections, as the Jacobi's fill did. */
+  pressureClear: `${HEAD}
+@group(0) @binding(2) var<storage, read_write> pr: array<f32>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = u32(S.n);
+  if (id.x >= n * n) { return; }
+  pr[id.x] = 0.0;
+}`,
+
+  /** `gradientSubtract`, reading the pressure from the buffer the sweeps wrote. */
+  gradientSubtractBuf: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var<storage, read> pr: array<f32>;
+fn prAt(x: i32, y: i32, n: i32) -> f32 {
+  return pr[clamp(y, 0, n - 1) * n + clamp(x, 0, n - 1)];
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let v = textureLoad(vel, p, 0);
+  let gx = prAt(p.x + 1, p.y, n) - prAt(p.x - 1, p.y, n);
+  let gy = prAt(p.x, p.y + 1, n) - prAt(p.x, p.y - 1, n);
+  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
+}`,
+
   gradientSubtract: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var pr: texture_2d<f32>;

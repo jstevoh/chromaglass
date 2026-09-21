@@ -259,6 +259,21 @@ const watch = (page) => {
         await page.evaluate((v) => window.chromaglassSettings({ particles: v }), was);
       }
 
+      /*
+        The pressure solve (H2).
+
+        Twelve red-black Gauss-Seidel sweeps replaced twenty-four Jacobi
+        passes on the strength of a textbook convergence rate, which is a
+        claim about the model Poisson problem and not about this one. So it
+        is measured: both solvers on the same divergence field, compared by
+        the residual each leaves, which is the thing the projection is
+        actually for. Red-black has to come out at least as low or the
+        halving was a quality cut wearing a speed-up's clothes.
+      */
+      const press = await page.evaluate(() => window.chromaglassDebug().pressureSelfTest());
+      check('12 red-black sweeps solve the pressure at least as well as 24 Jacobi passes',
+        press?.ok, press?.detail ?? 'not run');
+
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');
 
