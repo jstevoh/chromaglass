@@ -120,12 +120,73 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
           { grid: 256, dpr: 1 },
         ];
 
+  /*
+    No rung twice.
+
+    A rung is a grid and a number of device pixels, and on a display that has
+    only one pixel per pixel — a projector, most external monitors, any
+    machine that is not Retina — `{512, dpr}` and `{512, 1}` are the same
+    rung written down twice. The governor cannot tell, so a machine
+    struggling at 512² steps "down", waits out a settling period, measures
+    the identical frame, and steps down again: four seconds of a slow show
+    spent discovering that nothing happened.
+
+    Deduplicating here rather than writing two ladders keeps the rungs in one
+    place and lets the ratio decide, which is what actually varies.
+  */
+  const seen = new Set<string>();
+  const distinct = rungs.filter((r) => {
+    const key = `${r.grid}:${r.dpr.toFixed(3)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  rungs.length = 0;
+  rungs.push(...distinct);
+
   // Start one step below the best guess for the hardware so the first seconds
   // are smooth; the governor climbs within ~10 s if the machine has room.
   const wanted = gpu === 'strong' ? 512 : gpu === 'mid' ? 384 : 256;
   let start = rungs.findIndex((r) => r.grid <= wanted && r.dpr === 1);
   if (start < 0) start = rungs.length - 1;
   return { rungs, start };
+}
+
+/**
+ * How many pixels the canvas should have, for a rung.
+ *
+ * A rung is a solver grid *and* a share of the display's pixels, and the two
+ * are paid for in different places: the grid by the solver, the pixels by
+ * everything that draws. This is the second half, and it lives here — pure,
+ * with the display's ratio passed in rather than read from `window` — so a
+ * harness can check it without a browser.
+ *
+ * It had to be gathered into one function because there were two and they
+ * disagreed. The renderer's own sizing read the *display's* ratio where the
+ * rung carries its own, so a step from 512² at 2x to 512² at 1x wrote a new
+ * number into the label and left the canvas at full resolution. Every pixel
+ * rung on the ladder was inert: measured with `npm run ladder`, the canvas
+ * was 2560×1600 on all five rungs. The governor gave up a rung of quality,
+ * believed it had bought headroom, found none, and went looking for the next
+ * thing to give up — which is the worst shape a quality control can have.
+ *
+ * With a stage attached a projector is mirroring the canvas, so the stage's
+ * own pixels are the target and the rung is a fraction of them; the mirror
+ * shows the real picture and this window a scaled copy.
+ */
+export function canvasPixelsFor(
+  dpr: number,
+  stagePx: { width: number; height: number } | null,
+  cap: number,
+  devicePx: number,
+  windowPx: { width: number; height: number },
+): { width: number; height: number } {
+  const hold = (v: number) => Math.max(1, Math.min(cap, Math.round(v)));
+  if (stagePx) {
+    const frac = Math.min(1, dpr / Math.max(devicePx, 1e-6));
+    return { width: hold(stagePx.width * frac), height: hold(stagePx.height * frac) };
+  }
+  return { width: hold(windowPx.width * dpr), height: hold(windowPx.height * dpr) };
 }
 
 /** What the visualizer reports about the engine it is running. */

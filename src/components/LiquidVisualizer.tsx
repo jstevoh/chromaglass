@@ -21,7 +21,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outp
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
-import { detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { BeadField } from '../lib/beads';
@@ -192,6 +192,28 @@ const MAX_PINNED_GRID = 1024;
  */
 const STAGE_TIMINGS = (() => {
   try { return new URLSearchParams(window.location.search).has('stages'); } catch { return false; }
+})();
+
+/**
+ * `?rung=N` — hold the governor on one rung of its ladder and measure it.
+ *
+ * A rung is a grid *and* a number of device pixels, and the two are paid for
+ * in different places: the grid by the solver, the pixels by everything that
+ * draws. `?sim=` could only ever pin the first, because pinning the grid
+ * turns the governor off and an ungoverned frame renders at one device pixel
+ * whatever the rung says — so the pixels, which is the half the ladder turns
+ * out to be wrong about, could not be measured at all.
+ *
+ * Diagnostic only, read from the query string and nothing else.
+ * `npm run ladder` walks it.
+ */
+const PINNED_RUNG = (() => {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('rung');
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+  } catch { return null; }
 })();
 
 // Which grid the solver should run on. A pinned size is honoured up to the
@@ -4616,7 +4638,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const startWith = (r: PlateRenderer) => {
       renderer = r;
       const ladder = qualityLadder(tier, r.info.gpuClass);
-      governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
+      governorRef.current = new QualityGovernor(
+        ladder.rungs,
+        PINNED_RUNG ?? ladder.start,
+        performance.now() * 0.001,
+        PINNED_RUNG !== null,
+      );
       r.resize();
       render();
     };
@@ -4636,10 +4663,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // one: a CI runner's display rate says nothing about the stage.
     let cpuMs = 0;
     const size = () => {
-      const dpr = devicePixels();
-      const stagePx = stageRef.current;
-      canvas.width = Math.max(1, Math.round(stagePx ? stagePx.width : window.innerWidth * dpr));
-      canvas.height = Math.max(1, Math.round(stagePx ? stagePx.height : window.innerHeight * dpr));
+      const dpr = dprRef.current;
+      const px = canvasPixelsFor(
+        dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
+        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+      );
+      canvas.width = px.width;
+      canvas.height = px.height;
       return dpr;
     };
     void WebGPUStage.start(canvas).then((s) => {
@@ -5059,20 +5089,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       window that changed size kept the pixels it started with.
     */
     const resize = () => {
-      const dpr = dprRef.current;
-      const stagePx = stageRef.current;
-      if (stagePx) {
-        // A projector is mirroring this canvas: render at its pixels, with
-        // the governor's rung as a fraction of them, so the mirror shows the
-        // real picture and this window only a scaled copy.
-        const frac = Math.min(1, dpr / devicePixels());
-        const cap = renderer?.maxTexture ?? 8192;
-        canvas.width = Math.max(1, Math.min(cap, Math.round(stagePx.width * frac)));
-        canvas.height = Math.max(1, Math.min(cap, Math.round(stagePx.height * frac)));
-      } else {
-        canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
-        canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
-      }
+      const px = canvasPixelsFor(
+        dprRef.current, stageRef.current, renderer?.maxTexture ?? 8192,
+        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+      );
+      canvas.width = px.width;
+      canvas.height = px.height;
     };
     resizeRef.current = resize;
     window.addEventListener('resize', resize);

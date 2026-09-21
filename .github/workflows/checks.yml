@@ -74,6 +74,13 @@ jobs:
       - name: The ear
         run: npm run music
 
+      # The shape of the quality ladder: that every rung is a rung, that a
+      # step down gives something up, and that a rung asking for fewer device
+      # pixels actually gets fewer. That last one was inert for a long while
+      # and nothing looked.
+      - name: The ladder's shape
+        run: npm run rungs
+
       # Soap, milk, silicone and glycerine, each measured on the thing it is
       # for — and first, that an empty plate is left completely alone.
       - name: The liquids

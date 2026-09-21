@@ -75,9 +75,21 @@ export class QualityGovernor {
   /** Set each frame by the renderer: whether a heavy post pass is on. */
   heavyPost = false;
 
-  constructor(private readonly rungs: QualityRung[], start: number, now: number) {
+  /**
+   * Held on one rung, for measuring it (`?rung=`).
+   *
+   * `?sim=` pins the grid but not the rung: a pinned grid turns the governor
+   * off, and a governor that is off renders at one device pixel whatever the
+   * rung says. So the two halves of a rung could not be measured together,
+   * and the half that was missing — the pixels — is the half this ladder
+   * turns out to be wrong about. This holds the whole rung instead.
+   */
+  private readonly pinned: boolean;
+
+  constructor(private readonly rungs: QualityRung[], start: number, now: number, pin = false) {
     this.index = Math.max(0, Math.min(rungs.length - 1, start));
     this.start = this.index;
+    this.pinned = pin;
     this.settleUntil = now + SETTLE_S;
   }
 
@@ -120,6 +132,14 @@ export class QualityGovernor {
   sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
+    // Pinned: still average the frame, so the readout and the debug surface
+    // report what this rung actually costs, but never move off it.
+    if (this.pinned) {
+      const kp = frameMs > this.emaFrame ? 0.25 : 0.08;
+      this.emaFrame += (Math.min(frameMs, HUGE_MS) - this.emaFrame) * kp;
+      this.emaWork += (Math.max(workMs, gpuMs) - this.emaWork) * 0.1;
+      return false;
+    }
     if (frameMs > HUGE_MS) {
       if (++this.hugeStreak < 3) return false;
       frameMs = HUGE_MS;

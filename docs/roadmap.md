@@ -112,6 +112,13 @@ job: nothing was written twice. There is one shading language in the tree now �
      contrast than it adds structure. And revisit the splat resolution — 2× is one step
      past useless (at 1× it made the plate measurably **worse**, which is the finding
      that shaped everything else here) and probably not yet enough.
+   - **H3a · A governor that knows what a rung costs.** *Half done 2026-09-21.* The
+     ladder's pixel rungs were inert — the canvas ignored them — and on a 1x display
+     it carried a rung twice; both are fixed, and `npm run ladder` and `npm run rungs`
+     measure and check the shape. What is still true is that the governor has **no
+     cost model**: it walks the list one step at a time and the order of the list is
+     its whole understanding. Each step now saves something, and the order is
+     defensible, but it cannot tell a step worth 23 ms from one worth 2.
    - **H4 · Wide colour, and HDR** where the screen has it.
    - **H5 · The effects** ([`filters-plan.md`](filters-plan.md) F1–F9): film first, then
      the feedback camera and its coupled loops, the prism and kick ripple, letters as

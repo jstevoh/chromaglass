@@ -416,6 +416,53 @@ this plate has to be measured — 384² is 6.60 ms against 512²'s 8.26. The
 ladder is fine. The first reading was one run of a chaotic plate, which is
 the third time in two days that has nearly become a finding.
 
+## The quality ladder, measured — and half of it was doing nothing
+
+`npm run ladder` holds the governor on one rung at a time (`?rung=`) and
+reads what that rung costs. `?sim=` could not do this: pinning the grid turns
+the governor off, and an ungoverned frame renders at one device pixel
+whatever the rung says — so the pixel half of a rung had never been measured.
+It turned out to be the half that was broken.
+
+**Every pixel rung was inert.** A rung is a solver grid *and* a share of the
+display's pixels. The renderer's own canvas sizing read `devicePixels()` —
+the *display's* ratio — where the rung carries its own, so a step from 512²
+at 2x to 512² at 1x wrote a new number into the readout and the status and
+left the canvas exactly where it was. Measured on a 2x display, the canvas
+was **2560×1600 on all five rungs of a five-rung ladder**.
+
+That is the worst shape a quality control can have. The governor gave up a
+rung of quality, believed it had bought headroom, found none, and went
+looking for the next thing to give up. Fixed, the same step saves 2.0 ms of
+drawing — about half of it:
+
+| rung | grid | dpr | canvas | frame | step | drawing |
+|---|---|---|---|---|---|---|
+| 0 | 768² | 2.00 | 2560×1600 | 39.8 ms | 17.30 | 4.98 |
+| 1 | 512² | 2.00 | 2560×1600 | 16.9 | 6.83 | 4.43 |
+| 2 | 512² | 1.00 | 1280×800 | 17.2 | 8.20 | **2.43** |
+| 3 | 384² | 1.00 | 1280×800 | 17.1 | 6.74 | 3.38 |
+| 4 | 256² | 1.00 | 1280×800 | 16.9 | 4.00 | 3.23 |
+
+**And on a 1x display the ladder had a rung twice.** `{512, dpr}` and
+`{512, 1}` are one rung when `dpr` is 1 — a projector, most external
+monitors, any machine that is not Retina. The governor cannot tell, so a
+machine struggling at 512² would step down, wait out a settling period,
+measure the identical frame and step down again: four seconds of a slow show
+spent discovering that nothing happened. `qualityLadder` deduplicates now,
+and a 1x display gets four rungs where a 2x one gets five.
+
+**The frame column cannot see any of this on a fast machine**, which is why
+it went unnoticed: rungs 1 to 4 all read 17 ms because they are all capped by
+vsync. What distinguishes them is GPU cost, not frame time — the step and
+drawing columns — and the governor watches frame time. On a machine with room
+to spare that is correct and it does not matter; on a machine without it, the
+rungs now differ.
+
+`npm run rungs` checks the shape without a browser — that every rung is a
+rung, that a step down gives something up, that halving a rung's pixels
+quarters the canvas — and it runs in CI beside the other arithmetic.
+
 **And the plate is in slow motion at the top rung.** 45.3 steps a second
 against the 60 the show asks for, inside a 38.6 ms frame. A frame rate cannot
 show you that: the liquid is simply evolving at three quarters of wall-clock
