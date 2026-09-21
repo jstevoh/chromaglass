@@ -107,8 +107,10 @@ export async function pressureSelfTest(device: GPUDevice): Promise<{
   jacobi: number;
   redBlack: number;
   packedMatches: boolean;
+  shortOk: boolean;
   detail: string;
   packedDetail: string;
+  shortDetail: string;
 }> {
   const disposer = new Disposer();
   try {
@@ -368,12 +370,33 @@ fn residual() {
       twelve sweeps land within a fifth of a percent of twenty-four Jacobi
       passes, so 2% is a wide gate that still catches the halving going wrong.
     */
+    /*
+      And again at the squeeze film's counts.
+
+      Hele-Shaw is the same Poisson operator in the same Neumann box, so it
+      gets the same halving — five sweeps where it ran ten Jacobi passes.
+      That is a *different claim* from the one above, and worth its own
+      measurement: Gauss-Seidel's advantage over Jacobi is asymptotic, so a
+      ratio that holds at 24 and 12 is not automatically a ratio that holds
+      at 10 and 5, where neither solver has got very far. If five sweeps are
+      not worth ten passes at this end of the curve, the squeeze film gives
+      up structure for speed and nobody would see which.
+    */
+    const jacobiShort = await jacobiSolve(10);
+    await sweeps('redBlack', 5);
+    const redBlackShort = await residualOf();
+
     const ok = Number.isFinite(jacobi) && Number.isFinite(redBlack) && jacobi > 0 && redBlack <= jacobi * 1.02;
+    const shortOk = Number.isFinite(jacobiShort) && Number.isFinite(redBlackShort)
+      && jacobiShort > 0 && redBlackShort <= jacobiShort * 1.02;
     return {
       ok,
       jacobi,
       redBlack,
       packedMatches,
+      shortOk,
+      shortDetail: `10 Jacobi ${jacobiShort.toExponential(4)}, 5 red-black ${redBlackShort.toExponential(4)}` +
+        (jacobiShort > 0 ? ` — ${((redBlackShort / jacobiShort - 1) * 100).toFixed(2)}% more residual for half the work` : ''),
       detail: `24 Jacobi ${jacobi.toExponential(4)}, 12 red-black ${redBlack.toExponential(4)}` +
         (jacobi > 0 ? ` — ${((redBlack / jacobi - 1) * 100).toFixed(2)}% more residual for half the work` : ''),
       packedDetail: `largest disagreement ${maxDiff.toExponential(2)} on a field reaching ${reach.toExponential(2)}`,

@@ -125,6 +125,49 @@ fn bilerpN(t: texture_2d<f32>, uv: vec2f, n: f32) -> vec4f {
 }
 `;
 
+/**
+ * Reading a scalar field that is stored as two contiguous colour planes.
+ *
+ * Every kernel that touches one names its buffer `pr`, so this is a snippet
+ * rather than a function taking a pointer — a pointer parameter would have to
+ * pick an access mode, and the writers hold theirs `read_write` while the
+ * readers hold theirs `read`.
+ *
+ * There is one copy because there is one chance to get it wrong. The layout is
+ * checked once, on the GPU, by `pressureSelfTest` running a packed sweep beside
+ * a row-major one and requiring the same field cell for cell — and anything
+ * using this snippet inherits that proof. A second hand-written copy would not.
+ */
+const PACKED = /* wgsl */ `
+fn packedAt(x: i32, y: i32, n: i32) -> f32 {
+  // Neumann at the wall: the value outside is the value at the edge, so the
+  // gradient across it is zero. The clamp comes first and the colour after
+  // it — a neighbour that clamps back into the grid can land on the reader's
+  // own colour, which is what happens at x = 0 reading its left.
+  let cx = clamp(x, 0, n - 1);
+  let cy = clamp(y, 0, n - 1);
+  let half = n / 2;
+  return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
+}
+`;
+
+/** The same, sampled between cells, matching `bilerpN` exactly. */
+const PACKED_BILERP = /* wgsl */ `
+fn packedBilerp(uv: vec2f, n: f32) -> f32 {
+  let p = uv * n - 0.5;
+  let i = floor(p);
+  let f = p - i;
+  let lo = vec2i(clamp(i, vec2f(0.0), vec2f(n - 1.0)));
+  let hi = vec2i(clamp(i + 1.0, vec2f(0.0), vec2f(n - 1.0)));
+  let ni = i32(n);
+  let a = packedAt(lo.x, lo.y, ni);
+  let b = packedAt(hi.x, lo.y, ni);
+  let c = packedAt(lo.x, hi.y, ni);
+  let d = packedAt(hi.x, hi.y, ni);
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+`;
+
 const HEAD = SIM_STRUCT;
 const W = '@compute @workgroup_size(8, 8)';
 
@@ -181,38 +224,58 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), vec4f(gap, dhdt, 0.0, 0.0));
 }`,
 
-  // Hele-Shaw pressure: ∇²p = 12 μ (dh/dt) / h³
-  squeezeJacobi: `${HEAD}
-@group(0) @binding(2) var pr: texture_2d<f32>;
-@group(0) @binding(3) var sq: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let p = vec2i(id.xy);
-  let s = textureLoad(sq, p, 0);
-  let h = s.r;
-  let src = clamp(12.0 * S.visc * s.g / (h * h * h), -100.0, 100.0);
-  let l = textureLoad(pr, clampP(p - vec2i(1, 0), S.n), 0).r;
-  let r = textureLoad(pr, clampP(p + vec2i(1, 0), S.n), 0).r;
-  let b = textureLoad(pr, clampP(p - vec2i(0, 1), S.n), 0).r;
-  let t = textureLoad(pr, clampP(p + vec2i(0, 1), S.n), 0).r;
-  textureStore(dst, p, vec4f((l + r + b + t - src) * 0.25, 0.0, 0.0, 0.0));
+  /*
+    The squeeze film's pressure, as red-black Gauss-Seidel on packed planes.
+
+    Hele-Shaw is the same Poisson operator as the projection, in the same
+    Neumann box — only the source differs — so it gets the same treatment,
+    and for the same reasons. Ten Jacobi passes ping-ponging two textures
+    become five sweeps updating one buffer in place: half the arithmetic for
+    about the same convergence, and the buffer's two colour planes keep each
+    sweep's writes contiguous rather than spread across every other word.
+
+    It warm-starts. The Jacobi did too — it never cleared between steps, it
+    ping-ponged onward from wherever the last step left off — and in-place
+    sweeps carry that on for free with no swap.
+
+    The source is negated where the projection's is added, which is the only
+    line here that is not the projection.
+  */
+  squeezeRedBlack: `${HEAD}
+@group(0) @binding(2) var sq: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read_write> pr: array<f32>;
+${PACKED}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(S.n);
+  let half = n / 2;
+  let i = i32(id.x);
+  if (i >= n * half) { return; }
+  let parity = i32(A.a.x);
+  let y = i / half;
+  let x = 2 * (i % half) + ((y + parity) & 1);
+  let sv = textureLoad(sq, vec2i(x, y), 0);
+  let h = sv.r;
+  let src = clamp(12.0 * S.visc * sv.g / (h * h * h), -100.0, 100.0);
+  let s = packedAt(x - 1, y, n) + packedAt(x + 1, y, n) + packedAt(x, y - 1, n) + packedAt(x, y + 1, n);
+  pr[parity * n * half + i] = (s - src) * 0.25;
 }`,
 
-  // v += -(h²/12μ) ∇p, the gradient across one logical cell.
-  squeezeVel: `${HEAD}${BILERP_N}
+  /** `squeezeVel`, reading the pressure from the buffer the sweeps wrote. */
+  squeezeVelBuf: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var pr: texture_2d<f32>;
-@group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var<storage, read> pr: array<f32>;
+${PACKED}${PACKED_BILERP}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let uv = uvOf(id);
   let v = textureLoad(vel, p, 0);
   let e = vec2f(1.0 / S.l, 0.0);
-  let gx = (bilerpN(pr, uv + e, S.n).r - bilerpN(pr, uv - e, S.n).r) * 0.5;
-  let gy = (bilerpN(pr, uv + e.yx, S.n).r - bilerpN(pr, uv - e.yx, S.n).r) * 0.5;
+  let gx = (packedBilerp(uv + e, S.n) - packedBilerp(uv - e, S.n)) * 0.5;
+  let gy = (packedBilerp(uv + e.yx, S.n) - packedBilerp(uv - e.yx, S.n)) * 0.5;
   let h = textureLoad(sq, p, 0).r;
   let coeff = -(h * h) / (12.0 * S.visc);
   textureStore(dst, p, vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w));
@@ -309,22 +372,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   pressureRedBlack: `${HEAD}
 @group(0) @binding(2) var dv: texture_2d<f32>;
 @group(0) @binding(3) var<storage, read_write> pr: array<f32>;
-
-// The pressure buffer holds the two colours as contiguous planes: every red
-// cell, in row order, then every black one. A cell's place inside its own
-// plane is y * half + (x >> 1), because each row holds exactly 'half'
-// cells of each colour and they alternate, so the shift counts them.
-fn prAt(x: i32, y: i32, n: i32, half: i32) -> f32 {
-  // Neumann at the wall, as the Jacobi did through clampP: the pressure
-  // outside is the pressure at the edge, so the gradient across it is zero.
-  // The clamp has to come first, and the colour after it — a neighbour that
-  // clamps back into the grid can land on the reader's own colour, which is
-  // exactly what happens at x = 0 reading its left.
-  let cx = clamp(x, 0, n - 1);
-  let cy = clamp(y, 0, n - 1);
-  return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
-}
-
+${PACKED}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
@@ -336,7 +384,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   // The row's own colour decides which column this thread owns, so the two
   // sweeps together cover every cell exactly once.
   let x = 2 * (i % half) + ((y + parity) & 1);
-  let s = prAt(x - 1, y, n, half) + prAt(x + 1, y, n, half) + prAt(x, y - 1, n, half) + prAt(x, y + 1, n, half);
+  let s = packedAt(x - 1, y, n) + packedAt(x + 1, y, n) + packedAt(x, y - 1, n) + packedAt(x, y + 1, n);
   // y * half + (x >> 1) is i again, which is the whole point: thread i
   // writes word i of its plane, so a workgroup's 64 writes are 64 adjacent
   // words rather than 64 words spread across 128.
@@ -358,20 +406,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(4) var<storage, read> pr: array<f32>;
-fn prAt(x: i32, y: i32, n: i32) -> f32 {
-  // The same two-plane packing the sweeps write; see pressureRedBlack.
-  let cx = clamp(x, 0, n - 1);
-  let cy = clamp(y, 0, n - 1);
-  let half = n / 2;
-  return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
-}
+${PACKED}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
   let v = textureLoad(vel, p, 0);
-  let gx = prAt(p.x + 1, p.y, n) - prAt(p.x - 1, p.y, n);
-  let gy = prAt(p.x, p.y + 1, n) - prAt(p.x, p.y - 1, n);
+  let gx = packedAt(p.x + 1, p.y, n) - packedAt(p.x - 1, p.y, n);
+  let gy = packedAt(p.x, p.y + 1, n) - packedAt(p.x, p.y - 1, n);
   textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
 }`,
 
