@@ -29,7 +29,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
       surfaceTension: 0.14,      // blobs hold shape, merge slowly
-      diffusionRate: 0.00012,    // colors bleed softly at boundaries
+      diffusionRate: 0,          // measured: the bleed cost more edge than it bought
       buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
       advection: 0.35,           // smooth transport, no turbulence
       damping: 0.988,            // very slow energy loss — movements persist gracefully
@@ -1373,7 +1373,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#000000',
       ledSpeed: 0.0,
       surfaceTension: 0.2,
-      diffusionRate: 0.00006,
+      diffusionRate: 0,          // measured: sharper without it, and a pass cheaper
       buoyancy: 0.3,
       advection: 0.55,
       damping: 0.975,
