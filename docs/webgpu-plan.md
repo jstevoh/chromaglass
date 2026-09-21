@@ -251,8 +251,23 @@ surface reported the 2 ms of drawing and nothing about the 18 ms underneath
 it. `chromaglassDebug().webgpu.solver` is that profiler now, per layer. At
 768², per step: 9.18 ms and 8.71 ms for the two layers, against a 2.13 ms
 plate pass, in a 37.9 ms frame. The spike's 58-pass core was 3.74 ms at the
-same grid, so most of the app's step is what the spike did not include —
-the chemistry, the splats, the forced velocity and the measurements.
+same grid.
+
+**That gap was first written up here as the chemistry, the splats and the
+measurements — the work the spike did not include. It is not.** Those run on
+their own command encoders, with no timestamps on them, so they are not in
+the 9.18 ms at all: that number is one compute pass, `label: 'step'`, and
+nothing else. What is in it is about 101 dispatches against the spike's 58 —
+0.091 ms each against 0.064 — so the app's step costs what it costs mostly by
+doing 74% more dispatches, not by doing dearer ones. **Forty-eight of those
+101 are pressure Jacobi**, twenty-four in each of the two projections, and
+that is the single largest block of work in the frame by a wide margin.
+
+It is still an inference rather than a measurement: one timestamp pair spans
+the whole step, so the split above is arithmetic over the dispatch list, not
+something the GPU has been asked. Splitting the step into labelled passes is
+what H0 in [`roadmap.md`](roadmap.md) is for, and it is what decides whether
+the pressure solver (H2) is worth doing before the particles (H1).
 
 **The governor is judged on the GPU's own number now.** Its climb gate is a
 work budget, and on this path the work was half a millisecond of encoding
@@ -454,6 +469,44 @@ finds 40 lines in `src` rather than none — every one a comment where the
 reference *is* the explanation ("WebGL's timer queries counted queue waits on
 ANGLE and lied, which is why the governor reads timestamps"). Decoration was
 pruned; reasons were kept.
+
+**The last of P7's list, swept 2026-09-20.** The gate named more than the
+engine: `?sim=cpu`, the `cpu` rung, the `software` class, and README, docs and
+the CHANGELOG. Those are done now. The `cpu` member is off `SimResolution`, so
+the CPU · 192² option is out of the settings panel — it had been resolving
+quietly to 256², which is a setting that lies rather than a setting that is
+gone. `qualityLadder` lost its `cpuFallback` parameter and its bottom rung,
+`classifyGpu` went with the renderer string it parsed, and `EngineStatus.engine`
+says `'none'` where it used to claim `'cpu'` for a stage with no solver
+attached yet.
+
+**The `software` class stays, against the plan's own list.** It was down for
+deletion because it meant "use the CPU solver", and there isn't one. But it
+means something else now and something true: a fallback adapter — llvmpipe,
+SwiftShader, WARP — is a real WebGPU adapter that is very slow, and the class
+is how it gets pinned to one 256² rung instead of being walked down the ladder
+one measurement at a time. Deleting it would have cost a CI runner several
+minutes per harness to rediscover.
+
+**Two false greens fell out of the sweep, and the second was fresh.** `qa`
+proves that pressing Seed does not rebuild the renderer, and it proved it by
+counting `getContext('webgl2')` calls. With no WebGL in the tree that count is
+zero whatever the effect does — green, always, and meaningless. It counts
+`webgpu` now.
+
+The second was in the replacement written here. `npm run webgpu` had a check
+that pinned the CPU solver and asserted the plate still drew; with the pin
+gone it was rewritten to pin a grid past what any GPU can allocate and assert
+the clamp. It went green, reporting `grid 512` — the clamp is 1024, so the
+number said plainly that the pin had not landed, and the check passed anyway
+because it only asked for "lit, on the GPU". Two things were wrong with it, in
+opposite directions: writing `chromaglassDebug().settings.simResolution`
+changes a ref the drawing reads and not the state the solver is rebuilt from,
+so the pin did nothing; and `chromaglassDebug()` returns a snapshot, so even
+once the pin went through `chromaglassSettings` the `status` being read was
+the one captured before it. It asserts `grid === 1024` now, which is the thing
+that would have caught both. **A check whose detail string contradicts its own
+premise is failing quietly** — read the number, not the colour.
 
 **Still to do:** the CPU solver's stepping. It is unreachable — there is no
 rung, no pin and no fallback that leads to it — but the class is threaded
@@ -698,8 +751,9 @@ long-lived rewrite branch would drown in conflicts, so:
 | **P4 — Safety and operations** | <ul><li>The flash probe as a true-average compute reduction</li><li>The governor on timestamp queries</li><li>Recovery from device loss</li><li>Bench</li><li>Engine label, and the `RunLocallyCard` text</li></ul> | `wall`'s flash-guard checks pass; recovery is proved by a `device.destroy()` test |
 | **P5 — Harnesses and CI** | <ul><li>Every harness on WebGPU</li><li>CI flags from P0</li><li>Thresholds re-baselined</li><li>`qa`'s CPU default removed</li></ul> | All checks green with `?renderer=webgpu` as the harness default |
 | **P6 — Cutover** | WebGPU becomes the default, and the "needs WebGPU" screen goes live | A week of the live site on WebGPU with no new errors in the console reports |
-| **P7 — Delete** | <ul><li>The WebGL code, all GLSL, the CPU solver's stepping and the `cpu` rung</li><li>The `software` GPU class, `?sim=cpu`, `?filter=bspline` and `?derived=0`</li><li>The flag itself</li><li>The appliance files (below)</li><li>README, docs and the CHANGELOG</li></ul> | `git grep -i webgl` finds nothing except the CHANGELOG |
-| **H — Spend the headroom** | See below | Each item has its own measure |
+| **P7 — Delete** | <ul><li>The WebGL code, all GLSL, the CPU solver's stepping and the `cpu` rung</li><li>The `software` GPU class, `?sim=cpu`, `?filter=bspline` and `?derived=0`</li><li>The flag itself</li><li>The appliance files (below)</li><li>README, docs and the CHANGELOG</li></ul> | `git grep -i webgl` finds nothing except the CHANGELOG. **Done, bar the CPU solver's stepping** — and the `software` class was kept on purpose, for the reason in P7's results |
+| **H0 — Time the step** | Split the solver's one compute pass into labelled passes behind a diagnostic flag | `chromaglassDebug().webgpu.solver` names where a step's 9 ms goes, instead of one number for all of it |
+| **H — Spend the headroom** | See below, and the order in [`roadmap.md`](roadmap.md) | Each item has its own measure |
 
 **Time:** P0–P7 is several weeks of focused work. P2 and P3 are the bulk, and the
 composite shader alone is about a third of it. The pace depends mostly on the dual-edit
@@ -709,13 +763,27 @@ overhead from the other threads.
 
 In order of what they do for the picture:
 
+*The order these are listed in is what they do for the picture. The order to **build**
+them in is in [`roadmap.md`](roadmap.md), and it is not the same: the measurements taken
+during the port put H2 ahead of H1, and fold H3 into it as its test.*
+
+0. **Time the step (H0).** One compute pass carries one timestamp pair, so the 9.18 ms
+   above is a single number covering about 101 dispatches. Split it into labelled passes
+   behind a diagnostic flag.
+   - **Measure:** the step's own profiler names its stages. It decides H1 against H2,
+     which the present evidence orders two different ways depending on how it is read.
 1. **Dye carried by particles (H1).** Millions of dye particles advected by the velocity
    field and splatted each frame, alongside or instead of the dye grid.
    - **Measure:** `npm run detail`. The target is to close most of PLAN.md's 3–5× gap at
      4–8 px.
 2. **A better pressure solver (H2).** Red-black Gauss-Seidel or multigrid, in place of 24
-   Jacobi passes. The result is less residual divergence, and livelier small swirls.
-3. **A 1024² rung (H3)** on strong GPUs, chosen by the timestamp-driven governor.
+   Jacobi passes. The result is less residual divergence, and livelier small swirls —
+   and, if cost tracks dispatch count, the largest single saving available: 48 of a
+   step's ~101 dispatches are pressure Jacobi, 24 in each of the two projections.
+3. **A 1024² rung (H3)** on strong GPUs, chosen by the timestamp-driven governor. Two
+   lines, and the governor that chooses it already exists — so this is H2's gate rather
+   than a piece of work: today an M4 holds 1024² at 22 fps, and a rung the governor
+   steps straight back down from is the thing P6 fixed.
 4. **Display-P3 and HDR output (H4)** on screens that have them. Projectors and social
    video stay in standard range.
 5. **The filters plan (H5),** built on the post chain in WGSL. Its per-effect GPU costs

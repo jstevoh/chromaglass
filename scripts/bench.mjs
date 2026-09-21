@@ -99,10 +99,11 @@ try {
 
   check(/grid\s+fps\s+frame/.test(text ?? ''), 'the report has a table in it', 'the report has no table in it');
 
-  // The CPU solver is the one rung every machine has, so it is the one the
-  // numbers are asserted on. Whether a *GPU* rung runs depends on the host —
-  // a container rasterising in software may refuse them all, and that is a
-  // fact about the container, not a failure of this code.
+  // 256² is the bottom of every ladder and the one rung a software adapter
+  // is offered, so it is the one the numbers are asserted on. Whether a
+  // *finer* rung runs depends on the host — a container rasterising in
+  // software may refuse them all, and that is a fact about the container,
+  // not a failure of this code.
   check(/256²\s+\d/.test(text ?? ''), 'the smallest rung produced numbers', 'the smallest rung produced no numbers');
 
   if (!FULL) {

@@ -1,23 +1,30 @@
 # Plan: filters and effects
 
 *Written 2026-09-19 against `origin/main` at `4a4033b` (#88); line numbers drift, so the
-symbol names are what to search for. **F0, the post chain, shipped as #92**; the effects
-themselves wait for the WebGPU cutover. [The roadmap](roadmap.md) says where this sits.*
+symbol names are what to search for. **F0, the post chain, shipped as #92**, and was
+rebuilt in WGSL during the port (#100). The cutover the effects were waiting for landed
+2026-09-20, so E1–E8 are ready to build — as H5 in [the roadmap](roadmap.md), which says
+where this sits in the order.*
 
 This plan covers eight effects, the period film look that replaces the VHS/CRT idea, and
 the tools that make them playable rather than merely switchable.
 
-> **Built on WebGPU, after the cutover** (`docs/webgpu-plan.md`, decided 2026-09-19). The
-> post chain is written once, in WGSL. F0 below was written for WebGL and changes:
+> **Built on WebGPU** (`docs/webgpu-plan.md`; decided 2026-09-19, landed 2026-09-20).
+> F0 below was written for WebGL, and this is what became of it — all of it done:
 > - **Moot:** the texture-unit registry and the unit-11 clash, because WebGPU has no
 >   texture units.
-> - **Moved into the WebGPU port (P4):** the true-average flash probe.
+> - **Moved into the WebGPU port (P4):** the true-average flash probe, now a compute
+>   reduction (`src/gpu/probe.ts`).
 > - **The scene target** is `rgba16float` everywhere, with no
 >   `EXT_color_buffer_float` check.
+> - **The rest** — the finish pass, the history ring, the seeded clock, `npm run fx`,
+>   cast triggers and the governor's post level — is in `src/gpu/post.ts` and
+>   `src/gpu/wgsl/post.ts`, and its costs come from timestamp queries.
 >
-> The rest of F0 is built as described, in WGSL: the finish pass, history ring, seeded
-> clock, `npm run fx`, cast triggers and the governor's post level. Its costs come from
-> timestamp queries.
+> One thing the port added that an effect author needs: **a pass that writes a texture
+> another pass samples must flip clip space**, through the `FLIP_Y` override constant.
+> WebGPU puts `uv.y = 1` at row 0 where a framebuffer puts 0 there, and getting this
+> wrong is invisible in a shader test and upside down on the glass.
 
 | # | Effect | In one line |
 |---|---|---|
@@ -473,8 +480,10 @@ path.
 
 - **LUTs:**
   - `lut` (none, built-ins, user) and `lutMix`.
-  - A `.cube` parser (17³ or 33³) into a 3D texture; WebGL2 has them. Applied in the
-    finish pass.
+  - A `.cube` parser (17³ or 33³) into a `texture_3d<f32>`, sampled in the finish pass.
+    (Written for WebGL2's 3D textures; WGSL has the same thing, and `layoutFromWgsl`
+    in `gpu/kit.ts` needs `texture_3d` added beside the array case before it can bind
+    one.)
   - A look that uses a user LUT carries its data (about 15 KB at 17³), so the look file
     arrives whole.
 - **Poster grades as LUT files, not shader modes:**

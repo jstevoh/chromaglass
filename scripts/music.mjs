@@ -395,4 +395,5 @@ for (const [what, ok] of checks) {
   console.log(`${ok ? ' ok ' : 'FAIL'}  ${what}`);
 }
 
+console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

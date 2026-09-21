@@ -193,15 +193,11 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
  * The stage draws the show (docs/webgpu-plan.md): there is one engine.
  */
 
-// choice to the frame-time governor; 'cpu' is the 192² fallback.
+// choice to the frame-time governor.
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
-  // Under the WebGPU flag there is nothing to draw a CPU-held plate with, so
-  // a pin there becomes the smallest grid the stage can draw rather than a
-  // black screen. The pin itself goes when the CPU solver does (P7).
-  // There is no CPU rung to fall to: the stage draws the solver's
-  // textures, and a field on the CPU has none.
-  if (want === 'cpu') return 256;
+  // A pin is held to what this GPU can actually allocate, so an old saved
+  // look or a hand-typed query cannot ask for a texture the device refuses.
   return Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
 };
 
@@ -2576,7 +2572,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * new context and the show carries on where it was.
    */
   const glLostRef = useRef(false);
-  /** Under ?renderer=webgpu: why there is no GPU to draw with, for the "needs WebGPU" screen. */
+  /** Why there is no GPU to draw with, for the "needs WebGPU" screen. */
   const [gpuFailure, setGpuFailure] = useState<GpuFailure | null>(null);
   const [glLost, setGlLost] = useState(false);
   const [glEpoch, setGlEpoch] = useState(0);
@@ -3437,9 +3433,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const status: EngineStatus = {
             label: lead?.gpu
               ? `WebGPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
-              : `CPU · ${GRID_SIZE}²${gpuUnavailable ? ' · GPU unavailable' : ''}`,
-            engine: lead?.gpu ? 'webgpu' : 'cpu',
-            grid: lead?.gpu ? lead.gpu.N : GRID_SIZE,
+              : `WebGPU · ${gpuUnavailable ? 'unavailable' : 'starting'}`,
+            engine: lead?.gpu ? 'webgpu' : 'none',
+            grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
             governed,
@@ -4598,18 +4594,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
-      // No rung the stage cannot draw: a plate the CPU holds has no
-      // textures to sample (docs/webgpu-plan.md, P5).
-      const ladder = qualityLadder(tier, r.info.gpuClass, false);
+      const ladder = qualityLadder(tier, r.info.gpuClass);
       governorRef.current = new QualityGovernor(ladder.rungs, ladder.start, performance.now() * 0.001);
       r.resize();
       render();
     };
 
 
-    // ── WebGPU, under ?renderer=webgpu ────────────────────────────────
-    // Before anything else: a canvas holds one kind of context for life, and
-    // solver (P2) and the compositor (P3) move in behind this branch.
+    // ── The stage ─────────────────────────────────────────────────────
+    // Before anything else: a canvas holds one kind of context for life, so
+    // the stage takes it here and everything else draws through what it
+    // returns.
     let stage: WebGPUStage | null = null;
     let camera: WebGPUCamera | null = null;
     let projector: WebGPUOutput | null = null;
@@ -5203,8 +5198,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         front of a room: this says the machine knows, and is coming back.
       */}
       {/*
-        Under ?renderer=webgpu, a browser without it gets a clear screen, not a
-        degraded show (docs/webgpu-plan.md): what is missing, and where it works.
+        A browser without WebGPU gets a clear screen rather than a degraded
+        show (docs/webgpu-plan.md): what is missing, and where it works. There
+        is no second renderer to fall back to any more, so this is the whole
+        answer for a machine that cannot run it.
       */}
       {gpuFailure && (
         <div className="absolute inset-0 flex items-center justify-center p-6" data-testid="needs-webgpu">
