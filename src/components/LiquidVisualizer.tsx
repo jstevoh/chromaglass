@@ -247,6 +247,38 @@ const resolveSimResolution = (setting: SimResolution | undefined, governor: Qual
 // a 60 fps desktop and a 120 Hz display. A slow frame catches up by taking
 // several steps, capped so a stall can't spiral into a burst of work.
 const SIM_STEP = 1 / 60;
+/**
+ * `?steps=N` — take N solver steps a second instead of sixty (H2b).
+ *
+ * How far the liquid travels in a second is `steps per second × dt`, and the
+ * loop has always held the first at sixty and scaled the second with the
+ * Speed control. So a plate at Speed 0.012 runs the same hundred-odd
+ * dispatches a step, sixty times a second, as one at 0.3 — it just multiplies
+ * a smaller number in. Slow costs exactly what fast costs.
+ *
+ * It need not. Hold `dt` and lower the rate instead and the liquid moves the
+ * same distance for proportionally less work, and the solver is most of a
+ * frame's GPU time. What it cannot do is go too far: below about thirty steps
+ * a second a plate stops flowing and starts stepping, and a larger `dt` is a
+ * larger displacement per step, which semi-Lagrangian advection survives but
+ * does not render faithfully.
+ *
+ * So this is the diagnostic that measures where that line is, before
+ * anything is done automatically. Read from the query string and nothing
+ * else; `SIM_STEP` stays the rate the show runs at.
+ */
+const SIM_STEP_RATE = (() => {
+  if (typeof window === 'undefined') return 60;
+  const n = Number(new URLSearchParams(window.location.search).get('steps'));
+  return Number.isFinite(n) && n >= 5 && n <= 240 ? n : 60;
+})();
+/** Seconds of wall-clock one solver step stands for. */
+const SIM_STEP_S = 1 / SIM_STEP_RATE;
+/**
+ * How much bigger each step's `dt` must be so the liquid travels the same
+ * distance per second at the lower rate. One when nothing is asked for.
+ */
+const SIM_STEP_STRETCH = SIM_STEP_S / SIM_STEP;
 // `?warp=N` (diagnostic) lifts the catch-up cap so a slow renderer can still
 // take many solver steps per frame: the sim never runs ahead of wall-clock,
 // it just stops falling behind. Used to capture developed frames on machines
@@ -1573,7 +1605,15 @@ class FluidSimulation {
     // and calmer, that the live plate is worked over.
     if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
 
-    this.dt = Math.min(Math.max(dynamicSpeed * 0.2, 0.0000001), 0.05);
+    /*
+      The timestep, stretched to whatever rate the loop is stepping at (H2b).
+
+      How far the liquid travels in a second is `steps per second × dt`. The
+      loop holds the first at sixty and this scales the second, so halving the
+      rate and doubling `dt` is the same motion for half the work. The stretch
+      is one unless `?steps=` asks otherwise, so this is exactly what it was.
+    */
+    this.dt = Math.min(Math.max(dynamicSpeed * 0.2 * SIM_STEP_STRETCH, 0.0000001), 0.05);
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
@@ -3325,7 +3365,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
           );
           for (const f of fluidsRef.current) if (f) {
-            f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP;
+            f.phrase = phraseRef.current; f.dtSeconds = SIM_STEP_S;
             f.dropHeight = currentSettings.dropHeight ?? 0;
             f.dropFingering = currentSettings.fingering ?? 0;
           }
@@ -3352,9 +3392,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP * catchUp);
-        const simSteps = Math.floor(simAccumRef.current / SIM_STEP);
-        simAccumRef.current -= simSteps * SIM_STEP;
+        simAccumRef.current = Math.min(simAccumRef.current + realDt, SIM_STEP_S * catchUp);
+        const simSteps = Math.floor(simAccumRef.current / SIM_STEP_S);
+        simAccumRef.current -= simSteps * SIM_STEP_S;
         stepsThisFrame = simSteps;
 
         // How many steps a second that is actually producing.
@@ -3618,8 +3658,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // separate baselines and the per-cell cap is per stir, so two
               // sources can add more than one — which is the point of turning
               // the second one up.
-              if (roomReading) roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP);
-              if (filmReading) filmStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, filmReading, filmDrive, SIM_STEP);
+              if (roomReading) roomStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, roomReading, roomDrive, SIM_STEP_S);
+              if (filmReading) filmStirRef.current.apply(lead.vx, lead.vy, GRID_SIZE, filmReading, filmDrive, SIM_STEP_S);
               lead.markDirty();
             }
           }
@@ -4147,8 +4187,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const w = 2 * Math.PI * 0.9, z = 0.22;
             const ax = -w * w * rock.x - 2 * z * w * rock.vx;
             const ay = -w * w * rock.y - 2 * z * w * rock.vy;
-            rock.vx += ax * SIM_STEP; rock.vy += ay * SIM_STEP;
-            rock.x += rock.vx * SIM_STEP; rock.y += rock.vy * SIM_STEP;
+            rock.vx += ax * SIM_STEP_S; rock.vy += ay * SIM_STEP_S;
+            rock.x += rock.vx * SIM_STEP_S; rock.y += rock.vy * SIM_STEP_S;
             const swayX = noise2D(time * 0.11, 3.7) * 0.35 * R;
             const swayY = noise2D(7.1, time * 0.09) * 0.35 * R;
             // A phone held by the projectionist: its tilt is the plate's, fading
@@ -4184,7 +4224,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const lead0 = fluidsRef.current[0];
                   const bvx = lead0?.readVx, bvy = lead0?.readVy;
                   const bk = particleFlowScale(lead0, currentSettings);
-                  beads.step(SIM_STEP, (bx, by) => {
+                  beads.step(SIM_STEP_S, (bx, by) => {
                     if (!bvx || !bvy) return [0, 0];
                     const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                     const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
@@ -4226,7 +4266,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
-              bubbles.step(SIM_STEP, (bx, by) => {
+              bubbles.step(SIM_STEP_S, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
@@ -4266,7 +4306,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // the dye rides (see readVx), the wall-clock rate carried the soap
             // across the plate ahead of the dye it is meant to be thinning.
             const adv = currentSettings.advection ?? 0.45;
-            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP, fluid.dt * adv * (GRID_SIZE - 2));
+            for (const fluid of fluidsRef.current) fluid.stepLiquid(SIM_STEP_S, fluid.dt * adv * (GRID_SIZE - 2));
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
