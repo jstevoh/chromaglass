@@ -285,17 +285,44 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     mapped onto its own colour rather than dispatched over the whole grid and
     turned away at the door, which would spend half the threads doing
     nothing and give back the factor this exists to win.
+
+    ── Why the two colours are stored apart ──
+
+    That still left a red-black sweep costing **1.64x** a Jacobi pass for the
+    same number of cell updates, which is most of the reason the projection
+    came down 18% where the arithmetic promised 50%. It was never the maths.
+    With the grid stored in row order, a sweep touches every other word:
+    sixty-four consecutive threads wrote sixty-four floats spread across a
+    hundred and twenty-eight, so every cache line and every coalesced write
+    carried half a line of the other colour along with it and threw it away.
+
+    So the buffer holds the colours as two contiguous planes instead — all
+    the red cells in row order, then all the black. The mapping is a
+    relabelling and nothing else: the same cells, the same neighbours, the
+    same arithmetic in the same order, so the field it produces is identical
+    word for word, which is what `pressureSelfTest` checks rather than taking
+    on faith. What changes is the address arithmetic, and with it thread `i`
+    writes word `i` of its plane. Reads follow: the vertical neighbours of a
+    run of threads are themselves a run, and the horizontal ones are the same
+    run offset by one.
   */
   pressureRedBlack: `${HEAD}
 @group(0) @binding(2) var dv: texture_2d<f32>;
 @group(0) @binding(3) var<storage, read_write> pr: array<f32>;
 
-fn prAt(x: i32, y: i32, n: i32) -> f32 {
+// The pressure buffer holds the two colours as contiguous planes: every red
+// cell, in row order, then every black one. A cell's place inside its own
+// plane is y * half + (x >> 1), because each row holds exactly 'half'
+// cells of each colour and they alternate, so the shift counts them.
+fn prAt(x: i32, y: i32, n: i32, half: i32) -> f32 {
   // Neumann at the wall, as the Jacobi did through clampP: the pressure
   // outside is the pressure at the edge, so the gradient across it is zero.
+  // The clamp has to come first, and the colour after it — a neighbour that
+  // clamps back into the grid can land on the reader's own colour, which is
+  // exactly what happens at x = 0 reading its left.
   let cx = clamp(x, 0, n - 1);
   let cy = clamp(y, 0, n - 1);
-  return pr[cy * n + cx];
+  return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
 }
 
 @compute @workgroup_size(64)
@@ -304,12 +331,16 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let half = n / 2;
   let i = i32(id.x);
   if (i >= n * half) { return; }
+  let parity = i32(A.a.x);
   let y = i / half;
   // The row's own colour decides which column this thread owns, so the two
   // sweeps together cover every cell exactly once.
-  let x = 2 * (i % half) + ((y + i32(A.a.x)) & 1);
-  let s = prAt(x - 1, y, n) + prAt(x + 1, y, n) + prAt(x, y - 1, n) + prAt(x, y + 1, n);
-  pr[y * n + x] = (textureLoad(dv, vec2i(x, y), 0).r + s) * 0.25;
+  let x = 2 * (i % half) + ((y + parity) & 1);
+  let s = prAt(x - 1, y, n, half) + prAt(x + 1, y, n, half) + prAt(x, y - 1, n, half) + prAt(x, y + 1, n, half);
+  // y * half + (x >> 1) is i again, which is the whole point: thread i
+  // writes word i of its plane, so a workgroup's 64 writes are 64 adjacent
+  // words rather than 64 words spread across 128.
+  pr[parity * n * half + i] = (textureLoad(dv, vec2i(x, y), 0).r + s) * 0.25;
 }`,
 
   /** Zero the pressure buffer between projections, as the Jacobi's fill did. */
@@ -328,7 +359,11 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(4) var<storage, read> pr: array<f32>;
 fn prAt(x: i32, y: i32, n: i32) -> f32 {
-  return pr[clamp(y, 0, n - 1) * n + clamp(x, 0, n - 1)];
+  // The same two-plane packing the sweeps write; see pressureRedBlack.
+  let cx = clamp(x, 0, n - 1);
+  let cy = clamp(y, 0, n - 1);
+  let half = n / 2;
+  return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }

@@ -300,6 +300,16 @@ const watch = (page) => {
       const press = await page.evaluate(() => window.chromaglassDebug().pressureSelfTest());
       check('12 red-black sweeps solve the pressure at least as well as 24 Jacobi passes',
         press?.ok, press?.detail ?? 'not run');
+      /*
+        And that storing the two colours as contiguous planes is only a
+        relabelling. This is separate from the check above because it fails
+        for a different reason and wants a different reading: the one above
+        is about convergence, this one is about an index. A packed sweep that
+        reads the wrong cell still converges to something, and something is
+        what would ship.
+      */
+      check('the packed colour planes are the same field as the row-major grid, cell for cell',
+        press?.packedMatches, press?.packedDetail ?? 'not run');
 
       const kit = await page.evaluate(() => window.chromaglassDebug().kitSelfTest());
       check('the kit on this GPU: pipelines, ping-pong, readback, profiler', kit?.ok, kit?.detail ?? 'not run');

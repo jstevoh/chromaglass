@@ -106,7 +106,9 @@ export async function pressureSelfTest(device: GPUDevice): Promise<{
   ok: boolean;
   jacobi: number;
   redBlack: number;
+  packedMatches: boolean;
   detail: string;
+  packedDetail: string;
 }> {
   const disposer = new Disposer();
   try {
@@ -184,6 +186,34 @@ fn copy(@builtin(global_invocation_id) id: vec3u) {
   p[y * N + x] = q[y * N + x];
 }
 
+/**
+  The app's packed layout: the red cells as one contiguous plane, then the
+  black. This is the app's prAt with N substituted for S.n, so if the index
+  arithmetic is wrong it is wrong here in the same way.
+
+  (No backticks in here. This is a WGSL comment inside a TS template
+  literal, and one backtick ends the shader four lines early.)
+*/
+fn packed(x: i32, y: i32) -> f32 {
+  let cx = clamp(x, 0, N - 1);
+  let cy = clamp(y, 0, N - 1);
+  let half = N / 2;
+  return p[((cx + cy) & 1) * N * half + cy * half + (cx >> 1)];
+}
+
+/** The same sweep, on that layout. Thread i writes word i of its plane. */
+@compute @workgroup_size(64)
+fn redBlackPacked(@builtin(global_invocation_id) id: vec3u) {
+  let half = N / 2;
+  let i = i32(id.x);
+  if (i >= N * half) { return; }
+  let parity = i32(q[0]);
+  let y = i / half;
+  let x = 2 * (i % half) + ((y + parity) & 1);
+  let s = packed(x - 1, y) + packed(x + 1, y) + packed(x, y - 1) + packed(x, y + 1);
+  p[parity * N * half + i] = (dv[y * N + x] + s) * 0.25;
+}
+
 /** One red-black sweep half, in place. q[0] carries the parity. */
 @compute @workgroup_size(64)
 fn redBlack(@builtin(global_invocation_id) id: vec3u) {
@@ -213,28 +243,17 @@ fn residual() {
     const group = (pipeline: GPUComputePipeline) => bindGroup(device, pipeline, [divBuf, a, b]);
     const tiles = Math.ceil(N / 8);
 
-    /** Run one solver from zero, then leave its residual in `b[0]`. */
-    const solve = async (which: 'jacobi' | 'redBlack', rounds: number): Promise<number> => {
+    /** Twenty-four Jacobi passes from zero, then the residual in `b[0]`. */
+    const jacobiSolve = async (rounds: number): Promise<number> => {
       device.queue.writeBuffer(a, 0, new Float32Array(cells));
       device.queue.writeBuffer(b, 0, new Float32Array(cells));
-      const enc = device.createCommandEncoder({ label: `pressure selftest ${which}` });
+      const enc = device.createCommandEncoder({ label: 'pressure selftest jacobi' });
       const pass = enc.beginComputePass();
-      if (which === 'jacobi') {
-        const j = pipe('jacobi');
-        const c = pipe('copy');
-        for (let k = 0; k < rounds; k++) {
-          pass.setPipeline(j); pass.setBindGroup(0, group(j)); pass.dispatchWorkgroups(tiles, tiles);
-          pass.setPipeline(c); pass.setBindGroup(0, group(c)); pass.dispatchWorkgroups(tiles, tiles);
-        }
-      } else {
-        const rb = pipe('redBlack');
-        for (let k = 0; k < rounds; k++) {
-          for (const parity of [0, 1]) {
-            device.queue.writeBuffer(b, 0, new Float32Array([parity]));
-            pass.setPipeline(rb); pass.setBindGroup(0, group(rb));
-            pass.dispatchWorkgroups(Math.ceil((N * (N / 2)) / 64));
-          }
-        }
+      const j = pipe('jacobi');
+      const c = pipe('copy');
+      for (let k = 0; k < rounds; k++) {
+        pass.setPipeline(j); pass.setBindGroup(0, group(j)); pass.dispatchWorkgroups(tiles, tiles);
+        pass.setPipeline(c); pass.setBindGroup(0, group(c)); pass.dispatchWorkgroups(tiles, tiles);
       }
       const r = pipe('residual');
       pass.setPipeline(r); pass.setBindGroup(0, group(r)); pass.dispatchWorkgroups(1);
@@ -253,12 +272,10 @@ fn residual() {
       `writeBuffer` between two dispatches of the same pass does not land
       between them. So the sweeps are submitted one at a time.
     */
-    const jacobi = await solve('jacobi', 24);
-    let redBlack = 0;
-    {
+    const sweeps = async (entry: 'redBlack' | 'redBlackPacked', rounds: number): Promise<void> => {
       device.queue.writeBuffer(a, 0, new Float32Array(cells));
-      const rb = pipe('redBlack');
-      for (let k = 0; k < 12; k++) {
+      const rb = pipe(entry);
+      for (let k = 0; k < rounds; k++) {
         for (const parity of [0, 1]) {
           device.queue.writeBuffer(b, 0, new Float32Array([parity]));
           const enc = device.createCommandEncoder();
@@ -269,6 +286,10 @@ fn residual() {
           device.queue.submit([enc.finish()]);
         }
       }
+    };
+
+    /** The residual of whatever is in `a`, which the kernel reads row-major. */
+    const residualOf = async (): Promise<number> => {
       const enc = device.createCommandEncoder();
       const pass = enc.beginComputePass();
       const r = pipe('residual');
@@ -277,9 +298,66 @@ fn residual() {
       enc.copyBufferToBuffer(b, 0, out, 0, 4);
       device.queue.submit([enc.finish()]);
       await out.mapAsync(GPUMapMode.READ, 0, 4);
-      redBlack = new Float32Array(out.getMappedRange(0, 4).slice(0))[0];
+      const v = new Float32Array(out.getMappedRange(0, 4).slice(0))[0];
       out.unmap();
+      return v;
+    };
+
+    /** The whole pressure buffer, in whatever order the sweep left it. */
+    const fieldOf = async (): Promise<Float32Array> => {
+      const enc = device.createCommandEncoder();
+      enc.copyBufferToBuffer(a, 0, out, 0, cells * 4);
+      device.queue.submit([enc.finish()]);
+      await out.mapAsync(GPUMapMode.READ);
+      const f = new Float32Array(out.getMappedRange().slice(0));
+      out.unmap();
+      return f;
+    };
+
+    const jacobi = await jacobiSolve(24);
+
+    await sweeps('redBlack', 12);
+    const redBlack = await residualOf();
+    const rowMajor = await fieldOf();
+
+    /*
+      And the same sweep on the layout the app actually uses.
+
+      Storing the two colours as contiguous planes is what makes a sweep's
+      writes contiguous, and it is worth a measurable fraction of the
+      projection — but it is pure index arithmetic, the one kind of change
+      that can be badly wrong and still produce a plausible picture. A
+      pressure field that is subtly scrambled still damps divergence; it just
+      damps it somewhere else.
+
+      So the claim is stronger than "it converges": the packed sweep must
+      produce **the same field, cell for cell**. It is a relabelling, so that
+      is not optimism. Every cell has the same four neighbours summed in the
+      same order from the same values, and no cell of one colour is written
+      while another of that colour is read, so neither layout depends on the
+      order its threads happen to run in. The tolerance below exists for two
+      entry points compiled with different reassociation, not because
+      anything is expected to move — a wrong index does not shift a decimal
+      place, it reads somebody else's cell.
+    */
+    await sweeps('redBlackPacked', 12);
+    const packed = await fieldOf();
+
+    const half = N / 2;
+    let maxDiff = 0;
+    let reach = 0;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const there = rowMajor[y * N + x];
+        const here = packed[((x + y) & 1) * N * half + y * half + (x >> 1)];
+        const d = Math.abs(here - there);
+        if (d > maxDiff) maxDiff = d;
+        if (Math.abs(there) > reach) reach = Math.abs(there);
+      }
     }
+    // `reach > 0` because two fields of nothing match perfectly, and a sweep
+    // that never ran is exactly how this would fail quietly.
+    const packedMatches = Number.isFinite(maxDiff) && reach > 0 && maxDiff <= reach * 1e-5;
 
     /*
       Within a couple of percent, not strictly lower.
@@ -295,8 +373,10 @@ fn residual() {
       ok,
       jacobi,
       redBlack,
+      packedMatches,
       detail: `24 Jacobi ${jacobi.toExponential(4)}, 12 red-black ${redBlack.toExponential(4)}` +
         (jacobi > 0 ? ` — ${((redBlack / jacobi - 1) * 100).toFixed(2)}% more residual for half the work` : ''),
+      packedDetail: `largest disagreement ${maxDiff.toExponential(2)} on a field reaching ${reach.toExponential(2)}`,
     };
   } finally {
     disposer.dispose();
