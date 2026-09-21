@@ -55,7 +55,9 @@
     "map": "node --experimental-strip-types scripts/map.mjs",
     "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs",
     "stages": "npm run build && node scripts/stages.mjs",
-    "ab": "npm run build && node scripts/ab.mjs"
+    "ab": "npm run build && node scripts/ab.mjs",
+    "ladder": "npm run build && node scripts/ladder.mjs",
+    "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -260,6 +260,33 @@ const watch = (page) => {
       }
 
       /*
+        A rung spends device pixels as well as solver cells.
+
+        The local ladder's top two rungs are the same 512² grid at different
+        pixel counts, and for a long while that step did nothing at all: the
+        renderer's canvas sizing read the *display's* pixel ratio where the
+        governor's rung carries its own, so the canvas went back to full
+        resolution the moment it was asked to shrink. `npm run ladder` found
+        it — the canvas was 2560×1600 on all five rungs of a five-rung
+        ladder. The governor gave up a rung of quality, believed it had
+        bought headroom, found none, and went looking for the next thing to
+        give up.
+
+        `npm run rungs` checks the arithmetic without a browser. This checks
+        the ladder the app is actually holding, which is the one that
+        matters: every rung on it has to be a rung, and not another rung
+        written twice.
+      */
+      {
+        const keys = await page.evaluate(() => {
+          const g = window.chromaglassDebug().governor;
+          return g ? g.rungs.map((r) => `${r.grid}@${r.dpr.toFixed(2)}`) : [];
+        });
+        check('no rung on this ladder is another rung written twice',
+          keys.length > 0 && new Set(keys).size === keys.length, keys.join('  →  '));
+      }
+
+      /*
         The pressure solve (H2).
 
         Twelve red-black Gauss-Seidel sweeps replaced twenty-four Jacobi
