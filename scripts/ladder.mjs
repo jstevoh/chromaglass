@@ -53,6 +53,20 @@ const TIER = argOf('tier', 'local');
  * The ladder has to be right on both.
  */
 const DEVICE_PIXELS = Number(argOf('device-pixels', 1)) || 1;
+/*
+  How many solver steps a second to ask each rung for.
+
+  The default is sixty, which is what the show asks for and what this has
+  always measured. It is not always what the app would do: the governor gives
+  up the step rate *before* it gives up a rung (H2b), because thirty steps of
+  twice the length is the same motion for half the work and nothing anyone
+  can see. So a rung that reads as slow at sixty may be the rung the app
+  would actually hold — 1024² is 26 fps here at sixty and 32 at thirty, and
+  only one of those numbers describes a machine running the app.
+
+    npm run ladder -- --steps 30      what a struggling machine would ask for
+*/
+const STEPS = argOf('steps', null);
 
 {
   const held = await new Promise((resolve) => {
@@ -74,7 +88,7 @@ const browser = await launchChromium(chromium);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: DEVICE_PIXELS });
 await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
 
-const url = (rung) => `http://localhost:${PORT}/?debug&look=classic&gpu=${GPU}&tier=${TIER}&rung=${rung}`;
+const url = (rung) => `http://localhost:${PORT}/?debug&look=classic&gpu=${GPU}&tier=${TIER}&rung=${rung}${STEPS ? `&steps=${STEPS}` : ''}`;
 
 /** How many rungs this ladder has, and what they are. */
 await page.goto(url(0), { waitUntil: 'load' });
@@ -85,7 +99,7 @@ if (!isGpuEngine(engine)) {
   console.error(`  ⚠ not on a GPU (${engine}) — the numbers below would be of a machine nobody runs this on.`);
 }
 const distinct = new Set(rungs.map((r) => `${r.grid}:${r.dpr}`)).size;
-console.log(`\n${engine}  ·  tier ${TIER}, gpu ${GPU}, devicePixelRatio ${DEVICE_PIXELS}  ·  ` +
+console.log(`\n${engine}  ·  tier ${TIER}, gpu ${GPU}, devicePixelRatio ${DEVICE_PIXELS}, ${STEPS ?? 60} steps/s  ·  ` +
   `${rungs.length} rungs${distinct < rungs.length ? `, only ${distinct} of them distinct` : ''}  ·  ${SECONDS}s each, ${REPEATS} passes\n`);
 
 /** One rung, settled and read. */
@@ -161,7 +175,7 @@ for (const r of rows) {
 console.log(`
   frame    the whole frame, as the governor sees it
   step     one solver step across every layer, on the GPU
-  steps/s  against the 60 the show asks for — below that the plate is in slow motion
+  steps/s  against the ${STEPS ?? 60} asked for — below that the plate is in slow motion
   drawing  every pass the stage encodes, per frame
 `);
 
