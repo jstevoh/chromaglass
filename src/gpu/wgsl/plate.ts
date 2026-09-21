@@ -1346,11 +1346,31 @@ struct FsOut {
       let lampSide = Lb.xy / max(length(Lb.xy), 0.06);
       let nd = normalize(bestD + vec2f(1e-5));
       let toward = dot(nd, lampSide);
-      let ground = dot(outColor, vec3f(0.299, 0.587, 0.114));
+      /*
+        The liquid this bubble sits in, sampled just outside its own rim.
+
+        Every optic below is scaled by how much light and colour is around:
+        'ground' sets the rim strength, the specular and the arc; 'filmT'
+        decides how much the bubble takes the liquid's hue; 'tint' is that
+        hue. All three were read at this pixel — and this pixel is *inside*
+        the bubble, where the solver has just taken the dye away. So they all
+        answered "clear and dark", which greyed the interior and scaled the
+        membrane, the caustic arc and the specular dot to nothing. The
+        bubbles came out as flat grey discs with the optics still running and
+        nothing to run on.
+
+        Reading them from beyond the rim is also what the plan asks for:
+        tinted by what refraction bends in from the edge, rather than by the
+        hole it made.
+      */
+      let rimUv = fuvBase + outward * (bestRad * (1.35 + 0.5 * (1.0 - aC)));
+      let rimF = decodeFluid(layer0, rimUv, 0.0, false);
+      let rimCol = mix(bgColor, rimF.rgb, rimF.a);
+      let ground = dot(rimCol, vec3f(0.299, 0.587, 0.114));
       let rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
       var c = outColor;
-      let filmT = smoothstep(0.02, 0.28, fluid0.a);
-      let tint = mix(vec3f(1.0), outColor / max(max(outColor.r, max(outColor.g, outColor.b)), 1e-3), filmT);
+      let filmT = smoothstep(0.02, 0.28, rimF.a);
+      let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
       let lensUv = fuvBase - bestD * bestRad * (0.15 + 0.35 * play);
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
       let lensCol = mix(bgColor, lensF.rgb, lensF.a);
@@ -1367,11 +1387,20 @@ struct FsOut {
         because the rim refracts some of that back inward.
       */
       let dome = clamp(1.0 - dot(bestD, bestD), 0.0, 1.0);
-      let through = mix(vec3f(1.0), tint, 0.3) * (0.62 + 0.55 * dome + 0.3 * ground);
-      // Not a flat disc: the mix falls off toward the rim so the membrane,
-      // the caustic arc and the specular dot below are still the brightest
-      // things on the bubble rather than being washed out by its middle.
-      c = mix(c, through, inside * (0.35 + 0.45 * dome));
+      /*
+        The lamp through a clear gap, carrying the liquid's colour.
+
+        Weighted toward the tint rather than toward white: a bubble in
+        magenta liquid is a magenta bubble, and pulling hard to white is what
+        made these read as grey circles pasted on the picture rather than as
+        glass sitting in it.
+
+        And mixed in gently — the membrane, the arc and the specular dot are
+        what say "glass", so the interior has to stay behind them rather than
+        wash them out.
+      */
+      let through = mix(tint, vec3f(1.0), 0.25) * (0.45 + 0.5 * dome + 0.55 * ground);
+      c = mix(c, through, inside * (0.3 + 0.35 * dome));
       c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);
       c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
       let arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));
