@@ -546,17 +546,39 @@ try {
     `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
 
   // ── 5. Grade ───────────────────────────────────────────────────────
-  // The plate drifts while this runs, so each graded reading is bracketed by
-  // an ungraded one and compared against their mean: drift then cancels to
-  // first order instead of being mistaken for the effect.
-  const bracket = async (cfg) => {
+  /*
+    Alternating, not bracketing once.
+
+    The plate drifts while this runs, so a graded reading has to be compared
+    against ungraded ones taken around it — otherwise drift is mistaken for
+    the effect. One bracket cancels that to first order, and it was not
+    enough: the gain check measures a lift of about 1.5x against a gate of
+    1.25, and on a slow runner one reading came back at 1.258 and failed. The
+    gate is not miscalibrated — locally the same check reads 1.48, 1.58 and
+    1.48 — the measurement was just too noisy for it.
+
+    So this alternates, which is the same discipline `npm run stages` has in
+    its header for the same reason: the plate is chaotic, and what is worth
+    reading is the pair rather than the number. Three graded readings and
+    four ungraded ones around them, each set averaged. Drift now cancels
+    across several crossings instead of one, and single-frame noise is
+    averaged down rather than carried straight into the ratio.
+
+    The threshold is untouched. A check that fails now and then is fixed by
+    measuring it better, never by asking less of it.
+  */
+  const bracket = async (cfg, rounds = 3) => {
+    let off = 0;
+    let on = 0;
+    for (let i = 0; i < rounds; i++) {
+      await withOutput({});
+      off += meanOver(await gridOf(), () => true);
+      await withOutput(cfg);
+      on += meanOver(await gridOf(), () => true);
+    }
     await withOutput({});
-    const before = meanOver(await gridOf(), () => true);
-    await withOutput(cfg);
-    const it = meanOver(await gridOf(), () => true);
-    await withOutput({});
-    const after = meanOver(await gridOf(), () => true);
-    return { it, base: (before + after) / 2 };
+    off += meanOver(await gridOf(), () => true);
+    return { it: on / rounds, base: off / (rounds + 1) };
   };
   const gain = await bracket({ gain: 2.2 });
   check('output gain lifts what reaches the wall', gain.it > gain.base * 1.25,
