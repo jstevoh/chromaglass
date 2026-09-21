@@ -25,6 +25,21 @@ export const POST_FIELDS: Field[] = [
   { name: 'layer', type: 'f32', note: 'which layer of the history ring mode 2 reads' },
   { name: 'frame', type: 'u32', note: 'the effect chain’s own frame counter' },
   { name: 'seed', type: 'u32' },
+  /*
+    Film (F1, docs/filters-plan.md E6).
+
+    `stock*` and not `film*`: the existing `film` settings belong to the film
+    *projector*, the one that plays a video through the dye. This is the
+    stock the whole show is photographed on, and two things called film would
+    be confused for ever.
+  */
+  { name: 'stock', type: 'f32', note: '0 = off … 1; how much of the stock is in the picture' },
+  { name: 'stockType', type: 'i32', note: '0 16mm reversal, 1 slide, 2 faded negative, 3 Super 8, 4 monochrome' },
+  { name: 'stockGrain', type: 'f32' },
+  { name: 'stockGrainSize', type: 'f32', note: 'grain cell in screen pixels: Super 8 coarse, 35mm fine' },
+  { name: 'stockWeave', type: 'f32', note: 'how far the gate wanders, in pixels' },
+  { name: 'stockGate', type: 'f32', note: 'the soft rounded edge of the projector gate' },
+  { name: 'stockFrame', type: 'u32', note: 'the film frame, not the display frame: grain re-rolls on this' },
 ];
 
 export const POST_LAYOUT = layOut(POST_FIELDS);

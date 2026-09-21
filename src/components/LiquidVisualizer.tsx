@@ -4932,7 +4932,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // F0). Off, none of it is built and the plate finishes the
             // frame itself, exactly as before there was a chain.
             const postTest = view.postTest;
-            const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
+            // A look asking for film stock is what builds the chain, the same
+            // as the harness's test effect is (F1).
+            const wantStock = (view.settings.stock ?? 0) > 0.001;
+            const wantPost = view.postForce || (postTest?.mode ?? 0) > 0 || wantStock;
             if (wantPost && !chain) {
               chain = new WebGPUPostChain(s.device, s.format);
               // A mark that arrived before the chain did: it is uploaded on
@@ -5067,6 +5070,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
               if (post) {
                 post.effects(encoder, view.fxFrame, view.fxSeed, postTest);
+                /*
+                  The stock last, over whatever the effects left.
+
+                  That is the order light met it: everything in front of the
+                  lens happened, and then it was photographed. An effect that
+                  ran after the stock would be a digital thing on top of
+                  film, which is the look this is here to avoid.
+                */
+                post.stock(encoder, view.fxSeed, {
+                  stock: view.settings.stock ?? 0,
+                  stockType: view.settings.stockType ?? 0,
+                  grain: view.settings.stockGrain ?? 0,
+                  grainSize: view.settings.stockGrainSize ?? 2,
+                  weave: view.settings.stockWeave ?? 0,
+                  gate: view.settings.stockGate ?? 0,
+                  // The film's own rate, not the display's: at 60 fps a
+                  // 24 fps film holds each frame for two or three, which is
+                  // what makes grain crawl rather than fizz.
+                  filmFrame: Math.floor(view.fxFrame * (24 / 60)),
+                });
                 post.finish(encoder, screen, {
                   dimmer: dimmerNow,
                   markOn: markOnNow,
