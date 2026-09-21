@@ -49,12 +49,32 @@ job: nothing was written twice. There is one shading language in the tree now �
      35.9. That is 18% off the projection rather than the 50% the arithmetic promised,
      because a red-black sweep costs **1.64×** a Jacobi pass for the same cell updates
      — the checkerboard stride, not the maths. Packing the two colours into contiguous
-     halves of the buffer is the next step and should recover most of the rest.
-     *Still untouched:* dye diffusion (14.2%), the squeeze film (11.6%), viscosity
+     halves of the buffer recovered most of the rest; see below.
+     *Then untouched:* dye diffusion (14.2%), the squeeze film (11.6%), viscosity
      (10.2%) — but see the scaling table in [`webgpu-plan.md`](webgpu-plan.md) before
      starting them. A step is 64× the cells for 11× the cost from 96² to 768², and
      about 0.75 ms of every step is dispatch launching rather than arithmetic. All
      three of those items cut *arithmetic*. Count dispatches first.
+     *The packing landed 2026-09-21,* and it was the address and not the maths, as
+     suspected. With the pressure in row order a sweep wrote every other word, so
+     sixty-four consecutive threads wrote sixty-four floats spread across a hundred
+     and twenty-eight, and every cache line carried half a line of the other colour
+     along to be discarded. The buffer now holds the two colours as contiguous planes,
+     which makes thread `i` write word `i`. Measured at 768² alternating in two pairs,
+     eight readings of a projection with no overlap between the two sets: **1.114 ms →
+     0.822, 26% off**; a step 7.2 ms → 6.6; and the two projections drop from the top
+     of the stage table to fifth and sixth, behind the squeeze film. Gated on equality
+     rather than convergence — index arithmetic can be badly wrong and still produce a
+     plausible picture, since a scrambled pressure field still damps divergence, just
+     somewhere else — so `pressureSelfTest` requires the packed sweep to give the same
+     field cell for cell, and it does, to 0.00e+0.
+     *Dye diffusion is done too.* It costs about the same whatever rate it is given,
+     and the stage is skipped outright at zero. A ceiling of 0.0002 covers the nine
+     looks that were above it; Classic and Fillmore are measurably sharper with it off
+     entirely — three runs across two machines for Fillmore, and checked by eye — so
+     both are at zero.
+     *What is left of H2:* the squeeze film, now the most expensive stage at 16%, and
+     viscosity at 13%.
      — original note — Red-black
      or multigrid in place of 24 Jacobi passes — and the same treatment for dye
      diffusion (14.2%), the squeeze film (11.6%) and viscosity (10.2%), which between

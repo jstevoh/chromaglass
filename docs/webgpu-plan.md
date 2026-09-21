@@ -290,6 +290,34 @@ Classic, two layers, 768², dpr 1, on this M4:
 | decay | 0.282 | 3.0% | 2 |
 | grain | 0.234 | 2.5% | 1–2 |
 
+**Where that table stands now (2026-09-21).** It is left above as the H0
+baseline, because every decision below was taken against it and a table that
+is quietly rewritten stops being evidence. Three changes have landed since —
+the projections moved to red-black and then to packed colour planes, and
+Classic's dye diffusion went to zero, which skips that stage outright — and
+this is the same measurement afterwards, same plate, same rung:
+
+| Stage | ms | Share |
+|---|---|---|
+| squeeze | 1.129 | 16.1% |
+| advect dye | 0.918 | 13.1% |
+| viscosity | 0.914 | 13.0% |
+| **forces** | **0.818** | **11.7%** |
+| project 1 | 0.816 | 11.6% |
+| project 2 | 0.814 | 11.6% |
+| advect velocity | 0.686 | 9.8% |
+| current | 0.409 | 5.8% |
+| decay | 0.297 | 4.2% |
+| grain | 0.209 | 3.0% |
+
+A step is **9.14 ms → 6.58**. `dye diffuse` is absent rather than small: the
+stage is guarded on its own rate and Classic's is zero, which is also the
+cleanest confirmation that zeroing a look's diffusion removes work rather
+than shrinking it. The two projections together are 23.2% where they were
+28.8%, and the order has changed underneath the work that is left — the
+squeeze film is now the most expensive stage in the step, and `forces` has
+risen to fourth without moving at all, which is what H2a is about.
+
 **Cost does not track dispatch count.** That was the working assumption above
 and it is off by more than an order of magnitude in places: a pressure Jacobi
 dispatch is 0.049 ms and `forcesB` — one dispatch — is 0.808. The step is
