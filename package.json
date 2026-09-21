@@ -24,7 +24,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "node scripts/lint.mjs",
     "remote": "node server/remote-server.js",
     "detail": "node scripts/detail.mjs",
     "lights": "node scripts/lights.mjs",
