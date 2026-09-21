@@ -89,6 +89,10 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'damping', 'diffusionRate',
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
+  // `particles` and not `particleMix`: each plate has its own solver and its
+  // own population, so the amount is that plate's. How far their colour is
+  // trusted is read by the render pass, which sees one picture.
+  'particles',
   'platePressure', 'polarity', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
   'turbulenceScale', 'vibrationFrequency',
 ]);
