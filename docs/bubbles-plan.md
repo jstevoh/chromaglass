@@ -93,6 +93,33 @@ quantity the solver carries, exactly like dye. Everything else follows from that
 - `bubbleClear`: how completely the dye is excluded — 1 is physical; lower keeps some of
   today's look for presets that want it.
 
+**What the field turned out to need** (measured 2026-09-21, `claude/h6-air-field`):
+
+- **`r16float`, not `r32float`.** The splat blends (`max`, so two overlapping bubbles
+  do not make a cell twice as empty) and **WebGPU does not blend 32-bit float
+  targets** — the pipeline is rejected outright and the field is silently empty. Half
+  floats carry a 0-to-1 coverage to about three decimal places, finer than the dye
+  they multiply.
+- **A render pass, not a compute pass over cells.** The cost is the area the discs
+  cover rather than cells times bubbles, which is the whole reason hundreds become
+  possible. It has to be encoded *before* any compute pass opens, because a compute
+  pass cannot be interrupted to draw into a texture it is sampling.
+- **The splat must clear the field every frame**, by its load op, even with nothing
+  live — otherwise a popped bubble leaves its hole behind.
+- **`smoothstep` needs its low edge first.** Backwards it is undefined in WGSL and
+  returns near zero, which produces a field of discs in exactly the right places
+  peaking at 0.01.
+- **A readback must match the format.** Two-byte halves read as four-byte floats give
+  a plausible field in the wrong place, and every conclusion drawn from it is about
+  the reader.
+
+**How to know it works.** `npm run bubbles` places one bubble somewhere off-centre in
+both axes and asks the field **where** the air is — near the chosen position, and *not*
+near its mirror, which is what a y-flipped field looks like — with a control that
+clears the plate and requires the field to be empty. All three faults above passed
+every check that only asked whether air existed; none of them survived the question
+"where".
+
 **Checks** (`npm run fx`-style, with the parity harness's approach):
 - Dye under a settled bubble falls below 2% of its surroundings within a second.
 - Total dye mass changes by less than 0.5% while a bubble forms and pops.
