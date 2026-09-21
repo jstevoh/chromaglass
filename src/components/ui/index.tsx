@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
+import { curveOf, valueAt, travelOf } from '../../lib/midi';
+import type { VisualizerSettings } from '../../types';
 
 /**
  * The desk's vocabulary.
@@ -246,7 +248,20 @@ export interface SliderProps extends Keyed {
 }
 
 export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey }: SliderProps) {
-  const pct = ((value - min) / (max - min)) * 100;
+  /*
+    The travel is not always the value.
+
+    Speed's range is 0–0.3 and thirty of the thirty-two looks are at or below
+    0.08, so on a linear throw the whole of the plate's usable tempo was the
+    bottom quarter and the median look sat at 10% of the way along. `curveOf`
+    (`lib/midi.ts`) gives the control an exponent — the stored value is
+    untouched, so a look means what it always meant — and the desk, the phone
+    and a MIDI fader all bend the same way. `midiKey` is the setting's name
+    here, which is what the curve is looked up by.
+  */
+  const curve = midiKey ? curveOf(midiKey as keyof VisualizerSettings) : 1;
+  const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
+  const pct = at * 100;
   /*
     A fader already moves this bar — both go through the same number. What it
     does not show is *which* of ten rides the hand is on, which is the question
@@ -270,9 +285,15 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
       </div>
       <input
         type="range"
-        min={min} max={max} step={step ?? (max - min) / 200}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
+        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+        value={curve === 1 ? value : at}
+        onChange={e => {
+          const raw = Number(e.target.value);
+          if (curve === 1) { onChange(raw); return; }
+          const grain = step ?? (max - min) / 200;
+          onChange(Math.round(valueAt(raw, min, max, curve) / grain) * grain);
+        }}
         aria-label={label}
         className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
         style={{ '--fill': `${pct}%` } as CSSProperties}

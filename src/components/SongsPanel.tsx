@@ -80,7 +80,7 @@ function defaultWhat(d: ActionWhat['do'], looks: LookChoice[]): ActionWhat {
     case 'kaleidoscope': return { do: 'kaleidoscope', folds: 6 };
     case 'blackout': return { do: 'blackout', over: 4 };
     case 'lights-up': return { do: 'lights-up', over: 2 };
-    case 'set': return { do: 'set', key: 'globalSpeed', value: 0.03, over: 2 };
+    case 'set': return { do: 'set', key: 'globalSpeed', value: 0.018, over: 2 };
     default: return { do: d } as ActionWhat;
   }
 }

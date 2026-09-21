@@ -50,6 +50,19 @@ job: nothing was written twice. There is one shading language in the tree now �
      a 1024² rung on strong machines — which is two lines in `qualityLadder` and a
      governor that already judges by real GPU timings, so it is this item's test rather
      than an item of its own.
+   - **H2b · Make slow cheap: fewer steps, not smaller ones.** The largest saving
+     measured so far, and it is free of any visual cost. Motion per second is
+     `steps/s × dt`, and the app holds steps/s at 60 and shrinks `dt` — so a plate at
+     Speed 0.012 costs exactly what one at 0.3 costs, because the GPU runs the same
+     hundred dispatches either way with a smaller number in them. Holding `dt` and
+     shrinking the step rate gives identical motion for proportionally less work, and
+     the solver is **94% of the frame's GPU time**. At the default speed the timestep
+     is a fraction of what the solver takes stably, so the arithmetic says 3–5× of the
+     dominant cost.
+     *What it needs:* a floor on the step rate, because below about 20–25 steps a
+     second the plate judders rather than flows; and a pass over the dozen things keyed
+     to `simSteps` — the chemistry, the splats, the beads, the drain — which count
+     steps where they mean seconds. Not a one-liner, and worth more than H2.
    - **H2a · `forcesB` is one kernel too many things at once.** It is 8.6% of a step in
      a single dispatch — 0.808 ms against 0.049 for a pressure Jacobi. Its floor, with
      every force switched off, is 0.368; the six forces together add 0.44; and
@@ -58,11 +71,33 @@ job: nothing was written twice. There is one shading language in the tree now �
      holding occupancy down whatever it executes at runtime. The fix is to split it, or
      to shrink the worst path — not to micro-optimise a branch, which is what measuring
      one at a time would have suggested. Sized but not started.
-   - **H1 · Dye carried by particles.** The measured gap in `PLAN.md` is that filmed
-     liquid holds three to five times more structure at 4–8 px than ours. Particles
-     don't smear, which is the fix. Takes density estimation with it, so sparse regions
-     don't come out noisy. The largest thing in this list, and the one that changes what
-     people see.
+   - **H1 · Dye carried by particles.** *First landing 2026-09-20, off by default.*
+     The measured gap in `PLAN.md` is that filmed liquid holds three to five times more
+     structure at 4–8 px than ours. Particles don't smear, which is the fix.
+     `gpu/particles.ts` seeds them where there is dye, advects them through the same
+     forced velocity the dye rides, and splats them as additive soft discs into a
+     texture the compositor folds into the raw dye. `particles` is the amount and
+     `particleMix` how far their carried colour is trusted; at 0 none are allocated,
+     which is where every look made before this sits.
+     *Measured on one plate with the amount toggled under it* (`npm run ab`, which
+     exists because separate runs of this preset differ by more than the change does —
+     the same settings gave 1601 KB and 3042 KB on consecutive runs). Fillmore, 512²:
+     hard edges 12.3% → 16.8% of pixels, typical local gradient **1.5 → 2.4**,
+     structure at 2–4 px up, coverage unchanged. A macro closeup gains far more in the
+     band the plan cares about — 4 px 1.3 → 2.8, 8 px 0.8 → 3.2, 16 px 0.8 → 3.4 — but
+     *loses* hard edges (51.8% → 34.8%) and local contrast (33.1 → 2.5), because the
+     macro path synthesises detail of its own and the fold softens it.
+     *What it costs,* at 512², two layers, amount 0.8: the frame goes from 17.1 ms to
+     29.5 ms — 58 fps to 34. About a millisecond a layer a step is the seed and advect
+     compute; the rest, 6.6 ms a frame, is the splat, which is 2.1 million discs of
+     about seven fragments each. It is affordable well below 0.8 and it is why this
+     cannot be on by default yet.
+     *Still to do, in order:* teach the governor about it, since a setting that halves
+     the frame rate and the quality ladder that measures frame rate currently know
+     nothing about each other. Attenuate the fold under macro zoom, where it costs more
+     contrast than it adds structure. And revisit the splat resolution — 2× is one step
+     past useless (at 1× it made the plate measurably **worse**, which is the finding
+     that shaped everything else here) and probably not yet enough.
    - **H4 · Wide colour, and HDR** where the screen has it.
    - **H5 · The effects** ([`filters-plan.md`](filters-plan.md) F1–F9): film first, then
      the feedback camera and its coupled loops, the prism and kick ripple, letters as

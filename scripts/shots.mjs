@@ -29,7 +29,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { engineQuery, installFrameReader } from './frame.mjs';
+import { engineQuery, installFrameReader, isGpuEngine } from './frame.mjs';
 
 const PORT = 4326;
 
@@ -88,6 +88,20 @@ const SHOTS = [
 const WIDTH = Number(argOf('width', 1200)) || 1200;
 const PNG = process.argv.includes('--png');
 
+/**
+ * `--set turbulenceScale=0;dyeDiffusion=0` — photograph the same look with a
+ * setting moved, so two frames can be put through `scripts/detail.mjs` and
+ * compared. Applied after the preset, so it wins.
+ */
+const SET = (() => {
+  const raw = argOf('set', null);
+  if (!raw) return null;
+  return Object.fromEntries(raw.split(';').filter(Boolean).map((kv) => {
+    const [k, v] = kv.split('=');
+    return [k, v === 'true' ? true : v === 'false' ? false : Number(v)];
+  }));
+})();
+
 const only = argOf('preset', null);
 const extra = Number(argOf('seconds', 0)) || 0;
 const shots = only ? SHOTS.filter(s => s.id === only) : SHOTS;
@@ -131,7 +145,7 @@ try {
 
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? 'unknown');
   console.log(`Engine: ${engine}`);
-  if (!/^GPU/.test(engine)) {
+  if (!isGpuEngine(engine)) {
     console.log('  ⚠ software rasterisation — these will not look like the app on a real machine.');
   }
 
@@ -151,6 +165,14 @@ try {
       console.error('  no chromaglassApplyPreset on the page — stale build, or ?debug was dropped.');
       process.exitCode = 1;
       break;
+    }
+    // `--set k=v;k=v` — the same plate under a changed setting, for
+    // measuring one against the other with `scripts/detail.mjs`. After the
+    // preset, because the preset would otherwise put it back, and before the
+    // wait, so the plate settles under the setting rather than into it.
+    if (SET) {
+      await page.evaluate((patch) => window.chromaglassSettings?.(patch), SET);
+      console.log(`  set ${JSON.stringify(SET)}`);
     }
     await page.waitForTimeout((shot.seconds + extra) * 1000);
     // Everything off the wall: no toolbar, no cursor, just the plate.

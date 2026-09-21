@@ -15,6 +15,7 @@
 import { hexToRgb, PALETTE_RGB } from '../constants';
 import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
+import { PER_CELL, SPLAT_SCALE } from './particles';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
 export const LOGICAL_GRID = 192;
@@ -306,6 +307,35 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('flowRate', view.flowRate);
   pack.set('filmLevel', view.filmLevel);
   pack.set('filmGain', clamp(view.filmGain, 0.5, 12));
+
+  /*
+    Dye carried by particles (H1).
+
+    `particleNorm` is the splat weight a texel carries when the population is
+    all there, so that dividing by it makes the shader's coverage read about
+    1 and it can treat the splat as a fraction rather than as a count whose
+    meaning moves with the setting. Three factors: four particles a cell;
+    each depositing the integral of its kernel, which for (1−r²)² over a disc
+    of 1.5 texels is π/3 · 1.5² ≈ 2.36; and each averaging 2/π of its full
+    weight over a life that fades in and out. That is 6.0 a texel at an
+    amount of 1, and it scales with the amount because the population does.
+
+    It assumes the particles are spread over the whole plate, and they are
+    not — they are born only where there is dye, so a plate a third covered
+    packs them three times as densely. The shader clamps rather than trusting
+    this absolutely, which is what keeps a sparse plate from reading as one
+    enormous pile.
+  */
+  /**
+   * Four particles a cell, each depositing the integral of its kernel and
+   * averaging 2/π of its weight over a life that fades in and out, spread
+   * over a target `SPLAT_SCALE` times finer than the grid in each axis.
+   */
+  const PARTICLE_NORM = PER_CELL * (Math.PI / 3) * 1.5 * 1.5 * (2 / Math.PI) / (SPLAT_SCALE * SPLAT_SCALE);
+  const parts = clamp01(s.particles ?? 0);
+  pack.set('particles', parts);
+  pack.set('particleMix', clamp01(s.particleMix ?? 0.6));
+  pack.set('particleNorm', Math.max(1e-4, PARTICLE_NORM * parts));
 
   pack.set('grainOn', grainOn);
   pack.set('grainMix', fluids[0]?.gpu?.grainMix ?? 0);

@@ -1774,6 +1774,8 @@ class FluidSimulation {
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * CUR_TWIST * (this.layerIndex % 2 === 0 ? 1 : -1),
+      particles: settings.particles ?? 0,
+      particleLife: 4,
       meanDensity: this.meanDensity,
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
     };
@@ -4873,6 +4875,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // texture are not.
               const stageFormat = s.format;
               const plateFormat = cam ? stageFormat : post ? post.pictureFormat : stageFormat;
+              /*
+                The particles are drawn here, once, rather than in the solver
+                step that moves them (H1).
+
+                Several steps happen per frame and only the last is seen, so
+                splatting per step would draw the whole population over again
+                for each one and pay for it every time. This is also the last
+                moment before the compositor samples the target, which is
+                what makes one splat enough.
+              */
+              for (const f of fluidsRef.current) {
+                if (f.gpu instanceof WebGPUFluid) {
+                  f.gpu.splatParticles(encoder, (label) => stage?.profiler.renderPass(label));
+                }
+              }
               plate.draw(
                 encoder,
                 cam ? cam.sceneView(size.width, size.height) : afterEffects,

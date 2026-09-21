@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
-import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, type FactoryMapId } from '../lib/midi';
+import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, valueAt, travelOf, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
@@ -229,8 +229,24 @@ const TARGET_GROUPS = SETTINGS_SECTIONS
  * cannot do anything with the current settings; it is shown greyed with that
  * reason as its tooltip.
  */
+/**
+ * `curve` bends the travel without touching the value.
+ *
+ * A control whose useful range is all at one end is a control with no
+ * resolution where it is played. Speed is the case: thirty of thirty-two
+ * looks sit in the bottom 27% of its 0–0.3 range, and the median at 10% of
+ * the way along, so the whole of the plate's usable tempo was a centimetre of
+ * the throw. At `curve: 3` half the travel is 0.0375 and the slow end gets
+ * the bottom third.
+ *
+ * The stored setting is unchanged — only where the handle sits for it — so
+ * looks, patches and song cues written before this mean exactly what they
+ * meant. The curve comes from `LEARNABLE_SETTINGS` so the phone, a MIDI
+ * fader and its LED ring all bend the same way; see `curveOf` in `midi.ts`.
+ */
 const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, settingKey }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false; settingKey?: keyof VisualizerSettings }) => {
   const safeValue = value ?? 0;
+  const curve = settingKey ? curveOf(settingKey) : 1;
   return (
     <div className={`flex flex-col gap-2 mb-4 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined}>
       <div className="flex items-center justify-between gap-2">
@@ -262,13 +278,20 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
       </div>
       <input
         type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={safeValue}
+        min={curve === 1 ? min : 0}
+        max={curve === 1 ? max : 1}
+        step={curve === 1 ? step : 0.001}
+        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
         disabled={!!disabled}
         aria-label={label}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        onChange={(e) => {
+          const raw = parseFloat(e.target.value);
+          if (curve === 1) { onChange(raw); return; }
+          // Back onto the setting's own step, so a curved control still lands
+          // on values a preset could have written rather than on 0.0374213.
+          const v = valueAt(raw, min, max, curve);
+          onChange(Math.round(v / step) * step);
+        }}
         className={`w-full h-1 bg-white/10 rounded-full appearance-none accent-white transition-all ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:accent-gray-300'}`}
       />
     </div>
@@ -869,6 +892,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ sharpness: v })}
           settingKey="sharpness"
+        />
+        {/*
+          Dye carried by particles (H1). The grid keeps the body of colour and
+          these add the structure a grid cannot hold, so it reads as detail
+          appearing rather than as a different plate — and at 0 the solver
+          allocates none of them, which is where every look made before this
+          sits.
+        */}
+        <Slider
+          label="Dye Particles"
+          value={settings.particles ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ particles: v })}
+          settingKey="particles"
+        />
+        <Slider
+          label="Particle Colour"
+          disabled={(settings.particles ?? 0) <= 0.001 && 'needs Dye Particles above 0'}
+          value={settings.particleMix ?? 0.6}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ particleMix: v })}
+          settingKey="particleMix"
         />
         <Slider
           label="Granulation"

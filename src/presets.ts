@@ -20,7 +20,7 @@ export const PRESETS: Preset[] = [
     name: 'Classic Light Show',
     description: 'Slow, luminous blobs drift and merge — a meditative 1960s liquid light show.',
     settings: {
-      globalSpeed: 0.022,
+      globalSpeed: 0.0132,
       surge: 0.5,        // unhurried, dreamlike pace
       layerCount: 2,
       blendMode: 'screen',       // additive glow — colors brighten where they overlap
@@ -66,7 +66,7 @@ export const PRESETS: Preset[] = [
     name: 'Galaxy',
     description: 'Spiral arms of starlight swirl through the void — galaxies colliding in slow motion.',
     settings: {
-      globalSpeed: 0.018,
+      globalSpeed: 0.0108,
       surge: 0.5,        // stately cosmic drift
       layerCount: 2,
       blendMode: 'lighter',      // additive light — stars brighten where they overlap
@@ -112,7 +112,7 @@ export const PRESETS: Preset[] = [
     name: 'Deep Ocean',
     description: 'Slow moving, dense fluids over a deep blue LED platform.',
     settings: {
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.22,
       layerCount: 2,
       blendMode: 'overlay',
@@ -152,7 +152,7 @@ export const PRESETS: Preset[] = [
     name: 'Cyberpunk Neon',
     description: 'High contrast, fast-moving neon fluids over a cyberpunk LED base.',
     settings: {
-      globalSpeed: 0.08,
+      globalSpeed: 0.048,
       postBlurRadius: 0.1,
       boundaryContrast: 0.7,
       beads: 0.35,
@@ -195,7 +195,7 @@ export const PRESETS: Preset[] = [
     name: 'Lava Lamp',
     description: 'Wax blobs glowing in a dark, ember-lit liquid: they swell, merge and rise.',
     settings: {
-      globalSpeed: 0.04,
+      globalSpeed: 0.024,
       surge: 0.4,
       layerCount: 2,
       blendMode: 'screen',
@@ -249,7 +249,7 @@ export const PRESETS: Preset[] = [
     name: 'Acid Trip',
     description: 'Chaotic, rapidly rotating colors with strange blending physics.',
     settings: {
-      globalSpeed: 0.08,
+      globalSpeed: 0.048,
       beads: 0.4,
       surge: 0.95,
       layerCount: 2,
@@ -304,7 +304,7 @@ export const PRESETS: Preset[] = [
     name: 'Bass Drop',
     description: 'Heavy bass hits trigger massive fluid injections and screen shakes.',
     settings: {
-      globalSpeed: 0.05,
+      globalSpeed: 0.03,
       beads: 0.25,
       surge: 0.9,
       layerCount: 2,
@@ -343,7 +343,7 @@ export const PRESETS: Preset[] = [
     name: 'Timbre Shifter',
     description: 'The brightness of the sound controls the color and rotation of the fluid.',
     settings: {
-      globalSpeed: 0.06,
+      globalSpeed: 0.036,
       surge: 0.55,
       layerCount: 2,
       blendMode: 'lighter',
@@ -383,7 +383,7 @@ export const PRESETS: Preset[] = [
     name: 'Boiling Point',
     description: 'High heat and complexity create a chaotic, churning cauldron of fluid.',
     settings: {
-      globalSpeed: 0.07,
+      globalSpeed: 0.042,
       beads: 0.35,
       surge: 0.85,
       layerCount: 2,
@@ -429,7 +429,7 @@ export const PRESETS: Preset[] = [
     name: 'Microscopic Chaos',
     description: 'Extremely dense, high-contrast cellular fluid resembling oil and water under a microscope.',
     settings: {
-      globalSpeed: 0.04,
+      globalSpeed: 0.024,
       boundaryContrast: 0.7,
       beads: 0.45,
       surge: 0.9,
@@ -471,7 +471,7 @@ export const PRESETS: Preset[] = [
     name: 'Aurora Borealis',
     description: 'Slow sweeping curtains of light in greens and purples, rippling to low frequencies.',
     settings: {
-      globalSpeed: 0.025,
+      globalSpeed: 0.015,
       surge: 0.2,
       layerCount: 2,
       blendMode: 'lighter',
@@ -516,7 +516,7 @@ export const PRESETS: Preset[] = [
     name: 'Solar Flare',
     description: 'Explosive plumes of plasma erupt from a white-hot core, driven by bass.',
     settings: {
-      globalSpeed: 0.06,
+      globalSpeed: 0.036,
       boundaryContrast: 0.55,
       beads: 0.3,
       surge: 0.8,
@@ -558,7 +558,7 @@ export const PRESETS: Preset[] = [
     name: 'Jellyfish Bloom',
     description: 'Pulsing translucent bells drift and contract to rhythmic mid frequencies.',
     settings: {
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.25,
       layerCount: 2,
       blendMode: 'screen',
@@ -598,7 +598,7 @@ export const PRESETS: Preset[] = [
     name: 'Fractal Dream',
     description: 'Overlapping interference patterns bloom into recursive color mandalas.',
     settings: {
-      globalSpeed: 0.045,
+      globalSpeed: 0.027,
       boundaryContrast: 0.6,
       beads: 0.3,
       surge: 0.8,
@@ -640,7 +640,7 @@ export const PRESETS: Preset[] = [
     name: 'Velvet Underground',
     description: 'Rich saturated pools of deep magenta and indigo that churn slowly to the beat.',
     settings: {
-      globalSpeed: 0.02,
+      globalSpeed: 0.012,
       surge: 0.18,
       layerCount: 2,
       blendMode: 'overlay',
@@ -681,7 +681,7 @@ export const PRESETS: Preset[] = [
     name: 'Neon Coral Reef',
     description: 'Branching fluorescent tendrils sway and pulse in sync with mid and treble.',
     settings: {
-      globalSpeed: 0.04,
+      globalSpeed: 0.024,
       boundaryContrast: 0.5,
       beads: 0.3,
       surge: 0.5,
@@ -723,7 +723,7 @@ export const PRESETS: Preset[] = [
     name: 'Stardust Collapse',
     description: 'Glittering particles spiral inward then detonate outward on each bass hit.',
     settings: {
-      globalSpeed: 0.055,
+      globalSpeed: 0.033,
       boundaryContrast: 0.65,
       beads: 0.3,
       surge: 0.85,
@@ -775,7 +775,7 @@ export const PRESETS: Preset[] = [
     name: 'Lumia',
     description: 'Thomas Wilfred\u2019s aurora: slow folded sheets of light drifting under a nearly clear plate. No beat, no dye to speak of \u2014 minutes-long evolutions.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0072,
       surge: 0.12,
       layerCount: 1,
       blendMode: 'screen',
@@ -823,7 +823,7 @@ export const PRESETS: Preset[] = [
     name: 'Sensual Laboratory',
     description: 'Mark Boyle\u2019s London: reactions on the platen instead of oil in a dish. Coral and cells grow from the plate in graphite and rust, then the flow carries them off.',
     settings: {
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.3,
       layerCount: 1,
       blendMode: 'multiply',
@@ -872,7 +872,7 @@ export const PRESETS: Preset[] = [
     name: 'Oil Wheel',
     description: 'An Optikinetics wheel warming under a 250 W lamp: yellows, greens and blues turning at half a revolution a minute, cells drifting on convection, no hands on it.',
     settings: {
-      globalSpeed: 0.02,
+      globalSpeed: 0.012,
       surge: 0.35,
       layerCount: 2,
       blendMode: 'screen',
@@ -924,7 +924,7 @@ export const PRESETS: Preset[] = [
     name: 'Poster, 1969',
     description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: no gloss, no meniscus, one colour against the other.',
     settings: {
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
@@ -979,7 +979,7 @@ export const PRESETS: Preset[] = [
     name: 'Oil on Water',
     description: 'The macro photograph: yellow oil on water over blue paper, packed fields of bubbles, satellite droplets on the glass, a softbox in every dome, shallow focus.',
     settings: {
-      globalSpeed: 0.02,
+      globalSpeed: 0.012,
       surge: 0.45,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -1045,7 +1045,7 @@ export const PRESETS: Preset[] = [
     name: 'Colorful Cosmos',
     description: 'Big round drops over a warm gradient, each a shaded planet with a terminator: two lamps, deep focus fall-off, bloom in the highlights.',
     settings: {
-      globalSpeed: 0.02,
+      globalSpeed: 0.012,
       surge: 0.45,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -1111,7 +1111,7 @@ export const PRESETS: Preset[] = [
     name: 'Sunny Side Up',
     description: 'Thin sheets of oil over a hot orange backdrop, every edge running with interference colour; the polarised-light photograph.',
     settings: {
-      globalSpeed: 0.02,
+      globalSpeed: 0.012,
       surge: 0.5,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -1188,7 +1188,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      globalSpeed: 0.28,
+      globalSpeed: 0.168,
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
@@ -1249,7 +1249,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
-      globalSpeed: 0.18,
+      globalSpeed: 0.108,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
@@ -1310,7 +1310,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
-      globalSpeed: 0.45,
+      globalSpeed: 0.27,
       surge: 0.6,         // quick — this one rushes
       layerCount: 1,
       blendMode: 'screen',
@@ -1361,7 +1361,7 @@ export const PRESETS: Preset[] = [
     name: 'Fillmore East, 1969',
     description: 'The Joshua Light Show behind the Mothers: three projectors on one black screen, a big dish pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
     settings: {
-      globalSpeed: 0.024,
+      globalSpeed: 0.0144,
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
@@ -1428,7 +1428,7 @@ export const PRESETS: Preset[] = [
       // A plate that wants stirring rather than one that is already busy: the
       // turbulence starts low so what the room adds is what is seen moving,
       // and the dye budget runs full so there is something there to move.
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
@@ -1501,7 +1501,7 @@ export const PRESETS: Preset[] = [
       // churning then the soap arriving is just one more thing moving. The
       // entire look is the contrast between a plate that is *dead still* and
       // the half second after the soap lands.
-      globalSpeed: 0.03,
+      globalSpeed: 0.018,
       surge: 0.3,
       layerCount: 1,
       blendMode: 'screen',
@@ -1560,7 +1560,7 @@ export const PRESETS: Preset[] = [
       // has to be thin for the colour to be there at all, which is also what
       // makes it easy to break — so evaporation runs high and the dye budget
       // low, and the soap keeps re-opening what the flow closes.
-      globalSpeed: 0.04,
+      globalSpeed: 0.024,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
@@ -1621,7 +1621,7 @@ export const PRESETS: Preset[] = [
       // except the glycerine itself. Damping and advection both run high so
       // the bands keep moving for minutes; what makes the picture is the
       // handful of places that do not move with them.
-      globalSpeed: 0.025,
+      globalSpeed: 0.015,
       surge: 0.28,
       layerCount: 2,
       blendMode: 'screen',
