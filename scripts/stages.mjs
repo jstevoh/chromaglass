@@ -13,6 +13,14 @@
  *   npm run stages                  the local ladder's top rung (768²)
  *   npm run stages -- --grid 512    somewhere else on it
  *   npm run stages -- --seconds 30  longer, for a quieter median
+ *
+ * **Compare two settings by alternating runs in pairs, not by running each
+ * once.** The plate is chaotic and its state changes what a step costs: one
+ * pass over the grids read 384² as *slower* than 512², which would have meant
+ * a rung on the quality ladder that costs more than the finer one above it.
+ * Run again at eighteen seconds, alternating, and 384² is 6.60 ms against
+ * 512²'s 8.26 — the first reading was the weather. Two runs each way, and
+ * read the pair, not the number.
  */
 
 import { chromium } from 'playwright';
