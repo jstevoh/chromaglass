@@ -357,9 +357,36 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
+  /*
+    The divergence the projection solves, with the air pushing on it (H6 · A).
+
+    A bubble displaces liquid. In the liquid's own terms that is a **source**
+    where the air is arriving and a sink where it is leaving, and the right
+    place to say so is here: the projection solves for the pressure whose
+    gradient produces exactly that flow, so the liquid is pushed aside and
+    then goes round.
+
+    Three other ways were tried first and all are written up in
+    `bubbles-plan.md`. The one worth repeating here is adding a velocity down
+    the air gradient, which does nothing whatever — a gradient field is
+    precisely what this projection exists to remove, so the next one cancels
+    it. A source has to go in before the solve, not a velocity after it.
+
+    `A.a.x` is the strength and `A.a.y` the reciprocal timestep; the rate is
+    how much air arrived since the last frame. With no bubbles the two fields
+    are identical and the term is zero, so this costs two samples and changes
+    nothing.
+  */
   divergence: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var air: texture_2d<f32>;
+@group(0) @binding(4) var airPrev: texture_2d<f32>;
+// Last, because the convention here is every texture a pass reads and then
+// the one it writes — and run() binds them in exactly that order. Leaving
+// this at 3 put a sampled texture on a storage slot, which fails as
+// "usage doesn't include TextureUsage::StorageBinding" and leaves the field
+// empty with nothing else to show for it.
+@group(0) @binding(5) var dst: texture_storage_2d<r32float, write>;
 // Past the edge: the edge value with the wall-normal component negated, so the
 // velocity interpolated at the wall is zero.
 fn velG(p: vec2i, n: f32) -> vec2f {
@@ -373,7 +400,32 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let dx = velG(p + vec2i(1, 0), S.n).x - velG(p - vec2i(1, 0), S.n).x;
   let dy = velG(p + vec2i(0, 1), S.n).y - velG(p - vec2i(0, 1), S.n).y;
-  textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n, 0.0, 0.0, 0.0));
+  /*
+    This stores -div(v)·h², so a source q enters as +q·h². Positive where the
+    air is growing: liquid appearing, which is liquid being pushed out.
+  */
+  let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
+  let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
+  /*
+    Two terms, and the second is the one that empties a bubble.
+
+    The rate — how much air arrived since last frame — is the physical one: a
+    growing bubble displaces liquid, a popping one lets it back. It is also
+    only there while the bubble is *changing*, and a bubble that has arrived
+    and sits still has no rate at all. Measured on its own it moved the
+    interior from 0.70 to 0.67, which is nothing.
+
+    So there is a standing term as well: a source everywhere the air is, a
+    sink everywhere it is not, which keeps liquid flowing out of a bubble and
+    around it for as long as it is there. A.a.z is the fraction of the
+    plate that is air, subtracted so the two balance — a source that does not
+    average to zero has no solution for the projection to find, which is the
+    Neumann condition pressureSelfTest exists to protect.
+  */
+  let rate = clamp((now - was) * A.a.y, -40.0, 40.0);
+  let standing = (now - A.a.z) * 30.0;
+  let q = (rate + standing) * A.a.x;
+  textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
 }`,
 
   pressureJacobi: `${HEAD}

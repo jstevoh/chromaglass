@@ -176,6 +176,10 @@ export class WebGPUFluid {
   private particles: WebGPUParticles | null = null;
   /** The air field (H6): where the bubbles are, so the dye can be taken out of it. */
   private air: WebGPUAir | null = null;
+  /** How hard the arriving air pushes the liquid aside (H6); 0 switches it off. */
+  private airPush = 0;
+  private airCover = 0;
+  private lastDt = 1 / 60;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -518,6 +522,9 @@ export class WebGPUFluid {
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
+    this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    this.airCover = this.air.coverage;
+    this.lastDt = p.dt;
 
     /*
       One pass, or one per stage.
@@ -829,7 +836,8 @@ export class WebGPUFluid {
    */
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
-    this.run(pass, 'divergence', this.div, [this.vel.read], none);
+    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev],
+      this.arg('air source', [this.airPush, 1 / Math.max(this.lastDt, 1e-4), this.airCover, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));

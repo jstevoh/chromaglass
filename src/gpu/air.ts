@@ -29,9 +29,21 @@ export class WebGPUAir {
   private readonly pipelines: PipelineCache;
   private readonly buffer: GPUBuffer;
   private readonly uniform: GPUBuffer;
-  /** The air field itself, 0–1 in red. */
-  readonly field: GPUTexture;
+  /*
+    Two fields, and the second is not a convenience.
+
+    The liquid has to be pushed out of a bubble's way, and what does the
+    pushing is how fast the air is *arriving* — a growing bubble displaces
+    liquid, a popping one lets it back. That is a rate, so it needs the frame
+    before this one to difference against. Kept here rather than derived,
+    because the field is rebuilt from the list every frame and there is
+    nowhere else the previous one survives.
+  */
+  private readonly fields: [GPUTexture, GPUTexture];
+  private which = 0;
   private live = 0;
+  /** The list as last handed over, for the coverage the source needs. */
+  private packed = new Float32Array(0);
   private disposed = false;
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {
@@ -57,13 +69,19 @@ export class WebGPUAir {
       float carry a 0-to-1 coverage with about three decimal places, which is
       finer than the dye it multiplies, and it costs half the memory.
     */
-    this.field = this.disposer.track(device.createTexture({
-      label: 'air',
+    const one = (n: string) => this.disposer.track(device.createTexture({
+      label: n,
       size: [grid, grid],
       format: 'r16float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
+    this.fields = [one('air a'), one('air b')];
   }
+
+  /** The air as it is now. */
+  get field(): GPUTexture { return this.fields[this.which]; }
+  /** The air as it was last frame, for the rate the liquid is pushed at. */
+  get prev(): GPUTexture { return this.fields[1 - this.which]; }
 
   /**
    * The bubbles as the field should hold them, from `BubbleField.packed`
@@ -71,6 +89,7 @@ export class WebGPUAir {
    */
   setBubbles(packed: Float32Array, count: number, soft: number): void {
     this.live = Math.max(0, Math.min(count, Math.floor(this.buffer.size / STRIDE)));
+    this.packed = packed;
     if (this.live > 0) this.device.queue.writeBuffer(this.buffer, 0, packed, 0, this.live * 4);
     this.device.queue.writeBuffer(this.uniform, 0, new Uint32Array([this.live]));
     this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, 0, 0]));
@@ -78,6 +97,24 @@ export class WebGPUAir {
 
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
   get any(): boolean { return this.live > 0; }
+
+  /**
+   * What fraction of the plate is air, from the list rather than the field.
+   *
+   * The source the projection solves has to average to zero over the plate,
+   * or there is no solution to find — the same Neumann condition the pressure
+   * self-test exists to keep. A sustained push inside every bubble is not
+   * zero-mean on its own, so the mean is subtracted, and it is cheaper to add
+   * up the discs here than to reduce the field on the GPU.
+   */
+  get coverage(): number {
+    let a = 0;
+    for (let i = 0; i < this.live; i++) {
+      const r = this.packed[i * 4 + 2];
+      a += Math.PI * r * r * this.packed[i * 4 + 3];
+    }
+    return Math.min(1, a);
+  }
 
   /**
    * Stamp the list into the field.
@@ -119,6 +156,9 @@ export class WebGPUAir {
       primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
     }));
 
+    // Into the one that is not current, which then becomes current: what was
+    // there is last frame's air, which is what the push differences against.
+    this.which = 1 - this.which;
     const pass = enc.beginRenderPass({
       label: 'air splat',
       colorAttachments: [{
