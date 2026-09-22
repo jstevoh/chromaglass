@@ -874,13 +874,27 @@ export default function App() {
   // ── The room ────────────────────────────────────────────────────
   // The camera as a sensor: it stirs the plate, puts hands on it and rides
   // whatever settings the mappings name. Off unless someone switched it on.
-  const [sceneOn, setSceneOn] = useState<boolean>(() => { try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; } });
+  /*
+    Off on every load, whatever last time said.
+
+    This used to restore straight from `localStorage`, so a camera switched on
+    once came back on by itself at every load from then on — and because the
+    browser had already granted permission there was no prompt either. The
+    light came on in a room with nothing on screen saying why. A remembered
+    switch is an offer, not an instruction.
+  */
+  const [sceneOn, setSceneOn] = useState<boolean>(false);
+  /** It was on when they left, so the app offers it back rather than taking it. */
+  const [sceneResume, setSceneResume] = useState<boolean>(() => {
+    try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; }
+  });
   const [sceneDeviceId, setSceneDeviceId] = useState<string>(() => { try { return localStorage.getItem(SCENE_DEVICE_KEY) ?? ''; } catch { return ''; } });
   const scenePreviewRef = useRef<HTMLCanvasElement | null>(null);
   /** True once the camera has been switched on by hand in this session. */
   const sceneAskedRef = useRef(false);
   const toggleScene = useCallback((on: boolean) => {
     if (on) sceneAskedRef.current = true;
+    setSceneResume(false);
     setSceneOn(on);
     try { localStorage.setItem(SCENE_ON_KEY, on ? '1' : '0'); } catch { /* private */ }
   }, []);
@@ -2540,6 +2554,47 @@ export default function App() {
             data-testid="toast"
           >
             {toast}
+          </div>
+        )}
+        {/*
+          The room camera was on when they left, so the app offers it back
+          rather than taking it.
+
+          It used to restore itself: the switch was remembered, permission had
+          already been granted, and so the camera opened on load with no prompt
+          and nothing on screen saying why. Permission is not consent, and a
+          camera coming on unannounced in a room is the one thing here worth
+          being strict about. Ignoring this leaves it off, which is the safe
+          answer and therefore the default.
+        */}
+        {sceneResume && !sceneOn && (
+          <div
+            className="absolute bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
+            data-testid="scene-resume"
+            role="dialog"
+            aria-label="Room camera"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-live)]" />
+            <span>The room camera was on last time. Turn it back on?</span>
+            <button
+              onClick={() => toggleScene(true)}
+              className="font-medium text-white hover:underline"
+              data-testid="scene-resume-yes"
+            >
+              Turn it on
+            </button>
+            <button
+              onClick={() => {
+                setSceneResume(false);
+                // Stop asking: off is the safe state and switching it on is one
+                // click away in Settings whenever they want it.
+                try { localStorage.setItem(SCENE_ON_KEY, '0'); } catch { /* private */ }
+              }}
+              className="text-white/50 hover:text-white/80"
+              data-testid="scene-resume-no"
+            >
+              Not now
+            </button>
           </div>
         )}
 
