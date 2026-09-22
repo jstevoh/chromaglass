@@ -111,6 +111,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'lamp', name: 'Lamp & Light', category: 'look',
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
+  { id: 'stock', name: 'Film Stock', category: 'look',
+    terms: 'film stock 16mm super 8 slide reversal negative faded grain gate weave projector curve toe shoulder period sixties' },
   { id: 'camera', name: 'Camera', category: 'look',
     terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',

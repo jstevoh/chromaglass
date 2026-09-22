@@ -393,6 +393,56 @@ check('most of the app takes advantage of them', withPhysics >= PRESETS.length -
     what `render` and `step` do to a bead that has gone non-finite, and
     getting a bead to test them with is setup, not the measurement.
   */
+  /*
+    A setting that is not a number must not poison the plate for good.
+
+    Reported from a plate twice: "a big giant box spins onto the screen", once
+    with a freeze and once without. The freeze was a non-finite bead reaching
+    `createRadialGradient`, and it was fixed. The box outlived it.
+
+    Three places turned a missing setting into a broken picture, and two of
+    them could not recover:
+
+      globalSpeed        undefined / 0.05 is NaN, and it multiplies through
+                         into the timestep
+      the timestep       `Math.min(Math.max(NaN, lo), hi)` is NaN — a clamp
+                         carries a NaN rather than catching one, which is the
+                         same trap as the bead sampler's
+      the plate's angle  `angle += NaN` is NaN *for the rest of the session*:
+                         the angle turns the dish, so every frame after is
+                         sampled through a broken transform, and putting the
+                         setting back does not undo it
+
+    The third is the one that matches "and it stays". This checks the
+    arithmetic of all three, which is where the fault was — the plate itself
+    is out of reach of a harness with no GPU.
+  */
+  {
+    const clampNaN = (v) => Math.min(Math.max(v, 0.0000001), 0.05);
+    check('a clamp carries a NaN rather than catching one',
+      Number.isNaN(clampNaN(NaN)),
+      'which is why every one of these needs Number.isFinite first');
+
+    const speedOf = (g) => (Number.isFinite(g) ? g : 0.05) / 0.05;
+    // Near six, not six: 0.3 / 0.05 is 5.999999999999999 and an exact
+    // comparison here fails on the arithmetic rather than on the guard.
+    check('a missing speed does not become a NaN multiplier',
+      Number.isFinite(speedOf(undefined)) && Number.isFinite(speedOf(NaN)) && Math.abs(speedOf(0.3) - 6) < 1e-9,
+      `undefined gives ${speedOf(undefined)}, 0.3 still gives ${speedOf(0.3).toFixed(3)}`);
+
+    const dtOf = (want) => (Number.isFinite(want) ? clampNaN(want) : 0.0000001);
+    check('and a non-finite timestep never reaches the solver',
+      Number.isFinite(dtOf(NaN)) && Number.isFinite(dtOf(undefined)) && dtOf(0.01) === 0.01,
+      `NaN gives ${dtOf(NaN)}, 0.01 still gives ${dtOf(0.01)}`);
+
+    // The one that cannot recover: an angle is a running total.
+    let angle = 0;
+    const turn = (t) => { if (Number.isFinite(t)) angle += t; };
+    turn(0.5); turn(NaN); turn(undefined); turn(0.25);
+    check('a bad frame cannot poison the plate angle for the session',
+      angle === 0.75, `${angle} after a good turn, a NaN, an undefined and another good one`);
+  }
+
   const beaded = (count = 2) => {
     const f = new BeadField(192);
     for (let t = 0; t < 40 && f.beads.length === 0; t++) f.populate(count);

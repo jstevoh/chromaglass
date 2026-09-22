@@ -1203,6 +1203,85 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
       </section>
 
+      {/* Film stock — what the whole show is photographed on (F1). */}
+      <section id="settings-stock" className={`mb-8 scroll-mt-4 ${shown('stock') ? '' : 'hidden'} ${focusSection === 'stock' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="look" data-section="stock">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Film size={12} /> Film Stock
+        </h3>
+        <Info>
+          The texture of the era&apos;s projected film. Light shows ran 16mm loops and slides beside the liquid plates, all projected, and the plate itself sat on an overhead projector — so this is not a filter over the picture, it is what the picture was photographed on. A characteristic curve so highlights roll off instead of clipping, a per-channel dye crossover for the stock&apos;s cast, grain in three layers heaviest through the mid-tones, and a gate that wanders and has its own soft edge. The plate&apos;s own granulation gives way to it, so there is never two grains at once.
+        </Info>
+        <Slider
+          label="Film Stock"
+          value={settings.stock ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stock: v })}
+          settingKey="stock"
+        />
+        <div className="flex flex-col gap-2 mb-4">
+          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <div className="grid grid-cols-5 gap-1">
+            {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
+              <button
+                key={name}
+                onClick={() => onUpdate({ stockType: i })}
+                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                  (settings.stockType ?? 0) === i ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={[
+                  '16mm reversal: cool and saturated, with a hard shoulder',
+                  'A slide stock: warm, deep blacks, a long shoulder',
+                  'Faded sixties negative: magenta cast and lifted blacks',
+                  'Super 8: soft, warm, and grainy enough that the grain is the look',
+                  'Monochrome reversal, toned',
+                ][i]}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Grain"
+          value={settings.stockGrain ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stockGrain: v })}
+          settingKey="stockGrain"
+        />
+        <Slider
+          label="Grain Size"
+          value={settings.stockGrainSize ?? 2}
+          min={1}
+          max={6}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ stockGrainSize: v })}
+          settingKey="stockGrainSize"
+        />
+        <Slider
+          label="Gate Weave"
+          value={settings.stockWeave ?? 0}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ stockWeave: v })}
+          settingKey="stockWeave"
+        />
+        <Slider
+          label="Gate Edge"
+          value={settings.stockGate ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stockGate: v })}
+          settingKey="stockGate"
+        />
+      </section>
+
+
       {/*
         Kaleidoscope Section
 

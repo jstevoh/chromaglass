@@ -1567,7 +1567,18 @@ class FluidSimulation {
     dynamicSpeed += settings.airVelocity * 0.01;
     dynamicSpeed += settings.automateRate * 0.01;
 
-    let speedMultiplier = settings.globalSpeed / 0.05;
+    /*
+      A setting that is not a number must not become a timestep.
+
+      `settings.globalSpeed` is typed as one, and at run time it comes from
+      whatever was in a saved look or off a wire, where a key can simply be
+      missing. Undefined divided by 0.05 is NaN, NaN multiplies through
+      `dynamicSpeed`, and the clamp below does not stop it: `Math.max(NaN, x)`
+      is NaN and so is `Math.min(NaN, y)`. This is the same NaN-transparent
+      clamp that let a non-finite bead reach `createRadialGradient` and freeze
+      the plate — the comment in `plate.mjs` is about that one.
+    */
+    let speedMultiplier = (Number.isFinite(settings.globalSpeed) ? settings.globalSpeed : 0.05) / 0.05;
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
@@ -1627,7 +1638,9 @@ class FluidSimulation {
       runs at sixty, and follows the governor down without this needing to
       know the governor exists.
     */
-    this.dt = Math.min(Math.max(dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP), 0.0000001), 0.05);
+    const wantDt = dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP);
+    // Finite first, then clamped: a clamp cannot catch a NaN, it carries one.
+    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, 0.0000001), 0.05) : 0.0000001;
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
@@ -4433,8 +4446,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
 
             // Use realDt only — never timeMultiplier, which spikes with audio energy
-            const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod) * 0.3;
-            rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt;
+            const rotationSpeed = (currentSettings.rotationSpeed ?? 0) * 0.01 + Math.abs(rotationMod) * 0.3;
+            /*
+              An angle that accumulates cannot be allowed to go non-finite.
+
+              Everything else recovers when the bad value goes away: a NaN
+              velocity is overwritten next step, a NaN colour is one frame.
+              This is a running total, so `angle += NaN` is NaN for the rest
+              of the session — and the angle turns the dish, so the plate is
+              sampled through a broken transform from then on and never comes
+              back. A plate that has gone strange and *stays* strange after
+              the setting is put back is this line.
+            */
+            const turn = rotationSpeed * dirMod * realDt;
+            if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
           }
         }
 

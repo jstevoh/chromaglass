@@ -155,6 +155,13 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: 1, section: 'lamp' },
+  // Film stock (F1): what the whole show is photographed on, as against the
+  // `film*` settings, which drive the projector that plays video through dye.
+  { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },
+  { key: 'stockGrain', label: "Grain", min: 0, max: 1, section: 'stock' },
+  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 6, section: 'stock' },
+  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 3, section: 'stock' },
+  { key: 'stockGate', label: "Gate Edge", min: 0, max: 1, section: 'stock' },
   { key: 'transmission', label: "Light Through Dye", min: 0, max: 1, section: 'lamp' },
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
