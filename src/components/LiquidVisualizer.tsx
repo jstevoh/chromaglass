@@ -573,6 +573,9 @@ class FluidSimulation {
   */
   private rbSeq = 0;
   private rimSeq = -1;
+  /** Last frame's bubbles, for spotting the ones that have popped. */
+  private prevPacked = new Float32Array(0);
+  private prevCount = 0;
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
@@ -756,10 +759,13 @@ class FluidSimulation {
    * quadratic and a 10% shortfall contributes 0.0001.
    */
   depositBubbleRims(packed: Float32Array, count: number): void {
-    if (!this.gpu || count <= 0) return;
+    if (!this.gpu) return;
     // Once per mirror, not once per frame: see `rbSeq`.
     if (this.rbSeq === this.rimSeq) return;
     this.rimSeq = this.rbSeq;
+    // A cleared list is not nothing to do: every bubble that was there has
+    // popped, and each one's hole has to be filled back in.
+    if (count <= 0 && this.prevCount <= 0) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
     for (let k = 0; k < count; k++) {
@@ -817,6 +823,102 @@ class FluidSimulation {
         this.density[i] += mass * w;
         this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
       }
+    }
+    this.fillPoppedHoles(packed, count, dye, N);
+    // Keep this frame's list to diff against next time. A copy, because the
+    // packed block is rebuilt in place every frame.
+    if (this.prevPacked.length < count * 4) this.prevPacked = new Float32Array(count * 4);
+    this.prevPacked.set(packed.subarray(0, count * 4));
+    this.prevCount = count;
+  }
+
+  /**
+   * A popped bubble's hole, filled back in from the ring around it (H6 · A).
+   *
+   * This is the half that was missing, and it was the whole reason the
+   * exclusion could not ship. The dye a bubble displaces is conserved — the
+   * plate holds 99.6–105.1% of a no-bubble control — but once the air is gone
+   * nothing points inward, so the hole stayed open: 0.123 against 2.410
+   * twenty-four seconds after a pop, a clear scar drifting around the plate
+   * as a ghost.
+   *
+   * Two solver-side attempts did not reach it. A leaky trail, so the
+   * divergence's sink outlives the pop by a second rather than one clamped
+   * frame, moved the refill from 0.003 to 0.032–0.060. Making that same
+   * source zero-mean — a real fault, since a Neumann problem whose source
+   * does not average to zero has no solution to find — reached 0.061. Both
+   * are twenty times better than nothing and two orders short of enough.
+   *
+   * So it is done here instead, where it is exact. And it needs no ledger of
+   * what each bubble took, which is what made the earlier designs awkward: a
+   * collapsing ring falls inward until the level evens out, so the hole is
+   * simply filled from its own annulus until the two concentrations match.
+   * That conserves by construction, stops itself at the right moment, and
+   * needs nothing remembered but where the bubbles were last frame.
+   */
+  private fillPoppedHoles(packed: Float32Array, count: number, dye: Float32Array, N: number): void {
+    if (this.prevCount <= 0) return;
+    for (let k = 0; k < this.prevCount; k++) {
+      const o = k * 4;
+      const x = this.prevPacked[o] * N, y = this.prevPacked[o + 1] * N, R = this.prevPacked[o + 2] * N;
+      if (!(R > 0.7) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      /*
+        Still there? Bubbles have no identity across frames, so they are
+        matched by where they are: they drift with the liquid, a frame apart,
+        so anything within half a radius is the same bubble. A cleared list
+        matches nothing, which is exactly right — all of them popped at once.
+      */
+      let alive = false;
+      for (let j = 0; j < count && !alive; j++) {
+        const q = j * 4;
+        if (Math.hypot(packed[q] * N - x, packed[q + 1] * N - y) < Math.max(2, R * 0.5)) alive = true;
+      }
+      if (alive) continue;
+
+      // The hole, and the ring the displaced dye is sitting in.
+      const disc: number[] = [], ring: number[] = [];
+      const rOut = R * 1.45;
+      const yl = Math.max(0, Math.floor(y - rOut)), yh = Math.min(N - 1, Math.ceil(y + rOut));
+      const xl = Math.max(0, Math.floor(x - rOut)), xh = Math.min(N - 1, Math.ceil(x + rOut));
+      for (let j = yl; j <= yh; j++) {
+        for (let i = xl; i <= xh; i++) {
+          const d = Math.hypot(i - x, j - y);
+          if (d <= R) disc.push(i + j * N);
+          else if (d <= rOut) ring.push(i + j * N);
+        }
+      }
+      if (disc.length === 0 || ring.length === 0) continue;
+
+      let discMass = 0, ringMass = 0, aR = 0, aG = 0, aB = 0;
+      for (const i of disc) discMass += dye[i * 4 + 3];
+      for (const i of ring) {
+        const i4 = i * 4;
+        ringMass += dye[i4 + 3];
+        aR += dye[i4]; aG += dye[i4 + 1]; aB += dye[i4 + 2];
+      }
+      const discMean = discMass / disc.length, ringMean = ringMass / ring.length;
+      if (!(ringMean > discMean + 1e-4) || !(ringMass > 1e-4)) continue;
+
+      /*
+        A rate, not a jump. The ring collapses over a moment rather than
+        snapping shut, and a fraction each refresh also means a mis-matched
+        bubble — one that moved further in a frame than half its radius —
+        costs a nudge rather than a hole filled under a live bubble.
+      */
+      const per = (ringMean - discMean) * 0.35;
+      const moved = Math.min(per * disc.length, ringMass * 0.5);
+      if (!(moved > 1e-5)) continue;
+      const add = moved / disc.length;
+      const colR = aR / ringMass, colG = aG / ringMass, colB = aB / ringMass;
+      this.dirty = true;
+      for (const i of disc) {
+        this.density[i] += add;
+        this.densityR[i] += colR * add; this.densityG[i] += colG * add; this.densityB[i] += colB * add;
+      }
+      // And taken out of the ring, through the multiplicative channel that
+      // exists for exactly this: dye removed rather than dye added.
+      const keep = Math.max(0, 1 - moved / ringMass);
+      for (const i of ring) this.mul[i] *= keep;
     }
   }
 

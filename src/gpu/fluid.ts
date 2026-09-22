@@ -179,6 +179,17 @@ export class WebGPUFluid {
   /** How hard the arriving air pushes the liquid aside (H6); 0 switches it off. */
   private airPush = 0;
   private airCover = 0;
+  /*
+    Last frame's coverage, so the rate term can be made zero-mean.
+
+    The standing term has the plate's air fraction subtracted because a
+    Neumann problem whose source does not average to zero has no solution for
+    the projection to find — the condition pressureSelfTest exists to
+    protect. The rate term never had the same treatment, and it is the
+    suspect for why pushing the air source harder has bought so little: a
+    hundred times the strength moved the interior from 0.67 to 0.62.
+  */
+  private airCoverPrev = 0;
   private lastDt = 1 / 60;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
@@ -524,6 +535,7 @@ export class WebGPUFluid {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
     this.lastDt = p.dt;
 
@@ -846,8 +858,12 @@ export class WebGPUFluid {
    */
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
+    // The fifth number is the mean of the rate term over the plate, which the
+    // kernel subtracts so that term averages to zero as the standing one does.
+    const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev],
-      this.arg('air source', [this.airPush, 1 / Math.max(this.lastDt, 1e-4), this.airCover, 0]));
+      this.arg('air source', [this.airPush, invDt, this.airCover, 0,
+        (this.airCover - this.airCoverPrev) * invDt, 0, 0, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));

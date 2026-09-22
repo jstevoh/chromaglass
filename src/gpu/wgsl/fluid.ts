@@ -486,7 +486,20 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     average to zero has no solution for the projection to find, which is the
     Neumann condition pressureSelfTest exists to protect.
   */
-  let rate = clamp((now - was) * A.a.y, -40.0, 40.0);
+  /*
+    Zero-mean, as the standing term below already is.
+
+    A source the projection solves has to average to zero over the plate or
+    there is no solution to find, which is the Neumann condition
+    pressureSelfTest protects. The standing term has the air fraction taken
+    off for exactly that reason and this one never did: while a bubble grows
+    it is a net source over the whole plate with nothing to balance it, and
+    the solve spends itself on the imbalance rather than on the shape.
+
+    A.b.x is that mean, which is how fast the plate's air fraction is
+    changing, and the CPU has it from the bubble list for nothing.
+  */
+  let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
   let standing = (now - A.a.z) * 30.0;
   let q = (rate + standing) * A.a.x;
   textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));

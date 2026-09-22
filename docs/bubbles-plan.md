@@ -875,3 +875,61 @@ water leaves; wet-plate optics, where bare plate still refracts; and the oil
 saturation in D, whose whole state variable is *how much of the surface is
 already covered*. One field, three features, and one of them was already on the
 list from a different direction.
+
+
+## A, closed: the hole fills when the bubble pops (2026-09-21)
+
+**The exclusion works now.** A bubble is a hole while it is there, the plate
+keeps its dye, and the hole fills when the bubble goes.
+
+    and there is no dye left under it     0.002 against 5.490 around
+    and the dye comes back once gone      1.438 against 2.821, at the first
+                                          poll after the pop
+
+Against 0.003–0.123 twenty-four seconds after a pop before this, and 1.362
+against 1.998 for the neighbour exchange this whole line of work replaced.
+
+### What finally did it, after two things that did not
+
+**A leaky trail** so the divergence's sink outlives a pop by about a second
+rather than one clamped frame: 0.003 to 0.032–0.060.
+
+**Making that source zero-mean**, which was a real fault — the standing term
+has the plate's air fraction subtracted because a Neumann problem whose source
+does not average to zero has no solution for the projection to find, and the
+rate term never had the same treatment: 0.061. That correction is kept, on its
+own merits.
+
+Both are twenty times better than nothing and two orders short of enough, and
+the reason is the same one that runs through all of H6: **the transport cannot
+get there.** Semi-Lagrangian advection carries a value along a characteristic,
+a radially symmetric source has no velocity at its centre, and no amount of
+source strength changes either fact.
+
+So the fill is done on the CPU, where it is exact. The part that made earlier
+sketches awkward was bookkeeping — remembering how much each bubble had taken,
+across frames, for bubbles that have no identity. **It turns out not to be
+needed.** A collapsing ring falls inward until the level evens out, so a popped
+bubble's hole is filled from its own annulus until the two concentrations
+match. That conserves by construction, stops itself at the right moment, and
+needs nothing remembered but where the bubbles were last frame. Bubbles are
+matched between frames by position — they drift with the liquid, so anything
+within half a radius is the same one — and a cleared list matches nothing,
+which is exactly right.
+
+### The one check still failing, and why it is not loosened
+
+"The light it adds is the liquid lit, not paint on top of it" reads 45–52°
+against a gate of 22. It is measuring against the wrong reference now, and the
+reason is the feature working rather than failing: it compares the light a
+bubble adds against **the ground under the bubble**, which was right while a
+bubble shaded over dye. A hole shows the lamp, tinted by what the rim refracts
+inward — deliberately not the dye that used to be there, which is gone. The
+compositor already reads its tint from beyond the rim for this reason.
+
+It is also not a trustworthy instrument as written: it averages over the pixels
+it classes as lit, and that population has run from 9944 to 823 to 4532 across
+these changes, reading 14.6, 23.8, 24.0, 30.6, 39.2, 41.9, 45.3 and 51.6
+degrees. **Its reference and its population both need fixing before it can gate
+anything**, and neither should be done in the same change as the thing it is
+meant to be judging.
