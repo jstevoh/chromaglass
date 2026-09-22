@@ -20,6 +20,15 @@ export interface MidiSource {
 
 export type MidiAction =
   | 'seed' | 'clear' | 'drain' | 'lucky'
+  /**
+   * Flick a plate: spin it up and let it coast down.
+   *
+   * One per plate rather than one that follows the selected layer, because
+   * the two turn opposite ways and the point of having both on pads is
+   * shearing them against each other by hand. On a one-layer look the second
+   * does nothing.
+   */
+  | 'spin-front' | 'spin-back'
   | 'play-toggle' | 'automate-toggle' | 'overlays-toggle' | 'macro-toggle'
   | 'seq-play-pause' | 'seq-next' | 'seq-prev' | 'seq-stop'
   | 'preset-next' | 'preset-prev'
@@ -174,6 +183,7 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
 
 export const ACTION_LABELS: Record<MidiAction, string> = {
   'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
+  'spin-front': 'Spin Front Plate', 'spin-back': 'Spin Back Plate',
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',

@@ -59,6 +59,22 @@ struct Sim {
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
+  /*
+    The two glasses, and how they sit together.
+
+    plateCurve is the shape of the gap they leave at rest. Zero is two flats,
+    perfectly parallel, which is what this modelled before and which no real
+    pair of clock glasses is: negative makes them touch in the middle and
+    open toward the rim, positive makes the rim the tight part and the liquid
+    pool in the centre. It decides where dye gathers and which way a press
+    throws it.
+
+    gapSpring is how fast they come back apart, and gapMemory how long the
+    squeeze that a press made outlives the press.
+  */
+  plateCurve: f32,
+  gapSpring: f32,
+  gapMemory: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -203,6 +219,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
+  /*
+    The gap between the two glasses, and how a press changes it.
+
+    Three things were wrong here and all three were felt as "pressing does
+    not do enough".
+
+    **The plates were flats.** The gap was a constant, so the two glasses sat
+    perfectly parallel — which no real pair of clock glasses does. The rest
+    gap is a dome now: `plateCurve` below zero makes them touch in the middle
+    and open toward the rim, above zero makes the rim the tight part. That is
+    what decides where dye gathers and which way a press throws it, and with
+    a flat gap a press could only ever push radially outward from wherever
+    the finger was.
+
+    **The press was over in a twelfth of a second.** The gap sprang back a
+    fixed 0.005 a step across a range of 0.025, so it fully recovered in five
+    steps, and `dhdt` — the squeeze that actually moves liquid — halved every
+    step, a seventeen-millisecond half-life. Both are rates now, from
+    `gapSpring` and `gapMemory`.
+
+    **And the release did nothing.** `dhdt` was only ever written from the
+    press delta, so the plates coming back apart contributed nothing: liquid
+    was pushed out and never drawn back. The spring's own motion goes into
+    `dhdt` here, so a press now pushes and its release pulls — which is what
+    a squeeze between two wet glasses does, and why it redistributes dye
+    instead of simply shoving it.
+  */
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
@@ -210,18 +253,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
+  // Where this cell sits on the plate: 0 in the middle, 1 at the rim.
+  let d = uvOf(id) - vec2f(0.5);
+  let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
+  // The dome the two glasses leave when nothing is pressing on them.
+  let rest = clamp(0.03 * (1.0 + S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
-  var dhdt = s.g * 0.5;
+  var dhdt = s.g * S.gapMemory;
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
-      let g2 = max(0.005, gap + dg);
+      let g2 = max(0.004, gap + dg);
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
   }
-  gap = min(0.03, gap + 0.005);
-  textureStore(dst, vec2i(id.xy), vec4f(gap, dhdt, 0.0, 0.0));
+  // The spring back toward the dome, and its motion counts.
+  let g3 = gap + (rest - gap) * S.gapSpring;
+  dhdt += (g3 - gap) / max(S.dt, 0.0001);
+  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, 0.0, 0.0));
 }`,
 
   /*
@@ -281,6 +331,82 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w));
 }`,
 
+  /*
+    Where air is, dye is not — and it went somewhere (H6 · A).
+
+    A bubble is a hole, so the liquid under it has to leave. The first
+    version of this scaled the dye down: dye *= 1 - air. That empties a
+    bubble perfectly and it is wrong, because the dye does not go anywhere —
+    it is destroyed. A bubble that drifts on leaves a scar of clear plate
+    behind it, and a plate with bubbles on it slowly loses all its colour.
+
+    Measured, which is how it was caught: with the bubbles cleared away, the
+    cells they had been standing on read 0.002 against 0.792 around them. The
+    dye never came back because there was none left to come back.
+
+    So this moves the dye instead. Between each pair of neighbouring cells,
+    liquid flows from the one with more air in it to the one with less, in
+    proportion to the difference — the same exchange in both directions, so
+    what one cell loses another gains and the total is unchanged. Run every
+    step, it walks the dye out of a bubble and piles it against the rim,
+    which is where the plan wants it: the bright ring around a bubble is
+    real dye that was pushed there, and it moves with the liquid.
+
+    A.a.x is bubbleClear, the rate. The four flows are each at most a
+    quarter of the cell, so nothing can push a cell below zero.
+  */
+  /*
+    Where air is, dye is not (H6 · A).
+
+    A multiply, and it was a multiply before, and the round trip is the
+    lesson. `dye *= 1 - air` empties a bubble perfectly — measured 0.000
+    against 1.492 — and destroys what it removes, so a bubble that drifts on
+    leaves a scar of clear plate and a plate with bubbles slowly loses its
+    colour. The check caught that, so the multiply was replaced by a
+    conserving exchange between neighbours, from more air to less.
+
+    That exchange conserves and **cannot empty a bubble**, for a reason that
+    is structural rather than a matter of tuning: it is driven by the
+    *difference* in air between neighbouring cells, and the inside of a
+    bubble is uniformly air, so there is no difference to flow down. The
+    radial profile says it exactly. With the air at 1.00 in the middle of a
+    bubble, the dye there measured **0.990** of what the same plate had with
+    no bubble on it — untouched — while the rim, where the gradient is, sat
+    at 0.85. A hole with its middle intact is not a hole.
+
+    Three things were tried before believing that. A velocity down the air
+    gradient does nothing at all, because a gradient field is precisely what
+    the pressure projection removes. A source in the divergence the
+    projection solves does reach the flow and still leaves the middle: the
+    velocity of a radially symmetric source is zero at its centre, and the
+    dye's advection is semi-Lagrangian, which transports a value along a
+    characteristic and has no term to dilute it — so the centre cell
+    backtraces onto itself and keeps its dye for ever. Blurring the air
+    field to manufacture a slope made it worse.
+
+    So: the multiply, which needs no transport and therefore reaches the
+    middle, and the dye it displaces is kept by the plate's own budget
+    servo rather than here — see `evapFactor` in `LiquidVisualizer`. The
+    conservation is global rather than at the rim; a rim ring of real
+    displaced dye is written up in `bubbles-plan.md` as what is left.
+
+    `A.a.x` is `bubbleClear`: 1 is the physical answer, and lower keeps some
+    of the old shading for a look that wants it.
+  */
+  airExclude: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var air: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let a = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
+  let here = textureLoad(dye, p, 0);
+  let keep = 1.0 - clamp(A.a.x, 0.0, 1.0) * a;
+  textureStore(dst, p, max(here * keep, vec4f(0.0)));
+}`,
+
   // x = (x0 + a Σ neighbours) / (1 + 4a), per channel. A.a is a, A.b is 1/(1+4a).
   jacobi: `${HEAD}
 @group(0) @binding(2) var x: texture_2d<f32>;
@@ -295,9 +421,36 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
+  /*
+    The divergence the projection solves, with the air pushing on it (H6 · A).
+
+    A bubble displaces liquid. In the liquid's own terms that is a **source**
+    where the air is arriving and a sink where it is leaving, and the right
+    place to say so is here: the projection solves for the pressure whose
+    gradient produces exactly that flow, so the liquid is pushed aside and
+    then goes round.
+
+    Three other ways were tried first and all are written up in
+    `bubbles-plan.md`. The one worth repeating here is adding a velocity down
+    the air gradient, which does nothing whatever — a gradient field is
+    precisely what this projection exists to remove, so the next one cancels
+    it. A source has to go in before the solve, not a velocity after it.
+
+    `A.a.x` is the strength and `A.a.y` the reciprocal timestep; the rate is
+    how much air arrived since the last frame. With no bubbles the two fields
+    are identical and the term is zero, so this costs two samples and changes
+    nothing.
+  */
   divergence: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var air: texture_2d<f32>;
+@group(0) @binding(4) var airPrev: texture_2d<f32>;
+// Last, because the convention here is every texture a pass reads and then
+// the one it writes — and run() binds them in exactly that order. Leaving
+// this at 3 put a sampled texture on a storage slot, which fails as
+// "usage doesn't include TextureUsage::StorageBinding" and leaves the field
+// empty with nothing else to show for it.
+@group(0) @binding(5) var dst: texture_storage_2d<r32float, write>;
 // Past the edge: the edge value with the wall-normal component negated, so the
 // velocity interpolated at the wall is zero.
 fn velG(p: vec2i, n: f32) -> vec2f {
@@ -311,7 +464,45 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let dx = velG(p + vec2i(1, 0), S.n).x - velG(p - vec2i(1, 0), S.n).x;
   let dy = velG(p + vec2i(0, 1), S.n).y - velG(p - vec2i(0, 1), S.n).y;
-  textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n, 0.0, 0.0, 0.0));
+  /*
+    This stores -div(v)·h², so a source q enters as +q·h². Positive where the
+    air is growing: liquid appearing, which is liquid being pushed out.
+  */
+  let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
+  let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
+  /*
+    Two terms, and the second is the one that empties a bubble.
+
+    The rate — how much air arrived since last frame — is the physical one: a
+    growing bubble displaces liquid, a popping one lets it back. It is also
+    only there while the bubble is *changing*, and a bubble that has arrived
+    and sits still has no rate at all. Measured on its own it moved the
+    interior from 0.70 to 0.67, which is nothing.
+
+    So there is a standing term as well: a source everywhere the air is, a
+    sink everywhere it is not, which keeps liquid flowing out of a bubble and
+    around it for as long as it is there. A.a.z is the fraction of the
+    plate that is air, subtracted so the two balance — a source that does not
+    average to zero has no solution for the projection to find, which is the
+    Neumann condition pressureSelfTest exists to protect.
+  */
+  /*
+    Zero-mean, as the standing term below already is.
+
+    A source the projection solves has to average to zero over the plate or
+    there is no solution to find, which is the Neumann condition
+    pressureSelfTest protects. The standing term has the air fraction taken
+    off for exactly that reason and this one never did: while a bubble grows
+    it is a net source over the whole plate with nothing to balance it, and
+    the solve spends itself on the imbalance rather than on the shape.
+
+    A.b.x is that mean, which is how fast the plate's air fraction is
+    changing, and the CPU has it from the bubble list for nothing.
+  */
+  let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
+  let standing = (now - A.a.z) * 30.0;
+  let q = (rate + standing) * A.a.x;
+  textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
 }`,
 
   pressureJacobi: `${HEAD}

@@ -46,6 +46,15 @@ interface LiquidVisualizerProps {
   audioData: AudioData | null;
   settings: VisualizerSettings;
   seedCount?: number;
+  /**
+   * A flick of one plate: spin it up and let it coast down.
+   *
+   * A counter and a layer rather than a speed, the way `seedCount` is a
+   * counter: it is a momentary thing, and two flicks in a row have to both
+   * land. The strength is `spinImpulse`, so a pad and the screen button hit
+   * exactly as hard as each other.
+   */
+  spinFlick?: { seq: number; layer: number };
   selectedLiquid?: LiquidType;
   /**
    * Where the plate is drawn on this screen, in CSS pixels.
@@ -161,6 +170,16 @@ const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat fie
 const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
 const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
+/*
+  How much of a blow is swirl rather than push.
+
+  A push is curl-free and the projection removes it within the same step; a
+  swirl is not and survives. Measured against nothing else in the plate, so
+  it is written down rather than derived: 0.55 is the point at which a puff
+  still reads as a puff rather than as a stirring rod, and the dye it moves
+  keeps drifting for several seconds instead of stopping with the finger.
+*/
+const BLOW_SWIRL = 0.55;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
@@ -492,6 +511,14 @@ class FluidSimulation {
 
   temp: Float32Array;
   temp0: Float32Array;
+  /**
+   * How fast this plate is actually turning, in radians a second.
+   *
+   * Set by the frame from the flywheel, and read by the twist below. The
+   * *setting* is a motor — what the plate is asked to hold — and this is what
+   * it is doing, which after a flick are very different numbers.
+   */
+  plateSpin = 0;
   meanDensity = 0; // rolling measure of how full the plate is
   /**
    * The average colour on this layer, 0..1 per channel.
@@ -537,6 +564,20 @@ class FluidSimulation {
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
+  /*
+    How many readbacks have landed. The rim deposit needs it: the mirror
+    refreshes only when `readbackAsync` has something, and depositing from a
+    mirror that has not moved puts the same displaced dye back twice — which
+    measured as a plate 4-8% *over* its control and a popped bubble
+    refilling to 124% of what had been there.
+  */
+  private rbSeq = 0;
+  private rimSeq = -1;
+  /** Last frame's bubbles, for spotting the ones that have popped. */
+  private prevPacked = new Float32Array(0);
+  private prevCount = 0;
+  /** Holes still closing: carried so the fill converges instead of running once. */
+  private fillingHoles: { at: Float32Array; left: number }[] = [];
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
@@ -655,6 +696,7 @@ class FluidSimulation {
     }
     this.meanDensity = sum / GRID_AREA;
     this.meanColor = [sr / GRID_AREA, sg / GRID_AREA, sb / GRID_AREA];
+    this.rbSeq++;
   }
 
   private pullStateFromGpu() {
@@ -690,6 +732,229 @@ class FluidSimulation {
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     this.dirty = false;
+  }
+
+  /**
+   * The dye a bubble displaces, put back as a ring around it (H6 · A).
+   *
+   * The exclusion on the GPU is a multiply, because it is the only operator
+   * that reaches the middle of a bubble — every gradient-driven one is zero
+   * where the air is uniform, which is measured in `bubbles-plan.md`. A
+   * multiply destroys what it removes, and that was measured too: the plate
+   * drained to 83% of its dye in twenty seconds with one bubble on it, and a
+   * popped bubble refilled to 20% of what had been there and stopped. A
+   * permanent scar is worse than the shading H6 exists to replace.
+   *
+   * So the mass goes back, as a ring just outside the rim, which is where a
+   * bubble in a thin layer really does push it. Two things make this cheap
+   * rather than the three blur passes it first looked like:
+   *
+   * The mirror is a frame behind, and that is exactly right. On the frame a
+   * bubble arrives the mirror still holds the dye the GPU is removing this
+   * frame, so the disc total *is* the mass to redeposit. A frame later the
+   * mirror shows the emptied disc and there is nothing to move, which is
+   * also right — the bubble has already taken what was under it.
+   *
+   * And both halves read the same mirror, so it conserves by construction
+   * rather than by a servo. A servo was tried: the plate's dye-budget loop
+   * made symmetric, which never engaged, because the deficit term is
+   * quadratic and a 10% shortfall contributes 0.0001.
+   */
+  depositBubbleRims(packed: Float32Array, count: number): void {
+    if (!this.gpu) return;
+    // Once per mirror, not once per frame: see `rbSeq`.
+    if (this.rbSeq === this.rimSeq) return;
+    this.rimSeq = this.rbSeq;
+    // A cleared list is not nothing to do: every bubble that was there has
+    // popped, and each one's hole has to be filled back in.
+    if (count <= 0 && this.prevCount <= 0) return;
+    const dye = this.gpu.rbDyeView;
+    const N = this.size;
+    for (let k = 0; k < count; k++) {
+      // The packed block, because it carries the fade as its opacity and the
+      // Bubble record does not — a bubble part-way in has taken part of the
+      // dye, and the ring has to match or the plate gains colour.
+      const o = k * 4;
+      const b = { x: packed[o] * N, y: packed[o + 1] * N, r: packed[o + 2] * N, opacity: packed[o + 3] };
+      // The bubble list is in logical cells already, which is the grid the
+      // mirror and the deltas are both on, so nothing is mapped.
+      const R = b.r;
+      if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+      const clear = Math.max(0, Math.min(1, b.opacity));
+      if (clear < 0.02) continue;
+      let mass = 0, aR = 0, aG = 0, aB = 0;
+      const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
+      const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
+      for (let y = lo; y <= hi; y++) {
+        for (let x = xl; x <= xh; x++) {
+          const dx = x - b.x, dy = y - b.y;
+          if (dx * dx + dy * dy > R * R) continue;
+          const i4 = (x + y * N) * 4;
+          const d = dye[i4 + 3];
+          if (!(d > 1e-5)) continue;
+          mass += d * clear;
+          aR += dye[i4] * clear; aG += dye[i4 + 1] * clear; aB += dye[i4 + 2] * clear;
+        }
+      }
+      if (!(mass > 1e-4)) continue;
+      // The annulus the mass lands in: just outside the rim, a third of a
+      // radius wide, which is about what the references show as the bright
+      // ring around a bubble sitting in dye.
+      const rIn = R * 1.02, rOut = R * 1.38;
+      const cells: number[] = [];
+      const yl = Math.max(0, Math.floor(b.y - rOut)), yh = Math.min(N - 1, Math.ceil(b.y + rOut));
+      const cxl = Math.max(0, Math.floor(b.x - rOut)), cxh = Math.min(N - 1, Math.ceil(b.x + rOut));
+      for (let y = yl; y <= yh; y++) {
+        for (let x = cxl; x <= cxh; x++) {
+          const dd = Math.hypot(x - b.x, y - b.y);
+          if (dd < rIn || dd > rOut) continue;
+          cells.push(x + y * N);
+        }
+      }
+      if (!cells.length) continue;
+      /*
+        Deposited in the mirror's own log-space rather than through
+        `addDensity`, which takes a colour and takes its log. Going out to a
+        colour and back in would lose the mix: the absorptions here are
+        already the geometric-mean form the plate stores, so the ring keeps
+        the colour of the dye it came from, whatever was mixed into it.
+      */
+      const w = 1 / cells.length;
+      this.dirty = true;
+      for (const i of cells) {
+        this.density[i] += mass * w;
+        this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
+      }
+    }
+    this.fillPoppedHoles(packed, count, dye, N);
+    /*
+      Next frame's list to diff against: this frame's bubbles, *plus* the
+      ones still filling.
+
+      Without the second part the fill runs exactly once per popped bubble —
+      the single frame it leaves the list — and moves 0.35 of the deficit and
+      then never again. It reached 43-53% of the surroundings and sat there,
+      right on the gate, for that reason and not for any physical one. A hole
+      is carried for a few more frames so the fill converges, and it drops
+      out when it has nothing left to move.
+    */
+    const keep = this.fillingHoles.filter(h => h.left > 0);
+    const total = count + keep.length;
+    if (this.prevPacked.length < total * 4) this.prevPacked = new Float32Array(total * 4);
+    this.prevPacked.set(packed.subarray(0, count * 4));
+    for (let i = 0; i < keep.length; i++) this.prevPacked.set(keep[i].at, (count + i) * 4);
+    this.prevCount = total;
+    this.fillingHoles = keep;
+  }
+
+  /**
+   * A popped bubble's hole, filled back in from the ring around it (H6 · A).
+   *
+   * This is the half that was missing, and it was the whole reason the
+   * exclusion could not ship. The dye a bubble displaces is conserved — the
+   * plate holds 99.6–105.1% of a no-bubble control — but once the air is gone
+   * nothing points inward, so the hole stayed open: 0.123 against 2.410
+   * twenty-four seconds after a pop, a clear scar drifting around the plate
+   * as a ghost.
+   *
+   * Two solver-side attempts did not reach it. A leaky trail, so the
+   * divergence's sink outlives the pop by a second rather than one clamped
+   * frame, moved the refill from 0.003 to 0.032–0.060. Making that same
+   * source zero-mean — a real fault, since a Neumann problem whose source
+   * does not average to zero has no solution to find — reached 0.061. Both
+   * are twenty times better than nothing and two orders short of enough.
+   *
+   * So it is done here instead, where it is exact. And it needs no ledger of
+   * what each bubble took, which is what made the earlier designs awkward: a
+   * collapsing ring falls inward until the level evens out, so the hole is
+   * simply filled from its own annulus until the two concentrations match.
+   * That conserves by construction, stops itself at the right moment, and
+   * needs nothing remembered but where the bubbles were last frame.
+   */
+  private fillPoppedHoles(packed: Float32Array, count: number, dye: Float32Array, N: number): void {
+    if (this.prevCount <= 0) return;
+    for (let k = 0; k < this.prevCount; k++) {
+      const o = k * 4;
+      const x = this.prevPacked[o] * N, y = this.prevPacked[o + 1] * N, R = this.prevPacked[o + 2] * N;
+      if (!(R > 0.7) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      /*
+        Still there? Bubbles have no identity across frames, so they are
+        matched by where they are: they drift with the liquid, a frame apart,
+        so anything within half a radius is the same bubble. A cleared list
+        matches nothing, which is exactly right — all of them popped at once.
+      */
+      let alive = false;
+      for (let j = 0; j < count && !alive; j++) {
+        const q = j * 4;
+        if (Math.hypot(packed[q] * N - x, packed[q + 1] * N - y) < Math.max(2, R * 0.5)) alive = true;
+      }
+      if (alive) continue;
+
+      // The hole, and the liquid around it the fill draws from.
+      const disc: number[] = [], ring: number[] = [];
+      /*
+        Tight, on the ring the displacement was laid into.
+
+        Reaching wider was tried and is worse — 24-29% of the surroundings
+        against 48-53% — because it averages the enriched ring together with
+        ordinary liquid, so the level the fill equalises toward drops and
+        less moves. The dye is in the ring; that is where to get it.
+      */
+      const rOut = R * 1.45;
+      const yl = Math.max(0, Math.floor(y - rOut)), yh = Math.min(N - 1, Math.ceil(y + rOut));
+      const xl = Math.max(0, Math.floor(x - rOut)), xh = Math.min(N - 1, Math.ceil(x + rOut));
+      for (let j = yl; j <= yh; j++) {
+        for (let i = xl; i <= xh; i++) {
+          const d = Math.hypot(i - x, j - y);
+          if (d <= R) disc.push(i + j * N);
+          else if (d <= rOut) ring.push(i + j * N);
+        }
+      }
+      if (disc.length === 0 || ring.length === 0) continue;
+
+      let discMass = 0, ringMass = 0, aR = 0, aG = 0, aB = 0;
+      for (const i of disc) discMass += dye[i * 4 + 3];
+      for (const i of ring) {
+        const i4 = i * 4;
+        ringMass += dye[i4 + 3];
+        aR += dye[i4]; aG += dye[i4 + 1]; aB += dye[i4 + 2];
+      }
+      const discMean = discMass / disc.length, ringMean = ringMass / ring.length;
+      if (!(ringMean > discMean + 1e-4) || !(ringMass > 1e-4)) continue;
+
+      /*
+        A rate, not a jump. The ring collapses over a moment rather than
+        snapping shut, and a fraction each refresh also means a mis-matched
+        bubble — one that moved further in a frame than half its radius —
+        costs a nudge rather than a hole filled under a live bubble.
+      */
+      const per = (ringMean - discMean) * 0.35;
+      const moved = Math.min(per * disc.length, ringMass * 0.5);
+      if (!(moved > 1e-5)) continue;
+      const add = moved / disc.length;
+      const colR = aR / ringMass, colG = aG / ringMass, colB = aB / ringMass;
+      this.dirty = true;
+      for (const i of disc) {
+        this.density[i] += add;
+        this.densityR[i] += colR * add; this.densityG[i] += colG * add; this.densityB[i] += colB * add;
+      }
+      // And taken out of the ring, through the multiplicative channel that
+      // exists for exactly this: dye removed rather than dye added.
+      const keepRing = Math.max(0, 1 - moved / ringMass);
+      for (const i of ring) this.mul[i] *= keepRing;
+      /*
+        And keep this hole on the books while it is still worth filling. The
+        deficit shrinks every pass, so this drops out on its own — the count
+        is a ceiling for a hole that never closes, not the schedule.
+      */
+      if (!this.fillingHoles.some(h => Math.hypot(h.at[0] * N - x, h.at[1] * N - y) < Math.max(2, R * 0.5))) {
+        this.fillingHoles.push({ at: this.prevPacked.slice(o, o + 4), left: 45 });
+      } else {
+        for (const h of this.fillingHoles) {
+          if (Math.hypot(h.at[0] * N - x, h.at[1] * N - y) < Math.max(2, R * 0.5)) h.left--;
+        }
+      }
+    }
   }
 
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
@@ -1363,8 +1628,28 @@ class FluidSimulation {
           const idx = nx + ny * this.size;
           const dist = Math.sqrt(distSq);
           this.dirty = true;
-          this.vx[idx] += (i / dist) * strength;
-          this.vy[idx] += (j / dist) * strength;
+          /*
+            A puff is not only a push outward.
+
+            This was purely radial, and a purely radial field is exactly what
+            the pressure projection exists to remove — so most of a puff was
+            deleted at the end of the very step that applied it, and what
+            little survived was gone inside a second. That is why blowing
+            registered as a nudge that stopped rather than as something the
+            plate remembers.
+
+            Real air does not push a liquid aside so much as roll vorticity
+            into it, and vorticity is the part a projection cannot touch. So
+            the puff carries a swirl as well, and the swirl is what is still
+            turning long after the push has been solved away.
+
+            The direction comes from where the puff landed rather than from a
+            random number: the same show rendered twice has to be the same
+            film twice.
+          */
+          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
+          this.vx[idx] += ((i / dist) + (-j / dist) * swirl) * strength;
+          this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
           if (this.gpu) {
             this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
           } else {
@@ -1393,8 +1678,21 @@ class FluidSimulation {
           const idx = nx + ny * this.size;
           const w = 1 - Math.sqrt(distSq) / radius;
           this.dirty = true;
-          this.vx[idx] += dx * strength * w;
-          this.vy[idx] += dy * strength * w;
+          /*
+            And a directed blow rolls a *pair* of vortices, one either side of
+            the jet, turning opposite ways — which is what air blown across a
+            liquid actually leaves behind, and what keeps the dye moving after
+            the push itself has been projected away.
+
+            A straight push does carry some vorticity of its own, where the
+            jet's profile shears against the still liquid beside it, but it is
+            weak and it is all at the flanks. This puts it there on purpose.
+          */
+          const r = Math.sqrt(distSq) || 1;
+          const side = i * -dy + j * dx;       // across the jet
+          const sgn = side >= 0 ? 1 : -1;
+          this.vx[idx] += (dx + (-j / r) * sgn * BLOW_SWIRL) * strength * w;
+          this.vy[idx] += (dy + (i / r) * sgn * BLOW_SWIRL) * strength * w;
           if (this.gpu) this.mul[idx] *= 1 - 0.15 * w;
           else { const k = 1 - 0.15 * w; this.density[idx] *= k; this.densityR[idx] *= k; this.densityG[idx] *= k; this.densityB[idx] *= k; }
         }
@@ -1567,7 +1865,18 @@ class FluidSimulation {
     dynamicSpeed += settings.airVelocity * 0.01;
     dynamicSpeed += settings.automateRate * 0.01;
 
-    let speedMultiplier = settings.globalSpeed / 0.05;
+    /*
+      A setting that is not a number must not become a timestep.
+
+      `settings.globalSpeed` is typed as one, and at run time it comes from
+      whatever was in a saved look or off a wire, where a key can simply be
+      missing. Undefined divided by 0.05 is NaN, NaN multiplies through
+      `dynamicSpeed`, and the clamp below does not stop it: `Math.max(NaN, x)`
+      is NaN and so is `Math.min(NaN, y)`. This is the same NaN-transparent
+      clamp that let a non-finite bead reach `createRadialGradient` and freeze
+      the plate — the comment in `plate.mjs` is about that one.
+    */
+    let speedMultiplier = (Number.isFinite(settings.globalSpeed) ? settings.globalSpeed : 0.05) / 0.05;
     if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
     dynamicSpeed *= speedMultiplier;
 
@@ -1627,7 +1936,9 @@ class FluidSimulation {
       runs at sixty, and follows the governor down without this needing to
       know the governor exists.
     */
-    this.dt = Math.min(Math.max(dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP), 0.0000001), 0.05);
+    const wantDt = dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP);
+    // Finite first, then clamped: a clamp cannot catch a NaN, it carries one.
+    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, 0.0000001), 0.05) : 0.0000001;
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
@@ -1666,7 +1977,7 @@ class FluidSimulation {
     if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
     // 7. Immiscibility & fingering
-    this.applyImmiscibility(p.surfaceTension, time, noise2D);
+    this.applyImmiscibility(p.immiscibility, time, noise2D);
     if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
@@ -1804,7 +2115,19 @@ class FluidSimulation {
     // high tension the reverse (rounder, self-contained blobs).
     const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
-    const surfaceTension = polarity * 0.04 * (0.4 + tension * 1.2);
+/*
+      Named `immiscibility` and not `surfaceTension`, which is what it was
+      called until 2026-09-21.
+
+      There was also a *setting* called `surfaceTension`, written by all
+      thirty-two presets, and this local shadowed it well enough that an
+      audit for unread settings counted `p.surfaceTension` as its reads and
+      called it live. It was not: nothing ever read the setting, and the
+      presets' comments for it describe what `blobSurfaceTension` does. The
+      setting is gone; the name goes with it so the next audit cannot be
+      told the same lie.
+    */
+    const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
     const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
 
     let smearX = 0, smearY = 0;
@@ -1820,13 +2143,36 @@ class FluidSimulation {
     // or gradients and reads as a static colour wash. A macro frame needs
     // empty ground around its subject, so the budget drops hard while the
     // closeup camera is running.
+    // What the motor asks for, in the flywheel's units, so the twist below can
+    // tell the plate's own momentum apart from the speed it was told to hold.
+    const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
     const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     const regulatorEvap = Math.min(0.02, over * over * 0.012);
+    /*
+      Only ever upward, and H6 tried the other direction and took it out
+      again. A bubble's exclusion is a multiply, so it destroys the dye it
+      removes, and making this loop symmetric was the first attempt at
+      keeping the plate's colour. It never engaged: the deficit term is
+      quadratic, so a plate 10% under its budget contributed 0.0001. The dye
+      goes back where it physically went instead — a ring at the bubble's
+      rim, in `depositBubbleRims` — which conserves by construction because
+      both halves read the same mirror.
+    */
     const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
 
     return {
       dt, visc, nu,
+      /*
+        A bubble is a hole, so it empties the dye under it (H6 · A).
+
+        1 is the physical answer and the default: this is the change H6
+        exists to make, and every look with bubbles on it is meant to show
+        it. `bubbleClear` is a look setting in the plan, for presets that
+        want some of the old shading back; until the compositor half lands
+        there is nothing to tune it against, so it is not a slider yet.
+      */
+      bubbleClear: 1,
       diff: settings.diffusionRate,
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
@@ -1841,7 +2187,23 @@ class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, surfaceTension, fingering,
+      turbScale, turbDetail, spin, immiscibility, fingering,
+      /*
+        The two glasses (2026-09-21).
+
+        `plateSpring` is a slider from 0 to 1 and the shader wants a fraction
+        per *step*, so it is converted here rather than there: the ladder
+        gives up the step rate before anything else, and a fixed per-step
+        spring would make a press lift at two speeds on two machines.
+
+        The old behaviour was a flat 0.005 a step over a range of 0.025 —
+        five steps, a twelfth of a second — and a `gapMemory` of 0.5, which
+        is a seventeen-millisecond half-life. Both are far quicker than a
+        hand, which is why a press registered as a flicker.
+      */
+      plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
+      gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
+      gapMemory: Math.pow(0.5, this.dt / 0.22),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -1855,7 +2217,24 @@ class FluidSimulation {
       rockX: this.rockX * CUR_ROCK,
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
-      twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * CUR_TWIST * (this.layerIndex % 2 === 0 ? 1 : -1),
+      /*
+        The liquid is dragged round by the glass it is touching.
+
+        The first term is the motor's, unchanged, because every look is tuned
+        against it. The second is the part of the plate's motion that the
+        motor did not ask for — what a flick put there — and it is what makes
+        dye follow a spun plate instead of sitting still while the plate turns
+        underneath it.
+
+        Scaled by how hard the plates are pressed together, because that is
+        what contact means here: a plate barely touching drags its liquid
+        weakly, and one squeezed down on it takes the liquid with it. Couette
+        drag, in the one place this solver can express it without giving the
+        current pass the gap field to read.
+      */
+      twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
+        + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
+          * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
       particles: settings.particles ?? 0,
       particleLife: 4,
       meanDensity: this.meanDensity,
@@ -1961,8 +2340,8 @@ class FluidSimulation {
     }
   }
 
-  private applyImmiscibility(surfaceTension: number, time: number, noise2D: (x: number, y: number) => number) {
-    const strength = surfaceTension * 0.8;
+  private applyImmiscibility(immiscibility: number, time: number, noise2D: (x: number, y: number) => number) {
+    const strength = immiscibility * 0.8;
     const sharpness = 2.0;
     for (let j = 1; j < this.size - 1; j++) {
       for (let i = 1; i < this.size - 1; i++) {
@@ -2469,7 +2848,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, selectedLiquid, frame = null,
+  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef,
@@ -2654,6 +3033,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
+  /*
+    The plate's angular velocity, in radians a second, one per layer.
+    
+    Rotation used to be a speed and nothing else: the angle took
+    `rotationSpeed * dt` every frame and the plate turned at exactly what the
+    slider said. A plate is a thing with mass resting on something, so this
+    carries the speed as *state* — a flick adds to it, the bed it rests on
+    takes it away, and the slider becomes a motor the flywheel relaxes toward
+    rather than a position it is teleported to.
+  */
+  const spinVelRef = useRef<number[]>([]);
+  const lastFlickRef = useRef(0);
+
   /**
    * The GL context, lost and got back.
    *
@@ -2849,6 +3241,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     bubblesRef.current.clear();
     chemRef.current.reset();
     rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    spinVelRef.current = spinVelRef.current.map(() => 0);
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
@@ -3233,6 +3626,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  /**
+   * Spin a plate up, in radians a second added to whatever it is already doing.
+   *
+   * Exported on the debug hook as well as wired to the prop, so a harness can
+   * flick a plate without a pad or a pointer. A second flick adds to the
+   * first, which is what a hand does to a turntable.
+   */
+  const flickSpin = (layer: number, strength = 1): void => {
+    const l = Math.max(0, Math.min(spinVelRef.current.length - 1, Math.floor(layer)));
+    if (!(l >= 0) || spinVelRef.current.length === 0) return;
+    // Layers alternate direction, as they do for the motor, so a flick on the
+    // back plate turns the other way and the two shear against each other.
+    const dir = l % 2 === 0 ? 1 : -1;
+    // Up to about six-tenths of a turn a second at full strength, which is
+    // sixty times what the rotationSpeed slider can ask for at its top. That
+    // is deliberate: the slider is a drift that keeps a plate alive, and a
+    // flick is meant to be seen.
+    const top = 2 * Math.PI * 0.6;
+    const add = dir * Math.max(0, Math.min(2, strength)) * (settingsRef.current.spinImpulse ?? 0.5) * top;
+    if (Number.isFinite(add)) spinVelRef.current[l] = (spinVelRef.current[l] ?? 0) + add;
+  };
+
+  useEffect(() => {
+    if (!spinFlick || spinFlick.seq === lastFlickRef.current) return;
+    lastFlickRef.current = spinFlick.seq;
+    flickSpin(spinFlick.layer);
+    // flickSpin reads refs only, so it does not belong in the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinFlick]);
   useEffect(() => { selectedLiquidRef.current = selectedLiquid; }, [selectedLiquid]);
   useEffect(() => { activeLayerRef.current = activeLayer; }, [activeLayer]);
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
@@ -3263,12 +3686,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
+        spinVelRef.current.push(0);
 
       }
     } else if (currentCount > targetCount) {
       for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
+      spinVelRef.current = spinVelRef.current.slice(0, targetCount);
     }
   }, [settings.layerCount]);
 
@@ -4423,8 +4848,63 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
 
             // Use realDt only — never timeMultiplier, which spikes with audio energy
-            const rotationSpeed = currentSettings.rotationSpeed * 0.01 + Math.abs(rotationMod) * 0.3;
-            rotationAnglesRef.current[l] += rotationSpeed * dirMod * realDt;
+            const rotationSpeed = (currentSettings.rotationSpeed ?? 0) * 0.01 + Math.abs(rotationMod) * 0.3;
+            /*
+              An angle that accumulates cannot be allowed to go non-finite.
+
+              Everything else recovers when the bad value goes away: a NaN
+              velocity is overwritten next step, a NaN colour is one frame.
+              This is a running total, so `angle += NaN` is NaN for the rest
+              of the session — and the angle turns the dish, so the plate is
+              sampled through a broken transform from then on and never comes
+              back. A plate that has gone strange and *stays* strange after
+              the setting is put back is this line.
+            */
+            /*
+              The plate as a flywheel.
+
+              `rotationSpeed` is the motor: the speed the plate is *asked* to
+              hold, and the flywheel relaxes toward it rather than being set
+              to it. With the motor at zero — which is most looks — a flick
+              spins the plate up and the bed it rests on brings it back to
+              rest, which is the whole point.
+
+              Drag comes from what it is resting on, as well as from the
+              slider. A syrupy dish squeezed flat against the glass takes the
+              spin out of a plate faster than a thin one barely touching, so
+              `viscosity` and `platePressure` are in it. Viscous relaxation
+              on its own only ever *approaches* rest, so there is a dry
+              friction term as well: without it a flicked plate creeps for
+              ever at a speed too small to see and too large to be stopped.
+            */
+            const motor = rotationSpeed * dirMod;
+            const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
+              * (1 + (currentSettings.platePressure ?? 0) * 0.8);
+            /*
+              The range was measured and widened. At (0.15 + drag*3) a flicked
+              plate lost three-quarters of its speed in 2s at the slowest
+              setting and stopped dead at the fastest, so the slider had one
+              useful end. This gives a half-life of about eight seconds at 0 —
+              a plate that coasts lazily across a whole phrase — a second at
+              the default, and a quarter of a second at 1.
+            */
+            const dragRate = (0.04 + (currentSettings.spinDrag ?? 0.25) * 1.2) * bed;
+            const vel0 = spinVelRef.current[l] ?? 0;
+            let vel = vel0 + (motor - vel0) * (1 - Math.exp(-dragRate * realDt));
+            // Dry friction, toward the motor's speed: with no motor that is rest.
+            const grip = dragRate * 0.02 * realDt;
+            vel = Math.abs(vel - motor) <= grip ? motor : vel - Math.sign(vel - motor) * grip;
+            if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
+            // The plate is told what it is doing, so the liquid touching it
+            // can be dragged round by it (the twist in paramsFor).
+            if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
+            /*
+              An angle that accumulates cannot be allowed to go non-finite —
+              see the note above, which is why both of these are guarded and
+              not just the sum.
+            */
+            const turn = (spinVelRef.current[l] ?? 0) * realDt;
+            if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
           }
         }
 
@@ -4712,6 +5192,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         film: filmRef.current,
         fluids: fluidsRef.current,
         rotation: rotationAnglesRef,
+        /** Angular velocity per layer, rad/s, and the flick that adds to it. */
+        spin: spinVelRef,
+        flick: flickSpin,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputConfig: outputCfgRef.current,
         markTest: (on: boolean) => {
@@ -4922,7 +5405,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // F0). Off, none of it is built and the plate finishes the
             // frame itself, exactly as before there was a chain.
             const postTest = view.postTest;
-            const wantPost = view.postForce || (postTest?.mode ?? 0) > 0;
+            // A look asking for film stock is what builds the chain, the same
+            // as the harness's test effect is (F1).
+            const wantStock = (view.settings.stock ?? 0) > 0.001;
+            const wantPost = view.postForce || (postTest?.mode ?? 0) > 0 || wantStock;
             if (wantPost && !chain) {
               chain = new WebGPUPostChain(s.device, s.format);
               // A mark that arrived before the chain did: it is uploaded on
@@ -5057,6 +5543,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
               if (post) {
                 post.effects(encoder, view.fxFrame, view.fxSeed, postTest);
+                /*
+                  The stock last, over whatever the effects left.
+
+                  That is the order light met it: everything in front of the
+                  lens happened, and then it was photographed. An effect that
+                  ran after the stock would be a digital thing on top of
+                  film, which is the look this is here to avoid.
+                */
+                post.stock(encoder, view.fxSeed, {
+                  stock: view.settings.stock ?? 0,
+                  stockType: view.settings.stockType ?? 0,
+                  grain: view.settings.stockGrain ?? 0,
+                  grainSize: view.settings.stockGrainSize ?? 2,
+                  weave: view.settings.stockWeave ?? 0,
+                  gate: view.settings.stockGate ?? 0,
+                  // The film's own rate, not the display's: at 60 fps a
+                  // 24 fps film holds each frame for two or three, which is
+                  // what makes grain crawl rather than fizz.
+                  filmFrame: Math.floor(view.fxFrame * (24 / 60)),
+                });
                 post.finish(encoder, screen, {
                   dimmer: dimmerNow,
                   markOn: markOnNow,
@@ -5066,6 +5572,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
               return true;
             };
+          }
+          /*
+            The same list the compositor is given, handed to the solver too
+            (H6 · A). Once a frame rather than once a step: the positions
+            come from `bubbles.ts`, which moves at the frame's pace, and
+            stamping them again on each of the step's iterations would pay
+            for the splat several times over for one picture.
+          */
+          {
+            // The lead plate only: bubbles sit on the front of the dish, the
+            // same plate `disturb` works on above. Giving the list to every
+            // layer would cut the same holes through the background loop.
+            const lead = fluidsRef.current[0];
+            if (lead?.gpu instanceof WebGPUFluid) {
+              const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
+              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25);
+              /*
+                And the dye those bubbles displace, put back as a ring
+                (H6 · A). Before the hand-off in reading order but after it in
+                effect: the deposit goes into the CPU's delta buffers and is
+                folded in on the next flush, by which time the solver has
+                taken the disc. Measured without it, the plate drained to 83%
+                of its dye in twenty seconds and a popped bubble never got
+                its colour back.
+              */
+              lead.depositBubbleRims(bubblesRef.current.packed, live);
+            }
           }
           const frame = stage?.frame();
           cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
@@ -5135,6 +5668,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
+          /** The air field (H6), for `npm run bubbles` to ask where the air is. */
+          readAir: async () => {
+            const lead = fluidsRef.current[0];
+            return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readAir() : null;
+          },
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
           /**

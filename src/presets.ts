@@ -20,7 +20,7 @@ export const PRESETS: Preset[] = [
     name: 'Classic Light Show',
     description: 'Slow, luminous blobs drift and merge — a meditative 1960s liquid light show.',
     settings: {
-      globalSpeed: 0.0132,
+      globalSpeed: 0.00924,
       surge: 0.5,        // unhurried, dreamlike pace
       layerCount: 2,
       blendMode: 'screen',       // additive glow — colors brighten where they overlap
@@ -28,7 +28,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.008,      // barely perceptible rotation keeps it alive
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
-      surfaceTension: 0.14,      // blobs hold shape, merge slowly
       diffusionRate: 0,          // measured: the bleed cost more edge than it bought
       buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
       advection: 0.35,           // smooth transport, no turbulence
@@ -40,8 +39,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.15,            // occasional downward streaks for variety
       viscosity: 'thick',        // heavy, syrupy movement
       polarity: 0.7,             // colors stay distinct but can gently intermingle
-      heatIntensity: 0.1,        // low heat — convection is a background breath
-      boilingPoint: 0.9,         // very hard to boil — keeps things calm
       evaporationRate: 0.005,    // colors persist a long time
       airVelocity: 0.04,         // near-still air — no turbulence
       vibrationFrequency: 0.08,  // minimal vibration — serene
@@ -66,7 +63,7 @@ export const PRESETS: Preset[] = [
     name: 'Galaxy',
     description: 'Spiral arms of starlight swirl through the void — galaxies colliding in slow motion.',
     settings: {
-      globalSpeed: 0.0108,
+      globalSpeed: 0.00756,
       surge: 0.5,        // stately cosmic drift
       layerCount: 2,
       blendMode: 'lighter',      // additive light — stars brighten where they overlap
@@ -74,7 +71,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.035,      // visible rotation creates spiral arms
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
       ledPlatform: false,        // pure black void
-      surfaceTension: 0.02,      // near-zero — fluid fragments into star clusters
       diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
       buoyancy: 0.25,            // minimal buoyancy — horizontal swirl dominates
       advection: 0.75,           // strong transport — sweeping spiral arm motion
@@ -86,8 +82,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
       polarity: 0.25,            // low — colors intermingle freely like nebula gas
-      heatIntensity: 0.06,       // faint warmth — just enough for gentle convection
-      boilingPoint: 0.95,        // nearly impossible to boil — calm cosmos
       evaporationRate: 0.002,    // stars persist for a very long time
       airVelocity: 0.02,         // near-vacuum — no turbulence
       vibrationFrequency: 0.0,   // no vibration — serene void
@@ -112,7 +106,7 @@ export const PRESETS: Preset[] = [
     name: 'Deep Ocean',
     description: 'Slow moving, dense fluids over a deep blue LED platform.',
     settings: {
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.22,
       layerCount: 2,
       blendMode: 'overlay',
@@ -122,7 +116,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.05,
-      surfaceTension: 0.1,
       diffusionRate: 0.0001,
       buoyancy: 0.2,
       advection: 0.2,
@@ -134,8 +127,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.8,
       viscosity: 'thick',
       polarity: 0.8,
-      heatIntensity: 0.05,
-      boilingPoint: 0.9,
       evaporationRate: 0.01,
       airVelocity: 0.05,
       vibrationFrequency: 0.2,
@@ -152,7 +143,7 @@ export const PRESETS: Preset[] = [
     name: 'Cyberpunk Neon',
     description: 'High contrast, fast-moving neon fluids over a cyberpunk LED base.',
     settings: {
-      globalSpeed: 0.048,
+      globalSpeed: 0.0336,
       postBlurRadius: 0.1,
       boundaryContrast: 0.7,
       beads: 0.35,
@@ -165,7 +156,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'cyberpunk',
       ledSpeed: 0.3,
-      surfaceTension: 0.01,
       diffusionRate: 0.0002,
       buoyancy: 0.8,
       advection: 0.6,
@@ -177,8 +167,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.2,
-      heatIntensity: 0.3,
-      boilingPoint: 0.6,
       evaporationRate: 0.05,
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
@@ -195,7 +183,7 @@ export const PRESETS: Preset[] = [
     name: 'Lava Lamp',
     description: 'Wax blobs glowing in a dark, ember-lit liquid: they swell, merge and rise.',
     settings: {
-      globalSpeed: 0.024,
+      globalSpeed: 0.0168,
       surge: 0.4,
       layerCount: 2,
       blendMode: 'screen',
@@ -206,7 +194,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',         // one dim ember under the whole lamp, not a colour wheel
       ledColor: '#5c1400',
       ledSpeed: 0.02,
-      surfaceTension: 0.2,
       diffusionRate: 0.00005,
       buoyancy: 0.9,
       advection: 0.15,
@@ -218,8 +205,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.1,
       viscosity: 'thick',
       polarity: 0.95,
-      heatIntensity: 0.8,
-      boilingPoint: 0.6,
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.1,
@@ -249,7 +234,7 @@ export const PRESETS: Preset[] = [
     name: 'Acid Trip',
     description: 'Chaotic, rapidly rotating colors with strange blending physics.',
     settings: {
-      globalSpeed: 0.048,
+      globalSpeed: 0.0336,
       beads: 0.4,
       surge: 0.95,
       layerCount: 2,
@@ -260,7 +245,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.4,
-      surfaceTension: 0.15,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.8,
@@ -272,8 +256,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.4,
       viscosity: 'thin',
       polarity: 0.5,
-      heatIntensity: 0.5,
-      boilingPoint: 0.5,
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -304,7 +286,7 @@ export const PRESETS: Preset[] = [
     name: 'Bass Drop',
     description: 'Heavy bass hits trigger massive fluid injections and screen shakes.',
     settings: {
-      globalSpeed: 0.03,
+      globalSpeed: 0.021,
       beads: 0.25,
       surge: 0.9,
       layerCount: 2,
@@ -313,7 +295,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.01,
       centerGravity: 0.4,
       ledPlatform: false,
-      surfaceTension: 0.08,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.5,
@@ -325,8 +306,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.3,
       viscosity: 'thick',
       polarity: 0.7,
-      heatIntensity: 0.2,
-      boilingPoint: 0.8,
       evaporationRate: 0.02,
       airVelocity: 0.2,
       vibrationFrequency: 1.0,
@@ -343,7 +322,7 @@ export const PRESETS: Preset[] = [
     name: 'Timbre Shifter',
     description: 'The brightness of the sound controls the color and rotation of the fluid.',
     settings: {
-      globalSpeed: 0.036,
+      globalSpeed: 0.0252,
       surge: 0.55,
       layerCount: 2,
       blendMode: 'lighter',
@@ -353,7 +332,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.2,
-      surfaceTension: 0.02,
       diffusionRate: 0.0001,
       buoyancy: 0.7,
       advection: 0.6,
@@ -365,8 +343,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.6,
       viscosity: 'thin',
       polarity: 0.6,
-      heatIntensity: 0.3,
-      boilingPoint: 0.7,
       evaporationRate: 0.03,
       airVelocity: 0.1,
       vibrationFrequency: 0.4,
@@ -383,7 +359,7 @@ export const PRESETS: Preset[] = [
     name: 'Boiling Point',
     description: 'High heat and complexity create a chaotic, churning cauldron of fluid.',
     settings: {
-      globalSpeed: 0.042,
+      globalSpeed: 0.0294,
       beads: 0.35,
       surge: 0.85,
       layerCount: 2,
@@ -394,7 +370,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'fire',
       ledSpeed: 0.3,
-      surfaceTension: 0.1,
       diffusionRate: 0.0002,
       buoyancy: 1.0,
       advection: 0.8,
@@ -406,8 +381,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.7,
       viscosity: 'thin',
       polarity: 0.8,
-      heatIntensity: 0.9,
-      boilingPoint: 0.4,
       // The fire wheel with nothing on it, under music: 0.06 dried the plate
       // faster than the pour filled it, and the pour follows complexity, which
       // read two percent of its range until the analyser was fixed.
@@ -429,7 +402,7 @@ export const PRESETS: Preset[] = [
     name: 'Microscopic Chaos',
     description: 'Extremely dense, high-contrast cellular fluid resembling oil and water under a microscope.',
     settings: {
-      globalSpeed: 0.024,
+      globalSpeed: 0.0168,
       boundaryContrast: 0.7,
       beads: 0.45,
       surge: 0.9,
@@ -441,7 +414,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.08,
-      surfaceTension: 0.25,
       diffusionRate: 0.00005,
       buoyancy: 0.4,
       advection: 0.3,
@@ -453,8 +425,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.1,
       viscosity: 'thick',
       polarity: 0.95,
-      heatIntensity: 0.2,
-      boilingPoint: 0.8,
       evaporationRate: 0.01,
       airVelocity: 0.1,
       vibrationFrequency: 0.6,
@@ -471,7 +441,7 @@ export const PRESETS: Preset[] = [
     name: 'Aurora Borealis',
     description: 'Slow sweeping curtains of light in greens and purples, rippling to low frequencies.',
     settings: {
-      globalSpeed: 0.015,
+      globalSpeed: 0.0105,
       surge: 0.2,
       layerCount: 2,
       blendMode: 'lighter',
@@ -481,7 +451,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.03,
-      surfaceTension: 0.12,
       diffusionRate: 0.0002,
       buoyancy: 0.65,
       advection: 0.35,
@@ -493,8 +462,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.4,
-      heatIntensity: 0.25,
-      boilingPoint: 0.85,
       evaporationRate: 0.008,
       // Curtains, not a sheet: a full plate on the lighter blend was one flat
       // green. With less dye and the thin film read as sky, the ocean lamp
@@ -516,7 +483,7 @@ export const PRESETS: Preset[] = [
     name: 'Solar Flare',
     description: 'Explosive plumes of plasma erupt from a white-hot core, driven by bass.',
     settings: {
-      globalSpeed: 0.036,
+      globalSpeed: 0.0252,
       boundaryContrast: 0.55,
       beads: 0.3,
       surge: 0.8,
@@ -528,7 +495,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'fire',
       ledSpeed: 0.15,
-      surfaceTension: 0.03,
       diffusionRate: 0.0002,
       buoyancy: 0.85,
       advection: 0.7,
@@ -540,8 +506,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thin',
       polarity: 0.3,
-      heatIntensity: 0.75,
-      boilingPoint: 0.45,
       evaporationRate: 0.04,
       airVelocity: 0.35,
       vibrationFrequency: 0.6,
@@ -558,7 +522,7 @@ export const PRESETS: Preset[] = [
     name: 'Jellyfish Bloom',
     description: 'Pulsing translucent bells drift and contract to rhythmic mid frequencies.',
     settings: {
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.25,
       layerCount: 2,
       blendMode: 'screen',
@@ -568,7 +532,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.04,
-      surfaceTension: 0.18,
       diffusionRate: 0.00008,
       buoyancy: 0.55,
       advection: 0.25,
@@ -580,8 +543,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.45,
       viscosity: 'thick',
       polarity: 0.85,
-      heatIntensity: 0.12,
-      boilingPoint: 0.88,
       evaporationRate: 0.005,
       airVelocity: 0.04,
       vibrationFrequency: 0.25,
@@ -598,7 +559,7 @@ export const PRESETS: Preset[] = [
     name: 'Fractal Dream',
     description: 'Overlapping interference patterns bloom into recursive color mandalas.',
     settings: {
-      globalSpeed: 0.027,
+      globalSpeed: 0.0189,
       boundaryContrast: 0.6,
       beads: 0.3,
       surge: 0.8,
@@ -610,7 +571,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.25,
-      surfaceTension: 0.08,
       diffusionRate: 0.0002,
       buoyancy: 0.5,
       advection: 0.55,
@@ -622,8 +582,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.3,
       viscosity: 'thin',
       polarity: 0.65,
-      heatIntensity: 0.35,
-      boilingPoint: 0.65,
       evaporationRate: 0.025,
       airVelocity: 0.25,
       vibrationFrequency: 0.55,
@@ -640,7 +598,7 @@ export const PRESETS: Preset[] = [
     name: 'Velvet Underground',
     description: 'Rich saturated pools of deep magenta and indigo that churn slowly to the beat.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0084,
       surge: 0.18,
       layerCount: 2,
       blendMode: 'overlay',
@@ -651,7 +609,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#220044',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.00006,
       buoyancy: 0.3,
       advection: 0.2,
@@ -663,8 +620,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.6,
       viscosity: 'thick',
       polarity: 0.9,
-      heatIntensity: 0.08,
-      boilingPoint: 0.92,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
@@ -681,7 +636,7 @@ export const PRESETS: Preset[] = [
     name: 'Neon Coral Reef',
     description: 'Branching fluorescent tendrils sway and pulse in sync with mid and treble.',
     settings: {
-      globalSpeed: 0.024,
+      globalSpeed: 0.0168,
       boundaryContrast: 0.5,
       beads: 0.3,
       surge: 0.5,
@@ -693,7 +648,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'cyberpunk',
       ledSpeed: 0.12,
-      surfaceTension: 0.22,
       diffusionRate: 0.0001,
       buoyancy: 0.45,
       advection: 0.4,
@@ -705,8 +659,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.55,
       viscosity: 'thick',
       polarity: 0.75,
-      heatIntensity: 0.2,
-      boilingPoint: 0.78,
       evaporationRate: 0.012,
       airVelocity: 0.12,
       vibrationFrequency: 0.4,
@@ -723,7 +675,7 @@ export const PRESETS: Preset[] = [
     name: 'Stardust Collapse',
     description: 'Glittering particles spiral inward then detonate outward on each bass hit.',
     settings: {
-      globalSpeed: 0.033,
+      globalSpeed: 0.0231,
       boundaryContrast: 0.65,
       beads: 0.3,
       surge: 0.85,
@@ -737,7 +689,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: false,
       ledMode: 'rainbow',
       ledSpeed: 0.35,
-      surfaceTension: 0.01,
       diffusionRate: 0.0002,     // a spark stays a spark
       buoyancy: 0.7,
       advection: 0.9,
@@ -749,8 +700,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.15,
       viscosity: 'thin',
       polarity: 0.15,
-      heatIntensity: 0.6,
-      boilingPoint: 0.35,
       evaporationRate: 0.015,
       dyeBudget: 0.45,
       audioImpact: 0.85,
@@ -775,7 +724,7 @@ export const PRESETS: Preset[] = [
     name: 'Lumia',
     description: 'Thomas Wilfred\u2019s aurora: slow folded sheets of light drifting under a nearly clear plate. No beat, no dye to speak of \u2014 minutes-long evolutions.',
     settings: {
-      globalSpeed: 0.0072,
+      globalSpeed: 0.00504,
       surge: 0.12,
       layerCount: 1,
       blendMode: 'screen',
@@ -786,7 +735,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#05030c',
       ledSpeed: 0.0,
-      surfaceTension: 0.1,
       diffusionRate: 0.0002,
       buoyancy: 0.2,
       advection: 0.3,
@@ -798,8 +746,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.3,
-      heatIntensity: 0.05,
-      boilingPoint: 1.0,
       evaporationRate: 0.06,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
@@ -823,7 +769,7 @@ export const PRESETS: Preset[] = [
     name: 'Sensual Laboratory',
     description: 'Mark Boyle\u2019s London: reactions on the platen instead of oil in a dish. Coral and cells grow from the plate in graphite and rust, then the flow carries them off.',
     settings: {
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.3,
       layerCount: 1,
       blendMode: 'multiply',
@@ -834,7 +780,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#f3ecdc',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.4,
@@ -846,8 +791,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.6,
-      heatIntensity: 0.15,
-      boilingPoint: 0.9,
       evaporationRate: 0.05,
       airVelocity: 0.03,
       vibrationFrequency: 0.0,
@@ -872,7 +815,7 @@ export const PRESETS: Preset[] = [
     name: 'Oil Wheel',
     description: 'An Optikinetics wheel warming under a 250 W lamp: yellows, greens and blues turning at half a revolution a minute, cells drifting on convection, no hands on it.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0084,
       surge: 0.35,
       layerCount: 2,
       blendMode: 'screen',
@@ -883,7 +826,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#3a2408',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.5,
@@ -895,8 +837,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
-      heatIntensity: 0.5,
-      boilingPoint: 0.7,
       evaporationRate: 0.006,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -924,7 +864,7 @@ export const PRESETS: Preset[] = [
     name: 'Poster, 1969',
     description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: no gloss, no meniscus, one colour against the other.',
     settings: {
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
@@ -935,7 +875,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.00005,
       buoyancy: 0.3,
       advection: 0.5,
@@ -947,8 +886,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
-      heatIntensity: 0.1,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -979,7 +916,7 @@ export const PRESETS: Preset[] = [
     name: 'Oil on Water',
     description: 'The macro photograph: yellow oil on water over blue paper, packed fields of bubbles, satellite droplets on the glass, a softbox in every dome, shallow focus.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0084,
       surge: 0.45,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -989,7 +926,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1000,8 +936,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1045,7 +979,7 @@ export const PRESETS: Preset[] = [
     name: 'Colorful Cosmos',
     description: 'Big round drops over a warm gradient, each a shaded planet with a terminator: two lamps, deep focus fall-off, bloom in the highlights.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0084,
       surge: 0.45,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -1055,7 +989,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1066,8 +999,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1111,7 +1042,7 @@ export const PRESETS: Preset[] = [
     name: 'Sunny Side Up',
     description: 'Thin sheets of oil over a hot orange backdrop, every edge running with interference colour; the polarised-light photograph.',
     settings: {
-      globalSpeed: 0.012,
+      globalSpeed: 0.0084,
       surge: 0.5,
       blendMode: 'screen',
       gooeyEffect: 0.6,
@@ -1121,7 +1052,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1132,8 +1062,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1188,7 +1116,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      globalSpeed: 0.168,
+      globalSpeed: 0.1176,
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
@@ -1200,7 +1128,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#3B0806',       // deep red ground, like paint on stained board
       ledSpeed: 0.0,
-      surfaceTension: 0.22,      // beads hold their round shape
       diffusionRate: 0.00003,    // colors stay separate instead of muddying
       buoyancy: 0.35,
       advection: 0.6,
@@ -1212,8 +1139,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.9,             // strong immiscibility — hard color boundaries
-      heatIntensity: 0.12,
-      boilingPoint: 0.9,
       evaporationRate: 0.03,     // ground clears between beads instead of washing over
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
@@ -1249,7 +1174,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
-      globalSpeed: 0.108,
+      globalSpeed: 0.0756,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
@@ -1261,7 +1186,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#4A0D08',
       ledSpeed: 0.0,
-      surfaceTension: 0.18,
       diffusionRate: 0.00005,
       buoyancy: 0.5,
       advection: 0.45,
@@ -1273,8 +1197,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
-      heatIntensity: 0.2,
-      boilingPoint: 0.85,
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.0,
@@ -1310,7 +1232,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
-      globalSpeed: 0.27,
+      globalSpeed: 0.189,
       surge: 0.6,         // quick — this one rushes
       layerCount: 1,
       blendMode: 'screen',
@@ -1322,7 +1244,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#2E0705',
       ledSpeed: 0.0,
-      surfaceTension: 0.08,      // low — the edge fingers and splits
       diffusionRate: 0.00004,
       buoyancy: 0.3,
       advection: 0.85,
@@ -1334,8 +1255,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.95,
-      heatIntensity: 0.1,
-      boilingPoint: 0.9,
       evaporationRate: 0.035,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
@@ -1361,7 +1280,7 @@ export const PRESETS: Preset[] = [
     name: 'Fillmore East, 1969',
     description: 'The Joshua Light Show behind the Mothers: three projectors on one black screen, a big dish pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
     settings: {
-      globalSpeed: 0.0144,
+      globalSpeed: 0.01008,
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
@@ -1372,7 +1291,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0,          // measured: sharper without it, and a pass cheaper
       buoyancy: 0.3,
       advection: 0.55,
@@ -1384,8 +1302,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
-      heatIntensity: 0.1,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1428,14 +1344,13 @@ export const PRESETS: Preset[] = [
       // A plate that wants stirring rather than one that is already busy: the
       // turbulence starts low so what the room adds is what is seen moving,
       // and the dye budget runs full so there is something there to move.
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
       rotationSpeed: 0.0,
       centerGravity: 0.05,
-      surfaceTension: 0.1,
       granulation: 0.5,
       diffusionRate: 0.00012,
       buoyancy: 0.3,
@@ -1448,7 +1363,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      heatIntensity: 0.1,
       evaporationRate: 0.0025,
       audioImpact: 0.35,           // the music is still there, but it is not the loudest hand
       turbulenceScale: 0.12,
@@ -1501,7 +1415,7 @@ export const PRESETS: Preset[] = [
       // churning then the soap arriving is just one more thing moving. The
       // entire look is the contrast between a plate that is *dead still* and
       // the half second after the soap lands.
-      globalSpeed: 0.018,
+      globalSpeed: 0.0126,
       surge: 0.3,
       layerCount: 1,
       blendMode: 'screen',
@@ -1512,7 +1426,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.3,         // the spots hold as spots until something breaks them
       diffusionRate: 0.00004,      // near-zero: food colouring on milk does not bleed on its own
       buoyancy: 0.05,
       advection: 0.5,
@@ -1524,8 +1437,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.9,               // the colours stay four colours, not one brown one
-      heatIntensity: 0.02,
-      boilingPoint: 0.98,
       evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1560,7 +1471,7 @@ export const PRESETS: Preset[] = [
       // has to be thin for the colour to be there at all, which is also what
       // makes it easy to break — so evaporation runs high and the dye budget
       // low, and the soap keeps re-opening what the flow closes.
-      globalSpeed: 0.024,
+      globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
@@ -1571,7 +1482,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.06,        // low: the film is what tension is missing from
       diffusionRate: 0.00009,
       buoyancy: 0.2,
       advection: 0.6,              // the rush has to actually carry the dye
@@ -1583,8 +1493,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thin',
       polarity: 0.5,
-      heatIntensity: 0.08,
-      boilingPoint: 0.9,
       evaporationRate: 0.006,      // a film that is always thinning is always about to go
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
@@ -1621,7 +1529,7 @@ export const PRESETS: Preset[] = [
       // except the glycerine itself. Damping and advection both run high so
       // the bands keep moving for minutes; what makes the picture is the
       // handful of places that do not move with them.
-      globalSpeed: 0.015,
+      globalSpeed: 0.0105,
       surge: 0.28,
       layerCount: 2,
       blendMode: 'screen',
@@ -1632,7 +1540,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.12,
       diffusionRate: 0.0001,
       buoyancy: 0.15,              // sideways, not upward: this is shear, not convection
       advection: 0.7,
@@ -1644,8 +1551,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.75,
-      heatIntensity: 0.05,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.08,
       vibrationFrequency: 0.0,

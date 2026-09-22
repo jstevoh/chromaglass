@@ -70,13 +70,18 @@ export function luckyLook(
       0.012–0.06 — a median of 0.036, twice a typical look's — which was
       merely generous until every preset was scaled to 0.6 of its old
       speed, and then it was a roll that reliably came out faster than
-      anything it could replace. Scaled by the same 0.6.
+      anything it could replace.
+
+      The looks have been scaled twice now — 0.6, and 0.7 again when they
+      still opened too fast — and this range has followed both times.
+      `npm run panel` holds it to the looks' own median rather than to a
+      remembered number, so it cannot drift again without saying so.
     */
-    globalSpeed: 0.0072 + rand() * 0.0288,
+    globalSpeed: 0.005 + rand() * 0.0202,
     audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
     platePressure: rand(), glassSmear: rand(), rainDrip: rand(),
     viscosity: rand() > 0.5 ? 'thick' : 'thin', polarity: rand(),
-    heatIntensity: rand() * 0.5, boilingPoint: rand(), evaporationRate: rand() * 0.05,
+    evaporationRate: rand() * 0.05,
     airVelocity: rand() * 0.5, vibrationFrequency: rand(),
     layerCount: rand() > 0.5 ? 2 : 1,
     blendMode: blendModes[Math.floor(rand() * blendModes.length)],
@@ -85,7 +90,7 @@ export function luckyLook(
     ledMode: ledModes[Math.floor(rand() * ledModes.length)],
     ledColor: ledColors[Math.floor(rand() * ledColors.length)],
     ledSpeed: rand() * 0.5,
-    surfaceTension: rand() * 0.2,
+    
     /*
       A tenth of what it was, which is the ceiling every look is now under.
       Dye diffusion costs a full solver pass whatever rate it is given, and

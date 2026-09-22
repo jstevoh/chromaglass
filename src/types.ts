@@ -144,6 +144,19 @@ export interface VisualizerSettings {
   /** Learn the room's noise floor and dynamics, and normalise every band against them. */
   autoCalibrate: boolean;
   /** When a new song starts (a gap between tracks, or a different track identified): keep the look, switch to another preset, or roll a random one. */
+  /*
+    Film stock (F1, docs/filters-plan.md E6).
+
+    Named apart from the `film*` settings, which drive the film *projector*
+    that plays a video through the dye. This is what the whole show is
+    photographed on.
+  */
+  stock: number;
+  stockType: number;
+  stockGrain: number;
+  stockGrainSize: number;
+  stockWeave: number;
+  stockGate: number;
   onNewSong: 'off' | 'preset' | 'random';
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
@@ -171,14 +184,33 @@ export interface VisualizerSettings {
   
   // Squish Plate
   platePressure: number;
+  /*
+    The two glasses, and how they sit together (2026-09-21).
+
+    A lightshow plate is a pair of clock glasses, not a pair of flats, and
+    this modelled them as flats: the gap between them was one number for the
+    whole plate. `plateCurve` gives it a shape — below zero they touch in the
+    middle and open toward the rim, above zero the rim is the tight part and
+    the liquid pools in the centre.
+
+    `plateSpring` is how quickly they come back apart after a press, which
+    used to be fixed at a twelfth of a second for the full travel, and is
+    most of why pressing did not feel like much.
+  */
+  plateCurve: number;
+  plateSpring: number;
   glassSmear: number;
   rainDrip: number;
   viscosity: 'thick' | 'thin';
   polarity: number; // Repulsion between blobs
   
-  // Heat Slide
-  heatIntensity: number;
-  boilingPoint: number;
+  /*
+    Heat Slide.
+
+    `heatIntensity` and `boilingPoint` were here too, set by all thirty-two
+    presets and read by nothing. See docs/bubbles-plan.md — the heat that
+    exists is reachable through Buoyancy, and boiling is unbuilt.
+  */
   evaporationRate: number;
   
   // Manual/Interaction
@@ -191,6 +223,22 @@ export interface VisualizerSettings {
   blendMode: BlendMode;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
+  /*
+    The plate as a flywheel (2026-09-21).
+
+    `rotationSpeed` is a motor: it asks for a speed and the plate holds it.
+    These two make the plate something with mass that a flick can spin up and
+    that then slows down on its own, which is what a real dish on a real
+    turntable does.
+
+    `spinDrag` is what the plate is resting on — 0 coasts for several seconds,
+    1 stops it almost at once — and it is modulated by the look's own
+    viscosity and plate pressure, so a syrupy dish squeezed flat drags more
+    than a thin one barely touching.
+  */
+  spinDrag: number;
+  /** How hard one flick hits, as a fraction of a turn a second. */
+  spinImpulse: number;
   centerGravity: number;
   ledPlatform: boolean;
   ledMode: LedMode;
@@ -198,7 +246,6 @@ export interface VisualizerSettings {
   ledSpeed: number;
   
   // Fluid Physics (High Fidelity)
-  surfaceTension: number;
   /** Interface sharpening: how hard a dye boundary resists the solver's own smearing. 0 = the old soft plate. */
   sharpness: number;
   /** Pigment separating into a fine speckle that travels with the dye. */
@@ -338,6 +385,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   sensitivity: 0.4,
   bassBoost: 1.0,
   autoCalibrate: true,      // on by default — a fixed level can't serve every room
+  stock: 0,                 // off: a look asks for film, it is not the default
+  stockType: 0,             // 16mm reversal
+  stockGrain: 0.5,
+  stockGrainSize: 2,
+  stockWeave: 0.6,
+  stockGate: 0.35,
   onNewSong: 'preset',      // a new song gets a new look
   beatPrediction: 0.7,
   beatLead: 80,
@@ -367,12 +420,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     rotation: 'none',
   },
   platePressure: 0.4,       // glass plate squeeze — drives radial spreading
+  plateCurve: -0.35,        // clock glasses: they meet in the middle
+  plateSpring: 0.35,        // a press takes about a second to lift
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
   viscosity: 'thick',
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
-  heatIntensity: 0.15,
-  boilingPoint: 0.95,
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
   vibrationFrequency: 0.0,
@@ -381,12 +434,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   blendMode: 'screen',
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
+  spinDrag: 0.25,           // a flicked plate halves its speed in about a second
+  spinImpulse: 0.5,
   centerGravity: 0.0,
   ledPlatform: false,
   ledMode: 'rainbow',
   ledColor: '#FF0000',
   ledSpeed: 0.05,
-  surfaceTension: 0.05,
   // Still off, and now for a better reason than before.
   //
   // The pass had a real bug in it: the gate that keeps it from carving holes

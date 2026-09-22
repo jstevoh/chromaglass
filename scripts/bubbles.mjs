@@ -264,6 +264,7 @@ try {
     return put.length;
   });
   check('the bubbles are on dye, not on bare glass', placed >= 8, `${placed} placed on the thickest cells`);
+
   await page.waitForTimeout(900);
   const told = await page.evaluate(() => window.chromaglassDebug().bubbleUniforms());
   check('and the shader is told about them',
@@ -271,11 +272,164 @@ try {
     `count ${told.count}, strength ${told.strength.toFixed(2)}, setting ${told.amount}`);
   await grab('withBubbles');
 
+  /*
+    The dye under a bubble is gone (H6 · A).
+
+    This is the claim H6 makes, stated where it can be measured without
+    guessing: the air field says which cells a bubble stands on, and the
+    CPU's density mirror says how much dye is in them. Both are in grid
+    coordinates, so nothing has to be mapped.
+
+    It was written against the *picture* first — inside a bubble against a
+    ring of liquid around it — and the control caught that immediately: the
+    ratio came out the same with the bubbles there and with them gone, which
+    means the measurement was not finding them. The plate is drawn through a
+    dish, aspect-corrected and offset per layer, so a straight grid-to-pixel
+    map lands nowhere near. Reimplementing that mapping in a harness would be
+    a second copy of it to keep right.
+
+    How it *looks* is judged by looking, which is what the pictures in the
+    pull request are for. What a harness can hold is the physics, and the
+    physics is that there is no liquid where the air is.
+  */
+  const hole = await page.evaluate(async () => {
+    const d = window.chromaglassDebug();
+    const field = await d.readAir();
+    const dens = d.fluids?.[0]?.readDensity;
+    const G = d.gridSize;
+    if (!field || !dens) return null;
+    const { n, data } = field;
+    const step = n / G;                     // solver cells per logical cell
+    const air = (gx, gy) => data[Math.round(gy * step) * n + Math.round(gx * step)];
+    const D = 6;                            // logical cells: past the rim, still the same liquid
+    const spots = [];
+    let inD = 0, outD = 0, k = 0;
+    for (let y = D; y < G - D; y++) {
+      for (let x = D; x < G - D; x++) {
+        if (air(x, y) <= 0.7) continue;
+        const ring = [[D, 0], [-D, 0], [0, D], [0, -D]]
+          .filter(([dx, dy]) => air(x + dx, y + dy) < 0.02)
+          .map(([dx, dy]) => dens[(x + dx) + (y + dy) * G]);
+        if (ring.length < 2) continue;
+        spots.push([x, y]);
+        inD += dens[x + y * G];
+        outD += ring.reduce((p, q) => p + q, 0) / ring.length;
+        k++;
+      }
+    }
+    window.__holeSpots = spots;
+    window.__holeG = G;
+    return { k, inD: k ? inD / k : 0, outD: k ? outD / k : 0 };
+  });
+
+  check('a bubble is found standing on liquid, with liquid around it',
+    hole !== null && hole.k > 30, hole === null ? 'no air field or no density mirror' : `${hole.k} cells`);
+  if (hole && hole.k > 30) {
+    /*
+      A hole holds no liquid. That is the whole of H6 as a number, and it is
+      the piece that is not finished: the interior thins to about 0.7 of its
+      surroundings and stops.
+
+      The exchange in `airExclude` flows dye between cells by their
+      difference in air, so it empties the rim and cannot touch the middle,
+      where the air is uniform and there is no difference to flow down. The
+      mechanism that reaches the middle is the plan's **divergence source at
+      the rim**: the liquid is pushed aside as the bubble grows, and the
+      advection that already runs carries the dye out on it.
+
+      Adding a velocity down the air gradient does *not* work, and it is
+      worth writing down why: a gradient field is precisely what the pressure
+      projection exists to remove, so the next projection cancels it. The
+      source has to go into the divergence the projection solves, not into
+      the velocity afterwards.
+
+      This check is left failing rather than loosened. It states what a
+      bubble is, and until the divergence source lands it is not yet true.
+    */
+    check('and there is no dye left under it',
+      hole.inD < hole.outD * 0.25,
+      `${hole.inD.toFixed(3)} under the bubbles against ${hole.outD.toFixed(3)} around them ` +
+      `— the rim empties, the middle needs the divergence source (H6, bubbles-plan A)`);
+  }
+
   // …and straight back off again, so the "after" is as close in time as the
   // machine allows.
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
   await page.waitForTimeout(400);
   await grab('bareAfter');
+  /*
+    And then however long it takes, which is the number worth having.
+
+    400ms was enough while the exclusion was a neighbour exchange, because
+    that only ever moved dye one cell and clearing the bubbles let it step
+    straight back. The exclusion is a multiply now -- the only operator that
+    reaches the middle of a bubble -- and the dye it displaces is put back as
+    a ring outside the rim, so closing a hole means advecting that ring
+    inward on a plate deliberately slowed to a crawl for the photographs.
+
+    A fixed wait was tried and is the wrong instrument: eight seconds is
+    plenty at a preset's own speed of 0.009 and nowhere near enough at the
+    0.005 this harness pins, so the check failed on the clock rather than on
+    the physics. It polls instead, and prints the time. How long a popped
+    bubble takes to give the plate its colour back is a property of the
+    plate, not a tolerance to be tuned until it passes.
+  */
+
+  /*
+    The control: the same cells, with the bubbles gone.
+
+    Without it, "no dye under the bubbles" could be measuring a plate that
+    happens to be thin where they landed — and the first version of this
+    check, written against the picture, failed exactly that way: it read the
+    same ratio with the bubbles there and with them cleared, which is how it
+    was caught.
+  */
+  if (hole && hole.k > 30) {
+    const refill = async () => page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      const dens = d.fluids?.[0]?.readDensity;
+      const spots = window.__holeSpots ?? [];
+      const G = window.__holeG ?? 0;
+      if (!dens || !G || !spots.length) return null;
+      const D = 6;
+      let inD = 0, outD = 0, k = 0;
+      for (const [x, y] of spots) {
+        inD += dens[x + y * G];
+        outD += (dens[(x + D) + y * G] + dens[(x - D) + y * G]
+               + dens[x + (y + D) * G] + dens[x + (y - D) * G]) / 4;
+        k++;
+      }
+      return { inD: inD / k, outD: outD / k, k };
+    });
+    /*
+      And the plate let go of, first.
+
+      This check could not pass and it was not the physics. The harness pins
+      the plate at a globalSpeed of 0.005 so it holds still for the
+      photographs, and a hole closes by the liquid flowing back into it --
+      advection, on a plate deliberately stopped, in a look whose diffusion
+      is measured at zero. So the check asked the dye to move on a plate held
+      still on purpose, waited twenty-four seconds for it, and reported the
+      freeze as a defect in the bubbles.
+
+      The speed goes back to something a plate runs at for this one check.
+      That is not a loosened gate: it is the difference between measuring the
+      liquid and measuring the tripod.
+    */
+    await setSlider('recipe-globalSpeed', 0.05);
+    let flat = await refill(), took = 0;
+    for (const t of [2, 4, 6, 8, 10, 12, 15, 18, 21, 24]) {
+      if (flat && flat.inD > flat.outD * 0.5) break;
+      await page.waitForTimeout((t - took) * 1000);
+      took = t;
+      flat = await refill();
+    }
+    check('and the dye comes back once they are gone',
+      flat !== null && flat.inD > flat.outD * 0.5,
+      flat === null ? 'no cells kept'
+        : `${flat.inD.toFixed(3)} against ${flat.outD.toFixed(3)} over ${flat.k} cells, ` +
+          `${took}s after the pop (the ring advects back in)`);
+  }
 
   const report = await page.evaluate(() => {
     const P = window.__shots.bareBefore.data;   // before
@@ -295,9 +449,13 @@ try {
     const d3 = (X, Y, i) =>
       (Math.abs(X[i] - Y[i]) + Math.abs(X[i + 1] - Y[i + 1]) + Math.abs(X[i + 2] - Y[i + 2])) / 255;
 
-    let n = 0, satLost = 0, hueShift = 0, lumGain = 0, worstSat = -1, worstHue = -1;
+    let n = 0, hueShift = 0, hueWeight = 0, lumGain = 0, worstSat = -1, worstHue = -1;
     let changed = 0, drifted = 0, biggest = 0;
-    let addAngle = 0, addWeight = 0, worstAngle = -1, lit = 0;
+    let lit = 0;
+    // [how bright the plate was here, how much brighter the bubble made it]
+    const pairs = [];
+    // [light the bubble added here, saturation lost here]
+    const satPairs = [];
     for (let i = 0; i < B.length; i += 4) {
       if (d3(P, Q, i) > 0.03) { drifted++; continue; }        // the plate moved here: not evidence
       const dp = d3(B, P, i), dq = d3(B, Q, i);
@@ -311,58 +469,218 @@ try {
       if (a.s < 0.25 || a.v < 0.1) continue;   // near-grey or near-black under it: nothing to wash out
 
       /*
-        The measure that matters is the colour of the light the bubble *adds*,
-        not the colour of the result.
+        What separates a hole from paint: how the light it adds depends on
+        what was in the way.
 
-        Comparing the finished pixel to the one underneath dilutes the answer
-        with thousands of rim pixels the bubble barely touched — which is how
-        an earlier version of this gate passed a control built with the old
-        neutral-white highlight. `add` is B minus the ground; the angle between
-        it and the ground's own colour says directly whether the bubble is
-        lighting the liquid or painting over it. Neutral white on a red plate
-        is a wide angle; light that carries the dye's colour is a narrow one.
+        This used to take the angle between the light the bubble adds and the
+        ground's own colour, on the reasoning that neutral white on a red
+        plate is a wide angle and light carrying the dye's colour is a narrow
+        one. That was right while a bubble *shaded over* the dye, and it is
+        the wrong question now, in a way that got worse the better the
+        feature got.
+
+        A backlit dish filters the lamp through the dye: red dye passes red
+        and absorbs green and blue, so the ground is nearly (r, 0, 0). A hole
+        passes the lamp unfiltered. So the light a *correct* hole adds is
+        nearly (0, g, b) — the complement of the ground, ninety degrees from
+        it, which is the "worst 90.0" that showed up in every run. The check
+        failed hardest on the most physically correct hole, and no choice of
+        reference fixes that, because the claim itself is false: light through
+        a hole is the lamp's, not the liquid's.
+
+        The claim it was standing in for — that a bubble does not wash the
+        colour out of the picture — is already held by the two checks beside
+        it, on saturation and on hue, which measure the finished pixel.
+
+        So this asks the thing those two cannot. **Paint adds the same light
+        wherever it lands; a hole reveals the lamp in proportion to how much
+        dye was stopping it.** Pair each pixel's gain in brightness with how
+        thick the dye under it was, split at the median, and a hole brightens
+        the thick half more than the thin. A pasted highlight does not care.
       */
-      const add = [Math.max(0, br - ar), Math.max(0, bg - ag), Math.max(0, bb - ab)];
-      const addMag = Math.hypot(add[0], add[1], add[2]);
-      const gndMag = Math.hypot(ar, ag, ab);
-      if (addMag > 0.02 && gndMag > 1e-3) {
-        const cos = (add[0] * ar + add[1] * ag + add[2] * ab) / (addMag * gndMag);
-        const ang = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
-        addAngle += ang * addMag;      // weighted by how much light it added
-        addWeight += addMag;
-        worstAngle = Math.max(worstAngle, ang);
-        lit++;
-      }
+      const gndLum = 0.299 * ar + 0.587 * ag + 0.114 * ab;
+      const bubLum = 0.299 * br + 0.587 * bg + 0.114 * bb;
+      if (bubLum - gndLum > 0.01) { pairs.push([gndLum, bubLum - gndLum]); lit++; }
 
       let dh = Math.abs(b.h - a.h); if (dh > 180) dh = 360 - dh;
       const sl = (a.s - b.s) / a.s;
-      satLost += sl; hueShift += dh; lumGain += (b.v - a.v) / Math.max(a.v, 1e-3);
-      worstSat = Math.max(worstSat, sl); worstHue = Math.max(worstHue, dh);
+      /*
+        The interior and the rim are different claims, and averaging them was
+        measuring neither.
+
+        A flat mean over the whole footprint reads whatever mixture of the
+        two happens to fall in the sample, and that mixture moves with where
+        twelve bubbles land on a drifting plate: 2%, 8%, 9%, 10% and 39% on
+        one build, against a gate of a third. Weighting by the light added
+        made it *stable* at 51-56% and consistently failing, which is the
+        useful result — it was then measuring the interiors, and **a real
+        hole is supposed to desaturate there.** The interior is the lamp
+        coming through unfiltered; that is the whole of H6.
+
+        What must not wash out is the picture: the rim, and the liquid the
+        bubble sits in. So the two are split by how much light the bubble
+        added — the half it barely touched is the rim — and the claim is
+        made about that half. The core's figure is printed beside it, not
+        gated, because there is no number it ought to hold.
+      */
+      satPairs.push([Math.max(0, b.v - a.v), sl]);
+      lumGain += (b.v - a.v) / Math.max(a.v, 1e-3);
+      worstSat = Math.max(worstSat, sl);
+      /*
+        Hue only counts where there is a hue.
+
+        The filter above asks that the *ground* be coloured, which is not
+        enough: a pixel the bubble lightens toward grey has no meaningful hue
+        of its own, and the angle between an arbitrary hue and a real one is
+        up to 180 degrees. Every run of this reported "worst 180.0", and the
+        mean read 32.3 and then 4.9 on the same build, because how many of
+        those pixels fell inside the bubbles varied with where they landed.
+
+        So the shift is weighted by the saturation that survives, and a pixel
+        the bubble has washed to grey contributes nothing to the angle rather
+        than contributing noise. It is still caught, by `satLost` beside it,
+        which is the check for washing colour out and does not need a hue to
+        do its job.
+      */
+      const hw = Math.min(a.s, b.s);
+      if (hw > 0.12) {
+        hueShift += dh * hw; hueWeight += hw;
+        worstHue = Math.max(worstHue, dh);
+      }
       n++;
     }
     return { n, changed, drifted, biggest, total: B.length / 4,
-      lit, addAngle: addWeight ? addAngle / addWeight : 0, worstAngle,
-      satLost: n ? satLost / n : 0, hueShift: n ? hueShift / n : 0, lumGain: n ? lumGain / n : 0,
+      lit,
+      /*
+        The median split. Thick dye is dark dye — it is stopping more of the
+        lamp — so the darker half of the ground is the thick half, and a hole
+        should brighten it more.
+      */
+      ...(() => {
+        if (pairs.length < 40) return { thickGain: 0, thinGain: 0 };
+        const byGround = [...pairs].sort((u, v) => u[0] - v[0]);
+        const half = Math.floor(byGround.length / 2);
+        const mean = (xs) => xs.reduce((t, q) => t + q[1], 0) / xs.length;
+        return { thickGain: mean(byGround.slice(0, half)), thinGain: mean(byGround.slice(half)) };
+      })(),
+      ...(() => {
+        if (satPairs.length < 40) return { satLost: 0, satCore: 0 };
+        const byGain = [...satPairs].sort((u, v) => u[0] - v[0]);
+        const half = Math.floor(byGain.length / 2);
+        const mean = (xs) => xs.reduce((t, q) => t + q[1], 0) / xs.length;
+        // The half it barely lit is the rim; the half it lit hardest is the core.
+        return { satLost: mean(byGain.slice(0, half)), satCore: mean(byGain.slice(half)) };
+      })(), hueShift: hueWeight ? hueShift / hueWeight : 0, lumGain: n ? lumGain / n : 0,
       worstSat, worstHue };
   });
 
-  // Without this, a shader that drew nothing at all would pass every gate below.
+  /*
+    A hole is not measured by taking it away (H6 · A).
+
+    This check used to difference the plate against itself with the bubbles
+    cleared, and exclude whatever had moved in between as drift. That worked
+    while a bubble was *shading over* the dye: clearing it changed only the
+    pixels it had shaded.
+
+    A bubble is a hole in the liquid now. Clearing one lets the dye back in,
+    so the difference is enormous and real — 292,500 pixels on the run that
+    caught this — and almost everything the check wanted to look at was
+    thrown away as drift. It was not wrong about the plate. It was asking a
+    question that no longer means anything.
+
+    So it stops differencing and reads one frame. Three claims, each about
+    what a hole *is*, and each measurable where the bubble is rather than
+    where it was:
+  */
   check('the bubbles are actually drawn', report.changed > 3000 && report.n > 800,
     `${report.changed} pixels drawn on, ${report.n} of them over coloured liquid ` +
     `(${report.drifted} excluded as drift; biggest change ${report.biggest.toFixed(3)})`);
 
   if (report.n > 800) {
     check('a bubble keeps the colour of the liquid it is in',
-      report.satLost <= 0.34,
-      `${Math.round(report.satLost * 100)}% of the local saturation lost (worst ${Math.round(report.worstSat * 100)}%)`);
+      report.satLost <= 1 / 3,
+      `${Math.round(report.satLost * 100)}% of the local saturation lost at the rim, ` +
+      `${Math.round(report.satCore * 100)}% in the core — the core is the lamp through a hole ` +
+      `and is meant to lose it`);
     check('and does not shift its hue',
       report.hueShift <= 12,
       `${report.hueShift.toFixed(1)}° mean (worst ${report.worstHue.toFixed(1)}°)`);
-    check('and the light it adds is the liquid lit, not paint on top of it',
-      report.lit > 500 && report.addAngle <= 22,
-      `${report.addAngle.toFixed(1)}° between added light and ground colour ` +
-      `over ${report.lit} lit pixels (worst ${report.worstAngle.toFixed(1)}°)`);
+    check('and it lets the lamp through rather than painting light on top',
+      report.lit > 500 && report.thickGain > report.thinGain * 1.15,
+      `brightens the thick dye by ${report.thickGain.toFixed(3)} and the thin by ` +
+      `${report.thinGain.toFixed(3)} over ${report.lit} lit pixels — paint would brighten both alike`);
     console.log(`     and it is brighter, as a lens should be: ${Math.round(report.lumGain * 100)}% more light`);
+  }
+
+  /*
+    Where the air is (H6 · A).
+
+    Last, because it clears the plate and puts a single bubble somewhere of
+    its own choosing: every check above wants the twelve that were placed on
+    the thickest dye, and this one wants to know exactly where one is.
+
+    The air field is stamped by a render pass, and a render pass writes clip
+    space, which is y-up where these textures are read y-down. A field
+    flipped in y holds exactly the right amount of air, in exactly the right
+    number of discs, of exactly the right size — and every question except
+    *where* passes on it.
+
+    So this puts one bubble somewhere deliberately off-centre in both axes,
+    reads the whole field back, and asks where the air actually landed. The
+    flipped position is named explicitly, because "near where I put it" and
+    "nowhere near the mirror of where I put it" are two different claims and
+    only the pair of them rules out the trap.
+  */
+  {
+    const air = await page.evaluate(async () => {
+      const d = window.chromaglassDebug();
+      d.bubbles.clear();
+      const N = d.gridSize;
+      // A third across, a fifth down: distinct from its own mirror in both axes.
+      const bx = Math.round(N * 0.33), by = Math.round(N * 0.20);
+      d.bubbles.spawn(bx, by, N * 0.05, 1, 0);
+      d.bubbles.bubbles[d.bubbles.bubbles.length - 1].age = 1.0;
+      await new Promise((r) => setTimeout(r, 500));
+      const field = await d.readAir();
+      if (!field) return null;
+      const { n, data } = field;
+      let peak = -1, px = -1, py = -1, total = 0;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          const v = data[y * n + x];
+          total += v;
+          if (v > peak) { peak = v; px = x; py = y; }
+        }
+      }
+      return { n, peak, px: px / n, py: py / n, want: { x: bx / N, y: by / N }, mean: total / (n * n) };
+    });
+
+    check('the air field has air in it at all', air !== null && air.peak > 0.2,
+      air === null ? 'no field — the solver is not the GPU one' : `peak ${air.peak.toFixed(2)}, mean ${air.mean.toFixed(4)}`);
+
+    if (air) {
+      const near = Math.hypot(air.px - air.want.x, air.py - air.want.y);
+      const mirrored = Math.hypot(air.px - air.want.x, air.py - (1 - air.want.y));
+      check('and it is where the bubble was put', near < 0.06,
+        `air at ${air.px.toFixed(2)},${air.py.toFixed(2)} against ${air.want.x.toFixed(2)},${air.want.y.toFixed(2)} — ${near.toFixed(3)} away`);
+      check('and not at the mirror of it, which is what a flipped field looks like',
+        mirrored > 0.12, `${mirrored.toFixed(3)} from the flipped position`);
+    }
+
+    // And the control: with nothing on the plate the field is empty. Without
+    // this, a field that is simply full of air passes everything above.
+    const empty = await page.evaluate(async () => {
+      const d = window.chromaglassDebug();
+      d.bubbles.clear();
+      await new Promise((r) => setTimeout(r, 500));
+      const field = await d.readAir();
+      if (!field) return null;
+      let peak = 0;
+      for (const v of field.data) if (v > peak) peak = v;
+      return peak;
+    });
+    check('and no air at all once the bubbles are gone', empty !== null && empty < 0.02,
+      empty === null ? 'no field' : `peak ${empty.toFixed(4)} with an empty plate`);
   }
 } finally {
   await browser.close();

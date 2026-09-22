@@ -28,6 +28,18 @@ import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
 import { WebGPUParticles } from './particles';
+import { WebGPUAir } from './air';
+
+/*
+  How many bubbles the air field has room for.
+
+  `MAX_BUBBLES` in `lib/bubbles.ts` is 40 today, and that cap exists because
+  the compositor looped over them per pixel. The field does not care — the
+  splat costs the area the discs cover — so this is sized for where H6 is
+  going rather than for where the list is now, and raising the list's cap
+  needs nothing here.
+*/
+const AIR_CAPACITY = 512;
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -70,7 +82,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 32;      // 30 used, rounded up for the uniform's 16-byte tail
+const SIM_FLOATS = 36;      // 33 used, rounded up for the uniform's 16-byte tail
 
 export class WebGPUFluid {
   readonly N: number;
@@ -162,6 +174,23 @@ export class WebGPUFluid {
    * before H1 wants none of it.
    */
   private particles: WebGPUParticles | null = null;
+  /** The air field (H6): where the bubbles are, so the dye can be taken out of it. */
+  private air: WebGPUAir | null = null;
+  /** How hard the arriving air pushes the liquid aside (H6); 0 switches it off. */
+  private airPush = 0;
+  private airCover = 0;
+  /*
+    Last frame's coverage, so the rate term can be made zero-mean.
+
+    The standing term has the plate's air fraction subtracted because a
+    Neumann problem whose source does not average to zero has no solution for
+    the projection to find — the condition pressureSelfTest exists to
+    protect. The rate term never had the same treatment, and it is the
+    suspect for why pushing the air source harder has bought so little: a
+    hundred times the strength moved the interior from 0.67 to 0.62.
+  */
+  private airCoverPrev = 0;
+  private lastDt = 1 / 60;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -275,7 +304,7 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
-    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.surfaceTension; f[9] = p.fingering;
+    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = p.fingering;
     f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
     f[14] = p.smearX; f[15] = p.smearY;
     f[16] = p.damping; f[17] = p.heatDecay; f[18] = MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
@@ -283,6 +312,7 @@ export class WebGPUFluid {
     f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
     f[28] = p.rockX; f[29] = p.rockY;
+    f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -492,6 +522,24 @@ export class WebGPUFluid {
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
     /*
+      The air field, before any compute pass opens (H6 · A).
+
+      It is a render pass and the stage that reads it is a compute pass, so
+      it has to be encoded first — commands run in the order they are
+      recorded, and a compute pass cannot be interrupted to draw into a
+      texture it is sampling. It is also cheap and unconditional: the load op
+      is what clears the field, so skipping it on a frame with no bubbles
+      would leave the last frame's air behind and the dye would stay missing
+      under a bubble that had already popped.
+    */
+    if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.air.splat(enc, (label) => this.profiler.renderPass(label));
+    this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    this.airCoverPrev = this.airCover;
+    this.airCover = this.air.coverage;
+    this.lastDt = p.dt;
+
+    /*
       One pass, or one per stage.
 
       Off (the show), everything below is encoded into a single compute pass
@@ -599,6 +647,20 @@ export class WebGPUFluid {
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
 
+    /*
+      Where air is, dye is not (H6 · A).
+
+      After the advection, so the dye that moved this step is the dye the
+      hole is cut from; before anything reads the plate, so nothing sees
+      liquid where the bubble is. Skipped entirely when no bubble is on the
+      plate, which is most looks — `stage` does not open a pass it is told
+      not to, so the profiler reads zero rather than the cost of nothing.
+    */
+    stage('air exclude', (pass) => {
+      this.run(pass, 'airExclude', this.dye.write, [this.dye.read, this.air!.field], this.arg('air clear', [p.bubbleClear ?? 1, 0, 0, 0]));
+      this.dye.swap();
+    }, !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
+
     // 9.5. Sharpen what the advection and the diffusion softened
     if (p.sharpness > 0.0001) {
       stage('sharpen', (pass) => {
@@ -657,6 +719,74 @@ export class WebGPUFluid {
    * disposed, and the particles go with it. They do not survive the change,
    * which is right: they carry positions in a field that no longer exists.
    */
+  /**
+   * The bubbles this plate is carrying, from `BubbleField.packed`.
+   *
+   * Called by the frame rather than the step: the list is the renderer's
+   * bookkeeping and moves at the frame's pace, and stamping the same
+   * positions again on every one of the step's iterations would cost the
+   * splat several times over for one picture.
+   */
+  /**
+   * How much of the plate the air is taking, or 0 when nothing is excluding.
+   *
+   * The budget servo needs it: the exclusion is a multiply, so the dye it
+   * displaces leaves the field, and the servo is what keeps the plate's
+   * total rather than a ring at the rim (H6 · A).
+   */
+  get airDisplacing(): number { return this.airPush > 0 ? this.airCover : 0; }
+
+  setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
+    if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.air.setBubbles(packed, count, soft);
+  }
+
+  /**
+   * The air field, read back whole. For checks, not for a frame.
+   *
+   * A field can be the right size, hold the right amount and still be wrong
+   * — flipped in y, or off by a texel — and every one of those still looks
+   * like air in the right quantity. The only question that catches it is
+   * *where*, which needs the field itself rather than a summary of it.
+   */
+  async readAir(): Promise<{ n: number; data: Float32Array } | null> {
+    if (!this.air) return null;
+    const n = this.N;
+    /*
+      Two bytes a texel, because the field is `r16float`.
+
+      This read assumed four and a `Float32Array` when the field was
+      `r32float`, and kept assuming it after the format changed. What it
+      produced was not an error: it was a field with air in it, 190 cells
+      of it, peaking at 0.01 and sitting a sixth of the plate from where the
+      bubble was. Two half floats read as one single. Every conclusion drawn
+      from it was about the reader.
+    */
+    const row = Math.ceil((n * 2) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read air', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read air' });
+    enc.copyTextureToBuffer({ texture: this.air.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const halves = new Uint16Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n);
+    const stride = row / 2;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const h = halves[y * stride + x];
+        const sign = h & 0x8000 ? -1 : 1;
+        const exp = (h >> 10) & 0x1f;
+        const man = h & 0x3ff;
+        out[y * n + x] = exp === 0 ? sign * man * 2 ** -24
+          : exp === 31 ? (man ? NaN : sign * Infinity)
+          : sign * (man + 1024) * 2 ** (exp - 25);
+      }
+    }
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
+  }
+
   private stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
@@ -728,7 +858,12 @@ export class WebGPUFluid {
    */
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
-    this.run(pass, 'divergence', this.div, [this.vel.read], none);
+    // The fifth number is the mean of the rate term over the plate, which the
+    // kernel subtracts so that term averages to zero as the standing one does.
+    const invDt = 1 / Math.max(this.lastDt, 1e-4);
+    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev],
+      this.arg('air source', [this.airPush, invDt, this.airCover, 0,
+        (this.airCover - this.airCoverPrev) * invDt, 0, 0, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
@@ -992,6 +1127,8 @@ export class WebGPUFluid {
       grain: this.grain?.read ?? null,
       /** The particle splat, or null when the amount is 0 and none exist. */
       particles: this.particles && !this.particles.idle ? this.particles.target : null,
+      /** The air field (H6), or null when no bubble is on this plate. */
+      air: this.air?.any ? this.air.field : null,
     };
   }
 
@@ -1000,6 +1137,8 @@ export class WebGPUFluid {
     this.disposed = true;
     this.particles?.dispose();
     this.particles = null;
+    this.air?.dispose();
+    this.air = null;
     this.disposer.dispose();
     this.groups.clear();
   }

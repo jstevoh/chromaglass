@@ -148,3 +148,151 @@ struct BlitOut {
   return textureSampleLevel(picture, samp, in.uv, 0.0);
 }
 `;
+
+/**
+ * Film stock (F1, docs/filters-plan.md E6).
+ *
+ * The texture of the era's projected film. Light shows ran 16mm loops and
+ * slides beside the liquid plates, all projected, and the plate itself sat on
+ * an overhead projector — so the era's look is not a filter over the picture,
+ * it is what the picture was photographed on.
+ *
+ * Four things, in the order light meets them:
+ *
+ *   the gate    the frame wanders a fraction of a pixel, and its edge is a
+ *               soft rounded rectangle rather than the screen's corners
+ *   the curve   a toe and a shoulder: shadows compress, highlights roll off,
+ *               and nothing clips to flat white the way a digital frame does
+ *   the dyes    a per-channel crossover, which is what gives each stock its
+ *               cast, and a saturation response that is not flat
+ *   the grain   dye clouds, per channel, heaviest in the mid-tones, re-rolled
+ *               on the *film* frame rather than the display's
+ *
+ * Grain is per channel because film grain is: three dye layers, each with its
+ * own clumps, which is why film grain reads as colour speckle and video noise
+ * reads as grey. Heaviest in the mid-tones because the toe and the shoulder
+ * have less dye to clump.
+ *
+ * (No backticks in this comment: one inside a WGSL comment ends the
+ * TypeScript template literal holding it.)
+ */
+export const STOCK_PASS_WGSL = `${HEAD}${FX_RANDOM_WGSL}
+
+/** The stock's own character: lift, gain, gamma, and a per-channel crossover. */
+struct Stock {
+  lift: vec3f,
+  gain: vec3f,
+  gamma: f32,
+  sat: f32,
+  toe: f32,
+  shoulder: f32,
+};
+
+fn stockOf(kind: i32) -> Stock {
+  var s: Stock;
+  // 16mm reversal: cool and saturated, with a hard shoulder — reversal film
+  // has nowhere to go once it is full.
+  s.lift = vec3f(0.005, 0.008, 0.016);
+  s.gain = vec3f(0.98, 1.00, 1.06);
+  s.gamma = 1.12; s.sat = 1.18; s.toe = 0.16; s.shoulder = 0.78;
+  if (kind == 1) {
+    // A slide stock: warm, with deep blacks and a long shoulder.
+    s.lift = vec3f(0.004, 0.004, 0.006);
+    s.gain = vec3f(1.07, 1.00, 0.93);
+    s.gamma = 1.22; s.sat = 1.10; s.toe = 0.10; s.shoulder = 0.86;
+  } else if (kind == 2) {
+    // Faded sixties colour negative: a magenta cast and blacks that have
+    // lifted with age, which is what most surviving footage actually is.
+    s.lift = vec3f(0.055, 0.038, 0.052);
+    s.gain = vec3f(1.04, 0.94, 1.02);
+    s.gamma = 0.92; s.sat = 0.82; s.toe = 0.26; s.shoulder = 0.72;
+  } else if (kind == 3) {
+    // Super 8: soft, warm, and grainy enough that the grain is the look.
+    s.lift = vec3f(0.030, 0.022, 0.018);
+    s.gain = vec3f(1.09, 1.00, 0.88);
+    s.gamma = 1.02; s.sat = 0.94; s.toe = 0.22; s.shoulder = 0.70;
+  } else if (kind == 4) {
+    // Monochrome reversal, toned: the saturation goes to nothing and the
+    // gain carries the tone.
+    s.lift = vec3f(0.010, 0.010, 0.014);
+    s.gain = vec3f(1.05, 1.00, 0.92);
+    s.gamma = 1.18; s.sat = 0.0; s.toe = 0.12; s.shoulder = 0.82;
+  }
+  return s;
+}
+
+/*
+  The characteristic curve: a toe, a straight portion and a shoulder.
+
+  Digital clips — everything above one is one. Film does not: the shoulder
+  rolls it off, so a bright plate keeps its shape where a clipped frame goes
+  to a flat white blob. The toe does the same at the bottom, which is why
+  film shadows are grey and full of detail rather than crushed.
+*/
+fn curve(x: f32, toe: f32, shoulder: f32) -> f32 {
+  let v = clamp(x, 0.0, 4.0);
+  let lo = smoothstep(0.0, max(toe, 0.001) * 2.0, v) * toe;
+  let mid = clamp((v - toe) / max(shoulder - toe, 0.001), 0.0, 1.0) * (shoulder - toe) + toe;
+  let hi = 1.0 - exp(-(max(v - shoulder, 0.0) * 1.6));
+  return clamp(select(mid, shoulder + hi * (1.0 - shoulder), v > shoulder) * select(1.0, lo / max(toe, 0.001), v < toe), 0.0, 1.0);
+}
+
+@fragment fn fs(in: VsOut) -> @location(0) vec4f {
+  let amt = clamp(U.stock, 0.0, 1.0);
+  if (amt <= 0.001) { return vec4f(tex2(picture, in.uv).rgb, 1.0); }
+
+  let s = stockOf(U.stockType);
+
+  /*
+    The gate wanders. A projector does not hold a frame perfectly still — the
+    pin registers it and the film breathes — and a fraction of a pixel is
+    enough to read as film rather than as video. On the film frame, so it
+    moves at the film's rate and not the display's.
+  */
+  let wob = vec2f(
+    fxRand(vec2u(7u, 11u), U.stockFrame, U.seed) - 0.5,
+    fxRand(vec2u(13u, 17u), U.stockFrame, U.seed) - 0.5);
+  let uv = in.uv + wob * U.stockWeave / max(U.resolution, vec2f(1.0));
+
+  var c = tex2(picture, uv).rgb;
+
+  // The dyes: a per-channel crossover is what a stock's cast actually is.
+  c = (c + s.lift) * s.gain;
+  c = vec3f(curve(c.r, s.toe, s.shoulder), curve(c.g, s.toe, s.shoulder), curve(c.b, s.toe, s.shoulder));
+  c = pow(max(c, vec3f(0.0)), vec3f(s.gamma));
+  let grey = dot(c, vec3f(0.299, 0.587, 0.114));
+  c = mix(vec3f(grey), c, s.sat);
+
+  /*
+    Grain, per channel and heaviest in the mid-tones.
+
+    Film grain is three dye layers of clumps, so it reads as colour speckle
+    where video noise reads as grey. The toe and the shoulder have less dye
+    to clump, so the weight peaks in the middle of the curve.
+  */
+  if (U.stockGrain > 0.001) {
+    let cell = max(U.stockGrainSize, 1.0);
+    let g = vec2u(in.uv * U.resolution / cell);
+    let weight = 4.0 * grey * (1.0 - grey);
+    let n = vec3f(
+      fxRand(g, U.stockFrame, U.seed) - 0.5,
+      fxRand(g + vec2u(101u, 0u), U.stockFrame, U.seed ^ 0x9e37u) - 0.5,
+      fxRand(g + vec2u(0u, 211u), U.stockFrame, U.seed ^ 0x85ebu) - 0.5);
+    c = c + n * U.stockGrain * 0.28 * weight;
+  }
+
+  /*
+    The gate's own edge: a rounded rectangle, slightly soft, because a
+    projector's aperture is a cut piece of metal and not the screen.
+  */
+  if (U.stockGate > 0.001) {
+    let d = abs(in.uv - 0.5) * 2.0;
+    let r = 0.12;
+    let corner = length(max(d - (1.0 - r), vec2f(0.0))) / r;
+    let edge = max(max(d.x, d.y), corner);
+    c = c * mix(1.0, smoothstep(1.0, 1.0 - 0.06 - 0.05 * U.stockGate, edge), U.stockGate);
+  }
+
+  return vec4f(mix(tex2(picture, in.uv).rgb, max(c, vec3f(0.0)), amt), 1.0);
+}
+`;

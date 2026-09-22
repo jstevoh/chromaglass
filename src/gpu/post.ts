@@ -21,7 +21,7 @@
 import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
-import { BLIT_WGSL, FINISH_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
+import { BLIT_WGSL, FINISH_PASS_WGSL, STOCK_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
 /**
  * What the harness can ask the chain to do; never set by a look. It was
  * declared with the WebGL chain, which is gone (P7).
@@ -30,6 +30,25 @@ export interface PostTest {
   /** 0 off, 1 seeded noise, 2 the picture from `delay` frames ago. */
   mode: 0 | 1 | 2;
   delay: number;
+}
+
+/**
+ * The film stock a look is photographed on (F1, docs/filters-plan.md E6).
+ *
+ * `stock*` and not `film*`: the existing `film` settings drive the film
+ * *projector*, the one that plays a video through the dye.
+ */
+export interface StockSettings {
+  /** 0 = off. Nothing below is built while it is 0. */
+  stock: number;
+  /** 0 16mm reversal, 1 slide, 2 faded negative, 3 Super 8, 4 monochrome. */
+  stockType: number;
+  grain: number;
+  grainSize: number;
+  weave: number;
+  gate: number;
+  /** The film's own frame, so grain and weave move at the film's rate. */
+  filmFrame: number;
 }
 
 /** As the GLSL's ring keeps: about half a second at sixty frames a second. */
@@ -177,6 +196,47 @@ export class WebGPUPostChain {
    * proves is the shape they arrive into — a picture in, a picture out, and a
    * ring of past frames to reach into.
    */
+  /**
+   * The stock, over the picture.
+   *
+   * Its own pass rather than a branch inside the test one: the test effect is
+   * the harness's and never in a look, and this is a look's and never the
+   * harness's. They share the picture and nothing else.
+   */
+  stock(encoder: GPUCommandEncoder, seed: number, st: StockSettings): void {
+    if (st.stock <= 0.001 || this.targets.length !== 2) return;
+    const out = 1 - this.cur;
+    this.pack.set('stock', st.stock);
+    this.pack.set('stockType', Math.max(0, Math.min(4, Math.round(st.stockType))));
+    this.pack.set('stockGrain', st.grain);
+    this.pack.set('stockGrainSize', Math.max(1, st.grainSize));
+    this.pack.set('stockWeave', st.weave);
+    this.pack.set('stockGate', st.gate);
+    this.pack.set('stockFrame', st.filmFrame >>> 0);
+    this.pack.set('seed', seed >>> 0);
+    this.pack.set('resolution', this.size[0], this.size[1]);
+    this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
+
+    const pipe = this.pipeline('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true);
+    const pass = encoder.beginRenderPass({
+      label: 'film stock',
+      colorAttachments: [{ view: this.targets[out].createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+    });
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, this.device.createBindGroup({
+      layout: pipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.ubo } },
+        { binding: 1, resource: this.sampler },
+        { binding: 2, resource: this.targets[this.cur].createView() },
+        { binding: 3, resource: (this.markTexture ?? this.blankMark).createView() },
+      ],
+    }));
+    pass.draw(6);
+    pass.end();
+    this.cur = out;
+  }
+
   effects(encoder: GPUCommandEncoder, frame: number, seed: number, test: PostTest | null): void {
     if (!test || test.mode === 0 || this.targets.length !== 2) return;
     const ring = this.ensureRing();

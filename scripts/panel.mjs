@@ -21,7 +21,7 @@
  * section that exists, or a picker draws a heading for a place you cannot go.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
@@ -1018,6 +1018,85 @@ check('the bench starts with controls that exist', badRecipe.length === 0, badRe
 check('and neither starts over the limit',
   DEFAULT_RIDES.length <= MAX_PINS && DEFAULT_RECIPE.length <= MAX_PINS,
   `${DEFAULT_RIDES.length} rides, ${DEFAULT_RECIPE.length} recipe, limit ${MAX_PINS}`);
+
+// ── And the other direction: a setting nothing can reach ────────────
+//
+// The check above asks that every control the panel draws is one a desk can
+// hold. It says nothing about a setting that is drawn *nowhere* — declared,
+// defaulted, set by all thirty-two presets and rolled by the dice, with no
+// slider, no pin and no phone control anywhere.
+//
+// Two were found that way, and two more went the other way: `heatIntensity`
+// and `boilingPoint` were read by nothing, so they were deleted rather than
+// given a slider (docs/bubbles-plan.md says why).
+//
+// `surfaceTension` is the plate's own film tension,
+// read by the solver, carried by every preset between 0.01 and 0.3, and
+// reachable from nothing. `surge` shapes the automation into gusts with quiet
+// between — the thing that makes a plate look worked-on rather than busy —
+// same story.
+//
+// The exceptions are listed by name rather than by a rule, because each is a
+// decision and a rule would hide the next one.
+{
+  const KNOWN = new Set([
+    // Set by the zoom, which is the control; the flag rides along.
+    'macroMode', 'macroZoom',
+    // The paper backdrop's two colours: a look's, chosen with the dyes.
+    'paperA', 'paperB',
+  ]);
+  const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const drawn = new Set([
+    ...[...panelSrc.matchAll(/settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]),
+    ...[...panelSrc.matchAll(/onUpdate\(\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map(m => m[1]),
+  ]);
+  const orphans = Object.keys(DEFAULT_SETTINGS)
+    .filter(k => !drawn.has(k) && !PIN_RANGE.has(k) && !KNOWN.has(k));
+  check('every setting can be reached from somewhere',
+    orphans.length === 0,
+    orphans.length ? `${orphans.join(', ')} — add a control, or name it in this check's list and say why`
+      : `${Object.keys(DEFAULT_SETTINGS).length} settings, ${KNOWN.size} deliberately without one`);
+}
+
+// ── And one level down: a setting the engine never reads ────────────
+//
+// The check above asks whether a setting can be *reached*. It cannot ask
+// whether reaching it does anything, and that is a different fault with the
+// same cause.
+//
+// `surfaceTension` was written by all thirty-two presets, defaulted, rolled by
+// the dice — and read by nothing. It survived because the solver has a local
+// variable of the same name, derived from `polarity` and `blobSurfaceTension`,
+// which it hands to the params object as `p.surfaceTension`. An audit looking
+// for `.surfaceTension` finds those and calls the setting live. It was not:
+// the presets' own comments for it describe what `blobSurfaceTension` does,
+// and each preset that set both said the same thing twice. The local is now
+// called `immiscibility` so the name cannot lie again, and this check is here
+// so the next one does not need the name to be honest.
+//
+// Two things this had to learn the hard way, both of them the same rule —
+// run the control, on a commit that still has the bug:
+//
+//   · `p` is not in RECEIVERS. Letting the params object count is the fault.
+//   · The panel is not a read. A slider reads its own key to draw its handle,
+//     so the first version of this check passed on the very setting it was
+//     written to catch.
+{
+  const RECEIVERS = '(?:settings|currentSettings|s|look|next|prev|cur|base|a|b|current|ctx)';
+  // The plumbing that copies settings about, which is not the engine using one.
+  const PLUMBING = new Set(['presets.ts', 'types.ts', 'SettingsPanel.tsx',
+                            'deskPins.ts', 'lucky.ts', 'lookFade.ts']);
+  const body = readdirSync(join(root, 'src'), { recursive: true })
+    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()))
+    .map(f => readFileSync(join(root, 'src', f), 'utf8'))
+    .join('\n');
+  const unread = Object.keys(DEFAULT_SETTINGS)
+    .filter(k => !new RegExp(`\\b${RECEIVERS}\\s*\\??\\.${k}\\b`).test(body));
+  check('every setting is read by something that renders',
+    unread.length === 0,
+    unread.length ? `${unread.join(', ')} — nothing in src reads it; delete it or wire it`
+      : `${Object.keys(DEFAULT_SETTINGS).length} settings, all read`);
+}
 
 // ── The looks and the defaults, against the same ranges ─────────────
 //

@@ -75,6 +75,8 @@ interface SettingsPanelProps {
   /** Live room-calibration readout, null when auto-calibration is off. */
   calibration?: RoomCalibration | null;
   onRecalibrate?: () => void;
+  /** Flick a plate: spin it up and let the bed it rests on slow it down. */
+  onFlickPlate?: (layer: number) => void;
   /** Which solver is running and at what grid, e.g. "GPU · 512²". */
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
@@ -298,7 +300,8 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose, onFlickPlate,
+}) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
@@ -1202,6 +1205,85 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="thinFilm"
         />
       </section>
+
+      {/* Film stock — what the whole show is photographed on (F1). */}
+      <section id="settings-stock" className={`mb-8 scroll-mt-4 ${shown('stock') ? '' : 'hidden'} ${focusSection === 'stock' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="look" data-section="stock">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Film size={12} /> Film Stock
+        </h3>
+        <Info>
+          The texture of the era&apos;s projected film. Light shows ran 16mm loops and slides beside the liquid plates, all projected, and the plate itself sat on an overhead projector — so this is not a filter over the picture, it is what the picture was photographed on. A characteristic curve so highlights roll off instead of clipping, a per-channel dye crossover for the stock&apos;s cast, grain in three layers heaviest through the mid-tones, and a gate that wanders and has its own soft edge. The plate&apos;s own granulation gives way to it, so there is never two grains at once.
+        </Info>
+        <Slider
+          label="Film Stock"
+          value={settings.stock ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stock: v })}
+          settingKey="stock"
+        />
+        <div className="flex flex-col gap-2 mb-4">
+          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <div className="grid grid-cols-5 gap-1">
+            {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
+              <button
+                key={name}
+                onClick={() => onUpdate({ stockType: i })}
+                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                  (settings.stockType ?? 0) === i ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={[
+                  '16mm reversal: cool and saturated, with a hard shoulder',
+                  'A slide stock: warm, deep blacks, a long shoulder',
+                  'Faded sixties negative: magenta cast and lifted blacks',
+                  'Super 8: soft, warm, and grainy enough that the grain is the look',
+                  'Monochrome reversal, toned',
+                ][i]}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Slider
+          label="Grain"
+          value={settings.stockGrain ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stockGrain: v })}
+          settingKey="stockGrain"
+        />
+        <Slider
+          label="Grain Size"
+          value={settings.stockGrainSize ?? 2}
+          min={1}
+          max={6}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ stockGrainSize: v })}
+          settingKey="stockGrainSize"
+        />
+        <Slider
+          label="Gate Weave"
+          value={settings.stockWeave ?? 0}
+          min={0}
+          max={3}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ stockWeave: v })}
+          settingKey="stockWeave"
+        />
+        <Slider
+          label="Gate Edge"
+          value={settings.stockGate ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ stockGate: v })}
+          settingKey="stockGate"
+        />
+      </section>
+
 
       {/*
         Kaleidoscope Section
@@ -2352,6 +2434,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ platePressure: v })}
           settingKey="platePressure"
         />
+        {/*
+          The two glasses themselves.
+
+          Plate Shape is the dome the pair leaves at rest: left of centre
+          they meet in the middle and open toward the rim, which is what a
+          pair of clock glasses does and where the dye ends up gathering;
+          right of centre the rim is tight and the liquid pools in the
+          middle. Dead centre is two flats, which is what this was before and
+          which no real plate is.
+
+          Press Lift is how long a press takes to come back up. It was fixed
+          at a twelfth of a second, faster than a hand can move, which is
+          most of why pressing did not feel like it did anything.
+        */}
+        <Slider
+          label="Plate Shape"
+          value={settings.plateCurve ?? 0}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateCurve: v })}
+          settingKey="plateCurve"
+        />
+        <Slider
+          label="Press Lift"
+          value={settings.plateSpring ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateSpring: v })}
+          settingKey="plateSpring"
+        />
         <Slider
           label="Glass Smear"
           value={settings.glassSmear}
@@ -2537,6 +2651,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ automateRate: v })}
           settingKey="automateRate"
         />
+        {/*
+          Surge shapes the automation into gusts with quiet between, which is
+          what a dish being worked on actually looks like — a pour, twenty
+          seconds of watching it spread, then a press. Every preset sets it,
+          between 0.12 and 0.95, and until now nothing on any surface could.
+        */}
+        <Slider
+          label="Surge"
+          value={settings.surge ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ surge: v })}
+          settingKey="surge"
+        />
       </section>
 
       {/* Mixer Section */}
@@ -2561,6 +2690,54 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ rotationSpeed: v })}
           settingKey="rotationSpeed"
+        />
+        {/*
+          The plate as a flywheel.
+
+          Rotation Speed above is a motor: it asks for a speed and the plate
+          holds it, and every preset sets it low because it is there to keep a
+          plate alive rather than to be seen. A flick is the other thing a
+          plate does — spun by hand and left to slow down — so it is a press
+          and not a value, and it goes to one plate at a time because the two
+          turn opposite ways and shearing them by hand is the point.
+
+          Both are on pads too, as Spin Front Plate and Spin Back Plate.
+        */}
+        <div className="flex gap-2 mt-1 mb-2">
+          {[0, 1].map((l) => (
+            <button
+              key={l}
+              onClick={() => onFlickPlate?.(l)}
+              disabled={!onFlickPlate || (settings.layerCount ?? 1) <= l}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                         hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all
+                         disabled:opacity-35 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
+              data-testid={`flick-plate-${l}`}
+              title={(settings.layerCount ?? 1) <= l
+                ? 'This look has one plate'
+                : 'Spin this plate up; it slows on its own'}
+            >
+              Flick {l === 0 ? 'Front' : 'Back'}
+            </button>
+          ))}
+        </div>
+        <Slider
+          label="Flick Strength"
+          value={settings.spinImpulse ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinImpulse: v })}
+          settingKey="spinImpulse"
+        />
+        <Slider
+          label="Plate Drag"
+          value={settings.spinDrag ?? 0.25}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinDrag: v })}
+          settingKey="spinDrag"
         />
         <div className="flex items-center justify-between mb-4 mt-4">
           <span className="text-[13px] font-medium text-text">LED Platform</span>

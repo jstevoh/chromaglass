@@ -93,6 +93,79 @@ quantity the solver carries, exactly like dye. Everything else follows from that
 - `bubbleClear`: how completely the dye is excluded — 1 is physical; lower keeps some of
   today's look for presets that want it.
 
+**What the field turned out to need** (measured 2026-09-21, `claude/h6-air-field`):
+
+- **`r16float`, not `r32float`.** The splat blends (`max`, so two overlapping bubbles
+  do not make a cell twice as empty) and **WebGPU does not blend 32-bit float
+  targets** — the pipeline is rejected outright and the field is silently empty. Half
+  floats carry a 0-to-1 coverage to about three decimal places, finer than the dye
+  they multiply.
+- **A render pass, not a compute pass over cells.** The cost is the area the discs
+  cover rather than cells times bubbles, which is the whole reason hundreds become
+  possible. It has to be encoded *before* any compute pass opens, because a compute
+  pass cannot be interrupted to draw into a texture it is sampling.
+- **The splat must clear the field every frame**, by its load op, even with nothing
+  live — otherwise a popped bubble leaves its hole behind.
+- **`smoothstep` needs its low edge first.** Backwards it is undefined in WGSL and
+  returns near zero, which produces a field of discs in exactly the right places
+  peaking at 0.01.
+- **A readback must match the format.** Two-byte halves read as four-byte floats give
+  a plausible field in the wrong place, and every conclusion drawn from it is about
+  the reader.
+
+**Four mechanisms tried for the interior, all measured, none sufficient.**
+The number below is the dye left under a bubble as a fraction of the liquid
+around it; a hole should be near zero.
+
+| | result |
+|---|---|
+| Flow between neighbours by the difference in air | **0.70** — empties the rim, cannot touch the middle |
+| The same, down a *blurred* air field so the middle has a slope | **0.84**, worse: the hill is shallow, adjacent cells barely differ, almost nothing flows |
+| A velocity down the air gradient | **no effect at all** (see below) |
+| A source in the divergence the projection solves — the plan's own design | **0.67**, and **0.59** given six times as long |
+
+A local, conserving exchange is diffusion, and diffusion is far too slow to
+clear a bubble thirteen cells across in the time one exists. The transport has
+to be advection — a velocity field the dye rides — which is the divergence
+source, below.
+
+**The divergence source is built and is not enough as tuned.** It is in
+`divergence`, as two terms: the rate the air is arriving (a growing bubble
+displaces liquid, a popping one lets it back) and a standing source inside
+every bubble with the plate's air fraction subtracted so it averages to zero —
+without which the Neumann problem has no solution, the condition
+`pressureSelfTest` exists to protect.
+
+It reaches the flow: a hundred times the strength moves the interior from 0.67
+to 0.62, and six times the settling time moves it to 0.59. Both are real and
+both are small, and 0.59 is an asymptote rather than a trend toward zero. So
+something is holding it back, and the three candidates not yet ruled out are:
+the pressure solve not converging on this source in twelve sweeps; the dye's
+advection reading a velocity from before the projection that produced it; and
+the conserving exchange carrying dye back *into* the bubble as fast as the flow
+carries it out, since that exchange is symmetric and knows nothing about which
+way the liquid is going.
+
+**A velocity will not do.**
+Conserving the dye by flowing it between cells — from more air to less, in
+proportion to the difference — works at the rim and cannot touch the middle of
+a bubble, where the air is uniform and there is no difference to flow down.
+Measured: the interior thins to about 0.7 of its surroundings and stops.
+
+Adding a velocity down the air gradient instead **does not work at all**, and
+the reason is structural: a gradient field is exactly what the pressure
+projection exists to remove, so the next projection cancels it. The source has
+to go into the divergence the projection solves. That is also what makes the
+liquid flow *around* a bubble rather than through it, so the two bullets above
+are one piece of work.
+
+**How to know it works.** `npm run bubbles` places one bubble somewhere off-centre in
+both axes and asks the field **where** the air is — near the chosen position, and *not*
+near its mirror, which is what a y-flipped field looks like — with a control that
+clears the plate and requires the field to be empty. All three faults above passed
+every check that only asked whether air existed; none of them survived the question
+"where".
+
 **Checks** (`npm run fx`-style, with the parity harness's approach):
 - Dye under a settled bubble falls below 2% of its surroundings within a second.
 - Total dye mass changes by less than 0.5% while a bubble forms and pops.
@@ -385,3 +458,563 @@ nothing and explain a lot of what the references show:
 - **How many bottles is too many.** Eleven new ones is a lot of menu. The grouping and
   per-preset dishes should carry it, but it may be better to ship the first four, play
   with them, and let the rest earn their place.
+
+## Nucleation, and the two settings that were waiting for it (2026-09-21)
+
+Bubbles arrive today because something put them there — a pour, an impact, the
+automation. None of them arrive because the liquid is *hot*, and that is the one
+way a real dish makes them.
+
+The plate has had the parts for this the whole time and never joined them up.
+There is a temperature field (`vel.z`), heat goes into it from about twenty
+places, `heatDecay` cools it, and buoyancy lifts what is warm:
+
+```wgsl
+var f = vec2f(0.0, S.curBuoy * tanh(max(temp, 0.0) * 20.0));
+```
+
+Two settings were declared for it and read by nothing: `heatIntensity`, set by
+all thirty-two presets between 0.02 and 0.9, and `boilingPoint`, set by
+thirty-one between 0.35 and 1.0. Both were deleted on 2026-09-21. The reasons
+are worth keeping, because they are the argument for what to build instead.
+
+**`heatIntensity` was a second name for Buoyancy.** Across the presets the two
+move together almost rank for rank — Boiling Point 0.9/1.0, Lava Lamp 0.8/0.9,
+down to Milk Marbling 0.02/0.05, with only Cyberpunk Neon and Jellyfish Bloom
+out of order. That is not a coincidence: below `temp ≈ 0.05` the `tanh` above is
+near-linear, so scaling the heat going in and scaling `curBuoy` are the same
+gesture, and Buoyancy already has a slider and a pin. Above it the `tanh`
+saturates — and the hardcoded seeds (`addTemp(..., 3.0)`, `5.0`) land at
+`tanh(60) = 1.0`, where more heat does *nothing at all*.
+
+That saturation is the real defect the setting was hiding. **Every heat source
+on the plate is maximally buoyant regardless of how much heat it got**, so a
+plume has no strength, only a position. Whatever boiling gets built should fix
+the seeds into the responsive part of the curve first; the shape of a plume is
+free once they are.
+
+**`boilingPoint` had no mechanic anywhere,** and the decisive evidence that
+nobody had ever seen it work is Crowd Plate, which carries `boilingPoint: 0` —
+the most extreme value available, meaning "boils on contact" — with no effect
+anyone noticed. A threshold nothing compares against.
+
+What makes it worth building now is H6. Nucleation needs somewhere to put the
+air, and until the air field existed there was nowhere: bubbles were forty
+uniforms and a metaball loop in the compositor, and heat could not reach them.
+Now air is a quantity the plate carries, so the sketch is small:
+
+- where `temp` crosses a threshold, ask `bubbles.ts` for a bubble, at a radius
+  set by how far over it is;
+- the threshold is the per-look setting, and it comes back **named for what it
+  does to the picture** rather than inherited — the stored 0.35–1.0 range was
+  never meaningful, so a new range should be chosen by the mechanic;
+- a bubble takes its heat with it, which is what stops one cell spraying
+  hundreds, and is also why this belongs next to the exclusion rather than
+  before it.
+
+The preset called **Boiling Point** is the test. It is named for a mechanic that
+was never built, and it should be the look that proves the feature: a dish that
+sits, warms, and then breaks into bubbles from the bottom up.
+
+### A third one, and the name that hid it (2026-09-21)
+
+`surfaceTension` was the same fault as the two above and much better hidden.
+All thirty-two presets set it, between 0.01 and 0.3, each with a comment. The
+engine never read it.
+
+It survived because the solver has a **local variable of the same name**:
+
+```ts
+const tension = clamp01(settings.blobSurfaceTension ?? 0.5);
+const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);   // was: surfaceTension
+```
+
+That local goes into the params object, so `p.surfaceTension` exists and is
+read twice. Any audit grepping for `.surfaceTension` finds those two and calls
+the setting live. It also fooled a first pass at a control for it — a slider
+was added on the strength of those two reads, and the slider then *read the
+key itself* to draw its handle, which made the check written to catch the
+problem pass on it.
+
+What it actually duplicates is `blobSurfaceTension`, which has a slider and a
+pin already. The presets say so themselves; every one that set both said the
+same thing twice:
+
+```
+surfaceTension: 0.14,      // blobs hold shape, merge slowly
+blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
+
+surfaceTension: 0.02,      // near-zero — fluid fragments into star clusters
+blobSurfaceTension: 0.1,   // near-zero cohesion — matter fragments freely
+```
+
+The setting is deleted and the local renamed to `immiscibility`, which is what
+it does and what the method it feeds is already called.
+
+**A tuning job this turned up.** Thirteen presets wrote the dead key and never
+set the live one, so they run at the `blobSurfaceTension` default of 0.3 —
+Cyberpunk Neon, Stardust Collapse and Timbre Shifter wrote 0.01–0.02, the
+bottom of the dead scale, meaning almost no cohesion. The default is "mostly
+loose", so none of them is stranded and no look was changed here. But their
+authors asked for less cohesion than they are getting, and the numbers are in
+the git history if anyone wants to take it up: Cyberpunk Neon 0.01, Stardust
+Collapse 0.01, Timbre Shifter 0.02, Solar Flare 0.03, Bass Drop 0.08, Fractal
+Dream 0.08, Deep Ocean 0.1, Boiling Point 0.1, Aurora Borealis 0.12, Velvet
+Underground 0.15, Jellyfish Bloom 0.18, Neon Coral Reef 0.22, Microscopic
+Chaos 0.25.
+
+## D. What the liquids are, which is nothing yet (2026-09-21)
+
+Two questions asked of the running app, answered by reading it rather than by
+hoping: does it account for liquid *density* — which floats on which — and does
+it account for *saturation*, so that oil dropped on clean water spreads
+violently and oil dropped on oil does not? **Neither. Both are worth building,
+and the second is worth more.**
+
+### Density: there is one liquid
+
+The plate carries **one dye field** — `rgba16float`, `rgb` a log-space
+absorption for the geometric-mean mixing, `a` a concentration — and **one
+velocity field**. Every colour shares that momentum, so there is no per-species
+density and nothing that could stratify.
+
+The only density-like force is concentration, not species:
+
+```wgsl
+var f = vec2f(0.0, S.curBuoy * tanh(max(temp, 0.0) * 20.0));   // thermal only
+f += S.rock * dd;                        // dd = tanh(dye.a - S.meanD)
+if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
+```
+
+`dd` is how much dye is in a cell against the plate's mean. Thick dye therefore
+rocks and drifts differently from thin dye, which reads a little like weight —
+but two dyes of the same colour and different densities are *identical*, and
+nothing ever sinks through anything.
+
+What stands in for immiscibility is `applyImmiscibility`, and it is driven by
+**colour difference**: the force between neighbours goes as
+`|c_neighbour − c_here|²`. So two different colours repel, and two
+same-coloured liquids of different density do nothing whatever.
+
+This is already promised twice in this document — "density difference, so the
+heavy phase sinks against the plate rock and the tilt" in B, "heavy pigment
+sinks through light" in C — and it exists in neither.
+
+### Saturation: the thing that would change how a show begins
+
+A drop of oil on clean water spreads to a monolayer, fast and far. A drop of
+oil on water that is already covered sits where it lands as a lens. The plate
+does not know the difference: a pour onto bare glass and a pour onto a
+saturated plate behave the same, because nothing tracks coverage.
+
+The physics has a name and the right shape for this engine. The spreading
+coefficient is
+
+```
+S = γ_water − (γ_oil + γ_oil/water)
+```
+
+positive on a clean surface and about zero once it is covered, and what drives
+the spreading is not the tension but its **gradient** — Marangoni flow.
+So the state to carry is surface coverage, which the plate nearly has already
+in `dye.a`, and the force is `∇γ` with `γ = γ0 · (1 − coverage)`: dye is pushed
+from covered plate toward bare plate, hardest where the plate is bare, and the
+effect switches itself off as the plate fills.
+
+**And here is the trap, which this session paid for three times.** A force that
+is a pure gradient is *exactly* what the pressure projection exists to remove.
+Adding `∇γ` to the velocity and then projecting leaves nothing — the same
+result as adding a velocity down the air gradient for the bubbles, which cost a
+pass and did nothing at all. Marangoni has to enter one of the three ways that
+survive a projection:
+
+1. **Into the divergence the projection solves**, as the bubbles' displacement
+   does. A spreading film is genuinely a source in the plane, so this is the
+   physical place for it.
+2. **As transport of the dye directly**, not of the velocity — the dye's own
+   advection, with the spreading displacement added to the velocity it samples.
+3. **As a multiply on the dye**, which is what finally emptied a bubble, and
+   which reaches places no gradient can.
+
+Whichever is chosen, it must not be added to the velocity field before a
+projection and expected to survive. That sentence is the whole of what H6 cost
+to learn, and it applies unchanged here.
+
+**Why this one is worth more than density.** It gives a show a beginning. The
+first pour onto a clean plate would bloom across it and the tenth would sit in
+a puddle, which is what a real plate does and what no setting can currently
+express — and it needs one new scalar field, or possibly none at all, rather
+than the second momentum field that a true density difference requires.
+
+## A, continued: the interior empties, and the hole does not close (2026-09-21)
+
+**The mechanism is known now, and it was none of the three suspects.**
+
+The question that settled it asks *where* the dye is left rather than how much,
+by measuring the radial profile against the same plate with no bubble on it,
+alternated in pairs so the plate's drift is shared. With the air at **1.00** in
+the middle of a bubble:
+
+| r/R | 0.0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| dye, with / without | 1.00 | 1.01 | 1.00 | 1.01 | 0.93 | 0.84 | 0.79 | 0.83 | 0.93 | 0.81 |
+
+The centre is **untouched** — 0.990 over r < 0.5R — and only the rim thins. An
+under-converged pressure solve or a stale velocity would thin the whole disc a
+little; neither leaves the middle pristine. Both mechanisms in place were
+driven by the air *gradient*, and the inside of a bubble has none.
+
+Underneath that is a second fact worth keeping, because it rules out a whole
+family of fixes: **the dye's advection cannot dilute.** It is semi-Lagrangian,
+so it transports a value along a characteristic — `dye_new(x) = dye_old(x − v·dt)`
+— with no `−c(∇·v)` term. A radially symmetric source has zero velocity at its
+centre, so that cell backtraces onto itself and keeps its dye for ever however
+strong the source is. That is why a hundred times the strength moved 0.67 to
+0.62 and six times the settling time reached an asymptote at 0.59.
+
+**So the operator has to be local, and a multiply is the only local one.**
+`dye *= 1 − clear·a` needs no transport and therefore reaches the middle:
+measured **0.002–0.013 under a bubble against 5.2–5.5 around it**, against
+1.362/1.998 for the exchange it replaces. That is the claim H6 exists to make,
+and it now holds.
+
+### What it cost, and what is still open
+
+A multiply destroys what it removes, which is why it was abandoned the first
+time. Three things were tried to keep the dye:
+
+- **The plate's dye-budget servo, made symmetric.** Never engaged: the deficit
+  term is quadratic, so a plate 10% under its budget contributes 0.0001.
+- **A compensating uniform gain from the air's area fraction.** Wrong in
+  principle — after the first step the interior is already empty and nothing
+  more is being taken, so an area-based gain compounds every step.
+- **A ring of the displaced dye at the rim,** from the density mirror, which is
+  what works. The mirror being a frame behind is exactly right: on the frame a
+  bubble arrives it still holds the dye the GPU is removing, so the disc total
+  *is* the mass to move. Both halves read the same mirror, so it conserves by
+  construction. It must be gated on the mirror having actually refreshed —
+  depositing twice from a stale mirror measured as a plate 4–8% over its
+  control and a popped bubble refilling to 124%.
+
+With the ring, the plate keeps its dye: **99.6–105.1% of a no-bubble control**
+over twenty seconds, against 82.7% without it. The control matters — the plate
+drains to **90.7%** on its own in that time, so most of what looked like the
+bubble's fault was the plate settling.
+
+**What is not solved: a popped bubble's hole does not close.** 0.123 against
+2.410 twenty-four seconds after the pop, with the plate released to a normal
+speed. The dye is conserved and sitting in the ring; nothing brings it back in,
+because once the air is gone there is no force pointing inward, and `classic`
+has diffusion measured at zero. A hole therefore persists and advects around as
+a ghost.
+
+The mechanism that should close it already exists and is too brief: the rate
+term in `divergence` is a *sink* while air is leaving, but an abrupt
+`bubbles.clear()` empties the field in one frame, so the sink acts for one
+frame and is clamped. Two candidates, neither tried:
+
+1. **A leaky trail.** Keep `trail = max(air, trail·decay)` in a third field and
+   difference against that instead of last frame, so a departed bubble pulls
+   liquid inward for about a second rather than one frame.
+2. **Return the ring on the CPU,** symmetric with the deposit: diff the bubble
+   list, and for a bubble that has gone, move the annulus back into the disc.
+   Exact and cheap, and needs a way to match bubbles across frames.
+
+Until one lands, the exclusion leaves visible holes and should not go to the
+deployed site. The check is left failing and says the number, as the last one
+did.
+
+### A latent bug this turned up
+
+`bestRad` in the compositor is the constant **0.03** — the radius a bubble was
+given before the air field replaced the forty uniforms. The sample meant to
+read the liquid *beyond* the rim is taken at `bestRad · 1.35`, so on any bubble
+wider than that it lands **inside** the bubble. It did not show while the dye
+was still there to be sampled; with a real hole it reads nothing, the film
+thickness goes to zero and the tint goes white. It now walks outward along the
+air field until the air stops, six taps, inside the branch that already
+requires air, so a plate without bubbles pays nothing.
+
+**And a warning about the check next to it.** "The light it adds is the liquid
+lit" gates on a mean over pixels it classes as lit, and emptying the hole
+changed that population by a factor of ten — 9944 pixels before, 823–1187
+after. At one setting it read 24.0°, 39.2° and 41.9° on three runs. It is not
+comparable across this change and it is too noisy to tune against; it needs a
+fixed population before it can gate anything.
+
+### Candidate 1 tried: a leaky trail, and it is not enough (2026-09-21)
+
+Built and measured and taken out again. `trail = max(air, trail · decay)` in a
+third field, with the rate term differencing against that instead of last
+frame, so a popped bubble leaves a sink for about a second rather than one
+clamped frame.
+
+**Two bugs found on the way, both worth more than the mechanism.**
+
+*`r16float` is not a storage format.* The trail was made to match the air field
+and the whole command buffer was rejected — single-channel 16-bit float needs
+`texture-formats-tier1`. It is the exact mirror of the trap that opened H6: the
+field has to be `r16float` because it **blends**, and the trail has to be
+`r32float` because a compute pass **writes** it. The symptom looks nothing like
+a format error and is worth recognising: **the plate freezes**, and the readback
+repeats the same number to four decimals, because none of the step's work runs.
+
+*The air source was gated on live bubbles.* `airPush = air.any ? clear : 0`,
+so the moment the list emptied the entire source was multiplied by zero — and
+the trail exists precisely to act after that. The trail was built, measured and
+did nothing, because everything it fed was being zeroed. It has to linger on
+the same half-life.
+
+**With both fixed it still is not enough.** The refill went from 0.003 to
+0.032–0.060 against surroundings of about 2.4 — ten to twenty times better and
+still two orders of magnitude short. Three likely reasons, none chased:
+
+- the sink is spread over the trail's whole footprint rather than concentrated
+  where the dye has to arrive;
+- **the rate term is not zero-mean.** The standing term has the plate's air
+  fraction subtracted for exactly this reason; the rate term never did, and a
+  sink with no compensating source has no Neumann solution for the projection
+  to find. This is probably the real limit, and it is the same condition
+  `pressureSelfTest` exists to protect;
+- seven cells of semi-Lagrangian transport on a slow plate is simply slow.
+
+So candidate 2 — returning the ring on the CPU, symmetric with the deposit,
+using the `mul` buffer that already exists for taking dye away — is the one to
+try next, and the zero-mean fix should be tried first because it is one line
+and it may be what has been limiting the source all along.
+
+## E. The two glasses, and four things a hand does (2026-09-21)
+
+Four complaints, each traced to a specific line, each fixed, and **none of the
+fixes measurable** by the harness written for them. Recorded in that order
+because the last part is the part that matters.
+
+### What was found
+
+**A press was over in a twelfth of a second.** The squeeze kernel sprang the
+gap back a fixed 0.005 a step across a range of 0.025 — five steps — and
+decayed the squeeze itself by half every step, a 17ms half-life. Both are far
+quicker than a hand.
+
+**And the release did nothing.** `dhdt` was written only from the press delta,
+so the plates coming back apart contributed nothing: liquid was pushed out and
+never drawn back.
+
+**The plates were flats.** The gap was one constant for the whole plate, so the
+two glasses sat perfectly parallel, which no real pair of clock glasses does.
+
+**A puff was purely radial.** `blowAir` adds `(i/dist, j/dist) · strength`,
+which is exactly curl-free — precisely what the pressure projection exists to
+remove. Most of a puff was deleted at the end of the step that applied it.
+
+**And nothing dragged the liquid round with a turning plate.** The rotational
+coupling, `twist`, was driven by the `rotationSpeed` *setting* — the motor —
+not by what the plate is actually doing, so a flicked plate turned underneath
+its liquid without taking it along.
+
+### What was changed
+
+`plateCurve` gives the rest gap a dome; `plateSpring` makes the lift a rate
+from 0.12s to 2.3s; the spring's own motion now goes into `dhdt` so a release
+pulls liquid back; `gapMemory` gives the squeeze a 0.22s half-life instead of
+0.017s; both blows carry a swirl, the directed one as a counter-rotating pair
+either side of the jet; and `twist` picks up the part of the plate's motion the
+motor did not ask for, scaled by how hard the plates are pressed together.
+
+### What the measurement says: nothing changed
+
+`npm run plates`, against the same commit with and without all of it:
+
+| | before | after |
+|---|---|---|
+| a press moves the dye | 0.0262 against 0.0139 idle — **1.88x** | 0.0270 against 0.0147 — **1.84x** |
+| a blow moves the dye | 0.0642 against 0.0139 — **4.62x** | 0.0677 against 0.0147 — **4.60x** |
+| the dome moves where dye gathers | 1.622 / 1.602 | 1.884 / 1.862 |
+
+**The dome's null result is understood and is the useful one.** A gap that
+varies across the plate changes nothing, because *depth is not coupled to
+flow*: advection, diffusion and the projection are all depth-blind, and the gap
+field feeds only the squeeze pressure. A real Hele-Shaw cell obeys Darcy's law
+with mobility proportional to h², so thin places resist and thick places carry.
+Without that term a dome is decoration. **It is the prerequisite, not a
+refinement** — see F below.
+
+The press and blow results are not understood. The metric is total dye change,
+which is dominated by what those tools do to the dye *directly* — both multiply
+it down where they act — rather than by the flow they set up, so it may simply
+be insensitive to what was changed. That is a hypothesis and it is not tested.
+
+### And two instrument faults worth keeping
+
+**A press has to be held.** The first version called it once, one frame, and
+measured nothing at all. The gap delta is zeroed at every flush, so one call is
+one frame of squeeze — and with the release now pulling liquid back, a
+one-frame push followed by a slow lift nearly cancels inside one window.
+
+**The plate settles for as long as the harness runs.** Liquid speed read
+3.55e-1 early and 3.02e-1 several minutes later with nothing done to it, so a
+blow measured late looked *slower than an idle plate*. Every control here has
+to be contemporaneous with the thing it controls for, not taken at the top of
+the run.
+
+## F. Depth, and a plate that is wet everywhere
+
+Two questions asked of this, and they turn out to want the same field.
+
+**Does depth resist flow?** No. The gap is a real depth and it feeds only the
+squeeze. Giving the velocity a Darcy mobility in h² would make liquid run in
+the deep channels and stall where the glasses nearly touch — and it is what
+makes the dome in E do anything at all.
+
+**Is there water under the dye?** No. `dye.a` of zero means *nothing is there*,
+not clear liquid. A real plate is wet everywhere and the dye is a tracer in it.
+
+A clear carrier is worth more than it looks, because three separate things all
+want it and none can be expressed without it: drying, where dye concentrates as
+water leaves; wet-plate optics, where bare plate still refracts; and the oil
+saturation in D, whose whole state variable is *how much of the surface is
+already covered*. One field, three features, and one of them was already on the
+list from a different direction.
+
+
+## A, closed: the hole fills when the bubble pops (2026-09-21)
+
+**The exclusion works now.** A bubble is a hole while it is there, the plate
+keeps its dye, and the hole fills when the bubble goes.
+
+    and there is no dye left under it     0.002 against 5.490 around
+    and the dye comes back once gone      1.438 against 2.821, at the first
+                                          poll after the pop
+
+Against 0.003–0.123 twenty-four seconds after a pop before this, and 1.362
+against 1.998 for the neighbour exchange this whole line of work replaced.
+
+### What finally did it, after two things that did not
+
+**A leaky trail** so the divergence's sink outlives a pop by about a second
+rather than one clamped frame: 0.003 to 0.032–0.060.
+
+**Making that source zero-mean**, which was a real fault — the standing term
+has the plate's air fraction subtracted because a Neumann problem whose source
+does not average to zero has no solution for the projection to find, and the
+rate term never had the same treatment: 0.061. That correction is kept, on its
+own merits.
+
+Both are twenty times better than nothing and two orders short of enough, and
+the reason is the same one that runs through all of H6: **the transport cannot
+get there.** Semi-Lagrangian advection carries a value along a characteristic,
+a radially symmetric source has no velocity at its centre, and no amount of
+source strength changes either fact.
+
+So the fill is done on the CPU, where it is exact. The part that made earlier
+sketches awkward was bookkeeping — remembering how much each bubble had taken,
+across frames, for bubbles that have no identity. **It turns out not to be
+needed.** A collapsing ring falls inward until the level evens out, so a popped
+bubble's hole is filled from its own annulus until the two concentrations
+match. That conserves by construction, stops itself at the right moment, and
+needs nothing remembered but where the bubbles were last frame. Bubbles are
+matched between frames by position — they drift with the liquid, so anything
+within half a radius is the same one — and a cleared list matches nothing,
+which is exactly right.
+
+### The one check still failing, and why it is not loosened
+
+"The light it adds is the liquid lit, not paint on top of it" reads 45–52°
+against a gate of 22. It is measuring against the wrong reference now, and the
+reason is the feature working rather than failing: it compares the light a
+bubble adds against **the ground under the bubble**, which was right while a
+bubble shaded over dye. A hole shows the lamp, tinted by what the rim refracts
+inward — deliberately not the dye that used to be there, which is gone. The
+compositor already reads its tint from beyond the rim for this reason.
+
+It is also not a trustworthy instrument as written: it averages over the pixels
+it classes as lit, and that population has run from 9944 to 823 to 4532 across
+these changes, reading 14.6, 23.8, 24.0, 30.6, 39.2, 41.9, 45.3 and 51.6
+degrees. **Its reference and its population both need fixing before it can gate
+anything**, and neither should be done in the same change as the thing it is
+meant to be judging.
+
+
+## A, finished: the optics checks were measuring the wrong things (2026-09-21)
+
+The last check standing was not a defect in the bubbles. It was three checks
+built for a bubble that **shaded over** dye, still being asked about a bubble
+that is a **hole**, and each failed in a way that got worse the better the
+feature got.
+
+### "The light it adds is the liquid lit" was inverted
+
+It took the angle between the light a bubble adds and the ground's own colour,
+on the reasoning that neutral white on a red plate is a wide angle and light
+carrying the dye's colour is a narrow one. True for shading. For a hole it is
+backwards: a backlit dish filters the lamp through the dye, so red dye passes
+red and absorbs green and blue, and a hole passes the lamp unfiltered. The
+light a *correct* hole adds is therefore nearly the **complement** of the
+ground — ninety degrees from it, which is the "worst 90.0" that appeared in
+every run. **The check failed hardest on the most physically correct hole**,
+and no choice of reference rescues it, because the claim itself is false:
+light through a hole is the lamp's, not the liquid's.
+
+It is replaced by the question those two neighbours cannot ask. **Paint adds
+the same light wherever it lands; a hole reveals the lamp in proportion to how
+much dye was stopping it.** Pair each pixel's brightness gain with how thick
+the dye under it was, split at the median, and a hole brightens the thick half
+more. Validated by a control — the compositor patched to add a constant white
+instead of mixing toward the lamp — which reads 0.033 against 0.039, the thick
+half gaining *less*, and fails. The real thing reads 0.159 against 0.110.
+
+### "Does not shift its hue" was measuring hues that did not exist
+
+A pixel the bubble lightens toward grey has no meaningful hue, and the angle
+between an arbitrary hue and a real one runs to 180 degrees — the "worst 180.0"
+in every run. The mean read 32.3 and then 4.9 on the same build, with the
+qualifying population swinging 8096 to 2841. Weighted by the saturation that
+survives, it reads 1.0, 1.3, 1.5, 2.0, 2.4, 2.6 across six runs.
+
+### "Keeps the colour of the liquid it is in" was averaging two different claims
+
+A flat mean over the footprint mixes bubble interiors with rim pixels the
+bubble barely touched, and the mixture moves with where twelve bubbles land on
+a drifting plate: 2%, 8%, 9%, 10%, 39% on one build against a gate of a third.
+Weighting by the light added made it *stable* at 51-56% and consistently
+failing — which is the useful result, because it was then measuring the
+interiors, and **a real hole is supposed to desaturate there.** The interior is
+the lamp coming through unfiltered. That is the whole of H6.
+
+So the two are split by how much light the bubble added: the half it barely
+touched is the rim, and the claim is made about that. The rim loses **-5%, 6%,
+-1%** — nothing, and occasionally it gains, because the rim is where the
+displaced dye went. The core loses 44-67%, printed beside it and not gated,
+because there is no number it ought to hold.
+
+### And the fill only ever ran once
+
+The refill sat at 43-53% of the surroundings, right on its gate, and the reason
+was not physical: a popped bubble is in last frame's list for exactly one
+frame, so the fill moved 0.35 of the deficit and never ran again. Holes are
+carried now until they have nothing left to move, and the refill reads
+**3.575 against 3.146, 3.566 against 3.095, 3.598 against 3.143** — back to
+about 114% of its surroundings, the ring having collapsed inward and
+concentrated a little before it evens out.
+
+Reaching wider for the dye was tried first and is worse — 24-29% against 48-53%
+— because a wider annulus averages the enriched ring together with ordinary
+liquid, so the level the fill equalises toward drops. The dye is in the ring.
+
+### The lamp's share of the interior, chosen by measurement
+
+With the interior empty, all of its colour comes from one mix, and the two
+sound checks pull opposite ways:
+
+| white pull | hue shift | thick vs thin gain |
+|---|---|---|
+| 0.25 | 8.9-13.1 degrees, on its gate of 12 | 0.159 / 0.110 — 1.45x |
+| 0.10 | 1.7 degrees | 0.094 / 0.085 — 1.11x, fails |
+| **0.18** | **9.3 degrees** | **0.169 / 0.046 — 3.7x** |
+
+Tinting harder keeps the liquid's hue and flattens how much the lamp depends on
+the dye it comes through, which is the one thing separating a hole from a
+highlight painted on top. Eighteen hundredths holds both with room.
+
+**`npm run bubbles` is 18/18 on three runs in four**, the fourth flaking on the
+lamp check, which carries a 1.45x to 3.7x margin when it passes.

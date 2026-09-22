@@ -11,6 +11,15 @@
 /** Everything a step needs, already derived from settings by the caller. */
 export interface GpuStepParams {
   dt: number;
+  /**
+   * How completely a bubble empties the dye under it (H6 · A).
+   *
+   * 1 is the physical answer — a bubble is a hole, and a hole holds no
+   * liquid. Lower keeps some of the old look, where a bubble shaded what was
+   * behind it rather than removing it, for presets built around that. 0
+   * skips the stage altogether.
+   */
+  bubbleClear?: number;
   visc: number;         // Hele-Shaw viscosity (thick 1.5 / thin 0.5)
   nu: number;           // kinematic viscosity for momentum diffusion
   diff: number;         // dye / heat diffusivity
@@ -26,7 +35,13 @@ export interface GpuStepParams {
   turbScale: number;
   turbDetail: number;
   spin: number;         // vorticity strength (0 = off)
-  surfaceTension: number;
+  immiscibility: number;
+  /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
+  plateCurve: number;
+  /** How fast the plates spring back toward that dome, per step. */
+  gapSpring: number;
+  /** How much of a press's squeeze survives into the next step. */
+  gapMemory: number;
   fingering: number;
   vibIntensity: number;
   vibFrequency: number;
@@ -77,6 +92,13 @@ export interface PlateSolver {
   readonly grainMix: number;
   /** The coordinates the pigment rides, where the device can carry them. */
   readonly grainTexture?: unknown;
+  /**
+   * How much of the plate the air is taking, 0 when nothing is excluding.
+   *
+   * Optional because only the WebGPU solver carries an air field; the
+   * budget servo that reads it treats absence as none (H6 · A).
+   */
+  readonly airDisplacing?: number;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
   /** Start a read and take whatever has landed; false before the first. */

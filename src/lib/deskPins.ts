@@ -155,6 +155,13 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: 1, section: 'lamp' },
+  // Film stock (F1): what the whole show is photographed on, as against the
+  // `film*` settings, which drive the projector that plays video through dye.
+  { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },
+  { key: 'stockGrain', label: "Grain", min: 0, max: 1, section: 'stock' },
+  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 6, section: 'stock' },
+  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 3, section: 'stock' },
+  { key: 'stockGate', label: "Gate Edge", min: 0, max: 1, section: 'stock' },
   { key: 'transmission', label: "Light Through Dye", min: 0, max: 1, section: 'lamp' },
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
@@ -167,6 +174,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 1, section: 'macro' },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
+  { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'physics' },
+  { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'physics' },
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'squish' },
@@ -194,6 +203,7 @@ const FROM_PANEL: DeskSpec[] = [
     saving only arrives at exactly zero, where the solver skips the stage, so
     a look that wants none should say none.
   */
+  { key: 'surge', label: "Surge", min: 0, max: 1, section: 'automation' },
   { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: DIFFUSION_CEILING, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },
@@ -206,6 +216,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Layers", min: 1, max: 2, section: 'layers', step: 1 },
   { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'layers' },
+  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'layers' },
+  { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'layers' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },
   { key: 'centerGravity', label: "Center Gravity (Concave)", min: 0, max: 1, section: 'layers' },
   { key: 'gooeyEffect', label: "Gooey Blending", min: 0, max: 1, section: 'layers' },];

@@ -146,7 +146,16 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   // screen-fixed grain, which is why this is per-frame, not per-layer: the
   // second plate borrows the lead's coordinates when it has none, so only the
   // lead's decide it.
-  const gran = clamp01(s.granulation ?? 0);
+  /*
+    The plate's own grain gives way to the stock's (F1, filters-plan E6).
+
+    Two grains at once is the one thing this effect must not do: the plate's
+    is pigment settling in the dye, the stock's is dye clouds in the film, and
+    a frame carrying both reads as noise rather than as either. The stock is
+    photographing the plate, so it wins — and at half strength the plate's is
+    already halfway out of the way.
+  */
+  const gran = clamp01(s.granulation ?? 0) * (1 - clamp01(s.stock ?? 0));
   const leadGrain = fluids[0]?.gpu?.grainTexture ?? null;
   const grainOn = gran > 0.002 && Boolean(leadGrain) ? 1 : 0;
 

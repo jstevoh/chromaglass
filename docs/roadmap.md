@@ -17,8 +17,14 @@ this repo.
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
 | **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | **Ready to build.** The cutover they were waiting for has landed and the post chain is under them; each is written once, in WGSL, as H5 below |
-| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **Ready to build**, as H6–H8 below |
+| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 started.** The air field is built and proven on `claude/h6-air-field`, unmerged until the compositor reads it; H7–H8 not begun |
+| **The solver's speed** | this page, H0–H3 | **Done.** 768² with two layers went 38.6 ms a frame to 17.1 — the display's refresh — and a 1024² rung exists above it. The solver no longer bounds that rung |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the renderer settled, which it now is; the rest of §5 is independent |
+
+**The compiler is on.** `@types/react` was never installed, so every React API and every
+JSX element was `any` — which is how a settings object missing 33 required keys shipped.
+`strict` costs zero errors now that the types are there, so a look handed over
+incomplete is a build failure rather than a plate with its texture switched off.
 
 **The shader freeze is over.** It ran from 2026-09-19 until the cutover, and it did its
 job: nothing was written twice. There is one shading language in the tree now — WGSL, in
@@ -192,9 +198,33 @@ job: nothing was written twice. There is one shading language in the tree now �
      already built — the history ring and its self-test shipped with F0 — so it and H6
      are the two places to reach when what's wanted is something visible this week
      rather than a faster frame.
-   - **H6 · Air as a field** ([`bubbles-plan.md`](bubbles-plan.md) A). Small, and it
-     fixes something visibly wrong: bubbles are shading over the dye rather than holes
-     in it.
+   - **H6 · Air as a field** ([`bubbles-plan.md`](bubbles-plan.md) A). Fixes something
+     visibly wrong: bubbles are shading over the dye rather than holes in it.
+     *The field landed 2026-09-21, on `claude/h6-air-field`, and is deliberately not
+     merged.* A render pass stamps the bubble list into an `r16float` coverage field
+     with `max` blending, and `airExclude` multiplies the dye by `1 - air` after the
+     advection, for 0.197 ms — 2.9% of a step. `npm run bubbles` proves the air lands
+     where the bubbles are: peak 1.00, 0.030 of the plate from a position the check
+     chose, 0.635 from its mirror, and nothing at all once the plate is cleared.
+     *Why it is not merged:* the compositor still draws bubbles from its own forty
+     uniforms, so on its own this takes dye out from under a bubble with nothing on
+     screen saying why — and the rim that puts the dye back is a later slice. The
+     shippable unit is the field **and** the compositor reading it.
+     *What is left, in order:* the compositor reads the field and the metaball loop
+     goes (which is also what lifts the forty-bubble cap); the rim, so the dye that was
+     pushed aside is conserved rather than deleted; then the divergence source and the
+     surface tension, which are what make the liquid flow *around* a bubble.
+     *Three things that cost an hour and are worth knowing before touching it:*
+     `r32float` is **not blendable** and the splat blends, so the whole pipeline is
+     rejected and the field is silently empty; `smoothstep` with its edges the wrong
+     way round is undefined in WGSL and returns near zero, which makes a field of
+     discs in the right places peaking at 0.01; and a readback has to match the
+     texture's format — two-byte halves read as four-byte floats produce a plausible
+     field in the wrong place, which is what two of the three wrong guesses were
+     chasing.
+     *The check that found all of it* asked **where** the air was against a number it
+     chose in advance, with a control that clears the plate. Nothing that only asked
+     whether air existed would have caught any of the three.
    - **H7 · The second phase** ([`bubbles-plan.md`](bubbles-plan.md) B): a heavy,
      immiscible liquid with surface tension and a magnet — ferrofluid, at both macro and
      plate scale. Absorbs the oil-bead mask.
@@ -204,6 +234,15 @@ job: nothing was written twice. There is one shading language in the tree now �
 3. **A pass over the desk,** once the headroom is real: the settings, the presets and the
    Songs sequencer re-tuned for what is now cheap — defaults that assumed a 384² grid and
    a 24-pass solver, and ranges that were capped by the old cost.
+   *Started by symptom rather than by plan.* Speed has now been scaled twice from the
+   floor — every preset by 0.6, then by 0.7 again when looks still opened too fast — so
+   the median is 0.0126 where it was 0.030, and `lucky.ts` has followed both times
+   because `npm run panel` holds the dice to the looks' own median. That is two rounds
+   of somebody watching a plate and saying "too fast", which is what this item exists
+   to do properly and in one pass. **`lace-run` is still 0.189, fifteen times the
+   median**, with `macro-bead` at 0.118 and `cell-bloom` at 0.076: uniform scaling
+   keeps an outlier proportionally as much of an outlier, and those three want deciding
+   individually rather than divided again.
 4. **`PLAN.md` §6, Render a song,** once the renderer is settled: seeded randomness,
    offline audio analysis, and frames encoded rather than captured.
 
@@ -233,6 +272,45 @@ job: nothing was written twice. There is one shading language in the tree now �
   rim, and air is the simpler of the two. The second phase inherits that machinery.
 - **The bottles last,** because each one is cheap once the fields are on the GPU, and
   because they are the easiest thing to add too many of.
+
+## What a check has to do to count
+
+Written down on 2026-09-21, after nine separate checks in one day turned out to be
+green because they could not fail.
+
+Every one had the same shape: **a check that cannot tell "the system had nothing to
+give" from "the system worked".** A painter that declined to draw and said nothing, so
+a harness measured a frame nobody drew. A `populate` that placed no beads, so a test
+compared a count to itself — `0 === 0` — and passed while proving nothing; that one had
+been green and empty for an unknown length of time, and it skipped a deploy. A single
+frame of a drifting plate read as a grade. A settings roll handing over 33 keys as
+`undefined`. A `switch` with no `default`. A twenty-minute job timeout over a
+documented thirty-four-minute worst case. An air field that was entirely empty while a
+stage ran over it for 0.197 ms of every step and eleven checks passed.
+
+Three rules came out of it, and they cost less than the hour any one of these took to
+find:
+
+1. **Ask where, not whether.** "Is there air" passed on an empty field, on a field
+   peaking at 0.01, and on one read through the wrong format. "Is the air within 0.06
+   of the position this check chose, and *not* near its mirror" passed on none of them.
+   A claim with a number in it that the check picked in advance is worth more than any
+   amount of asserting that something happened.
+2. **Run the control.** A check that has never been seen to fail is a check that is
+   measuring nothing, and there is no way to tell the two apart from the outside. Force
+   the failing condition once — a software engine, a black frame, a flipped field — and
+   watch it go red before trusting it green.
+3. **Suspect the instrument first.** Of the faults above, more were in the measuring
+   than in the thing measured: a readback that did not match its texture's format, a
+   regex that mis-parsed a union three times, a grep that filtered out the error it was
+   looking for, a report of 3774 type errors where the real number was zero. When a
+   measurement disagrees with what you expected, check the instrument before you write
+   down the finding.
+
+The compiler is the strongest instrument available and was not switched on: the project
+carried no `@types/react`, so every React API and every JSX element was `any`, which is
+why `setSettings` accepted an object missing 33 required keys. `strict` is on now, at a
+cost of zero errors once the types were installed.
 
 ## How to read the plans
 
