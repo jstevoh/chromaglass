@@ -17,7 +17,7 @@ this repo.
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
 | **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | **Ready to build.** The cutover they were waiting for has landed and the post chain is under them; each is written once, in WGSL, as H5 below |
-| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 started.** The air field is built and proven on `claude/h6-air-field`, unmerged until the compositor reads it; H7–H8 not begun |
+| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 done and merged (#117).** A bubble is a hole: 0.004 of the dye under it against 5.4 around, the plate keeps its colour, and a popped hole fills back to about 114% of its surroundings. H7–H8 not begun; three new sections (D, E, F) came out of building it |
 | **The solver's speed** | this page, H0–H3 | **Done.** 768² with two layers went 38.6 ms a frame to 17.1 — the display's refresh — and a 1024² rung exists above it. The solver no longer bounds that rung |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the renderer settled, which it now is; the rest of §5 is independent |
 
@@ -198,36 +198,60 @@ job: nothing was written twice. There is one shading language in the tree now �
      already built — the history ring and its self-test shipped with F0 — so it and H6
      are the two places to reach when what's wanted is something visible this week
      rather than a faster frame.
-   - **H6 · Air as a field** ([`bubbles-plan.md`](bubbles-plan.md) A). Fixes something
-     visibly wrong: bubbles are shading over the dye rather than holes in it.
-     *The field landed 2026-09-21, on `claude/h6-air-field`, and is deliberately not
-     merged.* A render pass stamps the bubble list into an `r16float` coverage field
-     with `max` blending, and `airExclude` multiplies the dye by `1 - air` after the
-     advection, for 0.197 ms — 2.9% of a step. `npm run bubbles` proves the air lands
-     where the bubbles are: peak 1.00, 0.030 of the plate from a position the check
-     chose, 0.635 from its mirror, and nothing at all once the plate is cleared.
-     *Why it is not merged:* the compositor still draws bubbles from its own forty
-     uniforms, so on its own this takes dye out from under a bubble with nothing on
-     screen saying why — and the rim that puts the dye back is a later slice. The
-     shippable unit is the field **and** the compositor reading it.
-     *What is left, in order:* the compositor reads the field and the metaball loop
-     goes (which is also what lifts the forty-bubble cap); the rim, so the dye that was
-     pushed aside is conserved rather than deleted; then the divergence source and the
-     surface tension, which are what make the liquid flow *around* a bubble.
-     *Three things that cost an hour and are worth knowing before touching it:*
-     `r32float` is **not blendable** and the splat blends, so the whole pipeline is
-     rejected and the field is silently empty; `smoothstep` with its edges the wrong
-     way round is undefined in WGSL and returns near zero, which makes a field of
-     discs in the right places peaking at 0.01; and a readback has to match the
-     texture's format — two-byte halves read as four-byte floats produce a plausible
-     field in the wrong place, which is what two of the three wrong guesses were
-     chasing.
-     *The check that found all of it* asked **where** the air was against a number it
-     chose in advance, with a control that clears the plate. Nothing that only asked
-     whether air existed would have caught any of the three.
+   - ~~**H6 · Air as a field**~~ ([`bubbles-plan.md`](bubbles-plan.md) A) — **done
+     2026-09-21, merged in #117.** A bubble is a hole rather than shading over the dye:
+     **0.004** of the dye under one against **5.4** around it, where the mechanism it
+     replaced reached only 1.362 against 1.998. The plate keeps its colour (99.6–105.1%
+     of a no-bubble control) and a popped hole fills back to about **114%** of its
+     surroundings.
+     *What it cost to learn, and what it is worth reading before touching the solver:*
+     every operator driven by the air **gradient** is zero where the air is uniform, so
+     none of them can reach the middle of a bubble — the radial profile said it flatly,
+     with the centre at 0.990 of an identical plate carrying no bubble. Under that sits
+     the reason no amount of pushing helped: the dye's advection is semi-Lagrangian, so
+     it carries a value along a characteristic and has **no term that dilutes**, and a
+     radially symmetric source has no velocity at its centre. A hundred times the
+     source strength moved 0.67 to 0.62. Only a *local* operator reaches a uniform
+     interior, which is why the answer is a multiply, and the dye it removes is put
+     back as a ring — on the CPU, where it is exact.
+     *Formats, twice, in opposite directions:* `r32float` is **not blendable** and the
+     splat blends; `r16float` is **not a storage format** and a compute pass writes the
+     trail. The first rejects a pipeline and leaves a silently empty field; the second
+     rejects the command buffer and **the whole plate freezes**, which looks nothing
+     like a format error.
+     *And the checks were the harder half.* Three optics checks written for a bubble
+     that shaded over dye were still being asked about a bubble that is a hole, and one
+     of them was **inverted** — a backlit dish filters the lamp through the dye, so the
+     light a correct hole adds is nearly the complement of the ground, and the check
+     failed hardest on the most physically correct hole. They are rewritten and
+     validated against controls; see `bubbles-plan.md`.
+
    - **H7 · The second phase** ([`bubbles-plan.md`](bubbles-plan.md) B): a heavy,
      immiscible liquid with surface tension and a magnet — ferrofluid, at both macro and
      plate scale. Absorbs the oil-bead mask.
+     *It asks for a density difference*, "so the heavy phase sinks against the plate
+     rock and the tilt" — and there is no such thing in here to build on. The plate
+     carries **one** dye field and **one** velocity field, so every colour shares the
+     same momentum and nothing can stratify; the only density-like force is
+     `tanh(dye.a − meanD)`, which is how *much* dye and not what *kind*, and
+     immiscibility is repulsion by colour difference. That is section F below, and it
+     is H7's floor rather than a nicety.
+   - **F · Depth, and a plate that is wet everywhere**
+     ([`bubbles-plan.md`](bubbles-plan.md) F): the gap field is a real depth and feeds
+     only the squeeze, so advection, diffusion and the projection are all depth-blind.
+     A Hele-Shaw cell obeys Darcy with mobility in h², which is what would make liquid
+     run in the deep channels and stall where the glasses nearly touch — and what would
+     make the plate's dome (E) do anything at all, since it currently does nothing
+     measurable. The other half is a clear carrier: `dye.a` of zero means *nothing is
+     there* rather than clear liquid, and three separate features want that one field —
+     drying, wet-plate optics, and the oil saturation in D.
+   - **D · Spreading, and why a first pour is not a tenth**
+     ([`bubbles-plan.md`](bubbles-plan.md) D): oil on clean water spreads to a
+     monolayer; oil on oil sits where it lands. The state variable is surface coverage
+     and the force is `∇γ`, not γ. **The trap is written down**: a pure gradient force
+     added to the velocity is exactly what the projection removes, which is the same
+     wall H6 hit three times, so it has to enter the divergence, the dye's transport,
+     or a multiply.
    - **H8 · More bottles** ([`bubbles-plan.md`](bubbles-plan.md) C): latex, oil paint,
      clear medium, glycol first; then fizz, salt, slime, cornstarch, bleach. Needs the
      liquid field moved to the GPU.
