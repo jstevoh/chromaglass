@@ -214,6 +214,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Layers", min: 1, max: 2, section: 'layers', step: 1 },
   { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'layers' },
+  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'layers' },
+  { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'layers' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },
   { key: 'centerGravity', label: "Center Gravity (Concave)", min: 0, max: 1, section: 'layers' },
   { key: 'gooeyEffect', label: "Gooey Blending", min: 0, max: 1, section: 'layers' },];

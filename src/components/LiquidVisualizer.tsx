@@ -46,6 +46,15 @@ interface LiquidVisualizerProps {
   audioData: AudioData | null;
   settings: VisualizerSettings;
   seedCount?: number;
+  /**
+   * A flick of one plate: spin it up and let it coast down.
+   *
+   * A counter and a layer rather than a speed, the way `seedCount` is a
+   * counter: it is a momentary thing, and two flicks in a row have to both
+   * land. The strength is `spinImpulse`, so a pad and the screen button hit
+   * exactly as hard as each other.
+   */
+  spinFlick?: { seq: number; layer: number };
   selectedLiquid?: LiquidType;
   /**
    * Where the plate is drawn on this screen, in CSS pixels.
@@ -2615,7 +2624,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, selectedLiquid, frame = null,
+  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef,
@@ -2800,6 +2809,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   const rotationAnglesRef = useRef<number[]>([]);
+  /*
+    The plate's angular velocity, in radians a second, one per layer.
+    
+    Rotation used to be a speed and nothing else: the angle took
+    `rotationSpeed * dt` every frame and the plate turned at exactly what the
+    slider said. A plate is a thing with mass resting on something, so this
+    carries the speed as *state* — a flick adds to it, the bed it rests on
+    takes it away, and the slider becomes a motor the flywheel relaxes toward
+    rather than a position it is teleported to.
+  */
+  const spinVelRef = useRef<number[]>([]);
+  const lastFlickRef = useRef(0);
+
   /**
    * The GL context, lost and got back.
    *
@@ -2995,6 +3017,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     bubblesRef.current.clear();
     chemRef.current.reset();
     rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    spinVelRef.current = spinVelRef.current.map(() => 0);
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
@@ -3379,6 +3402,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  /**
+   * Spin a plate up, in radians a second added to whatever it is already doing.
+   *
+   * Exported on the debug hook as well as wired to the prop, so a harness can
+   * flick a plate without a pad or a pointer. A second flick adds to the
+   * first, which is what a hand does to a turntable.
+   */
+  const flickSpin = (layer: number, strength = 1): void => {
+    const l = Math.max(0, Math.min(spinVelRef.current.length - 1, Math.floor(layer)));
+    if (!(l >= 0) || spinVelRef.current.length === 0) return;
+    // Layers alternate direction, as they do for the motor, so a flick on the
+    // back plate turns the other way and the two shear against each other.
+    const dir = l % 2 === 0 ? 1 : -1;
+    // Up to about six-tenths of a turn a second at full strength, which is
+    // sixty times what the rotationSpeed slider can ask for at its top. That
+    // is deliberate: the slider is a drift that keeps a plate alive, and a
+    // flick is meant to be seen.
+    const top = 2 * Math.PI * 0.6;
+    const add = dir * Math.max(0, Math.min(2, strength)) * (settingsRef.current.spinImpulse ?? 0.5) * top;
+    if (Number.isFinite(add)) spinVelRef.current[l] = (spinVelRef.current[l] ?? 0) + add;
+  };
+
+  useEffect(() => {
+    if (!spinFlick || spinFlick.seq === lastFlickRef.current) return;
+    lastFlickRef.current = spinFlick.seq;
+    flickSpin(spinFlick.layer);
+    // flickSpin reads refs only, so it does not belong in the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinFlick]);
   useEffect(() => { selectedLiquidRef.current = selectedLiquid; }, [selectedLiquid]);
   useEffect(() => { activeLayerRef.current = activeLayer; }, [activeLayer]);
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
@@ -3409,12 +3462,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
+        spinVelRef.current.push(0);
 
       }
     } else if (currentCount > targetCount) {
       for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
+      spinVelRef.current = spinVelRef.current.slice(0, targetCount);
     }
   }, [settings.layerCount]);
 
@@ -4581,7 +4636,47 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               back. A plate that has gone strange and *stays* strange after
               the setting is put back is this line.
             */
-            const turn = rotationSpeed * dirMod * realDt;
+            /*
+              The plate as a flywheel.
+
+              `rotationSpeed` is the motor: the speed the plate is *asked* to
+              hold, and the flywheel relaxes toward it rather than being set
+              to it. With the motor at zero — which is most looks — a flick
+              spins the plate up and the bed it rests on brings it back to
+              rest, which is the whole point.
+
+              Drag comes from what it is resting on, as well as from the
+              slider. A syrupy dish squeezed flat against the glass takes the
+              spin out of a plate faster than a thin one barely touching, so
+              `viscosity` and `platePressure` are in it. Viscous relaxation
+              on its own only ever *approaches* rest, so there is a dry
+              friction term as well: without it a flicked plate creeps for
+              ever at a speed too small to see and too large to be stopped.
+            */
+            const motor = rotationSpeed * dirMod;
+            const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
+              * (1 + (currentSettings.platePressure ?? 0) * 0.8);
+            /*
+              The range was measured and widened. At (0.15 + drag*3) a flicked
+              plate lost three-quarters of its speed in 2s at the slowest
+              setting and stopped dead at the fastest, so the slider had one
+              useful end. This gives a half-life of about eight seconds at 0 —
+              a plate that coasts lazily across a whole phrase — a second at
+              the default, and a quarter of a second at 1.
+            */
+            const dragRate = (0.04 + (currentSettings.spinDrag ?? 0.25) * 1.2) * bed;
+            const vel0 = spinVelRef.current[l] ?? 0;
+            let vel = vel0 + (motor - vel0) * (1 - Math.exp(-dragRate * realDt));
+            // Dry friction, toward the motor's speed: with no motor that is rest.
+            const grip = dragRate * 0.02 * realDt;
+            vel = Math.abs(vel - motor) <= grip ? motor : vel - Math.sign(vel - motor) * grip;
+            if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
+            /*
+              An angle that accumulates cannot be allowed to go non-finite —
+              see the note above, which is why both of these are guarded and
+              not just the sum.
+            */
+            const turn = (spinVelRef.current[l] ?? 0) * realDt;
             if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
           }
         }
@@ -4870,6 +4965,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         film: filmRef.current,
         fluids: fluidsRef.current,
         rotation: rotationAnglesRef,
+        /** Angular velocity per layer, rad/s, and the flick that adds to it. */
+        spin: spinVelRef,
+        flick: flickSpin,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputConfig: outputCfgRef.current,
         markTest: (on: boolean) => {

@@ -423,6 +423,12 @@ export default function App() {
     return base;
   });
   const [seedCount, setSeedCount] = useState(0);
+  /*
+    A flick of one plate. A counter rather than a speed, like the seed: it is
+    momentary, and two flicks in a row both have to land.
+  */
+  const [spinFlick, setSpinFlick] = useState<{ seq: number; layer: number } | undefined>(undefined);
+  const flickPlate = (layer: number) => setSpinFlick(p => ({ seq: (p?.seq ?? 0) + 1, layer }));
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
@@ -1873,6 +1879,8 @@ export default function App() {
   const runAction = (a: MidiAction) => {
     switch (a) {
       case 'seed':            setSeedCount(prev => prev + 1); break;
+      case 'spin-front':      flickPlate(0); break;
+      case 'spin-back':       flickPlate(1); break;
       case 'clear':           setClearTrigger(prev => prev + 1); break;
       case 'drain':           setDrainTrigger(prev => prev + 1); break;
       case 'lucky':           triggerLucky(); break;
@@ -2440,7 +2448,7 @@ export default function App() {
     <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
         ref={visualizerRef}
-        audioData={audioData} settings={effectiveSettings} seedCount={seedCount}
+        audioData={audioData} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
@@ -3078,6 +3086,7 @@ export default function App() {
             onUpdate={updateSettings}
             calibration={audioData?.calibration ?? null}
             onRecalibrate={() => setCalibrateNonce(n => n + 1)}
+            onFlickPlate={flickPlate}
             engineStatus={engineStatus}
             getLiveEngineStatus={() => engineStatusRef.current}
             audioSource={audioSource}

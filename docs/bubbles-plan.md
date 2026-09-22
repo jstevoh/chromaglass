@@ -741,3 +741,44 @@ changed that population by a factor of ten — 9944 pixels before, 823–1187
 after. At one setting it read 24.0°, 39.2° and 41.9° on three runs. It is not
 comparable across this change and it is too noisy to tune against; it needs a
 fixed population before it can gate anything.
+
+### Candidate 1 tried: a leaky trail, and it is not enough (2026-09-21)
+
+Built and measured and taken out again. `trail = max(air, trail · decay)` in a
+third field, with the rate term differencing against that instead of last
+frame, so a popped bubble leaves a sink for about a second rather than one
+clamped frame.
+
+**Two bugs found on the way, both worth more than the mechanism.**
+
+*`r16float` is not a storage format.* The trail was made to match the air field
+and the whole command buffer was rejected — single-channel 16-bit float needs
+`texture-formats-tier1`. It is the exact mirror of the trap that opened H6: the
+field has to be `r16float` because it **blends**, and the trail has to be
+`r32float` because a compute pass **writes** it. The symptom looks nothing like
+a format error and is worth recognising: **the plate freezes**, and the readback
+repeats the same number to four decimals, because none of the step's work runs.
+
+*The air source was gated on live bubbles.* `airPush = air.any ? clear : 0`,
+so the moment the list emptied the entire source was multiplied by zero — and
+the trail exists precisely to act after that. The trail was built, measured and
+did nothing, because everything it fed was being zeroed. It has to linger on
+the same half-life.
+
+**With both fixed it still is not enough.** The refill went from 0.003 to
+0.032–0.060 against surroundings of about 2.4 — ten to twenty times better and
+still two orders of magnitude short. Three likely reasons, none chased:
+
+- the sink is spread over the trail's whole footprint rather than concentrated
+  where the dye has to arrive;
+- **the rate term is not zero-mean.** The standing term has the plate's air
+  fraction subtracted for exactly this reason; the rate term never did, and a
+  sink with no compensating source has no Neumann solution for the projection
+  to find. This is probably the real limit, and it is the same condition
+  `pressureSelfTest` exists to protect;
+- seven cells of semi-Lagrangian transport on a slow plate is simply slow.
+
+So candidate 2 — returning the ring on the CPU, symmetric with the deposit,
+using the `mul` buffer that already exists for taking dye away — is the one to
+try next, and the zero-mean fix should be tried first because it is one line
+and it may be what has been limiting the source all along.

@@ -57,7 +57,8 @@
     "stages": "npm run build && node scripts/stages.mjs",
     "ab": "npm run build && node scripts/ab.mjs",
     "ladder": "npm run build && node scripts/ladder.mjs",
-    "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs"
+    "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs",
+    "spin": "npm run build && node scripts/spin.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

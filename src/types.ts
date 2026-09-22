@@ -208,6 +208,22 @@ export interface VisualizerSettings {
   blendMode: BlendMode;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
+  /*
+    The plate as a flywheel (2026-09-21).
+
+    `rotationSpeed` is a motor: it asks for a speed and the plate holds it.
+    These two make the plate something with mass that a flick can spin up and
+    that then slows down on its own, which is what a real dish on a real
+    turntable does.
+
+    `spinDrag` is what the plate is resting on — 0 coasts for several seconds,
+    1 stops it almost at once — and it is modulated by the look's own
+    viscosity and plate pressure, so a syrupy dish squeezed flat drags more
+    than a thin one barely touching.
+  */
+  spinDrag: number;
+  /** How hard one flick hits, as a fraction of a turn a second. */
+  spinImpulse: number;
   centerGravity: number;
   ledPlatform: boolean;
   ledMode: LedMode;
@@ -401,6 +417,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   blendMode: 'screen',
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
+  spinDrag: 0.25,           // a flicked plate halves its speed in about a second
+  spinImpulse: 0.5,
   centerGravity: 0.0,
   ledPlatform: false,
   ledMode: 'rainbow',

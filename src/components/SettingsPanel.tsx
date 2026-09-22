@@ -75,6 +75,8 @@ interface SettingsPanelProps {
   /** Live room-calibration readout, null when auto-calibration is off. */
   calibration?: RoomCalibration | null;
   onRecalibrate?: () => void;
+  /** Flick a plate: spin it up and let the bed it rests on slow it down. */
+  onFlickPlate?: (layer: number) => void;
   /** Which solver is running and at what grid, e.g. "GPU · 512²". */
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
@@ -298,7 +300,8 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose, onFlickPlate,
+}) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
@@ -2655,6 +2658,54 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ rotationSpeed: v })}
           settingKey="rotationSpeed"
+        />
+        {/*
+          The plate as a flywheel.
+
+          Rotation Speed above is a motor: it asks for a speed and the plate
+          holds it, and every preset sets it low because it is there to keep a
+          plate alive rather than to be seen. A flick is the other thing a
+          plate does — spun by hand and left to slow down — so it is a press
+          and not a value, and it goes to one plate at a time because the two
+          turn opposite ways and shearing them by hand is the point.
+
+          Both are on pads too, as Spin Front Plate and Spin Back Plate.
+        */}
+        <div className="flex gap-2 mt-1 mb-2">
+          {[0, 1].map((l) => (
+            <button
+              key={l}
+              onClick={() => onFlickPlate?.(l)}
+              disabled={!onFlickPlate || (settings.layerCount ?? 1) <= l}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                         hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all
+                         disabled:opacity-35 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
+              data-testid={`flick-plate-${l}`}
+              title={(settings.layerCount ?? 1) <= l
+                ? 'This look has one plate'
+                : 'Spin this plate up; it slows on its own'}
+            >
+              Flick {l === 0 ? 'Front' : 'Back'}
+            </button>
+          ))}
+        </div>
+        <Slider
+          label="Flick Strength"
+          value={settings.spinImpulse ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinImpulse: v })}
+          settingKey="spinImpulse"
+        />
+        <Slider
+          label="Plate Drag"
+          value={settings.spinDrag ?? 0.25}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinDrag: v })}
+          settingKey="spinDrag"
         />
         <div className="flex items-center justify-between mb-4 mt-4">
           <span className="text-[13px] font-medium text-text">LED Platform</span>
