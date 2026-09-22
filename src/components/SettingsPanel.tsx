@@ -2437,12 +2437,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/*
           The two glasses themselves.
 
-          Plate Shape is the dome the pair leaves at rest: left of centre
-          they meet in the middle and open toward the rim, which is what a
-          pair of clock glasses does and where the dye ends up gathering;
-          right of centre the rim is tight and the liquid pools in the
-          middle. Dead centre is two flats, which is what this was before and
-          which no real plate is.
+          Plate Shape is the dome the pair leaves at rest. Left of centre
+          opens the gap in the middle and tightens it at the rim; right of
+          centre does the opposite. Dead centre is two flats, which is what
+          this was before and which no real plate is — and which is still the
+          default, because a dome measured more inward flow than a flat plate
+          and nothing yet measures what it buys.
 
           Press Lift is how long a press takes to come back up. It was fixed
           at a twelfth of a second, faster than a hand can move, which is

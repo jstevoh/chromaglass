@@ -420,7 +420,19 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     rotation: 'none',
   },
   platePressure: 0.4,       // glass plate squeeze — drives radial spreading
-  plateCurve: -0.35,        // clock glasses: they meet in the middle
+  /*
+    Flat, which is what it was before this existed.
+
+    Two glasses that are not parallel is the right idea and the default was
+    wrong twice over. The sign was documented backwards — **negative opens the
+    gap at the middle and tightens it at the rim**, not the other way — and a
+    domed plate measured 10-20% more inward flow than a flat one, reported
+    from the front as everything being pulled toward a drain in the centre.
+    Part of that was a plate filled flat and then sprung toward the dome,
+    which is fixed; the rest is that a dome is a real change to every look and
+    no measurement yet says it earns its place. So it is a control, off.
+  */
+  plateCurve: 0,
   plateSpring: 0.35,        // a press takes about a second to lift
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
