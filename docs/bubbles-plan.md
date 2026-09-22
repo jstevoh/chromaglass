@@ -458,3 +458,60 @@ nothing and explain a lot of what the references show:
 - **How many bottles is too many.** Eleven new ones is a lot of menu. The grouping and
   per-preset dishes should carry it, but it may be better to ship the first four, play
   with them, and let the rest earn their place.
+
+## Nucleation, and the two settings that were waiting for it (2026-09-21)
+
+Bubbles arrive today because something put them there — a pour, an impact, the
+automation. None of them arrive because the liquid is *hot*, and that is the one
+way a real dish makes them.
+
+The plate has had the parts for this the whole time and never joined them up.
+There is a temperature field (`vel.z`), heat goes into it from about twenty
+places, `heatDecay` cools it, and buoyancy lifts what is warm:
+
+```wgsl
+var f = vec2f(0.0, S.curBuoy * tanh(max(temp, 0.0) * 20.0));
+```
+
+Two settings were declared for it and read by nothing: `heatIntensity`, set by
+all thirty-two presets between 0.02 and 0.9, and `boilingPoint`, set by
+thirty-one between 0.35 and 1.0. Both were deleted on 2026-09-21. The reasons
+are worth keeping, because they are the argument for what to build instead.
+
+**`heatIntensity` was a second name for Buoyancy.** Across the presets the two
+move together almost rank for rank — Boiling Point 0.9/1.0, Lava Lamp 0.8/0.9,
+down to Milk Marbling 0.02/0.05, with only Cyberpunk Neon and Jellyfish Bloom
+out of order. That is not a coincidence: below `temp ≈ 0.05` the `tanh` above is
+near-linear, so scaling the heat going in and scaling `curBuoy` are the same
+gesture, and Buoyancy already has a slider and a pin. Above it the `tanh`
+saturates — and the hardcoded seeds (`addTemp(..., 3.0)`, `5.0`) land at
+`tanh(60) = 1.0`, where more heat does *nothing at all*.
+
+That saturation is the real defect the setting was hiding. **Every heat source
+on the plate is maximally buoyant regardless of how much heat it got**, so a
+plume has no strength, only a position. Whatever boiling gets built should fix
+the seeds into the responsive part of the curve first; the shape of a plume is
+free once they are.
+
+**`boilingPoint` had no mechanic anywhere,** and the decisive evidence that
+nobody had ever seen it work is Crowd Plate, which carries `boilingPoint: 0` —
+the most extreme value available, meaning "boils on contact" — with no effect
+anyone noticed. A threshold nothing compares against.
+
+What makes it worth building now is H6. Nucleation needs somewhere to put the
+air, and until the air field existed there was nowhere: bubbles were forty
+uniforms and a metaball loop in the compositor, and heat could not reach them.
+Now air is a quantity the plate carries, so the sketch is small:
+
+- where `temp` crosses a threshold, ask `bubbles.ts` for a bubble, at a radius
+  set by how far over it is;
+- the threshold is the per-look setting, and it comes back **named for what it
+  does to the picture** rather than inherited — the stored 0.35–1.0 range was
+  never meaningful, so a new range should be chosen by the mechanic;
+- a bubble takes its heat with it, which is what stops one cell spraying
+  hundreds, and is also why this belongs next to the exclusion rather than
+  before it.
+
+The preset called **Boiling Point** is the test. It is named for a mechanic that
+was never built, and it should be the look that proves the feature: a dish that
+sits, warms, and then breaks into bubbles from the bottom up.

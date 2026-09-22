@@ -40,8 +40,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.15,            // occasional downward streaks for variety
       viscosity: 'thick',        // heavy, syrupy movement
       polarity: 0.7,             // colors stay distinct but can gently intermingle
-      heatIntensity: 0.1,        // low heat — convection is a background breath
-      boilingPoint: 0.9,         // very hard to boil — keeps things calm
       evaporationRate: 0.005,    // colors persist a long time
       airVelocity: 0.04,         // near-still air — no turbulence
       vibrationFrequency: 0.08,  // minimal vibration — serene
@@ -86,8 +84,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
       polarity: 0.25,            // low — colors intermingle freely like nebula gas
-      heatIntensity: 0.06,       // faint warmth — just enough for gentle convection
-      boilingPoint: 0.95,        // nearly impossible to boil — calm cosmos
       evaporationRate: 0.002,    // stars persist for a very long time
       airVelocity: 0.02,         // near-vacuum — no turbulence
       vibrationFrequency: 0.0,   // no vibration — serene void
@@ -134,8 +130,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.8,
       viscosity: 'thick',
       polarity: 0.8,
-      heatIntensity: 0.05,
-      boilingPoint: 0.9,
       evaporationRate: 0.01,
       airVelocity: 0.05,
       vibrationFrequency: 0.2,
@@ -177,8 +171,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.2,
-      heatIntensity: 0.3,
-      boilingPoint: 0.6,
       evaporationRate: 0.05,
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
@@ -218,8 +210,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.1,
       viscosity: 'thick',
       polarity: 0.95,
-      heatIntensity: 0.8,
-      boilingPoint: 0.6,
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.1,
@@ -272,8 +262,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.4,
       viscosity: 'thin',
       polarity: 0.5,
-      heatIntensity: 0.5,
-      boilingPoint: 0.5,
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -325,8 +313,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.3,
       viscosity: 'thick',
       polarity: 0.7,
-      heatIntensity: 0.2,
-      boilingPoint: 0.8,
       evaporationRate: 0.02,
       airVelocity: 0.2,
       vibrationFrequency: 1.0,
@@ -365,8 +351,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.6,
       viscosity: 'thin',
       polarity: 0.6,
-      heatIntensity: 0.3,
-      boilingPoint: 0.7,
       evaporationRate: 0.03,
       airVelocity: 0.1,
       vibrationFrequency: 0.4,
@@ -406,8 +390,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.7,
       viscosity: 'thin',
       polarity: 0.8,
-      heatIntensity: 0.9,
-      boilingPoint: 0.4,
       // The fire wheel with nothing on it, under music: 0.06 dried the plate
       // faster than the pour filled it, and the pour follows complexity, which
       // read two percent of its range until the analyser was fixed.
@@ -453,8 +435,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.1,
       viscosity: 'thick',
       polarity: 0.95,
-      heatIntensity: 0.2,
-      boilingPoint: 0.8,
       evaporationRate: 0.01,
       airVelocity: 0.1,
       vibrationFrequency: 0.6,
@@ -493,8 +473,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.4,
-      heatIntensity: 0.25,
-      boilingPoint: 0.85,
       evaporationRate: 0.008,
       // Curtains, not a sheet: a full plate on the lighter blend was one flat
       // green. With less dye and the thin film read as sky, the ocean lamp
@@ -540,8 +518,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thin',
       polarity: 0.3,
-      heatIntensity: 0.75,
-      boilingPoint: 0.45,
       evaporationRate: 0.04,
       airVelocity: 0.35,
       vibrationFrequency: 0.6,
@@ -580,8 +556,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.45,
       viscosity: 'thick',
       polarity: 0.85,
-      heatIntensity: 0.12,
-      boilingPoint: 0.88,
       evaporationRate: 0.005,
       airVelocity: 0.04,
       vibrationFrequency: 0.25,
@@ -622,8 +596,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.3,
       viscosity: 'thin',
       polarity: 0.65,
-      heatIntensity: 0.35,
-      boilingPoint: 0.65,
       evaporationRate: 0.025,
       airVelocity: 0.25,
       vibrationFrequency: 0.55,
@@ -663,8 +635,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.6,
       viscosity: 'thick',
       polarity: 0.9,
-      heatIntensity: 0.08,
-      boilingPoint: 0.92,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
@@ -705,8 +675,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.55,
       viscosity: 'thick',
       polarity: 0.75,
-      heatIntensity: 0.2,
-      boilingPoint: 0.78,
       evaporationRate: 0.012,
       airVelocity: 0.12,
       vibrationFrequency: 0.4,
@@ -749,8 +717,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.15,
       viscosity: 'thin',
       polarity: 0.15,
-      heatIntensity: 0.6,
-      boilingPoint: 0.35,
       evaporationRate: 0.015,
       dyeBudget: 0.45,
       audioImpact: 0.85,
@@ -798,8 +764,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.3,
-      heatIntensity: 0.05,
-      boilingPoint: 1.0,
       evaporationRate: 0.06,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
@@ -846,8 +810,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.6,
-      heatIntensity: 0.15,
-      boilingPoint: 0.9,
       evaporationRate: 0.05,
       airVelocity: 0.03,
       vibrationFrequency: 0.0,
@@ -895,8 +857,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
-      heatIntensity: 0.5,
-      boilingPoint: 0.7,
       evaporationRate: 0.006,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -947,8 +907,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
-      heatIntensity: 0.1,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1000,8 +958,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1066,8 +1022,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1132,8 +1086,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      heatIntensity: 0.15,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1212,8 +1164,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.9,             // strong immiscibility — hard color boundaries
-      heatIntensity: 0.12,
-      boilingPoint: 0.9,
       evaporationRate: 0.03,     // ground clears between beads instead of washing over
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
@@ -1273,8 +1223,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
-      heatIntensity: 0.2,
-      boilingPoint: 0.85,
       evaporationRate: 0.02,
       airVelocity: 0.05,
       vibrationFrequency: 0.0,
@@ -1334,8 +1282,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.95,
-      heatIntensity: 0.1,
-      boilingPoint: 0.9,
       evaporationRate: 0.035,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
@@ -1384,8 +1330,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
-      heatIntensity: 0.1,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1448,7 +1392,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      heatIntensity: 0.1,
       evaporationRate: 0.0025,
       audioImpact: 0.35,           // the music is still there, but it is not the loudest hand
       turbulenceScale: 0.12,
@@ -1524,8 +1467,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.9,               // the colours stay four colours, not one brown one
-      heatIntensity: 0.02,
-      boilingPoint: 0.98,
       evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -1583,8 +1524,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thin',
       polarity: 0.5,
-      heatIntensity: 0.08,
-      boilingPoint: 0.9,
       evaporationRate: 0.006,      // a film that is always thinning is always about to go
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
@@ -1644,8 +1583,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.75,
-      heatIntensity: 0.05,
-      boilingPoint: 0.95,
       evaporationRate: 0.002,
       airVelocity: 0.08,
       vibrationFrequency: 0.0,

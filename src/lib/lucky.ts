@@ -81,7 +81,7 @@ export function luckyLook(
     audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
     platePressure: rand(), glassSmear: rand(), rainDrip: rand(),
     viscosity: rand() > 0.5 ? 'thick' : 'thin', polarity: rand(),
-    heatIntensity: rand() * 0.5, boilingPoint: rand(), evaporationRate: rand() * 0.05,
+    evaporationRate: rand() * 0.05,
     airVelocity: rand() * 0.5, vibrationFrequency: rand(),
     layerCount: rand() > 0.5 ? 2 : 1,
     blendMode: blendModes[Math.floor(rand() * blendModes.length)],

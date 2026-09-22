@@ -1026,7 +1026,11 @@ check('and neither starts over the limit',
 // defaulted, set by all thirty-two presets and rolled by the dice, with no
 // slider, no pin and no phone control anywhere.
 //
-// Two were found that way. `surfaceTension` is the plate's own film tension,
+// Two were found that way, and two more went the other way: `heatIntensity`
+// and `boilingPoint` were read by nothing, so they were deleted rather than
+// given a slider (docs/bubbles-plan.md says why).
+//
+// `surfaceTension` is the plate's own film tension,
 // read by the solver, carried by every preset between 0.01 and 0.3, and
 // reachable from nothing. `surge` shapes the automation into gusts with quiet
 // between — the thing that makes a plate look worked-on rather than busy —
@@ -1040,9 +1044,6 @@ check('and neither starts over the limit',
     'macroMode', 'macroZoom',
     // The paper backdrop's two colours: a look's, chosen with the dyes.
     'paperA', 'paperB',
-    // Read by nothing at all. Neither is a missing control; both are a
-    // decision about whether the feature should exist (see docs/roadmap.md).
-    'heatIntensity', 'boilingPoint',
   ]);
   const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
   const drawn = new Set([

@@ -189,9 +189,13 @@ export interface VisualizerSettings {
   viscosity: 'thick' | 'thin';
   polarity: number; // Repulsion between blobs
   
-  // Heat Slide
-  heatIntensity: number;
-  boilingPoint: number;
+  /*
+    Heat Slide.
+
+    `heatIntensity` and `boilingPoint` were here too, set by all thirty-two
+    presets and read by nothing. See docs/bubbles-plan.md — the heat that
+    exists is reachable through Buoyancy, and boiling is unbuilt.
+  */
   evaporationRate: number;
   
   // Manual/Interaction
@@ -390,8 +394,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   rainDrip: 0.0,
   viscosity: 'thick',
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
-  heatIntensity: 0.15,
-  boilingPoint: 0.95,
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
   vibrationFrequency: 0.0,
