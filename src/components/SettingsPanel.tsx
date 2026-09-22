@@ -2559,22 +2559,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           ceiling it was buying nothing anybody wanted. A ceiling rather than
           a switch, because some looks do lean on a little of it.
         */}
-        {/*
-          Read by the solver all along and reachable from nowhere: every
-          preset carries a value between 0.01 and 0.3 and there was no way
-          to set one. It is the plate's own film tension — the one blobs
-          ride on — as against Blob Surface Tension, which is the skin
-          around each blob.
-        */}
-        <Slider
-          label="Film Tension"
-          value={settings.surfaceTension ?? 0}
-          min={0}
-          max={0.3}
-          step={0.005}
-          onChange={(v: number) => onUpdate({ surfaceTension: v })}
-          settingKey="surfaceTension"
-        />
         <Slider
           label="Diffusion Rate"
           value={settings.diffusionRate}

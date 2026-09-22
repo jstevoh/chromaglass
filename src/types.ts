@@ -215,7 +215,6 @@ export interface VisualizerSettings {
   ledSpeed: number;
   
   // Fluid Physics (High Fidelity)
-  surfaceTension: number;
   /** Interface sharpening: how hard a dye boundary resists the solver's own smearing. 0 = the old soft plate. */
   sharpness: number;
   /** Pigment separating into a fine speckle that travels with the dye. */
@@ -407,7 +406,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledMode: 'rainbow',
   ledColor: '#FF0000',
   ledSpeed: 0.05,
-  surfaceTension: 0.05,
   // Still off, and now for a better reason than before.
   //
   // The pass had a real bug in it: the gate that keeps it from carving holes

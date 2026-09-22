@@ -28,7 +28,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.008,      // barely perceptible rotation keeps it alive
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
-      surfaceTension: 0.14,      // blobs hold shape, merge slowly
       diffusionRate: 0,          // measured: the bleed cost more edge than it bought
       buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
       advection: 0.35,           // smooth transport, no turbulence
@@ -72,7 +71,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.035,      // visible rotation creates spiral arms
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
       ledPlatform: false,        // pure black void
-      surfaceTension: 0.02,      // near-zero — fluid fragments into star clusters
       diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
       buoyancy: 0.25,            // minimal buoyancy — horizontal swirl dominates
       advection: 0.75,           // strong transport — sweeping spiral arm motion
@@ -118,7 +116,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.05,
-      surfaceTension: 0.1,
       diffusionRate: 0.0001,
       buoyancy: 0.2,
       advection: 0.2,
@@ -159,7 +156,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'cyberpunk',
       ledSpeed: 0.3,
-      surfaceTension: 0.01,
       diffusionRate: 0.0002,
       buoyancy: 0.8,
       advection: 0.6,
@@ -198,7 +194,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',         // one dim ember under the whole lamp, not a colour wheel
       ledColor: '#5c1400',
       ledSpeed: 0.02,
-      surfaceTension: 0.2,
       diffusionRate: 0.00005,
       buoyancy: 0.9,
       advection: 0.15,
@@ -250,7 +245,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.4,
-      surfaceTension: 0.15,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.8,
@@ -301,7 +295,6 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.01,
       centerGravity: 0.4,
       ledPlatform: false,
-      surfaceTension: 0.08,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.5,
@@ -339,7 +332,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.2,
-      surfaceTension: 0.02,
       diffusionRate: 0.0001,
       buoyancy: 0.7,
       advection: 0.6,
@@ -378,7 +370,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'fire',
       ledSpeed: 0.3,
-      surfaceTension: 0.1,
       diffusionRate: 0.0002,
       buoyancy: 1.0,
       advection: 0.8,
@@ -423,7 +414,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.08,
-      surfaceTension: 0.25,
       diffusionRate: 0.00005,
       buoyancy: 0.4,
       advection: 0.3,
@@ -461,7 +451,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.03,
-      surfaceTension: 0.12,
       diffusionRate: 0.0002,
       buoyancy: 0.65,
       advection: 0.35,
@@ -506,7 +495,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'fire',
       ledSpeed: 0.15,
-      surfaceTension: 0.03,
       diffusionRate: 0.0002,
       buoyancy: 0.85,
       advection: 0.7,
@@ -544,7 +532,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'ocean',
       ledSpeed: 0.04,
-      surfaceTension: 0.18,
       diffusionRate: 0.00008,
       buoyancy: 0.55,
       advection: 0.25,
@@ -584,7 +571,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'rainbow',
       ledSpeed: 0.25,
-      surfaceTension: 0.08,
       diffusionRate: 0.0002,
       buoyancy: 0.5,
       advection: 0.55,
@@ -623,7 +609,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#220044',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.00006,
       buoyancy: 0.3,
       advection: 0.2,
@@ -663,7 +648,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: true,
       ledMode: 'cyberpunk',
       ledSpeed: 0.12,
-      surfaceTension: 0.22,
       diffusionRate: 0.0001,
       buoyancy: 0.45,
       advection: 0.4,
@@ -705,7 +689,6 @@ export const PRESETS: Preset[] = [
       ledPlatform: false,
       ledMode: 'rainbow',
       ledSpeed: 0.35,
-      surfaceTension: 0.01,
       diffusionRate: 0.0002,     // a spark stays a spark
       buoyancy: 0.7,
       advection: 0.9,
@@ -752,7 +735,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#05030c',
       ledSpeed: 0.0,
-      surfaceTension: 0.1,
       diffusionRate: 0.0002,
       buoyancy: 0.2,
       advection: 0.3,
@@ -798,7 +780,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#f3ecdc',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
       advection: 0.4,
@@ -845,7 +826,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#3a2408',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.5,
@@ -895,7 +875,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.15,
       diffusionRate: 0.00005,
       buoyancy: 0.3,
       advection: 0.5,
@@ -947,7 +926,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1011,7 +989,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1075,7 +1052,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0.00008,
       buoyancy: 0.3,
       advection: 0.5,
@@ -1152,7 +1128,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#3B0806',       // deep red ground, like paint on stained board
       ledSpeed: 0.0,
-      surfaceTension: 0.22,      // beads hold their round shape
       diffusionRate: 0.00003,    // colors stay separate instead of muddying
       buoyancy: 0.35,
       advection: 0.6,
@@ -1211,7 +1186,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#4A0D08',
       ledSpeed: 0.0,
-      surfaceTension: 0.18,
       diffusionRate: 0.00005,
       buoyancy: 0.5,
       advection: 0.45,
@@ -1270,7 +1244,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#2E0705',
       ledSpeed: 0.0,
-      surfaceTension: 0.08,      // low — the edge fingers and splits
       diffusionRate: 0.00004,
       buoyancy: 0.3,
       advection: 0.85,
@@ -1318,7 +1291,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.2,
       diffusionRate: 0,          // measured: sharper without it, and a pass cheaper
       buoyancy: 0.3,
       advection: 0.55,
@@ -1379,7 +1351,6 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.5,
       rotationSpeed: 0.0,
       centerGravity: 0.05,
-      surfaceTension: 0.1,
       granulation: 0.5,
       diffusionRate: 0.00012,
       buoyancy: 0.3,
@@ -1455,7 +1426,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.3,         // the spots hold as spots until something breaks them
       diffusionRate: 0.00004,      // near-zero: food colouring on milk does not bleed on its own
       buoyancy: 0.05,
       advection: 0.5,
@@ -1512,7 +1482,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.06,        // low: the film is what tension is missing from
       diffusionRate: 0.00009,
       buoyancy: 0.2,
       advection: 0.6,              // the rush has to actually carry the dye
@@ -1571,7 +1540,6 @@ export const PRESETS: Preset[] = [
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
-      surfaceTension: 0.12,
       diffusionRate: 0.0001,
       buoyancy: 0.15,              // sideways, not upward: this is shear, not convection
       advection: 0.7,

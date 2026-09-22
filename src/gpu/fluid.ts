@@ -293,7 +293,7 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
-    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.surfaceTension; f[9] = p.fingering;
+    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = p.fingering;
     f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
     f[14] = p.smearX; f[15] = p.smearY;
     f[16] = p.damping; f[17] = p.heatDecay; f[18] = MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;

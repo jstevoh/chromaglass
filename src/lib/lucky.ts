@@ -90,7 +90,7 @@ export function luckyLook(
     ledMode: ledModes[Math.floor(rand() * ledModes.length)],
     ledColor: ledColors[Math.floor(rand() * ledColors.length)],
     ledSpeed: rand() * 0.5,
-    surfaceTension: rand() * 0.2,
+    
     /*
       A tenth of what it was, which is the ceiling every look is now under.
       Dye diffusion costs a full solver pass whatever rate it is given, and

@@ -201,7 +201,6 @@ const FROM_PANEL: DeskSpec[] = [
     saving only arrives at exactly zero, where the solver skips the stage, so
     a look that wants none should say none.
   */
-  { key: 'surfaceTension', label: "Film Tension", min: 0, max: 0.3, section: 'physics' },
   { key: 'surge', label: "Surge", min: 0, max: 1, section: 'automation' },
   { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: DIFFUSION_CEILING, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },

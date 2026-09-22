@@ -1679,7 +1679,7 @@ class FluidSimulation {
     if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
     // 7. Immiscibility & fingering
-    this.applyImmiscibility(p.surfaceTension, time, noise2D);
+    this.applyImmiscibility(p.immiscibility, time, noise2D);
     if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
@@ -1817,7 +1817,19 @@ class FluidSimulation {
     // high tension the reverse (rounder, self-contained blobs).
     const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
-    const surfaceTension = polarity * 0.04 * (0.4 + tension * 1.2);
+/*
+      Named `immiscibility` and not `surfaceTension`, which is what it was
+      called until 2026-09-21.
+
+      There was also a *setting* called `surfaceTension`, written by all
+      thirty-two presets, and this local shadowed it well enough that an
+      audit for unread settings counted `p.surfaceTension` as its reads and
+      called it live. It was not: nothing ever read the setting, and the
+      presets' comments for it describe what `blobSurfaceTension` does. The
+      setting is gone; the name goes with it so the next audit cannot be
+      told the same lie.
+    */
+    const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
     const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
 
     let smearX = 0, smearY = 0;
@@ -1864,7 +1876,7 @@ class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, surfaceTension, fingering,
+      turbScale, turbDetail, spin, immiscibility, fingering,
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -1984,8 +1996,8 @@ class FluidSimulation {
     }
   }
 
-  private applyImmiscibility(surfaceTension: number, time: number, noise2D: (x: number, y: number) => number) {
-    const strength = surfaceTension * 0.8;
+  private applyImmiscibility(immiscibility: number, time: number, noise2D: (x: number, y: number) => number) {
+    const strength = immiscibility * 0.8;
     const sharpness = 2.0;
     for (let j = 1; j < this.size - 1; j++) {
       for (let i = 1; i < this.size - 1; i++) {

@@ -515,3 +515,50 @@ Now air is a quantity the plate carries, so the sketch is small:
 The preset called **Boiling Point** is the test. It is named for a mechanic that
 was never built, and it should be the look that proves the feature: a dish that
 sits, warms, and then breaks into bubbles from the bottom up.
+
+### A third one, and the name that hid it (2026-09-21)
+
+`surfaceTension` was the same fault as the two above and much better hidden.
+All thirty-two presets set it, between 0.01 and 0.3, each with a comment. The
+engine never read it.
+
+It survived because the solver has a **local variable of the same name**:
+
+```ts
+const tension = clamp01(settings.blobSurfaceTension ?? 0.5);
+const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);   // was: surfaceTension
+```
+
+That local goes into the params object, so `p.surfaceTension` exists and is
+read twice. Any audit grepping for `.surfaceTension` finds those two and calls
+the setting live. It also fooled a first pass at a control for it — a slider
+was added on the strength of those two reads, and the slider then *read the
+key itself* to draw its handle, which made the check written to catch the
+problem pass on it.
+
+What it actually duplicates is `blobSurfaceTension`, which has a slider and a
+pin already. The presets say so themselves; every one that set both said the
+same thing twice:
+
+```
+surfaceTension: 0.14,      // blobs hold shape, merge slowly
+blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
+
+surfaceTension: 0.02,      // near-zero — fluid fragments into star clusters
+blobSurfaceTension: 0.1,   // near-zero cohesion — matter fragments freely
+```
+
+The setting is deleted and the local renamed to `immiscibility`, which is what
+it does and what the method it feeds is already called.
+
+**A tuning job this turned up.** Thirteen presets wrote the dead key and never
+set the live one, so they run at the `blobSurfaceTension` default of 0.3 —
+Cyberpunk Neon, Stardust Collapse and Timbre Shifter wrote 0.01–0.02, the
+bottom of the dead scale, meaning almost no cohesion. The default is "mostly
+loose", so none of them is stranded and no look was changed here. But their
+authors asked for less cohesion than they are getting, and the numbers are in
+the git history if anyone wants to take it up: Cyberpunk Neon 0.01, Stardust
+Collapse 0.01, Timbre Shifter 0.02, Solar Flare 0.03, Bass Drop 0.08, Fractal
+Dream 0.08, Deep Ocean 0.1, Boiling Point 0.1, Aurora Borealis 0.12, Velvet
+Underground 0.15, Jellyfish Bloom 0.18, Neon Coral Reef 0.22, Microscopic
+Chaos 0.25.

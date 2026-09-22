@@ -35,7 +35,7 @@ export interface GpuStepParams {
   turbScale: number;
   turbDetail: number;
   spin: number;         // vorticity strength (0 = off)
-  surfaceTension: number;
+  immiscibility: number;
   fingering: number;
   vibIntensity: number;
   vibFrequency: number;

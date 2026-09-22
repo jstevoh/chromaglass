@@ -1058,6 +1058,46 @@ check('and neither starts over the limit',
       : `${Object.keys(DEFAULT_SETTINGS).length} settings, ${KNOWN.size} deliberately without one`);
 }
 
+// ── And one level down: a setting the engine never reads ────────────
+//
+// The check above asks whether a setting can be *reached*. It cannot ask
+// whether reaching it does anything, and that is a different fault with the
+// same cause.
+//
+// `surfaceTension` was written by all thirty-two presets, defaulted, rolled by
+// the dice — and read by nothing. It survived because the solver has a local
+// variable of the same name, derived from `polarity` and `blobSurfaceTension`,
+// which it hands to the params object as `p.surfaceTension`. An audit looking
+// for `.surfaceTension` finds those and calls the setting live. It was not:
+// the presets' own comments for it describe what `blobSurfaceTension` does,
+// and each preset that set both said the same thing twice. The local is now
+// called `immiscibility` so the name cannot lie again, and this check is here
+// so the next one does not need the name to be honest.
+//
+// Two things this had to learn the hard way, both of them the same rule —
+// run the control, on a commit that still has the bug:
+//
+//   · `p` is not in RECEIVERS. Letting the params object count is the fault.
+//   · The panel is not a read. A slider reads its own key to draw its handle,
+//     so the first version of this check passed on the very setting it was
+//     written to catch.
+{
+  const RECEIVERS = '(?:settings|currentSettings|s|look|next|prev|cur|base|a|b|current|ctx)';
+  // The plumbing that copies settings about, which is not the engine using one.
+  const PLUMBING = new Set(['presets.ts', 'types.ts', 'SettingsPanel.tsx',
+                            'deskPins.ts', 'lucky.ts', 'lookFade.ts']);
+  const body = readdirSync(join(root, 'src'), { recursive: true })
+    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()))
+    .map(f => readFileSync(join(root, 'src', f), 'utf8'))
+    .join('\n');
+  const unread = Object.keys(DEFAULT_SETTINGS)
+    .filter(k => !new RegExp(`\\b${RECEIVERS}\\s*\\??\\.${k}\\b`).test(body));
+  check('every setting is read by something that renders',
+    unread.length === 0,
+    unread.length ? `${unread.join(', ')} — nothing in src reads it; delete it or wire it`
+      : `${Object.keys(DEFAULT_SETTINGS).length} settings, all read`);
+}
+
 // ── The looks and the defaults, against the same ranges ─────────────
 //
 // The dice were one of three lists of what a setting may be. These are the
