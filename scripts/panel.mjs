@@ -1019,6 +1019,44 @@ check('and neither starts over the limit',
   DEFAULT_RIDES.length <= MAX_PINS && DEFAULT_RECIPE.length <= MAX_PINS,
   `${DEFAULT_RIDES.length} rides, ${DEFAULT_RECIPE.length} recipe, limit ${MAX_PINS}`);
 
+// ── And the other direction: a setting nothing can reach ────────────
+//
+// The check above asks that every control the panel draws is one a desk can
+// hold. It says nothing about a setting that is drawn *nowhere* — declared,
+// defaulted, set by all thirty-two presets and rolled by the dice, with no
+// slider, no pin and no phone control anywhere.
+//
+// Two were found that way. `surfaceTension` is the plate's own film tension,
+// read by the solver, carried by every preset between 0.01 and 0.3, and
+// reachable from nothing. `surge` shapes the automation into gusts with quiet
+// between — the thing that makes a plate look worked-on rather than busy —
+// same story.
+//
+// The exceptions are listed by name rather than by a rule, because each is a
+// decision and a rule would hide the next one.
+{
+  const KNOWN = new Set([
+    // Set by the zoom, which is the control; the flag rides along.
+    'macroMode', 'macroZoom',
+    // The paper backdrop's two colours: a look's, chosen with the dyes.
+    'paperA', 'paperB',
+    // Read by nothing at all. Neither is a missing control; both are a
+    // decision about whether the feature should exist (see docs/roadmap.md).
+    'heatIntensity', 'boilingPoint',
+  ]);
+  const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const drawn = new Set([
+    ...[...panelSrc.matchAll(/settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]),
+    ...[...panelSrc.matchAll(/onUpdate\(\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map(m => m[1]),
+  ]);
+  const orphans = Object.keys(DEFAULT_SETTINGS)
+    .filter(k => !drawn.has(k) && !PIN_RANGE.has(k) && !KNOWN.has(k));
+  check('every setting can be reached from somewhere',
+    orphans.length === 0,
+    orphans.length ? `${orphans.join(', ')} — add a control, or name it in this check's list and say why`
+      : `${Object.keys(DEFAULT_SETTINGS).length} settings, ${KNOWN.size} deliberately without one`);
+}
+
 // ── The looks and the defaults, against the same ranges ─────────────
 //
 // The dice were one of three lists of what a setting may be. These are the
