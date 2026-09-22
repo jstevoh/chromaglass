@@ -59,6 +59,22 @@ struct Sim {
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
+  /*
+    The two glasses, and how they sit together.
+
+    plateCurve is the shape of the gap they leave at rest. Zero is two flats,
+    perfectly parallel, which is what this modelled before and which no real
+    pair of clock glasses is: negative makes them touch in the middle and
+    open toward the rim, positive makes the rim the tight part and the liquid
+    pool in the centre. It decides where dye gathers and which way a press
+    throws it.
+
+    gapSpring is how fast they come back apart, and gapMemory how long the
+    squeeze that a press made outlives the press.
+  */
+  plateCurve: f32,
+  gapSpring: f32,
+  gapMemory: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -203,6 +219,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
+  /*
+    The gap between the two glasses, and how a press changes it.
+
+    Three things were wrong here and all three were felt as "pressing does
+    not do enough".
+
+    **The plates were flats.** The gap was a constant, so the two glasses sat
+    perfectly parallel — which no real pair of clock glasses does. The rest
+    gap is a dome now: `plateCurve` below zero makes them touch in the middle
+    and open toward the rim, above zero makes the rim the tight part. That is
+    what decides where dye gathers and which way a press throws it, and with
+    a flat gap a press could only ever push radially outward from wherever
+    the finger was.
+
+    **The press was over in a twelfth of a second.** The gap sprang back a
+    fixed 0.005 a step across a range of 0.025, so it fully recovered in five
+    steps, and `dhdt` — the squeeze that actually moves liquid — halved every
+    step, a seventeen-millisecond half-life. Both are rates now, from
+    `gapSpring` and `gapMemory`.
+
+    **And the release did nothing.** `dhdt` was only ever written from the
+    press delta, so the plates coming back apart contributed nothing: liquid
+    was pushed out and never drawn back. The spring's own motion goes into
+    `dhdt` here, so a press now pushes and its release pulls — which is what
+    a squeeze between two wet glasses does, and why it redistributes dye
+    instead of simply shoving it.
+  */
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
@@ -210,18 +253,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
+  // Where this cell sits on the plate: 0 in the middle, 1 at the rim.
+  let d = uvOf(id) - vec2f(0.5);
+  let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
+  // The dome the two glasses leave when nothing is pressing on them.
+  let rest = clamp(0.03 * (1.0 + S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
-  var dhdt = s.g * 0.5;
+  var dhdt = s.g * S.gapMemory;
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
-      let g2 = max(0.005, gap + dg);
+      let g2 = max(0.004, gap + dg);
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
   }
-  gap = min(0.03, gap + 0.005);
-  textureStore(dst, vec2i(id.xy), vec4f(gap, dhdt, 0.0, 0.0));
+  // The spring back toward the dome, and its motion counts.
+  let g3 = gap + (rest - gap) * S.gapSpring;
+  dhdt += (g3 - gap) / max(S.dt, 0.0001);
+  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, 0.0, 0.0));
 }`,
 
   /*

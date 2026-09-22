@@ -82,7 +82,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 32;      // 30 used, rounded up for the uniform's 16-byte tail
+const SIM_FLOATS = 36;      // 33 used, rounded up for the uniform's 16-byte tail
 
 export class WebGPUFluid {
   readonly N: number;
@@ -301,6 +301,7 @@ export class WebGPUFluid {
     f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
     f[28] = p.rockX; f[29] = p.rockY;
+    f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 

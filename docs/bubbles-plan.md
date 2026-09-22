@@ -782,3 +782,96 @@ So candidate 2 — returning the ring on the CPU, symmetric with the deposit,
 using the `mul` buffer that already exists for taking dye away — is the one to
 try next, and the zero-mean fix should be tried first because it is one line
 and it may be what has been limiting the source all along.
+
+## E. The two glasses, and four things a hand does (2026-09-21)
+
+Four complaints, each traced to a specific line, each fixed, and **none of the
+fixes measurable** by the harness written for them. Recorded in that order
+because the last part is the part that matters.
+
+### What was found
+
+**A press was over in a twelfth of a second.** The squeeze kernel sprang the
+gap back a fixed 0.005 a step across a range of 0.025 — five steps — and
+decayed the squeeze itself by half every step, a 17ms half-life. Both are far
+quicker than a hand.
+
+**And the release did nothing.** `dhdt` was written only from the press delta,
+so the plates coming back apart contributed nothing: liquid was pushed out and
+never drawn back.
+
+**The plates were flats.** The gap was one constant for the whole plate, so the
+two glasses sat perfectly parallel, which no real pair of clock glasses does.
+
+**A puff was purely radial.** `blowAir` adds `(i/dist, j/dist) · strength`,
+which is exactly curl-free — precisely what the pressure projection exists to
+remove. Most of a puff was deleted at the end of the step that applied it.
+
+**And nothing dragged the liquid round with a turning plate.** The rotational
+coupling, `twist`, was driven by the `rotationSpeed` *setting* — the motor —
+not by what the plate is actually doing, so a flicked plate turned underneath
+its liquid without taking it along.
+
+### What was changed
+
+`plateCurve` gives the rest gap a dome; `plateSpring` makes the lift a rate
+from 0.12s to 2.3s; the spring's own motion now goes into `dhdt` so a release
+pulls liquid back; `gapMemory` gives the squeeze a 0.22s half-life instead of
+0.017s; both blows carry a swirl, the directed one as a counter-rotating pair
+either side of the jet; and `twist` picks up the part of the plate's motion the
+motor did not ask for, scaled by how hard the plates are pressed together.
+
+### What the measurement says: nothing changed
+
+`npm run plates`, against the same commit with and without all of it:
+
+| | before | after |
+|---|---|---|
+| a press moves the dye | 0.0262 against 0.0139 idle — **1.88x** | 0.0270 against 0.0147 — **1.84x** |
+| a blow moves the dye | 0.0642 against 0.0139 — **4.62x** | 0.0677 against 0.0147 — **4.60x** |
+| the dome moves where dye gathers | 1.622 / 1.602 | 1.884 / 1.862 |
+
+**The dome's null result is understood and is the useful one.** A gap that
+varies across the plate changes nothing, because *depth is not coupled to
+flow*: advection, diffusion and the projection are all depth-blind, and the gap
+field feeds only the squeeze pressure. A real Hele-Shaw cell obeys Darcy's law
+with mobility proportional to h², so thin places resist and thick places carry.
+Without that term a dome is decoration. **It is the prerequisite, not a
+refinement** — see F below.
+
+The press and blow results are not understood. The metric is total dye change,
+which is dominated by what those tools do to the dye *directly* — both multiply
+it down where they act — rather than by the flow they set up, so it may simply
+be insensitive to what was changed. That is a hypothesis and it is not tested.
+
+### And two instrument faults worth keeping
+
+**A press has to be held.** The first version called it once, one frame, and
+measured nothing at all. The gap delta is zeroed at every flush, so one call is
+one frame of squeeze — and with the release now pulling liquid back, a
+one-frame push followed by a slow lift nearly cancels inside one window.
+
+**The plate settles for as long as the harness runs.** Liquid speed read
+3.55e-1 early and 3.02e-1 several minutes later with nothing done to it, so a
+blow measured late looked *slower than an idle plate*. Every control here has
+to be contemporaneous with the thing it controls for, not taken at the top of
+the run.
+
+## F. Depth, and a plate that is wet everywhere
+
+Two questions asked of this, and they turn out to want the same field.
+
+**Does depth resist flow?** No. The gap is a real depth and it feeds only the
+squeeze. Giving the velocity a Darcy mobility in h² would make liquid run in
+the deep channels and stall where the glasses nearly touch — and it is what
+makes the dome in E do anything at all.
+
+**Is there water under the dye?** No. `dye.a` of zero means *nothing is there*,
+not clear liquid. A real plate is wet everywhere and the dye is a tracer in it.
+
+A clear carrier is worth more than it looks, because three separate things all
+want it and none can be expressed without it: drying, where dye concentrates as
+water leaves; wet-plate optics, where bare plate still refracts; and the oil
+saturation in D, whose whole state variable is *how much of the surface is
+already covered*. One field, three features, and one of them was already on the
+list from a different direction.

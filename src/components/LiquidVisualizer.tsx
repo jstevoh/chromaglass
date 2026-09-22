@@ -170,6 +170,16 @@ const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat fie
 const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
 const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
+/*
+  How much of a blow is swirl rather than push.
+
+  A push is curl-free and the projection removes it within the same step; a
+  swirl is not and survives. Measured against nothing else in the plate, so
+  it is written down rather than derived: 0.55 is the point at which a puff
+  still reads as a puff rather than as a stirring rod, and the dye it moves
+  keeps drifting for several seconds instead of stopping with the finger.
+*/
+const BLOW_SWIRL = 0.55;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
@@ -501,6 +511,14 @@ class FluidSimulation {
 
   temp: Float32Array;
   temp0: Float32Array;
+  /**
+   * How fast this plate is actually turning, in radians a second.
+   *
+   * Set by the frame from the flywheel, and read by the twist below. The
+   * *setting* is a motor — what the plate is asked to hold — and this is what
+   * it is doing, which after a flick are very different numbers.
+   */
+  plateSpin = 0;
   meanDensity = 0; // rolling measure of how full the plate is
   /**
    * The average colour on this layer, 0..1 per channel.
@@ -1473,8 +1491,28 @@ class FluidSimulation {
           const idx = nx + ny * this.size;
           const dist = Math.sqrt(distSq);
           this.dirty = true;
-          this.vx[idx] += (i / dist) * strength;
-          this.vy[idx] += (j / dist) * strength;
+          /*
+            A puff is not only a push outward.
+
+            This was purely radial, and a purely radial field is exactly what
+            the pressure projection exists to remove — so most of a puff was
+            deleted at the end of the very step that applied it, and what
+            little survived was gone inside a second. That is why blowing
+            registered as a nudge that stopped rather than as something the
+            plate remembers.
+
+            Real air does not push a liquid aside so much as roll vorticity
+            into it, and vorticity is the part a projection cannot touch. So
+            the puff carries a swirl as well, and the swirl is what is still
+            turning long after the push has been solved away.
+
+            The direction comes from where the puff landed rather than from a
+            random number: the same show rendered twice has to be the same
+            film twice.
+          */
+          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
+          this.vx[idx] += ((i / dist) + (-j / dist) * swirl) * strength;
+          this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
           if (this.gpu) {
             this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
           } else {
@@ -1503,8 +1541,21 @@ class FluidSimulation {
           const idx = nx + ny * this.size;
           const w = 1 - Math.sqrt(distSq) / radius;
           this.dirty = true;
-          this.vx[idx] += dx * strength * w;
-          this.vy[idx] += dy * strength * w;
+          /*
+            And a directed blow rolls a *pair* of vortices, one either side of
+            the jet, turning opposite ways — which is what air blown across a
+            liquid actually leaves behind, and what keeps the dye moving after
+            the push itself has been projected away.
+
+            A straight push does carry some vorticity of its own, where the
+            jet's profile shears against the still liquid beside it, but it is
+            weak and it is all at the flanks. This puts it there on purpose.
+          */
+          const r = Math.sqrt(distSq) || 1;
+          const side = i * -dy + j * dx;       // across the jet
+          const sgn = side >= 0 ? 1 : -1;
+          this.vx[idx] += (dx + (-j / r) * sgn * BLOW_SWIRL) * strength * w;
+          this.vy[idx] += (dy + (i / r) * sgn * BLOW_SWIRL) * strength * w;
           if (this.gpu) this.mul[idx] *= 1 - 0.15 * w;
           else { const k = 1 - 0.15 * w; this.density[idx] *= k; this.densityR[idx] *= k; this.densityG[idx] *= k; this.densityB[idx] *= k; }
         }
@@ -1955,6 +2006,9 @@ class FluidSimulation {
     // or gradients and reads as a static colour wash. A macro frame needs
     // empty ground around its subject, so the budget drops hard while the
     // closeup camera is running.
+    // What the motor asks for, in the flywheel's units, so the twist below can
+    // tell the plate's own momentum apart from the speed it was told to hold.
+    const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
     const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     const regulatorEvap = Math.min(0.02, over * over * 0.012);
@@ -1997,6 +2051,22 @@ class FluidSimulation {
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, immiscibility, fingering,
+      /*
+        The two glasses (2026-09-21).
+
+        `plateSpring` is a slider from 0 to 1 and the shader wants a fraction
+        per *step*, so it is converted here rather than there: the ladder
+        gives up the step rate before anything else, and a fixed per-step
+        spring would make a press lift at two speeds on two machines.
+
+        The old behaviour was a flat 0.005 a step over a range of 0.025 —
+        five steps, a twelfth of a second — and a `gapMemory` of 0.5, which
+        is a seventeen-millisecond half-life. Both are far quicker than a
+        hand, which is why a press registered as a flicker.
+      */
+      plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
+      gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
+      gapMemory: Math.pow(0.5, this.dt / 0.22),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -2010,7 +2080,24 @@ class FluidSimulation {
       rockX: this.rockX * CUR_ROCK,
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
-      twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * CUR_TWIST * (this.layerIndex % 2 === 0 ? 1 : -1),
+      /*
+        The liquid is dragged round by the glass it is touching.
+
+        The first term is the motor's, unchanged, because every look is tuned
+        against it. The second is the part of the plate's motion that the
+        motor did not ask for — what a flick put there — and it is what makes
+        dye follow a spun plate instead of sitting still while the plate turns
+        underneath it.
+
+        Scaled by how hard the plates are pressed together, because that is
+        what contact means here: a plate barely touching drags its liquid
+        weakly, and one squeezed down on it takes the liquid with it. Couette
+        drag, in the one place this solver can express it without giving the
+        current pass the gap field to read.
+      */
+      twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
+        + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
+          * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
       particles: settings.particles ?? 0,
       particleLife: 4,
       meanDensity: this.meanDensity,
@@ -4671,6 +4758,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const grip = dragRate * 0.02 * realDt;
             vel = Math.abs(vel - motor) <= grip ? motor : vel - Math.sign(vel - motor) * grip;
             if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
+            // The plate is told what it is doing, so the liquid touching it
+            // can be dragged round by it (the twist in paramsFor).
+            if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
               An angle that accumulates cannot be allowed to go non-finite —
               see the note above, which is why both of these are guarded and

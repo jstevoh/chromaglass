@@ -36,6 +36,12 @@ export interface GpuStepParams {
   turbDetail: number;
   spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
+  /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
+  plateCurve: number;
+  /** How fast the plates spring back toward that dome, per step. */
+  gapSpring: number;
+  /** How much of a press's squeeze survives into the next step. */
+  gapMemory: number;
   fingering: number;
   vibIntensity: number;
   vibFrequency: number;

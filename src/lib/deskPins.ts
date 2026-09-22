@@ -174,6 +174,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 1, section: 'macro' },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
+  { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'physics' },
+  { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'physics' },
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'squish' },

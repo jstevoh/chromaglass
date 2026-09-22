@@ -184,6 +184,21 @@ export interface VisualizerSettings {
   
   // Squish Plate
   platePressure: number;
+  /*
+    The two glasses, and how they sit together (2026-09-21).
+
+    A lightshow plate is a pair of clock glasses, not a pair of flats, and
+    this modelled them as flats: the gap between them was one number for the
+    whole plate. `plateCurve` gives it a shape — below zero they touch in the
+    middle and open toward the rim, above zero the rim is the tight part and
+    the liquid pools in the centre.
+
+    `plateSpring` is how quickly they come back apart after a press, which
+    used to be fixed at a twelfth of a second for the full travel, and is
+    most of why pressing did not feel like much.
+  */
+  plateCurve: number;
+  plateSpring: number;
   glassSmear: number;
   rainDrip: number;
   viscosity: 'thick' | 'thin';
@@ -405,6 +420,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     rotation: 'none',
   },
   platePressure: 0.4,       // glass plate squeeze — drives radial spreading
+  plateCurve: -0.35,        // clock glasses: they meet in the middle
+  plateSpring: 0.35,        // a press takes about a second to lift
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
   viscosity: 'thick',
