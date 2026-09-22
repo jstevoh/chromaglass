@@ -41,6 +41,10 @@ export interface LiquidDeposit {
   soap?: number;
   body?: number;
   repel?: number;
+  /** Heavier than water (+) or lighter (−). A *kind*, so it mixes, not sums. */
+  weight?: number;
+  /** Polar against water. A *kind*, so it mixes, not sums. */
+  polarity?: number;
 }
 
 /**
@@ -51,7 +55,34 @@ export interface LiquidDeposit {
  * are properties of a liquid that is still sitting there, so they last as long
  * as a plate of it plausibly would.
  */
-const DECAY_SECONDS = { soap: 6, body: 22, repel: 26 };
+const DECAY_SECONDS = { soap: 6, body: 22, repel: 26, weight: 30, polarity: 30 };
+
+/*
+  The two forces the *kind* channels drive.
+
+  SINK is how hard a weight difference pushes along the plate's own slope: a
+  heavy liquid settles downhill and a light one rides up over it, and with the
+  plate level neither does anything, which is right — a level dish separates by
+  standing still, not by moving sideways.
+
+  UNMIX is like-toward-like. Each cell is pushed along the polarity gradient in
+  the direction of its own kind, so water goes toward water and oil toward oil
+  and the boundary between them sharpens instead of blurring. This is the part
+  `repel` could not do: `repel` is one number for a cell, so a pool refuses to
+  mix with *anything*, where this asks what the two liquids actually are.
+*/
+const SINK = 0.9;
+/*
+  Set in family with its neighbours and measured for scale, not chosen by eye.
+
+  It is linear and the control holds at every strength: separation across an
+  oil/syrup boundary reads 0.0088 at 1.4, 0.0187 at 3.0 and 0.0374 at 6.0,
+  while two liquids of the same chemistry stay merged (−0.036, −0.033, −0.029)
+  throughout. Three is twice the effect of the first guess with no sign of
+  instability, and it is the number most likely to want moving once somebody
+  has watched oil and water on a real plate.
+*/
+const UNMIX = 3.0;
 
 /** Below this, a channel is rounded to nothing so the field can go quiet. */
 const FLOOR = 0.004;
@@ -98,10 +129,28 @@ export class LiquidPhase {
   readonly body: Float32Array;
   /** Refuses to mix, 0..1. */
   readonly repel: Float32Array;
+  /** Heavier than water (+) or lighter (−), −1..1. A kind, not an amount. */
+  readonly weight: Float32Array;
+  /** Polar against water, −1..1. A kind, not an amount. */
+  readonly polarity: Float32Array;
 
   private readonly scratch: Float32Array;
   /** True while any channel holds anything worth spending a pass on. */
   private live = false;
+  /*
+    Which way is downhill, from the plate rather than from here.
+
+    Set by the caller each step. Zero means a level dish, and a level dish is
+    exactly where a weight difference should do nothing: liquids separate by
+    standing still, not by drifting sideways.
+  */
+  private tiltX = 0;
+  private tiltY = 0;
+  /** Tell the field which way the plate is leaning. */
+  setTilt(x: number, y: number): void {
+    this.tiltX = Number.isFinite(x) ? x : 0;
+    this.tiltY = Number.isFinite(y) ? y : 0;
+  }
   /** Sum of each channel over the plate, kept current by `deposit` and `step`. */
   private readonly totals = { soap: 0, body: 0, repel: 0 };
 
@@ -111,6 +160,8 @@ export class LiquidPhase {
     this.soap = new Float32Array(n);
     this.body = new Float32Array(n);
     this.repel = new Float32Array(n);
+    this.weight = new Float32Array(n);
+    this.polarity = new Float32Array(n);
     this.scratch = new Float32Array(n);
   }
 
@@ -123,6 +174,8 @@ export class LiquidPhase {
     this.soap.fill(0);
     this.body.fill(0);
     this.repel.fill(0);
+    this.weight.fill(0);
+    this.polarity.fill(0);
     this.totals.soap = this.totals.body = this.totals.repel = 0;
     this.live = false;
   }
@@ -160,7 +213,21 @@ export class LiquidPhase {
     const soap = (what.soap ?? 0) * amount;
     const body = (what.body ?? 0) * amount;
     const repel = (what.repel ?? 0) * amount;
-    if (soap === 0 && body === 0 && repel === 0) return;
+    /*
+      The kinds are not scaled by `amount` the way the amounts are.
+
+      A half-sized dose of oil is less oil, not less *oily*: what a smaller
+      dose changes is how far the cell moves toward being oil, which is the
+      blend weight below, not the value it is moving toward. Scaling the value
+      as well would make a gentle pour of oil read as something halfway
+      between oil and water, which is not a liquid anybody has.
+    */
+    const weight = what.weight ?? 0;
+    const polarity = what.polarity ?? 0;
+    const kinds = weight !== 0 || polarity !== 0;
+    if (soap === 0 && body === 0 && repel === 0 && !kinds) return;
+    // How fast a cell takes on the character of what lands in it.
+    const take = Math.min(1, Math.max(0, amount)) * 0.6;
 
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
@@ -175,6 +242,17 @@ export class LiquidPhase {
         if (soap) { const v = Math.min(1, this.soap[i] + soap * w); this.totals.soap += v - this.soap[i]; this.soap[i] = v; }
         if (body) { const v = Math.min(1, this.body[i] + body * w); this.totals.body += v - this.body[i]; this.body[i] = v; }
         if (repel) { const v = Math.min(1, this.repel[i] + repel * w); this.totals.repel += v - this.repel[i]; this.repel[i] = v; }
+        /*
+          Mixed toward, not added to. Two drops of oil in one place are not
+          twice as oily — they are oil — so the cell moves a share of the way
+          from whatever was there to whatever arrived, and a cell that is
+          already oil stays exactly as oily as oil.
+        */
+        if (kinds) {
+          const k = take * w;
+          this.weight[i] += (weight - this.weight[i]) * k;
+          this.polarity[i] += (polarity - this.polarity[i]) * k;
+        }
       }
     }
     this.live = true;
@@ -198,7 +276,21 @@ export class LiquidPhase {
     this.totals.soap = this.advectDecay(this.soap, vx, vy, disp, keep.soap);
     this.totals.body = this.advectDecay(this.body, vx, vy, disp, keep.body);
     this.totals.repel = this.advectDecay(this.repel, vx, vy, disp, keep.repel);
-    this.live = this.totals.soap + this.totals.body + this.totals.repel > 0;
+    /*
+      The kinds ride the plate too, and they fade back toward water.
+
+      `advectDecay` returns a total, which for a signed channel is a sum that
+      cancels — oil on one side and syrup on the other add to nothing — so it
+      cannot say whether the channel is still holding anything. The absolute
+      sums do, and they are what keeps the pass alive.
+    */
+    const kw = Math.exp(-dt / DECAY_SECONDS.weight);
+    const kp = Math.exp(-dt / DECAY_SECONDS.polarity);
+    this.advectDecay(this.weight, vx, vy, disp, kw);
+    this.advectDecay(this.polarity, vx, vy, disp, kp);
+    let kinds = 0;
+    for (let i = 0; i < this.weight.length; i++) kinds += Math.abs(this.weight[i]) + Math.abs(this.polarity[i]);
+    this.live = this.totals.soap + this.totals.body + this.totals.repel + kinds > 0;
   }
 
   /** One channel: semi-Lagrangian backtrace, then decay. Returns what is left. */
@@ -272,7 +364,8 @@ export class LiquidPhase {
       for (let i = 1; i < s - 1; i++) {
         const idx = i + j * s;
         const soap = this.soap[idx], body = this.body[idx], repel = this.repel[idx];
-        if (soap === 0 && body === 0 && repel === 0) continue;
+        const heavy = this.weight[idx], polar = this.polarity[idx];
+        if (soap === 0 && body === 0 && repel === 0 && heavy === 0 && polar === 0) continue;
 
         let fx = 0, fy = 0;
 
@@ -295,6 +388,67 @@ export class LiquidPhase {
           const k = Math.min(0.9, body * BODY_DRAG * dt);
           fx -= plateVx[idx] * k;
           fy -= plateVy[idx] * k;
+        }
+
+        /*
+          ── Weight: heavy settles, light rides up ─────────────────
+
+          Along the plate's own slope, which is the only direction "down"
+          means on a dish lying flat. With the plate level this does nothing
+          at all, and that is right: a level dish separates by standing still.
+          Tilt it or rock it and oil goes up the slope while syrup goes down,
+          which is the whole of what "x floats on y" can mean on a plate seen
+          from above.
+
+          `tiltX`/`tiltY` come from the caller, because the plate's tilt is
+          the plate's, not the liquid field's.
+        */
+        if (heavy !== 0 && (this.tiltX !== 0 || this.tiltY !== 0)) {
+          fx += this.tiltX * heavy * SINK * dt * s;
+          fy += this.tiltY * heavy * SINK * dt * s;
+        }
+
+        /*
+          ── Polarity: like moves toward like ──────────────────────
+
+          The pairwise half, and the thing `repel` above cannot express. Each
+          cell is pushed along the polarity gradient *in the direction of its
+          own kind*: a watery cell climbs toward more polar, an oily one
+          toward less. Multiplying by the cell's own polarity gets both signs
+          from one line — where the two match, the product is small and
+          nothing happens, and that is miscibility.
+
+          So oil and water separate, oil and silicone barely notice each
+          other, and two dyes of different colours but the same chemistry mix
+          exactly as they should, which colour-difference repulsion has never
+          been able to say.
+        */
+        if (polar !== 0) {
+          /*
+            Away from what is unlike it, by how unlike it is.
+
+            The first try was "like moves toward like": push each cell up the
+            polarity gradient in the direction of its own sign. It separates
+            oil from syrup and it is wrong, because it makes *any* two blobs
+            of the same sign clump apart from each other — each runs to its
+            own nearest maximum. Measured: two liquids of near-identical
+            chemistry parted five times harder than oil and syrup did.
+
+            What matters is the *difference*, not the gradient. Each side is
+            weighed by how unlike this cell it is, and the cell moves away
+            from the more unlike side. Two liquids of the same chemistry
+            differ by nothing, so nothing happens and they mix, which is what
+            miscible means. This is the same shape as the colour-difference
+            force in the solver, with chemistry in place of colour — and
+            chemistry is the one that is true, because two dyes can differ in
+            colour and not at all in what they are made of.
+          */
+          const dR = this.polarity[idx + 1] - polar;
+          const dL = this.polarity[idx - 1] - polar;
+          const dU = this.polarity[idx + s] - polar;
+          const dD = this.polarity[idx - s] - polar;
+          fx -= (dR * dR - dL * dL) * UNMIX * dt * s;
+          fy -= (dU * dU - dD * dD) * UNMIX * dt * s;
         }
 
         // ── Repel: it holds its own edge ──────────────────────────

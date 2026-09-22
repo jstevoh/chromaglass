@@ -305,6 +305,87 @@ function spread(density) {
 }
 
 console.log('');
+/*
+  ── Weight: what floats on what ─────────────────────────────────────
+
+  The complaint this answers is that nothing floated on anything. Two pools
+  side by side on a tilted plate: the heavy one must go downhill and the light
+  one must go up, and on a level plate neither may move at all — a level dish
+  separates by standing still, and a weight force that works on a level plate
+  is a drift, not a density.
+*/
+{
+  const tilted = new LiquidPhase(N);
+  tilted.deposit(N * 0.35, N / 2, 10, { weight: 0.35, polarity: 0.6 }, 1);   // syrup
+  tilted.deposit(N * 0.65, N / 2, 10, { weight: -0.12, polarity: -0.9 }, 1); // oil
+  tilted.setTilt(1, 0);
+  const p = plate();
+  pool(p.density, N * 0.35, N / 2, 10, 1);
+  pool(p.density, N * 0.65, N / 2, 10, 1);
+  run(tilted, p, 1.2, { carryDye: false });
+  const heavyGo = p.vx[idx(Math.round(N * 0.35), N / 2)];
+  const lightGo = p.vx[idx(Math.round(N * 0.65), N / 2)];
+  check('a heavy liquid settles down the slope', heavyGo > 0, `syrup ${heavyGo.toFixed(4)}`);
+  check('and a light one rides up it', lightGo < 0, `oil ${lightGo.toFixed(4)}`);
+  check('so they go opposite ways, which is what floating is',
+    heavyGo > 0 && lightGo < 0, `${heavyGo.toFixed(4)} against ${lightGo.toFixed(4)}`);
+
+  // The control, and the one that would catch a drift dressed as a density.
+  const level = new LiquidPhase(N);
+  level.deposit(N * 0.35, N / 2, 10, { weight: 0.35 }, 1);
+  level.deposit(N * 0.65, N / 2, 10, { weight: -0.12 }, 1);
+  level.setTilt(0, 0);
+  const q = plate();
+  run(level, q, 1.2, { carryDye: false });
+  let moved = 0;
+  for (let i = 0; i < q.vx.length; i++) moved += Math.abs(q.vx[i]) + Math.abs(q.vy[i]);
+  check('and on a level plate weight moves nothing', moved < 1e-9, `total motion ${moved.toExponential(1)}`);
+}
+
+/*
+  ── Polarity: which liquids refuse each other ───────────────────────
+
+  The pairwise half. `repel` is one number a cell carries, so a pool refuses
+  to mix with *whatever* it meets; this asks what the two liquids actually
+  are. Oil against syrup must push apart, and two liquids of the same
+  chemistry must not — even when their colours differ, which is the case the
+  colour-difference force has always got wrong.
+*/
+{
+  /*
+    Measured at the boundary, not at the middle of each pool.
+
+    The first version of this sampled the pool centres and reported the two
+    liquids moving *together*. They were not: the centre of a pool is where
+    its own kind is thickest, so the polarity gradient there is zero by
+    symmetry and what it measured was drift. The force lives where the two
+    liquids meet, which is also the only place "these two refuse each other"
+    means anything.
+  */
+  const sep = (ph, seconds = 1.0) => {
+    const p = plate();
+    run(ph, p, seconds, { carryDye: false });
+    const mid = Math.round(N * 0.5);
+    const left = p.vx[idx(mid - 4, N / 2)];
+    const right = p.vx[idx(mid + 4, N / 2)];
+    return right - left;            // positive: the two sides are parting
+  };
+
+  const unlike = new LiquidPhase(N);
+  unlike.deposit(N * 0.42, N / 2, 12, { polarity: -0.9 }, 1);  // oil
+  unlike.deposit(N * 0.58, N / 2, 12, { polarity: 0.6 }, 1);   // syrup
+  const apart = sep(unlike);
+  check('oil and syrup part where they meet', apart > 0, `${apart.toFixed(4)} across the boundary`);
+
+  const alike = new LiquidPhase(N);
+  alike.deposit(N * 0.42, N / 2, 12, { polarity: 0.55 }, 1);
+  alike.deposit(N * 0.58, N / 2, 12, { polarity: 0.6 }, 1);
+  const together = sep(alike);
+  check('and two liquids of the same chemistry stay mixed',
+    together < apart * 0.25,
+    `${together.toFixed(4)} against ${apart.toFixed(4)} for unlike — the colours are irrelevant, which is the point`);
+}
+
 const failed = checks.filter(c => !c.ok);
 console.log(`${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length === 0 ? 0 : 1);

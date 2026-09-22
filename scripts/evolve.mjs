@@ -67,7 +67,7 @@ try {
 
   for (const startId of ['classic', 'fillmore-east-1969', 'oil-wheel']) {
     const from = base(startId);
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < 4; k++) {
       const look = evolvedLook(from, luckyLook(from, LED, rand));
       await page.evaluate((s) => {
         const d = window.chromaglassDebug();
@@ -82,7 +82,16 @@ try {
         one colour, which takes as long as the evaporation and the dye budget
         need. The reported case was 24 seconds in.
       */
-      await page.waitForTimeout(9000);
+      /*
+        Long enough for the automation to fill the plate.
+
+        Nine seconds did not reproduce it across 39 looks. The reported case
+        was 24 seconds in, and the automation pours on its own the whole time
+        — so a look that rolls a fast pour, a high dye budget and one dominant
+        colour has to be given the time to actually saturate before the frame
+        is judged.
+      */
+      await page.waitForTimeout(28000);
       const dens = await page.evaluate(() => {
         const d = window.chromaglassDebug();
         const a = d.fluids?.[0]?.readDensity;
