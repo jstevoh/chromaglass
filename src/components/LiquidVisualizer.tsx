@@ -537,6 +537,15 @@ class FluidSimulation {
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
+  /*
+    How many readbacks have landed. The rim deposit needs it: the mirror
+    refreshes only when `readbackAsync` has something, and depositing from a
+    mirror that has not moved puts the same displaced dye back twice — which
+    measured as a plate 4-8% *over* its control and a popped bubble
+    refilling to 124% of what had been there.
+  */
+  private rbSeq = 0;
+  private rimSeq = -1;
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
@@ -655,6 +664,7 @@ class FluidSimulation {
     }
     this.meanDensity = sum / GRID_AREA;
     this.meanColor = [sr / GRID_AREA, sg / GRID_AREA, sb / GRID_AREA];
+    this.rbSeq++;
   }
 
   private pullStateFromGpu() {
@@ -690,6 +700,97 @@ class FluidSimulation {
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     this.dirty = false;
+  }
+
+  /**
+   * The dye a bubble displaces, put back as a ring around it (H6 · A).
+   *
+   * The exclusion on the GPU is a multiply, because it is the only operator
+   * that reaches the middle of a bubble — every gradient-driven one is zero
+   * where the air is uniform, which is measured in `bubbles-plan.md`. A
+   * multiply destroys what it removes, and that was measured too: the plate
+   * drained to 83% of its dye in twenty seconds with one bubble on it, and a
+   * popped bubble refilled to 20% of what had been there and stopped. A
+   * permanent scar is worse than the shading H6 exists to replace.
+   *
+   * So the mass goes back, as a ring just outside the rim, which is where a
+   * bubble in a thin layer really does push it. Two things make this cheap
+   * rather than the three blur passes it first looked like:
+   *
+   * The mirror is a frame behind, and that is exactly right. On the frame a
+   * bubble arrives the mirror still holds the dye the GPU is removing this
+   * frame, so the disc total *is* the mass to redeposit. A frame later the
+   * mirror shows the emptied disc and there is nothing to move, which is
+   * also right — the bubble has already taken what was under it.
+   *
+   * And both halves read the same mirror, so it conserves by construction
+   * rather than by a servo. A servo was tried: the plate's dye-budget loop
+   * made symmetric, which never engaged, because the deficit term is
+   * quadratic and a 10% shortfall contributes 0.0001.
+   */
+  depositBubbleRims(packed: Float32Array, count: number): void {
+    if (!this.gpu || count <= 0) return;
+    // Once per mirror, not once per frame: see `rbSeq`.
+    if (this.rbSeq === this.rimSeq) return;
+    this.rimSeq = this.rbSeq;
+    const dye = this.gpu.rbDyeView;
+    const N = this.size;
+    for (let k = 0; k < count; k++) {
+      // The packed block, because it carries the fade as its opacity and the
+      // Bubble record does not — a bubble part-way in has taken part of the
+      // dye, and the ring has to match or the plate gains colour.
+      const o = k * 4;
+      const b = { x: packed[o] * N, y: packed[o + 1] * N, r: packed[o + 2] * N, opacity: packed[o + 3] };
+      // The bubble list is in logical cells already, which is the grid the
+      // mirror and the deltas are both on, so nothing is mapped.
+      const R = b.r;
+      if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+      const clear = Math.max(0, Math.min(1, b.opacity));
+      if (clear < 0.02) continue;
+      let mass = 0, aR = 0, aG = 0, aB = 0;
+      const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
+      const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
+      for (let y = lo; y <= hi; y++) {
+        for (let x = xl; x <= xh; x++) {
+          const dx = x - b.x, dy = y - b.y;
+          if (dx * dx + dy * dy > R * R) continue;
+          const i4 = (x + y * N) * 4;
+          const d = dye[i4 + 3];
+          if (!(d > 1e-5)) continue;
+          mass += d * clear;
+          aR += dye[i4] * clear; aG += dye[i4 + 1] * clear; aB += dye[i4 + 2] * clear;
+        }
+      }
+      if (!(mass > 1e-4)) continue;
+      // The annulus the mass lands in: just outside the rim, a third of a
+      // radius wide, which is about what the references show as the bright
+      // ring around a bubble sitting in dye.
+      const rIn = R * 1.02, rOut = R * 1.38;
+      const cells: number[] = [];
+      const yl = Math.max(0, Math.floor(b.y - rOut)), yh = Math.min(N - 1, Math.ceil(b.y + rOut));
+      const cxl = Math.max(0, Math.floor(b.x - rOut)), cxh = Math.min(N - 1, Math.ceil(b.x + rOut));
+      for (let y = yl; y <= yh; y++) {
+        for (let x = cxl; x <= cxh; x++) {
+          const dd = Math.hypot(x - b.x, y - b.y);
+          if (dd < rIn || dd > rOut) continue;
+          cells.push(x + y * N);
+        }
+      }
+      if (!cells.length) continue;
+      /*
+        Deposited in the mirror's own log-space rather than through
+        `addDensity`, which takes a colour and takes its log. Going out to a
+        colour and back in would lose the mix: the absorptions here are
+        already the geometric-mean form the plate stores, so the ring keeps
+        the colour of the dye it came from, whatever was mixed into it.
+      */
+      const w = 1 / cells.length;
+      this.dirty = true;
+      for (const i of cells) {
+        this.density[i] += mass * w;
+        this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
+      }
+    }
   }
 
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
@@ -1848,6 +1949,16 @@ class FluidSimulation {
     const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     const regulatorEvap = Math.min(0.02, over * over * 0.012);
+    /*
+      Only ever upward, and H6 tried the other direction and took it out
+      again. A bubble's exclusion is a multiply, so it destroys the dye it
+      removes, and making this loop symmetric was the first attempt at
+      keeping the plate's colour. It never engaged: the deficit term is
+      quadratic, so a plate 10% under its budget contributed 0.0001. The dye
+      goes back where it physically went instead — a ring at the bubble's
+      rim, in `depositBubbleRims` — which conserves by construction because
+      both halves read the same mirror.
+    */
     const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
 
     return {
@@ -5150,7 +5261,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // layer would cut the same holes through the background loop.
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
-              lead.gpu.setBubbles(bubblesRef.current.packed, Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES), 0.25);
+              const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
+              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25);
+              /*
+                And the dye those bubbles displace, put back as a ring
+                (H6 · A). Before the hand-off in reading order but after it in
+                effect: the deposit goes into the CPU's delta buffers and is
+                folded in on the next flush, by which time the solver has
+                taken the disc. Measured without it, the plate drained to 83%
+                of its dye in twenty seconds and a popped bubble never got
+                its colour back.
+              */
+              lead.depositBubbleRims(bubblesRef.current.packed, live);
             }
           }
           const frame = stage?.frame();

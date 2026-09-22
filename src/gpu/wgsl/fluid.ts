@@ -305,42 +305,56 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     A.a.x is bubbleClear, the rate. The four flows are each at most a
     quarter of the cell, so nothing can push a cell below zero.
   */
+  /*
+    Where air is, dye is not (H6 · A).
+
+    A multiply, and it was a multiply before, and the round trip is the
+    lesson. `dye *= 1 - air` empties a bubble perfectly — measured 0.000
+    against 1.492 — and destroys what it removes, so a bubble that drifts on
+    leaves a scar of clear plate and a plate with bubbles slowly loses its
+    colour. The check caught that, so the multiply was replaced by a
+    conserving exchange between neighbours, from more air to less.
+
+    That exchange conserves and **cannot empty a bubble**, for a reason that
+    is structural rather than a matter of tuning: it is driven by the
+    *difference* in air between neighbouring cells, and the inside of a
+    bubble is uniformly air, so there is no difference to flow down. The
+    radial profile says it exactly. With the air at 1.00 in the middle of a
+    bubble, the dye there measured **0.990** of what the same plate had with
+    no bubble on it — untouched — while the rim, where the gradient is, sat
+    at 0.85. A hole with its middle intact is not a hole.
+
+    Three things were tried before believing that. A velocity down the air
+    gradient does nothing at all, because a gradient field is precisely what
+    the pressure projection removes. A source in the divergence the
+    projection solves does reach the flow and still leaves the middle: the
+    velocity of a radially symmetric source is zero at its centre, and the
+    dye's advection is semi-Lagrangian, which transports a value along a
+    characteristic and has no term to dilute it — so the centre cell
+    backtraces onto itself and keeps its dye for ever. Blurring the air
+    field to manufacture a slope made it worse.
+
+    So: the multiply, which needs no transport and therefore reaches the
+    middle, and the dye it displaces is kept by the plate's own budget
+    servo rather than here — see `evapFactor` in `LiquidVisualizer`. The
+    conservation is global rather than at the rim; a rim ring of real
+    displaced dye is written up in `bubbles-plan.md` as what is left.
+
+    `A.a.x` is `bubbleClear`: 1 is the physical answer, and lower keeps some
+    of the old shading for a look that wants it.
+  */
   airExclude: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var air: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 
-fn airAt(p: vec2i, n: i32) -> f32 {
-  let c = clamp(p, vec2i(0), vec2i(n - 1, n - 1));
-  return clamp(textureLoad(air, c, 0).r, 0.0, 1.0);
-}
-
-fn dyeAt(p: vec2i, n: i32) -> vec4f {
-  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1, n - 1)), 0);
-}
-
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  let n = i32(S.n);
   let p = vec2i(id.xy);
-  let rate = clamp(A.a.x, 0.0, 1.0) * 0.25;
-  let aHere = airAt(p, n);
-  var here = dyeAt(p, n);
-  var out = here;
-
-  for (var k = 0; k < 4; k++) {
-    var o = vec2i(1, 0);
-    if (k == 1) { o = vec2i(-1, 0); }
-    if (k == 2) { o = vec2i(0, 1); }
-    if (k == 3) { o = vec2i(0, -1); }
-    let q = p + o;
-    let aThere = airAt(q, n);
-    // Downhill in air: out of the bubble, toward the liquid.
-    let gain = max(0.0, aThere - aHere) * rate;
-    let loss = max(0.0, aHere - aThere) * rate;
-    out = out + dyeAt(q, n) * gain - here * loss;
-  }
-  textureStore(dst, p, max(out, vec4f(0.0)));
+  let a = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
+  let here = textureLoad(dye, p, 0);
+  let keep = 1.0 - clamp(A.a.x, 0.0, 1.0) * a;
+  textureStore(dst, p, max(here * keep, vec4f(0.0)));
 }`,
 
   // x = (x0 + a Σ neighbours) / (1 + 4a), per channel. A.a is a, A.b is 1/(1+4a).

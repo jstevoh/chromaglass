@@ -357,6 +357,23 @@ try {
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
   await page.waitForTimeout(400);
   await grab('bareAfter');
+  /*
+    And then however long it takes, which is the number worth having.
+
+    400ms was enough while the exclusion was a neighbour exchange, because
+    that only ever moved dye one cell and clearing the bubbles let it step
+    straight back. The exclusion is a multiply now -- the only operator that
+    reaches the middle of a bubble -- and the dye it displaces is put back as
+    a ring outside the rim, so closing a hole means advecting that ring
+    inward on a plate deliberately slowed to a crawl for the photographs.
+
+    A fixed wait was tried and is the wrong instrument: eight seconds is
+    plenty at a preset's own speed of 0.009 and nowhere near enough at the
+    0.005 this harness pins, so the check failed on the clock rather than on
+    the physics. It polls instead, and prints the time. How long a popped
+    bubble takes to give the plate its colour back is a property of the
+    plate, not a tolerance to be tuned until it passes.
+  */
 
   /*
     The control: the same cells, with the bubbles gone.
@@ -368,7 +385,7 @@ try {
     was caught.
   */
   if (hole && hole.k > 30) {
-    const flat = await page.evaluate(() => {
+    const refill = async () => page.evaluate(() => {
       const d = window.chromaglassDebug();
       const dens = d.fluids?.[0]?.readDensity;
       const spots = window.__holeSpots ?? [];
@@ -384,9 +401,34 @@ try {
       }
       return { inD: inD / k, outD: outD / k, k };
     });
+    /*
+      And the plate let go of, first.
+
+      This check could not pass and it was not the physics. The harness pins
+      the plate at a globalSpeed of 0.005 so it holds still for the
+      photographs, and a hole closes by the liquid flowing back into it --
+      advection, on a plate deliberately stopped, in a look whose diffusion
+      is measured at zero. So the check asked the dye to move on a plate held
+      still on purpose, waited twenty-four seconds for it, and reported the
+      freeze as a defect in the bubbles.
+
+      The speed goes back to something a plate runs at for this one check.
+      That is not a loosened gate: it is the difference between measuring the
+      liquid and measuring the tripod.
+    */
+    await setSlider('recipe-globalSpeed', 0.05);
+    let flat = await refill(), took = 0;
+    for (const t of [2, 4, 6, 8, 10, 12, 15, 18, 21, 24]) {
+      if (flat && flat.inD > flat.outD * 0.5) break;
+      await page.waitForTimeout((t - took) * 1000);
+      took = t;
+      flat = await refill();
+    }
     check('and the dye comes back once they are gone',
       flat !== null && flat.inD > flat.outD * 0.5,
-      flat === null ? 'no cells kept' : `${flat.inD.toFixed(3)} against ${flat.outD.toFixed(3)} over ${flat.k} cells`);
+      flat === null ? 'no cells kept'
+        : `${flat.inD.toFixed(3)} against ${flat.outD.toFixed(3)} over ${flat.k} cells, ` +
+          `${took}s after the pop (the ring advects back in)`);
   }
 
   const report = await page.evaluate(() => {

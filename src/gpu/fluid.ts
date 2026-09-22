@@ -714,6 +714,15 @@ export class WebGPUFluid {
    * positions again on every one of the step's iterations would cost the
    * splat several times over for one picture.
    */
+  /**
+   * How much of the plate the air is taking, or 0 when nothing is excluding.
+   *
+   * The budget servo needs it: the exclusion is a multiply, so the dye it
+   * displaces leaves the field, and the servo is what keeps the plate's
+   * total rather than a ring at the rim (H6 · A).
+   */
+  get airDisplacing(): number { return this.airPush > 0 ? this.airCover : 0; }
+
   setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.setBubbles(packed, count, soft);

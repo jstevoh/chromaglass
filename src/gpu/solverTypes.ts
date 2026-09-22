@@ -86,6 +86,13 @@ export interface PlateSolver {
   readonly grainMix: number;
   /** The coordinates the pigment rides, where the device can carry them. */
   readonly grainTexture?: unknown;
+  /**
+   * How much of the plate the air is taking, 0 when nothing is excluding.
+   *
+   * Optional because only the WebGPU solver carries an air field; the
+   * budget servo that reads it treats absence as none (H6 · A).
+   */
+  readonly airDisplacing?: number;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
   /** Start a read and take whatever has landed; false before the first. */

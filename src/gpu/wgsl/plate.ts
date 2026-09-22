@@ -1363,7 +1363,33 @@ struct FsOut {
         tinted by what refraction bends in from the edge, rather than by the
         hole it made.
       */
-      let rimUv = fuvBase + outward * (bestRad * (1.35 + 0.5 * (1.0 - aC)));
+      /*
+        Walk outward until the air stops, and read the liquid there (H6 A).
+
+        This used to step a fixed fraction of the frame -- bestRad, which is
+        the constant 0.03 -- because that was the radius a bubble was given
+        before the air field replaced the forty uniforms. Once the exclusion
+        actually emptied a bubble, that constant became a bug with a measured
+        size: on any bubble wider than it, the sample meant to find the liquid
+        BEYOND the rim landed inside the hole, where there is now no dye at
+        all. So the film thickness read zero, the tint went white, and the
+        check asking whether a bubble is the liquid lit rather than paint on
+        top of it went from 14.6 degrees to 27.2.
+
+        Six taps, out to 0.12 of the frame, which covers the largest bubble a
+        look asks for. The march is inside the branch that already requires
+        air here, so a plate with no bubbles on it pays nothing.
+      */
+      var rimUv = fuvBase + outward * 0.012;
+      var walk = 0.012;
+      for (var ri = 0; ri < 6; ri++) {
+        walk = walk + 0.018;
+        let probe = fuvBase + outward * walk;
+        if (textureSampleLevel(air0, samp, probe, 0.0).r < 0.05) {
+          rimUv = probe + outward * 0.012;
+          break;
+        }
+      }
       let rimF = decodeFluid(layer0, rimUv, 0.0, false);
       let rimCol = mix(bgColor, rimF.rgb, rimF.a);
       let ground = dot(rimCol, vec3f(0.299, 0.587, 0.114));
@@ -1398,6 +1424,17 @@ struct FsOut {
         And mixed in gently — the membrane, the arc and the specular dot are
         what say "glass", so the interior has to stay behind them rather than
         wash them out.
+      */
+      /*
+        A quarter toward white, and a tenth was measured and is worse.
+
+        The reasoning for a tenth was that the interior is empty now, so all
+        of its colour comes from this mix and less white means more of the
+        liquid. The harness disagreed flatly: the angle between the light a
+        bubble adds and the colour of the ground it sits on went from 24.0
+        degrees to 39.2. Tinting harder pulls the added light toward the
+        colour beyond the rim, which is not the colour under the bubble, and
+        the check compares against the latter. Left where it measures best.
       */
       let through = mix(tint, vec3f(1.0), 0.25) * (0.45 + 0.5 * dome + 0.55 * ground);
       c = mix(c, through, inside * (0.3 + 0.35 * dome));
