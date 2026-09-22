@@ -1426,17 +1426,26 @@ struct FsOut {
         wash them out.
       */
       /*
-        A quarter toward white, and a tenth was measured and is worse.
+        How much of the lamp shows through the gap, and it was measured
+        rather than chosen.
 
-        The reasoning for a tenth was that the interior is empty now, so all
-        of its colour comes from this mix and less white means more of the
-        liquid. The harness disagreed flatly: the angle between the light a
-        bubble adds and the colour of the ground it sits on went from 24.0
-        degrees to 39.2. Tinting harder pulls the added light toward the
-        colour beyond the rim, which is not the colour under the bubble, and
-        the check compares against the latter. Left where it measures best.
+        The interior is empty now, so every bit of its colour comes from this
+        one mix: pull toward white and the bubble is the lamp, pull toward
+        the rim's tint and it is the liquid. Both ends are wrong in a way the
+        two checks beside it can each see, and neither could see alone —
+
+          0.25   hue shift 8.9-13.1 degrees, on its gate of 12
+                 thick dye brightened 0.159 against thin 0.110  (1.45x)
+          0.10   hue shift 1.7 degrees
+                 thick 0.094 against thin 0.085  (1.11x) — fails
+          0.18   hue shift 9.3, thick 0.169 against thin 0.046  (3.7x)
+
+        Tinting harder keeps the liquid's hue and flattens how much the lamp
+        depends on the dye it is coming through, which is the one thing that
+        tells a hole from a highlight painted on top. Eighteen hundredths
+        holds both, with room on each.
       */
-      let through = mix(tint, vec3f(1.0), 0.25) * (0.45 + 0.5 * dome + 0.55 * ground);
+      let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * dome + 0.55 * ground);
       c = mix(c, through, inside * (0.3 + 0.35 * dome));
       c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);
       c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;

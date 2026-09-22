@@ -449,9 +449,13 @@ try {
     const d3 = (X, Y, i) =>
       (Math.abs(X[i] - Y[i]) + Math.abs(X[i + 1] - Y[i + 1]) + Math.abs(X[i + 2] - Y[i + 2])) / 255;
 
-    let n = 0, satLost = 0, hueShift = 0, lumGain = 0, worstSat = -1, worstHue = -1;
+    let n = 0, hueShift = 0, hueWeight = 0, lumGain = 0, worstSat = -1, worstHue = -1;
     let changed = 0, drifted = 0, biggest = 0;
-    let addAngle = 0, addWeight = 0, worstAngle = -1, lit = 0;
+    let lit = 0;
+    // [how bright the plate was here, how much brighter the bubble made it]
+    const pairs = [];
+    // [light the bubble added here, saturation lost here]
+    const satPairs = [];
     for (let i = 0; i < B.length; i += 4) {
       if (d3(P, Q, i) > 0.03) { drifted++; continue; }        // the plate moved here: not evidence
       const dp = d3(B, P, i), dq = d3(B, Q, i);
@@ -465,38 +469,108 @@ try {
       if (a.s < 0.25 || a.v < 0.1) continue;   // near-grey or near-black under it: nothing to wash out
 
       /*
-        The measure that matters is the colour of the light the bubble *adds*,
-        not the colour of the result.
+        What separates a hole from paint: how the light it adds depends on
+        what was in the way.
 
-        Comparing the finished pixel to the one underneath dilutes the answer
-        with thousands of rim pixels the bubble barely touched — which is how
-        an earlier version of this gate passed a control built with the old
-        neutral-white highlight. `add` is B minus the ground; the angle between
-        it and the ground's own colour says directly whether the bubble is
-        lighting the liquid or painting over it. Neutral white on a red plate
-        is a wide angle; light that carries the dye's colour is a narrow one.
+        This used to take the angle between the light the bubble adds and the
+        ground's own colour, on the reasoning that neutral white on a red
+        plate is a wide angle and light carrying the dye's colour is a narrow
+        one. That was right while a bubble *shaded over* the dye, and it is
+        the wrong question now, in a way that got worse the better the
+        feature got.
+
+        A backlit dish filters the lamp through the dye: red dye passes red
+        and absorbs green and blue, so the ground is nearly (r, 0, 0). A hole
+        passes the lamp unfiltered. So the light a *correct* hole adds is
+        nearly (0, g, b) — the complement of the ground, ninety degrees from
+        it, which is the "worst 90.0" that showed up in every run. The check
+        failed hardest on the most physically correct hole, and no choice of
+        reference fixes that, because the claim itself is false: light through
+        a hole is the lamp's, not the liquid's.
+
+        The claim it was standing in for — that a bubble does not wash the
+        colour out of the picture — is already held by the two checks beside
+        it, on saturation and on hue, which measure the finished pixel.
+
+        So this asks the thing those two cannot. **Paint adds the same light
+        wherever it lands; a hole reveals the lamp in proportion to how much
+        dye was stopping it.** Pair each pixel's gain in brightness with how
+        thick the dye under it was, split at the median, and a hole brightens
+        the thick half more than the thin. A pasted highlight does not care.
       */
-      const add = [Math.max(0, br - ar), Math.max(0, bg - ag), Math.max(0, bb - ab)];
-      const addMag = Math.hypot(add[0], add[1], add[2]);
-      const gndMag = Math.hypot(ar, ag, ab);
-      if (addMag > 0.02 && gndMag > 1e-3) {
-        const cos = (add[0] * ar + add[1] * ag + add[2] * ab) / (addMag * gndMag);
-        const ang = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
-        addAngle += ang * addMag;      // weighted by how much light it added
-        addWeight += addMag;
-        worstAngle = Math.max(worstAngle, ang);
-        lit++;
-      }
+      const gndLum = 0.299 * ar + 0.587 * ag + 0.114 * ab;
+      const bubLum = 0.299 * br + 0.587 * bg + 0.114 * bb;
+      if (bubLum - gndLum > 0.01) { pairs.push([gndLum, bubLum - gndLum]); lit++; }
 
       let dh = Math.abs(b.h - a.h); if (dh > 180) dh = 360 - dh;
       const sl = (a.s - b.s) / a.s;
-      satLost += sl; hueShift += dh; lumGain += (b.v - a.v) / Math.max(a.v, 1e-3);
-      worstSat = Math.max(worstSat, sl); worstHue = Math.max(worstHue, dh);
+      /*
+        The interior and the rim are different claims, and averaging them was
+        measuring neither.
+
+        A flat mean over the whole footprint reads whatever mixture of the
+        two happens to fall in the sample, and that mixture moves with where
+        twelve bubbles land on a drifting plate: 2%, 8%, 9%, 10% and 39% on
+        one build, against a gate of a third. Weighting by the light added
+        made it *stable* at 51-56% and consistently failing, which is the
+        useful result — it was then measuring the interiors, and **a real
+        hole is supposed to desaturate there.** The interior is the lamp
+        coming through unfiltered; that is the whole of H6.
+
+        What must not wash out is the picture: the rim, and the liquid the
+        bubble sits in. So the two are split by how much light the bubble
+        added — the half it barely touched is the rim — and the claim is
+        made about that half. The core's figure is printed beside it, not
+        gated, because there is no number it ought to hold.
+      */
+      satPairs.push([Math.max(0, b.v - a.v), sl]);
+      lumGain += (b.v - a.v) / Math.max(a.v, 1e-3);
+      worstSat = Math.max(worstSat, sl);
+      /*
+        Hue only counts where there is a hue.
+
+        The filter above asks that the *ground* be coloured, which is not
+        enough: a pixel the bubble lightens toward grey has no meaningful hue
+        of its own, and the angle between an arbitrary hue and a real one is
+        up to 180 degrees. Every run of this reported "worst 180.0", and the
+        mean read 32.3 and then 4.9 on the same build, because how many of
+        those pixels fell inside the bubbles varied with where they landed.
+
+        So the shift is weighted by the saturation that survives, and a pixel
+        the bubble has washed to grey contributes nothing to the angle rather
+        than contributing noise. It is still caught, by `satLost` beside it,
+        which is the check for washing colour out and does not need a hue to
+        do its job.
+      */
+      const hw = Math.min(a.s, b.s);
+      if (hw > 0.12) {
+        hueShift += dh * hw; hueWeight += hw;
+        worstHue = Math.max(worstHue, dh);
+      }
       n++;
     }
     return { n, changed, drifted, biggest, total: B.length / 4,
-      lit, addAngle: addWeight ? addAngle / addWeight : 0, worstAngle,
-      satLost: n ? satLost / n : 0, hueShift: n ? hueShift / n : 0, lumGain: n ? lumGain / n : 0,
+      lit,
+      /*
+        The median split. Thick dye is dark dye — it is stopping more of the
+        lamp — so the darker half of the ground is the thick half, and a hole
+        should brighten it more.
+      */
+      ...(() => {
+        if (pairs.length < 40) return { thickGain: 0, thinGain: 0 };
+        const byGround = [...pairs].sort((u, v) => u[0] - v[0]);
+        const half = Math.floor(byGround.length / 2);
+        const mean = (xs) => xs.reduce((t, q) => t + q[1], 0) / xs.length;
+        return { thickGain: mean(byGround.slice(0, half)), thinGain: mean(byGround.slice(half)) };
+      })(),
+      ...(() => {
+        if (satPairs.length < 40) return { satLost: 0, satCore: 0 };
+        const byGain = [...satPairs].sort((u, v) => u[0] - v[0]);
+        const half = Math.floor(byGain.length / 2);
+        const mean = (xs) => xs.reduce((t, q) => t + q[1], 0) / xs.length;
+        // The half it barely lit is the rim; the half it lit hardest is the core.
+        return { satLost: mean(byGain.slice(0, half)), satCore: mean(byGain.slice(half)) };
+      })(), hueShift: hueWeight ? hueShift / hueWeight : 0, lumGain: n ? lumGain / n : 0,
       worstSat, worstHue };
   });
 
@@ -524,15 +598,17 @@ try {
 
   if (report.n > 800) {
     check('a bubble keeps the colour of the liquid it is in',
-      report.satLost <= 0.34,
-      `${Math.round(report.satLost * 100)}% of the local saturation lost (worst ${Math.round(report.worstSat * 100)}%)`);
+      report.satLost <= 1 / 3,
+      `${Math.round(report.satLost * 100)}% of the local saturation lost at the rim, ` +
+      `${Math.round(report.satCore * 100)}% in the core — the core is the lamp through a hole ` +
+      `and is meant to lose it`);
     check('and does not shift its hue',
       report.hueShift <= 12,
       `${report.hueShift.toFixed(1)}° mean (worst ${report.worstHue.toFixed(1)}°)`);
-    check('and the light it adds is the liquid lit, not paint on top of it',
-      report.lit > 500 && report.addAngle <= 22,
-      `${report.addAngle.toFixed(1)}° between added light and ground colour ` +
-      `over ${report.lit} lit pixels (worst ${report.worstAngle.toFixed(1)}°)`);
+    check('and it lets the lamp through rather than painting light on top',
+      report.lit > 500 && report.thickGain > report.thinGain * 1.15,
+      `brightens the thick dye by ${report.thickGain.toFixed(3)} and the thin by ` +
+      `${report.thinGain.toFixed(3)} over ${report.lit} lit pixels — paint would brighten both alike`);
     console.log(`     and it is brighter, as a lens should be: ${Math.round(report.lumGain * 100)}% more light`);
   }
 

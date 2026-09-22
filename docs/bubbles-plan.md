@@ -933,3 +933,88 @@ these changes, reading 14.6, 23.8, 24.0, 30.6, 39.2, 41.9, 45.3 and 51.6
 degrees. **Its reference and its population both need fixing before it can gate
 anything**, and neither should be done in the same change as the thing it is
 meant to be judging.
+
+
+## A, finished: the optics checks were measuring the wrong things (2026-09-21)
+
+The last check standing was not a defect in the bubbles. It was three checks
+built for a bubble that **shaded over** dye, still being asked about a bubble
+that is a **hole**, and each failed in a way that got worse the better the
+feature got.
+
+### "The light it adds is the liquid lit" was inverted
+
+It took the angle between the light a bubble adds and the ground's own colour,
+on the reasoning that neutral white on a red plate is a wide angle and light
+carrying the dye's colour is a narrow one. True for shading. For a hole it is
+backwards: a backlit dish filters the lamp through the dye, so red dye passes
+red and absorbs green and blue, and a hole passes the lamp unfiltered. The
+light a *correct* hole adds is therefore nearly the **complement** of the
+ground — ninety degrees from it, which is the "worst 90.0" that appeared in
+every run. **The check failed hardest on the most physically correct hole**,
+and no choice of reference rescues it, because the claim itself is false:
+light through a hole is the lamp's, not the liquid's.
+
+It is replaced by the question those two neighbours cannot ask. **Paint adds
+the same light wherever it lands; a hole reveals the lamp in proportion to how
+much dye was stopping it.** Pair each pixel's brightness gain with how thick
+the dye under it was, split at the median, and a hole brightens the thick half
+more. Validated by a control — the compositor patched to add a constant white
+instead of mixing toward the lamp — which reads 0.033 against 0.039, the thick
+half gaining *less*, and fails. The real thing reads 0.159 against 0.110.
+
+### "Does not shift its hue" was measuring hues that did not exist
+
+A pixel the bubble lightens toward grey has no meaningful hue, and the angle
+between an arbitrary hue and a real one runs to 180 degrees — the "worst 180.0"
+in every run. The mean read 32.3 and then 4.9 on the same build, with the
+qualifying population swinging 8096 to 2841. Weighted by the saturation that
+survives, it reads 1.0, 1.3, 1.5, 2.0, 2.4, 2.6 across six runs.
+
+### "Keeps the colour of the liquid it is in" was averaging two different claims
+
+A flat mean over the footprint mixes bubble interiors with rim pixels the
+bubble barely touched, and the mixture moves with where twelve bubbles land on
+a drifting plate: 2%, 8%, 9%, 10%, 39% on one build against a gate of a third.
+Weighting by the light added made it *stable* at 51-56% and consistently
+failing — which is the useful result, because it was then measuring the
+interiors, and **a real hole is supposed to desaturate there.** The interior is
+the lamp coming through unfiltered. That is the whole of H6.
+
+So the two are split by how much light the bubble added: the half it barely
+touched is the rim, and the claim is made about that. The rim loses **-5%, 6%,
+-1%** — nothing, and occasionally it gains, because the rim is where the
+displaced dye went. The core loses 44-67%, printed beside it and not gated,
+because there is no number it ought to hold.
+
+### And the fill only ever ran once
+
+The refill sat at 43-53% of the surroundings, right on its gate, and the reason
+was not physical: a popped bubble is in last frame's list for exactly one
+frame, so the fill moved 0.35 of the deficit and never ran again. Holes are
+carried now until they have nothing left to move, and the refill reads
+**3.575 against 3.146, 3.566 against 3.095, 3.598 against 3.143** — back to
+about 114% of its surroundings, the ring having collapsed inward and
+concentrated a little before it evens out.
+
+Reaching wider for the dye was tried first and is worse — 24-29% against 48-53%
+— because a wider annulus averages the enriched ring together with ordinary
+liquid, so the level the fill equalises toward drops. The dye is in the ring.
+
+### The lamp's share of the interior, chosen by measurement
+
+With the interior empty, all of its colour comes from one mix, and the two
+sound checks pull opposite ways:
+
+| white pull | hue shift | thick vs thin gain |
+|---|---|---|
+| 0.25 | 8.9-13.1 degrees, on its gate of 12 | 0.159 / 0.110 — 1.45x |
+| 0.10 | 1.7 degrees | 0.094 / 0.085 — 1.11x, fails |
+| **0.18** | **9.3 degrees** | **0.169 / 0.046 — 3.7x** |
+
+Tinting harder keeps the liquid's hue and flattens how much the lamp depends on
+the dye it comes through, which is the one thing separating a hole from a
+highlight painted on top. Eighteen hundredths holds both with room.
+
+**`npm run bubbles` is 18/18 on three runs in four**, the fourth flaking on the
+lamp check, which carries a 1.45x to 3.7x margin when it passes.

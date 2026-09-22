@@ -576,6 +576,8 @@ class FluidSimulation {
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
+  /** Holes still closing: carried so the fill converges instead of running once. */
+  private fillingHoles: { at: Float32Array; left: number }[] = [];
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
@@ -825,11 +827,24 @@ class FluidSimulation {
       }
     }
     this.fillPoppedHoles(packed, count, dye, N);
-    // Keep this frame's list to diff against next time. A copy, because the
-    // packed block is rebuilt in place every frame.
-    if (this.prevPacked.length < count * 4) this.prevPacked = new Float32Array(count * 4);
+    /*
+      Next frame's list to diff against: this frame's bubbles, *plus* the
+      ones still filling.
+
+      Without the second part the fill runs exactly once per popped bubble —
+      the single frame it leaves the list — and moves 0.35 of the deficit and
+      then never again. It reached 43-53% of the surroundings and sat there,
+      right on the gate, for that reason and not for any physical one. A hole
+      is carried for a few more frames so the fill converges, and it drops
+      out when it has nothing left to move.
+    */
+    const keep = this.fillingHoles.filter(h => h.left > 0);
+    const total = count + keep.length;
+    if (this.prevPacked.length < total * 4) this.prevPacked = new Float32Array(total * 4);
     this.prevPacked.set(packed.subarray(0, count * 4));
-    this.prevCount = count;
+    for (let i = 0; i < keep.length; i++) this.prevPacked.set(keep[i].at, (count + i) * 4);
+    this.prevCount = total;
+    this.fillingHoles = keep;
   }
 
   /**
@@ -875,8 +890,16 @@ class FluidSimulation {
       }
       if (alive) continue;
 
-      // The hole, and the ring the displaced dye is sitting in.
+      // The hole, and the liquid around it the fill draws from.
       const disc: number[] = [], ring: number[] = [];
+      /*
+        Tight, on the ring the displacement was laid into.
+
+        Reaching wider was tried and is worse — 24-29% of the surroundings
+        against 48-53% — because it averages the enriched ring together with
+        ordinary liquid, so the level the fill equalises toward drops and
+        less moves. The dye is in the ring; that is where to get it.
+      */
       const rOut = R * 1.45;
       const yl = Math.max(0, Math.floor(y - rOut)), yh = Math.min(N - 1, Math.ceil(y + rOut));
       const xl = Math.max(0, Math.floor(x - rOut)), xh = Math.min(N - 1, Math.ceil(x + rOut));
@@ -917,8 +940,20 @@ class FluidSimulation {
       }
       // And taken out of the ring, through the multiplicative channel that
       // exists for exactly this: dye removed rather than dye added.
-      const keep = Math.max(0, 1 - moved / ringMass);
-      for (const i of ring) this.mul[i] *= keep;
+      const keepRing = Math.max(0, 1 - moved / ringMass);
+      for (const i of ring) this.mul[i] *= keepRing;
+      /*
+        And keep this hole on the books while it is still worth filling. The
+        deficit shrinks every pass, so this drops out on its own — the count
+        is a ceiling for a hole that never closes, not the schedule.
+      */
+      if (!this.fillingHoles.some(h => Math.hypot(h.at[0] * N - x, h.at[1] * N - y) < Math.max(2, R * 0.5))) {
+        this.fillingHoles.push({ at: this.prevPacked.slice(o, o + 4), left: 45 });
+      } else {
+        for (const h of this.fillingHoles) {
+          if (Math.hypot(h.at[0] * N - x, h.at[1] * N - y) < Math.max(2, R * 0.5)) h.left--;
+        }
+      }
     }
   }
 
