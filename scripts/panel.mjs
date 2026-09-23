@@ -29,6 +29,7 @@ import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/li
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
 import { luckyLook } from '../src/lib/lucky.ts';
+import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { SettingRide } from '../src/lib/ride.ts';
@@ -1056,6 +1057,35 @@ check('and neither starts over the limit',
     orphans.length === 0,
     orphans.length ? `${orphans.join(', ')} — add a control, or name it in this check's list and say why`
       : `${Object.keys(DEFAULT_SETTINGS).length} settings, ${KNOWN.size} deliberately without one`);
+}
+
+/*
+  An unattended look change never leaves the closeup half-applied.
+
+  `evolvedLook` holds the structure and lets everything else drift. The trap is
+  a control that is *two* settings: `luckyLook` rolls `macroMode` and
+  `macroZoom` together, deliberately, so the flag follows the zoom — and
+  holding one of them while letting the other through recreates precisely the
+  disagreement that pairing exists to avoid. It shipped three times as a
+  spinning square filling the plate: magnified eight times with the flag off,
+  the plate's square edge and slow turn are the whole picture.
+
+  So this rolls the dice against a plate that is not in closeup, evolves it,
+  and asks that it is still not in closeup — the zoom as well as the flag.
+*/
+{
+  const rand = (() => { let s = 12345; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+  const flat = { ...DEFAULT_SETTINGS, macroMode: false, macroZoom: 1 };
+  let worst = 1;
+  for (let i = 0; i < 400; i++) {
+    const next = evolvedLook(flat, luckyLook(flat, ['#ff0000', '#00ff00'], rand));
+    if (next.macroMode !== flat.macroMode) { worst = -1; break; }
+    worst = Math.max(worst, next.macroZoom ?? 1);
+  }
+  check('an unattended look change cannot zoom a plate that is not in closeup',
+    worst <= 1.001,
+    worst < 0 ? 'it changed macroMode, which structure is supposed to hold'
+      : `four hundred rolls, the largest zoom that got through was ${worst.toFixed(2)}`);
 }
 
 // ── And one level down: a setting the engine never reads ────────────

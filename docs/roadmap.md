@@ -17,6 +17,8 @@ this repo.
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
 | **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | **Ready to build.** The cutover they were waiting for has landed and the post chain is under them; each is written once, in WGSL, as H5 below |
+| **The rig** | [`rig-plan.md`](rig-plan.md) | **Planned, not begun.** Many projectors on one screen, each with its own source, optics and place — which is what every show in the history actually was. The geometry is already built (sixteen surfaces, shapes, corner pins, source rects); what is missing is that every surface shows the same plate. **R6** makes one of those projectors a real one: the camera watches an analogue rig and the app plays alongside it |
+| **The European school** | [`slide-plan.md`](slide-plan.md) | **Planned, not begun.** Slide projectors rather than overheads: a 2-inch vertical stage, the heat filter taken out so the lamp boils the liquid away on screen, bubblers, and Mark Boyle and Joan Hills' photoscope. Depends on heat being wired and the press working |
 | **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 done and merged (#117).** A bubble is a hole: 0.004 of the dye under it against 5.4 around, the plate keeps its colour, and a popped hole fills back to about 114% of its surroundings. H7–H8 not begun; three new sections (D, E, F) came out of building it |
 | **The solver's speed** | this page, H0–H3 | **Done.** 768² with two layers went 38.6 ms a frame to 17.1 — the display's refresh — and a 1024² rung exists above it. The solver no longer bounds that rung |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the renderer settled, which it now is; the rest of §5 is independent |
@@ -248,17 +250,68 @@ job: nothing was written twice. There is one shading language in the tree now �
    - **D · Spreading, and why a first pour is not a tenth**
      ([`bubbles-plan.md`](bubbles-plan.md) D): oil on clean water spreads to a
      monolayer; oil on oil sits where it lands. The state variable is surface coverage
-     and the force is `∇γ`, not γ.
+     and the force is `∇γ`, not γ. **The trap is written down**: a pure gradient force
+     added to the velocity is exactly what the projection removes, which is the same
+     wall H6 hit three times, so it has to enter the divergence, the dye's transport,
+     or a multiply.
      *Half of it is already built, for soap.* `lib/liquidPhase.ts` carries a real
-     per-liquid chemistry field — `soap`, `body`, `repel` — with a Marangoni force on
-     the soap channel and a ceiling whose own comment states the saturation case: a
-     plate that is uniformly soaped has no force left in it. So the mechanism exists
-     and the missing part is **what it is attached to**: soap has a tension field and
-     the dye does not, which is why a pour onto bare plate and a pour onto a covered
-     one behave the same. Same field F asks for, from the other end.
-     *And what is genuinely absent:* `repel` is a scalar per cell rather than a
-     pairwise matrix, so a liquid refuses to mix with whatever it meets rather than
-     with a particular other liquid, and `LiquidBehaviour` has no density at all.
+     per-liquid chemistry field with a Marangoni force on the soap channel, and a
+     ceiling whose own comment states the saturation case: a plate that is uniformly
+     soaped has no force left in it. So the mechanism exists and the missing part is
+     **what it is attached to** — soap has a tension field and the dye does not, which
+     is why a pour onto bare plate and a pour onto a covered one behave the same.
+     Same field F asks for, from the other end.
+     *And what is left:* `repel` is a scalar per cell rather than a pairwise matrix,
+     so a liquid refuses to mix with whatever it meets rather than with a particular
+     other liquid. Weight and polarity landed in #119, so a liquid does now know what
+     it is made of and what it floats on; the pairwise part is what remains.
+   - **R · The rig** ([`rig-plan.md`](rig-plan.md)): many projectors on one
+     screen. Every show in the history was one — the Joshua Light Show ran
+     three overheads, three film projectors and two banks of four-carousel
+     slide projectors, rear projecting from twenty feet behind the stage, and
+     rigs ran from two or three projectors up to seventy with ten operators.
+     *The geometry is already built:* sixteen surfaces, each with a shape, a
+     corner-pin quad, a source rect and a feather. What is missing is that they
+     are all windows onto the **same plate**, which is the one thing a rig is
+     not — so the work is per-projector sources, then additive combination
+     (beams add; the soft edges the operators used exist precisely so two
+     overlapping beams do not show a seam), then per-projector optics.
+     *The cost is real and it is all in one place:* several live plates means
+     several solvers, and the quality ladder assumes two at a fine grid rather
+     than four at a coarse one.
+     *And **R6**, which is the one worth doing for its own sake:* point the
+     camera at a screen an analogue rig is projecting onto, and the app
+     responds to the picture as well as the music — the newest operator on a
+     bank of overheads, taking its cues from the people either side of it.
+     Four modes, and they are different instruments: **mirror** its look,
+     **couple** to its currents, **answer** it (the only one that sounds like
+     two operators rather than one follower), and **register** the two images
+     in one frame.
+     *Checked rather than assumed, and it changes the order:* `sceneSense`
+     already produces **per-cell optical flow on a 24² lattice**, which is the
+     hardest-sounding piece and is a velocity field a solver can eat. What it
+     has no notion of is coverage (only *motion*, which is what changed), scale
+     or edges, and its `hue`/`chroma` are a colour **centroid** — so a
+     magenta-and-cyan plate averages to grey and any plan that says "read the
+     palette" is wrong until that is a histogram. So the first thing to build
+     is none of the four modes: it is the extractor, judged against footage of
+     a real show, answering whether it can tell big slow magenta blobs settling
+     from fine fast cyan cells agitating.
+   - **S · The European school** ([`slide-plan.md`](slide-plan.md)): the other
+     tradition, and the app models none of it. An overhead projector is a
+     horizontal dish worked by hand; a slide projector is a **2-inch vertical
+     aperture with a fierce lamp inches behind it**, and every difference
+     follows from that. Liquid runs *down*; the stage is permanently macro;
+     and — the act that defines the school — **the heat filter comes out**, so
+     the lamp cooks the liquid and it boils, blisters and burns away while it
+     is on the screen. A slide has a beginning and an end, which nothing here
+     does yet.
+     *Most of it is wiring rather than new physics.* The temperature field
+     exists and is fed from twenty places; the air field (H6) is built and
+     proven; the squeeze film between two glasses *is* the photoscope. What is
+     missing is that heat has no strength (every source saturates the buoyancy
+     tanh, so a plume has a position and nothing else), and that the press does
+     not yet reach the picture. Both are prerequisites and both are small.
    - **H8 · More bottles** ([`bubbles-plan.md`](bubbles-plan.md) C): latex, oil paint,
      clear medium, glycol first; then fizz, salt, slime, cornstarch, bleach. Needs the
      liquid field moved to the GPU.
