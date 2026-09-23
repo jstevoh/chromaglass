@@ -798,7 +798,23 @@ export class WebGPUFluid {
   }
 
   /** Take the phase off the plate. */
-  clearPhase(): void { this.phaseLive = false; }
+  /**
+   * Take the phase off the plate — the field as well as the flag.
+   *
+   * This used to flip the flag and leave the texture alone, so "cleared" meant
+   * "not being stepped" while the liquid was still sitting there. The next
+   * pour landed on top of it, and a harness comparing two arms was really
+   * comparing one arm against itself plus the other. That is why it read an
+   * empty plate on one run and a full one on the next.
+   */
+  clearPhase(): void {
+    this.phaseLive = false;
+    const enc = this.device.createCommandEncoder({ label: 'clear phase' });
+    const pass = enc.beginComputePass({ label: 'clear phase' });
+    for (const t of [this.phase.a, this.phase.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
 
   setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
