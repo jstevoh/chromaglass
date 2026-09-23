@@ -3296,10 +3296,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       from `phaseScale`: beads at one end, hands at the other.
     */
     {
+      /*
+        A look that says nothing about ferrofluid leaves it alone.
+
+        This cleared the field first and poured afterwards, so laying *any*
+        look — and every shipped look asks for none — binned whatever was on
+        the plate. For an instrument that is the wrong instinct: a thing
+        somebody poured by hand should not disappear because the look changed
+        underneath it. It also made the field unmeasurable, because a harness
+        pouring by hand was racing a seed that wiped it, which read as a
+        physics fault and was not one.
+
+        So the phase is only touched when a look actually asks for some.
+      */
       const amt = settingsRef.current.phaseAmount ?? 0;
       const lead = fluidsRef.current[0]?.gpu;
-      if (lead?.clearPhase) lead.clearPhase();
       if (amt > 0.002 && lead?.addPhase) {
+        lead.clearPhase?.();
         const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
         const count = Math.round(3 + (1 - scale) * 22);
         const r = 0.04 + scale * 0.16;
@@ -5731,6 +5744,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
           /** The air field (H6), for `npm run bubbles` to ask where the air is. */
+          /** Whether the phase is being stepped, and how much is on the plate. */
+          phaseState: () => {
+            const g = fluidsRef.current[0]?.gpu;
+            return g instanceof WebGPUFluid ? { live: g.phaseIsLive } : null;
+          },
           /** The second phase (H7), for the harness. */
           readPhase: async () => {
             const lead = fluidsRef.current[0];

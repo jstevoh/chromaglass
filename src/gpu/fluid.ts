@@ -181,6 +181,8 @@ export class WebGPUFluid {
   private airPush = 0;
   /** Whether any of the second phase is on the plate; nothing runs without it. */
   private phaseLive = false;
+  /** For the harness: whether the phase stage is running at all. */
+  get phaseIsLive(): boolean { return this.phaseLive; }
   private airCover = 0;
   /*
     Last frame's coverage, so the rate term can be made zero-mean.

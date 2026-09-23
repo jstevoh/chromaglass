@@ -62,6 +62,16 @@ try {
   if (!fresh) { process.exit(1); }
 
   /** Put ferrofluid on the plate and settle it, with the magnet as asked. */
+  /*
+    Settings first, then a pause, then the pour.
+
+    Doing both in one go raced the app's own seeding: laying a look calls
+    clearPhase and re-pours from `phaseAmount`, and a harness that mutates
+    `d.settings` directly has not necessarily reached `settingsRef` when that
+    runs. The result was arms where the stage read OFF and the plate read
+    empty, alternating with arms that were fine — which looked like a physics
+    fault and was a race.
+  */
   const lay = async (magnet) => {
     await page.evaluate((m) => {
       const d = window.chromaglassDebug();
@@ -71,18 +81,41 @@ try {
         magnetX: m.x, magnetY: m.y, magnetHeight: m.h,
         magnetStrength: m.s, magnetPolarity: m.p,
       });
-      // Poured here rather than by re-seeding a look: the harness wants the
-      // same domains every time, so the only thing that differs between arms
-      // is the magnet.
-      const g = d.fluids?.[0]?.gpu;
+    }, magnet);
+    // Long enough for any seeding the settings change provoked to finish.
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      const g = window.chromaglassDebug().fluids?.[0]?.gpu;
       g?.clearPhase?.();
       for (let k = 0; k < 14; k++) {
         const a = k * 2.399963229728653;
         const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
         g?.addPhase?.(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, 0.07, 0.9);
       }
-    }, magnet);
+    });
+    /*
+      What landed, before anything is allowed to move it.
+
+      One arm reading an empty plate and the next reading a full one is the
+      pour failing, not the magnet — so the pour is checked where it happens
+      rather than inferred six seconds later.
+    */
+    const laid = await page.evaluate(async () => {
+      const f = await window.chromaglassDebug().readPhase();
+      if (!f) return -1;
+      let t = 0; for (let i = 0; i < f.data.length; i++) t += f.data[i];
+      return t;
+    });
     await page.waitForTimeout(6000);
+    const kept = await page.evaluate(async () => {
+      const f = await window.chromaglassDebug().readPhase();
+      if (!f) return -1;
+      let t = 0; for (let i = 0; i < f.data.length; i++) t += f.data[i];
+      return t;
+    });
+    const live = await page.evaluate(() => window.chromaglassDebug().phaseState?.());
+    console.log(`     poured ${laid.toFixed(0)}, six seconds later ${kept.toFixed(0)}` +
+      `  (stage ${live?.live ? 'running' : 'OFF'})`);
     return page.evaluate(async ({ mx, my }) => {
       const d = window.chromaglassDebug();
       const f = await d.readPhase();
@@ -116,6 +149,19 @@ try {
 
   // ── 2: a magnet gathers it, against the same plate with none ──
   const on = await lay({ x: MX, y: MY, h: 0.2, s: 0.8, p: 1 });
+  /*
+    Every arm has to have liquid on it before it can say anything.
+
+    Without this, an arm whose plate collapsed to nothing reported 0.0% near
+    the magnet, and "held close gathers harder than held away" *passed* on it —
+    0.0% being duly less than 2.5%. A check that a broken arm can satisfy is
+    worse than one that fails.
+  */
+  const armed = (p, name) => {
+    const ok = p !== null && p.total > 50;
+    if (!ok) check(`the ${name} arm has ferrofluid on it`, false, `total ${p ? p.total.toFixed(0) : 'none'}`);
+    return ok;
+  };
   console.log(`     near the magnet: ${(off.share * 100).toFixed(1)}% with it off, ${(on.share * 100).toFixed(1)}% with it on`);
   check('a magnet gathers the phase toward it', on.share > off.share * 1.25,
     `${(on.share * 100).toFixed(1)}% against ${(off.share * 100).toFixed(1)}% with the magnet off`);
@@ -129,12 +175,13 @@ try {
 
   // ── 3: height is the control that matters ──
   const far = await lay({ x: MX, y: MY, h: 0.9, s: 0.8, p: 1 });
-  check('held close it gathers harder than held away', on.share > far.share,
+  armed(far, 'lifted-away');
+  check('held close it gathers harder than held away', armed(far, 'lifted-away') && on.share > far.share,
     `${(on.share * 100).toFixed(1)}% at height 0.2 against ${(far.share * 100).toFixed(1)}% at 0.9`);
 
   // ── 4: the other way up pushes it off ──
   const rev = await lay({ x: MX, y: MY, h: 0.2, s: 0.8, p: -1 });
-  check('and turned over it pushes the phase away', rev.share < on.share,
+  check('and turned over it pushes the phase away', armed(rev, 'reversed') && rev.share < on.share,
     `${(rev.share * 100).toFixed(1)}% reversed against ${(on.share * 100).toFixed(1)}%`);
 } finally { await browser.close(); stop(); }
 

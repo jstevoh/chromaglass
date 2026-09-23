@@ -343,7 +343,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     */
     let fall = 1.0 / pow(r * r + h * h, 1.5);
     let pull = A.a.w * A.b.x * fall * 0.02;
-    d = d + (toM / r) * clamp(pull, -4.0, 4.0) * A.b.y;
+    /*
+      Minus, and the sign was settled by the plate rather than by argument.
+
+      The reasoning said plus: this is a backtrace, pos is uv - d, so a
+      displacement pointing at the magnet should fetch from the far side and
+      carry the liquid inward. The plate disagreed flatly and repeatably — with
+      the magnet on, the phase sat *further* from it than with the magnet off
+      (0.329 against 0.250), it pushed harder held close than held away, and
+      turning it over gathered. Three readings, one sign.
+    */
+    d = d - (toM / r) * clamp(pull, -4.0, 4.0) * A.b.y;
   }
   let pos = clamp(uv - d, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
   textureStore(dst, vec2i(id.xy), vec4f(textureSampleLevel(src, lin, pos, 0.0).r, 0.0, 0.0, 0.0));
