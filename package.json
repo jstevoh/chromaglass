@@ -62,7 +62,8 @@
     "plates": "npm run build && node scripts/plates.mjs",
     "ferro": "npm run build && node scripts/ferro.mjs",
     "press": "npm run build && node scripts/press.mjs",
-    "drain": "npm run build && node scripts/drain.mjs"
+    "drain": "npm run build && node scripts/drain.mjs",
+    "finger": "npm run build && node scripts/finger.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
