@@ -2211,6 +2211,33 @@ class FluidSimulation {
         is a seventeen-millisecond half-life. Both are far quicker than a
         hand, which is why a press registered as a flicker.
       */
+      /*
+        The second phase and the magnet (H7).
+
+        phaseScale is one slider that moves the look from beads to hands, and
+        it does it by setting the tension and the magnet's falloff together —
+        a big domain needs a strong tension to hold its shape and a broad pull
+        to move it, and a bead needs neither. One control, because the two are
+        never independently interesting.
+      */
+      phaseSharp: Math.max(0, Math.min(1, settings.phaseSharp ?? 0.35)),
+      phaseTension: Math.max(0, Math.min(1, (settings.phaseScale ?? 0.4) * 0.45)),
+      magnetX: Math.max(0, Math.min(1, settings.magnetX ?? 0.5)),
+      /*
+        Not flipped, and it was for a while on the strength of a bad reading.
+
+        The phase saturates at 1, so the brightest cell is the first one to get
+        there and says nothing about where the liquid went. Read that way the
+        magnet looked y-flipped and a flip was duly added. Read by centre of
+        mass it was never flipped: the liquid gathers 0.236 from where the
+        magnet was asked for and 0.350 from the mirror of it. The instrument
+        was wrong, not the axis.
+      */
+      magnetY: Math.max(0, Math.min(1, settings.magnetY ?? 0.5)),
+      // Held further away for a bigger look, which is what spreads the pull.
+      magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
+      magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
+      magnetPolarity: (settings.magnetPolarity ?? 1) >= 0 ? 1 : -1,
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
@@ -3259,6 +3286,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const seeded = fluid.seedPreset(presetId, noise2D);
       const contract = presetContractRef.current;
       harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
+    }
+    /*
+      The second phase, laid with the dye rather than waited for (H7).
+
+      A few domains rather than one: the shapes this is for — labyrinths,
+      chains, a lattice — need more than one body to be shapes at all, and a
+      single blob under a magnet is just a blob. How many, and how big, comes
+      from `phaseScale`: beads at one end, hands at the other.
+    */
+    {
+      const amt = settingsRef.current.phaseAmount ?? 0;
+      const lead = fluidsRef.current[0]?.gpu;
+      if (lead?.clearPhase) lead.clearPhase();
+      if (amt > 0.002 && lead?.addPhase) {
+        const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
+        const count = Math.round(3 + (1 - scale) * 22);
+        const r = 0.04 + scale * 0.16;
+        for (let k = 0; k < count; k++) {
+          // Deterministic placement: the same look laid twice is the same
+          // plate twice, which is what rendering a song depends on.
+          const a = (k * 2.399963229728653);
+          const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
+          lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
+        }
+      }
     }
     for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -5679,6 +5731,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
           /** The air field (H6), for `npm run bubbles` to ask where the air is. */
+          /** The second phase (H7), for the harness. */
+          readPhase: async () => {
+            const lead = fluidsRef.current[0];
+            return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
+          },
           readAir: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readAir() : null;

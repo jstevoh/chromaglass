@@ -892,6 +892,8 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 /** The air field (H6): coverage in 0–1, where a bubble has pushed the dye out. */
 @group(0) @binding(15) var air0: texture_2d<f32>;
 @group(0) @binding(16) var air1: texture_2d<f32>;
+/** The second phase on the front plate (H7): how much dark liquid is here. */
+@group(0) @binding(17) var phase0: texture_2d<f32>;
 `;
 
 /*
@@ -1185,6 +1187,49 @@ struct FsOut {
     outColor += vec3f(0.95, 0.97, 1.0) * fres * a * 0.18;
   } else {
     outColor = mix(outColor, fluid0.rgb, fluid0.a);
+
+    /*
+      The second phase, over the dye it is moving through (H7).
+
+      Opacity from *thickness*, which is the whole difference between a slide
+      of real ferrofluid and a black blob: thin edges are brown and let the
+      lamp through, thick middles are black. A flat black domain is the thing
+      that would read as CGI.
+
+      And a bright rim where the light bends through the edge, taken from the
+      dye just outside rather than invented, so a domain sitting in magenta
+      liquid has a magenta rim. That is the same lesson the bubbles taught —
+      the thing a hole or a body does to the picture has to be made of the
+      picture.
+    */
+    if (U.phaseAmount > 0.002) {
+      let ph = clamp(textureSampleLevel(phase0, samp, fuvBase, 0.0).r, 0.0, 1.0);
+      if (ph > 0.004) {
+        let e = 1.6 / U.logicalGrid;
+        let gx = textureSampleLevel(phase0, samp, fuvBase + vec2f(e, 0.0), 0.0).r
+               - textureSampleLevel(phase0, samp, fuvBase - vec2f(e, 0.0), 0.0).r;
+        let gy = textureSampleLevel(phase0, samp, fuvBase + vec2f(0.0, e), 0.0).r
+               - textureSampleLevel(phase0, samp, fuvBase - vec2f(0.0, e), 0.0).r;
+        let edge = clamp(length(vec2f(gx, gy)) * 3.0, 0.0, 1.0);
+        // Brown where it is thin, black where it is thick: a real film, not a
+        // silhouette with a hard edge.
+        let body = vec3f(0.07, 0.035, 0.02) * (1.0 - ph * 0.7);
+        let opac = clamp(ph * ph * 1.6, 0.0, 1.0) * clamp(U.phaseAmount, 0.0, 1.0);
+        var pc = mix(outColor, body, opac);
+        // The rim: the dye beyond the boundary, bent back through the edge.
+        let outward = select(vec2f(0.0), -normalize(vec2f(gx, gy)), length(vec2f(gx, gy)) > 1e-5);
+        let beyond = decodeFluid(layer0, fuvBase + outward * 0.02, 0.0, false);
+        let rimCol = mix(bgColor, beyond.rgb, beyond.a);
+        pc += rimCol * edge * 0.55 * opac;
+        // A hard specular dot, which every macro frame of this has.
+        // The lamp's direction here, the same way the bubbles take it.
+        let Lp = lampDir(fuvBase, U.lamp);
+        let lampTo = Lp.xy / max(length(Lp.xy), 0.06);
+        let hi = pow(max(0.0, dot(outward, lampTo)), 8.0) * edge;
+        pc += vec3f(1.0, 0.97, 0.92) * hi * 0.35 * opac;
+        outColor = pc;
+      }
+    }
   }
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;

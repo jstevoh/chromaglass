@@ -92,6 +92,14 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring',
+  /*
+    The second phase and its magnet (H7). Each layer is a separate dish with
+    its own phase field, so each can have its own domains and its own magnet —
+    which at plate scale is the two-magnet rig the plan asks for, and at macro
+    is simply the front plate's hand.
+  */
+  'phaseScale', 'phaseSharp',
+  'magnetX', 'magnetY', 'magnetHeight', 'magnetStrength', 'magnetPolarity',
   // `particles` and not `particleMix`: each plate has its own solver and its
   // own population, so the amount is that plate's. How far their colour is
   // trusted is read by the render pass, which sees one picture.

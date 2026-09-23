@@ -96,6 +96,7 @@ export class WebGPUFluid {
   private readonly dye: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
+  private readonly phase: PingPong;
   /**
    * The pressure, in a storage buffer rather than a texture (H2).
    *
@@ -178,6 +179,8 @@ export class WebGPUFluid {
   private air: WebGPUAir | null = null;
   /** How hard the arriving air pushes the liquid aside (H6); 0 switches it off. */
   private airPush = 0;
+  /** Whether any of the second phase is on the plate; nothing runs without it. */
+  private phaseLive = false;
   private airCover = 0;
   /*
     Last frame's coverage, so the rate term can be made zero-mean.
@@ -212,6 +215,17 @@ export class WebGPUFluid {
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.vel = pp(this.N, VEL, 'vel');
     this.squeeze = pp(this.N, RG32, 'squeeze');
+    /*
+      The second phase (H7): one number a cell, how much of the dark liquid is
+      there.
+
+      R32 and not R16, because a compute pass writes it — single-channel
+      16-bit float is not in WebGPU's core storage formats, and asking for one
+      rejects the whole command buffer and freezes the plate. The air field
+      next door is r16float for the opposite reason: it blends, and 32-bit
+      floats do not.
+    */
+    this.phase = pp(this.N, R32, 'phase');
     this.press = this.disposer.track(device.createBuffer({
       label: 'pressure',
       size: this.N * this.N * 4,
@@ -663,6 +677,34 @@ export class WebGPUFluid {
       this.dye.swap();
     }, !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
 
+    /*
+      The second phase, carried and kept sharp (H7).
+
+      After the dye's own advection, on the same velocity, so the two move
+      together — and before anything reads the plate, so the compositor sees
+      the phase where it actually is this frame.
+
+      The magnet enters here rather than in the forces, and that is the whole
+      trick: it moves the phase by adding to the displacement this advection
+      backtraces along, not by pushing the fluid. A magnet's pull is radial,
+      radial is curl-free, and curl-free is precisely what the projection
+      removes — a magnetic body force on the velocity would be deleted in the
+      same step that applied it, which is the mistake H6 made three times.
+
+      Skipped entirely on a plate with no phase on it, which is most looks.
+    */
+    stage('phase', (pass) => {
+      this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced, this.sampler],
+        this.arg('phase advect', [
+          p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength * (this.phaseLive ? 1 : 0),
+          p.magnetPolarity, disp, 0, 0,
+        ]));
+      this.phase.swap();
+      this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
+        this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
+      this.phase.swap();
+    }, this.phaseLive);
+
     // 9.5. Sharpen what the advection and the diffusion softened
     if (p.sharpness > 0.0001) {
       stage('sharpen', (pass) => {
@@ -738,6 +780,26 @@ export class WebGPUFluid {
    */
   get airDisplacing(): number { return this.airPush > 0 ? this.airCover : 0; }
 
+  /**
+   * Lay the second phase down, as a soft disc (H7).
+   *
+   * A pour rather than a field the caller owns: the phase is the solver's,
+   * like the dye, and what a hand does to it is put more of it somewhere.
+   */
+  addPhase(x: number, y: number, radius: number, amount: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'add phase' });
+    const pass = enc.beginComputePass({ label: 'add phase' });
+    this.run(pass, 'phaseSplat', this.phase.write, [this.phase.read],
+      this.arg('phase splat', [x, y, radius, amount]));
+    this.phase.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.phaseLive = true;
+  }
+
+  /** Take the phase off the plate. */
+  clearPhase(): void { this.phaseLive = false; }
+
   setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.setBubbles(packed, count, soft);
@@ -751,6 +813,35 @@ export class WebGPUFluid {
    * like air in the right quantity. The only question that catches it is
    * *where*, which needs the field itself rather than a summary of it.
    */
+  /**
+   * The second phase, read back whole. For checks, not for a frame.
+   *
+   * Four bytes a texel, because the phase is `r32float` — and that is worth
+   * saying next to `readAir` below, which is two, because the two fields have
+   * opposite formats for opposite reasons and a reader that assumes the wrong
+   * one produces a plausible field in the wrong place rather than an error.
+   */
+  async readPhase(): Promise<{ n: number; data: Float32Array } | null> {
+    // Not gated on `phaseLive`: a readback for checks has to be able to say
+    // "the field is empty", and a null that means both "no phase" and "no GPU"
+    // is an instrument that cannot tell a cleared plate from a broken one.
+    if (!this.device) return null;
+    const n = this.N;
+    const row = Math.ceil((n * 4) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read phase', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read phase' });
+    enc.copyTextureToBuffer({ texture: this.phase.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n);
+    const stride = row / 4;
+    for (let y = 0; y < n; y++) out.set(all.subarray(y * stride, y * stride + n), y * n);
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
+  }
+
   async readAir(): Promise<{ n: number; data: Float32Array } | null> {
     if (!this.air) return null;
     const n = this.N;
@@ -1131,6 +1222,8 @@ export class WebGPUFluid {
       particles: this.particles && !this.particles.idle ? this.particles.target : null,
       /** The air field (H6), or null when no bubble is on this plate. */
       air: this.air?.any ? this.air.field : null,
+      /** The second phase (H7), or null when none has been poured. */
+      phase: this.phaseLive ? this.phase.read : null,
     };
   }
 

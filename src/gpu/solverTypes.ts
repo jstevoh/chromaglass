@@ -37,6 +37,25 @@ export interface GpuStepParams {
   spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
+  /*
+    The second phase and the magnet under the glass (H7).
+
+    `phaseSharp` and `phaseTension` are the two that make the shapes: tension
+    smooths the boundary by its curvature and so decides how big a droplet has
+    to be to keep its shape, and sharpness is what stops advection blurring the
+    phase into a grey wash. Between them, spikes, labyrinths and lattices fall
+    out rather than being drawn.
+  */
+  phaseSharp: number;
+  phaseTension: number;
+  /** Where the hand is holding it, in plate coordinates, 0..1. */
+  magnetX: number;
+  magnetY: number;
+  /** How far below the glass. The control that matters most: it sets the falloff. */
+  magnetHeight: number;
+  magnetStrength: number;
+  /** Which way up it is held: +1 pulls the phase in, −1 pushes it away. */
+  magnetPolarity: number;
   plateCurve: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
@@ -99,6 +118,13 @@ export interface PlateSolver {
    * budget servo that reads it treats absence as none (H6 · A).
    */
   readonly airDisplacing?: number;
+  /**
+   * Pour the second phase onto the plate, and take it off (H7).
+   *
+   * Optional because only the WebGPU solver carries a phase field.
+   */
+  addPhase?(x: number, y: number, radius: number, amount: number): void;
+  clearPhase?(): void;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
   /** Start a read and take whatever has landed; false before the first. */

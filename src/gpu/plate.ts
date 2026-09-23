@@ -165,7 +165,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; phase: GPUTexture | null }[],
     velRange: number,
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
@@ -272,6 +272,8 @@ export class WebGPUPlate {
     // The air field, or a black 1×1 where a layer carries no bubbles. Read
     // unconditionally and multiplied by the strength, which is 0 with none.
     const air = (i: number) => fields[i]?.air ?? this.blank;
+    // The second phase (H7), black where a layer carries none.
+    const phase = (i: number) => fields[i]?.phase ?? this.blank;
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments: [
@@ -303,6 +305,7 @@ export class WebGPUPlate {
         { binding: 14, resource: parts(1).createView() },
         { binding: 15, resource: air(0).createView() },
         { binding: 16, resource: air(1).createView() },
+        { binding: 17, resource: phase(0).createView() },
       ],
     }));
     pass.draw(6);
