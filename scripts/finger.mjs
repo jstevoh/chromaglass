@@ -52,33 +52,98 @@ try {
     gesture has to be measured where the gesture is.
   */
   const N = await page.evaluate(() => window.chromaglassDebug().gridSize);
-  const inTrack = (i) => {
+  /*
+    Three bands, because one drag cannot be repeated.
+
+    Everything here is a multiple of what the plate does on its own, and both
+    halves of that ratio wander. Over seven runs of the single-window version
+    it read 1.28 to 1.89 against a gate of 1.4 — one in seven failing on code
+    that works, which is the fault that had this harness reporting 0.94x once
+    while three runs either side of it gave 1.8.
+
+    The denominator is fixed by measuring idle three times and taking the
+    middle. The numerator cannot be fixed the same way: dragging the same
+    track again runs the finger through liquid the first drag already mixed,
+    so repeats read low and the median would be biased into failing. So the
+    three drags go along three separate bands of the plate, each measured in
+    its own band, and none of them touches another's liquid.
+  */
+  const BANDS = [-42, 0, 42];
+  const inBand = (i, dy) => {
     const x = i % N, y = (i / N) | 0;
-    return Math.abs(y - N / 2) <= 16 && x >= N * 0.33 && x <= N * 0.68;
+    return Math.abs(y - (N / 2 + dy)) <= 16 && x >= N * 0.33 && x <= N * 0.68;
   };
-  const moved = (a, b) => {
+  const inTrack = (i) => inBand(i, 0);
+  const movedIn = (a, b, dy) => {
     let s = 0, k = 0;
-    for (let i = 0; i < a.length; i++) if (inTrack(i)) { s += Math.abs(a[i] - b[i]); k++; }
-    return s / k;
+    for (let i = 0; i < a.length; i++) if (inBand(i, dy)) { s += Math.abs(a[i] - b[i]); k++; }
+    return k ? s / k : 0;
   };
+  const moved = (a, b) => movedIn(a, b, 0);
 
-  // Idle, for the same window, so the plate's own motion is known.
-  const i0 = await state();
-  await page.waitForTimeout(1600);
-  const i1 = await state();
-  console.log(`  idle: speed ${i1.speed.toExponential(2)}, dye moved ${moved(i0.dye, i1.dye).toFixed(4)}`);
+  /*
+    Idle three times, and the middle one, because it is the denominator.
 
-  // And the finger, dragged across the middle the way a hand goes.
+    This was one 1600ms window, and everything here is reported as a multiple
+    of it — so a window in which the plate happened to be lively drags the
+    whole verdict down. Measured: four runs of this harness in a row gave
+    0.94x, 1.81x, 1.89x and 1.85x for the same code, and the 0.94 is a fat
+    idle reading rather than a finger that stopped working. A single-moment
+    denominator is the same fault as the beads' mask check in
+    `webgpu-smoke.mjs`, which failed CI today at 0.3 points against a gate of
+    0.4 on a quantity that swings fourfold.
+
+    The middle of three, not the smallest: picking the smallest would be
+    choosing the answer.
+  */
+  const idleSample = async () => {
+    const p0 = await state();
+    await page.waitForTimeout(1600);
+    const p1 = await state();
+    return { moved: moved(p0.dye, p1.dye), speed: p1.speed };
+  };
+  const idles = [await idleSample(), await idleSample(), await idleSample()];
+  const idleSorted = [...idles].sort((x, y) => x.moved - y.moved);
+  const i1 = idleSorted[1];
+  console.log(`  idle: speed ${i1.speed.toExponential(2)}, dye moved ${i1.moved.toFixed(4)}` +
+    `  (three windows: ${idles.map(x => x.moved.toFixed(4)).join(', ')})`);
+
+  /*
+    Each band against its own idle, not against the middle's.
+
+    The first attempt at this dragged three bands and compared all three to
+    the centre band's idle — and read *lower* than the single-window version
+    it replaced: 1.24, 1.55, 1.37, 1.33 against a gate of 1.4. The dish is
+    round, so a band forty cells off centre holds less dye than the middle;
+    the finger moves less there in absolute terms while the denominator stayed
+    where the dye is. Apples against oranges, and it would have read as the
+    finger getting worse.
+
+    So each band carries its own idle window, taken immediately before its own
+    drag, and what is compared is three ratios rather than three amounts.
+  */
+  const fingerRuns = [];
+  for (const dy of BANDS) {
+    const q0 = await state();
+    await page.waitForTimeout(1600);
+    const q1 = await state();
+    const bandIdle = movedIn(q0.dye, q1.dye, dy);
+    const p0 = await state();
+    await page.evaluate(async (yOff) => {
+      const d = window.chromaglassDebug();
+      const f = d.fluids[0], N = d.gridSize;
+      for (let k = 0; k <= 16; k++) {
+        f.fingerDrag(N * (0.35 + 0.018 * k), N / 2 + yOff, 7, 0.09, 3, 0);
+        await new Promise(r => setTimeout(r, 90));
+      }
+    }, dy);
+    const p1 = await state();
+    const bandFinger = movedIn(p0.dye, p1.dye, dy);
+    fingerRuns.push({ dy, idle: bandIdle, finger: bandFinger, ratio: bandIdle > 0 ? bandFinger / bandIdle : 0 });
+  }
   const a = await state();
-  await page.evaluate(async () => {
-    const d = window.chromaglassDebug();
-    const f = d.fluids[0], N = d.gridSize;
-    for (let k = 0; k <= 16; k++) {
-      f.fingerDrag(N * (0.35 + 0.018 * k), N / 2, 7, 0.09, 3, 0);
-      await new Promise(r => setTimeout(r, 90));
-    }
-  });
-  const b = await state();
+  const b = a;
+  const bandRatio = [...fingerRuns.map(r => r.ratio)].sort((x, y) => x - y)[1];
   // And the controls: the plate's own velocity API, and the blow, driven the
   // same way and for the same time.
   const runTool = async (name, fn) => {
@@ -106,13 +171,16 @@ try {
   };
   const velMoved = await runTool('addVelocity', null);
   await runTool('blow', null);
-  console.log(`  finger: speed ${b.speed.toExponential(2)}, dye moved ${moved(a.dye, b.dye).toFixed(4)}`);
-  const idleMoved = moved(i0.dye, i1.dye);
-  const fingerMoved = moved(a.dye, b.dye);
+  console.log(`  finger: speed ${b.speed.toExponential(2)}, three bands ` +
+    fingerRuns.map(r => `${r.finger.toFixed(4)}/${r.idle.toFixed(4)}=${r.ratio.toFixed(2)}x`).join('  '));
+  const idleMoved = i1.moved;
+  // Kept for the controls below, which run down the middle.
+  const fingerMoved = fingerRuns.find(r => r.dy === 0).finger;
   console.log('');
   check('a finger moves the liquid it is drawn through',
-    fingerMoved > idleMoved * 1.4,
-    `${(fingerMoved / idleMoved).toFixed(2)}x what an idle plate moves in the same window, along the same track`);
+    bandRatio > 1.4,
+    `${bandRatio.toFixed(2)}x what an idle plate moves in the same window, ` +
+    `the middle of three bands each against its own idle`);
   /*
     And the control that explains why it has to carry the dye itself.
 
