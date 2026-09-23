@@ -884,6 +884,9 @@ export class WebGPUFluid {
     buf.unmap();
     buf.destroy();
     return { n, data: out };
+  }
+
+  /**
    * The squeeze film, read back whole: the gap and its rate. For checks.
    *
    * RG32, so eight bytes a texel and two floats a cell — r is the gap between
