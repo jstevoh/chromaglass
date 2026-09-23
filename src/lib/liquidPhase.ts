@@ -208,6 +208,69 @@ export class LiquidPhase {
   }
 
   /**
+   * A finger through the liquid: what it touches is loosened and mixed.
+   *
+   * The other tools move liquid about. This changes what the liquid *is* where
+   * it passes, and it is the only one that can, because the plate now carries
+   * what each liquid is made of.
+   *
+   * Two liquids stay apart because their polarities differ — that is the whole
+   * of `UNMIX`, and it is what keeps oil out of water. A finger dragged through
+   * them does not push them together so much as **destroy the difference**: it
+   * pulls every cell it touches toward the average of what is under the finger,
+   * so oil and water that meet there are briefly one thing and the force that
+   * would separate them has nothing to work on. Lift the finger and the
+   * chemistry is still averaged, so they stay mixed rather than springing
+   * apart — which is what stirring a dish actually does and what no amount of
+   * blowing will.
+   *
+   * `repel` goes down as well, because a pool that has been dragged through
+   * has had its edge broken, and that is the same gesture.
+   */
+  stir(cx: number, cy: number, radius: number, amount: number): void {
+    const s = this.size;
+    const r = Math.max(1, radius);
+    const r2 = r * r;
+    const x0 = Math.max(1, Math.floor(cx - r)), x1 = Math.min(s - 2, Math.ceil(cx + r));
+    const y0 = Math.max(1, Math.floor(cy - r)), y1 = Math.min(s - 2, Math.ceil(cy + r));
+    // What is under the finger, as one liquid.
+    let mw = 0, mp = 0, k = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx + dy * dy > r2) continue;
+        const i = x + y * s;
+        mw += this.weight[i]; mp += this.polarity[i]; k++;
+      }
+    }
+    if (k === 0) return;
+    mw /= k; mp /= k;
+    const take = Math.max(0, Math.min(1, amount));
+    let touched = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - cx, dy = y - cy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r2) continue;
+        const w = (1 - Math.sqrt(d2) / r) * take;
+        const i = x + y * s;
+        this.weight[i] += (mw - this.weight[i]) * w;
+        this.polarity[i] += (mp - this.polarity[i]) * w;
+        // The edge of a pool does not survive being dragged through.
+        if (this.repel[i] > 0) {
+          const was = this.repel[i];
+          this.repel[i] = was * (1 - w * 0.5);
+          this.totals.repel += this.repel[i] - was;
+        }
+        touched += Math.abs(this.weight[i]) + Math.abs(this.polarity[i]);
+      }
+    }
+    // Averaging cannot create a kind, but it can move the total, and the pass
+    // has to know there is still something here to walk.
+    if (touched > 0) { this.kindsHeld = Math.max(this.kindsHeld, touched); this.live = true; }
+  }
+
+  /**
    * A liquid lands. `radius` is in cells, `amount` scales with how much of it
    * went in, and the falloff is the same soft disc the dye injection uses so
    * the property and the colour arrive on the same shape.
