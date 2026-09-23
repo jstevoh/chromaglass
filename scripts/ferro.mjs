@@ -162,9 +162,23 @@ try {
     if (!ok) check(`the ${name} arm has ferrofluid on it`, false, `total ${p ? p.total.toFixed(0) : 'none'}`);
     return ok;
   };
-  console.log(`     near the magnet: ${(off.share * 100).toFixed(1)}% with it off, ${(on.share * 100).toFixed(1)}% with it on`);
-  check('a magnet gathers the phase toward it', on.share > off.share * 1.25,
-    `${(on.share * 100).toFixed(1)}% against ${(off.share * 100).toFixed(1)}% with the magnet off`);
+  console.log(`     near the magnet: ${off.near.toFixed(0)} with it off, ${on.near.toFixed(0)} with it on` +
+    `  (of ${off.total.toFixed(0)} and ${on.total.toFixed(0)} on the plate)`);
+  /*
+    The amount near the magnet, not its share of the plate.
+
+    A share has the plate's total underneath it, and the total *grows* under a
+    pull: the advection is value transport, so a converging flow samples the
+    same cells repeatedly and makes liquid — 13825 to 17076 in six seconds.
+    So the denominator inflates exactly when the magnet works, and the share
+    falls while the liquid is gathering. Measured as a share, a magnet that
+    gathered read as a magnet that pushed, at every strength and both signs,
+    which is how three sign flips got argued for.
+
+    The centre of mass said so all along and was believed too late.
+  */
+  check('a magnet gathers the phase toward it', on.near > off.near * 1.15,
+    `${on.near.toFixed(0)} of it near the magnet against ${off.near.toFixed(0)} with the magnet off`);
   const toMagnet = Math.hypot(on.px - MX, on.py - GY);
   const toMirror = Math.hypot(on.px - MX, on.py - (1 - GY));
   const driftedTo = Math.hypot(off.px - MX, off.py - GY);
@@ -176,13 +190,13 @@ try {
   // ── 3: height is the control that matters ──
   const far = await lay({ x: MX, y: MY, h: 0.9, s: 0.8, p: 1 });
   armed(far, 'lifted-away');
-  check('held close it gathers harder than held away', armed(far, 'lifted-away') && on.share > far.share,
-    `${(on.share * 100).toFixed(1)}% at height 0.2 against ${(far.share * 100).toFixed(1)}% at 0.9`);
+  check('held close it gathers harder than held away', armed(far, 'lifted-away') && on.near > far.near,
+    `${on.near.toFixed(0)} near it at height 0.2 against ${far.near.toFixed(0)} at 0.9`);
 
   // ── 4: the other way up pushes it off ──
   const rev = await lay({ x: MX, y: MY, h: 0.2, s: 0.8, p: -1 });
-  check('and turned over it pushes the phase away', armed(rev, 'reversed') && rev.share < on.share,
-    `${(rev.share * 100).toFixed(1)}% reversed against ${(on.share * 100).toFixed(1)}%`);
+  check('and turned over it pushes the phase away', armed(rev, 'reversed') && rev.near < on.near,
+    `${rev.near.toFixed(0)} near it reversed against ${on.near.toFixed(0)}`);
 } finally { await browser.close(); stop(); }
 
 const bad = checks.filter(c => !c.ok).length;
