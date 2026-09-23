@@ -85,7 +85,20 @@ export function luckyLook(
     airVelocity: rand() * 0.5, vibrationFrequency: rand(),
     layerCount: rand() > 0.5 ? 2 : 1,
     blendMode: blendModes[Math.floor(rand() * blendModes.length)],
-    gooeyEffect: rand(), rotationSpeed: rand() * 0.1, centerGravity: rand(),
+    gooeyEffect: rand(),
+    /*
+      Rotation, kept near the range the looks actually use.
+
+      This rolled to 0.1, which is eight times the highest of the
+      thirty-two shipped looks (0.012) and about thirty times the median. The
+      dice are meant to explore, but a plate turning eight times faster than
+      anything anybody tuned is the other half of the spinning square that has
+      now been reported three times — the first half being a zoom that should
+      have been held and was not. Twice the looks' top leaves room to surprise
+      without leaving the vocabulary.
+    */
+    rotationSpeed: rand() * 0.025,
+    centerGravity: rand(),
     ledPlatform: rand() > 0.5,
     ledMode: ledModes[Math.floor(rand() * ledModes.length)],
     ledColor: ledColors[Math.floor(rand() * ledColors.length)],

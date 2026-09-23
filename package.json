@@ -60,7 +60,9 @@
     "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs",
     "spin": "npm run build && node scripts/spin.mjs",
     "plates": "npm run build && node scripts/plates.mjs",
-    "ferro": "npm run build && node scripts/ferro.mjs"
+    "ferro": "npm run build && node scripts/ferro.mjs",
+    "press": "npm run build && node scripts/press.mjs",
+    "drain": "npm run build && node scripts/drain.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

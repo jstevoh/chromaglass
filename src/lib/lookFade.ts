@@ -139,7 +139,23 @@ export const STRUCTURE: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vi
   'ledPlatform', 'ledMode',
   'layerCount',
   'blendMode',
-  'macroMode',
+  /*
+    Both halves of the closeup, and holding only one of them is what put a
+    spinning square over the plate three times.
+
+    `luckyLook` rolls these two together on purpose — either closeup at four to
+    twelve times, or not closeup at one — with a note that the flag follows the
+    zoom "rather than the two disagreeing". Holding `macroMode` here and
+    letting `macroZoom` through produced exactly that disagreement: the flag
+    stayed false and the zoom arrived at eight. Magnified eight times, the
+    plate's own square edge and its slow turn become a large spinning square,
+    the dye reads flat, and the bubbles — drawn at their own scale — are all
+    that is left of the picture. Which is the report, three times.
+
+    A control split across two settings has to be held as one thing or not at
+    all.
+  */
+  'macroMode', 'macroZoom',
   'renderStyle',
   'viscosity',
   'kaleidoscope',

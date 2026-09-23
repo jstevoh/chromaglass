@@ -396,6 +396,60 @@ console.log('');
     `${together.toFixed(4)} against ${apart.toFixed(4)} for unlike — the colours are irrelevant, which is the point`);
 }
 
+/*
+  ── The finger: it mixes what will not mix ──────────────────────────
+
+  Every other tool moves liquid about. This one changes what the liquid *is*
+  where it passes, and it is the only one that can, because the plate now
+  carries what each liquid is made of.
+
+  Two liquids stay apart because their polarities differ. A finger dragged
+  through them destroys the difference, so the force that would separate them
+  has nothing left to work on — and it stays destroyed after the finger has
+  gone, which is what stirring a dish does and what no amount of blowing will.
+*/
+{
+  const sep = (ph, seconds = 1.0) => {
+    const p = plate();
+    run(ph, p, seconds, { carryDye: false });
+    const mid = Math.round(N * 0.5);
+    return p.vx[idx(mid + 4, N / 2)] - p.vx[idx(mid - 4, N / 2)];
+  };
+  const lay = () => {
+    const ph = new LiquidPhase(N);
+    ph.deposit(N * 0.42, N / 2, 12, { polarity: -0.9, repel: 0.6 }, 1);  // oil
+    ph.deposit(N * 0.58, N / 2, 12, { polarity: 0.6 }, 1);               // syrup
+    return ph;
+  };
+
+  const untouched = lay();
+  const apart = sep(untouched);
+
+  const stirred = lay();
+  // A finger drawn across the boundary, the way a hand goes.
+  for (let k = 0; k <= 10; k++) stirred.stir(N * (0.42 + 0.016 * k), N / 2, 10, 0.35);
+  const mixed = sep(stirred);
+
+  check('a finger mixes two liquids that refuse each other',
+    mixed < apart * 0.35,
+    `they part at ${mixed.toFixed(4)} after stirring against ${apart.toFixed(4)} before`);
+
+  // And it is the chemistry that changed, not just the moment: the difference
+  // across the boundary is what the separating force reads.
+  const spread = (ph) => {
+    let lo = 1, hi = -1;
+    for (let x = Math.round(N * 0.42); x <= Math.round(N * 0.58); x++) {
+      const v = ph.polarity[idx(x, N / 2)];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    return hi - lo;
+  };
+  check('and it is their chemistry that changed, not only their speed',
+    spread(stirred) < spread(untouched) * 0.6,
+    `polarity across the boundary spans ${spread(stirred).toFixed(3)} after, ${spread(untouched).toFixed(3)} before`);
+}
+
 const failed = checks.filter(c => !c.ok);
 console.log(`${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length === 0 ? 0 : 1);

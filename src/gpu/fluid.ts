@@ -195,6 +195,10 @@ export class WebGPUFluid {
     hundred times the strength moved the interior from 0.67 to 0.62.
   */
   private airCoverPrev = 0;
+  /** The plate's mean of the press source, so the projection has a solution. */
+  private squeezeMean = 0;
+  /** How much of a press reaches the flow, from the look's plate pressure. */
+  private squeezeGain = 0;
   private lastDt = 1 / 60;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
@@ -370,6 +374,27 @@ export class WebGPUFluid {
    */
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
     const q = this.device.queue;
+    /*
+      What the press just did to the plate as a whole, so its source can be
+      made zero-mean.
+
+      A Neumann problem whose source does not average to zero has no solution
+      for the projection to find — the condition `pressureSelfTest` exists to
+      protect, and the same one the air's standing term already obeys. A press
+      is a net source over the whole plate: liquid is pushed out from under the
+      palm and nothing anywhere absorbs it. Left unbalanced, the solve spends
+      itself on the imbalance and the press arrives as almost nothing, which is
+      what it measured — 0.4% of the dye moved, for a press seventy-five times
+      harder than the tool's own.
+
+      The gap delta rides channel 3 of the velocity deltas (see `flushDeltas`),
+      so the mean is a sum over what was just handed across, and the source it
+      produces is that rate over a resting gap.
+    */
+    let gapSum = 0;
+    for (let i = 3; i < velAdd.length; i += 4) gapSum += velAdd[i];
+    const meanGap = gapSum / (this.L * this.L);
+    this.squeezeMean = -(meanGap / Math.max(dt, 1e-4)) / 0.03;
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
@@ -553,6 +578,7 @@ export class WebGPUFluid {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
     this.lastDt = p.dt;
@@ -858,6 +884,32 @@ export class WebGPUFluid {
     buf.unmap();
     buf.destroy();
     return { n, data: out };
+   * The squeeze film, read back whole: the gap and its rate. For checks.
+   *
+   * RG32, so eight bytes a texel and two floats a cell — r is the gap between
+   * the glasses, g is how fast it is changing, which is the thing that moves
+   * any liquid at all.
+   */
+  async readSqueeze(): Promise<{ n: number; gap: Float32Array; rate: Float32Array } | null> {
+    const n = this.N;
+    const row = Math.ceil((n * 8) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
+    enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(buf.getMappedRange().slice(0));
+    const gap = new Float32Array(n * n), rate = new Float32Array(n * n);
+    const stride = row / 4;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        gap[y * n + x] = all[y * stride + x * 2];
+        rate[y * n + x] = all[y * stride + x * 2 + 1];
+      }
+    }
+    buf.unmap();
+    buf.destroy();
+    return { n, gap, rate };
   }
 
   async readAir(): Promise<{ n: number; data: Float32Array } | null> {
@@ -972,9 +1024,12 @@ export class WebGPUFluid {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero as the standing one does.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev],
+    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
-        (this.airCover - this.airCoverPrev) * invDt, 0, 0, 0]));
+        (this.airCover - this.airCoverPrev) * invDt,
+        // The press: its plate-mean, so the source averages to zero, and how
+        // much of it reaches the flow.
+        this.squeezeMean, this.squeezeGain, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));

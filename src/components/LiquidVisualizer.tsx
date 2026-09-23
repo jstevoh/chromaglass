@@ -88,7 +88,7 @@ interface LiquidVisualizerProps {
     real string gets through. Give the project `@types/react` and the
     compiler reports all five comparisons at once as unreachable.
   */
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
@@ -180,6 +180,14 @@ const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the cen
   keeps drifting for several seconds instead of stopping with the finger.
 */
 const BLOW_SWIRL = 0.55;
+/*
+  How much of a finger's wake is roll rather than carry.
+
+  Higher than a puff's, because a finger is a solid thing dragged through the
+  liquid and sheds a stronger pair of vortices than air blown across it does —
+  and because the roll is the part that survives the projection.
+*/
+const FINGER_SWIRL = 0.8;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
@@ -732,6 +740,71 @@ class FluidSimulation {
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     this.dirty = false;
+  }
+
+  /**
+   * The dye a press squeezes out, put where it goes: a ring around the palm.
+   *
+   * Everything in the solver was tried first and each was measured. More
+   * strength — seventy-five times — moved the same 1%. So did slower springs,
+   * the solver's own clamp, and the squeeze entered as a source in the
+   * divergence the projection solves. The film itself is fine: the gap
+   * collapses from 0.030 to 0.004 under the palm at a rate of 166. The
+   * velocity under the palm stays at **0.97x idle**. Nothing downstream of the
+   * film carries the result.
+   *
+   * That is the same finding as the bubbles, twice over. A source in the
+   * divergence is a weak instrument here because the transport cannot carry
+   * it; and anything driven by a *gradient* does nothing in a uniform middle,
+   * which is exactly what a pressed disc is — the gap is at its floor
+   * everywhere under the palm, so there is no slope to push along.
+   *
+   * So the dye is moved here, where the palm's position and size are known
+   * rather than inferred from a field. It is the same operator that fills a
+   * popped bubble, run the other way: take a share of what is under the palm
+   * and put it in the annulus outside, conserving by construction because both
+   * halves read the same mirror.
+   */
+  squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
+    if (!this.gpu) return;
+    const dye = this.gpu.rbDyeView;
+    const N = this.size;
+    const R = Math.max(2, radius);
+    const rOut = R * 1.7;
+    const disc: number[] = [], ring: number[] = [];
+    const yl = Math.max(0, Math.floor(cy - rOut)), yh = Math.min(N - 1, Math.ceil(cy + rOut));
+    const xl = Math.max(0, Math.floor(cx - rOut)), xh = Math.min(N - 1, Math.ceil(cx + rOut));
+    for (let y = yl; y <= yh; y++) {
+      for (let x = xl; x <= xh; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d <= R) disc.push(x + y * N);
+        else if (d <= rOut) ring.push(x + y * N);
+      }
+    }
+    if (disc.length === 0 || ring.length === 0) return;
+
+    let mass = 0, aR = 0, aG = 0, aB = 0;
+    // How much of what is under the palm goes, this press. A share rather
+    // than all of it: a hand squeezes the film thin, it does not scrape it.
+    const take = Math.max(0, Math.min(0.6, amount * 12));
+    for (const i of disc) {
+      const i4 = i * 4;
+      const v = dye[i4 + 3];
+      if (!(v > 1e-5)) continue;
+      mass += v * take; aR += dye[i4] * take; aG += dye[i4 + 1] * take; aB += dye[i4 + 2] * take;
+    }
+    if (!(mass > 1e-4)) return;
+    this.dirty = true;
+    // Out of the disc, through the multiplicative channel that exists for dye
+    // being taken away...
+    for (const i of disc) this.mul[i] *= 1 - take;
+    // ...and into the ring, in the mirror's own log space so the colour that
+    // arrives is the colour that left.
+    const w = 1 / ring.length;
+    for (const i of ring) {
+      this.density[i] += mass * w;
+      this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
+    }
   }
 
   /**
@@ -1673,6 +1746,50 @@ class FluidSimulation {
     }
   }
 
+  /**
+   * A finger drawn through the liquid: it carries what it touches and loosens it.
+   *
+   * The drag is the easy half and it is deliberately not a push. A push is
+   * radial, radial is curl-free, and curl-free is what the projection removes —
+   * this codebase has paid for that five times. A finger does not push anyway:
+   * it drags, and what a drag leaves behind is a shear, which is vorticity and
+   * survives. So the velocity added is the finger's own motion in the middle
+   * and a counter-rotation either side of its track, which is the pair of
+   * vortices a stick pulled through water actually leaves.
+   *
+   * The other half is `stir` on the liquid field, and it is the part no other
+   * tool can do: it averages the chemistry under the finger, so two liquids
+   * that refuse each other are briefly one liquid and stay mixed after the
+   * finger has gone.
+   */
+  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
+    const r = Math.round(radius * GRID_SCALE);
+    const r2 = r * r;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 1e-4)) return;
+    const ux = dx / len, uy = dy / len;
+    for (let j = -r; j <= r; j++) {
+      for (let i = -r; i <= r; i++) {
+        const d2 = i * i + j * j;
+        if (d2 >= r2) continue;
+        const nx = x + i, ny = y + j;
+        if (nx <= 0 || nx >= this.size - 1 || ny <= 0 || ny >= this.size - 1) continue;
+        const idx = nx + ny * this.size;
+        const w = 1 - Math.sqrt(d2) / r;
+        this.dirty = true;
+        // Across the track: which side of the finger this cell is on.
+        const side = i * -uy + j * ux;
+        const sgn = side >= 0 ? 1 : -1;
+        const rr = Math.sqrt(d2) || 1;
+        // Carried along, and rolled either side — the wake of a stick in water.
+        this.vx[idx] += (ux + (-j / rr) * sgn * FINGER_SWIRL) * strength * w;
+        this.vy[idx] += (uy + (i / rr) * sgn * FINGER_SWIRL) * strength * w;
+      }
+    }
+    // And the chemistry under it is averaged, which is the mixing.
+    this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
+  }
+
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
   blowDirected(x: number, y: number, radius: number, strength: number, dx: number, dy: number) {
     radius = Math.round(radius * GRID_SCALE);
@@ -2169,7 +2286,35 @@ class FluidSimulation {
       rim, in `depositBubbleRims` — which conserves by construction because
       both halves read the same mirror.
     */
-    const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    /*
+      Per second of the plate's own time, not per step.
+
+      This was a flat multiply applied once a step with no dt in it at all,
+      while every other rate in here is scaled by dt — so lowering the speed
+      slowed the liquid down and left the drying running at full pace. A plate
+      set slow therefore stopped moving and went on evaporating until there
+      was no dye left, and what you were looking at was the bare backdrop,
+      which the randomiser had just given a new colour. That is the reported
+      "random evolve fills the screen with one colour", and the older "evolve
+      removes all of the dye" is the same fault without the recolour.
+
+      Raised to dt over the reference step, the drying takes the same time per
+      second of plate time at any speed, which is what a dish does.
+    */
+    const perStep = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    /*
+      Referenced to a full-speed step, so no existing look changes.
+
+      Normalising to SIM_STEP was tried first and is wrong in the other
+      direction: dt at full speed is 0.05, three times the 1/60 reference, so
+      every normal plate would have dried three times faster while the crawl
+      stayed as it was. DT_FULL is the dt a plate runs at when the speed is up
+      — the same value the clamp above stops at — so at full speed this is
+      exactly the number it always was, and only a slowed plate changes, which
+      is the whole point.
+    */
+    const DT_FULL = 0.05;
+    const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
 
     return {
       dt, visc, nu,
@@ -2241,6 +2386,7 @@ class FluidSimulation {
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
+      platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -3228,6 +3374,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         af.applySquish(x, y, 20 + 12 * amt, a, fg, true);
         af.applySquish(x, y, 12 + 6 * amt, a, fg);
         af.applySquish(x, y, 6, a, fg);
+        af.squeezeOut(x, y, (20 + 12 * amt) * GRID_SCALE, a);
         if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
         break;
       }
@@ -3796,6 +3943,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId = 0;
     let renderer: PlateRenderer | null = null;
 
+    /** When the projector last asked for a frame; see __chromaglassFrame below. */
+    let lastExternalFrame = 0;
     const render = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
@@ -4252,12 +4401,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 af.applySquish(x, y, 30, 0.004, fg, true);
                 af.applySquish(x, y, 18, 0.004, fg);
                 af.applySquish(x, y, 8, 0.004, fg);
+                // And the liquid goes where a squeezed film sends it.
+                af.squeezeOut(x, y, 30 * GRID_SCALE, 0.004);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 af.blowAir(x, y, 4, 0.06);
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                   bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                 }
+
+              } else if (tool === 'finger') {
+                /*
+                  A finger through the liquid: it carries what it touches and
+                  loosens it.
+
+                  The direction is the pointer's own motion since last frame,
+                  the same way the directed blow takes its. A finger standing
+                  still does nothing, which is right — you mix by moving.
+                */
+                const fdx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? mousePosRef.current.x);
+                const fdy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? mousePosRef.current.y);
+                af.fingerDrag(x, y, 7, 0.09, fdx, fdy);
+                if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
@@ -5234,6 +5399,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       animationFrameId = requestAnimationFrame(render);
     };
 
+    /*
+      A frame the projector window can ask for (the wall going fullscreen).
+
+      This loop is `requestAnimationFrame` and nothing else, and a browser
+      stops rAF for a window it considers hidden. The projector window mirrors
+      whatever *this* window draws — it pushes, it does not pull, because a
+      presented WebGPU canvas answers a pull with black — so the moment this
+      window is occluded the wall holds its last frame and the show freezes on
+      it. Which is exactly what going fullscreen on the second screen does:
+      the wall fills a display, this window is behind it, and the picture
+      stops.
+
+      So the window that *is* visible drives. The projector runs its own rAF
+      and calls this; the guard is what keeps that from becoming a second
+      clock when both windows are up, because a frame already drawn this
+      display interval is not drawn again.
+    */
+    (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+      const now = performance.now();
+      if (now - lastExternalFrame < 6) return;     // this interval already has a frame
+      lastExternalFrame = now;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      render();
+    };
+
     // ── What `?debug` shows ───────────────────────────────────────────
     // One surface whichever engine is drawing: the show's own state here, and
     // whatever the renderer wants to add spread in at the top level, so a
@@ -5754,6 +5944,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
           },
+          /** The gap between the glasses and its rate, for the press checks. */
+          readSqueeze: async () => {
+            const lead = fluidsRef.current[0];
+            return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readSqueeze() : null;
+          },
           readAir: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readAir() : null;
@@ -5955,6 +6150,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
+      // And the frame the projector could ask for goes with it.
+      delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
 
       camera?.dispose();
       camera = null;
