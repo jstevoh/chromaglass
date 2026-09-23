@@ -970,9 +970,25 @@ velocity it is built from. A gap deeper than nominal is not accelerated, it is
 simply not slowed, and the difference across the plate is the same difference.
 
 `depthDrag` is the exponent, so zero is off bit for bit and one is the physical
-h². It ships at one, which is safe because a gap at its nominal depth is
-multiplied by exactly one however high the dial goes — and that is the check
-that lets it ship on by default.
+h². **It ships off**, and that is a measurement rather than a preference.
+
+A plate at nominal depth is untouched by construction — 0.2% on this machine,
+0.6% on CI — so on a look that sets no plate shape the only thing this reaches
+is the thin film under a press or a beat squeeze. An A/B across all thirty-two
+presets, flipping the setting inside one page load and alternating A,B,B,A so
+the plate's own ageing cancels, left twenty-six of them inside two points of
+flatness and three percent of dye. Six moved further, and repeating the two
+that moved most is what settled it: `macro-bead` came back +47, +41, then
+**−24** points, with its *unchanged-setting* baseline swinging 17% to 40% to
+63% between runs. That is the measurement failing to resolve the effect, not
+the effect. The one preset whose direction held across three runs is
+`lace-run`, which is already carried as pathological — fifteen times the speed
+median, 0.07 of dye on the glass.
+
+So it cannot be shown safe on every look, and it costs nothing to leave off:
+`plateCurve` is zero in all thirty-two presets, so the dome is opt-in either
+way. The honest position is that depth is *available* and proven, not that it
+is on.
 
 **One imprecision, left in knowingly.** The squeeze's own velocity already
 carries h²/12μ from `squeezeVelBuf`, and by the time the flow reaches

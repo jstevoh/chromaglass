@@ -166,8 +166,11 @@ is where I would start.
    **The depth half landed 2026-09-23**; the carrier is what is left.
    *Done:* depth is a Darcy mobility on the flow that carries the dye — the
    tight rim of a domed plate runs at 0.08 of its deep centre where it used to
-   run at 1.14, and a flat plate is 0.5% from where it was, which is what lets
-   it ship on by default. Two faults fell out on the way: the dome's sign was
+   run at 1.14, and a flat plate is 0.2% from where it was. It **ships off**:
+   an A/B over all 32 presets could not show it safe on every look, and
+   repeating the two that moved most had one of them reverse sign, so the
+   measurement was not resolving the effect. It costs nothing to leave off,
+   because no preset sets a plate shape. Two faults fell out on the way: the dome's sign was
    inverted relative to all three descriptions of it, and a shape change took
    ninety seconds to appear because the gap sprang toward it at the *press's*
    rate. A shape change is now a *shift* of the gap rather than a reset, so a

@@ -269,6 +269,24 @@ export interface VisualizerSettings {
     dragged by exactly zero however high this is set, and zero switches it off
     entirely. What it makes visible is the dome, and the thin film left under
     a press.
+
+    **It ships off, and that is a measurement rather than a preference.** A
+    plate at nominal depth is untouched by construction — measured at 0.2% on
+    this machine and 0.6% on CI — so the only thing it reaches on a look that
+    sets no plate shape is the thin film under a press or a beat squeeze. An
+    A/B across all thirty-two presets, flipping it inside one page load and
+    alternating A,B,B,A so the plate's own ageing cancels, left twenty-six of
+    them inside two points of flatness and three percent of dye. Six moved
+    further, and repeating the two that moved most showed why that is not a
+    result: `macro-bead` came back +47, +41, then **−24** points, its
+    unchanged-setting baseline swinging 17% to 40% to 63% between runs. The
+    one preset whose direction held across three runs, `lace-run`, is the one
+    already carried as pathological — fifteen times the speed median, almost
+    no dye on the glass.
+
+    So: it cannot be shown to be safe on every look, and it costs nothing to
+    leave off, because `plateCurve` is zero in all thirty-two presets and the
+    dome is opt-in regardless. Turn it up with the plate shape.
   */
   depthDrag: number;
   /*
@@ -533,7 +551,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     no measurement yet says it earns its place. So it is a control, off.
   */
   plateCurve: 0,
-  depthDrag: 1,
+  depthDrag: 0,
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,

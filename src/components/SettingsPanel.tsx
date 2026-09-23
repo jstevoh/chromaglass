@@ -2547,7 +2547,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Depth Drag"
-          value={settings.depthDrag ?? 1}
+          value={settings.depthDrag ?? 0}
           min={0}
           max={3}
           step={0.05}

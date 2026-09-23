@@ -26,7 +26,10 @@ import { spawn } from 'node:child_process';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 
-const PORT = 4342;
+// Overridable so a second sweep can run beside one already going — the guard
+// below is right to refuse a port it did not open, but that should not mean
+// waiting half an hour to check something unrelated.
+const PORT = Number(process.env.LOOKS_PORT ?? 4342);
 const ONLY = process.env.LOOKS_ONLY ? process.env.LOOKS_ONLY.split(',') : null;
 const SETTLE = Number(process.env.LOOKS_SETTLE ?? 11000);
 const LATE = Number(process.env.LOOKS_LATE ?? 14000);
