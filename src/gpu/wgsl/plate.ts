@@ -1549,7 +1549,28 @@ struct FsOut {
 
   // ── Film grain ────────────────────────────────────────────────────
   let grainLuma = dot(outColor, vec3f(0.299, 0.587, 0.114));
-  let grain = (hashFinish(in.uv * U.resolution + fract(U.time * 47.3)) - 0.5) * 0.03
+  /*
+    Hashed off the pixel, not off the interpolated uv.
+
+    This read the interpolated uv times the resolution, and fx.mjs has
+    carried the explanation
+    for a while: a plate drawn into a texture is mirrored (FLIP_Y), mirroring
+    perturbs the interpolated uv in its last bit, and a hash turns a last-bit
+    difference into a different sample. So "the chain changes nothing" measured
+    a worst pixel of nine against a limit of ten — one step of headroom, on
+    noise with no sign to it, and any change to what is on the plate tipped it
+    over. It duly did: a merge that touched neither the post chain nor the
+    compositor took it to eleven on the CI runner and went red.
+
+    That note also says what to do — the coordinate wants to be the pixel — and
+    that it was waiting on the shader freeze, which is over. The fragment's
+    builtin position is
+    its own centre: exact, identical whichever way the geometry was
+    wound, and the same grain on the screen either way. Film grain belongs to
+    the gate rather than to the picture, so this is also the more correct of
+    the two.
+  */
+  let grain = (hashFinish(floor(in.pos.xy) + fract(U.time * 47.3)) - 0.5) * 0.03
             * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
   if (U.cameraOn == 0) { outColor = clamp(outColor + grain, vec3f(0.0), vec3f(1.0)); }
 
