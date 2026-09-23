@@ -135,8 +135,9 @@ export class LiquidPhase {
   readonly polarity: Float32Array;
 
   private readonly scratch: Float32Array;
-  /** A second scratch, so both kind channels ride one backtrace. */
+  /** More scratch, so every channel rides one backtrace. */
   private readonly scratchB: Float32Array;
+  private readonly scratchC: Float32Array;
   /** True while any channel holds anything worth spending a pass on. */
   private live = false;
   /*
@@ -168,6 +169,7 @@ export class LiquidPhase {
     this.polarity = new Float32Array(n);
     this.scratch = new Float32Array(n);
     this.scratchB = new Float32Array(n);
+    this.scratchC = new Float32Array(n);
   }
 
   /** Nothing on the plate. */
@@ -280,9 +282,18 @@ export class LiquidPhase {
       body: Math.exp(-dt / DECAY_SECONDS.body),
       repel: Math.exp(-dt / DECAY_SECONDS.repel),
     };
-    this.totals.soap = this.advectDecay(this.soap, vx, vy, disp, keep.soap);
-    this.totals.body = this.advectDecay(this.body, vx, vy, disp, keep.body);
-    this.totals.repel = this.advectDecay(this.repel, vx, vy, disp, keep.repel);
+    /*
+      All three amounts along one backtrace.
+
+      They were three separate calls with the same velocity and the same
+      displacement — three identical walks over the plate, each recomputing the
+      same backtrace and the same four bilinear weights, to sample a different
+      field. The backtrace is nearly all of the cost. One walk, three samples.
+
+      The conservation clamp stays per channel, because it has to: each has its
+      own decay and therefore its own allowance.
+    */
+    this.advectAmounts(vx, vy, disp, keep.soap, keep.body, keep.repel);
     /*
       The kinds ride the plate too, and they fade back toward water.
 
@@ -326,6 +337,58 @@ export class LiquidPhase {
   }
 
   /** One channel: semi-Lagrangian backtrace, then decay. Returns what is left. */
+  /**
+   * The three amount channels along one backtrace, clamped per channel.
+   *
+   * A backtrace does not conserve what it carries: where the flow converges it
+   * samples the same few cells repeatedly and the liquid multiplies — a dose of
+   * soap once grew to fifteen times itself in fifteen seconds and emptied Solar
+   * Flare under music. None of these is ever made by moving, so a pass that
+   * leaves more than decay alone would have is scaled back to that, and each
+   * channel needs its own allowance because each has its own decay.
+   */
+  private advectAmounts(vx: Float32Array, vy: Float32Array, disp: number, ks: number, kb: number, kr: number): void {
+    const s = this.size;
+    const so = this.soap, bo = this.body, re = this.repel;
+    const ss = this.scratch, sb = this.scratchB, sr = this.scratchC;
+    ss.set(so); sb.set(bo); sr.set(re);
+    const last = s - 2;
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) {
+      const k = i + j * s; b0 += ss[k]; b1 += sb[k]; b2 += sr[k];
+    }
+    let t0 = 0, t1 = 0, t2 = 0;
+    for (let j = 1; j < s - 1; j++) {
+      for (let i = 1; i < s - 1; i++) {
+        const idx = i + j * s;
+        let x = i - disp * vx[idx];
+        let y = j - disp * vy[idx];
+        if (x < 0.5) x = 0.5; else if (x > last + 0.5) x = last + 0.5;
+        if (y < 0.5) y = 0.5; else if (y > last + 0.5) y = last + 0.5;
+        const i0 = x | 0, j0 = y | 0;
+        const a = i0 + j0 * s, b = a + 1, c = a + s, d = c + 1;
+        const fx = x - i0, fy = y - j0;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const v0 = (ss[a] * w00 + ss[b] * w10 + ss[c] * w01 + ss[d] * w11) * ks;
+        const v1 = (sb[a] * w00 + sb[b] * w10 + sb[c] * w01 + sb[d] * w11) * kb;
+        const v2 = (sr[a] * w00 + sr[b] * w10 + sr[c] * w01 + sr[d] * w11) * kr;
+        const o0 = v0 < FLOOR ? 0 : v0, o1 = v1 < FLOOR ? 0 : v1, o2 = v2 < FLOOR ? 0 : v2;
+        so[idx] = o0; bo[idx] = o1; re[idx] = o2;
+        t0 += o0; t1 += o1; t2 += o2;
+      }
+    }
+    const hold = (field: Float32Array, total: number, before: number, keep: number): number => {
+      const allowed = before * keep;
+      if (!(total > allowed) || !(total > 0)) return total;
+      const k = allowed / total;
+      for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) field[i + j * s] *= k;
+      return allowed;
+    };
+    this.totals.soap = hold(so, t0, b0, ks);
+    this.totals.body = hold(bo, t1, b1, kb);
+    this.totals.repel = hold(re, t2, b2, kr);
+  }
+
   /**
    * The two kind channels along one backtrace, returning how much they hold.
    *
