@@ -63,7 +63,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
-import { CrashReportButton } from './components/CrashReportButton';
+import { CrashReportButton, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -2316,6 +2316,7 @@ export default function App() {
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
       { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];
@@ -3693,12 +3694,9 @@ export default function App() {
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       )}
       {/* The crash report, under a desk: its header has no room for a
-          button that is idle nearly always, so it appears only when lit. */}
-      {deskUp && (
-        <div className="fixed right-4 top-16 z-50 rounded-full border border-white/10 bg-black/60 p-1.5 backdrop-blur-xl pointer-events-auto empty:hidden">
-          <CrashReportButton onlyWhenLit />
-        </div>
-      )}
+          button that is idle nearly always, so the chip says when there is
+          news and ⌘K opens the sheet. */}
+      {deskUp && <CrashReportButton floating />}
 
       {showSave && (
         <SaveLookSheet

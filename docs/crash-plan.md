@@ -23,7 +23,8 @@ place nothing was ever written down. This adds two things:
 | The device's `.lost` (sent to `console.error` in the visualizer's loss handler) | error | `gpu` |
 | Three losses within 60 s: recovery is not holding | **fatal** | `gpu` |
 | The loss recovery finishing: a new device, the look laid again | info | `recovery` |
-| The heartbeat: no frame for 6 s while the tab is visible | **fatal** | `heartbeat` |
+| The heartbeat: no frame for 6 s while the tab is visible (a long task that lets go looks the same) | error | `heartbeat` |
+| The heartbeat: still no frame at 20 s | **fatal** | `heartbeat` |
 | The heartbeat: frames resume after a stall | info | `heartbeat` |
 | The `Boot` error boundary catches: the app is down | **fatal** | `react` |
 | Load start, `pagehide` | info | `boot`, `unload` |
@@ -67,8 +68,14 @@ from the previous one's tail.
 
 - **Placement.** It sits in the top bar, after Record and Cast. It does
   nothing on its own.
+  - Under a desk there is no button, because the header has no room. The chip
+    appears on its own, and ⌘K → *Report a problem* opens the sheet from
+    anywhere.
 - **Lighting.** When the log records a fatal, the button turns amber and a chip
   asks *"The plate stopped — save a report?"*
+  - The chip goes after 12 s and the button stays lit. A chip that stayed up
+    sat over the preset title on a phone and the recipe picker on the desk,
+    for the rest of the show. `npm run qa` caught it.
   - A fatal that ended the *previous* load lights it too, which is the usual
     case after a crash-and-reload.
   - Dismissing the chip, or saving or sending a report, marks that fatal as
@@ -190,7 +197,7 @@ has a GPU that presents.
 3. **The loss and the recovery.** A forced loss writes the `gpu` line and then
    the `recovery` line. One loss is not a fatal.
 4. **Frames that stop.** With `requestAnimationFrame` stubbed out, the
-   heartbeat writes a fatal within its window. The fatal carries `rung` and
+   heartbeat writes a stall (error) at 6 s and a fatal at 20 s. The fatal carries `rung` and
    `engine`, and the button lights with its chip.
 5. **The reload.** The sheet opens with the tail, and Save file downloads a
    report. After the page is closed and a new one loaded:

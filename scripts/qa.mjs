@@ -2078,6 +2078,13 @@ try {
     await fresh.close();
   }
 
+  // The black box's view of the same night: a fatal is the show having
+  // stopped — the frames, the device, the app — whether or not anything
+  // printed. Every load in this context shares the log, so this is the
+  // whole run, not the last page.
+  const fatals = await page.evaluate(() => (window.chromaglassDebug?.().crash?.entries() ?? [])
+    .filter((e) => e.level === 'fatal').map((e) => `${e.source}: ${e.msg.split('\n')[0]}`)).catch(() => ['the log could not be read']);
+  check('the black box logged no fatal on show night', fatals.length === 0, fatals.slice(0, 3).join(' | '));
   check('the console stayed clean', errors.length === 0, errors.slice(0, 5).join(' | '));
 } catch (err) {
   check('the run completed', false, String(err).split('\n')[0]);

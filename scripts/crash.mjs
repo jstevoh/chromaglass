@@ -13,7 +13,8 @@
  *   2. a report from a page whose device is destroyed still returns, with
  *      `screenshot: null` — the report is for exactly the moment things broke;
  *   3. a device loss is logged, and so is the recovery from it;
- *   4. frames that stop in a visible tab become a fatal, and the button lights;
+ *   4. frames that stop in a visible tab are a stall at 6 s and a fatal at 20 s,
+ *      and the fatal lights the button;
  *   5. the log survives the reload: `crash.last()` is the line before it, and
  *      the button is still lit for a fatal the previous load ended on.
  *
@@ -134,9 +135,11 @@ try {
     await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 10, null, { timeout: 15_000 }).catch(() => {});
     await page.evaluate(() => { window.requestAnimationFrame = () => 0; });
     const fatal = await page.waitForFunction(
-      () => window.chromaglassDebug().crash.thisLoad().find((e) => e.level === 'fatal' && e.source === 'heartbeat'), null, { timeout: 15_000 },
+      () => window.chromaglassDebug().crash.thisLoad().find((e) => e.level === 'fatal' && e.source === 'heartbeat'), null, { timeout: 35_000 },
     ).then((h) => h.jsonValue()).catch(() => null);
-    check('frames that stop become a fatal', !!fatal, fatal?.msg ?? 'none in 15s');
+    const stallLine = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().find((e) => e.level === 'error' && e.source === 'heartbeat'));
+    check('frames that stop are first a stall', !!stallLine, stallLine?.msg ?? 'no stall line');
+    check('and then a fatal', !!fatal, fatal?.msg ?? 'none in 35s');
     check('the fatal carries the state it stopped in', !!fatal?.snap?.rung && !!fatal?.snap?.engine, JSON.stringify(fatal?.snap ?? {}).slice(0, 160));
     const lit = await page.locator('[data-testid="crash-report-button"][data-lit="true"]').count();
     check('the button lights, and the chip asks', lit === 1 && await page.locator('[data-testid="crash-chip"]').isVisible());

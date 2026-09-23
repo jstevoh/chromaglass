@@ -13,6 +13,11 @@ import { downloadText } from '../lib/userPresets';
  * lights, and a chip offers to save a report. Nothing is captured until one
  * of the sheet's buttons is pressed; Send only exists when a Worker is wired
  * (`VITE_CRASH_REPORT_URL`).
+ *
+ * The chip is a notice, not a fixture: it goes by itself after a few
+ * seconds and the lit button carries on saying so, because a chip that
+ * stays up sits over whatever control is under it — the preset title on a
+ * phone, the recipe picker on the desk — for the rest of the show.
  */
 
 const SEEN = 'chromaglass-crash-seen';
@@ -20,10 +25,19 @@ const readSeen = () => { try { return Number(localStorage.getItem(SEEN) ?? 0); }
 const markSeen = (t: number) => { try { localStorage.setItem(SEEN, String(t)); } catch { /* private window */ } };
 
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const CHIP_MS = 12_000;
 
-export function CrashReportButton({ onlyWhenLit = false }: {
-  /** The desk's header has no room: there, it appears only when there is something to report. */
-  onlyWhenLit?: boolean;
+/** Open the report sheet from anywhere — the command palette, the desk. */
+export const OPEN_CRASH_REPORT = 'chromaglass:crash-report';
+export const openCrashReport = () => window.dispatchEvent(new Event(OPEN_CRASH_REPORT));
+
+export function CrashReportButton({ floating = false }: {
+  /**
+   * Under a desk, whose header has no room for a button that is idle nearly
+   * always: no button, only the chip when there is news, and the sheet when
+   * the palette asks for it.
+   */
+  floating?: boolean;
 }) {
   const [fatal, setFatal] = useState<crashLog.CrashEntry | null>(() => {
     const f = crashLog.lastFatal();
@@ -37,15 +51,44 @@ export function CrashReportButton({ onlyWhenLit = false }: {
     setFatal(e);
     setChip(true);
   }), []);
+  useEffect(() => {
+    if (!chip) return;
+    const t = setTimeout(() => setChip(false), CHIP_MS);
+    return () => clearTimeout(t);
+  }, [chip, fatal]);
+  useEffect(() => {
+    const show = () => { setOpen(true); setChip(false); };
+    window.addEventListener(OPEN_CRASH_REPORT, show);
+    return () => window.removeEventListener(OPEN_CRASH_REPORT, show);
+  }, []);
 
+  /** Seen: the button goes dark and this fatal does not ask again, on this load or the next. */
   const acknowledge = useCallback(() => {
     if (fatal) markSeen(fatal.t);
+    setFatal(null);
     setChip(false);
   }, [fatal]);
 
-  const lit = fatal !== null && chip;
-  if (onlyWhenLit && !lit && !open) return null;
+  const lit = fatal !== null;
+  const chipUp = lit && chip && !open;
 
+  const chipEl = chipUp && (
+    <div
+      className={`${floating ? 'fixed right-4 top-16 z-50' : 'absolute right-0 top-full mt-2'} flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-400/40 bg-[#0b0b10]/95 py-1 pl-3 pr-1 text-[12px] text-white/90 shadow-2xl backdrop-blur-xl pointer-events-auto`}
+      style={{ animation: 'chromaglass-menu-in 0.15s ease-out' }}
+      data-testid="crash-chip"
+    >
+      <span>The plate stopped — save a report?</span>
+      <button onClick={() => { setOpen(true); setChip(false); }} className="min-h-[28px] rounded-full bg-amber-500 px-3 font-medium text-black hover:bg-amber-400">Report</button>
+      <button onClick={acknowledge} className="min-h-[28px] min-w-[28px] rounded-full text-white/50 hover:text-white" aria-label="Dismiss">✕</button>
+    </div>
+  );
+  const sheet = open && createPortal(
+    <ReportSheet fatal={fatal} onClose={() => setOpen(false)} onDone={acknowledge} />,
+    document.body,
+  );
+
+  if (floating) return <>{chipEl}{sheet}</>;
   return (
     <div className="relative">
       <button
@@ -57,21 +100,8 @@ export function CrashReportButton({ onlyWhenLit = false }: {
       >
         <LifeBuoy size={14} />
       </button>
-      {lit && !open && (
-        <div
-          className="absolute right-0 top-full mt-2 flex items-center gap-2 whitespace-nowrap rounded-full border border-amber-400/40 bg-[#0b0b10]/95 py-1.5 pl-3 pr-1.5 text-[12px] text-white/90 shadow-2xl backdrop-blur-xl pointer-events-auto"
-          style={{ animation: 'chromaglass-menu-in 0.15s ease-out' }}
-          data-testid="crash-chip"
-        >
-          <span>The plate stopped — save a report?</span>
-          <button onClick={() => { setOpen(true); setChip(false); }} className="rounded-full bg-amber-500 px-2.5 py-0.5 font-medium text-black hover:bg-amber-400">Report</button>
-          <button onClick={acknowledge} className="rounded-full px-2 py-0.5 text-white/50 hover:text-white" aria-label="Dismiss">✕</button>
-        </div>
-      )}
-      {open && createPortal(
-        <ReportSheet fatal={fatal} onClose={() => setOpen(false)} onDone={acknowledge} />,
-        document.body,
-      )}
+      {chipEl}
+      {sheet}
     </div>
   );
 }

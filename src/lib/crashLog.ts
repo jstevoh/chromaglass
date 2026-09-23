@@ -63,8 +63,16 @@ export interface CrashReport {
 const STORE = 'chromaglass-crashlog';
 const RING = 200;
 const MSG_MAX = 600;
-/** How long a visible tab may go without a frame before it counts as stopped. */
+/**
+ * How long a visible tab may go without a frame: first a stall, worth a line,
+ * then a stop. A long task that blocks the main thread for seconds and then
+ * lets go — a big settings sheet, a song-map decode — looks exactly like a
+ * stall to this interval, which only runs once the block is over; that is an
+ * error to read later, not a plate that stopped. Twenty seconds with no frame
+ * is.
+ */
 const STALL_S = 6;
+const STOP_S = 20;
 /** Losses inside this window that mean recovery is not holding. */
 const LOSS_WINDOW_S = 60;
 const LOSS_FATAL = 3;
@@ -102,7 +110,8 @@ let grab: (() => Promise<{ width: number; height: number; pixels: Uint8Array; pa
 let frames = 0;
 let seenFrames = -1;
 let lastAdvance = 0;
-let stalled = false;
+/** 0 frames flowing, 1 stalled (an error was logged), 2 stopped (the fatal was). */
+let stalled: 0 | 1 | 2 = 0;
 const losses: number[] = [];
 
 const clip = (s: string) => (s.length > MSG_MAX ? `${s.slice(0, MSG_MAX)}…` : s);
@@ -222,13 +231,17 @@ export function install(opts: { ignore?: RegExp[] } = {}): void {
       if (stalled) record('info', 'heartbeat', `frames resumed after ${((now - lastAdvance) / 1000).toFixed(1)}s`);
       seenFrames = frames;
       lastAdvance = now;
-      stalled = false;
+      stalled = 0;
       return;
     }
-    if (document.visibilityState !== 'visible' || stalled) return;
-    if (now - lastAdvance > STALL_S * 1000) {
-      stalled = true;
-      record('fatal', 'heartbeat', `no frame for ${STALL_S}s with the tab visible (${frames} drawn this load)`);
+    if (document.visibilityState !== 'visible') return;
+    const quiet = now - lastAdvance;
+    if (stalled < 1 && quiet > STALL_S * 1000) {
+      stalled = 1;
+      record('error', 'heartbeat', `no frame for ${STALL_S}s with the tab visible (${frames} drawn this load)`);
+    } else if (stalled < 2 && quiet > STOP_S * 1000) {
+      stalled = 2;
+      record('fatal', 'heartbeat', `no frame for ${STOP_S}s with the tab visible (${frames} drawn this load): the plate has stopped`);
     }
   }, 1000);
 }
