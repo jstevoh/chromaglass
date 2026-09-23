@@ -33,6 +33,7 @@ import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
+import * as crashLog from '../lib/crashLog';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -4033,6 +4034,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
+      // The heartbeat: a visible tab that stops getting here has stopped.
+      crashLog.beat();
       const workStart = performance.now();
       let frameS = 0;
       /** How many solver steps this frame took, for the governor's GPU budget. */
@@ -5513,8 +5516,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // whatever the renderer wants to add spread in at the top level, so a
     // harness reaching for `chromaglassDebug().gl` finds it where it always
     // was (docs/webgpu-plan.md, P3).
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+    //
+    // Built always, because the crash report carries it; only on `window`
+    // under `?debug`.
+    const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         status: engineStatusRef.current,
         governor: governorRef.current,
@@ -5566,9 +5571,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         journey: journeyRef.current,
         lamp: lampRef.current,
         settings: settingsRef.current,
+        /** The black box: `.last()` is the line before a stop, `.previous()` the last load's tail. */
+        crash: crashLog.crashApi,
         ...(renderer?.debug?.() ?? {}),
       });
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
     }
+    // What every line of the log carries, and the report's larger parts.
+    const unprovide = crashLog.provide('visualizer', () => {
+      const status = engineStatusRef.current;
+      const rung = governorRef.current?.rung;
+      return {
+        engine: status?.label ?? 'none',
+        rung: rung ? `${rung.grid}²@${rung.dpr}x` : undefined,
+        fps: status?.frameMs ? +(1000 / status.frameMs).toFixed(1) : undefined,
+        stepsPerSec: +stepsPerSecRef.current.toFixed(1),
+        stats: { simMs: +simMsRef.current.toFixed(2), layers: fluidsRef.current.length, beads: beadsRef.current.beads.length, bubbles: bubblesRef.current.bubbles.length },
+        plate: livePresetRef.current,
+        lost: glLostRef.current,
+      };
+    });
+    crashLog.provideReport({ debug: debugState });
 
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
@@ -5616,6 +5640,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       stage = s;
+      // The report's GPU and its frame. `grabFrame` is the only read that
+      // works: a presented WebGPU canvas reads back black.
+      crashLog.provideReport({
+        gpu: () => {
+          const l = s.device.limits;
+          return {
+            label: s.gpu.label, gpuClass: s.gpu.gpuClass, fallback: s.gpu.fallback, format: s.format,
+            limits: { maxTextureDimension2D: l.maxTextureDimension2D, maxBufferSize: l.maxBufferSize, maxStorageBufferBindingSize: l.maxStorageBufferBindingSize, maxComputeWorkgroupStorageSize: l.maxComputeWorkgroupStorageSize },
+            lost: stage !== s,
+          };
+        },
+        grab: () => (stage === s ? s.grabFrame() : null),
+      });
 
       /**
        * The GPU, taken away (docs/webgpu-plan.md, P4).
@@ -5633,6 +5670,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       s.lost.then((info) => {
         if (cancelled) return;
         console.error('WebGPU device lost:', info.reason, info.message);
+        crashLog.deviceLost(info.reason);
         // Dropping rather than detaching skips a readback from a dead
         // device and leaves the CPU's own state alone.
         for (const fluid of fluidsRef.current) fluid.dropGpu();
@@ -5655,6 +5693,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         layPlateRef.current(livePresetRef.current);
         glLostRef.current = false;
         setGlLost(false);
+        crashLog.recovered(`a new device (${s.gpu.label}), ${livePresetRef.current} laid again`);
       }
 
       /**
@@ -6236,6 +6275,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       cancelAnimationFrame(animationFrameId);
       // And the frame the projector could ask for goes with it.
       delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
+      unprovide();
 
       camera?.dispose();
       camera = null;

@@ -63,6 +63,8 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
+import { CrashReportButton } from './components/CrashReportButton';
+import * as crashLog from './lib/crashLog';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -2464,6 +2466,30 @@ export default function App() {
     return allPresets.find(p => p.id === activePresetId)?.name ?? null;
   }, [activePresetId, allPresets]);
 
+  // The black box's half from here: which look, where the picture is going,
+  // and the look itself for a report (docs/crash-plan.md).
+  const crashStateRef = useRef({ activePresetName, settings, output, isCasting, projector: projector.projector });
+  crashStateRef.current = { activePresetName, settings, output, isCasting, projector: projector.projector };
+  useEffect(() => {
+    const unprovide = crashLog.provide('app', () => {
+      const c = crashStateRef.current;
+      const p = c.projector;
+      return {
+        preset: c.activePresetName ?? 'custom',
+        projector: c.isCasting ? `casting${p ? ` to ${p.availWidth}x${p.availHeight}` : ''}` : p ? `found ${p.availWidth}x${p.availHeight}` : 'none',
+      };
+    });
+    crashLog.provideReport({
+      look: () => ({
+        preset: crashStateRef.current.activePresetName,
+        settings: crashStateRef.current.settings,
+        plate: visualizerRef.current?.describePlate() ?? null,
+        output: crashStateRef.current.output,
+      }),
+    });
+    return unprovide;
+  }, []);
+
   return (
     <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
@@ -3483,6 +3509,7 @@ export default function App() {
               </div>
             )}
           </div>
+          <CrashReportButton />
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
@@ -3653,6 +3680,13 @@ export default function App() {
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {deskUp && (
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      )}
+      {/* The crash report, under a desk: its header has no room for a
+          button that is idle nearly always, so it appears only when lit. */}
+      {deskUp && (
+        <div className="fixed right-4 top-16 z-50 rounded-full border border-white/10 bg-black/60 p-1.5 backdrop-blur-xl pointer-events-auto empty:hidden">
+          <CrashReportButton onlyWhenLit />
+        </div>
       )}
 
       {showSave && (
