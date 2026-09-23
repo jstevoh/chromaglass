@@ -84,6 +84,32 @@ milk 1.03, silicone 0.96, water the zero). Evolving a look and then lowering
 the speed — the exact sequence that was reported — no longer empties the
 plate.
 
+**A second flat plate, still unexplained.** With the flatness check able to
+read frames at last, a sixty-roll sweep found one: 96% of the frame a single
+purple, `renderStyle` **show** rather than photo, the two paper colours far
+apart, and 0.45 of dye still on the glass. So it is neither the backdrop nor an
+empty plate.
+
+It has not reproduced. Replaying all 136 of that roll's settings onto a fresh
+plate gives 7–14% flat and 83% colour variety — a healthy picture. What is
+different about the run that found it is that `evolve` rolls one after another
+on a single page with nothing cleared between them, which is right, because it
+is what a performer does: roll nine sits on whatever rolls zero to eight left
+behind. So the remaining suspect is accumulated plate state, and the next step
+is replaying the ten rolls in order rather than the tenth alone.
+
+Chasing it turned up three more fallbacks of exactly the kind this dive is
+about. **One of `evolve`'s three start looks was never that look**: it evolves
+from `fillmore-east-1969`, which is not a preset — the id is `fillmore-1969` —
+and `base` ended in `?? {}`, so a third of every run quietly evolved from
+DEFAULT_SETTINGS while the report named Fillmore. **A roll's settings do not
+determine its plate**, and nothing said so until failing to reproduce one
+taught it. **And a flat roll's look was only ever printed**, so the first
+reproduction attempt picked nine of the fifty-five settings that differed and
+measured the wrong plate. All three are fixed: `base` throws and names the ids
+it has, the caveat is printed under every flat report, and the whole look is
+written out for `npm run wash` to replay.
+
 **What now guards it.** `npm run looks` draws all 32 presets and asks of each
 whether the frame is one colour, whether there is dye on the plate, whether
 there is light in it, and whether it drains; it judges a late frame, because
@@ -93,7 +119,9 @@ panel` gained five: the backdrop's two colours have to differ, the Design desk
 has to offer every tool the engine acts on, nothing on a desk may be a tool
 the engine ignores, every tool needs a letter, and the phone has to be able to
 send a blow, a press and a finger. Each of the five was watched going red
-against the fault it is named for before being trusted green.
+against the fault it is named for before being trusted green. `npm run wash`
+replays one look and watches its colour variety over ninety seconds, and
+`npm run replay` walks the seeded roll sequence without a browser.
 
 ## The stages, and what each one is for
 
