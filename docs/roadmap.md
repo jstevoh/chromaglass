@@ -125,6 +125,16 @@ against the fault it is named for before being trusted green. `npm run wash`
 replays one look and watches its colour variety over ninety seconds, and
 `npm run replay` walks the seeded roll sequence without a browser.
 
+**And one gap left open on purpose.** Nothing photographs the plate *during* a
+look change. `looks` loads each preset fresh, `evolve` assigns settings in one
+go, and the fade path — pressing Go, where the desk interpolates between two
+looks over a second or two — is covered statically by `desk` and `panel` but
+never by a frame. The spinning square that filled the screen lived exactly
+there: `macroZoom` interpolating through values neither look holds. The static
+guard that came out of it (structure snaps rather than fades) is real, but it
+checks the list rather than the picture. A sweep that presses Go between pairs
+of looks and asks whether any frame in the fade goes flat is the missing one.
+
 ## The stages, and what each one is for
 
 Everything reported broken is fixed and deployed — but see **The deep dive**
