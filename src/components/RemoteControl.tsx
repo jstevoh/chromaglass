@@ -201,7 +201,7 @@ export default function RemoteControl() {
   // presses (more dye) and leans (which way the air goes). Each device holds
   // one layer, so two tablets are two projectionists on two plates.
   const [padLayer, setPadLayer] = useState(0);
-  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press'>('blow');
+  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press' | 'finger'>('blow');
   const [padColor, setPadColor] = useState<string | null>(null);
   const [padLiquid, setPadLiquid] = useState<string>('water');
   const [padFull, setPadFull] = useState(false);
@@ -215,10 +215,20 @@ export default function RemoteControl() {
     // Normalised, y up — the plate's own coordinates.
     return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
   };
-  const padSend = (kind: 'blow' | 'drop' | 'press', e: ReactPointerEvent, p: { x: number; y: number }) => {
+  const padSend = (kind: 'blow' | 'drop' | 'press' | 'finger', e: ReactPointerEvent, p: { x: number; y: number },
+                   from?: { x: number; y: number }) => {
     const amount = pressureOf(e);
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
     else if (kind === 'press') send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
+    else if (kind === 'finger') {
+      // A finger mixes by moving, so the stroke's own direction is the whole
+      // gesture: where the touch was last, against where it is now. A tap
+      // sends nothing, which is right — a finger held still does not mix.
+      if (!from) return;
+      const dx = p.x - from.x, dy = p.y - from.y;
+      if (dx === 0 && dy === 0) return;
+      send({ type: 'finger', x: p.x, y: p.y, layer: padLayer, amount, dx, dy });
+    }
     else { const t = tiltOf(e); send({ type: 'blow', x: p.x, y: p.y, layer: padLayer, amount, ...(t ?? {}) }); }
   };
   const onPadDown = (e: ReactPointerEvent) => {
@@ -237,11 +247,12 @@ export default function RemoteControl() {
   const onPadMove = (e: ReactPointerEvent) => {
     if (!connected || !padTouches.current.has(e.pointerId)) return;
     const p = padPoint(e);
+    const from = padTouches.current.get(e.pointerId);
     padTouches.current.set(e.pointerId, p);
     const now = performance.now();
     if (now - (padLastSend.current.get(e.pointerId) ?? 0) < (padTool === 'press' ? 16 : 33)) return;   // 30 Hz along a drag, 60 for a held press
     padLastSend.current.set(e.pointerId, now);
-    padSend(e.buttons === 32 ? 'blow' : padTool, e, p);
+    padSend(e.buttons === 32 ? 'blow' : padTool, e, p, from);
   };
   const onPadUp = (e: ReactPointerEvent) => {
     padTouches.current.delete(e.pointerId);
@@ -338,7 +349,7 @@ export default function RemoteControl() {
           ))}
         </div>
         <div className="flex gap-1.5">
-          {(['blow', 'drop', 'press'] as const).map((t) => (
+          {(['blow', 'drop', 'press', 'finger'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setPadTool(t)}

@@ -63,7 +63,8 @@
     "ferro": "npm run build && node scripts/ferro.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
-    "finger": "npm run build && node scripts/finger.mjs"
+    "finger": "npm run build && node scripts/finger.mjs",
+    "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
