@@ -34,6 +34,58 @@ const LATE = Number(process.env.LOOKS_LATE ?? 14000);
 const rows = [];
 const bad = [];
 
+/**
+ * How much of a frame is one colour, how lit it is, and how much of it has
+ * any colour in it at all.
+ *
+ * Bucketed coarsely — four bits a channel — because a flat plate is not
+ * bit-identical: a gradient backdrop, dither and grain all move the low bits
+ * while the picture is, to a person, one colour.
+ */
+const judge = (px) => {
+  const bins = new Map();
+  let tot = 0, lum = 0, sat = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    bins.set(k, (bins.get(k) ?? 0) + 1);
+    lum += 0.299 * r + 0.587 * g + 0.114 * b;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx > 40 && (mx - mn) / mx > 0.25) sat++;
+    tot++;
+  }
+  let top = 0;
+  for (const v of bins.values()) if (v > top) top = v;
+  return { flat: top / tot, luma: lum / tot / 255, colours: sat / tot };
+};
+
+/*
+  The control, run before anything is measured.
+
+  A sweep that reports "all 32 looks draw a picture" is worth exactly as much
+  as the measure behind it, and this repository has already shipped one check
+  for this fault that could not fail — `evolve`'s flatness verdict, green and
+  blind since the day it was written. So the measure is shown a frame that is
+  one flat colour and a frame that is not, and it has to tell them apart
+  before a single look is loaded.
+*/
+{
+  const N = 320 * 200 * 4;
+  const solid = new Uint8Array(N);
+  for (let i = 0; i < N; i += 4) { solid[i] = 255; solid[i + 1] = 234; solid[i + 2] = 0; solid[i + 3] = 255; }
+  const mixed = new Uint8Array(N);
+  for (let i = 0; i < N; i += 4) {
+    mixed[i] = (i * 7) & 255; mixed[i + 1] = (i * 13) & 255; mixed[i + 2] = (i * 29) & 255; mixed[i + 3] = 255;
+  }
+  const a = judge(solid), b = judge(mixed);
+  if (!(a.flat > 0.99 && b.flat < 0.2)) {
+    console.error(`the flatness measure cannot tell one colour from many: ` +
+      `a solid yellow frame reads ${(a.flat * 100).toFixed(0)}% and a mixed one ${(b.flat * 100).toFixed(0)}%`);
+    process.exit(2);
+  }
+  console.log(`  control: a solid frame reads ${(a.flat * 100).toFixed(0)}% flat, a mixed one ${(b.flat * 100).toFixed(0)}%`);
+}
+
 /*
   And if the port is taken, stop.
 
@@ -102,23 +154,7 @@ try {
       const why = await page.evaluate(() => window.__cgFrameLast);
       throw new Error(`could not photograph ${preset.id}: ${JSON.stringify(why)}`);
     }
-    let flat = 1, luma = 0, colours = 0;
-    {
-      const bins = new Map();
-      let tot = 0, lum = 0, sat = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        const r = px[i], g = px[i + 1], b = px[i + 2];
-        const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
-        bins.set(k, (bins.get(k) ?? 0) + 1);
-        lum += 0.299 * r + 0.587 * g + 0.114 * b;
-        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-        if (mx > 40 && (mx - mn) / mx > 0.25) sat++;
-        tot++;
-      }
-      let top = 0;
-      for (const v of bins.values()) if (v > top) top = v;
-      flat = top / tot; luma = lum / tot / 255; colours = sat / tot;
-    }
+    const { flat, luma, colours } = judge(px);
     const dye = await dyeOf();
 
     const faults = [];

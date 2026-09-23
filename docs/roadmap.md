@@ -123,12 +123,25 @@ The gestures exist and are thin. This is the stage that makes them read, and it
 is where I would start.
 
 1. **F · Depth and a wet carrier** ([`bubbles-plan.md`](bubbles-plan.md) F).
-   The gap is a real depth that feeds only the squeeze, so advection, diffusion
-   and the projection are all depth-blind. Two things are already *measured* as
-   null because of it: the plate's dome does nothing, and there is no coverage,
-   so a pour onto bare glass behaves exactly like a pour onto a covered plate.
-   Darcy mobility in h², and a carrier so bare plate is wet rather than empty.
-   **One change that unblocks the three below.**
+   **The depth half landed 2026-09-23**; the carrier is what is left.
+   *Done:* depth is a Darcy mobility on the flow that carries the dye — the
+   tight rim of a domed plate runs at 0.08 of its deep centre where it used to
+   run at 1.14, and a flat plate is 0.5% from where it was, which is what lets
+   it ship on by default. Two faults fell out on the way: the dome's sign was
+   inverted relative to all three descriptions of it, and a shape change took
+   ninety seconds to appear because the gap sprang toward it at the *press's*
+   rate. A shape change is now a *shift* of the gap rather than a reset, so a
+   live press keeps its dent while the glasses change under it — the shape is a
+   per-plate patch target and a reset would wipe a press every frame it was
+   modulated. `npm run depth` holds all six of those.
+   *And a third finding worth as much as the feature:* **a pointwise multiply
+   on the velocity does nothing**, because `MAX_SPEED` is what sets the
+   magnitude — the forcing re-saturates that clamp every step. Halving every
+   velocity on the plate every step changed the flow by 1%. That is §H's lesson
+   one stage further on: additions are projected away, and multiplies in front
+   of a clamp are clamped away. What survives is the transport.
+   *Left:* the carrier. `dye.a` of zero still means nothing is there rather
+   than clear liquid, and **D, drying and wet-plate optics all wait on it**.
 2. **G · The press and the lift are different strokes**
    ([`bubbles-plan.md`](bubbles-plan.md) G). Squeezing is the *stable*
    direction and should give a smooth ring; lifting is the unstable one, and

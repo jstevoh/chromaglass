@@ -257,6 +257,21 @@ export interface VisualizerSettings {
   plateCurve: number;
   plateSpring: number;
   /*
+    How hard the gap resists the flow through it (F).
+
+    A thin film between two glasses is held back by its walls at 12μ/h² —
+    Hele-Shaw, the same law the squeeze film already solves. Until this, only
+    the squeeze knew about it: advection, diffusion and the projection were
+    all depth-blind, so a plate with a dome on it flowed exactly like a flat
+    one and `plateCurve` measured as doing nothing at every setting.
+
+    It acts on the *variation* in the gap, so a plate at its nominal depth is
+    dragged by exactly zero however high this is set, and zero switches it off
+    entirely. What it makes visible is the dome, and the thin film left under
+    a press.
+  */
+  depthDrag: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -518,6 +533,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     no measurement yet says it earns its place. So it is a control, off.
   */
   plateCurve: 0,
+  depthDrag: 1,
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,

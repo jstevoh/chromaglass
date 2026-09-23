@@ -91,7 +91,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
-  'plateCurve', 'plateSpring',
+  'plateCurve', 'plateSpring', 'depthDrag',
   /*
     The second phase and its magnet (H7). Each layer is a separate dish with
     its own phase field, so each can have its own domains and its own magnet —

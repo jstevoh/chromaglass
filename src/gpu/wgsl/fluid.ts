@@ -261,13 +261,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     So the fill knows the shape. A plate that starts at rest has nothing to
     settle toward and pumps nothing.
   */
+  /*
+    The glasses change shape, and the liquid between them keeps its dents (F).
+
+    Re-laying the gap outright was the first version and it is a trap: the
+    plate shape is a per-plate patch target, so the room camera or a sound
+    mapping can drive it every frame — and re-laying writes the rest shape
+    *and zeroes the rate*, which would wipe a live press sixty times a second
+    for as long as the modulation ran.
+
+    So a change of shape is a shift rather than a reset: every cell moves by
+    the difference between the old rest and the new one, which leaves whatever
+    a press had pushed it away from rest exactly where it was. The rate is not
+    touched, because changing which glasses are on the desk is not a squeeze
+    and should not pump the liquid.
+
+    A.a.x is the shape it was laid at, A.a.y the shape it is going to.
+  */
+  gapReshape: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rg32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let d = uvOf(id) - vec2f(0.5);
+  let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
+  let k = (r2 - 0.5) * 2.0;
+  let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
+  let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
+  let s = textureLoad(src, vec2i(id.xy), 0);
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, 0.0, 0.0));
+}`,
+
   gapRest: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
-  let rest = clamp(0.03 * (1.0 + S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
+  // Negated, because the sign was the other way round to every description
+  // of it. types.ts and the two notes above all say the same thing — below
+  // zero the glasses touch in the middle and open toward the rim, above zero
+  // the rim is the tight part and the liquid pools in the centre — and the
+  // formula did the opposite at both ends. Nothing could tell: the dome fed
+  // the squeeze film and no look sets it, and depth did not reach the flow
+  // until depth became a mobility on the transport, so the shape has
+  // never been visible.
+  let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
 }`,
 
@@ -424,7 +463,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   // The dome the two glasses leave when nothing is pressing on them.
-  let rest = clamp(0.03 * (1.0 + S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
+  let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
   var dhdt = s.g * S.gapMemory;
   if (A.a.x > 0.5) {
@@ -980,15 +1019,66 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The flow the dye rides: the main field plus the current, sampled up from M.
+  /*
+    The flow the dye rides — and the plate's depth, which scales it (F).
+
+    This builds velForced, the field the dye, the second phase, the grain and
+    the particles are all carried through. The depth belongs here and nowhere
+    else, and the two places it was tried first say why.
+
+    A drag on the stored velocity in decayVel does nothing at all. Measured:
+    halving every velocity every single step changed the plate's mean speed by
+    less than a percent. The forcing re-saturates the speed clamp each step —
+    MAX_SPEED is 0.002 and the field sits near it — so the magnitude is set by
+    the clamp rather than by any balance of forces, and a pointwise multiply
+    in front of that clamp is erased before anything reads it.
+
+    A velocity *added* down the depth gradient does nothing either, and that
+    one was predictable: it is the eighth time in this codebase. A smooth
+    localised field is mostly a gradient, and the projection exists to remove
+    gradients.
+
+    What is left is the transport itself. Darcy in a thin film is
+    u = -(h^2/12mu) grad p, so the depth is a mobility on the flow, and a
+    mobility is a multiply on the displacement a cell is carried by. Nothing
+    downstream can take it back, because there is no downstream: this *is*
+    what carries the liquid.
+
+    A.a.z is the exponent, so zero is exactly one — off, bit for bit, and the
+    plate is the plate it was. One is the physical h^2. Above one exaggerates
+    it, which is what a dial on a light-show desk is for.
+  */
   addCurrent: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var cur: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let v = textureLoad(vel, vec2i(id.xy), 0);
   let c = bilerpN(cur, uvOf(id), A.a.y).xy;   // the current is on the M grid
-  textureStore(dst, vec2i(id.xy), vec4f(v.xy + c, v.z, v.w));
+  var flow = v.xy + c;
+  if (A.a.z > 0.0) {
+    let h = max(textureLoad(sq, vec2i(id.xy), 0).r, 0.0005);
+    let nominal = 0.03;
+    /*
+      Capped at one, so this is a drag and never a pump.
+
+      Left free to rise above one it reached four at the dome's deep centre,
+      and the plate did not run four times faster there — it ran fifty-three
+      times faster and was plainly diverging, because the dye this carries
+      feeds the forces that make the velocity it is built from. A mobility
+      above one is physically fine and numerically a loop.
+
+      So a gap deeper than nominal is not accelerated, it is simply not
+      slowed, and the difference across the plate is the same difference. The
+      floor keeps the tightest gap the plate allows from stopping the liquid
+      dead.
+    */
+    let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
+    flow = flow * pow(ratio, A.a.z);
+  }
+  textureStore(dst, vec2i(id.xy), vec4f(flow, v.z, v.w));
 }`,
 
   // The current's own divergence and projection, on the M grid.

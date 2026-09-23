@@ -96,6 +96,8 @@ export class WebGPUFluid {
   private readonly dye: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
+  /** The plate shape the gap was last laid at; a change re-seeds it. */
+  private lastCurve: number | null = null;
   private readonly phase: PingPong;
   /**
    * The pressure, in a storage buffer rather than a texture (H2).
@@ -620,6 +622,45 @@ export class WebGPUFluid {
 
     // 1. Hele-Shaw squeeze-film flow
     stage('squeeze', (pass) => {
+      /*
+        A new plate shape is a new pair of glasses, not a press.
+
+        The gap springs toward its rest dome at `gapSpring`, which is tuned
+        for a press lifting — about a second — and measures as a time constant
+        near half a minute on a slow plate. That is right for a press and
+        wrong for the dome itself: turning Plate Shape up is swapping the
+        glasses, and the answer should be the shape they are, not a shape they
+        reach ninety seconds later. Measured before this: eight seconds after
+        setting the curve to 1, the gap had moved a sixth of the way.
+
+        So the gap is *shifted* by the change, in `gapReshape`, which leaves a
+        press's own dent in place and does not touch the rate. Re-laying it
+        outright was the first version and it is a trap: the plate shape is a
+        per-plate patch target, so a sound or camera mapping can drive it every
+        frame, and a reset would wipe a live press sixty times a second.
+      */
+      if (this.lastCurve === null) {
+        /*
+          A plate that has just appeared is laid at the shape it is meant to
+          have, absolutely.
+
+          This branch is not a formality. The ladder builds a new solver a few
+          seconds into a show, and the clear that comes with it lays the gap
+          flat — so a plate whose shape was already set came back flat and
+          then crept toward its dome at the spring's rate. Measured: the dome
+          held for six seconds, snapped to 0.03 everywhere, and started over.
+          Adopting the current shape without laying it is what caused that.
+        */
+        for (const t of [this.squeeze.a, this.squeeze.b]) {
+          this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
+        }
+        this.lastCurve = p.plateCurve;
+      } else if (this.lastCurve !== p.plateCurve) {
+        this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
+          this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
+        this.squeeze.swap();
+        this.lastCurve = p.plateCurve;
+      }
       if (!deltasApplied) {
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
         this.squeeze.swap();
@@ -683,7 +724,10 @@ export class WebGPUFluid {
     // 8.9. The lasting current, and the flow the dye rides
     stage('current', (pass) => {
       this.stepCurrent(pass);
-      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read], this.arg('current grid', [0, this.M, 0, 0]));
+      // The gap rides along: the plate's depth is a mobility on the flow that
+      // carries the dye (F), and this is the field that carries it.
+      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read],
+        this.arg('current grid', [0, this.M, p.depthDrag, 0]));
     });
 
     // 9. Dye: diffuse, then advect through the forced velocity

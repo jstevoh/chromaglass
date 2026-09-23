@@ -905,6 +905,86 @@ saturation in D, whose whole state variable is *how much of the surface is
 already covered*. One field, three features, and one of them was already on the
 list from a different direction.
 
+### The depth half, done (2026-09-23)
+
+**Depth resists flow now**, and `npm run depth` holds it:
+
+    the gap is domed                       centre 0.0581, rim 0.0144
+    the tight rim runs slower              rim/centre 1.138 → 0.082
+    and a flat plate does not notice        centre 0.2568 → 0.2582, 0.5%
+
+Three things had to be found first, and two of them were faults rather than
+work.
+
+**The dome's sign was inverted.** `types.ts` and both notes in the shader say
+the same thing — below zero the glasses touch in the middle and open toward
+the rim, above zero the rim is the tight part and the liquid pools in the
+centre — and the formula did the opposite at both ends. Nothing could tell,
+because no look sets a plate shape and depth did not reach the flow, so the
+shape has never been visible. The formula now matches its description.
+
+**The dome took ninety seconds to appear.** The gap springs toward its rest
+shape at `gapSpring`, which is tuned for a press lifting. Measured: eight
+seconds after setting the curve to 1, the gap had moved a sixth of the way. A
+change to the *shape* is a change of glasses rather than a press, so the dome
+is there in under two seconds now — and it is a **shift**, not a reset. Every
+cell moves by the difference between the old rest and the new one, which
+leaves a press's own dent exactly where it was: the plate shape is a per-plate
+patch target, so a sound or camera mapping can drive it every frame, and
+re-laying the gap would wipe a live press sixty times a second and zero the
+squeeze rate with it. Measured both ways — a reset reads 0.0596 against a rest
+of 0.06, the shift reads 0.0337 and has carried the dent up.
+
+**And a plate that has just appeared is laid absolutely**, which is not a
+formality: the ladder builds a new solver a few seconds into a show, and the
+clear that comes with it lays the gap flat. A first version adopted the
+current shape without laying it, and the dome held for six seconds, snapped to
+0.03 everywhere and started creeping back at the spring's rate.
+
+**And a drag on the velocity does nothing at all.** This is the sibling of
+§H and it is worth as much. The depth was first applied where velocity is
+already multiplied once a step, in `decayVel`. It moved the flow across the
+plate by 1%. Scaling the term by eight moved it by 1%. **Halving every
+velocity on the plate, every step, moved it by 1%** — which is the control
+that found it.
+
+The reason is `MAX_SPEED`, 0.002, in the same kernel. The forcing re-saturates
+that clamp every step, so the velocity's magnitude is set by the clamp and not
+by any balance of forces, and a multiply in front of a clamp is erased before
+anything downstream reads it. **A pointwise multiply is not automatically
+safe from being undone** — the lesson of §H was that additions get projected
+away, and this is the same lesson one stage further on.
+
+What works is the transport itself. Darcy in a thin film is
+u = -(h²/12μ)∇p, so depth is a mobility, and a mobility is a multiply on the
+displacement a cell is carried by. It goes in `addCurrent`, which builds the
+field the dye, the second phase, the grain and the particles all ride. There
+is no downstream to undo it: that field *is* what carries the liquid.
+
+**Capped at one, because above one it is a loop.** Left free to rise, the
+mobility reached four at the dome's deep centre and the plate ran *fifty-three*
+times faster there — the dye this carries feeds the forces that make the
+velocity it is built from. A gap deeper than nominal is not accelerated, it is
+simply not slowed, and the difference across the plate is the same difference.
+
+`depthDrag` is the exponent, so zero is off bit for bit and one is the physical
+h². It ships at one, which is safe because a gap at its nominal depth is
+multiplied by exactly one however high the dial goes — and that is the check
+that lets it ship on by default.
+
+**One imprecision, left in knowingly.** The squeeze's own velocity already
+carries h²/12μ from `squeezeVelBuf`, and by the time the flow reaches
+`addCurrent` it is one field, so a press's outflow gets the mobility twice.
+The right fix wants the squeeze kept separate from the general flow, which is
+another texture and another pass. What argues for leaving it: the press still
+measurably works — `npm run press` is unchanged, the palm still loses its dye
+into the ring — and a thin film resisting the flow through it is the correct
+sign in both places, only the exponent is wrong. Worth revisiting with E.
+
+**What is left of F is the carrier**: `dye.a` of zero still means nothing is
+there rather than clear liquid, and D, drying and wet-plate optics all wait on
+it.
+
 
 ## A, closed: the hole fills when the bubble pops (2026-09-21)
 

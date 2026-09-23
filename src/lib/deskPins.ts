@@ -183,6 +183,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'magnetY', label: "Magnet Up", min: 0, max: 1, section: 'physics' },
   { key: 'magnetPolarity', label: "Magnet Polarity", min: -1, max: 1, section: 'physics' },
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'physics' },
+  { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'physics' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'physics' },
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },

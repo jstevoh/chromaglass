@@ -2449,6 +2449,7 @@ class FluidSimulation {
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
       magnetPolarity: (settings.magnetPolarity ?? 1) >= 0 ? 1 : -1,
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
+      depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 1)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),

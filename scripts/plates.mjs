@@ -6,6 +6,26 @@
  *   2. the plates leave a dome, so dye gathers where the gap is wide
  *   3. a spun plate drags its liquid round with it
  *   4. a blow keeps the dye moving after the push has been projected away
+ *
+ * **This exits non-zero now, and it is red.** It printed how many checks had
+ * failed and then exited 0 regardless, which makes it a report wearing a
+ * gate's clothes — the same fault as `evolve`'s flatness verdict, one step
+ * along: it *can* fail, it just never says so where anything is listening.
+ * It is not in CI, so nothing was resting on it, but I read it as passing.
+ *
+ * Three of its checks are open work rather than regressions, and they are
+ * named here so the red is legible:
+ *
+ *   "keeps moving after the finger lifts" and "the movement continues
+ *   rather than stopping with the puff" are §H of `docs/bubbles-plan.md`:
+ *   momentum a gesture leaves behind does not survive the projection. Stage 1
+ *   item 2 (G) is the work.
+ *
+ *   "the dome decides where the dye gathers" is E, not F. F coupled depth to
+ *   the flow — a domed plate's tight rim now runs at 0.08 of its deep centre,
+ *   which `npm run depth` holds — but a mobility alone does not make liquid
+ *   *pool*. Pooling wants the flow driven down the depth gradient, which is
+ *   Stage 1 item 4.
  */
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
@@ -180,3 +200,4 @@ try {
     `centre/rim ${rA.toFixed(3)} when they meet in the middle, ${rB.toFixed(3)} when the rim is tight`);
 } finally { await browser.close(); stop(); }
 console.log(bad ? `\n${bad} failed` : '\nall plate checks passed');
+process.exit(bad ? 1 : 0);

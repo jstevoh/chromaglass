@@ -57,6 +57,8 @@ export interface GpuStepParams {
   /** Which way up it is held: +1 pulls the phase in, −1 pushes it away. */
   magnetPolarity: number;
   plateCurve: number;
+  /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
+  depthDrag: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */
