@@ -109,13 +109,16 @@ const judge = (px) => {
 */
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
-let serverUp = true;
+let serverUp = true, leaving = false;
 server.on('exit', (code) => {
   serverUp = false;
+  // The deliberate kill at the end lands here too; only an exit we did not
+  // ask for means the port was taken.
+  if (leaving) return;
   console.error(`\nthe preview server exited (${code}) — port ${PORT} is probably already in use`);
   process.exit(2);
 });
-const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
+const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
 process.on('exit', stop);
 for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));

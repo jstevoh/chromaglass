@@ -36,9 +36,23 @@ const DRAG = Number(process.env.DEPTH_DRAG ?? 3);
 
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
-let up = true;
-server.on('exit', (c) => { up = false; console.error(`\npreview server exited (${c}) — port ${PORT} in use?`); process.exit(2); });
-const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
+let up = true, leaving = false;
+/*
+  Only a surprise before we ask it to go.
+
+  The kill at the end of a clean run lands in this handler too, and it called
+  `process.exit(2)` — so whether a passing run reported success came down to
+  whether the summary's own `process.exit(0)` won the race with the server's
+  exit event. It usually did. This is going into CI, which is exactly where
+  "usually" stops being good enough.
+*/
+server.on('exit', (c) => {
+  up = false;
+  if (leaving) return;
+  console.error(`\npreview server exited (${c}) — port ${PORT} in use?`);
+  process.exit(2);
+});
+const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
 process.on('exit', stop);
 for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
