@@ -759,6 +759,53 @@ try {
   await withOutput({});
   const goneAgain = await page.evaluate(() => !!window.chromaglassDebug?.().outputPass);
   check('resetting drops the pass again', goneAgain === false, goneAgain ? 'still built' : 'gone');
+
+  /*
+    The wall does not freeze when it takes the screen.
+
+    Reported from a show: sending the plate to the wall and going fullscreen
+    left a still picture on it. The projector window mirrors whatever the show
+    window draws — it pushes, it does not pull, because a presented WebGPU
+    canvas answers a pull with black — and the show window's loop is
+    `requestAnimationFrame` and nothing else. A browser stops giving animation
+    frames to a window it thinks is hidden, which is precisely what the show
+    window becomes when the wall covers the screen in front of it. The wall
+    then holds the last frame it was handed, for ever.
+
+    The fix is that the window which is definitely visible asks for the
+    frames. What can be checked here is the mechanism: the show exposes a
+    frame the projector can ask for, and asking produces a picture that has
+    moved — with the plate's own clock left running, so a frame that never
+    arrives is the only way this fails.
+  */
+  {
+    const hasHook = await page.evaluate(() => typeof window.__chromaglassFrame === 'function');
+    check('the show offers the projector a frame it can ask for', hasHook,
+      hasHook ? '__chromaglassFrame is there' : 'the wall can only wait to be pushed to');
+    if (hasHook) {
+      /*
+        Counted, not photographed.
+
+        The first version of this read the canvas with `drawImage` and saw
+        nothing change — which is not the show standing still, it is the thing
+        the projector was built around in the first place: a presented WebGPU
+        canvas hands back black when it is pulled from. Asking the show how
+        many frames it has drawn is the question that survives that.
+      */
+      const drew = await page.evaluate(async () => {
+        const frames = () => window.chromaglassDebug?.().webgpu?.frames ?? -1;
+        const before = frames();
+        for (let i = 0; i < 30; i++) {
+          window.__chromaglassFrame();
+          await new Promise(r => setTimeout(r, 16));
+        }
+        return { before, after: frames() };
+      });
+      check('and asking for one draws one', drew.after > drew.before + 20,
+        `${drew.after - drew.before} frames drawn over thirty asks`);
+    }
+  }
+
 } catch (err) {
   check('the run completed', false, String(err?.message ?? err));
   failed = 1;

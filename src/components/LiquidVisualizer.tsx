@@ -3721,6 +3721,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId = 0;
     let renderer: PlateRenderer | null = null;
 
+    /** When the projector last asked for a frame; see __chromaglassFrame below. */
+    let lastExternalFrame = 0;
     const render = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
@@ -5159,6 +5161,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       animationFrameId = requestAnimationFrame(render);
     };
 
+    /*
+      A frame the projector window can ask for (the wall going fullscreen).
+
+      This loop is `requestAnimationFrame` and nothing else, and a browser
+      stops rAF for a window it considers hidden. The projector window mirrors
+      whatever *this* window draws — it pushes, it does not pull, because a
+      presented WebGPU canvas answers a pull with black — so the moment this
+      window is occluded the wall holds its last frame and the show freezes on
+      it. Which is exactly what going fullscreen on the second screen does:
+      the wall fills a display, this window is behind it, and the picture
+      stops.
+
+      So the window that *is* visible drives. The projector runs its own rAF
+      and calls this; the guard is what keeps that from becoming a second
+      clock when both windows are up, because a frame already drawn this
+      display interval is not drawn again.
+    */
+    (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+      const now = performance.now();
+      if (now - lastExternalFrame < 6) return;     // this interval already has a frame
+      lastExternalFrame = now;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      render();
+    };
+
     // ── What `?debug` shows ───────────────────────────────────────────
     // One surface whichever engine is drawing: the show's own state here, and
     // whatever the renderer wants to add spread in at the top level, so a
@@ -5870,6 +5897,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchmove', handleTouchMove);
       cancelAnimationFrame(animationFrameId);
+      // And the frame the projector could ask for goes with it.
+      delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
 
       camera?.dispose();
       camera = null;

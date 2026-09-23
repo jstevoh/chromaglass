@@ -123,6 +123,29 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     };
     if (opener && !opener.closed) opener.__chromaglassMirror = paint;
 
+    /*
+      And this window drives the clock when the show window cannot.
+
+      The show pushes frames; it does not get pulled. That is right, and it
+      has one consequence: when the browser stops giving the show window
+      animation frames — which is what happens the moment this window goes
+      fullscreen and covers it — the wall holds the last frame it was given
+      and the show appears to freeze.
+
+      This window is the one that is definitely visible, so it asks. The show
+      ignores the ask if it has already drawn this interval, so with both
+      windows up there is still one clock and nothing tears.
+    */
+    let tick = 0;
+    const ask = () => {
+      try {
+        const o = window.opener as (Window & { __chromaglassFrame?: () => void }) | null;
+        if (o && !o.closed) o.__chromaglassFrame?.();
+      } catch { /* the show window is gone, or cross-origin */ }
+      tick = requestAnimationFrame(ask);
+    };
+    tick = requestAnimationFrame(ask);
+
     // The show window closing is the one thing this window still has to
     // notice for itself, and twice a second is often enough to say so.
     const watch = window.setInterval(() => {
@@ -131,6 +154,7 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     }, 500);
 
     return () => {
+      cancelAnimationFrame(tick);
       window.clearInterval(watch);
       try {
         const o = window.opener as (Window & { __chromaglassMirror?: unknown }) | null;
