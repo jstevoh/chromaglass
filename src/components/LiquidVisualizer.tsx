@@ -808,6 +808,40 @@ class FluidSimulation {
   }
 
   /**
+   * Dye lifted off the plate, softly, over a patch.
+   *
+   * Evolving only ever *added*: drops, blows and the occasional flood, with
+   * nothing taking any away except the global dye budget, which thins the
+   * whole plate at once when it is over. So an evolving plate filled up and
+   * the only variety left was which colour arrived next.
+   *
+   * This is the other half — a patch going pale, the way a dish does where
+   * the lamp is hottest or where a rag has been over it. It is a multiply,
+   * which destroys what it removes, and that is the point: H6 · A wanted a
+   * bubble to *displace* dye and a multiply was the bug there. Here the dye
+   * is meant to leave.
+   *
+   * Soft-edged, because a disc with a hard rim reads as a wipe with a
+   * stencil. `keep` is what survives in the middle, rising to 1 at the rim.
+   */
+  thinPatch(cx: number, cy: number, radius: number, keep: number): void {
+    const N = this.size;
+    const R = Math.max(2, radius);
+    const k = Math.max(0, Math.min(1, keep));
+    const yl = Math.max(0, Math.floor(cy - R)), yh = Math.min(N - 1, Math.ceil(cy + R));
+    const xl = Math.max(0, Math.floor(cx - R)), xh = Math.min(N - 1, Math.ceil(cx + R));
+    for (let y = yl; y <= yh; y++) {
+      for (let x = xl; x <= xh; x++) {
+        const d = Math.hypot(x - cx, y - cy) / R;
+        if (d >= 1) continue;
+        const fall = (1 - d) * (1 - d);
+        this.mul[x + y * N] *= 1 - (1 - k) * fall;
+      }
+    }
+    this.dirty = true;
+  }
+
+  /**
    * The dye a bubble displaces, put back as a ring around it (H6 · A).
    *
    * The exclusion on the GPU is a multiply, because it is the only operator
@@ -3346,6 +3380,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
   /** When the last flood pour landed, so gusts cannot stack into a wash. */
   const lastFloodRef = useRef(-1e9);
+  const lastThinRef = useRef(-1e9);
+  /*
+    What the automation has actually done, for `npm run evolving`.
+
+    Counting rather than inferring: a harness can watch the plate change and
+    still not know *which* of the automation's hands changed it, and this
+    repository has spent a day on checks that could not tell one cause from
+    another. Two integers make the difference between "the plate moved" and
+    "evolving thinned it twice and drew a finger through it once".
+  */
+  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0 });
+  /*
+    A finger the automation is drawing, over frames rather than in one.
+
+    A gesture applied in a single frame is a stamp; the finger only reads as a
+    hand because it keeps moving, which is also the only reason it moves
+    liquid at all (bubbles-plan.md §H: a drag leaves a shear, a push leaves a
+    gradient the projection removes). So a stroke is a small piece of state
+    that advances a step a frame and then stops.
+  */
+  const autoStrokeRef = useRef<{ x: number; y: number; dx: number; dy: number; left: number } | null>(null);
   const camBassRef = useRef(0);     // the camera's own onset memory, per frame
   const onManualGestureRef = useRef(onManualGesture);
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
@@ -4666,6 +4721,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // also a bigger pour.
             if (ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
               lastFloodRef.current = now;
+              autoEventsRef.current.poured++;
               const af = fluidsRef.current[0];
               if (af) {
                 const color = harmonyColor(harmonyRef.current);
@@ -4726,6 +4782,72 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // random every ~45 s. The journey itself runs below, evolving or not.
             if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0004) {
               harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
+            }
+
+            /*
+              And dye leaves, which nothing here used to do.
+
+              Everything above adds: a drop, a blow, a flood. The only thing
+              that ever took dye away was the global budget thinning the whole
+              plate at once when it went over, so an evolving plate filled up
+              and the only variety left was which colour came next. A patch
+              going pale is what a dish does where the lamp is hottest, and it
+              makes room for the next pour instead of painting over the last.
+
+              Rarer than a pour and gentler: a fifth off the middle of a patch
+              at most, softened to nothing at its rim.
+            */
+            if (now - lastThinRef.current > 9 && Math.random() < rate * 0.004) {
+              lastThinRef.current = now;
+              autoEventsRef.current.thinned++;
+              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+              if (af) {
+                af.thinPatch(
+                  GRID_SIZE * (0.2 + Math.random() * 0.6),
+                  GRID_SIZE * (0.2 + Math.random() * 0.6),
+                  GRID_SIZE * (0.10 + Math.random() * 0.12),
+                  0.80 + Math.random() * 0.12,
+                );
+              }
+            }
+
+            /*
+              And a finger goes through it now and then.
+
+              The blow and the drop are the only gestures the automation had,
+              and both of them arrive from outside the liquid. A finger is the
+              one that works *what is already there* — it carries dye along its
+              track and averages the chemistry under it, so two bottles that
+              refuse each other come out briefly mixed. That is the gesture a
+              person reaches for when a plate has gone static, which is exactly
+              when this should be reaching for it.
+            */
+            if (!autoStrokeRef.current && Math.random() < rate * 0.003) {
+              autoEventsRef.current.stroked++;
+              const a = Math.random() * Math.PI * 2;
+              autoStrokeRef.current = {
+                x: GRID_SIZE * (0.3 + Math.random() * 0.4),
+                y: GRID_SIZE * (0.3 + Math.random() * 0.4),
+                dx: Math.cos(a), dy: Math.sin(a),
+                left: 18 + Math.floor(Math.random() * 14),
+              };
+            }
+            const stroke = autoStrokeRef.current;
+            if (stroke) {
+              const af = fluidsRef.current[0];
+              if (af) {
+                af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3);
+                if ((currentSettings.bubbles ?? 0) > 0) {
+                  beadsRef.current.disturb(stroke.x, stroke.y, 9 * GRID_SCALE, 0.18);
+                }
+              }
+              stroke.x += stroke.dx * 1.6;
+              stroke.y += stroke.dy * 1.6;
+              // Off the plate, or done: the hand lifts.
+              if (--stroke.left <= 0 || stroke.x < 8 || stroke.y < 8 ||
+                  stroke.x > GRID_SIZE - 8 || stroke.y > GRID_SIZE - 8) {
+                autoStrokeRef.current = null;
+              }
             }
 
           }
@@ -5566,6 +5688,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         journey: journeyRef.current,
         lamp: lampRef.current,
         settings: settingsRef.current,
+        /** What Random Evolve has done with its own hands, since the page loaded. */
+        autoEvents: { ...autoEventsRef.current },
         ...(renderer?.debug?.() ?? {}),
       });
     }
