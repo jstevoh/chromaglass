@@ -258,6 +258,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('photo', photo ? 1 : 0);
     const pa = hexToRgb(s.paperA ?? '#1e5fb8');
     const pb = hexToRgb(s.paperB ?? '#f4c04a');
+    pack.set('phaseAmount', clamp01(s.phaseAmount ?? 0));
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     pack.set('droplets', clamp01(s.microDroplets ?? 0));

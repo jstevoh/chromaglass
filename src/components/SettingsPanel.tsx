@@ -2448,6 +2448,94 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           at a twelfth of a second, faster than a hand can move, which is
           most of why pressing did not feel like it did anything.
         */}
+        {/*
+          The second phase and the magnet under the glass (H7).
+
+          Ferrofluid is a heavy liquid that will not mix with the dye and that
+          a magnet can pull. The shapes are not drawn: spikes, labyrinths,
+          lattices and chains fall out of a surface tension on one side and a
+          magnetic pull on the other, and which one you get is a matter of how
+          close and how strong the magnet is. Domain Size carries the whole
+          look from beads, through cells, to hand-sized bodies.
+
+          Ferrofluid is 0 on every existing look, so nothing changes until it
+          is asked for.
+        */}
+        <Slider
+          label="Ferrofluid"
+          value={settings.phaseAmount ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ phaseAmount: v })}
+          settingKey="phaseAmount"
+        />
+        <Slider
+          label="Domain Size"
+          value={settings.phaseScale ?? 0.4}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ phaseScale: v })}
+          settingKey="phaseScale"
+        />
+        <Slider
+          label="Phase Edge"
+          value={settings.phaseSharp ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ phaseSharp: v })}
+          settingKey="phaseSharp"
+        />
+        <Slider
+          label="Magnet Strength"
+          value={settings.magnetStrength ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ magnetStrength: v })}
+          settingKey="magnetStrength"
+        />
+        {/* Height is the control that matters most: close is a hard narrow
+            pull, lifted away is broad and weak. */}
+        <Slider
+          label="Magnet Height"
+          value={settings.magnetHeight ?? 0.25}
+          min={0.02}
+          max={1}
+          step={0.02}
+          onChange={(v: number) => onUpdate({ magnetHeight: v })}
+          settingKey="magnetHeight"
+        />
+        <Slider
+          label="Magnet Across"
+          value={settings.magnetX ?? 0.5}
+          min={0}
+          max={1}
+          step={0.02}
+          onChange={(v: number) => onUpdate({ magnetX: v })}
+          settingKey="magnetX"
+        />
+        <Slider
+          label="Magnet Up"
+          value={settings.magnetY ?? 0.5}
+          min={0}
+          max={1}
+          step={0.02}
+          onChange={(v: number) => onUpdate({ magnetY: v })}
+          settingKey="magnetY"
+        />
+        <Slider
+          label="Magnet Polarity"
+          value={settings.magnetPolarity ?? 1}
+          min={-1}
+          max={1}
+          step={2}
+          onChange={(v: number) => onUpdate({ magnetPolarity: v })}
+          settingKey="magnetPolarity"
+        />
+
         <Slider
           label="Plate Shape"
           value={settings.plateCurve ?? 0}

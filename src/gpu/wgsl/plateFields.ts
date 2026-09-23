@@ -112,6 +112,8 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'thinFilm', type: 'f32', note: 'interference colour where the dye runs thinnest' },
   { name: 'time', type: 'f32' },
   { name: 'transmission', type: 'f32' },
+  /** How much of the second phase to draw (H7): 0 keeps it off the picture. */
+  { name: 'phaseAmount', type: 'f32' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

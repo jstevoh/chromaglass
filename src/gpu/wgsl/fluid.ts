@@ -271,6 +271,148 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
 }`,
 
+  /*
+    The second phase: a heavy, immiscible liquid a magnet can pull (H7,
+    docs/bubbles-plan.md B).
+
+    It is one number a cell, how much of the dark phase is there, advected by
+    the same flow as everything else — and then two things that are not
+    advection, because a phase that only advects is a phase that blurs away.
+
+    ── The magnet moves the phase, not the velocity ──
+
+    This is the one decision worth stating loudly, and it is the lesson H6
+    paid for three times. A magnet pulls radially, a radial field is
+    curl-free, and curl-free is exactly what the pressure projection exists to
+    remove — so a magnetic body force added to the fluid velocity would be
+    deleted at the end of the very step that applied it. Instead the pull is
+    added to the *displacement this kernel backtraces along*: the phase is
+    carried toward the magnet directly, as transport, where no projection can
+    reach it.
+
+    A real magnet's pull follows the steepness of its own field and falls away
+    sharply, so height is the control that matters most: close is a hard,
+    narrow pull and lifting it away spreads and weakens it. That is an inverse
+    power law, and the height sits inside it rather than beside it.
+
+    A.a = (magnet x, magnet y, height, strength), A.b.x = polarity (which way
+    up the magnet is held), A.b.y the displacement the flow advects by.
+  */
+  /** A soft disc of the second phase, poured onto the plate. A.a = (x, y, r, amount). */
+  phaseSplat: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let add = select(0.0, (1.0 - d * d) * A.a.w, d < 1.0);
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(textureLoad(src, vec2i(id.xy), 0).r + add, 0.0, 1.0), 0.0, 0.0, 0.0));
+}`,
+
+  phaseAdvect: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(5) var lin: sampler;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  var d = textureSampleLevel(vel, lin, uv, 0.0).xy * A.b.y;
+  let m = A.a.xy;
+  let toM = m - uv;
+  let r = length(toM);
+  if (A.a.w > 0.0001 && r > 1e-4) {
+    /*
+      The pull, as a magnet's is: it goes as the steepness of the field, and
+      the height is what keeps it finite over the magnet itself. Held close
+      (small height) this is tall and narrow; lifted away it flattens into
+      something broad and weak, which is exactly how the shapes change.
+    */
+    let h = max(A.a.z, 0.02);
+    /*
+      A dipole's pull, and no normalising by height.
+
+      It was written as fall times h cubed, which holds the pull constant over
+      the magnet and makes it *broader* as the magnet is lifted — so held far
+      away it gathered more of the plate than held close, which is backwards
+      and was measured that way (30.6% against 23.6%). A real magnet's field
+      falls as the cube of the distance, so lifting it weakens it everywhere;
+      that is the whole reason height is the control that matters most, and
+      the h³ was quietly cancelling it.
+    */
+    let fall = 1.0 / pow(r * r + h * h, 1.5);
+    let pull = A.a.w * A.b.x * fall * 0.02;
+    /*
+      Minus, and the sign was settled by the plate rather than by argument.
+
+      The reasoning said plus: this is a backtrace, pos is uv - d, so a
+      displacement pointing at the magnet should fetch from the far side and
+      carry the liquid inward. The plate disagreed flatly and repeatably — with
+      the magnet on, the phase sat *further* from it than with the magnet off
+      (0.329 against 0.250), it pushed harder held close than held away, and
+      turning it over gathered. Three readings, one sign.
+    */
+    d = d - (toM / r) * clamp(pull, -4.0, 4.0) * A.b.y;
+  }
+  let pos = clamp(uv - d, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+  textureStore(dst, vec2i(id.xy), vec4f(textureSampleLevel(src, lin, pos, 0.0).r, 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    The phase separates instead of blurring.
+
+    Semi-Lagrangian advection smears an interface a little every step, and a
+    phase that blurs is a grey wash rather than two liquids. This pushes each
+    cell away from the mean of its neighbours — anti-diffusion — which sharpens
+    a boundary at exactly the rate advection softens it, and the clamp to the
+    neighbourhood is what stops it running away into stripes.
+
+    It is the same operator as sharpenDye above, with one difference that
+    matters: the phase is also pulled toward 0 or 1 by the cubic term, so a
+    cell that is nearly all phase becomes all phase and a cell that is nearly
+    empty empties. That is the Cahn-Hilliard part, and it is what makes a
+    domain keep an edge for minutes rather than a second.
+
+    A.a.x is how hard, A.a.y the surface tension, which smooths the boundary's
+    curvature and therefore sets how big a droplet has to be to keep its shape.
+  */
+  phaseSeparate: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn ph(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let c = ph(p, n);
+  let l = ph(p - vec2i(1, 0), n); let r = ph(p + vec2i(1, 0), n);
+  let d = ph(p - vec2i(0, 1), n); let u = ph(p + vec2i(0, 1), n);
+  let mean = (l + r + d + u) * 0.25;
+  /*
+    Both halves conserve, and the first version did not.
+
+    It had a pointwise cubic pulling each cell toward 0 or 1 — the tidy way to
+    write "the phase separates" and a mass leak: once advection smears a cell
+    below half, the cubic drives it to zero and that liquid is *gone*. Measured,
+    the whole phase evaporated inside six seconds and the plate read empty.
+
+    Diffusion and anti-diffusion both leave the total alone, because the sum of
+    (neighbour mean − centre) over a symmetric stencil is zero. So the sharp
+    boundary comes from the balance of the two: tension smooths it by its own
+    curvature, which is what sets how big a droplet has to be to keep its
+    shape, and the sharpening pushes back against what the advection blurred.
+    Nothing here creates or destroys the liquid.
+  */
+  let smoothed = c + (mean - c) * clamp(A.a.y, 0.0, 1.0) * 0.5;
+  let out = smoothed + (smoothed - mean) * clamp(A.a.x, 0.0, 1.0);
+  // Never outside what the neighbourhood already holds: anti-diffusion that
+  // is not fenced in makes stripes out of a smooth field.
+  let lo = min(min(min(l, r), min(d, u)), c);
+  let hi = max(max(max(l, r), max(d, u)), c);
+  textureStore(dst, p, vec4f(clamp(out, min(lo, 0.0), max(hi, 1.0)), 0.0, 0.0, 0.0));
+}`,
+
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;

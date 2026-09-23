@@ -256,6 +256,34 @@ export interface VisualizerSettings {
   */
   plateCurve: number;
   plateSpring: number;
+  /*
+    The second phase, and the magnet under the glass (H7,
+    docs/bubbles-plan.md B).
+
+    A heavy liquid that will not mix with the dye and that a magnet can pull.
+    The shapes the references show — spikes, labyrinths, lattices, chains —
+    are not drawn: they fall out of a surface tension on one side and a
+    magnetic pull on the other, and which one appears is a matter of how
+    close and how strong the magnet is.
+
+    `phaseScale` is the one control that carries the look from beads, through
+    cells, to hand-sized domains. It sets the tension and the magnet's falloff
+    together, because the two are never independently interesting.
+  */
+  /** How much of the second phase a pour lays down. 0 keeps it off the plate. */
+  phaseAmount: number;
+  /** Beads at 0, hands at 1. */
+  phaseScale: number;
+  /** How hard the phase refuses to blur into a grey wash. */
+  phaseSharp: number;
+  /** Where the hand is holding the magnet, across the plate. */
+  magnetX: number;
+  magnetY: number;
+  /** How far below the glass. The control that matters most. */
+  magnetHeight: number;
+  magnetStrength: number;
+  /** Which way up it is held: 1 pulls the phase in, −1 pushes it away. */
+  magnetPolarity: number;
   glassSmear: number;
   rainDrip: number;
   viscosity: 'thick' | 'thin';
@@ -491,6 +519,14 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   */
   plateCurve: 0,
   plateSpring: 0.35,        // a press takes about a second to lift
+  phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
+  phaseScale: 0.4,
+  phaseSharp: 0.35,
+  magnetX: 0.5,
+  magnetY: 0.5,
+  magnetHeight: 0.25,
+  magnetStrength: 0,
+  magnetPolarity: 1,
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
   viscosity: 'thick',
