@@ -112,7 +112,9 @@ interface PerformDeskProps {
   onDrain: () => void;
 }
 
-const TOOLS = [['dropper', 'Drop', 'D'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P']] as const;
+// Drop lays liquid, Blow moves it, Press squeezes it — and Finger mixes it,
+// which is the only one that changes what the liquid *is* rather than where.
+const TOOLS = [['dropper', 'Drop', 'D'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P'], ['finger', 'Finger', 'G']] as const;
 
 /**
  * A dye pad fires by palette index, and the tray holds hexes — so the tray has

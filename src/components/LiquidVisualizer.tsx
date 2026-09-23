@@ -88,7 +88,7 @@ interface LiquidVisualizerProps {
     real string gets through. Give the project `@types/react` and the
     compiler reports all five comparisons at once as unreachable.
   */
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
@@ -180,6 +180,14 @@ const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the cen
   keeps drifting for several seconds instead of stopping with the finger.
 */
 const BLOW_SWIRL = 0.55;
+/*
+  How much of a finger's wake is roll rather than carry.
+
+  Higher than a puff's, because a finger is a solid thing dragged through the
+  liquid and sheds a stronger pair of vortices than air blown across it does —
+  and because the roll is the part that survives the projection.
+*/
+const FINGER_SWIRL = 0.8;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
@@ -1671,6 +1679,50 @@ class FluidSimulation {
         }
       }
     }
+  }
+
+  /**
+   * A finger drawn through the liquid: it carries what it touches and loosens it.
+   *
+   * The drag is the easy half and it is deliberately not a push. A push is
+   * radial, radial is curl-free, and curl-free is what the projection removes —
+   * this codebase has paid for that five times. A finger does not push anyway:
+   * it drags, and what a drag leaves behind is a shear, which is vorticity and
+   * survives. So the velocity added is the finger's own motion in the middle
+   * and a counter-rotation either side of its track, which is the pair of
+   * vortices a stick pulled through water actually leaves.
+   *
+   * The other half is `stir` on the liquid field, and it is the part no other
+   * tool can do: it averages the chemistry under the finger, so two liquids
+   * that refuse each other are briefly one liquid and stay mixed after the
+   * finger has gone.
+   */
+  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
+    const r = Math.round(radius * GRID_SCALE);
+    const r2 = r * r;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 1e-4)) return;
+    const ux = dx / len, uy = dy / len;
+    for (let j = -r; j <= r; j++) {
+      for (let i = -r; i <= r; i++) {
+        const d2 = i * i + j * j;
+        if (d2 >= r2) continue;
+        const nx = x + i, ny = y + j;
+        if (nx <= 0 || nx >= this.size - 1 || ny <= 0 || ny >= this.size - 1) continue;
+        const idx = nx + ny * this.size;
+        const w = 1 - Math.sqrt(d2) / r;
+        this.dirty = true;
+        // Across the track: which side of the finger this cell is on.
+        const side = i * -uy + j * ux;
+        const sgn = side >= 0 ? 1 : -1;
+        const rr = Math.sqrt(d2) || 1;
+        // Carried along, and rolled either side — the wake of a stick in water.
+        this.vx[idx] += (ux + (-j / rr) * sgn * FINGER_SWIRL) * strength * w;
+        this.vy[idx] += (uy + (i / rr) * sgn * FINGER_SWIRL) * strength * w;
+      }
+    }
+    // And the chemistry under it is averaged, which is the mixing.
+    this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
 
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
@@ -4193,6 +4245,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                   bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                 }
+
+              } else if (tool === 'finger') {
+                /*
+                  A finger through the liquid: it carries what it touches and
+                  loosens it.
+
+                  The direction is the pointer's own motion since last frame,
+                  the same way the directed blow takes its. A finger standing
+                  still does nothing, which is right — you mix by moving.
+                */
+                const fdx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? mousePosRef.current.x);
+                const fdy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? mousePosRef.current.y);
+                af.fingerDrag(x, y, 7, 0.09, fdx, fdy);
+                if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
