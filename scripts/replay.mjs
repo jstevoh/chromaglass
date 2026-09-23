@@ -27,10 +27,15 @@ const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4
 const LED = ['#ff2d55', '#34c759', '#0a84ff', '#ffd60a'];
 const base = (id) => ({ ...DEFAULT_SETTINGS, ...(PRESETS.find(p => p.id === id)?.settings ?? {}) });
 const ROLLS = Number(process.env.EVOLVE_ROLLS ?? 20);
-const WANT_ID = process.env.WANT_ID ?? 'fillmore-east-1969';
+const STARTS = ['classic', 'fillmore-1969', 'oil-wheel'];
+const WANT_ID = process.env.WANT_ID ?? STARTS[0];
+if (!STARTS.includes(WANT_ID)) {
+  console.error(`WANT_ID must be one of the start looks: ${STARTS.join(', ')}`);
+  process.exit(2);
+}
 const WANT_K = Number(process.env.WANT_K ?? 9);
 
-for (const startId of ['classic', 'fillmore-1969', 'oil-wheel']) {
+for (const startId of STARTS) {
   const from = base(startId);
   for (let k = 0; k < ROLLS; k++) {
     const look = evolvedLook(from, luckyLook(from, LED, rand));
@@ -42,4 +47,5 @@ for (const startId of ['classic', 'fillmore-1969', 'oil-wheel']) {
     }
   }
 }
-console.log('not reached');
+console.error(`roll ${WANT_K} of ${WANT_ID} was never reached — EVOLVE_ROLLS is ${ROLLS}`);
+process.exit(2);

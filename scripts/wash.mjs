@@ -77,6 +77,11 @@ try {
     to think the other forty-six were passengers. `npm run replay` writes the
     look out; this puts all of it on the plate.
   */
+  if (!process.env.WASH_LOOK) {
+    console.error('WASH_LOOK must point at a look to replay — `npm run evolve` writes one out\n' +
+      'for every flat roll it finds, and `npm run replay` can produce one from a seed.');
+    process.exit(2);
+  }
   const look = JSON.parse(readFileSync(process.env.WASH_LOOK, 'utf8'));
   await page.evaluate(([l, imm]) => {
     Object.assign(window.chromaglassDebug().settings, l);
