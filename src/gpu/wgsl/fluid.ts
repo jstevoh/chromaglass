@@ -445,12 +445,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var air: texture_2d<f32>;
 @group(0) @binding(4) var airPrev: texture_2d<f32>;
+/*
+  The squeeze film (the press), because a gradient added to the velocity is
+  not a press — it is a thing the next projection deletes.
+
+  The plates closing pushes liquid out from between them, which in the plane
+  is a source, exactly as a growing bubble is. It used to be applied as
+  v += -(h squared/12mu) grad p, in squeezeVelBuf, one stage before the
+  first projection — a pure
+  gradient field handed straight to the operator whose whole job is to remove
+  curl-free flow. Measured: pressing seventy-five times harder moved the same
+  1% of the dye, because the strength was never what was being thrown away.
+*/
+@group(0) @binding(5) var sq: texture_2d<f32>;
 // Last, because the convention here is every texture a pass reads and then
 // the one it writes — and run() binds them in exactly that order. Leaving
 // this at 3 put a sampled texture on a storage slot, which fails as
 // "usage doesn't include TextureUsage::StorageBinding" and leaves the field
 // empty with nothing else to show for it.
-@group(0) @binding(5) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
 // Past the edge: the edge value with the wall-normal component negated, so the
 // velocity interpolated at the wall is zero.
 fn velG(p: vec2i, n: f32) -> vec2f {
@@ -501,7 +514,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
   let standing = (now - A.a.z) * 30.0;
-  let q = (rate + standing) * A.a.x;
+  /*
+    And the press, as mass conservation says it is: closing a gap of height h
+    at a rate dh/dt pushes out −(1/h)(dh/dt) per unit area.
+
+    A.b.y is the plate's mean of that, subtracted for the same reason the air's
+    is — a Neumann problem whose source does not average to zero has no
+    solution for the projection to find, and a press is a net source over the
+    whole plate with nothing to balance it.
+  */
+  let sqv = textureLoad(sq, p, 0);
+  let squeeze = clamp(-sqv.g / max(sqv.r, 0.004) - A.b.y, -60.0, 60.0) * A.b.z;
+  let q = (rate + standing) * A.a.x + squeeze;
   textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
 }`,
 

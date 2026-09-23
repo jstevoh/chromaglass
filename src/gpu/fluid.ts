@@ -190,6 +190,10 @@ export class WebGPUFluid {
     hundred times the strength moved the interior from 0.67 to 0.62.
   */
   private airCoverPrev = 0;
+  /** The plate's mean of the press source, so the projection has a solution. */
+  private squeezeMean = 0;
+  /** How much of a press reaches the flow, from the look's plate pressure. */
+  private squeezeGain = 0;
   private lastDt = 1 / 60;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
@@ -535,6 +539,7 @@ export class WebGPUFluid {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
     this.lastDt = p.dt;
@@ -861,9 +866,12 @@ export class WebGPUFluid {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero as the standing one does.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev],
+    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
-        (this.airCover - this.airCoverPrev) * invDt, 0, 0, 0]));
+        (this.airCover - this.airCoverPrev) * invDt,
+        // The press: its plate-mean, so the source averages to zero, and how
+        // much of it reaches the flow.
+        this.squeezeMean, this.squeezeGain, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));

@@ -42,6 +42,8 @@ export interface GpuStepParams {
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */
   gapMemory: number;
+  /** How hard the hand is on the glass: scales the press's push on the flow. */
+  platePressure: number;
   fingering: number;
   vibIntensity: number;
   vibFrequency: number;

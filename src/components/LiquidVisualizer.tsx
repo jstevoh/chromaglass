@@ -2159,7 +2159,35 @@ class FluidSimulation {
       rim, in `depositBubbleRims` — which conserves by construction because
       both halves read the same mirror.
     */
-    const evapFactor = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    /*
+      Per second of the plate's own time, not per step.
+
+      This was a flat multiply applied once a step with no dt in it at all,
+      while every other rate in here is scaled by dt — so lowering the speed
+      slowed the liquid down and left the drying running at full pace. A plate
+      set slow therefore stopped moving and went on evaporating until there
+      was no dye left, and what you were looking at was the bare backdrop,
+      which the randomiser had just given a new colour. That is the reported
+      "random evolve fills the screen with one colour", and the older "evolve
+      removes all of the dye" is the same fault without the recolour.
+
+      Raised to dt over the reference step, the drying takes the same time per
+      second of plate time at any speed, which is what a dish does.
+    */
+    const perStep = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    /*
+      Referenced to a full-speed step, so no existing look changes.
+
+      Normalising to SIM_STEP was tried first and is wrong in the other
+      direction: dt at full speed is 0.05, three times the 1/60 reference, so
+      every normal plate would have dried three times faster while the crawl
+      stayed as it was. DT_FULL is the dt a plate runs at when the speed is up
+      — the same value the clamp above stops at — so at full speed this is
+      exactly the number it always was, and only a slowed plate changes, which
+      is the whole point.
+    */
+    const DT_FULL = 0.05;
+    const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
 
     return {
       dt, visc, nu,
@@ -2204,6 +2232,7 @@ class FluidSimulation {
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
+      platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
