@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a show that stops and does not come back
+
+A single failure used to be a one-way door, and the live site hit these
+doors often. Closed in this release, all in `docs/stability-plan.md`:
+
+- A frame that throws is logged and the loop goes on. Frames that keep
+  throwing rebuild the stage.
+- A picture that will not upload is left out of that frame instead of ending
+  the loop.
+- Running out of GPU memory steps the quality down and caps the grid size
+  across rebuilds. Before, it was a black plate on a live device.
+- A rung change frees the old solver before building the new one, which
+  halves the memory peak.
+- A solver that will not start steps down a rung. Only the bottom rung
+  failing shows the failure screen, which now has **Try again**.
+- A device that is not back after a loss is asked for again with backoff.
+  GPU requests time out. A sustained stream of GPU errors rebuilds the stage.
+- The first-listen recorder keeps ten minutes, not hours.
+- The logo is sent to a cast receiver once, not with every state.
+
+Fifteen larger jobs are ranked in the plan for later.
+
+### Added — the black box: crash detection and a report button
+
+**Every way a stop can announce itself is now written down, and it outlasts the
+reload.** `src/lib/crashLog.ts` records the following into a 200-line ring in
+localStorage, each line with a snapshot of the rung, engine, fps, steps/s,
+preset and projector:
+
+- uncaught errors and rejections
+- `console.error`/`warn`
+- the device's errors and losses, and the recoveries from them
+- the error boundary
+- a heartbeat that writes a fatal when frames stop in a visible tab
+
+After a crash-and-reload, `chromaglassDebug().crash.last()` is the line that
+preceded it.
+
+**A report button beside Record and Cast** lights when a fatal is logged. It
+builds one JSON report only when asked, and offers Save file, Save screenshot,
+Copy text, and Send (Send appears only when `VITE_CRASH_REPORT_URL` is set). The
+report holds the note, environment, snapshot, debug state, look, log and a
+960-pixel frame taken through `grabFrame`. `npm run crash` proves the box
+records. See `docs/crash-plan.md`.
+
 ### Changed — one engine: the app runs on WebGPU
 
 **The renderer is WebGPU, and nothing else is.** The WebGL2 renderer, every line

@@ -206,9 +206,15 @@ export class ReadbackRing {
     const slot = this.slots.find((s) => s.buf === buf);
     if (!slot) return;
     buf.mapAsync(GPUMapMode.READ).then(() => {
-      if (slot.seq > this.landedSeq) { this.data = buf.getMappedRange().slice(0); this.landedSeq = slot.seq; }
-      buf.unmap();
-      slot.busy = false;
+      // Free the slot whatever happens: a slot left busy is a readback that
+      // never comes back, and with two or three of them that is the flash
+      // guard and the dye readback stopped for the rest of the show.
+      try {
+        if (slot.seq > this.landedSeq) { this.data = buf.getMappedRange().slice(0); this.landedSeq = slot.seq; }
+      } finally {
+        try { buf.unmap(); } catch { /* destroyed under it */ }
+        slot.busy = false;
+      }
     }, () => { slot.busy = false; });
   }
 

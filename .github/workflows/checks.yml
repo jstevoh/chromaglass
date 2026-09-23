@@ -149,6 +149,12 @@ jobs:
       # not a tuning.
       - name: Depth reaches the flow
         run: npm run depth
+      # The black box records (crash-plan.md): errors land with a snapshot,
+      # a device loss and its recovery are logged, frames that stop become a
+      # fatal and light the button, a report from a destroyed device still
+      # returns with no screenshot, and the log survives the reload.
+      - name: The black box
+        run: node scripts/crash.mjs
       # And the projector's geometry, on a GPU: which pixels are black, and
       # how many times a second the whole screen is allowed to change.
       - name: The wall

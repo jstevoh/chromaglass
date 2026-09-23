@@ -51,13 +51,27 @@ export function classifyAdapter(info: Gpu['info'], fallback: boolean): GpuClass 
   return 'mid';
 }
 
+/**
+ * A GPU request that answers, one way or the other. Mid-reset, a driver can
+ * leave `requestAdapter` pending indefinitely, and a recovery waiting on it
+ * showed "rebuilding the plate…" for good; now it fails, and the recovery's
+ * backoff asks again.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+function settles<T>(p: Promise<T>, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} did not answer in ${REQUEST_TIMEOUT_MS / 1000}s`)), REQUEST_TIMEOUT_MS);
+    p.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
 export async function requestGpu(): Promise<Gpu | GpuFailure> {
   if (typeof navigator === 'undefined' || !('gpu' in navigator) || !navigator.gpu) {
     return { failure: 'no-webgpu', detail: 'navigator.gpu is missing' };
   }
   let adapter: GPUAdapter | null = null;
   try {
-    adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    adapter = await settles(navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }), 'requestAdapter');
   } catch (e) {
     return { failure: 'no-adapter', detail: String((e as Error)?.message ?? e) };
   }
@@ -77,7 +91,7 @@ export async function requestGpu(): Promise<Gpu | GpuFailure> {
   try {
     // The default limits: every pass reads its fields as textures and writes
     // one storage texture. A pass that needs more asks for it here, by name.
-    device = await adapter.requestDevice({ requiredFeatures: want });
+    device = await settles(adapter.requestDevice({ requiredFeatures: want }), 'requestDevice');
   } catch (e) {
     return { failure: 'no-device', detail: String((e as Error)?.message ?? e) };
   }

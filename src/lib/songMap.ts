@@ -8,6 +8,9 @@ import { putFingerprint } from './musicDb';
 
 const ANALYSIS_SAMPLE_RATE = 22050;
 
+/** Five-second chunks: ten minutes of first listen, the longest a song map is made from. */
+const MAX_LISTEN_CHUNKS = 120;
+
 /** Records mono audio from a MediaStream until stop() is called. */
 export class ListenRecorder {
   private recorder: MediaRecorder | null = null;
@@ -23,7 +26,13 @@ export class ListenRecorder {
         .find(m => MediaRecorder.isTypeSupported(m)) || '';
       this.recorder = new MediaRecorder(audioOnly, this.mime ? { mimeType: this.mime, audioBitsPerSecond: 64000 } : undefined);
       this.chunks = [];
-      this.recorder.ondataavailable = e => { if (e.data.size > 0) this.chunks.push(e.data); };
+      // The first ten minutes and no more. The recorder only stops on a
+      // silence or a confirmed track change, and in a continuous mix that
+      // re-identification keeps missing, neither comes: it ran for hours,
+      // and the decode at the end — the whole recording, at full rate, in
+      // float, before any trim — took the tab down. The leading chunks of a
+      // WebM are still a valid WebM, so the tail is simply not kept.
+      this.recorder.ondataavailable = e => { if (e.data.size > 0 && this.chunks.length < MAX_LISTEN_CHUNKS) this.chunks.push(e.data); };
       this.recorder.start(5000); // chunk every 5s
       return true;
     } catch (e) {
