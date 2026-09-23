@@ -35,9 +35,10 @@ job: nothing was written twice. There is one shading language in the tree now �
 
 ## The deep dive, 2026-09-23
 
-Every preset, every setting, every tool and every bottle, asked whether it
-works. Four faults came out of it, and the first one is why the other three
-lasted.
+Every preset, every setting, every tool, every bottle and every dye, asked
+whether it works. Seven faults came out of it and one open question, and the
+first fault is why the rest lasted: the check for the reported symptom had
+never read a frame.
 
 **The check for "the whole plate went to one colour" had never read a frame.**
 `npm run evolve` photographs the plate and buckets the colours; it took the
@@ -78,11 +79,12 @@ a bubble control and a plate that boils, and it belongs with S2 in Stage 3.
 
 **What passed.** All 32 presets draw a picture: none flat, none empty, none
 dark, no console noise, and none of them dries out over the half-minute after
-it settles. All 135 settings are read by the engine — there are no dead
-controls. The nine bottles carry the weights they should (glycerine 1.26,
-milk 1.03, silicone 0.96, water the zero). Evolving a look and then lowering
-the speed — the exact sequence that was reported — no longer empties the
-plate.
+it settles. Every setting is read by the engine — 135 at the time of the dive,
+136 since — so there are no dead controls. The nine bottles carry the weights
+they should (glycerine 1.26, milk 1.03, silicone 0.96, water the zero), and
+each of the sixteen dyes paints the hue it is set to, 0° off, which
+`npm run dye` holds. Evolving a look and then lowering the speed — the exact
+sequence that was reported — no longer empties the plate.
 
 **A second flat plate, still unexplained.** With the flatness check able to
 read frames at last, a sixty-roll sweep found one: 96% of the frame a single
