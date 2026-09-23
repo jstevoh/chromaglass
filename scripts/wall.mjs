@@ -353,7 +353,7 @@ try {
    * the picture is and where it is not, and it is a few hundred numbers over
    * the wire instead of three million.
    */
-  const gridOf = (cols = 32, rows = 18) => page.evaluate(async ({ cols, rows }) => {
+  const gridOnce = (cols, rows) => page.evaluate(async ({ cols, rows }) => {
     const src = document.querySelector('#liquid-canvas');
     if (!src || !src.width) return null;
     const c = document.createElement('canvas');
@@ -361,17 +361,32 @@ try {
     const ctx = c.getContext('2d', { willReadFrequently: true });
     // drawImage downsamples with the browser's own box filter: every output
     // cell is the mean of the block under it, which is exactly what is wanted.
-    // What it is given depends on the engine: a presented WebGPU canvas is
-    // not readable, so the stage photographs it for us (scripts/frame.mjs).
+    // The stage photographs the canvas for us (scripts/frame.mjs), because a
+    // presented WebGPU canvas cannot be copied out directly.
     const shot = await window.__cgShot('wall');
-    if (shot) {
-      const full = document.createElement('canvas');
-      full.width = shot.w; full.height = shot.h;
-      full.getContext('2d').putImageData(window.__shots.wall, 0, 0);
-      ctx.drawImage(full, 0, 0, cols, rows);
-    } else {
-      ctx.drawImage(src, 0, 0, cols, rows);
-    }
+    /*
+      No fallback to drawImage, deliberately.
+
+      This used to end `else { ctx.drawImage(src, ...) }`, and `frame.mjs` says
+      at the top of the file why that cannot stand: a presented WebGPU canvas
+      answers drawImage with **black**, which is not an error and not
+      distinguishable from a black plate. So whenever the stage could not give
+      a frame — a rung change disposing one solver and building the next takes
+      a few — the harness measured a black picture and reported it as the
+      wall's doing. That is CI's "a keystone keeps the middle of the frame —
+      mean 0.000" on a commit whose `src/` was byte-identical to the one that
+      had just passed.
+
+      `__cgShot` already waits out a decline for eight animation frames; what
+      is left is a runner slow enough to need longer, and that is the caller's
+      retry below. Returning null here makes the difference visible instead of
+      turning it into a measurement.
+    */
+    if (!shot) return { failed: window.__cgFrameLast ?? { via: 'no shot' } };
+    const full = document.createElement('canvas');
+    full.width = shot.w; full.height = shot.h;
+    full.getContext('2d').putImageData(window.__shots.wall, 0, 0);
+    ctx.drawImage(full, 0, 0, cols, rows);
     const d = ctx.getImageData(0, 0, cols, rows).data;
     const out = [];
     for (let i = 0; i < cols * rows; i++) {
@@ -379,6 +394,24 @@ try {
     }
     return { cols, rows, lum: out };
   }, { cols, rows });
+
+  /*
+    A frame the stage has not painted is waited for, not measured.
+
+    In wall-clock time rather than animation frames: a painter with nothing to
+    draw from may not be scheduling rAF often, which is the case `__cgShot`'s
+    own eight-frame wait cannot cover on a slow runner.
+  */
+  const gridOf = async (cols = 32, rows = 18) => {
+    let last = null;
+    for (let tries = 0; tries < 12; tries++) {
+      const g = await gridOnce(cols, rows);
+      if (g && !g.failed) return g;
+      last = g?.failed ?? 'no canvas';
+      await page.waitForTimeout(200);
+    }
+    throw new Error(`the stage never gave a frame to measure: ${JSON.stringify(last)}`);
+  };
 
   const at = (g, cx, ry) => g.lum[Math.floor(ry * g.rows) * g.cols + Math.floor(cx * g.cols)];
   const meanOver = (g, pred) => {
