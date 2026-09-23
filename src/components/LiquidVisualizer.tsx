@@ -271,6 +271,12 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
  */
 
 // choice to the frame-time governor.
+/** How many times a lost device is asked for again before the screen says it is gone (~2 min of backoff). */
+const RECOVERY_TRIES = 8;
+/** Consecutive frames that throw before the stage is rebuilt (about 1.5 s at 60 fps). */
+const SELF_HEAL_FRAMES = 90;
+/** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
+const ERROR_STORM = 45;
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
   // A pin is held to what this GPU can actually allocate, so an old saved
@@ -3317,6 +3323,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const [glEpoch, setGlEpoch] = useState(0);
   /** The look that is on the plate, so a rebuild can put the same one back. */
   const livePresetRef = useRef('classic');
+  /**
+   * Asking again for a device that did not come back. After a loss the
+   * adapter is often not there on the first ask — the GPU process is still
+   * restarting, or the driver is mid-reset — and giving up on that first
+   * answer is what left the plate black until a reload. Reset on a success.
+   */
+  const recoveryTriesRef = useRef(0);
+  /** When the stage was last rebuilt because frames kept throwing (ms), for the three-a-minute limit. */
+  const selfHealsRef = useRef<number[]>([]);
+  /**
+   * The largest grid this GPU has shown it can hold, learned the hard way.
+   * A rebuild makes a new governor, which starts at the ladder's usual rung;
+   * without this it would climb straight back into the grid that ran out of
+   * memory and lose the plate again, round and round.
+   */
+  const gridCapRef = useRef(Number.POSITIVE_INFINITY);
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -4030,10 +4052,48 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     /** When the projector last asked for a frame; see __chromaglassFrame below. */
     let lastExternalFrame = 0;
+    /*
+      The loop, guarded.
+
+      `renderFrame` schedules the next frame as its last line, so anything
+      that threw in the fourteen hundred lines before it ended the show: no
+      error on screen, no recovery, a still plate until a reload. That was
+      the "stops and never comes back" on the live site that no device loss
+      explained. Now a frame that throws is logged and the next one is asked
+      for regardless; and frames that keep throwing — a second and a half of
+      them — are treated like a lost device: the stage is destroyed, which
+      runs the recovery that rebuilds everything from scratch. Three of those
+      inside a minute and it stops trying, says so as a fatal, and keeps the
+      loop alive in case whatever it was clears.
+    */
+    let frameErrors = 0;
+    let lastFrameErrorLog = -Infinity;
+    /** `chromaglassDebug().throwFrames(n)`: the next n frames throw, for the soak that proves the guard. */
+    let throwFrames = 0;
     const render = () => {
+      try {
+        renderFrame();
+        frameErrors = 0;
+      } catch (err) {
+        frameErrors++;
+        const now = performance.now();
+        if (frameErrors === 1 || now - lastFrameErrorLog > 5000) {
+          lastFrameErrorLog = now;
+          console.error(`ChromaGlass: a frame threw (${frameErrors} in a row); the loop carries on.`, err);
+        }
+        if (frameErrors >= SELF_HEAL_FRAMES) {
+          frameErrors = 0;
+          healStage(`frames keep throwing (${String((err as Error)?.message ?? err).slice(0, 160)})`);
+        }
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    const renderFrame = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
+      if (throwFrames > 0) { throwFrames--; throw new Error('a test throw (throwFrames)'); }
       // The heartbeat: a visible tab that stops getting here has stopped.
       crashLog.beat();
       const workStart = performance.now();
@@ -5573,6 +5633,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         settings: settingsRef.current,
         /** The black box: `.last()` is the line before a stop, `.previous()` the last load's tail. */
         crash: crashLog.crashApi,
+        /** Make the next `n` frames throw: the guard should carry on, and past SELF_HEAL_FRAMES rebuild. */
+        throwFrames: (n: number) => { throwFrames = Math.max(0, n | 0); },
         ...(renderer?.debug?.() ?? {}),
       });
     if (new URLSearchParams(window.location.search).has('debug')) {
@@ -5594,6 +5656,61 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     });
     crashLog.provideReport({ debug: debugState });
 
+    /**
+     * Rebuild the stage from nothing: destroy the device, and the loss
+     * handler does the rest — a new device, every pass built again, the look
+     * laid again. The one cure for GPU objects that have gone invalid, which
+     * nothing else can repair. Three in a minute and it stops, because
+     * whatever it is is not something a rebuild fixes.
+     */
+    const healStage = (why: string): boolean => {
+      const now = performance.now();
+      const heals = selfHealsRef.current.filter((t) => now - t < 60_000);
+      selfHealsRef.current = heals;
+      if (heals.length >= 3) {
+        crashLog.record('fatal', 'heal', `${why} — and ${heals.length} rebuilds in the last minute did not cure it`);
+        return false;
+      }
+      if (!stage || glLostRef.current) return false;
+      heals.push(now);
+      console.error(`ChromaGlass: ${why}; rebuilding the stage.`);
+      stage.device.destroy();
+      return true;
+    };
+
+    /**
+     * The GPU ran out of memory at this grid. Remember it across rebuilds,
+     * and step down: in place when the governor has a rung to spare, by a
+     * rebuild when it does not.
+     */
+    let lastOutOfMemory = -Infinity;
+    const outOfMemory = (grid: number, detail: string) => {
+      // One shortage reports once per object that failed — a dozen textures
+      // in a solver — and it is one step down, not a dozen.
+      const at = performance.now();
+      if (at - lastOutOfMemory < 2000) return;
+      lastOutOfMemory = at;
+      gridCapRef.current = Math.min(gridCapRef.current, grid - 1);
+      const governor = governorRef.current;
+      console.warn(`ChromaGlass: out of GPU memory at ${grid}² (${detail}); capping the grid below it.`);
+      if (governor && governor.failRung(performance.now() * 0.001)) return;
+      if (!healStage(`out of GPU memory at the smallest grid (${grid}²)`)) {
+        setGpuFailure({ failure: 'no-adapter', detail: `out of GPU memory even at ${grid}²` });
+      }
+    };
+
+    /** A picture upload that may throw, logged once per kind rather than every frame. */
+    const uploadFailed = new Set<string>();
+    const upload = (what: string, fn: () => void) => {
+      try {
+        fn();
+        uploadFailed.delete(what);
+      } catch (err) {
+        if (!uploadFailed.has(what)) console.warn(`ChromaGlass: the ${what} picture would not upload; leaving it out.`, err);
+        uploadFailed.add(what);
+      }
+    };
+
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
       renderer = r;
@@ -5604,6 +5721,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         performance.now() * 0.001,
         PINNED_RUNG !== null,
       );
+      // Below whatever ran out of memory before.
+      const g = governorRef.current;
+      while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }
       r.resize();
       render();
     };
@@ -5632,14 +5752,51 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.height = px.height;
       return dpr;
     };
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     void WebGPUStage.start(canvas).then((s) => {
       if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
       if (isGpuFailure(s)) {
+        // Coming back from a loss, the answer is usually "not yet" rather
+        // than "never": ask again, backing off, for about two minutes.
+        const tries = recoveryTriesRef.current;
+        if (glLostRef.current && tries < RECOVERY_TRIES) {
+          recoveryTriesRef.current = tries + 1;
+          const wait = Math.min(30_000, 1000 * 2 ** tries);
+          console.warn(`ChromaGlass: no device yet after a loss (${s.failure}: ${s.detail}); asking again in ${wait / 1000}s.`);
+          retryTimer = setTimeout(() => setGlEpoch((n) => n + 1), wait);
+          return;
+        }
         console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
         setGpuFailure(s);
         return;
       }
       stage = s;
+      const bornAt = performance.now();
+      // A new device is a new chance for the solver, whatever the last one
+      // managed; the failure screen's "Try again" relies on it too.
+      gpuSupportedRef.current = null;
+
+      /*
+        Errors the device reports on its own, counted. One is a bug to log;
+        one every frame is GPU objects gone invalid — a texture that did not
+        allocate, a bind group built on it — and a plate that will stay black
+        with a device that is still alive, which no loss handler hears about.
+        So a sustained stream is treated as a loss: rebuild. Out of memory
+        says so, and caps the grid first.
+      */
+      let errorWindowStart = 0;
+      let errorsInWindow = 0;
+      s.device.addEventListener('uncapturederror', (e) => {
+        if (cancelled || stage !== s) return;
+        const error = (e as GPUUncapturedErrorEvent).error;
+        if (typeof GPUOutOfMemoryError !== 'undefined' && error instanceof GPUOutOfMemoryError) {
+          outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, error.message);
+          return;
+        }
+        const now = performance.now();
+        if (now - errorWindowStart > 3000) { errorWindowStart = now; errorsInWindow = 0; }
+        if (++errorsInWindow === ERROR_STORM) healStage(`${ERROR_STORM} GPU errors in 3s (last: ${error?.message?.slice(0, 160) ?? 'unknown'})`);
+      });
       // The report's GPU and its frame. `grabFrame` is the only read that
       // works: a presented WebGPU canvas reads back black.
       crashLog.provideReport({
@@ -5671,6 +5828,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (cancelled) return;
         console.error('WebGPU device lost:', info.reason, info.message);
         crashLog.deviceLost(info.reason);
+        // A device that dies as soon as it is made is not "back"; asking for
+        // the next one at once only feeds a loop of them. Back off instead.
+        const shortLived = performance.now() - bornAt < 5000;
         // Dropping rather than detaching skips a readback from a dead
         // device and leaves the CPU's own state alone.
         for (const fluid of fluidsRef.current) fluid.dropGpu();
@@ -5682,7 +5842,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         flashGainRef.current = 1;
         glLostRef.current = true;
         setGlLost(true);
-        setGlEpoch((n) => n + 1);
+        if (shortLived && recoveryTriesRef.current < RECOVERY_TRIES) {
+          const tries = recoveryTriesRef.current++;
+          retryTimer = setTimeout(() => setGlEpoch((n) => n + 1), Math.min(30_000, 1000 * 2 ** tries));
+        } else {
+          recoveryTriesRef.current = 0;
+          setGlEpoch((n) => n + 1);
+        }
       });
 
       // Coming back from one. The plate did not survive — the dye lives in
@@ -5716,13 +5882,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             return true;
           }
           if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+          /*
+            The old solver goes before the new one is built, not after: at
+            the top rungs a solver is a couple of hundred megabytes a layer,
+            and holding both across the swap doubled the peak at exactly the
+            moment the governor had decided there was room — the moment most
+            likely to find there was not. `detachGpu` carries the field to
+            the CPU arrays, and the new solver starts from them as before.
+          */
+          if (fluid.gpu) fluid.detachGpu();
           try {
+            /*
+              And out of memory is not an exception. A texture the GPU cannot
+              hold comes back as an invalid object, silently, and every frame
+              after that draws nothing — the black plate with a live device
+              that no loss handler ever hears about. The scope is how it is
+              heard: if it catches one, this solver is dropped and the
+              governor steps down (see `outOfMemory`).
+            */
+            s.device.pushErrorScope('out-of-memory');
             const solver = new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
               float32Filterable: s.gpu.float32Filterable,
               timestamps: s.gpu.timestamps,
             });
             solver.stageTimings = STAGE_TIMINGS;
             fluid.attachGpu(solver);
+            void s.device.popErrorScope().then((oom) => {
+              if (!oom || cancelled || stage !== s) return;
+              if (fluid.gpu === solver) fluid.dropGpu();
+              outOfMemory(wantRes, oom.message);
+            }, () => { /* the device went; the loss handler has it */ });
             return true;
           } catch (err) {
             /*
@@ -5738,8 +5927,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               So say so instead. A machine that cannot run the solver gets
               the same screen as a machine with no WebGPU at all.
             */
-            console.error('ChromaGlass: the WebGPU solver would not start.', err);
             fluid.dropGpu();
+            /*
+              But first, smaller. A grid that will not allocate is far more
+              often a GPU short of memory — a projector's framebuffer added
+              mid-set, another tab, the rung the governor had just climbed to
+              — than a GPU that cannot run the show, and this used to end the
+              show on the spot, with no way back but a reload. So the governor
+              drops a rung and never climbs back to this one; the next frame
+              attaches there. Only the bottom rung failing is the screen.
+            */
+            const governor = governorRef.current;
+            if (governor && governor.failRung(performance.now() * 0.001)) {
+              console.warn(`ChromaGlass: the solver would not start at ${wantRes}²; stepping down a rung.`, err);
+              return true;
+            }
+            console.error('ChromaGlass: the WebGPU solver would not start.', err);
             setGpuFailure({
               failure: 'no-adapter',
               detail: `the solver would not start at ${wantRes}²: ${String(err).slice(0, 120)}`,
@@ -5762,20 +5965,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // The uniforms are told about each of them in `plateUniforms`,
             // under the same conditions, or the shader would be drawing a
             // picture it had not been given.
-            if (view.beadMask) plate.setSource('beads', view.beadMask);
+            //
+            // Each upload is fenced. `copyExternalImageToTexture` throws on
+            // a picture it cannot take — a video whose camera track ended, a
+            // frame the size of which changed between measuring and copying,
+            // a cross-origin image — and a throw here used to end the loop.
+            // A picture that will not upload is left out of this frame.
+            if (view.beadMask) upload('beads', () => plate.setSource('beads', view.beadMask!));
             const mk = view.mark;
             if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
             else if (mk.dirty) {
-              plate.setSource('mark', mk.source);
-              // The chain's finish lays the mark over the frame when it is
-              // the one finishing, so it needs the picture as well.
-              const [mw, mh] = pictureSize(mk.source);
-              chain?.setMark(mk.source, mw, mh);
+              // Clean whatever happens: a mark that will not upload once will
+              // not upload the next sixty times either.
               mk.dirty = false;
+              upload('mark', () => {
+                plate.setSource('mark', mk.source);
+                // The chain's finish lays the mark over the frame when it is
+                // the one finishing, so it needs the picture as well.
+                const [mw, mh] = pictureSize(mk.source);
+                chain?.setMark(mk.source, mw, mh);
+              });
             }
             const film = view.film;
             if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
-              plate.setSource('film', film.video);
+              upload('film', () => plate.setSource('film', film.video!));
             }
             // Two passes when the camera is on: the plate is
             // drawn into a texture and the camera looks at it, because
@@ -6276,6 +6489,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // And the frame the projector could ask for goes with it.
       delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
       unprovide();
+      if (retryTimer) clearTimeout(retryTimer);
 
       camera?.dispose();
       camera = null;
@@ -6356,6 +6570,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 : 'The GPU would not start.'}
             </div>
             <div>It runs in Chrome or Edge on a desktop, Chrome on a recent Android phone, Safari 26 on macOS and iOS, and Firefox on Windows.</div>
+            {gpuFailure.failure !== 'no-webgpu' && (
+              /* A GPU that would not start a minute ago may start now — the
+                 driver finished resetting, the other tab closed — and asking
+                 again costs nothing next to a reload that loses the set. */
+              <button
+                onClick={() => {
+                  recoveryTriesRef.current = 0;
+                  gpuSupportedRef.current = null;
+                  glLostRef.current = true;
+                  setGlLost(true);
+                  setGpuFailure(null);
+                  setGlEpoch((n) => n + 1);
+                }}
+                className="pointer-events-auto mt-5 rounded-md border border-white/20 px-4 py-2 text-[12px] text-white/90 transition-colors hover:bg-white/10"
+                data-testid="gpu-retry"
+              >
+                Try again
+              </button>
+            )}
           </div>
         </div>
       )}

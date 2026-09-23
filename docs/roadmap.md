@@ -14,6 +14,7 @@ this repo.
 
 | | Plan | State |
 |---|---|---|
+| **Stability** | [`stability-plan.md`](stability-plan.md) | **S0 in #127; S1–S15 open.** The live site stops and does not come back. The GPU audit found no per-frame leak; what it and two other audits found were one-way doors: a frame that throws ends the loop, out of memory is a silent black plate, a solver that will not start or a device that is not back on the first ask is a permanent screen. S0 closes those and adds the black box. **S1 (the whole tree renders every frame) and S2 (the recorder holds hours of video in memory) come before new features** |
 | **The deep dive** | below | **Done 2026-09-23.** Every preset drawn, every setting traced, every tool and bottle checked. Four faults, the first of which is that the check for the reported one had never read a frame |
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |

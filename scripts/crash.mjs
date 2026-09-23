@@ -109,6 +109,27 @@ try {
     check('and so is the recovery', recovered, after.find((e) => e.source === 'recovery')?.msg ?? 'none in 15s');
     check('one loss is not a fatal', !after.some((e) => e.level === 'fatal'));
 
+    // ── 3b. A frame that throws is not the end of the show ───────────
+    // It used to be: the next frame was only asked for on the loop's last
+    // line. Ten throws and the frames carry on; past the self-heal limit
+    // the stage is rebuilt, and the recovery says so.
+    const carriedOn = await page.evaluate(async () => {
+      const d = window.chromaglassDebug();
+      d.throwFrames(10);
+      const before = d.webgpu?.frames ?? 0;
+      await new Promise((r) => setTimeout(r, 1500));
+      return { advanced: (window.chromaglassDebug().webgpu?.frames ?? 0) - before };
+    });
+    check('frames that throw do not stop the loop', carriedOn.advanced > 20, `${carriedOn.advanced} frames drawn after 10 throws`);
+    const recoveriesBefore = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length);
+    await page.evaluate(() => window.chromaglassDebug().throwFrames(200));
+    const healed = await page.waitForFunction(
+      (n) => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length > n, recoveriesBefore, { timeout: 20_000 },
+    ).then(() => true).catch(() => false);
+    check('frames that keep throwing rebuild the stage', healed);
+    await page.evaluate(() => window.chromaglassDebug().throwFrames(0));
+    await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 10, null, { timeout: 15_000 }).catch(() => {});
+
     // ── 4. Frames that stop ──────────────────────────────────────────
     await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 10, null, { timeout: 15_000 }).catch(() => {});
     await page.evaluate(() => { window.requestAnimationFrame = () => 0; });

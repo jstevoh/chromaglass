@@ -1689,14 +1689,18 @@ export default function App() {
    */
   const markUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
-  const sendCastState = useCallback(() => {
+  const sendCastState = useCallback((withMark = false) => {
     castSend({ type: 'state', state: castState });
-    // On the same call as the state, because the one moment a receiver needs
-    // the picture is the moment it says hello and gets its first state.
-    castSend({ type: 'mark', dataUrl: markUrlRef.current });
+    // The picture only when a receiver is new — on its hello, or when a cast
+    // or a mirror starts — because that is the one moment it needs it.
+    // It used to ride along with every state, and the state changes twice a
+    // second while a track is identified and every frame of a fade: a data
+    // URL of up to several megabytes, sixty times a second, down the channel
+    // and the relay, each one decoded and re-uploaded at the other end.
+    if (withMark) castSend({ type: 'mark', dataUrl: markUrlRef.current });
     if (mirrorCount > 0) {
       relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
-      relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
     }
   }, [castSend, castState, mirrorCount]);
 
@@ -1726,8 +1730,15 @@ export default function App() {
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
-  castReadyRef.current = sendCastState;
-  useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
+  castReadyRef.current = () => sendCastState(true);
+  const castLinkRef = useRef('');
+  useEffect(() => {
+    if (!isCasting && mirrorCount === 0) { castLinkRef.current = ''; return; }
+    const link = `${isCasting}:${mirrorCount}`;
+    const joined = link !== castLinkRef.current;
+    castLinkRef.current = link;
+    sendCastState(joined);
+  }, [isCasting, mirrorCount, sendCastState]);
   /*
     The live state, for a harness to read.
 

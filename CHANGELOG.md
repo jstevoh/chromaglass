@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a show that stops and does not come back
+
+A single failure used to be a one-way door, and the live site hit these
+doors often. Closed in this release, all in `docs/stability-plan.md`:
+
+- A frame that throws is logged and the loop goes on. Frames that keep
+  throwing rebuild the stage.
+- A picture that will not upload is left out of that frame instead of ending
+  the loop.
+- Running out of GPU memory steps the quality down and caps the grid size
+  across rebuilds. Before, it was a black plate on a live device.
+- A rung change frees the old solver before building the new one, which
+  halves the memory peak.
+- A solver that will not start steps down a rung. Only the bottom rung
+  failing shows the failure screen, which now has **Try again**.
+- A device that is not back after a loss is asked for again with backoff.
+  GPU requests time out. A sustained stream of GPU errors rebuilds the stage.
+- The first-listen recorder keeps ten minutes, not hours.
+- The logo is sent to a cast receiver once, not with every state.
+
+Fifteen larger jobs are ranked in the plan for later.
+
 ### Added — the black box: crash detection and a report button
 
 **Every way a stop can announce itself is now written down, and it outlasts the

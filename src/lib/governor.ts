@@ -282,6 +282,21 @@ export class QualityGovernor {
     return false;
   }
 
+  /**
+   * The rung could not be built at all: the solver's textures would not
+   * allocate, which on a laptop mid-set is the GPU out of memory, not a GPU
+   * that cannot run the show. Step down and never climb back to it this
+   * session — a rung that failed to exist once will fail again, and each
+   * attempt costs the plate. False at the bottom rung: nothing smaller left.
+   */
+  failRung(now: number): boolean {
+    if (this.index >= this.rungs.length - 1) return false;
+    this.failed.set(this.index, Number.POSITIVE_INFINITY);
+    this.index += 1;
+    this.everSteppedDown = true;
+    return this.moved(now);
+  }
+
   private moved(now: number): boolean {
     this.settleUntil = now + SETTLE_S;
     this.slowSince = null;

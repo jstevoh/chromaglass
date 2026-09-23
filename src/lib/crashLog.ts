@@ -40,6 +40,9 @@ export interface CrashEntry {
   source: string;
   msg: string;
   snap?: CrashSnapshot;
+  /** The same line again, this many more times, until `lastT`. */
+  repeats?: number;
+  lastT?: number;
 }
 
 export interface CrashReport {
@@ -119,19 +122,32 @@ function snapshot(): CrashSnapshot {
   return out;
 }
 
-function persist(now = false) {
+let lastWrite = -Infinity;
+function persist(now = false, force = false) {
   const write = () => {
     saveTimer = null;
+    lastWrite = performance.now();
     try { localStorage.setItem(STORE, JSON.stringify(ring)); } catch { /* full, or private: the ring still lives here */ }
   };
-  if (now) { if (saveTimer) clearTimeout(saveTimer); write(); return; }
-  if (!saveTimer) saveTimer = setTimeout(write, 500);
+  // At once, but not more than once a second: an error that fires every
+  // frame must not become sixty synchronous writes of the whole ring a
+  // second — the box would be what stalled the show.
+  if (force || (now && performance.now() - lastWrite > 1000)) { if (saveTimer) clearTimeout(saveTimer); write(); return; }
+  if (!saveTimer) saveTimer = setTimeout(write, now ? 250 : 500);
 }
 
 /** Add a line. Errors and fatals are written through at once: the page may not get another chance. */
 export function record(level: CrashLevel, source: string, msg: string): CrashEntry | null {
   const text = clip(msg);
   if (level !== 'fatal' && ignore.some((re) => re.test(text))) return null;
+  // The same line again: counted on the last one rather than filling the ring.
+  const prev = ring[ring.length - 1];
+  if (prev && prev.load === LOAD && prev.level === level && prev.source === source && prev.msg === text && level !== 'fatal') {
+    prev.repeats = (prev.repeats ?? 0) + 1;
+    prev.lastT = Date.now();
+    persist();
+    return prev;
+  }
   const entry: CrashEntry = {
     t: Date.now(),
     up: +((performance.now() - T0) / 1000).toFixed(2),
@@ -143,7 +159,7 @@ export function record(level: CrashLevel, source: string, msg: string): CrashEnt
   };
   ring.push(entry);
   if (ring.length > RING) ring.splice(0, ring.length - RING);
-  persist(level === 'error' || level === 'fatal');
+  persist(level === 'error' || level === 'fatal', level === 'fatal');
   for (const fn of listeners) { try { fn(entry); } catch { /* a listener is not allowed to take the log down */ } }
   return entry;
 }
@@ -192,11 +208,11 @@ export function install(opts: { ignore?: RegExp[] } = {}): void {
     };
   }
 
-  window.addEventListener('pagehide', () => { record('info', 'unload', 'pagehide'); persist(true); });
+  window.addEventListener('pagehide', () => { record('info', 'unload', 'pagehide'); persist(true, true); });
   document.addEventListener('visibilitychange', () => {
     // A hidden tab gets no frames and that is not a stall; start counting again.
     lastAdvance = performance.now();
-    if (document.visibilityState === 'hidden') persist(true);
+    if (document.visibilityState === 'hidden') persist(true, true);
   });
 
   setInterval(() => {
@@ -280,7 +296,7 @@ export const lastFatal = (): CrashEntry | null =>
   ?? [...previousTail].reverse().find((e) => e.level === 'fatal')
   ?? null;
 export const loadId = LOAD;
-export function clear(): void { ring = []; previousTail = []; persist(true); }
+export function clear(): void { ring = []; previousTail = []; persist(true, true); }
 
 /**
  * Whatever the debug object holds, made JSON-safe: functions dropped, typed

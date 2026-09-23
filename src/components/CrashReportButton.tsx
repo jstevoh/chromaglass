@@ -144,7 +144,7 @@ function ReportSheet({ fatal, onClose, onDone }: { fatal: crashLog.CrashEntry | 
         <div className="flex flex-col gap-1">
           <span className="text-[12px] text-muted">The last lines of the log</span>
           <pre className="max-h-44 overflow-auto rounded-md border border-border bg-black/40 p-2 text-[11px] leading-snug text-text-2" data-testid="crash-tail">
-            {tail.length ? tail.map((e) => `${e.up.toFixed(1).padStart(7)}s ${e.level.padEnd(5)} ${e.source}: ${e.msg.split('\n')[0]}`).join('\n') : 'Nothing logged.'}
+            {tail.length ? tail.map((e) => `${e.up.toFixed(1).padStart(7)}s ${e.level.padEnd(5)} ${e.source}: ${e.msg.split('\n')[0]}${e.repeats ? ` (×${e.repeats + 1})` : ''}`).join('\n') : 'Nothing logged.'}
           </pre>
         </div>
         <div className="flex flex-col gap-1 text-[13px] text-text-2">
