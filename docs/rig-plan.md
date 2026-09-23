@@ -131,3 +131,150 @@ one, and the quality ladder currently assumes the latter.
 - [Liquid light show — Wikipedia](https://en.wikipedia.org/wiki/Liquid_light_show)
 - [An audiovisual experience: the 1960s — HeavyM](https://www.heavym.net/did-you-know-4-the-1960s/)
 - [Soft edge mask (patent US5077154)](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/5077154)
+
+---
+
+# R6 · ChromaGlass watching a real rig
+
+The idea: point the camera at a screen an analogue light show is being projected
+onto, and let the app respond to the *picture* as well as the music. A rig is
+many projectors on one screen; this makes one of them a real one, from 1967, and
+the app the newest operator on the bank.
+
+The camera pipeline already exists and is aimed at the wrong thing. Room sensing
+looks for **disturbance** — somebody moved, the energy went up. A projected
+liquid light show is not disturbance; it is a structured image of the same
+physical process this app simulates. The camera stops being a motion sensor and
+becomes a second plate to read.
+
+## What the sensor actually gives, today
+
+Checked rather than assumed, because the whole plan turns on it.
+`lib/sceneSense.ts` has no DOM in it and is driven in Node by `npm run scene`,
+so it is the cheapest thing here to extend and to test.
+
+**Per cell, on a 24×24 lattice (576 vectors):**
+
+- `flowX` / `flowY` — Lucas–Kanade optical flow, deadzoned and smoothed in time.
+  **This is the surprise: the hardest-sounding piece is already built.** It is a
+  velocity field, which is what a solver eats.
+  *With a caveat its own comment states:* Lucas–Kanade linearises, so past about
+  a pixel of displacement a frame it under-reads — `scripts/scene.mjs` measures
+  a bar crossing at 0.6 frame widths a second as about **0.1**. Read it as a
+  direction with comparable magnitudes, never as a calibrated speed.
+- `motion` — how much changed in each cell, 0..1.
+
+**For the frame as a whole:** `energy` (normalised against the room's own recent
+range), `raw`, `centroidX/Y`, `dirX/dirY`, `spread`, `brightness`, `hue`,
+`chroma`, `people[]`, `crowd`.
+
+## And what it does not give
+
+Every one of these is the plate's vocabulary rather than a room's, and none of
+them exists:
+
+- **Coverage.** There is `motion`, which is what *changed*, and `brightness`,
+  which is one number for the frame. Nothing says where the dye is. This is the
+  single most important missing feature, because it is the analogue of `dye.a`.
+- **Palette.** `hue` and `chroma` are the frame's colour *centroid* — one hue and
+  one saturation. **A magenta-and-cyan plate averages to grey.** Anything that
+  wants to wear a rig's palette needs a histogram or a few dominant colours, not
+  a mean, and a plan that says "read the palette" without this is wrong.
+- **Scale and structure.** No edge density, no characteristic blob size. Big slow
+  cells and fine fast stipple are indistinguishable to the sensor as it stands,
+  and telling those apart is most of what "the rig's character" means.
+- **Rings and holes.** The bright-rimmed dark disc that H6 spent a week getting
+  right is exactly what a bubble looks like to a camera, and nothing looks for
+  one.
+
+**So the prototype worth building first is none of the four modes below.** It is
+the feature extractor, run against footage of a real show, answering one
+question: can it reliably tell *big slow magenta blobs, settling* from *small
+fast cyan cells, agitating*, under projection-screen conditions? If it cannot,
+nothing downstream has anything to run on.
+
+## Four modes, and they are different instruments
+
+### 1 · Mirror — it learns the rig's look
+
+Colour, scale, edge sharpness and speed drive the *look settings* — palette,
+`blobSurfaceTension`, `viscosity`, `globalSpeed`, `dyeBudget`. The app runs its
+own physics wearing the rig's character, and drifts as the operator works the
+dish. Two plates that look like siblings rather than a copy.
+
+Nearly free once the features exist: it is `sceneMappings` pointed at look
+settings instead of at stirring, through the patch bay that already routes
+features per layer.
+
+### 2 · Couple — the rig's currents stir the liquid
+
+The flow lattice becomes a velocity field in the solver. Physically the most
+interesting, and it walks straight into the trap this codebase has paid for
+**five** times now — the bubbles, the blow, the magnet, the press, and the
+squeeze film — **a field added to the velocity loses its curl-free part to the
+next projection.**
+
+There is a reason to think this one survives better: optical flow off a real
+liquid is largely divergence-free already, because liquid conserves area. But
+that is a hypothesis, and the rule stands — measure it, and if it is eaten,
+enter through the divergence, the dye's own transport, or a multiply.
+
+Two practical notes: the lattice is 24² against a solver at 192² or 384², so it
+wants upsampling; and the flow under-reads at speed, so it must be treated as a
+direction with a gain, not a measurement.
+
+### 3 · Answer — it plays against the rig
+
+The rig goes dark upper-left, the app blooms there. The rig leans magenta, the
+app leans cyan. The rig settles, the app agitates.
+
+This is the only mode that sounds like two operators listening to each other
+rather than one following the other, and it is the argument for doing any of
+this. Without it you have built an expensive mirror. It needs the palette work
+above, because "lean the other way" is meaningless against a colour centroid.
+
+### 4 · Register — the two images share a frame
+
+Find the rig's projected quad in the camera's view, and the app knows where the
+rig's image sits in its own output space. It can then place itself deliberately:
+beside it, inside its dark regions, keyed through its holes, masked to its
+complement.
+
+The `Surface` system is exactly this machinery — sixteen surfaces, shapes,
+corner-pin quads, source rects — and this plan already treats overlapping beams
+as additive, which is what the screen does anyway. Registration also solves a
+problem the other modes have: cropping to the quad is how you stop measuring the
+audience, the operator's silhouette and the room.
+
+## The hard parts, stated plainly
+
+**The feedback loop.** If the app is projected onto the screen it is watching, it
+sees itself: a closed loop with gain, which either dies or runs away. The
+failure mode is already known here — `scripts/scene.mjs` runs *a camera on
+itself* for forty seconds precisely to see whether it finds a ceiling or keeps
+climbing. Mitigations: watch only the rig's half of the screen; subtract your own
+last frame, which you know exactly because you sent it; or run at low gain
+behind a hard ceiling.
+
+**Photometry.** A camera pointed at a projection screen fights exposure, white
+balance, moiré, keystone, the room's light and the projector's gamma.
+Auto-exposure alone will chase the show and make brightness meaningless. Same
+class of problem as the flash guard, and it wants the same answer: a known
+reference in frame, or auto-exposure locked off.
+
+**Latency.** Capture plus analysis is a few frames. Irrelevant for Mirror and
+Answer. For Couple it means being stirred by currents that have already moved —
+a real artefact at speed and invisible at the pace a liquid show actually runs.
+
+**Consent.** This is still a camera in a room. It only opens on an explicit
+click now, and a remembered switch is an offer rather than an instruction; that
+holds here and is not to be loosened because the camera is pointed at a screen
+rather than at people.
+
+## Order
+
+The extractor first, and alone, judged against real footage. Then Mirror,
+because it needs nothing else. Then Register, which makes the other two honest
+by cropping away the room. Then Answer, which is the point. Couple last, because
+it is the one that has to fight the projection and the one that can be cut
+without losing the idea.
