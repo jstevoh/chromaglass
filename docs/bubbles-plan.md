@@ -1047,3 +1047,119 @@ highlight painted on top. Eighteen hundredths holds both with room.
 
 **`npm run bubbles` is 18/18 on three runs in four**, the fourth flaking on the
 lamp check, which carries a 1.45x to 3.7x margin when it passes.
+
+## G. What pressing on a plate actually does (2026-09-23)
+
+Reported from the front: "pressing only pushes things into a mush, and when you
+press down and pull back the fluid moves with both motions, not just on press."
+
+Both halves of that are right, and the second is the important one — not
+because both motions should not move liquid, but because **they are different
+motions and the app treats them as one**.
+
+### The two strokes are not each other's opposite
+
+A plate is a Hele-Shaw cell: liquid in a thin gap between two glasses. Squeeze
+it and the liquid is pushed radially outward. Lift it and the outside comes
+back in. Those sound symmetric and are not, because of which fluid is
+displacing which.
+
+**Squeezing is stable.** The viscous liquid in the middle pushes outward into
+whatever is around it — air, or a thinner liquid. A viscous fluid displacing a
+less viscous one has a smooth front: that is the stable direction of the
+Saffman–Taylor problem. A press should make a clean disc with a thickened ring,
+and nothing else.
+
+**Lifting is unstable, and that is where the picture comes from.** Separating
+the plates drops the pressure in the film and drags the outside *in*, and now
+the less viscous fluid is displacing the more viscous one — the unstable
+direction. The interface breaks into fingers that invade inward, and the
+circular film disintegrates at many places at once. The literature on the
+lifting Hele-Shaw cell describes exactly this: the outer fluid enters through
+the sides, the interface deforms, and fingers of the outer fluid invade the
+inner one.
+
+The classic gesture is the whole of it: **squeeze, wait, lift.** Squeeze to a
+disc, pause so the film thins evenly, then part the plates and watch it
+disintegrate into branches.
+
+### What the app does instead
+
+`applySquish` carries a `fingering` parameter and spends it **on the way
+down** — the spokes thin the film along a ring and the outflow is pushed along
+them. That is the stable stroke, so the fingers are being drawn on the one
+where they would not form, and the unstable stroke has no instability at all.
+Press and release then push and pull the same dye through the same shape, and
+what is left is a blur. Mush.
+
+**So the work is an asymmetry, not a stronger press:**
+
+- **On the press:** smooth radial outflow, a thickening ring, no spokes. The
+  `squeezeOut` that now moves the dye is the right operator; what it lacks is a
+  *ring* rather than a uniform annulus.
+- **On the lift:** the outflow reverses, and *this* is where the fingering
+  belongs — a front that breaks at many points at once and reaches inward, at a
+  spacing set by the film's thickness and its surface tension.
+- **A pause between them matters**, which means the gesture has a state: down,
+  held, up. The tool currently has no notion of which stroke it is in.
+
+This is also S4 in [`slide-plan.md`](slide-plan.md) — the photoscope is two
+slides squeezed and twisted by hand, and the twist adds shear to the same
+picture.
+
+**Sources:** [Controlling fingering instabilities in Hele-Shaw flows with
+wetting film effects](https://arxiv.org/pdf/2103.05206) · [Fingering
+stabilization and adhesion force in the lifting flow with a fluid
+annulus](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.109.015104) ·
+[Controlled viscous fingering in volatile
+fluid](https://pmc.ncbi.nlm.nih.gov/articles/PMC10313706/)
+
+## H. Adding velocity does not move the liquid (2026-09-23)
+
+The finding underneath several complaints, and it is systemic.
+
+Measured against an idle plate over the same window, along the same track:
+
+| | mean speed | dye moved |
+|---|---|---|
+| idle | 2.47e-1 | 0.2457 |
+| `addVelocity`, 0.5 a cell, 17 times | 2.51e-1 | 0.2482 |
+| `blowDirected` | 2.52e-1 | 0.4450 |
+| the finger, before it carried dye | 2.48e-1 | 0.2489 |
+
+**A push of 0.5 a cell is two hundred and fifty times the solver's speed clamp
+and it moves nothing.** Strength is not the variable: raising the clamp tenfold
+changes nothing either. It is the projection, for the seventh time in this
+codebase — a localised blob of velocity is mostly a gradient, and a gradient is
+exactly what the projection exists to remove.
+
+The blow appears to work and does not: its effect is the dye it *thins*
+(`mul *= 1 - 0.15w`), not the flow it adds.
+
+So the rule, which now has seven instances behind it: **a tool that means to
+move liquid has to move the dye**, through the divergence, through the dye's
+own transport, or as a multiply. Adding velocity is for disturbing what floats
+in the liquid, and for feeding the flow that is already there. `npm run finger`
+holds both halves — that a finger moves the liquid, and that adding velocity
+alone would not have.
+
+## I. The liquids are not on layers (2026-09-23)
+
+Also reported: "it seems like the liquids aren't actually on a layer."
+
+They are not, and it is worth being precise about what exists. There is **one
+dye field** — colour and concentration — and **one liquid-phase field** holding
+what the liquid there is *like*: soap, body, repel, weight, polarity. A liquid
+is a set of properties smeared across the plate, not a body with a boundary.
+
+So "mix two liquids" today means *average their properties and blend their
+colours*, which is what the finger does. What it cannot mean is two distinct
+bodies with an interface between them that deforms, fingers and breaks — and
+that is what a plate of oil and water actually looks like.
+
+The second phase (H7) is the first thing here that *is* a body with a
+boundary: one field, in 0–1, with its own surface tension and its own sharp
+edge. Whether the answer is to give the carrier the same treatment — a second
+immiscible field with an interface, rather than more scalar properties — is the
+question F and D should be read against, and it is the one that decides whether
+"mixing liquids" ever becomes visible rather than statistical.

@@ -32,52 +32,102 @@ incomplete is a build failure rather than a plate with its texture switched off.
 job: nothing was written twice. There is one shading language in the tree now — WGSL, in
 `src/gpu/wgsl/` — so a shader fix is a shader fix again.
 
-## What is next, as of 2026-09-23
+## The stages, and what each one is for
 
-Everything reported broken is fixed and deployed, and H6 and H7 are done. What
-remains falls into three piles, and the order between them is a matter of
-appetite rather than dependency — but the order *within* the first is not.
+Everything reported broken is fixed and deployed. What remains is new work, and
+it falls into five stages. The order inside a stage matters; the order between
+them is appetite, except where a later stage names an earlier one.
 
-**The one that unblocks the most: F, depth and a wet carrier**
-([`bubbles-plan.md`](bubbles-plan.md) F). The gap field is a real depth and it
-feeds only the squeeze, so advection, diffusion and the projection are all
-depth-blind. Two consequences, both already measured: the plate's dome does
-nothing (E), and there is no notion of coverage, so a pour onto bare glass and a
-pour onto a covered plate behave identically (D). Darcy mobility in h² and a
-clear carrier are one piece of work that makes three other pieces possible, and
-S2 wants it too.
+Two findings from 2026-09-23 set most of this order, and both are written up in
+[`bubbles-plan.md`](bubbles-plan.md):
 
-**Newly unblocked by the press working: S4, the photoscope**
-([`slide-plan.md`](slide-plan.md)). Mark Boyle and Joan Hills' instrument is two
-glass slides squeezed and twisted by hand, which is the squeeze film — and until
-this week the press did not reach the picture. It does now. What S4 still needs
-beyond that is *shear*: twisting one slide against the other is what tears the
-film into cells, and only the press is built.
+- **Adding velocity does not move the liquid** (§H). A push of 0.5 a cell — two
+  hundred and fifty times the solver's speed clamp — moves nothing, and raising
+  the clamp tenfold changes nothing either. It is the projection, for the
+  seventh time in this codebase: a localised blob of velocity is mostly a
+  gradient. **A tool that means to move liquid has to move the dye.** Every
+  gesture below inherits this, and `npm run finger` holds it.
+- **The liquids are not bodies** (§I). There is one dye field and one field of
+  properties, so "mixing two liquids" means averaging scalars and blending
+  colours. There is no interface to deform, finger or break — which is most of
+  what a plate of oil and water looks like.
 
-**Still blocked, and cheaply: S2, heat and boiling.** Everything is there —
-a temperature field, twenty places that feed it, `heatDecay`, buoyancy, and H6's
-air field for the bubbles to come out of. The one missing piece is that heat has
-no *strength*: every source saturates the buoyancy tanh, so a plume has a
-position and nothing else. That fix is small and it is the gate on the whole
-European school.
+### Stage 1 — Make the plate behave like liquid between two glasses
 
-**And the piles:**
+The gestures exist and are thin. This is the stage that makes them read, and it
+is where I would start.
 
-- **Looks, now** — H5's seven remaining effects. Independent of everything,
-  each is one WGSL pass, and the post chain is already under them.
-- **The rig** — R1 first, because every other item is meaningless while all
-  sixteen surfaces show the same plate. R6 (watching a real rig) wants its
-  feature extractor prototyped before any of its four modes.
-- **The desk pass and Render a song** — item 3 and `PLAN.md` §6 below, both
-  waiting on nothing.
+1. **F · Depth and a wet carrier** ([`bubbles-plan.md`](bubbles-plan.md) F).
+   The gap is a real depth that feeds only the squeeze, so advection, diffusion
+   and the projection are all depth-blind. Two things are already *measured* as
+   null because of it: the plate's dome does nothing, and there is no coverage,
+   so a pour onto bare glass behaves exactly like a pour onto a covered plate.
+   Darcy mobility in h², and a carrier so bare plate is wet rather than empty.
+   **One change that unblocks the three below.**
+2. **G · The press and the lift are different strokes**
+   ([`bubbles-plan.md`](bubbles-plan.md) G). Squeezing is the *stable*
+   direction and should give a smooth ring; lifting is the unstable one, and
+   that is where the fingers come from. The app spends its fingering on the
+   press, which is backwards, and presses and releases symmetrically, which is
+   why it reads as mush. Needs a gesture that knows which stroke it is in.
+3. **D · Spreading** ([`bubbles-plan.md`](bubbles-plan.md) D): a first pour
+   blooms, a tenth sits in a puddle. Coverage is the state variable, so this
+   follows F immediately.
+4. **E · The two glasses** ([`bubbles-plan.md`](bubbles-plan.md) E): the dome is
+   built and inert until F gives depth a say in the flow.
 
-**Debts, written down rather than carried silently:** the second phase's totals
-climb under a pull, because a semi-Lagrangian backtrace does not conserve what
-it carries (`liquidPhase` solves this by clamping the total; the GPU wants a
-reduction and the stats pass has the shape of one). H6's "the light it adds is
-the liquid lit" needs a fixed pixel population before it can gate anything.
-`lace-run` is still 0.189, fifteen times the speed median. And the CPU solver's
-stepping is a thousand unreachable lines.
+### Stage 2 — Make the liquids visible as liquids
+
+Settle §I first: whether a liquid becomes a **body with an interface**, the way
+the second phase already is, or stays a set of properties. Everything about
+mixing, fingering and immiscibility *reading on screen* depends on that answer,
+and it is a decision rather than a task.
+
+5. **H8 · More bottles** ([`bubbles-plan.md`](bubbles-plan.md) C) — latex, oil
+   paint, clear medium, glycol, then fizz, salt, slime, cornstarch, bleach.
+   Cheap once that is settled, and largely pointless before it.
+
+### Stage 3 — The European school
+
+6. **S2 · Heat and boiling** ([`slide-plan.md`](slide-plan.md)) — blocked on one
+   small thing: heat has no *strength*, because every source saturates the
+   buoyancy tanh, so a plume has a position and nothing else. The temperature
+   field, its decay, the buoyancy and H6's air field are all built and waiting.
+7. **S4 · The photoscope** — unblocked as of #120, because the press now reaches
+   the picture. Still wants **shear**: twisting one slide against the other is
+   what tears the film into cells, and only the squeeze exists.
+8. **S1, S3, S5** — the vertical 2-inch stage, the bubbler, the slide as a cue.
+
+### Stage 4 — More than one projector
+
+9. **R1 · A surface becomes a projector with its own source**
+   ([`rig-plan.md`](rig-plan.md)). Every other rig item is meaningless while all
+   sixteen surfaces show the same plate. The expensive one: several live plates
+   means several solvers, and the ladder assumes two fine rather than four
+   coarse.
+10. **R3 · Beams add**, then **R2 · per-projector optics**, then **R4 · placing
+    by hand**, then **R5 · the rig as a document**.
+11. **R6 · Watching a real rig** — prototype the feature extractor *first* and
+    alone, judged against footage of a real show. `sceneSense` already gives
+    per-cell optical flow; it has no notion of coverage, scale or palette.
+
+### Stage 5 — Looks and the show
+
+12. **H5 · The effects** — seven left, each one WGSL pass, independent of
+    everything above: the camera on the wall, coupled loops, prism, letters as
+    windows, slit-scan, iris and wipes, kick ripple, colour finishing. This is
+    the stage to reach for when what is wanted is something visible this week.
+13. **The desk pass** — item 3 below.
+14. **Render a song** — `PLAN.md` §6.
+
+### Debts, carried openly
+
+The second phase's totals climb under a pull (a semi-Lagrangian backtrace does
+not conserve what it carries; `liquidPhase` clamps the total back, and the GPU
+wants a reduction the stats pass already has the shape of). H6's "the light it
+adds is the liquid lit" needs a fixed pixel population before it can gate
+anything. `lace-run` is still 0.189, fifteen times the speed median. The CPU
+solver's stepping is a thousand unreachable lines.
 
 ## The order, and why
 

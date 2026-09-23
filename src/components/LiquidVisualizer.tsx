@@ -1786,8 +1786,73 @@ class FluidSimulation {
         this.vy[idx] += (uy + (i / rr) * sgn * FINGER_SWIRL) * strength * w;
       }
     }
+    /*
+      And the dye is carried, because adding velocity does not carry it.
+
+      The velocity above is kept — it disturbs the beads and feeds the flow —
+      but it is not what moves the liquid, and the commit that added this tool
+      claimed otherwise. It argued that a drag leaves a shear, which is
+      vorticity, which survives the projection. That was a hypothesis and it
+      was never measured. Measured now, against an idle plate over the same
+      window:
+
+        idle          speed 2.47e-1   dye moved 0.1382
+        addVelocity   speed 2.49e-1   dye moved 0.1012   (0.5 a cell, 250x the clamp)
+        blow          speed 2.52e-1   dye moved 0.1138
+        finger        speed 2.48e-1   dye moved 0.1182
+
+      Every tool leaves the plate at an idle plate's speed. Strength is not it
+      (a quarter-thousand times the speed clamp does nothing) and neither is
+      the clamp (raising it tenfold does nothing). It is the projection, for
+      the seventh time in this codebase: a localised blob of velocity is mostly
+      a gradient, and a gradient is what the projection exists to remove.
+
+      So the dye is moved the way the press moves it and the magnet moves the
+      phase — as transport, on the CPU, where the gesture's geometry is known.
+      Dye is taken from behind the finger and put in front of it, conserving
+      because both halves read the same mirror.
+    */
+    this.carryDye(x, y, r, ux, uy, Math.min(0.45, strength * 4));
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
+  }
+
+  /**
+   * Dye taken from behind a gesture and put in front of it.
+   *
+   * The conserving half of a drag: what leaves one cell arrives in another,
+   * because both are read from the same mirror in the same pass.
+   */
+  private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): void {
+    if (!this.gpu) return;
+    const dye = this.gpu.rbDyeView;
+    const N = this.size;
+    // A short hop: far enough to read as carried, short enough that the dye
+    // lands somewhere the finger is still touching.
+    const hop = Math.max(1, Math.round(r * 0.45));
+    const r2 = r * r;
+    for (let j = -r; j <= r; j++) {
+      for (let i = -r; i <= r; i++) {
+        const d2 = i * i + j * j;
+        if (d2 > r2) continue;
+        const sx = Math.round(cx + i), sy = Math.round(cy + j);
+        const tx = Math.round(sx + ux * hop), ty = Math.round(sy + uy * hop);
+        if (sx < 1 || sy < 1 || sx >= N - 1 || sy >= N - 1) continue;
+        if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1) continue;
+        const si = sx + sy * N, ti = tx + ty * N;
+        const s4 = si * 4;
+        const amount = dye[s4 + 3];
+        if (!(amount > 1e-5)) continue;
+        const w = take * (1 - Math.sqrt(d2) / r);
+        if (!(w > 1e-4)) continue;
+        this.dirty = true;
+        this.mul[si] *= 1 - w;
+        this.density[ti] += amount * w;
+        this.densityR[ti] += dye[s4] * w;
+        this.densityG[ti] += dye[s4 + 1] * w;
+        this.densityB[ti] += dye[s4 + 2] * w;
+      }
+    }
   }
 
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
