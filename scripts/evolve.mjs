@@ -14,6 +14,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { luckyLook } from '../src/lib/lucky.ts';
 import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -31,12 +32,39 @@ process.on('exit', stop);
 for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
+/*
+  A seeded roll, so the *look* can be reproduced exactly — which is not the
+  same as reproducing the plate.
+
+  The rolls run one after another on one page and nothing is cleared between
+  them, which is what a performer does: they evolve a look on a plate that is
+  already running. So roll nine sits on whatever rolls zero to eight left
+  behind, and a flat frame at roll nine is not necessarily a property of roll
+  nine's settings. Measured: the one flat roll this found did not reproduce
+  from a fresh plate with the same 136 settings on it — 7–14% against 96%.
+*/
 // A seeded roll, so a failure can be reproduced exactly.
 let seed = Number(process.env.EVOLVE_SEED ?? 20260922);
 const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 
 const LED = ['#ff2d55', '#34c759', '#0a84ff', '#ffd60a'];
-const base = (id) => ({ ...DEFAULT_SETTINGS, ...(PRESETS.find(p => p.id === id)?.settings ?? {}) });
+/*
+  A start look, and it has to be a real one.
+
+  `?? {}` made a missing preset indistinguishable from an empty one, so
+  `fillmore-east-1969` — which is not a preset; the id is `fillmore-1969` —
+  quietly evolved from DEFAULT_SETTINGS while the report said Fillmore. One of
+  the three start looks was never the look it was named after, and the run that
+  found a flat plate blamed it on a preset that had not been on the glass.
+
+  Same family as the flatness verdict that could not fail and the preview port
+  that was not ours: a fallback that cannot be told from a success.
+*/
+const base = (id) => {
+  const found = PRESETS.find(p => p.id === id);
+  if (!found) throw new Error(`no preset '${id}' — the ids are ${PRESETS.map(p => p.id).join(', ')}`);
+  return { ...DEFAULT_SETTINGS, ...found.settings };
+};
 
 const browser = await launchChromium(chromium);
 let bad = 0, n = 0;
@@ -70,7 +98,7 @@ try {
     return { share: top / tot, rgb: [(topKey >> 8) * 17, ((topKey >> 4) & 15) * 17, (topKey & 15) * 17] };
   };
 
-  for (const startId of ['classic', 'fillmore-east-1969', 'oil-wheel']) {
+  for (const startId of ['classic', 'fillmore-1969', 'oil-wheel']) {
     const from = base(startId);
     for (let k = 0; k < ROLLS_EACH; k++) {
       const look = evolvedLook(from, luckyLook(from, LED, rand));
@@ -140,6 +168,48 @@ try {
           ` evap=${look.evaporationRate?.toFixed?.(4)} plateDye=${dens?.toFixed?.(4)}` +
           ` ledPlatform=${look.ledPlatform} blendMode=${look.blendMode}`);
         console.log(`   changed ${diff.length} settings`);
+        /*
+          Written out, because reading the settings back off the screen is
+          how the last one got away.
+
+          A flat roll was reproduced by hand from the nine settings that
+          looked like they mattered, and the plate came out at 7–14% —
+          nothing like the 96% reported. Fifty-five settings differed and
+          there was no reason the other forty-six were passengers.
+        */
+        const file = `/tmp/evolve-flat-${startId}-${k}.json`;
+        writeFileSync(file, JSON.stringify(look, null, 2));
+        /*
+          And a picture of it, because two flat plates have now been chased
+          on numbers alone and neither reproduced.
+
+          What the settings say is what the plate was *told*; a photograph is
+          what it did. The first case was argued about for an hour on the
+          strength of "96% of the frame is one purple" — a thin-dye theory
+          that a later measurement disproved outright — when a look at the
+          frame would have said in a second whether it was a wash, a blown
+          render or a solid fill.
+        */
+        const png = await page.evaluate(async () => {
+          const c = document.querySelector('#liquid-canvas');
+          if (!c) return null;
+          const shot = await window.__cgShot('flat');
+          if (!shot) return null;
+          const full = document.createElement('canvas');
+          full.width = shot.w; full.height = shot.h;
+          full.getContext('2d').putImageData(window.__shots.flat, 0, 0);
+          return full.toDataURL('image/png');
+        });
+        if (png) {
+          const img = `/tmp/evolve-flat-${startId}-${k}.png`;
+          writeFileSync(img, Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
+          console.log(`   and a picture of the plate in ${img}`);
+        } else {
+          console.log('   (the stage gave no frame to photograph)');
+        }
+        console.log(`   the whole look is in ${file} — replay it with WASH_LOOK=${file} npm run wash`);
+        console.log(`   NOTE: this plate has been running through ${k} earlier rolls. The look alone`);
+        console.log(`   may not reproduce it — a roll inherits whatever the ones before it left.`);
       } else {
         process.stdout.write(dens !== null && dens < 0.02 ? 'o' : '.');
       }

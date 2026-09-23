@@ -35,9 +35,10 @@ job: nothing was written twice. There is one shading language in the tree now �
 
 ## The deep dive, 2026-09-23
 
-Every preset, every setting, every tool and every bottle, asked whether it
-works. Four faults came out of it, and the first one is why the other three
-lasted.
+Every preset, every setting, every tool, every bottle and every dye, asked
+whether it works. Seven faults came out of it and one open question, and the
+first fault is why the rest lasted: the check for the reported symptom had
+never read a frame.
 
 **The check for "the whole plate went to one colour" had never read a frame.**
 `npm run evolve` photographs the plate and buckets the colours; it took the
@@ -78,11 +79,55 @@ a bubble control and a plate that boils, and it belongs with S2 in Stage 3.
 
 **What passed.** All 32 presets draw a picture: none flat, none empty, none
 dark, no console noise, and none of them dries out over the half-minute after
-it settles. All 135 settings are read by the engine — there are no dead
-controls. The nine bottles carry the weights they should (glycerine 1.26,
-milk 1.03, silicone 0.96, water the zero). Evolving a look and then lowering
-the speed — the exact sequence that was reported — no longer empties the
-plate.
+it settles. Every setting is read by the engine — 135 at the time of the dive,
+136 since — so there are no dead controls. The nine bottles carry the weights
+they should (glycerine 1.26, milk 1.03, silicone 0.96, water the zero), and
+each of the sixteen dyes paints the hue it is set to, 0° off, which
+`npm run dye` holds. Evolving a look and then lowering the speed — the exact
+sequence that was reported — no longer empties the plate.
+
+**Two more flat plates, both still unexplained.** With the flatness check able
+to read frames at last, sixty-roll sweeps found one each:
+
+    96% of the frame one purple    show, papers far apart, 0.45 of dye
+    100% of it rgb(255,0,255)      show, papers far apart, 0.50 of dye,
+                                   ledPlatform on, saturationBoost 1.80
+
+Neither is the backdrop and neither is an empty plate — there is dye on the
+glass in both, and the second is a fully clipped magenta, which is a render
+saturating rather than dye blending.
+
+**Neither reproduces from its own settings.** Replaying all 136 of each onto a
+fresh plate gives 4–14% flat and 83–91% colour variety — healthy pictures. A
+thin-dye theory for the second (that a sparse plate lets the lamp, gel and
+lumia stages dominate and clip) was **measured and is wrong**: forcing the dye
+down to 0.35 and then 0.19 made the plate *less* flat, 3–7%, with colour
+variety rising to 100%.
+
+So the cause is state carried across look changes, not a combination of
+settings. Ruled out: the backdrop, an empty plate, the look's own settings on a
+fresh plate, and thin dye under those settings. `npm run evolve` now
+photographs a flat plate as well as writing its look out, because two cases
+have been argued about on numbers alone and a frame would have settled in a
+second what a wrong theory cost an hour.
+
+What is different about the runs that find them is that `evolve` rolls one after another
+on a single page with nothing cleared between them, which is right, because it
+is what a performer does: roll nine sits on whatever rolls zero to eight left
+behind. So the remaining suspect is accumulated plate state, and the next step
+is replaying the ten rolls in order rather than the tenth alone.
+
+Chasing it turned up three more fallbacks of exactly the kind this dive is
+about. **One of `evolve`'s three start looks was never that look**: it evolves
+from `fillmore-east-1969`, which is not a preset — the id is `fillmore-1969` —
+and `base` ended in `?? {}`, so a third of every run quietly evolved from
+DEFAULT_SETTINGS while the report named Fillmore. **A roll's settings do not
+determine its plate**, and nothing said so until failing to reproduce one
+taught it. **And a flat roll's look was only ever printed**, so the first
+reproduction attempt picked nine of the fifty-five settings that differed and
+measured the wrong plate. All three are fixed: `base` throws and names the ids
+it has, the caveat is printed under every flat report, and the whole look is
+written out for `npm run wash` to replay.
 
 **What now guards it.** `npm run looks` draws all 32 presets and asks of each
 whether the frame is one colour, whether there is dye on the plate, whether
@@ -93,7 +138,19 @@ panel` gained five: the backdrop's two colours have to differ, the Design desk
 has to offer every tool the engine acts on, nothing on a desk may be a tool
 the engine ignores, every tool needs a letter, and the phone has to be able to
 send a blow, a press and a finger. Each of the five was watched going red
-against the fault it is named for before being trusted green.
+against the fault it is named for before being trusted green. `npm run wash`
+replays one look and watches its colour variety over ninety seconds, and
+`npm run replay` walks the seeded roll sequence without a browser.
+
+**And one gap left open on purpose.** Nothing photographs the plate *during* a
+look change. `looks` loads each preset fresh, `evolve` assigns settings in one
+go, and the fade path — pressing Go, where the desk interpolates between two
+looks over a second or two — is covered statically by `desk` and `panel` but
+never by a frame. The spinning square that filled the screen lived exactly
+there: `macroZoom` interpolating through values neither look holds. The static
+guard that came out of it (structure snaps rather than fades) is real, but it
+checks the list rather than the picture. A sweep that presses Go between pairs
+of looks and asks whether any frame in the fade goes flat is the missing one.
 
 ## The stages, and what each one is for
 
@@ -123,12 +180,28 @@ The gestures exist and are thin. This is the stage that makes them read, and it
 is where I would start.
 
 1. **F · Depth and a wet carrier** ([`bubbles-plan.md`](bubbles-plan.md) F).
-   The gap is a real depth that feeds only the squeeze, so advection, diffusion
-   and the projection are all depth-blind. Two things are already *measured* as
-   null because of it: the plate's dome does nothing, and there is no coverage,
-   so a pour onto bare glass behaves exactly like a pour onto a covered plate.
-   Darcy mobility in h², and a carrier so bare plate is wet rather than empty.
-   **One change that unblocks the three below.**
+   **The depth half landed 2026-09-23**; the carrier is what is left.
+   *Done:* depth is a Darcy mobility on the flow that carries the dye — the
+   tight rim of a domed plate runs at 0.08 of its deep centre where it used to
+   run at 1.14, and a flat plate is 0.2% from where it was. It **ships off**:
+   an A/B over all 32 presets could not show it safe on every look, and
+   repeating the two that moved most had one of them reverse sign, so the
+   measurement was not resolving the effect. It costs nothing to leave off,
+   because no preset sets a plate shape. Two faults fell out on the way: the dome's sign was
+   inverted relative to all three descriptions of it, and a shape change took
+   ninety seconds to appear because the gap sprang toward it at the *press's*
+   rate. A shape change is now a *shift* of the gap rather than a reset, so a
+   live press keeps its dent while the glasses change under it — the shape is a
+   per-plate patch target and a reset would wipe a press every frame it was
+   modulated. `npm run depth` holds all six of those.
+   *And a third finding worth as much as the feature:* **a pointwise multiply
+   on the velocity does nothing**, because `MAX_SPEED` is what sets the
+   magnitude — the forcing re-saturates that clamp every step. Halving every
+   velocity on the plate every step changed the flow by 1%. That is §H's lesson
+   one stage further on: additions are projected away, and multiplies in front
+   of a clamp are clamped away. What survives is the transport.
+   *Left:* the carrier. `dye.a` of zero still means nothing is there rather
+   than clear liquid, and **D, drying and wet-plate optics all wait on it**.
 2. **G · The press and the lift are different strokes**
    ([`bubbles-plan.md`](bubbles-plan.md) G). Squeezing is the *stable*
    direction and should give a smooth ring; lifting is the unstable one, and

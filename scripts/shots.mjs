@@ -200,17 +200,29 @@ try {
       // Through the shared reader, because a presented WebGPU canvas hands
       // `drawImage` a black frame and these are pictures somebody looks at.
       const shot = await window.__cgShot('still');
-      if (shot) {
-        const full = document.createElement('canvas');
-        full.width = shot.w; full.height = shot.h;
-        full.getContext('2d').putImageData(window.__shots.still, 0, 0);
-        ctx.drawImage(full, 0, 0, out.width, out.height);
-      } else {
-        ctx.drawImage(c, 0, 0, out.width, out.height);
-      }
+      /*
+        No fallback to drawImage, deliberately — see scripts/frame.mjs.
+
+        A presented WebGPU canvas answers drawImage with black, which is not
+        an error and cannot be told from a black plate. This exact fallback,
+        in scripts/wall.mjs, turned a frame the stage had not painted into
+        "a keystone keeps the middle of the frame — mean 0.000" and failed CI
+        on a commit whose src/ had not changed at all.
+      */
+      if (!shot) return { failed: window.__cgFrameLast ?? { via: 'no shot' } };
+      const full = document.createElement('canvas');
+      full.width = shot.w; full.height = shot.h;
+      full.getContext('2d').putImageData(window.__shots.still, 0, 0);
+      ctx.drawImage(full, 0, 0, out.width, out.height);
       return png ? out.toDataURL('image/png') : out.toDataURL('image/jpeg', 0.92);
     }, { width: WIDTH, png: PNG });
     if (!dataUrl) { console.error(`  no canvas to read for ${shot.name}`); process.exitCode = 1; continue; }
+    if (dataUrl.failed) {
+      // A still nobody drew is not a still. Better a missing file and a
+      // reason than a black PNG in the folder somebody ships from.
+      console.error(`  the stage gave no frame for ${shot.name}: ${JSON.stringify(dataUrl.failed)}`);
+      process.exitCode = 1; continue;
+    }
     fs.writeFileSync(file, Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64'));
     await page.evaluate(() => document.body.classList.remove('overlays-hidden'));
     const kb = (fs.statSync(file).size / 1024).toFixed(0);

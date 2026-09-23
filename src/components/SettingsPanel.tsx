@@ -2546,6 +2546,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="plateCurve"
         />
         <Slider
+          label="Depth Drag"
+          value={settings.depthDrag ?? 0}
+          min={0}
+          max={3}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ depthDrag: v })}
+          settingKey="depthDrag"
+        />
+        <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
           min={0}

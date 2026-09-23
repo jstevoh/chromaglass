@@ -26,13 +26,80 @@ import { spawn } from 'node:child_process';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 
-const PORT = 4342;
+// Overridable so a second sweep can run beside one already going — the guard
+// below is right to refuse a port it did not open, but that should not mean
+// waiting half an hour to check something unrelated.
+const PORT = Number(process.env.LOOKS_PORT ?? 4342);
 const ONLY = process.env.LOOKS_ONLY ? process.env.LOOKS_ONLY.split(',') : null;
 const SETTLE = Number(process.env.LOOKS_SETTLE ?? 11000);
 const LATE = Number(process.env.LOOKS_LATE ?? 14000);
+/*
+  LOOKS_AB=depthDrag measures one setting against itself, preset by preset.
+
+  Run twice and compared, this sweep is useless for judging a solver change:
+  the plate drifts enough between runs that `lace-run` read 42% flat once and
+  16% the next time with nothing changed at all. So the A/B is done inside one
+  page load — settle, read, flip the setting, wait the same again, read — and
+  what is reported is the pair.
+*/
+const AB = process.env.LOOKS_AB || null;
+const AB_FROM = Number(process.env.LOOKS_AB_FROM ?? 0);
+const AB_TO = Number(process.env.LOOKS_AB_TO ?? 1);
 
 const rows = [];
 const bad = [];
+
+/**
+ * How much of a frame is one colour, how lit it is, and how much of it has
+ * any colour in it at all.
+ *
+ * Bucketed coarsely — four bits a channel — because a flat plate is not
+ * bit-identical: a gradient backdrop, dither and grain all move the low bits
+ * while the picture is, to a person, one colour.
+ */
+const judge = (px) => {
+  const bins = new Map();
+  let tot = 0, lum = 0, sat = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    bins.set(k, (bins.get(k) ?? 0) + 1);
+    lum += 0.299 * r + 0.587 * g + 0.114 * b;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx > 40 && (mx - mn) / mx > 0.25) sat++;
+    tot++;
+  }
+  let top = 0;
+  for (const v of bins.values()) if (v > top) top = v;
+  return { flat: top / tot, luma: lum / tot / 255, colours: sat / tot };
+};
+
+/*
+  The control, run before anything is measured.
+
+  A sweep that reports "all 32 looks draw a picture" is worth exactly as much
+  as the measure behind it, and this repository has already shipped one check
+  for this fault that could not fail — `evolve`'s flatness verdict, green and
+  blind since the day it was written. So the measure is shown a frame that is
+  one flat colour and a frame that is not, and it has to tell them apart
+  before a single look is loaded.
+*/
+{
+  const N = 320 * 200 * 4;
+  const solid = new Uint8Array(N);
+  for (let i = 0; i < N; i += 4) { solid[i] = 255; solid[i + 1] = 234; solid[i + 2] = 0; solid[i + 3] = 255; }
+  const mixed = new Uint8Array(N);
+  for (let i = 0; i < N; i += 4) {
+    mixed[i] = (i * 7) & 255; mixed[i + 1] = (i * 13) & 255; mixed[i + 2] = (i * 29) & 255; mixed[i + 3] = 255;
+  }
+  const a = judge(solid), b = judge(mixed);
+  if (!(a.flat > 0.99 && b.flat < 0.2)) {
+    console.error(`the flatness measure cannot tell one colour from many: ` +
+      `a solid yellow frame reads ${(a.flat * 100).toFixed(0)}% and a mixed one ${(b.flat * 100).toFixed(0)}%`);
+    process.exit(2);
+  }
+  console.log(`  control: a solid frame reads ${(a.flat * 100).toFixed(0)}% flat, a mixed one ${(b.flat * 100).toFixed(0)}%`);
+}
 
 /*
   And if the port is taken, stop.
@@ -45,13 +112,16 @@ const bad = [];
 */
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
-let serverUp = true;
+let serverUp = true, leaving = false;
 server.on('exit', (code) => {
   serverUp = false;
+  // The deliberate kill at the end lands here too; only an exit we did not
+  // ask for means the port was taken.
+  if (leaving) return;
   console.error(`\nthe preview server exited (${code}) — port ${PORT} is probably already in use`);
   process.exit(2);
 });
-const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
+const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
 process.on('exit', stop);
 for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
@@ -95,30 +165,48 @@ try {
       and the reported case was around twenty-four seconds in — so the first
       reading is only kept to see which way the dye is going.
     */
+    const put = (k, v) => page.evaluate(([a, b]) => { window.chromaglassDebug().settings[a] = b; }, [k, v]);
+    if (AB) await put(AB, AB_FROM);
     const early = await dyeOf();
     await page.waitForTimeout(LATE);
+    let before = null;
+    if (AB) {
+      /*
+        Alternated, because the plate ages while this is measuring.
+
+        Read once at A and once at B and the B reading is always on an older
+        plate — and a plate loses dye with time, 1.70 down to 0.61 over ninety
+        seconds on the look `wash` replays. That drift points the same way as
+        the effect being looked for, which would have made any setting look
+        like it thinned the plate. So it goes A, B, B, A and each is the mean
+        of its pair: whatever is a function of time cancels, and what is left
+        is the setting.
+      */
+      const reads = { a: [], b: [] };
+      for (const [slot, value] of [['a', AB_FROM], ['b', AB_TO], ['b', AB_TO], ['a', AB_FROM]]) {
+        await put(AB, value);
+        await page.waitForTimeout(LATE);
+        const p0 = await frameOf(page, 320, 200);
+        if (!p0) throw new Error(`could not photograph ${preset.id}`);
+        reads[slot].push({ ...judge(p0), dye: await dyeOf() });
+      }
+      const mean = (xs, k) => xs.reduce((t, x) => t + x[k], 0) / xs.length;
+      before = { flat: mean(reads.a, 'flat'), colours: mean(reads.a, 'colours'), dye: mean(reads.a, 'dye') };
+      const after = { flat: mean(reads.b, 'flat'), colours: mean(reads.b, 'colours'), dye: mean(reads.b, 'dye') };
+      console.log(`  ${preset.id.padEnd(22)} ${AB} ${AB_FROM}→${AB_TO}:  ` +
+        `flat ${(before.flat * 100).toFixed(0)}%→${(after.flat * 100).toFixed(0)}%   ` +
+        `dye ${before.dye.toFixed(2)}→${after.dye.toFixed(2)}   ` +
+        `colours ${(before.colours * 100).toFixed(0)}%→${(after.colours * 100).toFixed(0)}%`);
+      rows.push({ id: preset.id, ab: { before, after }, faults: [], errors });
+      await page.close();
+      continue;
+    }
     const px = await frameOf(page, 320, 200);
     if (!px) {
       const why = await page.evaluate(() => window.__cgFrameLast);
       throw new Error(`could not photograph ${preset.id}: ${JSON.stringify(why)}`);
     }
-    let flat = 1, luma = 0, colours = 0;
-    {
-      const bins = new Map();
-      let tot = 0, lum = 0, sat = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        const r = px[i], g = px[i + 1], b = px[i + 2];
-        const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
-        bins.set(k, (bins.get(k) ?? 0) + 1);
-        lum += 0.299 * r + 0.587 * g + 0.114 * b;
-        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-        if (mx > 40 && (mx - mn) / mx > 0.25) sat++;
-        tot++;
-      }
-      let top = 0;
-      for (const v of bins.values()) if (v > top) top = v;
-      flat = top / tot; luma = lum / tot / 255; colours = sat / tot;
-    }
+    const { flat, luma, colours } = judge(px);
     const dye = await dyeOf();
 
     const faults = [];

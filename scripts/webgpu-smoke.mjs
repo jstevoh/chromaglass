@@ -673,20 +673,42 @@ const laidOver = (page) => page.evaluate(async () => {
   // beads, in the same places, no longer drawn. The field repopulates every
   // thirtieth frame, which two frames cannot reach.
   d.settings.markMix = 0;
-  // Seed first: what the beads are worth depends on the dye under them, and
-  // a plate that has drifted pale makes them worth almost nothing — one run
-  // measured 0.3% of the frame where another measured 4.6%.
-  window.chromaglassAction?.('seed');
-  d.settings.beads = 0.8;
-  await settle(150);
-  const withBeads = await shot();
-  await settle(2);
-  const beadFloor = changed(withBeads, await shot(), null);
-  const count = dbg().beads;
-  const before = await shot();
-  d.settings.beads = 0.001;
-  await settle(2);
-  const beads = changed(before, await shot(), null);
+  /*
+    Three samples and the median of each, not one moment.
+
+    What the beads are worth depends on the dye under them, and a plate that
+    has drifted pale makes them worth almost nothing — one run measured 0.3%
+    of the frame where another measured 4.6%. Seeding first was an earlier
+    attempt at that and it is kept, but it was not enough: taken once, this
+    measured 1.9% and 3.1% on one machine and 0.8% on CI, against a floor that
+    was 0.1–0.2% here and 0.5% there. The gate asks for four tenths of a point
+    between them, so a single bad moment fails a check about a feature that is
+    working — which is what it did, at 0.3 points.
+
+    The claim is unchanged and so is the gate. What changes is that the
+    quantity is measured three times and the middle one taken, on both sides,
+    so one lively moment neither inflates the floor nor deflates the beads.
+    Not the best of three: that would be choosing the answer.
+  */
+  const beadSample = async () => {
+    window.chromaglassAction?.('seed');
+    d.settings.beads = 0.8;
+    await settle(150);
+    const withBeads = await shot();
+    await settle(2);
+    const fl = changed(withBeads, await shot(), null);
+    const n = dbg().beads;
+    const before = await shot();
+    d.settings.beads = 0.001;
+    await settle(2);
+    const off = changed(before, await shot(), null);
+    return { floor: fl, beads: off, count: n };
+  };
+  const samples = [await beadSample(), await beadSample(), await beadSample()];
+  const median = (pick) => samples.map(pick).sort((x, y) => x - y)[1];
+  const beadFloor = { outside: median(s => s.floor.outside) };
+  const beads = { outside: median(s => s.beads.outside) };
+  const count = median(s => s.count);
 
   // The film, which is the one picture that arrives every frame rather than
   // once: a video, here a canvas of flat blue streaming to itself, because a

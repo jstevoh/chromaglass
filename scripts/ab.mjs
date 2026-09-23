@@ -105,18 +105,30 @@ const shoot = async (name) => {
     out.height = Math.round(width * (c.height / c.width));
     const ctx = out.getContext('2d');
     const shot = await window.__cgShot('ab');
-    if (shot) {
-      const full = document.createElement('canvas');
-      full.width = shot.w; full.height = shot.h;
-      full.getContext('2d').putImageData(window.__shots.ab, 0, 0);
-      ctx.drawImage(full, 0, 0, out.width, out.height);
-    } else {
-      ctx.drawImage(c, 0, 0, out.width, out.height);
-    }
+    /*
+      No fallback to drawImage, deliberately — see scripts/frame.mjs.
+
+      A presented WebGPU canvas answers drawImage with black, which is not
+      an error and cannot be told from a black plate. This exact fallback,
+      in scripts/wall.mjs, turned a frame the stage had not painted into
+      "a keystone keeps the middle of the frame — mean 0.000" and failed CI
+      on a commit whose src/ had not changed at all.
+    */
+    if (!shot) return { failed: window.__cgFrameLast ?? { via: 'no shot' } };
+    const full = document.createElement('canvas');
+    full.width = shot.w; full.height = shot.h;
+    full.getContext('2d').putImageData(window.__shots.ab, 0, 0);
+    ctx.drawImage(full, 0, 0, out.width, out.height);
     return out.toDataURL('image/png');
   }, { width: WIDTH });
   await page.evaluate(() => document.body.classList.remove('overlays-hidden'));
   if (!dataUrl) { console.error('  no canvas to read.'); return null; }
+  if (dataUrl.failed) {
+    // Half of an A/B that is black is worse than no A/B: every difference it
+    // reports afterwards is the difference between a picture and nothing.
+    console.error(`  the stage gave no frame for ${name}: ${JSON.stringify(dataUrl.failed)}`);
+    return null;
+  }
   const file = path.join(OUT, `${name}.png`);
   fs.writeFileSync(file, Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64'));
   console.log(`  ${file}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
