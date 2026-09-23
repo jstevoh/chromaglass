@@ -114,14 +114,22 @@ try {
     // It used to be: the next frame was only asked for on the loop's last
     // line. Ten throws and the frames carry on; past the self-heal limit
     // the stage is rebuilt, and the recovery says so.
+    // Counted by the loop's own heartbeat, not the stage's frames: a stage
+    // just rebuilt by the recovery above draws nothing until its solver and
+    // pipelines are up, and at a headless runner's ten frames a second that
+    // read as "0 frames" while the loop was plainly running.
     const carriedOn = await page.evaluate(async () => {
-      const d = window.chromaglassDebug();
-      d.throwFrames(10);
-      const before = d.webgpu?.frames ?? 0;
-      await new Promise((r) => setTimeout(r, 1500));
-      return { advanced: (window.chromaglassDebug().webgpu?.frames ?? 0) - before };
+      const c = () => window.chromaglassDebug().crash;
+      window.chromaglassDebug().throwFrames(10);
+      const start = c().beats();
+      const t0 = performance.now();
+      // Ten throws, then twenty frames that get through: the loop carried on.
+      while (c().beats() - start < 20 && performance.now() - t0 < 15_000) await new Promise((r) => setTimeout(r, 100));
+      const tail = c().thisLoad().slice(-6).map((e) => `${e.level} ${e.source}: ${e.msg.split('\n')[0].slice(0, 80)}`);
+      return { advanced: c().beats() - start, ms: Math.round(performance.now() - t0), tail };
     });
-    check('frames that throw do not stop the loop', carriedOn.advanced > 20, `${carriedOn.advanced} frames drawn after 10 throws`);
+    check('frames that throw do not stop the loop', carriedOn.advanced >= 20,
+      carriedOn.advanced >= 20 ? `${carriedOn.advanced} frames through the loop in ${carriedOn.ms} ms after 10 throws` : `${carriedOn.advanced} frames in ${carriedOn.ms} ms; log: ${carriedOn.tail.join(' | ')}`);
     const recoveriesBefore = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length);
     await page.evaluate(() => window.chromaglassDebug().throwFrames(200));
     const healed = await page.waitForFunction(

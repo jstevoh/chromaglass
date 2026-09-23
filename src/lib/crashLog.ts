@@ -424,4 +424,6 @@ export const crashApi = {
   last, latest, entries, previous, thisLoad, lastFatal, clear, record,
   report: (note?: string) => buildReport({ note }),
   load: LOAD,
+  /** Frames the render loop has got through this load: the heartbeat's own count. */
+  beats: () => frames,
 };
