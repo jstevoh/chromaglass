@@ -3443,6 +3443,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
         break;
       }
+      case 'finger': {
+        /*
+          A finger from any hand but the mouse.
+
+          It was only ever wired to the local pointer, so a finger arriving
+          from the phone pad, a pen, the gamepad, OSC, a replayed performance
+          or the room camera fell through to `default` and *dropped dye* —
+          the opposite of mixing, and it added colour to a plate the performer
+          was trying to blend. The direction is the gesture's own, the same
+          one a directed blow uses; with no direction there is no drag, which
+          is right, because you mix by moving.
+        */
+        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
+          af.fingerDrag(x, y, 7, 0.09 * amt * 0.5, g.dx, g.dy);
+          if (layer === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
+        }
+        break;
+      }
       case 'spray':
         af.autoInject('spray', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
         break;

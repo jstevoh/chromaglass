@@ -41,6 +41,14 @@ export const isGpuEngine = (label) => /^(GPU|WebGPU)\b/.test(label ?? '');
  * Install `window.__cgFrame(w, h)` for every navigation on this page. It
  * answers with the plate scaled to `w`×`h` as a flat RGBA array, or null if
  * there is no canvas yet.
+ *
+ * A FLAT ARRAY — not an ImageData, and not `{ data }`. Two harnesses read
+ * `f.data` off it, got undefined, and treated that as "no frame to judge":
+ * `evolve`'s flatness check, the one written to catch a plate that has gone
+ * to a single colour, skipped every frame it ever took and reported "0 of
+ * them flat" for months while the fault it was looking for was on screen.
+ * If you cannot read the plate, fail — never return a value that a check
+ * will read as consent.
  */
 export const installFrameReader = (page) => page.addInitScript(() => {
   /**

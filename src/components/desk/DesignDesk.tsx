@@ -28,6 +28,7 @@ const RANGE = PIN_RANGE;
 const TOOLS = [
   ['dropper', 'Drop', 'D'], ['spray', 'Spray', 'S'], ['splatter', 'Splat', 'X'],
   ['pour', 'Pour', 'O'], ['streak', 'Streak', 'K'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P'],
+  ['finger', 'Finger', 'G'],
 ] as const;
 
 export interface DesignDeskProps {

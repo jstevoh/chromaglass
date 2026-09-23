@@ -17,7 +17,7 @@ import { DesignDesk } from './components/desk/DesignDesk';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { PRESETS } from './presets';
@@ -89,8 +89,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
 /** The letter printed on each tool, and the tool it picks. */
-const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press'> = {
-  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press',
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger',
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
@@ -434,7 +434,7 @@ export default function App() {
   const [activeLayer, setActiveLayer] = useState(0);
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
   // The message handler is built once and must not go stale when a liquid's
@@ -2057,6 +2057,9 @@ export default function App() {
         case 'press':
           visualizerRef.current?.applyGesture({ tool: 'press', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
           break;
+        case 'finger':
+          visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+          break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
           break;
@@ -2378,9 +2381,12 @@ export default function App() {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (!deskUp) return;          // the narrow-screen UI has its own keys
 
-      // The tools are the same letters on both desks; Design has all seven.
+      // The tools are the same letters on both desks; Design has all eight.
+      // The Perform desk's four are the ones that work the liquid already on
+      // the plate rather than adding more of it — and the finger is one of
+      // those, which is why G belongs in this list and not only in Design.
       const tool = TOOL_KEYS[e.key.toLowerCase()];
-      if (tool && (designing || tool === 'dropper' || tool === 'blow' || tool === 'press')) {
+      if (tool && (designing || tool === 'dropper' || tool === 'blow' || tool === 'press' || tool === 'finger')) {
         setActiveTool(tool);
         return;
       }
@@ -2771,6 +2777,7 @@ export default function App() {
                       { id: 'streak' as const, icon: Slash, label: 'Streak' },
                       { id: 'blow' as const, icon: Wind, label: 'Blow' },
                       { id: 'press' as const, icon: Hand, label: 'Press' },
+                      { id: 'finger' as const, icon: Fingerprint, label: 'Finger' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}

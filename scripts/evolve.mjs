@@ -21,6 +21,9 @@ import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 
 const PORT = 4336;
+// Four is a smoke test. The flat-backdrop roll was 1 in 63, so hunting for
+// another cause of it wants a number like 20 and the patience to match.
+const ROLLS_EACH = Number(process.env.EVOLVE_ROLLS ?? 4);
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
 const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
@@ -51,9 +54,11 @@ try {
     while the picture is still, to a person, one colour.
   */
   const flatness = async () => {
-    const f = await frameOf(page, 320, 200);
-    const px = f?.data;
-    if (!px) return null;
+    const px = await frameOf(page, 320, 200);
+    if (!px) {
+      const why = await page.evaluate(() => window.__cgFrameLast);
+      throw new Error(`could not photograph the plate: ${JSON.stringify(why)}`);
+    }
     const bins = new Map();
     let tot = 0;
     for (let i = 0; i < px.length; i += 4) {
@@ -67,11 +72,13 @@ try {
 
   for (const startId of ['classic', 'fillmore-east-1969', 'oil-wheel']) {
     const from = base(startId);
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < ROLLS_EACH; k++) {
       const look = evolvedLook(from, luckyLook(from, LED, rand));
       await page.evaluate((s) => {
         const d = window.chromaglassDebug();
         Object.assign(d.settings, s);
+        // The previous roll left the plate crawling; a roll starts at speed.
+        if (s.globalSpeed === undefined) d.settings.globalSpeed = 0.015;
       }, look);
       /*
         Long enough for the look to actually arrive.
@@ -99,19 +106,41 @@ try {
         let t = 0; for (let i = 0; i < a.length; i++) t += a[i];
         return t / a.length;
       });
-      const flat = await flatness();
+      let flat = await flatness();
       n++;
-      if (flat && flat.share > 0.9) {
+      /*
+        Then the speed comes down, which is how it was actually reported:
+        "the big colored screen happened after i pressed random evolve and
+        then lowered the speed".
+
+        That pairing is the whole bug. Evolving alone rolls a new backdrop;
+        slowing the plate alone dries nothing. Together they used to empty the
+        dish — the drying ran per step rather than per second of plate time,
+        so a plate set to crawl went on evaporating at full pace and left the
+        bare, freshly recoloured backdrop. Fixed in #121, and this is the
+        check that would have caught it, so it runs on every roll.
+      */
+      if (flat.share <= 0.9) {
+        await page.evaluate(() => {
+          const d = window.chromaglassDebug();
+          d.settings.globalSpeed = 0.003;
+        });
+        await page.waitForTimeout(28000);
+        const slow = await flatness();
+        if (slow.share > flat.share) flat = { ...slow, afterSlowing: true };
+      }
+      if (flat.share > 0.9) {
         bad++;
         const diff = Object.keys(look).filter(key =>
           JSON.stringify(look[key]) !== JSON.stringify(from[key]));
-        console.log(`\n FLAT  ${startId} roll ${k}: ${(flat.share * 100).toFixed(0)}% of the frame is rgb(${flat.rgb.join(',')})`);
+        console.log(`\n FLAT  ${startId} roll ${k}${flat.afterSlowing ? ' (after slowing the plate)' : ''}: ` +
+          `${(flat.share * 100).toFixed(0)}% of the frame is rgb(${flat.rgb.join(',')})`);
         console.log(`   renderStyle=${look.renderStyle} paperA=${look.paperA} paperB=${look.paperB}` +
           ` dyeBudget=${look.dyeBudget?.toFixed?.(2)} dimmer=${look.dimmer?.toFixed?.(2)}` +
           ` evap=${look.evaporationRate?.toFixed?.(4)} plateDye=${dens?.toFixed?.(4)}` +
           ` ledPlatform=${look.ledPlatform} blendMode=${look.blendMode}`);
         console.log(`   changed ${diff.length} settings`);
-      } else if (flat) {
+      } else {
         process.stdout.write(dens !== null && dens < 0.02 ? 'o' : '.');
       }
     }

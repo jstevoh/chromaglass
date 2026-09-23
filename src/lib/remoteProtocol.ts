@@ -144,6 +144,12 @@ export type RemoteMessage =
   | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string }
   /** A hand pressing the top glass: the film thins under it and the dye spreads out in a ring. */
   | { type: 'press'; x: number; y: number; layer: number; amount?: number }
+  /**
+   * A finger drawn through the liquid, carrying what it touches and mixing
+   * two bottles that refuse each other. `dx`/`dy` are the stroke's direction;
+   * without them there is no drag, because you mix by moving.
+   */
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
   | { type: 'dye'; color: string }

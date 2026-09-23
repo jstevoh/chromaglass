@@ -3,6 +3,41 @@ import { DROPPER_COLORS } from '../constants';
 import { DIFFUSION_CEILING } from './deskPins';
 
 /**
+ * The backdrop's two colours, which have to be two.
+ *
+ * Rolled independently they came up the same colour once in every seventeen
+ * photo looks — `#FF0000`/`#FF0000`, `#0000FF`/`#0000FF` — and in photo mode
+ * the backdrop is `mix(paperA, paperB, g)` across the whole frame, so an
+ * identical pair is a flat saturated field with no gradient in it at all.
+ * With the dye thin on top, that is the reported "the entire plate goes to a
+ * single colour", and the yellow screen that filled the view: 1.6% of every
+ * roll — often enough to hit inside a set, rare enough that twelve rolls of
+ * `npm run evolve` missed it.
+ *
+ * Every hand-authored look pairs two colours that differ — blue into pale
+ * blue, teal into orange, amber into red-orange — because the pair *is* the
+ * gradient. So the second is drawn only from the colours far enough from the
+ * first to read as one.
+ */
+const PAPER_GAP = 90;
+
+const rgbOf = (hex: string): [number, number, number] =>
+  [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+
+const paperPair = (rand: () => number): { paperA: string; paperB: string } => {
+  const paperA = DROPPER_COLORS[Math.floor(rand() * DROPPER_COLORS.length)];
+  const [ar, ag, ab] = rgbOf(paperA);
+  const far = DROPPER_COLORS.filter((hex) => {
+    const [r, g, b] = rgbOf(hex);
+    return Math.hypot(r - ar, g - ag, b - ab) >= PAPER_GAP;
+  });
+  // The palette is wide enough that this never empties; a palette edited down
+  // to near-neighbours should give a dull backdrop rather than throw.
+  const pool = far.length ? far : DROPPER_COLORS;
+  return { paperA, paperB: pool[Math.floor(rand() * pool.length)] };
+};
+
+/**
  * One roll of the dice: a complete look, made up on the spot.
  *
  * "Randomise the look", and what `onNewSong: 'random'` reaches for. It lived
@@ -139,8 +174,7 @@ export function luckyLook(
     secondLamp: rand() < 0.35 ? 0.4 + rand() * 0.6 : 0,
     iridescence: rand() * 0.6,
     renderStyle: rand() < 0.25 ? 'photo' : 'show',
-    paperA: DROPPER_COLORS[Math.floor(rand() * DROPPER_COLORS.length)],
-    paperB: DROPPER_COLORS[Math.floor(rand() * DROPPER_COLORS.length)],
+    ...paperPair(rand),
     camera: rand() < 0.4 ? 0.5 + rand() * 0.5 : 0,
     focus: rand(),
     aperture: rand() * 0.8,

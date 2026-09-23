@@ -44,6 +44,7 @@ import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 const root = process.env.INIT_CWD ?? process.cwd();
 const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
 const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
+const panel0app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -1189,6 +1190,31 @@ check('and neither starts over the limit',
     blank.size === 0, blank.size ? `${blank.size} left undefined: ${[...blank].sort().join(', ')}` : `all ${wanted.length}`);
 
   // 2. Finite. A NaN reaches the shader as a black plate.
+  /*
+    And the backdrop has two colours in it.
+
+    In photo mode the whole frame is `mix(paperA, paperB, g)`. Rolled
+    independently the two came up identical in 1.6% of all rolls — a flat
+    saturated field, no gradient, dye thin on top of it: the reported "the
+    entire plate goes to a single colour" and the yellow screen that filled
+    the view. One roll in sixty-three is often enough to hit inside a set and
+    rare enough that twelve rolls of `npm run evolve` never saw it, which is
+    why it is checked here, where five hundred are rolled for free.
+  */
+  {
+    const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    let worst = Infinity, pair = null;
+    for (const r of rolls) {
+      if (r.renderStyle !== 'photo' || !r.paperA || !r.paperB) continue;
+      const [a, b, c] = rgb(r.paperA), [x, y, z] = rgb(r.paperB);
+      const d = Math.hypot(a - x, b - y, c - z);
+      if (d < worst) { worst = d; pair = `${r.paperA}/${r.paperB}`; }
+    }
+    check('a photo look never puts the plate on one flat colour',
+      worst >= 60,
+      worst === Infinity ? 'no photo rolls' : `closest pair over ${ROLLS} rolls: ${pair}, ${worst.toFixed(0)} apart`);
+  }
+
   const nan = new Set();
   for (const r of rolls) for (const k of wanted) if (typeof r[k] === 'number' && !Number.isFinite(r[k])) nan.add(k);
   check('and every number in it is a number', nan.size === 0, [...nan].join(', ') || 'all finite');
@@ -1225,6 +1251,70 @@ check('and neither starts over the limit',
     mid(rolled) >= mid(speeds) * 0.5 && mid(rolled) <= mid(speeds) * 2,
     `roll median ${mid(rolled).toFixed(4)}, the ${speeds.length} looks' median ${mid(speeds).toFixed(4)}` +
     ` (looks span ${speeds[0]}..${speeds[speeds.length - 1]})`);
+}
+
+// ── Every tool is reachable, and every reachable tool does something ──
+/*
+  The finger shipped to one desk and one hand.
+
+  It was added to the Perform desk and to the local pointer, and nothing else
+  learned it: `performGesture` — the single door every other hand comes
+  through, the phone pad, a pen, the gamepad, OSC, a replayed performance and
+  the room camera — had no case for it, so a finger from any of them fell to
+  `default` and *dropped dye*, which is the opposite of mixing. The Design
+  desk never offered it, the keyboard map had no `g` though the desk printed
+  the shortcut, and the remote protocol had no such message.
+
+  Five places, one feature, and every one of them silent. So the tools are
+  checked from both ends: nothing on a desk that the engine ignores, and
+  nothing in the engine that no desk can reach.
+*/
+{
+  const design = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
+  const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
+  const toolsOf = (src) => {
+    const m = src.match(/const TOOLS = \[([\s\S]*?)\] as const;/);
+    return m ? [...m[1].matchAll(/\['([a-z]+)'/g)].map(x => x[1]) : [];
+  };
+  const onDesks = new Set([...toolsOf(design), ...toolsOf(perform)]);
+  // What `performGesture` actually knows: its own switch, plus the dropper it
+  // falls back to. A tool absent from here is a tool that silently drops dye.
+  const gesture = panel0.slice(panel0.indexOf('const performGesture ='));
+  const handled = new Set([...gesture.slice(0, gesture.indexOf('\n  };')).matchAll(/case '([a-z]+)'/g)].map(x => x[1]));
+  handled.add('dropper');
+
+  check('every tool on a desk is one the engine acts on',
+    [...onDesks].every(t => handled.has(t) || t === 'dropper'),
+    [...onDesks].filter(t => !handled.has(t) && t !== 'dropper').join(', ') || `${onDesks.size} tools`);
+
+  /*
+    Against the Design desk, not "either desk".
+
+    Written the loose way first — reachable from *a* desk — it stayed green
+    with the finger taken back off Design, because Perform still had it. The
+    Perform desk is deliberately four tools, the ones that work liquid already
+    on the plate; the Design desk is the whole bench, and that is the one an
+    invariant can be written against.
+  */
+  const onDesign = new Set(toolsOf(design));
+  check('the Design desk offers every tool the engine acts on',
+    [...handled].every(t => onDesign.has(t) || t === 'drop'),
+    [...handled].filter(t => !onDesign.has(t) && t !== 'drop').join(', ') || `${onDesign.size} on the bench`);
+
+  const keys = panel0app.match(/const TOOL_KEYS[^=]*= \{([\s\S]*?)\};/);
+  const mapped = keys ? new Set([...keys[1].matchAll(/'([a-z]+)'/g)].map(x => x[1])) : new Set();
+  check('and has a keyboard letter that selects it',
+    [...onDesks].every(t => mapped.has(t)),
+    [...onDesks].filter(t => !mapped.has(t)).join(', ') || `${mapped.size} letters`);
+
+  const proto = readFileSync(join(root, 'src/lib/remoteProtocol.ts'), 'utf8');
+  // The hands that work liquid already on the plate are the ones a phone
+  // sends; the bottles it pours are a `drop` with a colour.
+  for (const t of ['blow', 'press', 'finger']) {
+    check(`the phone can send a ${t}`,
+      new RegExp(`type: '${t}'`).test(proto) && new RegExp(`case '${t}':`).test(panel0app),
+      proto.includes(`type: '${t}'`) ? 'protocol and dispatch' : 'not in the protocol');
+  }
 }
 
 // ── Result ──────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ this repo.
 
 | | Plan | State |
 |---|---|---|
+| **The deep dive** | below | **Done 2026-09-23.** Every preset drawn, every setting traced, every tool and bottle checked. Four faults, the first of which is that the check for the reported one had never read a frame |
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
 | **The effects** | [`filters-plan.md`](filters-plan.md) | **F0 and E6 shipped.** The post chain is under them and film stock is on the plate. Seven left — E1 the camera on the wall, E1c coupled loops, E2 prism, E3 letters as windows, E4 slit-scan, E5 iris and wipes, E7 kick ripple, E8 colour finishing — each written once, in WGSL, as H5 below |
@@ -32,10 +33,74 @@ incomplete is a build failure rather than a plate with its texture switched off.
 job: nothing was written twice. There is one shading language in the tree now — WGSL, in
 `src/gpu/wgsl/` — so a shader fix is a shader fix again.
 
+## The deep dive, 2026-09-23
+
+Every preset, every setting, every tool and every bottle, asked whether it
+works. Four faults came out of it, and the first one is why the other three
+lasted.
+
+**The check for "the whole plate went to one colour" had never read a frame.**
+`npm run evolve` photographs the plate and buckets the colours; it took the
+frame with `frameOf()`, which answers with a flat RGBA array, and then read
+`f.data` off it. `undefined`. The verdict sat behind `if (flat && flat.share >
+0.9)`, so both branches were unreachable, and the run printed *"0 of them
+flat"* and exited 0 every time. It has been green and blind for as long as it
+has existed, and I cited those green runs twice as evidence that the reported
+fault was fixed. Rule 2 of *What a check has to do to count*, written down two
+days earlier, is exactly this — the rule was applied to checks as they were
+written and never to the ones already in the tree.
+
+**The randomiser puts the plate on one flat colour in 1.6% of rolls.** In
+photo mode the whole frame is `mix(paperA, paperB, g)`, and `luckyLook` rolled
+the two independently out of the dye palette — so `#FF0000`/`#FF0000` and
+`#0000FF`/`#0000FF` came up about once in sixty-three rolls: a saturated field
+with no gradient anywhere in it, thin dye on top. That is the reported yellow
+screen that filled the view. Rare enough that twelve rolls of the harness
+never saw it, common enough to hit inside a set. The second colour is now
+drawn only from the colours at least 90 apart in RGB from the first, which is
+what every hand-authored look already does — the pair *is* the gradient.
+
+**The finger reached one desk and one hand.** It shipped to the Perform desk
+and the local pointer, and nothing else learned it: `performGesture` — the
+single door the phone pad, a pen, the gamepad, OSC, a replayed performance and
+the room camera all come through — had no case for it, so a finger from any
+of them fell to `default` and **dropped dye**, the opposite of mixing. The
+Design desk, which is the whole bench, never offered it. The keyboard map had
+no `g` although the desk printed the shortcut. The remote protocol had no such
+message. Five places, one feature, every one of them silent.
+
+**Bubbles are never driven by heat.** In the rigs this is modelled on, the
+lamp's heat filter comes out and the water *boils*: the bubbles are the lamp's
+doing, they pulse, and they need no performer. Ours spawn from the pointer,
+from a blow and from bass, and a plate left alone with `bubbles` turned up
+makes none. Not a bug — nothing is broken — but it is the difference between
+a bubble control and a plate that boils, and it belongs with S2 in Stage 3.
+
+**What passed.** All 32 presets draw a picture: none flat, none empty, none
+dark, no console noise, and none of them dries out over the half-minute after
+it settles. All 135 settings are read by the engine — there are no dead
+controls. The nine bottles carry the weights they should (glycerine 1.26,
+milk 1.03, silicone 0.96, water the zero). Evolving a look and then lowering
+the speed — the exact sequence that was reported — no longer empties the
+plate.
+
+**What now guards it.** `npm run looks` draws all 32 presets and asks of each
+whether the frame is one colour, whether there is dye on the plate, whether
+there is light in it, and whether it drains; it judges a late frame, because
+the reported case was twenty-four seconds in. `npm run evolve` reads frames
+now, takes `EVOLVE_ROLLS`, and lowers the speed after every roll. `npm run
+panel` gained five: the backdrop's two colours have to differ, the Design desk
+has to offer every tool the engine acts on, nothing on a desk may be a tool
+the engine ignores, every tool needs a letter, and the phone has to be able to
+send a blow, a press and a finger. Each of the five was watched going red
+against the fault it is named for before being trusted green.
+
 ## The stages, and what each one is for
 
-Everything reported broken is fixed and deployed. What remains is new work, and
-it falls into five stages. The order inside a stage matters; the order between
+Everything reported broken is fixed and deployed — but see **The deep dive**
+below before reading that sentence the way it was meant on 2026-09-20. One of
+the things it was resting on was a check that could not fail. What remains is
+new work, and it falls into five stages. The order inside a stage matters; the order between
 them is appetite, except where a later stage names an earlier one.
 
 Two findings from 2026-09-23 set most of this order, and both are written up in
@@ -93,6 +158,14 @@ and it is a decision rather than a task.
    small thing: heat has no *strength*, because every source saturates the
    buoyancy tanh, so a plume has a position and nothing else. The temperature
    field, its decay, the buoyancy and H6's air field are all built and waiting.
+   *And it is not only the European rig that wants this.* The deep dive found
+   that bubbles are spawned by the pointer, by a blow and by bass, and by
+   nothing else — so a plate left alone with the control turned up makes none.
+   In the rigs this is modelled on the bubbles are the lamp's doing: the heat
+   filter comes out, the water boils, and they pulse without anyone touching
+   the dish. Boiling as a *source of bubbles*, keyed to the temperature field
+   and to how hard the lamp is driven, is the same piece of work as this and
+   should be done with it.
 7. **S4 · The photoscope** — unblocked as of #120, because the press now reaches
    the picture. Still wants **shear**: twisting one slide against the other is
    what tears the film into cells, and only the squeeze exists.
@@ -457,7 +530,13 @@ solver's stepping is a thousand unreachable lines.
 ## What a check has to do to count
 
 Written down on 2026-09-21, after nine separate checks in one day turned out to be
-green because they could not fail.
+green because they could not fail. A tenth turned up on 2026-09-23 — `evolve`'s
+flatness verdict, unreachable since the day it was written — and it is the one
+that says the rules are not enough on their own: **they were applied to checks as
+they were written and never to the ones already in the tree.** A rule that only
+runs at the moment of writing protects nothing that already exists. When a
+harness reports zero failures on a fault the user is still reporting, the harness
+is the first suspect, not the last.
 
 Every one had the same shape: **a check that cannot tell "the system had nothing to
 give" from "the system worked".** A painter that declined to draw and said nothing, so
@@ -481,6 +560,12 @@ find:
    measuring nothing, and there is no way to tell the two apart from the outside. Force
    the failing condition once — a software engine, a black frame, a flipped field — and
    watch it go red before trusting it green.
+   *And never hand a check a value it can read as consent.* `evolve` asked for a
+   frame, got `undefined` because it unwrapped a field that does not exist on a
+   plain array, and treated that as "nothing to judge" rather than as a failure.
+   A measurement helper that cannot measure should **throw**; `frameOf` says so
+   at the top of `scripts/frame.mjs` now, and `evolve` and `looks` both stop
+   rather than shrug.
 3. **Suspect the instrument first.** Of the faults above, more were in the measuring
    than in the thing measured: a readback that did not match its texture's format, a
    regex that mis-parsed a union three times, a grep that filtered out the error it was
