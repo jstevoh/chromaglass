@@ -179,6 +179,34 @@ try {
         */
         const file = `/tmp/evolve-flat-${startId}-${k}.json`;
         writeFileSync(file, JSON.stringify(look, null, 2));
+        /*
+          And a picture of it, because two flat plates have now been chased
+          on numbers alone and neither reproduced.
+
+          What the settings say is what the plate was *told*; a photograph is
+          what it did. The first case was argued about for an hour on the
+          strength of "96% of the frame is one purple" — a thin-dye theory
+          that a later measurement disproved outright — when a look at the
+          frame would have said in a second whether it was a wash, a blown
+          render or a solid fill.
+        */
+        const png = await page.evaluate(async () => {
+          const c = document.querySelector('#liquid-canvas');
+          if (!c) return null;
+          const shot = await window.__cgShot('flat');
+          if (!shot) return null;
+          const full = document.createElement('canvas');
+          full.width = shot.w; full.height = shot.h;
+          full.getContext('2d').putImageData(window.__shots.flat, 0, 0);
+          return full.toDataURL('image/png');
+        });
+        if (png) {
+          const img = `/tmp/evolve-flat-${startId}-${k}.png`;
+          writeFileSync(img, Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
+          console.log(`   and a picture of the plate in ${img}`);
+        } else {
+          console.log('   (the stage gave no frame to photograph)');
+        }
         console.log(`   the whole look is in ${file} — replay it with WASH_LOOK=${file} npm run wash`);
         console.log(`   NOTE: this plate has been running through ${k} earlier rolls. The look alone`);
         console.log(`   may not reproduce it — a roll inherits whatever the ones before it left.`);

@@ -86,15 +86,32 @@ each of the sixteen dyes paints the hue it is set to, 0° off, which
 `npm run dye` holds. Evolving a look and then lowering the speed — the exact
 sequence that was reported — no longer empties the plate.
 
-**A second flat plate, still unexplained.** With the flatness check able to
-read frames at last, a sixty-roll sweep found one: 96% of the frame a single
-purple, `renderStyle` **show** rather than photo, the two paper colours far
-apart, and 0.45 of dye still on the glass. So it is neither the backdrop nor an
-empty plate.
+**Two more flat plates, both still unexplained.** With the flatness check able
+to read frames at last, sixty-roll sweeps found one each:
 
-It has not reproduced. Replaying all 136 of that roll's settings onto a fresh
-plate gives 7–14% flat and 83% colour variety — a healthy picture. What is
-different about the run that found it is that `evolve` rolls one after another
+    96% of the frame one purple    show, papers far apart, 0.45 of dye
+    100% of it rgb(255,0,255)      show, papers far apart, 0.50 of dye,
+                                   ledPlatform on, saturationBoost 1.80
+
+Neither is the backdrop and neither is an empty plate — there is dye on the
+glass in both, and the second is a fully clipped magenta, which is a render
+saturating rather than dye blending.
+
+**Neither reproduces from its own settings.** Replaying all 136 of each onto a
+fresh plate gives 4–14% flat and 83–91% colour variety — healthy pictures. A
+thin-dye theory for the second (that a sparse plate lets the lamp, gel and
+lumia stages dominate and clip) was **measured and is wrong**: forcing the dye
+down to 0.35 and then 0.19 made the plate *less* flat, 3–7%, with colour
+variety rising to 100%.
+
+So the cause is state carried across look changes, not a combination of
+settings. Ruled out: the backdrop, an empty plate, the look's own settings on a
+fresh plate, and thin dye under those settings. `npm run evolve` now
+photographs a flat plate as well as writing its look out, because two cases
+have been argued about on numbers alone and a frame would have settled in a
+second what a wrong theory cost an hour.
+
+What is different about the runs that find them is that `evolve` rolls one after another
 on a single page with nothing cleared between them, which is right, because it
 is what a performer does: roll nine sits on whatever rolls zero to eight left
 behind. So the remaining suspect is accumulated plate state, and the next step
