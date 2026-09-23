@@ -942,7 +942,9 @@ current shape without laying it, and the dome held for six seconds, snapped to
 0.03 everywhere and started creeping back at the spring's rate.
 
 **And a drag on the velocity does nothing at all.** This is the sibling of
-§H and it is worth as much. The depth was first applied where velocity is
+§H and it is worth as much. (A velocity *added* down the depth gradient was
+not tried — §H's seven findings are reason enough not to spend an eighth —
+so nothing is claimed about it here.) The depth was first applied where velocity is
 already multiplied once a step, in `decayVel`. It moved the flow across the
 plate by 1%. Scaling the term by eight moved it by 1%. **Halving every
 velocity on the plate, every step, moved it by 1%** — which is the control

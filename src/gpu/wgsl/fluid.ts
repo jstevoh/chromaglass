@@ -1033,10 +1033,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     the clamp rather than by any balance of forces, and a pointwise multiply
     in front of that clamp is erased before anything reads it.
 
-    A velocity *added* down the depth gradient does nothing either, and that
-    one was predictable: it is the eighth time in this codebase. A smooth
-    localised field is mostly a gradient, and the projection exists to remove
-    gradients.
+    Adding a velocity down the depth gradient was never tried, and it is not
+    being claimed here that it fails — only that §H spent seven findings
+    establishing that a smooth localised field is mostly a gradient and the
+    projection exists to remove gradients, which is reason enough not to spend
+    an eighth.
 
     What is left is the transport itself. Darcy in a thin film is
     u = -(h^2/12mu) grad p, so the depth is a mobility on the flow, and a
