@@ -248,10 +248,17 @@ job: nothing was written twice. There is one shading language in the tree now �
    - **D · Spreading, and why a first pour is not a tenth**
      ([`bubbles-plan.md`](bubbles-plan.md) D): oil on clean water spreads to a
      monolayer; oil on oil sits where it lands. The state variable is surface coverage
-     and the force is `∇γ`, not γ. **The trap is written down**: a pure gradient force
-     added to the velocity is exactly what the projection removes, which is the same
-     wall H6 hit three times, so it has to enter the divergence, the dye's transport,
-     or a multiply.
+     and the force is `∇γ`, not γ.
+     *Half of it is already built, for soap.* `lib/liquidPhase.ts` carries a real
+     per-liquid chemistry field — `soap`, `body`, `repel` — with a Marangoni force on
+     the soap channel and a ceiling whose own comment states the saturation case: a
+     plate that is uniformly soaped has no force left in it. So the mechanism exists
+     and the missing part is **what it is attached to**: soap has a tension field and
+     the dye does not, which is why a pour onto bare plate and a pour onto a covered
+     one behave the same. Same field F asks for, from the other end.
+     *And what is genuinely absent:* `repel` is a scalar per cell rather than a
+     pairwise matrix, so a liquid refuses to mix with whatever it meets rather than
+     with a particular other liquid, and `LiquidBehaviour` has no density at all.
    - **H8 · More bottles** ([`bubbles-plan.md`](bubbles-plan.md) C): latex, oil paint,
      clear medium, glycol first; then fizz, salt, slime, cornstarch, bleach. Needs the
      liquid field moved to the GPU.

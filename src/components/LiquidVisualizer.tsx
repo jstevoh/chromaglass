@@ -1003,6 +1003,16 @@ class FluidSimulation {
    */
   stepLiquid(dt: number, disp: number) {
     if (!this.liquid.active) return;
+    /*
+      Which way is downhill, so a weight difference has something to act on.
+
+      Tilt *and* rock: the tilt is where the plate is being held and the rock
+      is the projectionist moving it, and a liquid heavier than the one it is
+      in settles against both. On a plate that is perfectly level and still
+      this is zero and nothing separates by weight, which is correct — a level
+      dish separates by standing still.
+    */
+    this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
     // the deltas and nothing else reads it. The CPU solver has no such step —

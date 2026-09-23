@@ -119,23 +119,25 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
     const sampler = new VideoSampler(FRAME);
 
     const start = async () => {
-      // A camera is not opened behind anyone's back. `enabled` means somebody
-      // pressed the button, and when the button was pressed in an earlier
-      // session the camera only comes back where permission is already
-      // granted — so a reload never puts a prompt over the plate.
+      /*
+        A camera is not opened behind anyone's back, and permission is not the
+        same as consent.
+
+        This used to check whether the browser had *already granted* camera
+        permission, and open the camera silently when it had. The reasoning
+        was about the browser's prompt — "a reload never puts a prompt over
+        the plate" — and it protected the wrong thing. A permission granted in
+        some earlier session is not somebody asking for the camera now: the
+        light came on, in a room, with nothing on screen saying why.
+
+        So `userAsked` is the whole gate. Nothing else may open it, whatever
+        the permission state, and a switch remembered from last time is an
+        *offer* the app makes on screen rather than something it acts on. See
+        the resume notice in App.
+      */
       if (!userAsked) {
-        try {
-          const status = await navigator.permissions?.query({ name: 'camera' as PermissionName });
-          if (status && status.state !== 'granted') {
-            setState({ ...IDLE, error: 'Switch the room camera on to let the browser ask for it.' });
-            return;
-          }
-        } catch {
-          // No camera descriptor in this browser: wait to be asked rather than
-          // guess and prompt.
-          setState({ ...IDLE, error: 'Switch the room camera on to let the browser ask for it.' });
-          return;
-        }
+        setState({ ...IDLE, error: 'Switch the room camera on to use it.' });
+        return;
       }
       try {
         local = await navigator.mediaDevices.getUserMedia({

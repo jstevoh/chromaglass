@@ -246,6 +246,31 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     a squeeze between two wet glasses does, and why it redistributes dye
     instead of simply shoving it.
   */
+  /*
+    The gap at rest, laid down directly.
+
+    The plate used to be filled with a flat 0.03 and then *spring* toward the
+    dome, and the two disagreeing is a pump: at the middle the gap grows,
+    which draws liquid in, and at the rim it shrinks, which pushes liquid off
+    the edge. With the spring turned into a slow rate that is several seconds
+    of the plate sucking toward its middle on every start, clear and look
+    change — reported from the front as "all of the liquid is getting pulled
+    toward a drain in the center", and measured as 10-20% more inward flow
+    than a flat plate.
+
+    So the fill knows the shape. A plate that starts at rest has nothing to
+    settle toward and pumps nothing.
+  */
+  gapRest: `${HEAD}
+@group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let d = uvOf(id) - vec2f(0.5);
+  let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
+  let rest = clamp(0.03 * (1.0 + S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
+  textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
+}`,
+
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;

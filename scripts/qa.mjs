@@ -2042,6 +2042,42 @@ try {
   check('no control appears on the screen twice', dupes.length === 0,
     dupes.map(([id, n]) => `${id} ×${n}`).join(', '));
 
+  /*
+    A camera does not open because it was open last time.
+
+    This context grants camera permission, which is exactly the condition the
+    bug needed: the app remembered the switch in localStorage, the browser had
+    already granted permission, so `getUserMedia` was called on load with no
+    prompt and nothing on screen saying why. The light came on in a room.
+    Permission is not consent.
+
+    So: a fresh page, with the switch remembered as on, must not open a video
+    stream — and must say so on screen instead. `getUserMedia` is wrapped
+    before any of the app's code runs, which is the only place that can see a
+    call the app makes during boot.
+  */
+  {
+    const fresh = await context.newPage();
+    await fresh.addInitScript(() => {
+      window.__videoOpens = 0;
+      const md = navigator.mediaDevices;
+      if (md?.getUserMedia) {
+        const real = md.getUserMedia.bind(md);
+        md.getUserMedia = (c) => { if (c && c.video) window.__videoOpens++; return real(c); };
+      }
+      try { localStorage.setItem('chromaglass-scene-on', '1'); } catch { /* private */ }
+    });
+    await fresh.goto(URL, { waitUntil: 'load' });
+    await fresh.waitForTimeout(6000);
+    const opens = await fresh.evaluate(() => window.__videoOpens ?? -1);
+    check('a remembered camera switch does not open the camera', opens === 0,
+      opens === 0 ? 'no video stream opened on load' : `${opens} getUserMedia(video) call(s) during boot`);
+    const offered = await fresh.locator('[data-testid="scene-resume"]').count();
+    check('it offers the camera back instead, and waits to be told', offered === 1,
+      offered === 1 ? 'the resume notice is on screen' : 'no notice — the switch is simply lost');
+    await fresh.close();
+  }
+
   check('the console stayed clean', errors.length === 0, errors.slice(0, 5).join(' | '));
 } catch (err) {
   check('the run completed', false, String(err).split('\n')[0]);

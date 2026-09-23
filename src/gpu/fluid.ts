@@ -330,7 +330,9 @@ export class WebGPUFluid {
     this.fill(pass, this.div, [0, 0, 0, 0], this.N);
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
-    for (const t of [this.squeeze.a, this.squeeze.b]) this.fill(pass, t, [0.03, 0, 0, 0], this.N);
+    // At the dome's own shape, not flat: a plate filled flat then sprung
+    // toward the dome pumps its liquid inward until the two agree.
+    for (const t of [this.squeeze.a, this.squeeze.b]) this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     if (this.grain) {

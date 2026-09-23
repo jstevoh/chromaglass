@@ -121,11 +121,15 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'classic':            ['water', 'water', 'soap'],
   // Points of light that must not feather at the edge, and are white anyway.
   'galaxy':             ['water', 'milk'],
-  'deep-ocean':         ['water', 'glycerine'],
+  // Syrup is heavier than the water it is in, so it goes down the slope
+  // while everything else drifts — which is what depth looks like.
+  'deep-ocean':         ['water', 'glycerine', 'syrup'],
   // Neon wants hard edges and punched holes, not a soft wash.
   'cyberpunk':          ['water', 'silicone'],
   // A blob that crawls while the oil around it climbs — which is the lamp.
-  'lava-lamp':          ['oil', 'glycerine', 'milk'],
+  // Alcohol is lighter than all of it and carries heat, so it is what goes
+  // up: the lamp needs something to rise, not only something to sit.
+  'lava-lamp':          ['oil', 'glycerine', 'milk', 'alcohol'],
   'acid-trip':          ['soap', 'silicone'],
   // Each hit blows a clear hole and the colour runs off the rim of it.
   'bass-drop':          ['water', 'soap'],
@@ -136,12 +140,15 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'microscopic-chaos':  ['oil', 'silicone'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
-  'solar-flare':        ['water', 'soap'],
+  // Heat drives this one, and alcohol is the liquid that answers heat.
+  'solar-flare':        ['water', 'soap', 'alcohol'],
   // A bell holds its shape and lags the water it is drifting in.
   'jellyfish-bloom':    ['water', 'milk'],
   'fractal-dream':      ['water', 'silicone'],
   // Pools that stay pools while the plate churns underneath them.
-  'velvet-underground': ['ink', 'glycerine'],
+  // Pools that stay pools while the plate churns underneath them, with
+  // syrup settling under the ink rather than mixing into it.
+  'velvet-underground': ['ink', 'glycerine', 'syrup'],
   // Filaments are what a Marangoni front curls into.
   'neon-coral-reef':    ['water', 'soap', 'silicone'],
   'stardust-collapse':  ['water', 'soap'],
