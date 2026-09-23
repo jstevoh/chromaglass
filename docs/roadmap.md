@@ -16,10 +16,10 @@ this repo.
 |---|---|---|
 | **The post chain** | [`filters-plan.md`](filters-plan.md) F0 | **Shipped** (#92): the scene target, the finish pass, the frame-history ring and the true-average flash probe |
 | **WebGPU** | [`webgpu-plan.md`](webgpu-plan.md) | **Done.** P0–P7: the app runs on WebGPU and nothing else does. The WebGL renderer, the GLSL and the parity harnesses are deleted; what remains of the port is the CPU solver's stepping, which is unreachable and waiting on its own surgery |
-| **The effects** | [`filters-plan.md`](filters-plan.md) F1–F9 | **Ready to build.** The cutover they were waiting for has landed and the post chain is under them; each is written once, in WGSL, as H5 below |
+| **The effects** | [`filters-plan.md`](filters-plan.md) | **F0 and E6 shipped.** The post chain is under them and film stock is on the plate. Seven left — E1 the camera on the wall, E1c coupled loops, E2 prism, E3 letters as windows, E4 slit-scan, E5 iris and wipes, E7 kick ripple, E8 colour finishing — each written once, in WGSL, as H5 below |
 | **The rig** | [`rig-plan.md`](rig-plan.md) | **Planned, not begun.** Many projectors on one screen, each with its own source, optics and place — which is what every show in the history actually was. The geometry is already built (sixteen surfaces, shapes, corner pins, source rects); what is missing is that every surface shows the same plate. **R6** makes one of those projectors a real one: the camera watches an analogue rig and the app plays alongside it |
 | **The European school** | [`slide-plan.md`](slide-plan.md) | **Planned, not begun.** Slide projectors rather than overheads: a 2-inch vertical stage, the heat filter taken out so the lamp boils the liquid away on screen, bubblers, and Mark Boyle and Joan Hills' photoscope. Depends on heat being wired and the press working |
-| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 done and merged (#117).** A bubble is a hole: 0.004 of the dye under it against 5.4 around, the plate keeps its colour, and a popped hole fills back to about 114% of its surroundings. H7–H8 not begun; three new sections (D, E, F) came out of building it |
+| **Air, ferrofluid, bottles** | [`bubbles-plan.md`](bubbles-plan.md) | **H6 and H7 done (#117, #122).** A bubble is a hole — 0.004 of the dye under it against 5.4 around — and a magnet gathers the second phase, 4927 near it against 3439 with it off. **H8 (bottles) is what is left of the plan as written**, plus three sections that came out of building the first two: D (spreading), E (the two glasses) and F (depth and a wet carrier) |
 | **The solver's speed** | this page, H0–H3 | **Done.** 768² with two layers went 38.6 ms a frame to 17.1 — the display's refresh — and a 1024² rung exists above it. The solver no longer bounds that rung |
 | **The plate's own batches** | `PLAN.md` §5, §6 | §6 (Render a song) wants the renderer settled, which it now is; the rest of §5 is independent |
 
@@ -31,6 +31,53 @@ incomplete is a build failure rather than a plate with its texture switched off.
 **The shader freeze is over.** It ran from 2026-09-19 until the cutover, and it did its
 job: nothing was written twice. There is one shading language in the tree now — WGSL, in
 `src/gpu/wgsl/` — so a shader fix is a shader fix again.
+
+## What is next, as of 2026-09-23
+
+Everything reported broken is fixed and deployed, and H6 and H7 are done. What
+remains falls into three piles, and the order between them is a matter of
+appetite rather than dependency — but the order *within* the first is not.
+
+**The one that unblocks the most: F, depth and a wet carrier**
+([`bubbles-plan.md`](bubbles-plan.md) F). The gap field is a real depth and it
+feeds only the squeeze, so advection, diffusion and the projection are all
+depth-blind. Two consequences, both already measured: the plate's dome does
+nothing (E), and there is no notion of coverage, so a pour onto bare glass and a
+pour onto a covered plate behave identically (D). Darcy mobility in h² and a
+clear carrier are one piece of work that makes three other pieces possible, and
+S2 wants it too.
+
+**Newly unblocked by the press working: S4, the photoscope**
+([`slide-plan.md`](slide-plan.md)). Mark Boyle and Joan Hills' instrument is two
+glass slides squeezed and twisted by hand, which is the squeeze film — and until
+this week the press did not reach the picture. It does now. What S4 still needs
+beyond that is *shear*: twisting one slide against the other is what tears the
+film into cells, and only the press is built.
+
+**Still blocked, and cheaply: S2, heat and boiling.** Everything is there —
+a temperature field, twenty places that feed it, `heatDecay`, buoyancy, and H6's
+air field for the bubbles to come out of. The one missing piece is that heat has
+no *strength*: every source saturates the buoyancy tanh, so a plume has a
+position and nothing else. That fix is small and it is the gate on the whole
+European school.
+
+**And the piles:**
+
+- **Looks, now** — H5's seven remaining effects. Independent of everything,
+  each is one WGSL pass, and the post chain is already under them.
+- **The rig** — R1 first, because every other item is meaningless while all
+  sixteen surfaces show the same plate. R6 (watching a real rig) wants its
+  feature extractor prototyped before any of its four modes.
+- **The desk pass and Render a song** — item 3 and `PLAN.md` §6 below, both
+  waiting on nothing.
+
+**Debts, written down rather than carried silently:** the second phase's totals
+climb under a pull, because a semi-Lagrangian backtrace does not conserve what
+it carries (`liquidPhase` solves this by clamping the total; the GPU wants a
+reduction and the stats pass has the shape of one). H6's "the light it adds is
+the liquid lit" needs a fixed pixel population before it can gate anything.
+`lace-run` is still 0.189, fifteen times the speed median. And the CPU solver's
+stepping is a thousand unreachable lines.
 
 ## The order, and why
 
