@@ -162,15 +162,41 @@ try {
       and the reported case was around twenty-four seconds in — so the first
       reading is only kept to see which way the dye is going.
     */
-    if (AB) await page.evaluate(([k, v]) => { window.chromaglassDebug().settings[k] = v; }, [AB, AB_FROM]);
+    const put = (k, v) => page.evaluate(([a, b]) => { window.chromaglassDebug().settings[a] = b; }, [k, v]);
+    if (AB) await put(AB, AB_FROM);
     const early = await dyeOf();
     await page.waitForTimeout(LATE);
     let before = null;
     if (AB) {
-      const p0 = await frameOf(page, 320, 200);
-      before = { ...judge(p0), dye: await dyeOf() };
-      await page.evaluate(([k, v]) => { window.chromaglassDebug().settings[k] = v; }, [AB, AB_TO]);
-      await page.waitForTimeout(LATE);
+      /*
+        Alternated, because the plate ages while this is measuring.
+
+        Read once at A and once at B and the B reading is always on an older
+        plate — and a plate loses dye with time, 1.70 down to 0.61 over ninety
+        seconds on the look `wash` replays. That drift points the same way as
+        the effect being looked for, which would have made any setting look
+        like it thinned the plate. So it goes A, B, B, A and each is the mean
+        of its pair: whatever is a function of time cancels, and what is left
+        is the setting.
+      */
+      const reads = { a: [], b: [] };
+      for (const [slot, value] of [['a', AB_FROM], ['b', AB_TO], ['b', AB_TO], ['a', AB_FROM]]) {
+        await put(AB, value);
+        await page.waitForTimeout(LATE);
+        const p0 = await frameOf(page, 320, 200);
+        if (!p0) throw new Error(`could not photograph ${preset.id}`);
+        reads[slot].push({ ...judge(p0), dye: await dyeOf() });
+      }
+      const mean = (xs, k) => xs.reduce((t, x) => t + x[k], 0) / xs.length;
+      before = { flat: mean(reads.a, 'flat'), colours: mean(reads.a, 'colours'), dye: mean(reads.a, 'dye') };
+      const after = { flat: mean(reads.b, 'flat'), colours: mean(reads.b, 'colours'), dye: mean(reads.b, 'dye') };
+      console.log(`  ${preset.id.padEnd(22)} ${AB} ${AB_FROM}→${AB_TO}:  ` +
+        `flat ${(before.flat * 100).toFixed(0)}%→${(after.flat * 100).toFixed(0)}%   ` +
+        `dye ${before.dye.toFixed(2)}→${after.dye.toFixed(2)}   ` +
+        `colours ${(before.colours * 100).toFixed(0)}%→${(after.colours * 100).toFixed(0)}%`);
+      rows.push({ id: preset.id, ab: { before, after }, faults: [], errors });
+      await page.close();
+      continue;
     }
     const px = await frameOf(page, 320, 200);
     if (!px) {
@@ -191,14 +217,6 @@ try {
     rows.push({ id: preset.id, flat, dye, luma, colours, faults, errors });
     if (faults.length) bad.push(preset.id);
 
-    if (before) {
-      console.log(`  ${preset.id.padEnd(22)} ${AB} ${AB_FROM}→${AB_TO}:  ` +
-        `flat ${(before.flat * 100).toFixed(0)}%→${(flat * 100).toFixed(0)}%   ` +
-        `dye ${before.dye.toFixed(2)}→${dye.toFixed(2)}   ` +
-        `colours ${(before.colours * 100).toFixed(0)}%→${(colours * 100).toFixed(0)}%`);
-      await page.close();
-      continue;
-    }
     console.log(`  ${preset.id.padEnd(22)} ${(flat * 100).toFixed(0).padStart(4)}%  ` +
       `${dye.toFixed(2).padStart(5)}  ${luma.toFixed(3)}  ${(colours * 100).toFixed(0).padStart(5)}%   ` +
       (faults.length ? faults.join(' ') : 'ok'));
