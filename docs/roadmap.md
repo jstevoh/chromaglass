@@ -254,6 +254,17 @@ job: nothing was written twice. There is one shading language in the tree now �
      added to the velocity is exactly what the projection removes, which is the same
      wall H6 hit three times, so it has to enter the divergence, the dye's transport,
      or a multiply.
+     *Half of it is already built, for soap.* `lib/liquidPhase.ts` carries a real
+     per-liquid chemistry field with a Marangoni force on the soap channel, and a
+     ceiling whose own comment states the saturation case: a plate that is uniformly
+     soaped has no force left in it. So the mechanism exists and the missing part is
+     **what it is attached to** — soap has a tension field and the dye does not, which
+     is why a pour onto bare plate and a pour onto a covered one behave the same.
+     Same field F asks for, from the other end.
+     *And what is left:* `repel` is a scalar per cell rather than a pairwise matrix,
+     so a liquid refuses to mix with whatever it meets rather than with a particular
+     other liquid. Weight and polarity landed in #119, so a liquid does now know what
+     it is made of and what it floats on; the pairwise part is what remains.
    - **R · The rig** ([`rig-plan.md`](rig-plan.md)): many projectors on one
      screen. Every show in the history was one — the Joshua Light Show ran
      three overheads, three film projectors and two banks of four-carousel

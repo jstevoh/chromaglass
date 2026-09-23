@@ -591,10 +591,24 @@ rocks and drifts differently from thin dye, which reads a little like weight —
 but two dyes of the same colour and different densities are *identical*, and
 nothing ever sinks through anything.
 
-What stands in for immiscibility is `applyImmiscibility`, and it is driven by
-**colour difference**: the force between neighbours goes as
-`|c_neighbour − c_here|²`. So two different colours repel, and two
-same-coloured liquids of different density do nothing whatever.
+One of the two things that stand in for immiscibility is `applyImmiscibility`,
+driven by **colour difference**: the force between neighbours goes as
+`|c_neighbour − c_here|²`. On its own that would mean two different colours
+repel and two same-coloured liquids of different density do nothing.
+
+**Corrected 2026-09-22.** That is not on its own. `lib/liquidPhase.ts` carries
+a real per-liquid chemistry field — `soap`, `body`, `repel` — deposited by the
+bottle and persisting with its own decay (6s, 22s, 26s) and ceilings. Milk is
+`repel: 1`, Silicone `0.45`, Glycerine `0.25`, and the force takes back the
+flow escaping a pool so it keeps its edge. So repulsion **is** chemistry-driven
+and not only colour-driven, and the first version of this section said
+otherwise.
+
+What is still true is narrower: `repel` is a **scalar per cell**, not a pairwise
+matrix. It says how much the liquid here refuses to mix with whatever it meets,
+so there is no "oil repels water *specifically*" — Milk and Silicone do not
+repel each other differently from the way either repels ink. And there is no
+density in `LiquidBehaviour` at all, so nothing floats on anything.
 
 This is already promised twice in this document — "density difference, so the
 heavy phase sinks against the plate rock and the tilt" in B, "heavy pigment
@@ -606,6 +620,21 @@ A drop of oil on clean water spreads to a monolayer, fast and far. A drop of
 oil on water that is already covered sits where it lands as a lens. The plate
 does not know the difference: a pour onto bare glass and a pour onto a
 saturated plate behave the same, because nothing tracks coverage.
+
+**Corrected 2026-09-22: half of this is already built, for soap.**
+`liquidPhase.ts` has `MARANGONI = 1.1` and the note that says exactly what this
+section was asking for — *liquid flows from where the tension is low toward
+where it is high, which is away from the soap* — and its ceiling comment
+already states the saturation case: *the Marangoni force is a gradient, so a
+plate that is uniformly soaped has no force left in it at all.* An earlier
+draft of this section said the app had no `∇γ` term anywhere. It has one.
+
+So what is missing is not the mechanism but **what it is attached to**. Soap
+carries its own tension field; the dye does not. A pour onto a bare plate and a
+pour onto a plate already covered in oil behave identically because nothing
+tracks *dye* coverage, not because the force has nowhere to live. The work is
+to give the carrier the same treatment soap already has — which is the same
+field F asks for, from the other end.
 
 The physics has a name and the right shape for this engine. The spreading
 coefficient is

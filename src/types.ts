@@ -12,6 +12,34 @@ export interface LiquidBehaviour {
   body?: number;
   /** Refuses to let go of itself: a pool of it keeps its edge. */
   repel?: number;
+  /*
+    The two below are a different kind of number from the three above, and the
+    difference is worth stating because it decides how they are stored.
+
+    Soap, body and repel are **amounts**: how much of that property has been
+    put here, they add up, and they saturate. Weight and polarity are **kinds**:
+    what the liquid in this cell *is*. Two drops of oil in one place are not
+    twice as oily — they are oil. So these mix toward the liquid that arrives
+    instead of summing, and they decay back toward water, which is the carrier
+    everything else is suspended in and therefore the zero of both scales.
+  */
+  /**
+   * Denser than water, or lighter, as a fraction. Oil is about −0.12 and
+   * syrup about +0.35. It decides which way a liquid goes when the plate is
+   * tilted or rocked: heavy settles downhill, light rides up over it.
+   */
+  weight?: number;
+  /**
+   * How polar it is, against water. Water is 0, oil is about −0.9, silicone
+   * lower still; a salt or sugar solution is positive.
+   *
+   * This is what makes repulsion *pairwise* — like dissolves like, so two
+   * liquids mix in proportion to how close their polarities are and separate
+   * in proportion to how far apart. `repel` above cannot say that: it is one
+   * number per cell, so a pool refuses to mix with whatever it meets rather
+   * than with a particular other liquid.
+   */
+  polarity?: number;
 }
 
 export interface LiquidType {
@@ -26,12 +54,33 @@ export interface LiquidType {
   behaviour?: LiquidBehaviour;
 }
 
+/*
+  Every bottle now says what it *is*, not only what it does.
+
+  The five below carried no behaviour at all: Oil was described as "repels
+  water" and Syrup as "very heavy" in prose that nothing read, so a plate of
+  oil and a plate of water behaved identically and the descriptions were a
+  promise the solver never kept. `weight` and `polarity` are that promise,
+  written as numbers — roughly the real ones, because the real ones are what
+  makes a dish of them look like a dish of them.
+*/
 export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
-  { id: 'water',   name: 'Water',   color: '#4488ff', description: 'Flows freely, spreads evenly',         injectRadius: 3, injectAmount: 0.6, heatAmount: 0.05 },
-  { id: 'oil',     name: 'Oil',     color: '#ffaa22', description: 'Thick, repels water, stays in blobs',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0  },
-  { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Thin, rises and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5  },
-  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0  },
-  { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Very heavy, barely moves once placed', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0  },
+  // The carrier, and therefore the zero of both scales.
+  { id: 'water',   name: 'Water',   color: '#4488ff', description: 'Flows freely, spreads evenly',         injectRadius: 3, injectAmount: 0.6, heatAmount: 0.05,
+    behaviour: { weight: 0, polarity: 0 } },
+  // Lighter than water and about as unlike it as a kitchen gets: it rides up
+  // over water and will not mix with it.
+  { id: 'oil',     name: 'Oil',     color: '#ffaa22', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,
+    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3 } },
+  // Lighter still, and polar enough to go into water rather than sit on it.
+  { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Light and thin: it rises through water and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
+    behaviour: { weight: -0.2, polarity: -0.15 } },
+  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0,
+    behaviour: { weight: 0.02, polarity: 0.2 } },
+  // The heavy one, and it is sugar in water, so it is polar: it sinks through
+  // water without refusing to mix with it.
+  { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Heavy and polar: it sinks through water and drags where it settles', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0,
+    behaviour: { weight: 0.35, polarity: 0.6, body: 0.5 } },
 
   // The four that change what the plate does rather than only what colour it
   // is. Each writes into the liquid field, and the field goes on acting for as
@@ -45,18 +94,26 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     // the plate underneath — it read as "red is broken". Picking a colour is
     // a statement of intent, so it has to land. Still the lightest bottle
     // there is: a fifth of syrup, and soap goes on thinning what it lands in.
-    injectRadius: 3, injectAmount: 0.4, heatAmount: 0.0, behaviour: { soap: 1 } },
+    injectRadius: 3, injectAmount: 0.4, heatAmount: 0.0,
+    // Amphiphilic: one end likes water and the other does not, so it sits at
+    // the boundary rather than choosing a side. Near zero, and weightless.
+    behaviour: { soap: 1, weight: -0.02, polarity: -0.25 } },
   { id: 'milk',      name: 'Milk',      color: '#f4efe4',
     description: 'A pale ground that holds its own edge instead of blending away',
-    injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0, behaviour: { repel: 1, body: 0.35 } },
+    injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0,
+    behaviour: { repel: 1, body: 0.35, weight: 0.03, polarity: 0.45 } },
   { id: 'silicone',  name: 'Silicone',  color: '#dfe7ee',
     description: 'Shoulders colour aside into a ring — the cell maker',
     // 0.05 before — forty times less than syrup, which made every colour
     // picked with Silicone selected invisible on a live plate.
-    injectRadius: 3, injectAmount: 0.35, heatAmount: 0.0, behaviour: { soap: 0.8, repel: 0.45 } },
+    injectRadius: 3, injectAmount: 0.35, heatAmount: 0.0,
+    // The least polar thing on the shelf, which is why it shoulders colour
+    // aside instead of tinting it.
+    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95 } },
   { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff',
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
-    injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0, behaviour: { body: 1, repel: 0.25 } },
+    injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
+    behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**
@@ -420,7 +477,19 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     rotation: 'none',
   },
   platePressure: 0.4,       // glass plate squeeze — drives radial spreading
-  plateCurve: -0.35,        // clock glasses: they meet in the middle
+  /*
+    Flat, which is what it was before this existed.
+
+    Two glasses that are not parallel is the right idea and the default was
+    wrong twice over. The sign was documented backwards — **negative opens the
+    gap at the middle and tightens it at the rim**, not the other way — and a
+    domed plate measured 10-20% more inward flow than a flat one, reported
+    from the front as everything being pulled toward a drain in the centre.
+    Part of that was a plate filled flat and then sprung toward the dome,
+    which is fixed; the rest is that a dome is a real change to every look and
+    no measurement yet says it earns its place. So it is a control, off.
+  */
+  plateCurve: 0,
   plateSpring: 0.35,        // a press takes about a second to lift
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
