@@ -735,6 +735,71 @@ class FluidSimulation {
   }
 
   /**
+   * The dye a press squeezes out, put where it goes: a ring around the palm.
+   *
+   * Everything in the solver was tried first and each was measured. More
+   * strength — seventy-five times — moved the same 1%. So did slower springs,
+   * the solver's own clamp, and the squeeze entered as a source in the
+   * divergence the projection solves. The film itself is fine: the gap
+   * collapses from 0.030 to 0.004 under the palm at a rate of 166. The
+   * velocity under the palm stays at **0.97x idle**. Nothing downstream of the
+   * film carries the result.
+   *
+   * That is the same finding as the bubbles, twice over. A source in the
+   * divergence is a weak instrument here because the transport cannot carry
+   * it; and anything driven by a *gradient* does nothing in a uniform middle,
+   * which is exactly what a pressed disc is — the gap is at its floor
+   * everywhere under the palm, so there is no slope to push along.
+   *
+   * So the dye is moved here, where the palm's position and size are known
+   * rather than inferred from a field. It is the same operator that fills a
+   * popped bubble, run the other way: take a share of what is under the palm
+   * and put it in the annulus outside, conserving by construction because both
+   * halves read the same mirror.
+   */
+  squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
+    if (!this.gpu) return;
+    const dye = this.gpu.rbDyeView;
+    const N = this.size;
+    const R = Math.max(2, radius);
+    const rOut = R * 1.7;
+    const disc: number[] = [], ring: number[] = [];
+    const yl = Math.max(0, Math.floor(cy - rOut)), yh = Math.min(N - 1, Math.ceil(cy + rOut));
+    const xl = Math.max(0, Math.floor(cx - rOut)), xh = Math.min(N - 1, Math.ceil(cx + rOut));
+    for (let y = yl; y <= yh; y++) {
+      for (let x = xl; x <= xh; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d <= R) disc.push(x + y * N);
+        else if (d <= rOut) ring.push(x + y * N);
+      }
+    }
+    if (disc.length === 0 || ring.length === 0) return;
+
+    let mass = 0, aR = 0, aG = 0, aB = 0;
+    // How much of what is under the palm goes, this press. A share rather
+    // than all of it: a hand squeezes the film thin, it does not scrape it.
+    const take = Math.max(0, Math.min(0.6, amount * 12));
+    for (const i of disc) {
+      const i4 = i * 4;
+      const v = dye[i4 + 3];
+      if (!(v > 1e-5)) continue;
+      mass += v * take; aR += dye[i4] * take; aG += dye[i4 + 1] * take; aB += dye[i4 + 2] * take;
+    }
+    if (!(mass > 1e-4)) return;
+    this.dirty = true;
+    // Out of the disc, through the multiplicative channel that exists for dye
+    // being taken away...
+    for (const i of disc) this.mul[i] *= 1 - take;
+    // ...and into the ring, in the mirror's own log space so the colour that
+    // arrives is the colour that left.
+    const w = 1 / ring.length;
+    for (const i of ring) {
+      this.density[i] += mass * w;
+      this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
+    }
+  }
+
+  /**
    * The dye a bubble displaces, put back as a ring around it (H6 · A).
    *
    * The exclusion on the GPU is a multiply, because it is the only operator
@@ -3220,6 +3285,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         af.applySquish(x, y, 20 + 12 * amt, a, fg, true);
         af.applySquish(x, y, 12 + 6 * amt, a, fg);
         af.applySquish(x, y, 6, a, fg);
+        af.squeezeOut(x, y, (20 + 12 * amt) * GRID_SCALE, a);
         if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
         break;
       }
@@ -4208,6 +4274,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 af.applySquish(x, y, 30, 0.004, fg, true);
                 af.applySquish(x, y, 18, 0.004, fg);
                 af.applySquish(x, y, 8, 0.004, fg);
+                // And the liquid goes where a squeezed film sends it.
+                af.squeezeOut(x, y, 30 * GRID_SCALE, 0.004);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 af.blowAir(x, y, 4, 0.06);
@@ -5725,6 +5793,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
           /** The air field (H6), for `npm run bubbles` to ask where the air is. */
+          /** The gap between the glasses and its rate, for the press checks. */
+          readSqueeze: async () => {
+            const lead = fluidsRef.current[0];
+            return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readSqueeze() : null;
+          },
           readAir: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readAir() : null;
