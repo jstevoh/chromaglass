@@ -6,8 +6,10 @@
  * deep. Both engines are told the same things, so it is here, once, writing
  * into a `UniformPack` rather than into a context. Every clamp, every `?? 0.35`
  * that a look saved before a setting existed relies on, and every conditional
- * is the WebGL path's, copied: `npm run uniforms` checks the two field for
- * field and a tidied default reads as a failure.
+ * was the WebGL path's, copied: a gate called `npm run uniforms` checked the
+ * two field for field, so a tidied default read as a failure. The WebGL path
+ * and that gate both went at P7 — these clamps and defaults are now load
+ * bearing on their own, and changing one changes what every saved look does.
  *
  * The twelve textures are not here — they are bindings, not buffer fields.
  */

@@ -1,10 +1,10 @@
 /**
- * The projector's pass in WGSL (docs/webgpu-plan.md, P3), twin of the GLSL in
- * `src/lib/outputPass.ts`.
- *
- * `npm run output` runs both over the same scene and the same mapping and
- * compares the frames. Read the GLSL for why a line is the way it is — the
- * comments here cover only what the port changes.
+ * The projector's pass in WGSL (docs/webgpu-plan.md, P3). It was written as
+ * the twin of a GLSL pass in `src/lib/outputPass.ts` and proved against it
+ * frame for frame by `npm run output`; both were deleted with the WebGL
+ * renderer at P7, so this is the only copy and `npm run wall` is what holds
+ * it. Comments that once said "see the GLSL for why" have nothing to point
+ * at — what is here is the whole of it.
  *
  * What the port changes:
  * - The quad's corners were a vertex buffer rewritten per draw; here they are

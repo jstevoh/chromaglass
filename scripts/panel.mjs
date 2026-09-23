@@ -1317,6 +1317,69 @@ check('and neither starts over the limit',
   }
 }
 
+// ── Every command the code tells you to run, exists ─────────────────
+/*
+  `npm run evolve` was cited in the roadmap, in `bubbles-plan.md`, in four
+  commit messages and in two pull request descriptions, and it was never a
+  script. It had only ever been run by bundling it with esbuild by hand.
+  Anyone following the documentation got "Missing script".
+
+  Sweeping for it found six more, all pointing at gates that went with the
+  WebGL renderer at P7 — and five of those were in *source* docstrings, where
+  they read as instructions rather than history: "npm run camera compares its
+  output with the GLSL's, pixel for pixel", beside a file whose GLSL twin no
+  longer exists.
+
+  So a command named in the code either runs, or is listed here as one that
+  used to. A citation that is neither is a promise the repository cannot keep.
+*/
+{
+  /*
+    Retired, and named rather than tolerated silently. Each of these was a
+    real gate that compared a WGSL pass against its GLSL twin; the twins and
+    the gates were deleted together at P7 (docs/webgpu-plan.md). The comments
+    that mention them now say so in the past tense, which is worth keeping:
+    they record what proved the shader that is still here.
+  */
+  const RETIRED = new Map([
+    ['camera', 'compared the camera pass against its GLSL twin; both went at P7'],
+    ['composite', 'compared the compositor against its GLSL twin; both went at P7'],
+    ['output', 'compared the projector pass against its GLSL twin; both went at P7'],
+    ['parity', 'compared the two solvers; the CPU one went at P7'],
+    ['post', 'compared the post chain against its GLSL twin; both went at P7'],
+    ['uniforms', 'compared the two uniform packs field for field; the WebGL one went at P7'],
+    ['clip', 'docs/clip-plan.md plans it; scripts/clip* are local-only and run with node'],
+  ]);
+  const have = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts));
+  const walk = (dir, out = []) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full, out);
+      else if (/\.(ts|tsx|mjs|js)$/.test(e.name)) out.push(full);
+    }
+    return out;
+  };
+  const cited = new Map();
+  for (const f of [...walk(join(root, 'src')), ...walk(join(root, 'scripts'))]) {
+    for (const m of readFileSync(f, 'utf8').matchAll(/npm run ([a-z][a-z0-9:-]*)/g)) {
+      if (!cited.has(m[1])) cited.set(m[1], f.replace(root + '/', ''));
+    }
+  }
+  const phantom = [...cited].filter(([name]) => !have.has(name) && !RETIRED.has(name));
+  check('every command the code tells you to run is one that exists',
+    phantom.length === 0,
+    phantom.length
+      ? phantom.map(([n, f]) => `npm run ${n} (${f})`).join(', ')
+      : `${cited.size} cited, ${[...cited].filter(([n]) => RETIRED.has(n)).length} of them retired and listed`);
+
+  // And the list does not rot: a retired name that comes back as a real
+  // script should leave the list rather than sit in it claiming to be gone.
+  const undead = [...RETIRED.keys()].filter(n => have.has(n));
+  check('nothing is listed as retired while it still exists', undead.length === 0,
+    undead.length ? undead.join(', ') : `${RETIRED.size} retired`);
+}
+
 // ── Result ──────────────────────────────────────────────────────────
 const failed = checks.filter(c => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
