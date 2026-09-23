@@ -30,6 +30,18 @@ const PORT = 4342;
 const ONLY = process.env.LOOKS_ONLY ? process.env.LOOKS_ONLY.split(',') : null;
 const SETTLE = Number(process.env.LOOKS_SETTLE ?? 11000);
 const LATE = Number(process.env.LOOKS_LATE ?? 14000);
+/*
+  LOOKS_AB=depthDrag measures one setting against itself, preset by preset.
+
+  Run twice and compared, this sweep is useless for judging a solver change:
+  the plate drifts enough between runs that `lace-run` read 42% flat once and
+  16% the next time with nothing changed at all. So the A/B is done inside one
+  page load — settle, read, flip the setting, wait the same again, read — and
+  what is reported is the pair.
+*/
+const AB = process.env.LOOKS_AB || null;
+const AB_FROM = Number(process.env.LOOKS_AB_FROM ?? 0);
+const AB_TO = Number(process.env.LOOKS_AB_TO ?? 1);
 
 const rows = [];
 const bad = [];
@@ -147,8 +159,16 @@ try {
       and the reported case was around twenty-four seconds in — so the first
       reading is only kept to see which way the dye is going.
     */
+    if (AB) await page.evaluate(([k, v]) => { window.chromaglassDebug().settings[k] = v; }, [AB, AB_FROM]);
     const early = await dyeOf();
     await page.waitForTimeout(LATE);
+    let before = null;
+    if (AB) {
+      const p0 = await frameOf(page, 320, 200);
+      before = { ...judge(p0), dye: await dyeOf() };
+      await page.evaluate(([k, v]) => { window.chromaglassDebug().settings[k] = v; }, [AB, AB_TO]);
+      await page.waitForTimeout(LATE);
+    }
     const px = await frameOf(page, 320, 200);
     if (!px) {
       const why = await page.evaluate(() => window.__cgFrameLast);
@@ -168,6 +188,14 @@ try {
     rows.push({ id: preset.id, flat, dye, luma, colours, faults, errors });
     if (faults.length) bad.push(preset.id);
 
+    if (before) {
+      console.log(`  ${preset.id.padEnd(22)} ${AB} ${AB_FROM}→${AB_TO}:  ` +
+        `flat ${(before.flat * 100).toFixed(0)}%→${(flat * 100).toFixed(0)}%   ` +
+        `dye ${before.dye.toFixed(2)}→${dye.toFixed(2)}   ` +
+        `colours ${(before.colours * 100).toFixed(0)}%→${(colours * 100).toFixed(0)}%`);
+      await page.close();
+      continue;
+    }
     console.log(`  ${preset.id.padEnd(22)} ${(flat * 100).toFixed(0).padStart(4)}%  ` +
       `${dye.toFixed(2).padStart(5)}  ${luma.toFixed(3)}  ${(colours * 100).toFixed(0).padStart(5)}%   ` +
       (faults.length ? faults.join(' ') : 'ok'));

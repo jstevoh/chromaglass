@@ -140,6 +140,15 @@ jobs:
       # effects' randomness is the same twice.
       - name: The post chain
         run: npm run fx
+      # The plate's own depth, which until F reached nothing (bubbles-plan.md
+      # F): a domed plate's tight rim has to run slower than its deep centre,
+      # a flat plate has to be untouched however high the dial goes, and a
+      # press has to keep its dent while the glasses change shape under it.
+      # The margins are wide — the rim/centre ratio moves 1.13 to 0.08 where
+      # the gate asks for 10% — because what it guards is a sign and a place,
+      # not a tuning.
+      - name: Depth reaches the flow
+        run: npm run depth
       # And the projector's geometry, on a GPU: which pixels are black, and
       # how many times a second the whole screen is allowed to change.
       - name: The wall
