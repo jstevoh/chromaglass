@@ -135,6 +135,9 @@ export class LiquidPhase {
   readonly polarity: Float32Array;
 
   private readonly scratch: Float32Array;
+  /** More scratch, so every channel rides one backtrace. */
+  private readonly scratchB: Float32Array;
+  private readonly scratchC: Float32Array;
   /** True while any channel holds anything worth spending a pass on. */
   private live = false;
   /*
@@ -153,6 +156,8 @@ export class LiquidPhase {
   }
   /** Sum of each channel over the plate, kept current by `deposit` and `step`. */
   private readonly totals = { soap: 0, body: 0, repel: 0 };
+  /** What the kind channels hold, so an empty plate never walks them. */
+  private kindsHeld = 0;
 
   constructor(size: number) {
     this.size = size;
@@ -163,6 +168,8 @@ export class LiquidPhase {
     this.weight = new Float32Array(n);
     this.polarity = new Float32Array(n);
     this.scratch = new Float32Array(n);
+    this.scratchB = new Float32Array(n);
+    this.scratchC = new Float32Array(n);
   }
 
   /** Nothing on the plate. */
@@ -177,6 +184,7 @@ export class LiquidPhase {
     this.weight.fill(0);
     this.polarity.fill(0);
     this.totals.soap = this.totals.body = this.totals.repel = 0;
+    this.kindsHeld = 0;
     this.live = false;
   }
 
@@ -252,6 +260,7 @@ export class LiquidPhase {
           const k = take * w;
           this.weight[i] += (weight - this.weight[i]) * k;
           this.polarity[i] += (polarity - this.polarity[i]) * k;
+          this.kindsHeld += Math.abs(this.weight[i]) + Math.abs(this.polarity[i]);
         }
       }
     }
@@ -273,9 +282,18 @@ export class LiquidPhase {
       body: Math.exp(-dt / DECAY_SECONDS.body),
       repel: Math.exp(-dt / DECAY_SECONDS.repel),
     };
-    this.totals.soap = this.advectDecay(this.soap, vx, vy, disp, keep.soap);
-    this.totals.body = this.advectDecay(this.body, vx, vy, disp, keep.body);
-    this.totals.repel = this.advectDecay(this.repel, vx, vy, disp, keep.repel);
+    /*
+      All three amounts along one backtrace.
+
+      They were three separate calls with the same velocity and the same
+      displacement — three identical walks over the plate, each recomputing the
+      same backtrace and the same four bilinear weights, to sample a different
+      field. The backtrace is nearly all of the cost. One walk, three samples.
+
+      The conservation clamp stays per channel, because it has to: each has its
+      own decay and therefore its own allowance.
+    */
+    this.advectAmounts(vx, vy, disp, keep.soap, keep.body, keep.repel);
     /*
       The kinds ride the plate too, and they fade back toward water.
 
@@ -284,16 +302,130 @@ export class LiquidPhase {
       cannot say whether the channel is still holding anything. The absolute
       sums do, and they are what keeps the pass alive.
     */
-    const kw = Math.exp(-dt / DECAY_SECONDS.weight);
-    const kp = Math.exp(-dt / DECAY_SECONDS.polarity);
-    this.advectDecay(this.weight, vx, vy, disp, kw);
-    this.advectDecay(this.polarity, vx, vy, disp, kp);
-    let kinds = 0;
-    for (let i = 0; i < this.weight.length; i++) kinds += Math.abs(this.weight[i]) + Math.abs(this.polarity[i]);
+    /*
+      Both kinds along one backtrace, and a separate walk to add them up was
+      one walk too many.
+
+      Each channel had its own `advectDecay`, which is its own backtrace over
+      the whole plate — and the backtrace is nearly all of the cost, not the
+      sampling. Two more of them put the pass at **3.51 ms at 192² on a CI
+      runner against a gate of 3.0**, having measured 1.50 on a laptop, which
+      is what a slower machine is for. The two kinds ride the same flow, so
+      they share one backtrace and one set of bilinear weights, and the second
+      field costs four multiplies rather than a second pass over the plate.
+
+      Neither is clamped back the way the amounts are. That guard exists
+      because a converging flow samples the same cells over and over and so
+      *makes* soap out of nothing; a signed property has nothing to make, since
+      a cell can only ever become more like the liquid around it.
+    */
+    /*
+      And skipped altogether on a plate that has none.
+
+      A look with soap on it but no weight or polarity anywhere was still
+      paying for a full backtrace of both, every step, to move zeroes around.
+      What they held last step says whether this step has anything to do, which
+      costs one number and is exact: a kind cannot appear except by being
+      deposited, and a deposit says so.
+    */
+    const kinds = this.kindsHeld > 0
+      ? this.advectKinds(vx, vy, disp,
+          Math.exp(-dt / DECAY_SECONDS.weight), Math.exp(-dt / DECAY_SECONDS.polarity))
+      : 0;
+    this.kindsHeld = kinds;
     this.live = this.totals.soap + this.totals.body + this.totals.repel + kinds > 0;
   }
 
   /** One channel: semi-Lagrangian backtrace, then decay. Returns what is left. */
+  /**
+   * The three amount channels along one backtrace, clamped per channel.
+   *
+   * A backtrace does not conserve what it carries: where the flow converges it
+   * samples the same few cells repeatedly and the liquid multiplies — a dose of
+   * soap once grew to fifteen times itself in fifteen seconds and emptied Solar
+   * Flare under music. None of these is ever made by moving, so a pass that
+   * leaves more than decay alone would have is scaled back to that, and each
+   * channel needs its own allowance because each has its own decay.
+   */
+  private advectAmounts(vx: Float32Array, vy: Float32Array, disp: number, ks: number, kb: number, kr: number): void {
+    const s = this.size;
+    const so = this.soap, bo = this.body, re = this.repel;
+    const ss = this.scratch, sb = this.scratchB, sr = this.scratchC;
+    ss.set(so); sb.set(bo); sr.set(re);
+    const last = s - 2;
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) {
+      const k = i + j * s; b0 += ss[k]; b1 += sb[k]; b2 += sr[k];
+    }
+    let t0 = 0, t1 = 0, t2 = 0;
+    for (let j = 1; j < s - 1; j++) {
+      for (let i = 1; i < s - 1; i++) {
+        const idx = i + j * s;
+        let x = i - disp * vx[idx];
+        let y = j - disp * vy[idx];
+        if (x < 0.5) x = 0.5; else if (x > last + 0.5) x = last + 0.5;
+        if (y < 0.5) y = 0.5; else if (y > last + 0.5) y = last + 0.5;
+        const i0 = x | 0, j0 = y | 0;
+        const a = i0 + j0 * s, b = a + 1, c = a + s, d = c + 1;
+        const fx = x - i0, fy = y - j0;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const v0 = (ss[a] * w00 + ss[b] * w10 + ss[c] * w01 + ss[d] * w11) * ks;
+        const v1 = (sb[a] * w00 + sb[b] * w10 + sb[c] * w01 + sb[d] * w11) * kb;
+        const v2 = (sr[a] * w00 + sr[b] * w10 + sr[c] * w01 + sr[d] * w11) * kr;
+        const o0 = v0 < FLOOR ? 0 : v0, o1 = v1 < FLOOR ? 0 : v1, o2 = v2 < FLOOR ? 0 : v2;
+        so[idx] = o0; bo[idx] = o1; re[idx] = o2;
+        t0 += o0; t1 += o1; t2 += o2;
+      }
+    }
+    const hold = (field: Float32Array, total: number, before: number, keep: number): number => {
+      const allowed = before * keep;
+      if (!(total > allowed) || !(total > 0)) return total;
+      const k = allowed / total;
+      for (let j = 1; j < s - 1; j++) for (let i = 1; i < s - 1; i++) field[i + j * s] *= k;
+      return allowed;
+    };
+    this.totals.soap = hold(so, t0, b0, ks);
+    this.totals.body = hold(bo, t1, b1, kb);
+    this.totals.repel = hold(re, t2, b2, kr);
+  }
+
+  /**
+   * The two kind channels along one backtrace, returning how much they hold.
+   *
+   * They are signed, so a plain sum cancels — oil on one side and syrup on the
+   * other add to nothing — and a pass that asked that question would switch
+   * itself off with a full plate. The absolute total is what says whether
+   * there is anything here.
+   */
+  private advectKinds(vx: Float32Array, vy: Float32Array, disp: number, kw: number, kp: number): number {
+    const s = this.size;
+    const w = this.weight, pol = this.polarity;
+    const sw = this.scratch, sp = this.scratchB;
+    sw.set(w); sp.set(pol);
+    const last = s - 2;
+    let held = 0;
+    for (let j = 1; j < s - 1; j++) {
+      for (let i = 1; i < s - 1; i++) {
+        const idx = i + j * s;
+        let x = i - disp * vx[idx];
+        let y = j - disp * vy[idx];
+        if (x < 0.5) x = 0.5; else if (x > last + 0.5) x = last + 0.5;
+        if (y < 0.5) y = 0.5; else if (y > last + 0.5) y = last + 0.5;
+        const i0 = x | 0, j0 = y | 0;
+        const a = i0 + j0 * s, b = a + 1, c = a + s, d = c + 1;
+        const fx = x - i0, fy = y - j0;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const nw = (sw[a] * w00 + sw[b] * w10 + sw[c] * w01 + sw[d] * w11) * kw;
+        const np = (sp[a] * w00 + sp[b] * w10 + sp[c] * w01 + sp[d] * w11) * kp;
+        const ow = nw > -FLOOR && nw < FLOOR ? 0 : nw;
+        const op = np > -FLOOR && np < FLOOR ? 0 : np;
+        w[idx] = ow; pol[idx] = op;
+        held += (ow < 0 ? -ow : ow) + (op < 0 ? -op : op);
+      }
+    }
+    return held;
+  }
+
   private advectDecay(field: Float32Array, vx: Float32Array, vy: Float32Array, disp: number, keep: number): number {
     const s = this.size;
     const src = this.scratch;
@@ -364,7 +496,8 @@ export class LiquidPhase {
       for (let i = 1; i < s - 1; i++) {
         const idx = i + j * s;
         const soap = this.soap[idx], body = this.body[idx], repel = this.repel[idx];
-        const heavy = this.weight[idx], polar = this.polarity[idx];
+        const heavy = this.kindsHeld > 0 ? this.weight[idx] : 0;
+        const polar = this.kindsHeld > 0 ? this.polarity[idx] : 0;
         if (soap === 0 && body === 0 && repel === 0 && heavy === 0 && polar === 0) continue;
 
         let fx = 0, fy = 0;

@@ -290,7 +290,17 @@ function spread(density) {
   const ph = new LiquidPhase(N);
   const p = plate();
   pool(p.density, N / 2, N / 2, 30, 1);
-  ph.deposit(N / 2, N / 2, 25, { soap: 1, body: 1, repel: 1 }, 1);
+  /*
+    All five channels, because the cost of the ones that are skipped when empty
+    is exactly the cost worth knowing.
+
+    This deposited soap, body and repel only. The kind channels — weight and
+    polarity — are skipped on a plate that holds none, which is the right
+    optimisation and would have made this benchmark pass by not measuring
+    them. A plate carrying a real liquid carries all five: glycerine is thick,
+    cohesive, heavy and polar all at once.
+  */
+  ph.deposit(N / 2, N / 2, 25, { soap: 1, body: 1, repel: 1, weight: 0.26, polarity: 0.8 }, 1);
   const t0 = performance.now();
   const STEPS = 240;
   for (let s = 0; s < STEPS; s++) {
