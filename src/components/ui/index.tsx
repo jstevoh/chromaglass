@@ -83,13 +83,20 @@ export function Button({
 // ── Segmented control ────────────────────────────────────────────────
 
 export function Segmented<T extends string>({
-  value, options, onChange, height = 36, testId,
+  value, options, onChange, height = 36, testId, compact = false,
 }: {
   value: T;
   options: readonly (readonly [T, string] | readonly [T, string, string])[];
   onChange: (v: T) => void;
   height?: number;
   testId?: string;
+  /**
+   * Tighter, for a row that has to share its line: below 1280 the padding
+   * narrows and the key letters step back into the tooltip. Perform's eight
+   * tools next to the dye tray pushed Freeze and Drain off a 1024 screen
+   * without it.
+   */
+  compact?: boolean;
 }) {
   return (
     <div className="inline-flex rounded-md border border-border bg-elevated p-0.5" role="tablist" data-testid={testId}>
@@ -101,12 +108,13 @@ export function Segmented<T extends string>({
           onClick={() => onChange(id)}
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
-          className={`inline-flex items-center gap-1.5 rounded-sm px-4 text-[13px] font-medium transition-colors duration-[120ms] ${
+          title={compact && kbd ? `${label} (${kbd})` : undefined}
+          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 xl:px-4' : 'px-4'} text-[13px] font-medium transition-colors duration-[120ms] ${
             value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
           }`}
         >
           {label}
-          {kbd && <span className="font-mono text-[11px] text-faint">{kbd}</span>}
+          {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden xl:inline' : ''}`}>{kbd}</span>}
         </button>
       ))}
     </div>

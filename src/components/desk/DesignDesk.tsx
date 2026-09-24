@@ -8,6 +8,7 @@ import { readSetting } from '../../lib/readout';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
 import type { LiquidType, VisualizerSettings } from '../../types';
+import { DESK_TOOLS } from './tools';
 
 /**
  * The bench, to the handoff's Design screen.
@@ -24,12 +25,8 @@ import type { LiquidType, VisualizerSettings } from '../../types';
 
 const RANGE = PIN_RANGE;
 
-/** All seven, with the letter that picks each one. */
-const TOOLS = [
-  ['dropper', 'Drop', 'D'], ['spray', 'Spray', 'S'], ['splatter', 'Splat', 'X'],
-  ['pour', 'Pour', 'O'], ['streak', 'Streak', 'K'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P'],
-  ['finger', 'Finger', 'G'],
-] as const;
+/** The same eight tools on both desks (`tools.ts`). */
+const TOOLS = DESK_TOOLS;
 
 export interface DesignDeskProps {
   /** The bottles, already in the two groups the bench thinks in. */
