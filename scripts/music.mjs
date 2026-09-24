@@ -19,7 +19,7 @@
  * gap longer than four seconds does not work on real music.
  */
 
-import { extractPeakHashes, buildIndex, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
+import { extractPeakHashes, buildIndex, addToIndex, forEachEntry, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
 import { RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SongBoundary, roomIsQuiet, DEFAULT_BOUNDARY } from '../src/lib/songBoundary.ts';
 import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
@@ -241,6 +241,41 @@ for (const { name, index } of library) {
   checks.push([`${name}: and knows where in it`, offErr.length === 6 && Math.max(...offErr) < 1.0]);
   checks.push([`${name}: says nothing about six tracks it has not heard`, named(strangers, false) === 0]);
   checks.push([`${name}: says nothing about noise`, noise === null]);
+}
+
+// ── The index a song at a time ──────────────────────────────────────
+//
+// In the app the index is built once, at load, and then each newly mapped
+// song is added to it on its own — segments merging as they go — rather than
+// the whole library being rebuilt. That only works if the index it ends up
+// as answers every question exactly as a fresh build of the same library
+// would: the same entries under every hash, and the same verdict (track,
+// offset, score, background) on every snippet.
+{
+  const all = [fpA, fpC, ...STRANGERS.map((pcm, i) => fingerprint(`TEST-S${i}`, pcm))];
+  const full = buildIndex(all);
+  const grown = buildIndex(all.slice(0, 1));
+  for (const rec of all.slice(1)) addToIndex(grown, rec);
+
+  const entriesOf = (index, h) => {
+    const out = [];
+    forEachEntry(index, h, (t, f) => out.push(`${t}:${f}`));
+    return out.sort().join(',');
+  };
+  let hashesSame = true, checked = 0;
+  for (const rec of all) {
+    for (const h of rec.hashes) { checked++; if (entriesOf(full, h) !== entriesOf(grown, h)) hashesSame = false; }
+  }
+  const questions = [...all.map((_, i) => (i < 2 ? [A, C][i] : STRANGERS[i - 2])), song(4242)]
+    .flatMap(pcm => [5, 20, 38].map(at => snippet(pcm, at)));
+  const answers = (index) => JSON.stringify(questions.map(q => matchSnippet(q, FP_RATE, index)));
+  const verdictsSame = answers(full) === answers(grown);
+  const refused = !addToIndex(grown, fpC);
+
+  console.log(`\nThe index grown a song at a time: ${all.length} tracks in ${grown.segments.length} segment(s), ${checked} hash lookups, ${questions.length} snippets`);
+  checks.push(['an index grown a song at a time holds what a full build holds', hashesSame && grown.trackCount === full.trackCount]);
+  checks.push(['and names every snippet the same way', verdictsSame]);
+  checks.push(['and will not index a track twice', refused && grown.trackCount === all.length]);
 }
 
 // ── Taking the tempo from somewhere that knows ──────────────────────
