@@ -247,6 +247,9 @@ try {
   // it: a bare plate is black everywhere and every gate below would pass for
   // the wrong reason.
   await page.waitForTimeout(9000);
+  // Read before anything below touches the output: the gain and gamma checks
+  // switch the guard off for themselves and back on after.
+  const guardAtLoad = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.flashGuard);
 
   /**
    * Set the output config on the plate that is already running.
@@ -600,16 +603,29 @@ try {
     The threshold is untouched. A check that fails now and then is fixed by
     measuring it better, never by asking less of it.
   */
+  /*
+    With the flash guard off, and only here.
+
+    Alternating a graded frame with a plain one every few frames *is* a
+    flicker, and the guard is built to catch exactly that: it rides the
+    master dimmer down against the swing. So did the masks, pins and flips
+    just before, which blank and restore the frame the same way. On a slow
+    runner the guard was still holding the plate at a third when this
+    started (the plain reading 0.031 against 0.095 at the top of the run),
+    and then answered the 2.2x gain by dimming again: 0.031 -> 0.030, a
+    check measuring the guard rather than the grade. The guard has its own
+    checks below, with it back on.
+  */
   const bracket = async (cfg, rounds = 3) => {
     let off = 0;
     let on = 0;
     for (let i = 0; i < rounds; i++) {
-      await withOutput({});
+      await withOutput({ flashGuard: false });
       off += meanOver(await gridOf(), () => true);
-      await withOutput(cfg);
+      await withOutput({ ...cfg, flashGuard: false });
       on += meanOver(await gridOf(), () => true);
     }
-    await withOutput({});
+    await withOutput({ flashGuard: false });
     off += meanOver(await gridOf(), () => true);
     return { it: on / rounds, base: off / (rounds + 1) };
   };
@@ -619,6 +635,7 @@ try {
   const gamma = await bracket({ gamma: 2.2 });
   check('output gamma darkens the mid-tones', gamma.it < gamma.base * 0.95,
     `${gamma.base.toFixed(3)} -> ${gamma.it.toFixed(3)}`);
+  await withOutput({ flashGuard: true });
 
   // ── 6. The same, with the camera in the way ────────────────────────
   //
@@ -713,7 +730,8 @@ try {
   // "the debug hook returns an object", which it does whatever the guard is
   // doing and which is what an earlier version of this line checked.
   const guardOn = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.flashGuard);
-  check('the guard is on without anyone asking for it', guardOn === true, `flashGuard ${guardOn}`);
+  check('the guard is on without anyone asking for it', guardAtLoad === true && guardOn === true,
+    `flashGuard ${guardAtLoad} at load, ${guardOn} now`);
   const reading = await page.evaluate(() => window.chromaglassDebug?.().flash?.()?.luminance ?? null);
   check('and it is being fed', reading !== null && reading > 0, `luminance ${reading}`);
 

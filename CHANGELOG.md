@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the presets, redone
+
+- **Eight new colours** (teal, amber, ultramarine, jade, magenta, coral,
+  midnight, lavender) and four palettes built on them (Reef, Twilight, Forest,
+  Dusk). Every preset has a new set of dyes, and most have a new ground: half
+  of them used to carry yellow, and the three macro looks shared one warm set
+  on three dark reds.
+- **Four near-copies are new looks.** Fractal Dream is a turning six-way
+  kaleidoscope. Neon Coral Reef grows coral with the chemistry. Stardust
+  Collapse is dye particles. Boiling Point is a green cauldron full of
+  bubbles. Microscopic Chaos is a stained slide on a bright field.
+- **Three new presets** use parts of the app no preset used before: Magnet
+  Garden (ferrofluid and a magnet), Home Movie (Super 8 film stock) and Clock
+  Glass (curved glasses and depth drag).
+- **More of the lamp and the dish:** the gel wheel, the round dish, the second
+  lamp, lamp warmth, light through dye, the macro camera's music sync, drop
+  height and plate drag now appear across the set.
+- **The macro looks slow down.** Lacing Run ran at fifteen times the median
+  speed; it and the other two are now at roughly half of where they were.
+- **A look change in Perform hands over its colours.** The old dye thins out
+  while the new look's colours pour in, colours fade through each other
+  instead of switching, and the kaleidoscope and film stock change at the
+  midpoint in one step instead of passing through every value between.
+- **The look the app opens on is drawn in its own colours.** The opening
+  look's settings were applied, but its plate was never laid: every look the
+  app opened on was seeded, coloured and poured as Classic until someone
+  changed look. The first preset gallery showed two dozen looks in one set
+  of colours, which is most of what "the presets all look alike" was.
+- **A plate that goes bad recovers.** The GPU solver's NaN guards compared
+  a number with itself, which a compiler assuming no NaN deletes, and they
+  ran after the clamps that turn an infinity into a NaN. One bad cell then
+  poisoned the whole plate for good: five presets drew bare ground from their
+  first seconds, and a show could stop the same way and never come back.
+  The guards now test the exponent bits, before the clamps, and dye and
+  motion are held finite, and dye to its cap, where they enter a step as
+  well as where it ends: a dense seed used to overflow the first step.
+- **Macro Bead no longer goes black,** and `npm run gallery` (and the Preset
+  gallery workflow) photographs every preset for review.
+
 ### Fixed — the rest of the stability plan
 
 Every job in `docs/stability-plan.md` except S7 (an hour in CI):

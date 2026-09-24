@@ -18,7 +18,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'Slow, luminous blobs drift and merge — a meditative 1960s liquid light show.',
+    description: 'Slow, luminous blobs of yellow, pink and blue drift and merge: the 1960s overhead projector at its most meditative.',
     settings: {
       globalSpeed: 0.00924,
       surge: 0.5,        // unhurried, dreamlike pace
@@ -50,6 +50,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
       postBlurRadius: 0.35,
+      secondLamp: 0.2,
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
         density: 'volume',       // louder = more color, but mapped gently
@@ -70,7 +71,7 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.15,         // low goo — sharper points of light, less blobby
       rotationSpeed: 0.035,      // visible rotation creates spiral arms
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
-      ledPlatform: false,        // pure black void
+      ledPlatform: true,
       diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
       buoyancy: 0.25,            // minimal buoyancy — horizontal swirl dominates
       advection: 0.75,           // strong transport — sweeping spiral arm motion
@@ -93,6 +94,10 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.45,     // vivid nebula color
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
+      ledMode: 'single',
+      ledColor: '#03041a',
+      ledSpeed: 0.0,
+      secondLamp: 0.25,
       audioMappings: {
         velocity: 'bass',        // bass drives galactic tides
         density: 'energy',       // overall energy triggers star formation
@@ -104,7 +109,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'deep-ocean',
     name: 'Deep Ocean',
-    description: 'Slow moving, dense fluids over a deep blue LED platform.',
+    description: 'Slow, dense teal and midnight fluids drift down through a deep blue LED platform, light coming through them from below.',
     settings: {
       globalSpeed: 0.0126,
       surge: 0.22,
@@ -130,6 +135,9 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.01,
       airVelocity: 0.05,
       vibrationFrequency: 0.2,
+      transmission: 0.85,
+      secondLamp: 0.3,
+      saturationBoost: 1.35,
       audioMappings: {
         velocity: 'volume',
         density: 'bass',
@@ -170,6 +178,7 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.05,
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
+      chromaticAberration: 0.35,
       audioMappings: {
         velocity: 'energy',
         density: 'treble',
@@ -181,7 +190,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'lava-lamp',
     name: 'Lava Lamp',
-    description: 'Wax blobs glowing in a dark, ember-lit liquid: they swell, merge and rise.',
+    description: 'Amber and red wax rises and sinks through violet liquid: heavy blobs that stretch, pinch off and fall back.',
     settings: {
       globalSpeed: 0.0168,
       surge: 0.4,
@@ -192,7 +201,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0,          // the wax wanders the lamp; the music already pours it in the middle
       ledPlatform: true,
       ledMode: 'single',         // one dim ember under the whole lamp, not a colour wheel
-      ledColor: '#5c1400',
+      ledColor: '#2a0620',
       ledSpeed: 0.02,
       diffusionRate: 0.00005,
       buoyancy: 0.9,
@@ -221,6 +230,8 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.45,
       exposure: 0.9,
       postBlurRadius: 0.55,      // softer edges than the flat-dye presets
+      lampWarmth: 0.4,
+      transmission: 0.75,
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -232,7 +243,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'acid-trip',
     name: 'Acid Trip',
-    description: 'Chaotic, rapidly rotating colors with strange blending physics.',
+    description: 'Clashing ultramarine, coral, lime and magenta under a turning colour gel: everything inverts where it overlaps.',
     settings: {
       globalSpeed: 0.0336,
       beads: 0.4,
@@ -243,8 +254,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.1,
       centerGravity: 0.6,
       ledPlatform: true,
-      ledMode: 'rainbow',
-      ledSpeed: 0.4,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.8,
@@ -259,7 +270,7 @@ export const PRESETS: Preset[] = [
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
-      evaporationRate: 0.02,
+      evaporationRate: 0.008,
       dyeBudget: 0.6,
       audioImpact: 0.8,
       airVelocity: 0.5,
@@ -273,6 +284,9 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.6,      // hyper-saturated
       glossiness: 0.0,
       postBlurRadius: 0.12,
+      gelWheel: 0.55,
+      gelSpeed: 0.6,
+      ledColor: '#12002c',
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',
@@ -284,13 +298,13 @@ export const PRESETS: Preset[] = [
   {
     id: 'bass-drop',
     name: 'Bass Drop',
-    description: 'Heavy bass hits trigger massive fluid injections and screen shakes.',
+    description: 'Every bass hit drops a heavy splash from height: crimson and ultramarine thrown across ice, the plate squeezed on the kick.',
     settings: {
       globalSpeed: 0.021,
       beads: 0.25,
       surge: 0.9,
       layerCount: 2,
-      blendMode: 'screen',
+      blendMode: 'lighter',
       gooeyEffect: 0.6,
       rotationSpeed: 0.01,
       centerGravity: 0.4,
@@ -309,6 +323,8 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.02,
       airVelocity: 0.2,
       vibrationFrequency: 1.0,
+      dropHeight: 0.9,
+      beatSqueeze: 0.8,
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -346,6 +362,7 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.03,
       airVelocity: 0.1,
       vibrationFrequency: 0.4,
+      hueJourney: 6,
       audioMappings: {
         velocity: 'mid',
         density: 'volume',
@@ -357,19 +374,19 @@ export const PRESETS: Preset[] = [
   {
     id: 'boiling-point',
     name: 'Boiling Point',
-    description: 'High heat and complexity create a chaotic, churning cauldron of fluid.',
+    description: 'A cauldron at the boil: bubbles rise and break through lime, jade and gold, and the heat churns the whole pot.',
     settings: {
       globalSpeed: 0.0294,
       beads: 0.35,
       surge: 0.85,
       layerCount: 2,
-      blendMode: 'overlay',
+      blendMode: 'screen',
       gooeyEffect: 0.7,
       rotationSpeed: 0.02,
       centerGravity: 0.1,
       ledPlatform: true,
-      ledMode: 'fire',
-      ledSpeed: 0.3,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 1.0,
       advection: 0.8,
@@ -384,11 +401,15 @@ export const PRESETS: Preset[] = [
       // The fire wheel with nothing on it, under music: 0.06 dried the plate
       // faster than the pour filled it, and the pour follows complexity, which
       // read two percent of its range until the analyser was fixed.
-      evaporationRate: 0.025,
-      dyeBudget: 0.6,
+      evaporationRate: 0.008,
+      dyeBudget: 0.9,
       audioImpact: 0.8,
       airVelocity: 0.4,
       vibrationFrequency: 0.7,
+      ledColor: '#0c2206',
+      bubbles: 0.5,
+      dropHeight: 0.7,
+      saturationBoost: 1.4,
       audioMappings: {
         velocity: 'energy',
         density: 'complexity',
@@ -400,20 +421,20 @@ export const PRESETS: Preset[] = [
   {
     id: 'microscopic-chaos',
     name: 'Microscopic Chaos',
-    description: 'Extremely dense, high-contrast cellular fluid resembling oil and water under a microscope.',
+    description: 'A stained slide on a bright field: magenta, violet and blue cells crowd, divide and jostle under the lamp.',
     settings: {
       globalSpeed: 0.0168,
       boundaryContrast: 0.7,
       beads: 0.45,
       surge: 0.9,
       layerCount: 2,
-      blendMode: 'screen',
+      blendMode: 'multiply',
       gooeyEffect: 0.15,
       rotationSpeed: 0.01,
       centerGravity: 0.5,
       ledPlatform: true,
-      ledMode: 'rainbow',
-      ledSpeed: 0.08,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.00005,
       buoyancy: 0.4,
       advection: 0.3,
@@ -428,6 +449,10 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.01,
       airVelocity: 0.1,
       vibrationFrequency: 0.6,
+      ledColor: '#f1ebf5',
+      cells: 0.45,
+      saturationBoost: 1.15,
+      dyeBudget: 0.55,
       audioMappings: {
         velocity: 'complexity',
         density: 'energy',
@@ -439,7 +464,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'aurora-borealis',
     name: 'Aurora Borealis',
-    description: 'Slow sweeping curtains of light in greens and purples, rippling to low frequencies.',
+    description: 'Curtains of jade, lime and lavender ripple across a night sky, slow and hushed.',
     settings: {
       globalSpeed: 0.0105,
       surge: 0.2,
@@ -449,8 +474,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.008,
       centerGravity: 0.05,
       ledPlatform: true,
-      ledMode: 'ocean',
-      ledSpeed: 0.03,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.65,
       advection: 0.35,
@@ -470,6 +495,8 @@ export const PRESETS: Preset[] = [
       exposure: 0.5,
       airVelocity: 0.08,
       vibrationFrequency: 0.15,
+      ledColor: '#020818',
+      secondLamp: 0.35,
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -493,8 +520,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.015,
       centerGravity: 0.7,
       ledPlatform: true,
-      ledMode: 'fire',
-      ledSpeed: 0.15,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.85,
       advection: 0.7,
@@ -506,9 +533,11 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thin',
       polarity: 0.3,
-      evaporationRate: 0.04,
+      evaporationRate: 0.012,
       airVelocity: 0.35,
       vibrationFrequency: 0.6,
+      iridescence: 0.25,
+      ledColor: '#2a0700',
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
@@ -520,7 +549,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'jellyfish-bloom',
     name: 'Jellyfish Bloom',
-    description: 'Pulsing translucent bells drift and contract to rhythmic mid frequencies.',
+    description: 'Translucent magenta and lavender bells pulse through teal water, lit from beneath.',
     settings: {
       globalSpeed: 0.0126,
       surge: 0.25,
@@ -530,8 +559,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.006,
       centerGravity: 0.15,
       ledPlatform: true,
-      ledMode: 'ocean',
-      ledSpeed: 0.04,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.00008,
       buoyancy: 0.55,
       advection: 0.25,
@@ -546,6 +575,9 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.005,
       airVelocity: 0.04,
       vibrationFrequency: 0.25,
+      transmission: 0.3,
+      secondLamp: 0.3,
+      ledColor: '#03102a',
       audioMappings: {
         velocity: 'mid',
         density: 'mid',
@@ -557,20 +589,20 @@ export const PRESETS: Preset[] = [
   {
     id: 'fractal-dream',
     name: 'Fractal Dream',
-    description: 'Overlapping interference patterns bloom into recursive color mandalas.',
+    description: 'The plate folded into a turning six-way mirror: rings of amber, magenta and teal become a mandala that breathes with the music.',
     settings: {
       globalSpeed: 0.0189,
       boundaryContrast: 0.6,
       beads: 0.3,
       surge: 0.8,
       layerCount: 2,
-      blendMode: 'exclusion',
+      blendMode: 'screen',
       gooeyEffect: 0.2,
       rotationSpeed: 0.04,
       centerGravity: 0.9,
-      ledPlatform: true,
-      ledMode: 'rainbow',
-      ledSpeed: 0.25,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.5,
       advection: 0.55,
@@ -585,6 +617,12 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.025,
       airVelocity: 0.25,
       vibrationFrequency: 0.55,
+      kaleidoscope: 6,
+      kaleidoSpin: 0.06,
+      kaleidoZoom: 0.85,
+      ledColor: '#000000',
+      saturationBoost: 1.45,
+      dishVignette: 0.5,
       audioMappings: {
         velocity: 'complexity',
         density: 'mid',
@@ -596,7 +634,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'velvet-underground',
     name: 'Velvet Underground',
-    description: 'Rich saturated pools of deep magenta and indigo that churn slowly to the beat.',
+    description: 'Rich pools of magenta, raspberry and ultramarine over deep violet, churning slowly to the beat under a warm lamp.',
     settings: {
       globalSpeed: 0.0084,
       surge: 0.18,
@@ -623,6 +661,11 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
+      transmission: 0.55,
+      lampWarmth: 0.25,
+      glossiness: 0.35,
+      edgeRelief: 0.45,
+      boundaryContrast: 0.5,
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -634,7 +677,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'neon-coral-reef',
     name: 'Neon Coral Reef',
-    description: 'Branching fluorescent tendrils sway and pulse in sync with mid and treble.',
+    description: 'A reaction grows coral across the glass: coral, teal and amber branches spread, fork and are carried off by the current.',
     settings: {
       globalSpeed: 0.0168,
       boundaryContrast: 0.5,
@@ -646,8 +689,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.012,
       centerGravity: 0.0,
       ledPlatform: true,
-      ledMode: 'cyberpunk',
-      ledSpeed: 0.12,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0001,
       buoyancy: 0.45,
       advection: 0.4,
@@ -662,6 +705,9 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.012,
       airVelocity: 0.12,
       vibrationFrequency: 0.4,
+      chemistry: 0.7,
+      ledColor: '#021418',
+      saturationBoost: 1.4,
       audioMappings: {
         velocity: 'mid',
         density: 'treble',
@@ -673,7 +719,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'stardust-collapse',
     name: 'Stardust Collapse',
-    description: 'Glittering particles spiral inward then detonate outward on each bass hit.',
+    description: 'Motes of white, lavender and amber dust spiral into the centre and burst back out on the bass, every grain holding its colour.',
     settings: {
       globalSpeed: 0.0231,
       boundaryContrast: 0.65,
@@ -687,8 +733,8 @@ export const PRESETS: Preset[] = [
       // Glitter wants a night sky. On the rainbow wheel, with the dye dried
       // and diffused away, the frame was the wheel and nothing else.
       ledPlatform: false,
-      ledMode: 'rainbow',
-      ledSpeed: 0.35,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,     // a spark stays a spark
       buoyancy: 0.7,
       advection: 0.9,
@@ -700,11 +746,14 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.15,
       viscosity: 'thin',
       polarity: 0.15,
-      evaporationRate: 0.015,
+      evaporationRate: 0.006,
       dyeBudget: 0.45,
       audioImpact: 0.85,
       airVelocity: 0.55,
       vibrationFrequency: 0.85,
+      particles: 0.8,
+      particleMix: 0.75,
+      ledColor: '#000000',
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
@@ -856,13 +905,17 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.6,
       lampMotion: 0.2,
       lightPlay: 0.7,
+      gelWheel: 0.25,
+      gelSpeed: 0.25,
+      dishVignette: 0.7,
+      spinDrag: 0.08,
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
   {
     id: 'poster-1969',
     name: 'Poster, 1969',
-    description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: no gloss, no meniscus, one colour against the other.',
+    description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: orange against ultramarine, the colours that vibrate.',
     settings: {
       globalSpeed: 0.0126,
       surge: 0.55,
@@ -1104,7 +1157,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'macro-bead',
     name: 'Macro Bead',
-    description: 'The camera chases one travelling bead at 8x — cells, lacing and razor edges fill the frame.',
+    description: 'The camera chases one travelling bead — teal, amber and coral on a deep sea-green ground — cells, lacing and razor edges filling the frame.',
     settings: {
       macroMode: true,
       macroZoom: 4.5,            // ~28 sim cells across — bead plus its surroundings
@@ -1116,7 +1169,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      globalSpeed: 0.1176,
+      globalSpeed: 0.06,
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
@@ -1126,20 +1179,20 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#3B0806',       // deep red ground, like paint on stained board
+      ledColor: '#04181a',
       ledSpeed: 0.0,
       diffusionRate: 0.00003,    // colors stay separate instead of muddying
       buoyancy: 0.35,
       advection: 0.6,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.16,
+      automateRate: 0.22,
       platePressure: 0.3,
       glassSmear: 0.2,
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.9,             // strong immiscibility — hard color boundaries
-      evaporationRate: 0.03,     // ground clears between beads instead of washing over
+      evaporationRate: 0.006,
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
@@ -1151,6 +1204,7 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.7,
       saturationBoost: 1.5,
       glossiness: 0.12,          // a hint of wet sheen at this distance
+      macroSync: 0.6,
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -1162,7 +1216,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'cell-bloom',
     name: 'Cell Bloom',
-    description: 'Packed rings of paint cells — dark cores in bright halos — breathing across a magnified pool.',
+    description: 'Packed rings of paint cells — dark cores in bright magenta and lavender halos — breathing across a magnified violet pool.',
     settings: {
       macroMode: true,
       macroZoom: 3.5,
@@ -1174,7 +1228,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
-      globalSpeed: 0.0756,
+      globalSpeed: 0.045,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
@@ -1184,7 +1238,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.05,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#4A0D08',
+      ledColor: '#12062a',
       ledSpeed: 0.0,
       diffusionRate: 0.00005,
       buoyancy: 0.5,
@@ -1197,7 +1251,7 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
-      evaporationRate: 0.02,
+      evaporationRate: 0.01,
       airVelocity: 0.05,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
@@ -1209,6 +1263,7 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.6,
       saturationBoost: 1.55,
       glossiness: 0.18,
+      macroSync: 0.35,
       audioMappings: {
         velocity: 'mid',
         density: 'bass',
@@ -1220,7 +1275,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'lace-run',
     name: 'Lacing Run',
-    description: 'A fast tongue of dye spreading over dark ground, dragging black dendritic lacing behind it.',
+    description: 'A tongue of amber dye spreading over dark red ground, dragging black dendritic lacing behind it; the camera cuts on the kick.',
     settings: {
       macroMode: true,
       macroZoom: 4.0,
@@ -1232,7 +1287,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
-      globalSpeed: 0.189,
+      globalSpeed: 0.07,
       surge: 0.6,         // quick — this one rushes
       layerCount: 1,
       blendMode: 'screen',
@@ -1249,13 +1304,13 @@ export const PRESETS: Preset[] = [
       advection: 0.85,
       damping: 0.975,
       heatDecay: 0.97,
-      automateRate: 0.2,
+      automateRate: 0.28,
       platePressure: 0.45,       // squeeze drives the front without flattening it
       glassSmear: 0.4,
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.95,
-      evaporationRate: 0.035,
+      evaporationRate: 0.005,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
       audioImpact: 0.65,
@@ -1267,6 +1322,7 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.8,
       saturationBoost: 1.4,
       glossiness: 0.08,
+      macroSync: 0.85,
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
@@ -1514,8 +1570,8 @@ export const PRESETS: Preset[] = [
       lightPlay: 0.6,
       lampMotion: 0.2,
       lampHotspot: 0.45,
-      iridescence: 0.75,           // the reason a soap film is worth looking at
-      thinFilm: 0.6,
+      iridescence: 0.6,
+      thinFilm: 1.0,
       secondLamp: 0,
       audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
     }
@@ -1574,7 +1630,155 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.4,
       iridescence: 0.1,
       secondLamp: 0.25,
+      transmission: 0.8,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
+    }
+  },
+  // ── Three that show off a part of the app ────────────────────────
+  // The ferrofluid and its magnet, the film stock, and the curved glasses
+  // were each built, measured and set by no preset at all, so nobody who
+  // only picks looks had ever seen them.
+  {
+    id: 'magnet-garden',
+    name: 'Magnet Garden',
+    description: 'Black ferrofluid on a bright golden pool, a magnet held under the glass: it gathers into spikes and labyrinths and lets go on the beat.',
+    settings: {
+      globalSpeed: 0.0105,
+      surge: 0.35,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.55,
+      rotationSpeed: 0.004,
+      centerGravity: 0.2,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#1a1408',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.25,
+      advection: 0.35,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.1,
+      platePressure: 0.3,
+      glassSmear: 0.2,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.8,
+      evaporationRate: 0.003,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.1,
+      audioImpact: 0.5,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.4,
+      dyeBudget: 1.0,
+      glossiness: 0.2,
+      postBlurRadius: 0.15,
+      phaseAmount: 0.9,
+      phaseScale: 0.3,
+      phaseSharp: 0.75,
+      magnetStrength: 0.9,
+      magnetHeight: 0.3,
+      magnetPolarity: 1,
+      beatSqueeze: 0.4,
+      lampHotspot: 0.4,
+      secondLamp: 0.3,
+      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
+    }
+  },
+  {
+    id: 'home-movie',
+    name: 'Home Movie',
+    description: 'A light show filmed on Super 8 from the back of the hall: warm, soft, grainy, the gate weaving, orange and coral against teal.',
+    settings: {
+      globalSpeed: 0.0105,
+      surge: 0.55,
+      layerCount: 2,
+      blendMode: 'screen',
+      gooeyEffect: 0.6,
+      rotationSpeed: 0.01,
+      centerGravity: 0.15,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.4,
+      advection: 0.4,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.14,
+      platePressure: 0.35,
+      glassSmear: 0.3,
+      rainDrip: 0.1,
+      viscosity: 'thick',
+      polarity: 0.75,
+      evaporationRate: 0.004,
+      airVelocity: 0.04,
+      vibrationFrequency: 0.1,
+      audioImpact: 0.55,
+      blobSurfaceTension: 0.4,
+      boundaryContrast: 0.4,
+      saturationBoost: 1.4,
+      dyeBudget: 0.8,
+      postBlurRadius: 0.3,
+      stock: 0.85,
+      stockType: 3,
+      stockGrain: 0.6,
+      stockWeave: 1.2,
+      stockGate: 0.5,
+      lampWarmth: 0.45,
+      dishVignette: 0.3,
+      hueJourney: 2,
+      audioMappings: { velocity: 'bass', density: 'volume', color: 'treble', rotation: 'none' },
+    }
+  },
+  {
+    id: 'clock-glass',
+    name: 'Clock Glass',
+    description: 'Two curved clock glasses with the dye between them: lavender, ice and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
+    settings: {
+      globalSpeed: 0.0126,
+      surge: 0.4,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.5,
+      rotationSpeed: 0.012,
+      centerGravity: 0.1,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.2,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.12,
+      platePressure: 0.55,
+      glassSmear: 0.25,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.003,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.55,
+      blobSurfaceTension: 0.45,
+      boundaryContrast: 0.35,
+      saturationBoost: 1.45,
+      dyeBudget: 0.9,
+      glossiness: 0.25,
+      postBlurRadius: 0.15,
+      plateCurve: 0.6,
+      depthDrag: 1.5,
+      plateSpring: 0.35,
+      beatSqueeze: 0.6,
+      transmission: 0.35,
+      dishVignette: 0.8,
+      lampHotspot: 0.5,
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
 ];

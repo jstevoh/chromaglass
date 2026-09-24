@@ -275,6 +275,10 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
 const RECOVERY_TRIES = 8;
 /** Consecutive frames that throw before the stage is rebuilt (about 1.5 s at 60 fps). */
 const SELF_HEAL_FRAMES = 90;
+/** How much of the old dye is left when a pressed look change finishes handing over. */
+const HANDOFF_KEEP = 0.45;
+/** How many pours of the new palette arrive through the second half of the handover. */
+const HANDOFF_POURS = 6;
 /** Whether Evolve pours whole-plate floods at the peak of a gust. Off: evolve is subtle. */
 const EVOLVE_FLOODS = false;
 /** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
@@ -392,6 +396,8 @@ export interface LiquidVisualizerHandle {
    * next to it did not.
    */
   adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
+  /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
+  handoff: (seconds: number) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -1197,6 +1203,24 @@ class FluidSimulation {
     this.dirty = true;
   }
 
+  /**
+   * All the dye on this layer, thinned by `factor` (0..1). A look handing
+   * over to the next one: the old colours make room for the new ones instead
+   * of sitting under them for minutes.
+   */
+  thinDye(factor: number) {
+    const f = Math.max(0, Math.min(1, factor));
+    if (f >= 1) return;
+    if (this.gpu) {
+      for (let i = 0; i < GRID_AREA; i++) this.mul[i] *= f;
+      this.dirty = true;
+    } else {
+      for (let i = 0; i < GRID_AREA; i++) {
+        this.density[i] *= f; this.densityR[i] *= f; this.densityG[i] *= f; this.densityB[i] *= f;
+      }
+    }
+  }
+
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
     this.dirty = true;
@@ -1668,6 +1692,27 @@ class FluidSimulation {
             this.splatBlob(x, y + Math.sin(t * 0.13 + b) * 6 * k, 9 * k, 1.5, c.r, c.g, c.b);
             this.addVelocity(Math.floor(x), Math.floor(y), b % 2 === 0 ? 0.05 : -0.05, 0);
           }
+        }
+        break;
+      }
+
+      case 'magnet-garden': {
+        // The ferrofluid is dark and only reads against something bright, so
+        // the plate starts as a full pool of light dye for it to stand on.
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2, d = S * (i === 0 ? 0 : 0.26);
+          const c = col(i);
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, S * 0.2, 2.2, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'clock-glass': {
+        // Curved glasses gather the liquid in the middle; seed it there, in
+        // rings, so the dome has something to hold from the first frame.
+        for (let ring = 0; ring < 3; ring++) {
+          const c = col(ring);
+          this.splatBlob(cx, cy, S * (0.3 - ring * 0.09), 2.4, c.r, c.g, c.b);
         }
         break;
       }
@@ -3418,6 +3463,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const selfHealsRef = useRef<number[]>([]);
   /** Whether the loss just handled kept the plate, so the recovery does not lay the look over it (S1). */
   const plateKeptRef = useRef(false);
+  /*
+    A look handing over to the next (a pressed Go or Back).
+
+    `adoptPreset` changes the palette at once but leaves the plate alone, and
+    at the default evaporation the old dye's half-life is minutes — so after
+    a two-second fade the settings were the new look's and the colours were
+    still the old one's, with the new palette's drops landing in them: for a
+    long while the wall read as neither look. Over the fade now, the old dye
+    thins to a little under half and six pours of the new palette arrive
+    through the second half, so the colours change hands with the settings.
+  */
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -3606,6 +3663,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     dish and an empty ring, Fillmore after Classic had two. So the layer is laid
     here and again the moment it is built.
   */
+  /** The opening look was laid before the GPU solver existed and still owes it its phase. */
+  const phasePendingRef = useRef(false);
+  /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
+  const phaseSolverRef = useRef<unknown>(null);
   const laidPresetRef = useRef<string | null>(null);
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
@@ -3649,21 +3710,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         So the phase is only touched when a look actually asks for some.
       */
-      const amt = settingsRef.current.phaseAmount ?? 0;
-      const lead = fluidsRef.current[0]?.gpu;
-      if (amt > 0.002 && lead?.addPhase) {
-        lead.clearPhase?.();
-        const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
-        const count = Math.round(3 + (1 - scale) * 22);
-        const r = 0.04 + scale * 0.16;
-        for (let k = 0; k < count; k++) {
-          // Deterministic placement: the same look laid twice is the same
-          // plate twice, which is what rendering a song depends on.
-          const a = (k * 2.399963229728653);
-          const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
-          lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
-        }
-      }
+      // A look laid before the GPU solver exists (the opening look, laid on
+      // mount) owes its phase to the solver when it attaches: laid here it
+      // went nowhere, and Magnet Garden opened as a bare gold pool.
+      phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      layPhaseRef.current();
     }
     for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -3681,6 +3732,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     macroCamRef.current.reset();
     livePresetRef.current = presetId;
   };
+  /** The second phase for the look being laid, if it asks for some and the GPU solver is there to take it. */
+  const layPhase = () => {
+    const amt = settingsRef.current.phaseAmount ?? 0;
+    const lead = fluidsRef.current[0]?.gpu;
+    if (amt > 0.002 && lead?.addPhase) {
+      lead.clearPhase?.();
+      const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
+      const count = Math.round(3 + (1 - scale) * 22);
+      const r = 0.04 + scale * 0.16;
+      for (let k = 0; k < count; k++) {
+        // Deterministic placement: the same look laid twice is the same
+        // plate twice, which is what rendering a song depends on.
+        const a = (k * 2.399963229728653);
+        const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
+        lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
+      }
+    }
+  };
+  const layPhaseRef = useRef(layPhase);
+  layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
   layPlateRef.current = layPlate;
@@ -3804,6 +3875,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const contract = presetContractRef.current;
         harmonyRef.current = contract ? harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0) : pickHarmony();
       }
+    },
+    handoff: (seconds: number) => {
+      if (!(seconds > 0)) { handoffRef.current = null; return; }
+      const now = performance.now();
+      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0 };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
@@ -4444,6 +4520,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             gpuSupportedRef.current = false;
           }
         }
+        /*
+          The phase goes to each new solver the lead plate gets, not only
+          the first. The governor rebuilds the solver a few seconds into a
+          show when it moves the grid, and the dye is carried across that
+          but the phase is not: Magnet Garden had its ferrofluid at 8 s and
+          a bare gold pool by 20.
+        */
+        const leadGpu = fluidsRef.current[0]?.gpu ?? null;
+        if (leadGpu !== phaseSolverRef.current) {
+          phaseSolverRef.current = leadGpu;
+          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+            phasePendingRef.current = false;
+            layPhaseRef.current();
+          }
+        }
         {
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
@@ -4925,6 +5016,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const contract = presetContractRef.current;
                 harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
               }
+            }
+          }
+
+          // ── A pressed look change handing over (see `handoffRef`) ──
+          {
+            const h = handoffRef.current;
+            if (h && isActiveRef.current && drainFrameRef.current === 0) {
+              const nowMs = performance.now();
+              const p = Math.min(1, (nowMs - h.start) / h.dur);
+              const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
+              h.last = nowMs;
+              // To HANDOFF_KEEP of the old dye across the whole fade, a little
+              // each frame so it reads as fading and not as a step.
+              const f = Math.pow(HANDOFF_KEEP, dtMs / h.dur);
+              for (const fluid of fluidsRef.current) fluid.thinDye(f);
+              // The new palette arrives through the second half.
+              const due = Math.floor(Math.max(0, Math.min(1, (p - 0.3) / 0.6)) * HANDOFF_POURS + 1e-6);
+              while (h.poured < Math.min(due, HANDOFF_POURS)) {
+                h.poured++;
+                const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
+                if (!fluid) break;
+                const rx = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const ry = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const color = harmonyColor(harmonyRef.current);
+                const styles = injectStyleRef.current;
+                fluid.autoInject(styles[Math.floor(Math.random() * styles.length)] ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                fluid.addTemp(rx, ry, 1.2);
+                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
+              }
+              if (p >= 1) handoffRef.current = null;
             }
           }
 
@@ -5698,6 +5819,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /*
+          What is on each plate, from the last readback: how full it is, its
+          mean colour, how many cells are not a number, and the fastest cell.
+          A plate that draws as bare ground is either empty or poisoned, and
+          the picture cannot tell those apart; this can.
+        */
+        plateStats: () => fluidsRef.current.map((f) => {
+          const d = f.readDensity, vx = f.readVx, vy = f.readVy;
+          let nan = 0, vmax = 0;
+          for (let i = 0; i < d.length; i++) {
+            if (!Number.isFinite(d[i]) || !Number.isFinite(vx[i]) || !Number.isFinite(vy[i])) { nan++; continue; }
+            const v = Math.abs(vx[i]) + Math.abs(vy[i]);
+            if (v > vmax) vmax = v;
+          }
+          return { mean: f.meanDensity, colour: [...f.meanColor], nan, vmax };
+        }),
         bubbles: bubblesRef.current,
         // What the shader was actually told about them last frame: a bubble
         // that is on the plate but not in these two numbers is not on screen.

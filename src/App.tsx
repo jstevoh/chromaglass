@@ -1018,6 +1018,16 @@ export default function App() {
     if (paletteLock != null) visualizerRef.current?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Lay the opening look's plate: its dyes, its seed, its injection styles and
+  // its liquids. The settings above arrive with the first render, but the
+  // plate is the visualizer's and it seeds Classic until told otherwise — so
+  // every look the app opened on used to be drawn in Classic's yellow, pink
+  // and blue, poured Classic's way, until someone changed look. The preset
+  // gallery showed it: two dozen looks, one set of colours. After the lock
+  // above, so a pinned palette is honoured by the plate it lays.
+  useEffect(() => {
+    visualizerRef.current?.applyPreset(OPENING_LOOK);
+  }, []);
 
   // Overlay music-driven parameters onto the user's settings for rendering only
   // (the settings state itself is untouched, so preset detection keeps working).
@@ -1443,7 +1453,10 @@ export default function App() {
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
     setCued(null);
-    // Pressing Go is a decision: the whole look, structure and all.
+    // Pressing Go is a decision: the whole look, structure and all — and its
+    // colours with it, handed over across the fade rather than left to
+    // evaporate for minutes under the new ones. A cut still gets a second.
+    visualizerRef.current?.handoff(Math.max(1, seconds));
     fadeSettingsTo(targetLook(from, next.settings), seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
@@ -1468,6 +1481,7 @@ export default function App() {
     if (!prev) return;
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
+    visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
     fadeSettingsTo(prev.settings, fadeSeconds);
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 

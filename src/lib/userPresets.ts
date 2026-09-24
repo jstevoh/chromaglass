@@ -10,6 +10,7 @@
  * stages refer to, so it arrives whole.
  */
 
+import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
@@ -122,7 +123,7 @@ export function parsePresetFile(text: string): UserPreset {
     description: typeof o.description === 'string' ? o.description : undefined,
     createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date().toISOString(),
     settings: cleanSettings(o.settings),
-    contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 16).slice(0, 8) : undefined,
+    contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < PALETTE.length).slice(0, 8) : undefined,
     injectStyles: Array.isArray(o.injectStyles) ? o.injectStyles.filter((s): s is string => typeof s === 'string').slice(0, 6) : undefined,
     liquids: Array.isArray(o.liquids) ? o.liquids.filter((s): s is string => typeof s === 'string').slice(0, 8) : undefined,
     song: parseSongRef(o.song),

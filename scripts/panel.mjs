@@ -1272,11 +1272,23 @@ check('and neither starts over the limit',
 {
   const design = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
   const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
+  const shared = readFileSync(join(root, 'src/components/desk/tools.ts'), 'utf8');
+  // The list itself, wherever it lives: a desk's own `TOOLS = [...]`, or the
+  // shared `DESK_TOOLS` both desks now take theirs from.
   const toolsOf = (src) => {
-    const m = src.match(/const TOOLS = \[([\s\S]*?)\] as const;/);
-    return m ? [...m[1].matchAll(/\['([a-z]+)'/g)].map(x => x[1]) : [];
+    const m = src.match(/const (?:DESK_)?TOOLS = \[([\s\S]*?)\] as const;/);
+    if (m) return [...m[1].matchAll(/\['([a-z]+)'/g)].map(x => x[1]);
+    return /const TOOLS = DESK_TOOLS;/.test(src) ? toolsOf(shared) : [];
   };
   const onDesks = new Set([...toolsOf(design), ...toolsOf(perform)]);
+  const sharedTools = toolsOf(shared);
+  // The owner's call: the same tools on both desks, so a look poured and
+  // sprayed on the bench can be touched up the same way once it is live.
+  // Checked as the same list, not as "both have enough" — the drift this
+  // stops is one desk quietly carrying fewer.
+  check('both desks offer the same tools',
+    sharedTools.length > 0 && toolsOf(design).join() === sharedTools.join() && toolsOf(perform).join() === sharedTools.join(),
+    `design ${toolsOf(design).length}, perform ${toolsOf(perform).length}, shared ${sharedTools.length}`);
   // What `performGesture` actually knows: its own switch, plus the dropper it
   // falls back to. A tool absent from here is a tool that silently drops dye.
   const gesture = panel0.slice(panel0.indexOf('const performGesture ='));
@@ -1291,10 +1303,9 @@ check('and neither starts over the limit',
     Against the Design desk, not "either desk".
 
     Written the loose way first — reachable from *a* desk — it stayed green
-    with the finger taken back off Design, because Perform still had it. The
-    Perform desk is deliberately four tools, the ones that work liquid already
-    on the plate; the Design desk is the whole bench, and that is the one an
-    invariant can be written against.
+    with the finger taken back off Design, because Perform still had it. Both
+    desks now share one list (checked above), but the invariant stays written
+    against the bench.
   */
   const onDesign = new Set(toolsOf(design));
   check('the Design desk offers every tool the engine acts on',
