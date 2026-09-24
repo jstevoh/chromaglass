@@ -2387,17 +2387,18 @@ class FluidSimulation {
       a completely dye saturated layer", and measured at the moment it happened
       as 94-95% of the plate wet with peaks at the 6.0 clamp.
 
-      Linear rather than quadratic, and that is the second correction.
+      Quadratic, with the ceiling doing the work, and the linear shapes tried
+      on the way here are below because both gave the fault back.
 
-      Quadratic at 0.6 held soap-film beautifully — 2.1x down to 1.15x — and
+      Quadratic at 0.6 holds soap-film beautifully — 2.1x down to 1.15x — and
       overshot the other way on the looks with a small budget: macro-bead asks
       for 0.28 and sat at 0.12, less than half of it, because a flood landing
       on a thin plate makes `over` large, the square makes it enormous, and the
       bite crashes the plate through its own target. Measured as flatness:
-      macro-bead 31% to 53%, cell-bloom 18% to 52%.
+      macro-bead 31% to 53%, cell-bloom 18% to 52%. That overshoot is the price,
+      and the paragraph below is why it was paid rather than tuned away.
 
-      Two gentler shapes were tried on the way here and both gave the fault
-      back. Linear at 0.1 with a ceiling of 0.04 left soap-film at 1.27x and
+      Linear at 0.1 with a ceiling of 0.04 left soap-film at 1.27x and
       oil-on-water at 21% of the frame in one colour; dropping the ceiling to
       0.018 to spare the thin looks put soap-film back to 1.05 — 2.1x, exactly
       where it started — and oil-on-water back to 47%. **The ceiling is what
