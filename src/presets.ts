@@ -18,7 +18,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'Slow, luminous blobs of amber, magenta and ultramarine drift and merge: the 1960s overhead projector at its most meditative.',
+    description: 'Slow, luminous blobs of amber, magenta and lavender drift and merge: the 1960s overhead projector at its most meditative.',
     settings: {
       globalSpeed: 0.00924,
       surge: 0.5,        // unhurried, dreamlike pace
@@ -254,8 +254,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.1,
       centerGravity: 0.6,
       ledPlatform: true,
-      ledMode: 'rainbow',
-      ledSpeed: 0.4,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.6,
       advection: 0.8,
@@ -286,6 +286,7 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.12,
       gelWheel: 0.55,
       gelSpeed: 0.6,
+      ledColor: '#12002c',
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',
@@ -400,13 +401,13 @@ export const PRESETS: Preset[] = [
       // The fire wheel with nothing on it, under music: 0.06 dried the plate
       // faster than the pour filled it, and the pour follows complexity, which
       // read two percent of its range until the analyser was fixed.
-      evaporationRate: 0.025,
-      dyeBudget: 0.6,
+      evaporationRate: 0.008,
+      dyeBudget: 0.9,
       audioImpact: 0.8,
       airVelocity: 0.4,
       vibrationFrequency: 0.7,
-      ledColor: '#081604',
-      bubbles: 0.85,
+      ledColor: '#0c2206',
+      bubbles: 0.5,
       dropHeight: 0.7,
       saturationBoost: 1.4,
       audioMappings: {
@@ -519,8 +520,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.015,
       centerGravity: 0.7,
       ledPlatform: true,
-      ledMode: 'fire',
-      ledSpeed: 0.15,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.0002,
       buoyancy: 0.85,
       advection: 0.7,
@@ -532,10 +533,11 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thin',
       polarity: 0.3,
-      evaporationRate: 0.04,
+      evaporationRate: 0.012,
       airVelocity: 0.35,
       vibrationFrequency: 0.6,
       iridescence: 0.25,
+      ledColor: '#2a0700',
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
@@ -557,8 +559,8 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.006,
       centerGravity: 0.15,
       ledPlatform: true,
-      ledMode: 'ocean',
-      ledSpeed: 0.04,
+      ledMode: 'single',
+      ledSpeed: 0.0,
       diffusionRate: 0.00008,
       buoyancy: 0.55,
       advection: 0.25,
@@ -575,6 +577,7 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.25,
       transmission: 0.3,
       secondLamp: 0.3,
+      ledColor: '#03102a',
       audioMappings: {
         velocity: 'mid',
         density: 'mid',
@@ -631,7 +634,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'velvet-underground',
     name: 'Velvet Underground',
-    description: 'Rich pools of magenta and raspberry over midnight, churning slowly to the beat under a warm lamp.',
+    description: 'Rich pools of magenta, raspberry and ultramarine over deep violet, churning slowly to the beat under a warm lamp.',
     settings: {
       globalSpeed: 0.0084,
       surge: 0.18,
@@ -658,7 +661,7 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
-      transmission: 0.9,
+      transmission: 0.55,
       lampWarmth: 0.25,
       audioMappings: {
         velocity: 'bass',
@@ -1304,7 +1307,7 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       viscosity: 'thin',
       polarity: 0.95,
-      evaporationRate: 0.035,
+      evaporationRate: 0.012,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
       audioImpact: 0.65,
@@ -1635,7 +1638,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'magnet-garden',
     name: 'Magnet Garden',
-    description: 'Black ferrofluid on a bright pool of amber, teal and ice, a magnet held under the glass: it gathers into spikes and labyrinths and lets go on the beat.',
+    description: 'Black ferrofluid on a bright golden pool, a magnet held under the glass: it gathers into spikes and labyrinths and lets go on the beat.',
     settings: {
       globalSpeed: 0.0105,
       surge: 0.35,
@@ -1731,7 +1734,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'clock-glass',
     name: 'Clock Glass',
-    description: 'Two curved clock glasses with the dye between them: ultramarine, amber and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
+    description: 'Two curved clock glasses with the dye between them: lavender, ice and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
     settings: {
       globalSpeed: 0.0126,
       surge: 0.4,
@@ -1769,7 +1772,7 @@ export const PRESETS: Preset[] = [
       depthDrag: 1.5,
       plateSpring: 0.35,
       beatSqueeze: 0.6,
-      transmission: 0.8,
+      transmission: 0.35,
       dishVignette: 0.8,
       lampHotspot: 0.5,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },

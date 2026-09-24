@@ -18,7 +18,7 @@ import { DEFAULT_LIQUID_TYPES } from './types';
 // slow harmony rotation all pick from inside that set. A user's palette lock
 // still wins outright.
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [17, 20, 18],
+  'classic':            [17, 20, 23],
   'galaxy':             [18, 23, 16],
   'deep-ocean':         [16, 22, 7, 19],
   'cyberpunk':          [20, 16, 6],
@@ -32,7 +32,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'solar-flare':        [17, 21, 4],
   'jellyfish-bloom':    [20, 23, 16],
   'fractal-dream':      [17, 20, 16],
-  'velvet-underground': [22, 20, 11],
+  'velvet-underground': [18, 20, 11],
   'neon-coral-reef':    [21, 16, 17],
   'stardust-collapse':  [15, 23, 17],
   'lumia':              [10, 7, 1],
@@ -41,10 +41,13 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'poster-1969':        [1, 18],
   'fillmore-1969':      [1, 0, 3, 7, 5, 10],
   'fillmore-wash':      [5, 10, 9],
+  // The dye mixes like filters, so a set is chosen for what its overlaps make:
+  // amber over teal is a flat green and amber over ultramarine is mud, which
+  // is what the first gallery of this set showed on four plates.
   // The three that show off a part of the app nothing else used.
-  'magnet-garden':      [17, 16, 7],           // bright ground for the dark ferrofluid to stand on
+  'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
-  'clock-glass':        [18, 17, 20],            // the second projector: emerald, purple, cobalt
+  'clock-glass':        [23, 7, 20],            // the second projector: emerald, purple, cobalt
   'oil-on-water':       [0, 1],
   'colorful-cosmos':    [18, 20, 17],
   'sunny-side-up':      [7, 10, 2],
@@ -62,8 +65,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 2, 8, 6],
-  'soap-film':          [23, 16, 17],
-  'glycerine-drift':    [22, 18, 20, 17],
+  'soap-film':          [23, 20, 7],
+  'glycerine-drift':    [18, 20, 23, 21],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
