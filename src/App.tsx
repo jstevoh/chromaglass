@@ -2543,14 +2543,17 @@ export default function App() {
 
   // The black box's half from here: which look, where the picture is going,
   // and the look itself for a report (docs/crash-plan.md).
-  const crashStateRef = useRef({ activePresetName, settings, output, isCasting, projector: projector.projector });
-  crashStateRef.current = { activePresetName, settings, output, isCasting, projector: projector.projector };
+  const crashStateRef = useRef({ activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated });
+  crashStateRef.current = { activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated };
   useEffect(() => {
     const unprovide = crashLog.provide('app', () => {
       const c = crashStateRef.current;
       const p = c.projector;
       return {
         preset: c.activePresetName ?? 'custom',
+        // Whether Evolve is on, and how fast: the one switch a report about
+        // "the plate changing too much" could not answer without.
+        evolve: c.isAutomated ? `on at ${Math.round((c.settings.automateRate ?? 0) * 100)}%, surge ${Math.round((c.settings.surge ?? 0) * 100)}%` : 'off',
         projector: c.isCasting ? `casting${p ? ` to ${p.availWidth}x${p.availHeight}` : ''}` : p ? `found ${p.availWidth}x${p.availHeight}` : 'none',
       };
     });
