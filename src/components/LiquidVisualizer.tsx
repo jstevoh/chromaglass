@@ -5790,6 +5790,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /*
+          What is on each plate, from the last readback: how full it is, its
+          mean colour, how many cells are not a number, and the fastest cell.
+          A plate that draws as bare ground is either empty or poisoned, and
+          the picture cannot tell those apart; this can.
+        */
+        plateStats: () => fluidsRef.current.map((f) => {
+          const d = f.readDensity, vx = f.readVx, vy = f.readVy;
+          let nan = 0, vmax = 0;
+          for (let i = 0; i < d.length; i++) {
+            if (!Number.isFinite(d[i]) || !Number.isFinite(vx[i]) || !Number.isFinite(vy[i])) { nan++; continue; }
+            const v = Math.abs(vx[i]) + Math.abs(vy[i]);
+            if (v > vmax) vmax = v;
+          }
+          return { mean: f.meanDensity, colour: [...f.meanColor], nan, vmax };
+        }),
         bubbles: bubblesRef.current,
         // What the shader was actually told about them last frame: a bubble
         // that is on the plate but not in these two numbers is not on screen.

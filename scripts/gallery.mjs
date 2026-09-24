@@ -94,7 +94,9 @@ try {
       }, WIDTH);
       const status = await page.evaluate(() => {
         const d = window.chromaglassDebug?.();
-        return { engine: d?.engine ?? '', evolve: d?.crash?.latest?.()?.snap?.evolve ?? null };
+        const r = (n) => (Number.isFinite(n) ? +n.toFixed(4) : String(n));
+        const plates = (d?.plateStats?.() ?? []).map((p) => ({ mean: r(p.mean), colour: p.colour.map(r), nan: p.nan, vmax: r(p.vmax) }));
+        return { engine: d?.engine ?? '', evolve: d?.crash?.latest?.()?.snap?.evolve ?? null, plates };
       });
       if (!dataUrl) {
         row.frames.push({ t, file: null, why: JSON.stringify(await lastFrameRead(page)).slice(0, 200) });
@@ -103,9 +105,12 @@ try {
       }
       const file = `${preset.id}-${t}s.jpg`;
       fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
-      row.frames.push({ t, file, engine: status.engine });
+      row.frames.push({ t, file, engine: status.engine, plates: status.plates });
     }
-    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length} frames${errors.length ? `, ${errors.length} console errors` : ''}`);
+    // What was on the plate at each moment: fill, and a count of cells that
+    // are not a number. A bare-ground frame is empty or poisoned; this says which.
+    const plateNote = row.frames.map((f) => (f.plates ?? []).map((p) => `${p.mean}${p.nan ? ` NaN×${p.nan}` : ''}`).join('/')).join(' ');
+    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length} frames${errors.length ? `, ${errors.length} console errors` : ''}  fill ${plateNote}`);
     index.push(row);
     await page.close();
   }
