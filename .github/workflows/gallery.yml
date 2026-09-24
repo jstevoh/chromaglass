@@ -1,0 +1,58 @@
+name: Preset gallery
+
+# Every preset, photographed on a GPU that presents (docs/presets-plan.md).
+# The presets are judged by eye; this is the eye's evidence. It runs beside
+# Checks, never in the deploy's way, whenever a pull request touches the
+# presets or how looks are laid and faded, and on demand from the Actions tab.
+# The pictures come back as the `preset-gallery` artifact: one JPEG per
+# preset per moment, and gallery/contact.jpg with all of them on one sheet.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated preset ids (blank for all)'
+        required: false
+        default: ''
+      times:
+        description: 'Seconds after load to photograph'
+        required: false
+        default: '8,20,40'
+  pull_request:
+    paths:
+      - 'src/presets.ts'
+      - 'src/presetPlate.ts'
+      - 'src/constants.ts'
+      - 'src/lib/lookFade.ts'
+      - 'scripts/gallery.mjs'
+      - '.github/workflows/gallery.yml'
+
+concurrency:
+  group: gallery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gallery:
+    name: Gallery (macOS)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Photograph every preset
+        run: npm run gallery
+        env:
+          GALLERY_ONLY: ${{ inputs.only }}
+          GALLERY_TIMES: ${{ inputs.times }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preset-gallery
+          path: gallery/
+          retention-days: 14

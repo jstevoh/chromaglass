@@ -67,6 +67,7 @@
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
     "finger": "npm run build && node scripts/finger.mjs",
+    "gallery": "npm run build && esbuild scripts/gallery.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gallery.mjs && node node_modules/.cache/gallery.mjs",
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
