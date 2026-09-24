@@ -2456,6 +2456,22 @@ class FluidSimulation {
       is the whole point.
     */
     const DT_FULL = 0.05;
+    /*
+      No ceiling on the drying, and the reason is worth keeping.
+
+      One was added here on this reasoning: at Speed 0.25 the timestep reaches
+      DT_FULL, the exponent becomes one, and the budget regulator's ceiling of
+      0.12 becomes 0.88 a step — 0.88^60, five parts in ten thousand left after
+      a second. The arithmetic is right and the conclusion was wrong. Measured
+      with the budget slammed to 0.2 and the speed to 0.25, the plate falls
+      from 1.08 to 0.14 and stops there, because the overshoot clamps at zero
+      and the regulator switches itself off the moment the plate reaches its
+      budget. It cannot dry past the target however steep it is.
+
+      The control said so plainly — with the ceiling and without it, the same
+      readings to two decimal places — so it was taken out rather than kept as
+      insurance against something that does not happen.
+    */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
 
     return {

@@ -163,23 +163,48 @@ try {
     const px = await frameOf(page, 320, 200);
     if (!px) throw new Error(`could not photograph: ${JSON.stringify(await page.evaluate(() => window.__cgFrameLast))}`);
     const j = judge(px);
+    /*
+      The dye on every line, not only at the death.
+
+      One run ended at 100% black with the plate holding *nothing* — 0.00 dye,
+      0% wet, no colours at all — five seconds after reading 16%. A plate that
+      empties and a plate that drowns look identical in the frame once they
+      are dark, and the difference is the whole diagnosis, so it belongs on
+      every line rather than on the last one.
+    */
+    const dyeNow = await page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      const target = d.settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, d.settings.dyeBudget ?? 0.85));
+      return { mean: d.fluids?.[0]?.meanDensity ?? -1, target };
+    });
     const t = Math.round((MINUTES * 60000 - (until - Date.now())) / 1000);
-    log.push({ t, what: `${a.name}: ${detail}`, flat: j.flat, luma: j.luma, rgb: j.rgb });
+    log.push({ t, what: `${a.name}: ${detail}`, flat: j.flat, luma: j.luma, rgb: j.rgb, dye: dyeNow.mean, target: dyeNow.target });
     if (log.length > 40) log.shift();
 
     if (baseline.length < 14) baseline.push(j.flat);
     const settled = [...baseline].sort((x, y) => x - y)[Math.floor(baseline.length / 2)] ?? j.flat;
-    const bad = baseline.length >= 10 && (j.flat > Math.max(0.3, settled + 0.2) || j.luma < 0.03);
+    /*
+      Half the frame, because that is what was reported.
+
+      "The entire screen yellow", "covered the view port". The catches that
+      were plainly that are 96%, 100% and 52-62% of the frame in one colour.
+      A bar set at 30% also fires on a blue-dominant moment of a working
+      plate, and two of those were chased as failures before this was noticed
+      — the cost of a detector tuned tighter than the thing it is detecting.
+    */
+    const bad = baseline.length >= 10 && (j.flat > Math.max(0.5, settled + 0.35) || j.luma < 0.03);
     over = bad ? over + 1 : 0;
     process.stdout.write(`  ${String(t).padStart(4)}s  ${(j.flat * 100).toFixed(0).padStart(3)}%  ` +
-      `${j.luma.toFixed(3)}  rgb(${j.rgb.join(',')})  ${a.name}: ${detail}\n`);
+      `${j.luma.toFixed(3)}  dye ${dyeNow.mean.toFixed(2)}/${dyeNow.target.toFixed(2)}  ` +
+      `rgb(${j.rgb.join(',')})  ${a.name}: ${detail}\n`);
 
     if (over < 2 && j.flat <= 0.9) continue;
     died = true;
     console.log(`\n  THE PICTURE DIED at ${t}s, ${(j.flat * 100).toFixed(0)}% of it rgb(${j.rgb.join(',')}).`);
     console.log('  The last dozen things done to it:');
     for (const e of log.slice(-12)) {
-      console.log(`    ${String(e.t).padStart(4)}s  ${(e.flat * 100).toFixed(0).padStart(3)}%  ${e.what}`);
+      console.log(`    ${String(e.t).padStart(4)}s  ${(e.flat * 100).toFixed(0).padStart(3)}%  ` +
+        `dye ${(e.dye ?? -1).toFixed(2)}/${(e.target ?? 0).toFixed(2)}  ${e.what}`);
     }
     const state = await page.evaluate(() => {
       const d = window.chromaglassDebug();
