@@ -275,6 +275,8 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
 const RECOVERY_TRIES = 8;
 /** Consecutive frames that throw before the stage is rebuilt (about 1.5 s at 60 fps). */
 const SELF_HEAL_FRAMES = 90;
+/** Whether Evolve pours whole-plate floods at the peak of a gust. Off: evolve is subtle. */
+const EVOLVE_FLOODS = false;
 /** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
 const ERROR_STORM = 45;
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
@@ -4485,7 +4487,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004 * (isAutomatedRef.current ? 2 : 1)) {
+            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004) {
               chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
             }
             // The dividing regime grows at a pace a show can watch; coral is slower than a set.
@@ -4779,10 +4781,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
             /*
-              The rate scales everything: at the default it is a drop or a
-              blow every second or so, quickening with the music; at full it
-              is the old frenzy. (Before, the music term stood on its own and
-              the slider hardly mattered.)
+              The rate scales everything: at the default it is one small drop
+              or a soft breath every seven seconds or so, quickening a little
+              with the music; at full, about one a second. Evolve is a
+              slow drift by design — it used to be a drop or a blow every
+              second at the default and a frenzy at full, with floods and the
+              music's reactions doubled, and it read as fast, massive changes.
 
               The phrase is what gives it shape. Without it this is a Poisson
               process at a fixed rate, which means impulses arrive
@@ -4821,7 +4825,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // and a loud one pours often, which is what the dial was for. The
             // size and the force still ride the gust, so a bigger surge is
             // also a bigger pour.
-            if (ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+            /*
+              Evolve is subtle now (the owner's call, after watching it: "fast
+              changes that are massive on the screen"). A flood a third of the
+              plate across is the opposite of subtle, so evolve no longer pours
+              one; the plate is left to change the way a dish left on the
+              projector does — slowly, in small places. `EVOLVE_FLOODS` brings
+              it back.
+            */
+            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
               lastFloodRef.current = now;
               const af = fluidsRef.current[0];
               if (af) {
@@ -4848,7 +4860,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
 
-            if (Math.random() < rate * (0.08 + energy * 0.5) * ph.drive) {
+            // About one small event every seven seconds at the default rate,
+            // about one a second at full — against two or three a
+            // second before, each of them large.
+            if (Math.random() < rate * (0.012 + energy * 0.03) * ph.drive) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -4858,7 +4873,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3 + ph.gust * 3), (0.08 + energy * 0.18) * (1 + ph.gust * 1.5));
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
@@ -4870,18 +4885,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
-                  af.autoInject(style, rx, ry, (6.0 + energy * 35) * (1 + ph.gust * 1.3), color.r, color.g, color.b, energy);
-                  af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
+                  af.autoInject(style, rx, ry, 1.5 + energy * 4, color.r, color.g, color.b, energy);
+                  af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
-                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.6 + energy * 0.8);
+                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.25 + energy * 0.25);
                 }
               }
             }
 
             // With no hue journey set, an evolving plate re-picks its palette at
-            // random every ~45 s. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0004) {
+            // random every ~3 min (it was ~45 s). Only the dye still to come
+            // takes the new colours, so with small drops this is a drift, not
+            // a change of scene. The journey itself runs below, evolving or not.
+            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0001) {
               harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
             }
 
@@ -4991,7 +5008,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
                   // At impact=1.0 + auto → ~4.9x baseline
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
-                  const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
+                  // Evolve used to multiply every music reaction by 2.2 — dye,
+                  // heat, bursts — which is most of why it read as massive. It
+                  // leaves the music's own reactions as the look sets them now.
+                  const autoAmp = impactMul;
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -5006,7 +5026,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                   // A hit on the velocity route: radial burst — scales with impact + auto mode
                   if (vel01 > 0.25) {
-                    const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
+                    const burstR = Math.round(18 * GRID_SCALE * Math.max(0.4, impactMul));
                     const bassStr = (vel01 - 0.25) * autoAmp;
                     for (let bj = -burstR; bj <= burstR; bj += 3) {
                       for (let bi = -burstR; bi <= burstR; bi += 3) {
@@ -5018,10 +5038,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                           activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
                         }
                       }
-                    }
-                    if (isAutomatedRef.current && bass01 > 0.4) {
-                      activeFluid.autoInject(aStyle(), centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a, bass01);
-                      activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
                     }
                   }
 
@@ -5071,7 +5087,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const sparkCol = colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
-                    const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 4 : 2) * impactMul);
+                    const sparks = Math.floor(treble01 * 2 * impactMul);
                     for (let s = 0; s < sparks; s++) {
                       const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                       const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -5092,11 +5108,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
                     const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
-                    if (isAutomatedRef.current) {
-                      const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
-                      const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
-                      activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.05, swellCol.r, swellCol.g, swellCol.b, energy01);
-                    }
                   }
                 }
               }
