@@ -27,9 +27,11 @@ on:
       - 'scripts/gallery.mjs'
       - '.github/workflows/gallery.yml'
 
+# A run that is photographing finishes: its sheet is the "before" the next
+# push is compared against. A newer push still replaces one that is waiting.
 concurrency:
   group: gallery-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   gallery:
