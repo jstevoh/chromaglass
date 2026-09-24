@@ -284,6 +284,40 @@ export class MacroCamera {
            density[i + (j + r) * size] + density[i + (j - r) * size]) * 0.25 - this.floor);
         const compactness = clamp((d - ring) / (d + 0.001), 0, 1);
 
+        /*
+          Raw density here is not what blacks the closeup out, and the control
+          is worth keeping because the arithmetic says otherwise.
+
+          `d` runs to the 6.0 clamp and `compactness` cannot pass 1, so the
+          middle of a saturated pool scores 6.0 * 0.25 = 1.5 while a real bead
+          at d = 0.5 scores 0.5 * 2.0 = 1.0 — which reads as a proof that a
+          filled plate makes the camera cut into its flattest place. Scoring on
+          the fall-off instead (`(d - ring) * (0.25 + compactness * 1.75)`),
+          which is zero for a uniform pool, changed nothing: measured by
+          `npm run closeup` over a filled plate, three toggles a look, the
+          worst frame went 100% -> 100% on soap-film, 96% -> 96% on classic,
+          68% -> 60% on galaxy, and classic's median frame got *worse*, 35% ->
+          82%. So the subject it picks is not what fills the frame.
+
+          The fault is real and reproducible — `npm run gig` has killed a show
+          on the macro-toggle alone, twice, over a plate 96% wet with 125
+          colours on it — but it is not here.
+
+          Nor is it that a look built for the whole plate has nothing to resolve
+          this close, which was the next suspect. Flatness against magnification
+          on one plate, eight frames a step, peaks in the middle and comes back
+          down: soap-film 10% at 1x, 60% at 2x, 30% at 4x, 27% at 8x, and
+          classic 7%, 50%, 40%, 25%. Deeper is not flatter.
+
+          What is left is that it happens to *some shots and not others*. Over
+          fourteen seconds at 4x, soap-film's median frame is 19% in one colour
+          and its worst is 100% — the camera cuts on a hold of about two
+          seconds, so roughly every other reading catches a bad one. So the
+          question is not how close it goes or which pool it prefers, but what
+          a shot looks like in the moment it lands: whether the frame is one
+          colour while the ease is still running, or whether some subjects are
+          simply uniform all the way across at that magnification.
+        */
         let score = d * (0.25 + compactness * 1.75);
         if (avoid) {
           const dist = Math.hypot(i - avoid.x, j - avoid.y);

@@ -6119,6 +6119,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         journey: journeyRef.current,
         lamp: lampRef.current,
         settings: settingsRef.current,
+        /*
+          Which look is actually on the glass.
+
+          `npm run gig` had to infer it from `renderStyle`, which several looks
+          share, so a run that stepped through three presets reported the same
+          thing three times and the log could not say what had arrived. The
+          crash report carried this all along; the harness hook did not.
+        */
+        plate: livePresetRef.current,
         /** What Random Evolve has done with its own hands, since the page loaded. */
         autoEvents: { ...autoEventsRef.current },
         /*
