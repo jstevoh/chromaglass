@@ -8,7 +8,9 @@
  * and grain. All of it needs the finished picture to sample from, which is
  * why it cannot happen in the pass that draws the plate.
  *
- * `npm run camera` compares its output with the GLSL's, pixel for pixel.
+ * It was proved against a GLSL twin, pixel for pixel, by a gate called
+ * `npm run camera`. Both the twin and the gate went with the WebGL renderer
+ * (docs/webgpu-plan.md, P7); what covers this pass now is `npm run webgpu`.
  */
 
 import { Disposer, PipelineCache, layoutFromWgsl } from './kit';

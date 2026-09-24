@@ -15,7 +15,9 @@
  * time one of them changed. It reads `U.dimmer`, `U.markOn` and `U.markRect`,
  * which is why this pass's table names them the same.
  *
- * `npm run post` runs both chains over the same picture and compares them.
+ * There were two chains once, and `npm run post` ran both over the same
+ * picture and compared them. The GLSL one went at P7, and so did the gate;
+ * `npm run fx` is what holds this one.
  */
 
 import { POST_STRUCT } from './postFields';

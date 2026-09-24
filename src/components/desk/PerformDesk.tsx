@@ -107,6 +107,19 @@ interface PerformDeskProps {
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
   breadcrumb: ReactNode;
+  /*
+    The two the header carries on both desks.
+
+    `Send to wall` was on the Design bench alone, which is backwards: throwing
+    the plate at a projector is a *performance* action before it is a design
+    one, and the desk you are on when a room is watching is this one. `Save`
+    goes with it for the same reason — the look worth keeping is usually the
+    one you evolved into during a show, not the one you sat down to build.
+  */
+  onSendToWall: () => void;
+  onSave: () => void;
+  /** Whether there is anything to save, for the dot on the button. */
+  dirty: boolean;
   onFreeze: () => void;
   /** Whether the solver is already stopped, so the button can say so. */
   frozen: boolean;
@@ -148,6 +161,16 @@ export function PerformDesk(p: PerformDeskProps) {
         onMidi={p.onMidi}
         onPhone={p.onPhone}
         onSearch={p.onSearch}
+        trailing={
+          <>
+            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
+              <span className="hidden xl:inline">Send to&nbsp;</span>wall
+            </Button>
+            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
+              {p.dirty ? 'Save •' : 'Save'}
+            </Button>
+          </>
+        }
       />
 
       {/* ── Cues ────────────────────────────────────────────── */}

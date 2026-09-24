@@ -323,7 +323,7 @@ const watch = (page) => {
       const timings = await page.evaluate(() => window.chromaglassDebug().webgpu.timings);
       if (started.timestamps) check('the frame is timed on the GPU', typeof timings.plate === 'number', JSON.stringify(timings));
 
-      // The camera. `npm run camera` proves the shader against the GLSL's;
+      // The camera. A gate called `npm run camera` proved it against the GLSL's;
       // what is asked here is that the app runs it — a pass of its own,
       // timed on the GPU, taking a photograph that is not the plate as drawn.
       const lens = await page.evaluate(async () => {
@@ -422,7 +422,7 @@ const watch = (page) => {
         `${guard.dark?.toFixed(3)} dim / ${guard.plain?.toFixed(3)} plain / ${guard.bright?.toFixed(3)} lifted, ` +
         `the guard idle at gain ${guard.gain}`);
 
-      // The projector. `npm run output` proves the shader against the GLSL's
+      // The projector. A gate called `npm run output` proved it against the GLSL's
       // over every shape and pin; what is asked here is that the app runs it,
       // by the two answers a mapping has that nothing else does: a pin that
       // empties the edge of the frame, and a blackout that empties all of it.
@@ -587,7 +587,7 @@ const watch = (page) => {
 // ── The pictures the plate is given ──────────────────────────────────
 /**
  * The mark, the film's frame and the beads' mask are pictures the page hands
- * the compositor each frame. `npm run composite` proves the WGSL *samples*
+ * the compositor each frame. A gate called `npm run composite` proved the WGSL *samples*
  * them as the GLSL does — it feeds both shaders the same bytes — but it
  * cannot see the upload: whether a picture reaches its texture at all, and
  * which way up it lands there. So each engine is asked to lay the same mark

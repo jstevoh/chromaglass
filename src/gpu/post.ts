@@ -15,7 +15,8 @@
  * frames at half resolution, which is what a time-based effect reaches into;
  * it keeps the picture as it came in, before the frame's own effects.
  *
- * `npm run post` compares its output with the GLSL's, pixel for pixel.
+ * It was proved against a GLSL chain, pixel for pixel, by `npm run post`.
+ * Both went with the WebGL renderer (P7); `npm run fx` covers this now.
  */
 
 import { Disposer, PipelineCache, layoutFromWgsl } from './kit';

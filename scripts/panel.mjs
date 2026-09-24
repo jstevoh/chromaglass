@@ -25,6 +25,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
+import { driftLook } from '../src/lib/drift.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
@@ -1210,7 +1211,28 @@ check('and neither starts over the limit',
       const d = Math.hypot(a - x, b - y, c - z);
       if (d < worst) { worst = d; pair = `${r.paperA}/${r.paperB}`; }
     }
-    check('a photo look never puts the plate on one flat colour',
+    /*
+    And it never rolls the dish shut.
+
+    `dishVignette` darkens beyond the dish's rim. Rolled at 0.4 to 1.0 in
+    three rolls out of ten, the top of that range closes the dish to a
+    pinhole: over forty random looks, six came out dark or covered, and this
+    one setting separated those six from the rest by five standard deviations
+    — 0.905 against 0.052 — with nothing else within one and a half. One roll
+    in seven was a dark screen. No preset in the tree raises it at all.
+
+    Same fault as the backdrop's two colours being rolled independently: the
+    randomiser reaching outside the range any real look uses. Measured after:
+    six in forty down to two or three.
+  */
+  {
+    let worst = 0;
+    for (const r of rolls) if ((r.dishVignette ?? 0) > worst) worst = r.dishVignette;
+    check('a random look never rolls the dish shut', worst <= 0.5,
+      `the heaviest vignette over ${ROLLS} rolls was ${worst.toFixed(3)}`);
+  }
+
+  check('a photo look never puts the plate on one flat colour',
       worst >= 60,
       worst === Infinity ? 'no photo rolls' : `closest pair over ${ROLLS} rolls: ${pair}, ${worst.toFixed(0)} apart`);
   }
@@ -1326,6 +1348,142 @@ check('and neither starts over the limit',
       new RegExp(`type: '${t}'`).test(proto) && new RegExp(`case '${t}':`).test(panel0app),
       proto.includes(`type: '${t}'`) ? 'protocol and dispatch' : 'not in the protocol');
   }
+}
+
+// ── Evolve's drift scales a look, it does not switch things on ─────
+/*
+  Nudging a dial a hair off zero is not a small change to that dial — it is
+  switching a feature on at a value too small to see, and several of them are
+  modes rather than amounts. `dishSpread` at 0.003 turned the plate from
+  filling the frame into a disc inscribed in its height and took 48% of the
+  picture with it, in exchange for no visible spread at all. The shader no
+  longer has that cliff, but the next setting like it should not have to be
+  found the same way.
+*/
+{
+  const anchor = { ...DEFAULT_SETTINGS, dishSpread: 0, dishVignette: 0, bubbles: 0, turbulenceScale: 0.3 };
+  // Its own generator, so a failure here is reproducible rather than a mood.
+  let bits = 20260923;
+  const roll = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
+  let fromZero = 0, live = 0, current = { ...anchor };
+  for (let i = 0; i < 4000; i++) {
+    const patch = driftLook(current, anchor, 1, roll);
+    for (const [k, v] of Object.entries(patch)) {
+      if (anchor[k] === 0 && v !== 0) fromZero++;
+      else live++;
+    }
+    current = { ...current, ...patch };
+  }
+  check('evolve never switches on a dial the look switched off',
+    fromZero === 0, `${fromZero} from zero against ${live} live, over 4000 drifts`);
+  check('and it does move the ones that are in play', live > 100, `${live} moved`);
+}
+
+// ── The two desks carry the same actions on the top bar ───────────
+/*
+  Reported: "the perform and design tabs need the same functions on the top
+  bar. For example, send to wall should be on both."
+
+  They did share the header component — and that is what made the gap easy to
+  miss. `DeskHeader` takes a `trailing` slot, the Design bench filled it with
+  Send to wall and Save, and the Perform desk passed nothing, so the desk you
+  are on when a room is watching was the one that could not throw the plate at
+  a projector. Sharing a component is not sharing a top bar.
+
+  So the actions in that slot are compared between the two files rather than
+  assumed equal because the component is the same one.
+*/
+{
+  const trailingOf = (src) => {
+    const at = src.indexOf('trailing={');
+    if (at < 0) return null;
+    // Walk the braces so a nested {p.dirty ? ...} does not end the slot early.
+    let depth = 0, i = src.indexOf('{', at + 'trailing='.length - 1);
+    const from = i;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) break;
+    }
+    const body = src.slice(from, i + 1);
+    return [...body.matchAll(/testId="([a-z0-9-]+)"/g)].map(m => m[1]).sort();
+  };
+  const perform = trailingOf(readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8'));
+  const design = trailingOf(readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8'));
+  check('both desks put actions on the top bar at all',
+    perform !== null && design !== null,
+    `perform ${perform ? perform.length : 'none'}, design ${design ? design.length : 'none'}`);
+  if (perform && design) {
+    const onlyDesign = design.filter(t => !perform.includes(t));
+    const onlyPerform = perform.filter(t => !design.includes(t));
+    check('and they are the same actions on both',
+      onlyDesign.length === 0 && onlyPerform.length === 0,
+      onlyDesign.length || onlyPerform.length
+        ? `${onlyDesign.map(t => 'design only: ' + t).concat(onlyPerform.map(t => 'perform only: ' + t)).join(', ')}`
+        : perform.join(', '));
+  }
+}
+
+// ── Every command the code tells you to run, exists ─────────────────
+/*
+  `npm run evolve` was cited in the roadmap, in `bubbles-plan.md`, in four
+  commit messages and in two pull request descriptions, and it was never a
+  script. It had only ever been run by bundling it with esbuild by hand.
+  Anyone following the documentation got "Missing script".
+
+  Sweeping for it found six more, all pointing at gates that went with the
+  WebGL renderer at P7 — and five of those were in *source* docstrings, where
+  they read as instructions rather than history: "npm run camera compares its
+  output with the GLSL's, pixel for pixel", beside a file whose GLSL twin no
+  longer exists.
+
+  So a command named in the code either runs, or is listed here as one that
+  used to. A citation that is neither is a promise the repository cannot keep.
+*/
+{
+  /*
+    Retired, and named rather than tolerated silently. Each of these was a
+    real gate that compared a WGSL pass against its GLSL twin; the twins and
+    the gates were deleted together at P7 (docs/webgpu-plan.md). The comments
+    that mention them now say so in the past tense, which is worth keeping:
+    they record what proved the shader that is still here.
+  */
+  const RETIRED = new Map([
+    ['camera', 'compared the camera pass against its GLSL twin; both went at P7'],
+    ['composite', 'compared the compositor against its GLSL twin; both went at P7'],
+    ['output', 'compared the projector pass against its GLSL twin; both went at P7'],
+    ['parity', 'compared the two solvers; the CPU one went at P7'],
+    ['post', 'compared the post chain against its GLSL twin; both went at P7'],
+    ['uniforms', 'compared the two uniform packs field for field; the WebGL one went at P7'],
+    ['clip', 'docs/clip-plan.md plans it; scripts/clip* are local-only and run with node'],
+  ]);
+  const have = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts));
+  const walk = (dir, out = []) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full, out);
+      else if (/\.(ts|tsx|mjs|js)$/.test(e.name)) out.push(full);
+    }
+    return out;
+  };
+  const cited = new Map();
+  for (const f of [...walk(join(root, 'src')), ...walk(join(root, 'scripts'))]) {
+    for (const m of readFileSync(f, 'utf8').matchAll(/npm run ([a-z][a-z0-9:-]*)/g)) {
+      if (!cited.has(m[1])) cited.set(m[1], f.replace(root + '/', ''));
+    }
+  }
+  const phantom = [...cited].filter(([name]) => !have.has(name) && !RETIRED.has(name));
+  check('every command the code tells you to run is one that exists',
+    phantom.length === 0,
+    phantom.length
+      ? phantom.map(([n, f]) => `npm run ${n} (${f})`).join(', ')
+      : `${cited.size} cited, ${[...cited].filter(([n]) => RETIRED.has(n)).length} of them retired and listed`);
+
+  // And the list does not rot: a retired name that comes back as a real
+  // script should leave the list rather than sit in it claiming to be gone.
+  const undead = [...RETIRED.keys()].filter(n => have.has(n));
+  check('nothing is listed as retired while it still exists', undead.length === 0,
+    undead.length ? undead.join(', ') : `${RETIRED.size} retired`);
 }
 
 // ── Result ──────────────────────────────────────────────────────────

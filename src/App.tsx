@@ -11,6 +11,7 @@ import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
+import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
@@ -1069,6 +1070,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.gestureFire?.seq]);
 
+  /*
+    The look the drift wanders around: see the interval below and lib/drift.ts.
+    Declared here because `applyPreset` re-takes it, and that reads better than
+    a reference reaching forward past four hundred lines.
+  */
+  const driftAnchor = useRef(settings);
+
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
@@ -1077,7 +1085,12 @@ export default function App() {
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
     // (the microphone's calibration, the dimmer, the logo, the grid) stays.
-    setSettings(prev => targetLook(prev, presetSettings));
+    setSettings(prev => {
+      const next = targetLook(prev, presetSettings);
+      // From here on it is this look the drift wanders around, not the last.
+      driftAnchor.current = next;
+      return next;
+    });
     setPinnedPresetId(presetId);
     // A built-in is somewhere to start, not a file of yours: ⌘S asks for a
     // name rather than writing over a look that ships with the app.
@@ -1227,6 +1240,37 @@ export default function App() {
   // slider, so the phone and the panel show the glide as it happens.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  /*
+    Evolve, as a wander rather than a jump (lib/drift.ts).
+
+    "Random Evolve" meant two unrelated things and nothing in between: the
+    automation that drops dye and blows air, and a whole new look rolled at a
+    song boundary — fifty-five settings replaced at once, which is a cut. So a
+    look either sat perfectly still in its settings or went somewhere else
+    entirely.
+
+    This is the middle. Every few seconds two dials move a little, held inside
+    a window either side of where the look sat when evolving started, so an
+    hour of it wanders the mood without arriving anywhere the look was not.
+    The anchor is re-taken whenever a look is laid down, because from then on
+    *that* is the look being wandered around.
+  */
+  useEffect(() => {
+    if (!isAutomated || !isActive) {
+      // Switched off, or the show is paused: the next spell of evolving starts
+      // from wherever the plate is now, not from where the last one began.
+      driftAnchor.current = settingsRef.current;
+      return;
+    }
+    const id = setInterval(() => {
+      const rate = settingsRef.current.automateRate ?? 0.12;
+      const patch = driftLook(settingsRef.current, driftAnchor.current, rate);
+      if (Object.keys(patch).length) updateSettings(patch);
+    }, 6000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAutomated, isActive]);
 
   /*
     A hand on a hardware fader, answered at once and rendered once a frame.
@@ -2992,8 +3036,9 @@ export default function App() {
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
                   <button
                     onClick={() => setIsAutomated(!isAutomated)}
+                    data-testid="evolve-toggle"
                     className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
-                    title="Auto-generate dye drops and air bursts from audio"
+                    title="Works the plate on its own: drops and air from the music, dye lifted off again, a finger drawn through it, and the dials wandering slowly around the look"
                   >
                     <motion.div
                       className="absolute top-[3px] left-[3px] w-5 h-5 bg-white rounded-full shadow-md"
@@ -3016,7 +3061,7 @@ export default function App() {
                       onChange={e => updateSettings({ automateRate: parseFloat(e.target.value) })}
                       className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
                       style={{ background: `linear-gradient(to right, rgb(192,132,252) ${(settings.automateRate ?? 0) * 100}%, rgba(255,255,255,0.1) ${(settings.automateRate ?? 0) * 100}%)` }}
-                      title="How quickly Random Evolve adds drops and blows"
+                      title="How busy Random Evolve is: how often it pours, thins, strokes, and how far the dials wander"
                       data-testid="evolve-speed"
                     />
                   </div>
@@ -3630,6 +3675,9 @@ export default function App() {
       */}
       {performing && overlaysVisible && (
         <PerformDesk
+          onSendToWall={() => { void startCast('window'); }}
+          onSave={saveLook}
+          dirty={docDirty}
           onOpenSettings={openAllSettings}
           automated={isAutomated}
           onAutomate={setIsAutomated}

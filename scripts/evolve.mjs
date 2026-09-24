@@ -200,6 +200,48 @@ try {
           full.getContext('2d').putImageData(window.__shots.flat, 0, 0);
           return full.toDataURL('image/png');
         });
+        /*
+          And which layer flattened it, which is the question two of these
+          have now been argued about without.
+
+          A flat frame over a *structured* dye field means the renderer
+          flattened it; a flat frame over a flat dye field means the dye did.
+          Both cases so far were chased on the frame alone — one of them
+          through a thin-dye theory that a later measurement disproved — when
+          this one number forks the whole investigation.
+
+          The dye's colour is read normalised by its own density, because
+          `rbDyeView` holds colour premultiplied by how much dye is there:
+          without dividing it out, a pale cell and a saturated one of the same
+          hue land in different buckets and every plate looks structured.
+        */
+        const field = await page.evaluate(() => {
+          const g = window.chromaglassDebug().fluids[0]?.gpu;
+          const dye = g?.rbDyeView;
+          if (!dye) return null;
+          const bins = new Map();
+          let wet = 0;
+          for (let i = 0; i < dye.length; i += 4) {
+            const a = dye[i + 3];
+            if (a < 0.05) continue;
+            wet++;
+            const r = Math.min(255, (dye[i] / a) * 255) | 0;
+            const gg = Math.min(255, (dye[i + 1] / a) * 255) | 0;
+            const b = Math.min(255, (dye[i + 2] / a) * 255) | 0;
+            const key = ((r >> 4) << 8) | ((gg >> 4) << 4) | (b >> 4);
+            bins.set(key, (bins.get(key) ?? 0) + 1);
+          }
+          let top = 0;
+          for (const v of bins.values()) if (v > top) top = v;
+          return { wet, colours: bins.size, dominant: wet ? top / wet : 0 };
+        });
+        if (field) {
+          console.log(`   the DYE FIELD itself: ${field.colours} colours over ${field.wet} wet cells, ` +
+            `the commonest ${(field.dominant * 100).toFixed(0)}% of them`);
+          console.log(field.dominant > 0.85
+            ? '   → the dye went uniform. The solver flattened it, not the renderer.'
+            : '   → the dye still has structure. THE RENDERER flattened it, not the solver.');
+        }
         if (png) {
           const img = `/tmp/evolve-flat-${startId}-${k}.png`;
           writeFileSync(img, Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
