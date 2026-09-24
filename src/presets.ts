@@ -18,7 +18,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'Slow, luminous blobs of amber, magenta and lavender drift and merge: the 1960s overhead projector at its most meditative.',
+    description: 'Slow, luminous blobs of amber, magenta and ultramarine drift and merge: the 1960s overhead projector at its most meditative.',
     settings: {
       globalSpeed: 0.00924,
       surge: 0.5,        // unhurried, dreamlike pace
