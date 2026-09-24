@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ferrofluid. It drifts slowly around its resting place, faster when the music
   is loud, so Magnet Garden no longer sits still in one spot.
 
+### Fixed
+
+- **Oil beads no longer overlap.** They used to rest with their rings drawn
+  through each other (up to 40% deep once the flow pushed them together). Now
+  they meet rim to rim and gather into bunches along shared borders, the way
+  real oil beads do.
+
 ### Changed — the presets, redone
 
 - **Eight new colours** (teal, amber, ultramarine, jade, magenta, coral,
