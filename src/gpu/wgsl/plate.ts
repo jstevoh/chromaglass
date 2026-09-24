@@ -994,20 +994,7 @@ struct FsOut {
 };
 
 @fragment fn fs(in: VsOut) -> FsOut {
-  /*
-    The uv, snapped to the centre of its pixel.
-
-    Drawn into a texture, this pass mirrors its geometry (FLIP_Y), and the
-    interpolated uv comes out different in its last bit from the one drawn
-    onto the canvas. The grain was moved onto the pixel for exactly that, but
-    it is not the only thing that hashes a screen coordinate: the droplets,
-    the clumping and the fibre noise all do, and each turns a last-bit
-    difference into a different sample. npm run fx compares the two paths
-    and sat on its limit because of it; a brighter Classic tipped it over.
-    A pixel centre is k + 0.5 texels in on either path, nowhere near a floor
-    boundary, so both paths snap to the same bits.
-  */
-  var uv = (floor(in.uv * U.resolution) + 0.5) / U.resolution;
+  var uv = in.uv;
   let darkBlend = U.darkBlend != 0;
   // GL counts fragment rows up from the bottom; the dither hashes that.
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
