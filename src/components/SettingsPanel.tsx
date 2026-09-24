@@ -2535,6 +2535,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ magnetPolarity: v })}
           settingKey="magnetPolarity"
         />
+        {/* The hand moving the magnet around under the dish, slowly, faster
+            with the music. Evolve starts it on any ferrofluid look. */}
+        <Slider
+          label="Magnet Walk"
+          value={settings.magnetWalk ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ magnetWalk: v })}
+          settingKey="magnetWalk"
+        />
 
         <Slider
           label="Plate Shape"

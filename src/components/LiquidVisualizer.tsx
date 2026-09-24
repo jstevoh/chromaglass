@@ -89,7 +89,7 @@ interface LiquidVisualizerProps {
     real string gets through. Give the project `@types/react` and the
     compiler reports all five comparisons at once as unreachable.
   */
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
@@ -3672,6 +3672,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * film all over again.
    */
   const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => {
+    // The magnet moves no fluid itself: it is held where the gesture is, and
+    // the next solver step pulls the ferrofluid toward it. Ahead of the drain
+    // gate, since holding it over an emptying plate is harmless.
+    switch (g.tool) {
+      case 'magnet':
+        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: performance.now() };
+        return;
+    }
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
     if (!af || drainFrameRef.current > 0) return;
@@ -3780,6 +3788,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   /** The opening look was laid before the GPU solver existed and still owes it its phase. */
   const phasePendingRef = useRef(false);
+  /**
+   * The magnet, when a hand has it: where on the plate (0–1) and when it was
+   * last there. The Magnet tool, the phone pad and a replay all set it; the
+   * solver steps read it, and let go of it a moment after the hand does.
+   */
+  const magnetHandRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  /** The magnet's own slow walk when nobody is holding it: where along its path. */
+  const magnetWalkRef = useRef(0);
+  const magnetWalkAtRef = useRef(0);
+  /** The settings handed to the lead plate's step, with the magnet where it is now. */
+  const magnetStepRef = useRef<Record<string, unknown>>({});
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
   const phaseSolverRef = useRef<unknown>(null);
   const laidPresetRef = useRef<string | null>(null);
@@ -4421,6 +4440,48 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // setting the render pass reads is global whatever it was aimed at,
       // which is why the panel will not let you aim one at a layer.
       const currentSettings = patch.global;
+      /*
+        Where the magnet is this frame.
+
+        A hand on it wins: the Magnet tool (or the phone pad, or a replay)
+        puts it where the pointer is, at no less than a firm pull, and it
+        stays there a quarter of a second after the last touch. With nobody
+        holding it and the automation on, a look with ferrofluid on it gets a
+        magnet that walks: a slow figure around where the look put it, faster
+        when the music is. A magnet that sits still under a still plate is a
+        photograph of ferrofluid, not ferrofluid. Every other look is handed
+        its settings untouched.
+      */
+      const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
+        const now = performance.now();
+        const hand = magnetHandRef.current;
+        const held = hand !== null && now - hand.at < 250;
+        const strength = look.magnetStrength ?? 0;
+        // The walk is a look setting, so a look (or a test) that places its
+        // magnet keeps it there; Evolve starts a gentle one on any ferrofluid
+        // look that has none of its own.
+        const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.5 : 0);
+        const walks = !held && walk > 0 && isActiveRef.current
+          && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
+        if (!held && !walks) return look;
+        let mx: number, my: number, ms = strength;
+        if (held) {
+          mx = hand.x; my = hand.y; ms = Math.max(strength, 0.85);
+        } else {
+          const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
+          const last = magnetWalkAtRef.current || now;
+          magnetWalkAtRef.current = now;
+          magnetWalkRef.current += Math.min(0.1, (now - last) / 1000) * (0.35 + 1.1 * energy) * (0.6 + 0.6 * walk);
+          const t = magnetWalkRef.current;
+          mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
+          my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
+        }
+        return Object.assign(magnetStepRef.current, look, {
+          magnetX: Math.max(0.05, Math.min(0.95, mx)),
+          magnetY: Math.max(0.05, Math.min(0.95, my)),
+          magnetStrength: ms,
+        }) as T;
+      };
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
         const now = Date.now() * 0.001;
@@ -4824,9 +4885,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
+                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
               }
-              if (activeLayerRef.current === 0 && tool !== 'press' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
+              if (activeLayerRef.current === 0 && tool !== 'press' && tool !== 'magnet' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 
               // Feed the performance recorder (~15 Hz while painting)
               if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
@@ -4843,7 +4904,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 });
               }
 
-              if (tool === 'press') {
+              if (tool === 'magnet') {
+                // Nothing is laid: the magnet goes where the hand is.
+                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: performance.now() };
+              } else if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
                 const fg = currentSettings.fingering ?? 0;
@@ -5592,7 +5656,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
-              fluidsRef.current[li].step(patch.layer(li), currentAudioData, time, noise2D);
+              fluidsRef.current[li].step(li === 0 ? magnetFor(patch.layer(li)) : patch.layer(li), currentAudioData, time, noise2D);
             }
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;

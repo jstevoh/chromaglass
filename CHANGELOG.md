@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a magnet you can move
+
+- **The Magnet tool (M)** on both desks: hold it on the plate and the
+  ferrofluid gathers under the pointer and follows it. On looks without
+  ferrofluid it does nothing.
+- **The magnet can walk on its own.** A new Magnet Walk setting moves it
+  slowly around its resting place, faster when the music is loud. Magnet
+  Garden has it on, and Evolve starts a gentle walk on any look with
+  ferrofluid. Looks that place their magnet keep it still.
+
+### Fixed
+
+- **Oil beads no longer overlap.** They used to rest with their rings drawn
+  through each other (up to 40% deep once the flow pushed them together). Now
+  they meet rim to rim and gather into bunches along shared borders, the way
+  real oil beads do.
+- **Oil beads look like oil, not bubbles.** The heavy dark ring is now a
+  thin, soft edge. The inside is paler than the dye around it, with a bright
+  core where the droplet gathers the lamp's light, the way a real oil bead
+  projects.
+
 ### Changed — the presets, redone
 
 - **Eight new colours** (teal, amber, ultramarine, jade, magenta, coral,

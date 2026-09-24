@@ -1,9 +1,10 @@
 /**
- * Oil beads: the field of small dark-rimmed droplets in the Fillmore stills.
+ * Oil beads: the field of small oil droplets in the Fillmore stills.
  *
  * Oil shaken into water breaks into hundreds of beads that never quite
- * dissolve. Each shows a dark meniscus ring with the ground colour inside,
- * they ride the flow a little behind it, crowd without overlapping, and
+ * dissolve. Each is a small lens: a thin dark edge, paler than the dye around
+ * it (oil takes none of it), with the light gathered in its middle. They
+ * ride the flow a little behind it, crowd without overlapping, and
  * now and then two touch and become one. The solver has no second phase,
  * so, like the bubbles, they live here as particles; unlike the bubbles
  * they are drawn as a mask texture (hundreds of them, too many for
@@ -107,7 +108,7 @@ export class BeadField {
       // packed tighter there (the crowding step keeps them from overlapping).
       const p = this.patchField(x, y);
       if (p <= 0 || Math.random() > p) continue;
-      const gap = 1.3 - 0.5 * p;
+      const gap = 1.3 - 0.3 * p;
       let ok = true;
       for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * gap) { ok = false; break; } }
       if (ok) { this.beads.push({ x, y, r, age: 0, seed: Math.random() }); this.dirty = true; }
@@ -166,7 +167,11 @@ export class BeadField {
       console.warn(`ChromaGlass: dropped ${bad} bead(s) that went non-finite.`);
     }
     // Crowding: beads touching push apart; two pressed hard together merge.
-    const cell = 8;
+    // A bucket at least as wide as the furthest two beads can reach each
+    // other (1.3 × two of the biggest), so the 3 × 3 search never misses one.
+    let maxR = 0;
+    for (const b of bs) if (b.r > maxR) maxR = b.r;
+    const cell = Math.max(8, Math.ceil(maxR * 2.6));
     const buckets = this.buckets, gone = this.gone, spare = this.spareLists;
     for (const b of bs) {
       const k = Math.floor(b.x / cell) + Math.floor(b.y / cell) * 4096;
@@ -183,20 +188,30 @@ export class BeadField {
           if (o === b || gone.has(o)) continue;
           const dx = o.x - b.x, dy = o.y - b.y;
           const d = Math.hypot(dx, dy) || 1e-3;
-          // Not a honeycomb: only a hard overlap pushes apart, and by an
-          // amount that differs per bead, so the crowd stays irregular.
-          const want = (b.r + o.r) * (0.55 + 0.35 * b.seed);
-          if (d >= want) continue;
-          if (d < (b.r + o.r) * 0.45 && b.r + o.r < 7 && Math.random() < 0.02) {
-            // Merge: the larger takes the smaller's area.
+          /*
+            Oil beads meet rim to rim and stay there: two beads share a border,
+            they do not slide over each other. This used to rest them at 55-90%
+            of the touching distance, which read on the plate as rings drawn
+            through one another. Now they rest just touching (the per-bead
+            spread is a few percent, so the crowd is still not a honeycomb:
+            the sizes already see to that) and a bead a little way off is drawn
+            in to meet its neighbour, which is what makes them bunch.
+          */
+          const touch = b.r + o.r;
+          const want = touch * (0.96 + 0.06 * b.seed);
+          if (d >= touch * 1.3) continue;
+          if (d < touch * 0.7 && touch < 7 && Math.random() < 0.02) {
+            // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             big.r = Math.sqrt(big.r * big.r + small.r * small.r);
             gone.add(small);
             continue;
           }
-          const push = (want - d) * 0.15;
-          b.x -= dx / d * push; b.y -= dy / d * push;
-          o.x += dx / d * push; o.y += dy / d * push;
+          // Apart when overlapping, firmly; together when near, gently. Each
+          // pair is visited from both ends, so each move is half of it.
+          const move = d < want ? (want - d) * 0.25 : -Math.min(d - want, touch * 0.3) * Math.min(1, dt * 1.5) * 0.5;
+          b.x -= dx / d * move; b.y -= dy / d * move;
+          o.x += dx / d * move; o.y += dy / d * move;
         }
       }
     }
@@ -253,7 +268,8 @@ export class BeadField {
       const fade = Math.min(1, b.age / 0.6);
       const rr = Math.max(1, b.r * k);
       ctx.globalAlpha = fade * (0.8 + 0.2 * b.seed);
-      ctx.lineWidth = Math.max(1.2, rr * 0.28);
+      // Thin: an oil bead's edge is a fine line, not a bubble's heavy ring.
+      ctx.lineWidth = Math.max(1, rr * 0.12);
       ctx.beginPath(); ctx.arc(b.x * k, b.y * k, rr - ctx.lineWidth * 0.5, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.globalAlpha = 1;
