@@ -106,6 +106,60 @@ export function CrashReportButton({ floating = false }: {
   );
 }
 
+/**
+ * The quiet one: a dot in the corner that saves a report in one click.
+ *
+ * The lit button only lights on a stop the log recognises, and under a desk
+ * there is no button at all — so a crash that reloads the tab, or one noticed
+ * a minute later, left no obvious way to keep what the log knew. This is
+ * always there, on every screen, and asks nothing: the report, with the
+ * picture and the whole ring (every load it still holds), goes straight to
+ * Downloads as `chromaglass-report-<time>.json`, where Claude Code on the
+ * same machine can read it.
+ *
+ * Faint on purpose, and fixed in the corner so it sits over no control.
+ */
+export function QuickReportDot() {
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  useEffect(() => {
+    if (state !== 'saved' && state !== 'failed') return;
+    const t = setTimeout(() => setState('idle'), 2500);
+    return () => clearTimeout(t);
+  }, [state]);
+  const save = async () => {
+    if (state === 'saving') return;
+    setState('saving');
+    try {
+      crashLog.record('info', 'report', 'saved by hand from the corner dot');
+      const report = await crashLog.buildReport({ note: 'saved from the corner dot' });
+      downloadText(`chromaglass-report-${stamp()}.json`, JSON.stringify(report, null, 2));
+      setState('saved');
+    } catch {
+      setState('failed');
+    }
+  };
+  return (
+    <button
+      onClick={() => { void save(); }}
+      className="group fixed bottom-1 right-1 z-[70] flex h-6 w-6 items-center justify-center rounded-full pointer-events-auto"
+      aria-label="Save a crash report to Downloads"
+      title="Save a crash report to Downloads"
+      data-testid="quick-report"
+    >
+      <span
+        className={`block h-1.5 w-1.5 rounded-full transition-colors ${
+          state === 'saved' ? 'bg-emerald-400' : state === 'failed' ? 'bg-red-500' : state === 'saving' ? 'bg-white/60' : 'bg-white/15 group-hover:bg-white/60'
+        }`}
+      />
+      {(state === 'saved' || state === 'failed') && (
+        <span className="pointer-events-none absolute bottom-7 right-0 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[11px] text-white/90" data-testid="quick-report-said">
+          {state === 'saved' ? 'Report saved to Downloads' : 'Could not save the report'}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function ReportSheet({ fatal, onClose, onDone }: { fatal: crashLog.CrashEntry | null; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('');
   const [withShot, setWithShot] = useState(true);

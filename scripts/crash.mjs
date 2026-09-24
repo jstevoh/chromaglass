@@ -262,6 +262,16 @@ try {
   check('Save file downloads a report', !!download && /chromaglass-report-.*\.json$/.test(download.suggestedFilename()), download?.suggestedFilename() ?? 'no download');
   await page.keyboard.press('Escape');
 
+  // The corner dot: one click, no sheet, a report in Downloads with the whole ring.
+  const [dotFile] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15_000 }).catch(() => null),
+    page.locator('[data-testid="quick-report"]').click(),
+  ]);
+  let dotHistory = -1;
+  if (dotFile) { try { dotHistory = JSON.parse(await (await import('node:fs/promises')).readFile(await dotFile.path(), 'utf8')).history?.length ?? -1; } catch { /* unreadable */ } }
+  check('the corner dot saves a report in one click, with the whole ring', !!dotFile && dotHistory > 0,
+    dotFile ? `${dotFile.suggestedFilename()}, ${dotHistory} lines of history` : 'no download');
+
   // ── 5. Across the reload ─────────────────────────────────────────
   const beforeReload = await page.evaluate(() => { window.chromaglassDebug().crash.record('error', 'soak', 'the line before the reload'); return window.chromaglassDebug().crash.load; });
   // No pagehide: a tab that dies does not get one either.

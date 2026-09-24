@@ -63,7 +63,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
-import { CrashReportButton, openCrashReport } from './components/CrashReportButton';
+import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -3760,6 +3760,8 @@ export default function App() {
           button that is idle nearly always, so the chip says when there is
           news and ⌘K opens the sheet. */}
       {deskUp && <CrashReportButton floating />}
+      {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
+      {overlaysVisible && <QuickReportDot />}
 
       {showSave && (
         <SaveLookSheet

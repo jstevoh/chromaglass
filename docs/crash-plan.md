@@ -10,6 +10,19 @@ place nothing was ever written down. This adds two things:
 - **A button** (`src/components/CrashReportButton.tsx`) that turns the log into
   a report. It does so only when asked.
 
+## The corner dot: a report whenever you want one
+
+A faint dot in the bottom-right corner, on every screen (hidden on a clean
+screen). One click saves `chromaglass-report-<time>.json` to Downloads, with no
+sheet and nothing to fill in. It holds the picture and the whole log ring:
+every load it still holds, so a crash two reloads back is in it.
+
+The lit button only lights on a stop the log recognises, and a tab that crashes
+and reloads itself is not one. This dot is for everything else. To have Claude
+look at one, say so: Claude Code on the same Mac reads
+`~/Downloads/chromaglass-report-*.json` directly. In a cloud session, attach
+the file.
+
 ## Automatic detection: `crashLog.ts`
 
 **What it listens to:**

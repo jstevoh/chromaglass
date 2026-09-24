@@ -57,6 +57,8 @@ export interface CrashReport {
   look: unknown;
   log: CrashEntry[];
   previous: CrashEntry[];
+  /** The whole ring, every load it still holds — a crash two reloads back is in here. */
+  history: CrashEntry[];
   screenshot: { dataUrl: string; width: number; height: number; painted: boolean } | null;
 }
 
@@ -406,6 +408,7 @@ export async function buildReport(opts: { note?: string; screenshot?: boolean; s
     look: opts.settings === false ? null : jsonSafe(guard(lookState)),
     log: thisLoad(),
     previous: previous(),
+    history: entries(),
     screenshot: opts.screenshot === false ? null : await screenshot(),
   };
 }
