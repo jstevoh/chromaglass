@@ -27,7 +27,7 @@ doors often. Closed in this release, all in `docs/stability-plan.md`:
 - The first-listen recorder keeps ten minutes, not hours.
 - The logo is sent to a cast receiver once, not with every state.
 
-Fifteen larger jobs are ranked in the plan for later.
+Thirteen larger jobs are ranked in the plan for later.
 
 ### Added — the black box: crash detection and a report button
 
