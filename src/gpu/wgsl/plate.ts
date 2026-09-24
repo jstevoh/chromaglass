@@ -1544,8 +1544,19 @@ struct FsOut {
     if (sl > 1e-5) { facing = dot(slope / sl, lampS); }
     let dome = 0.78 + 0.32 * ramp;
     let catchL = max(0.0, facing) * (1.0 - ramp) * smoothstep(0.0, 0.5, ramp) * 0.5;
-    outColor *= 1.0 - ring * 0.7 * k;
-    outColor = mix(outColor, outColor * dome + vec3f(0.9, 0.85, 0.75) * catchL * 0.35, inner * (1.0 - ring) * k);
+    /*
+      A bead is oil, not air, and it has to read that way. An air bubble in
+      water spreads the light, so it projects as a heavy dark ring. Oil is
+      only a little denser than water, so a bead is a weak converging lens: a
+      thin, soft edge, and the light gathered into a bright core. The oil
+      takes none of the water's dye either, so the bead is the colour around
+      it thinned by the lamp, paler than the liquid it sits in.
+    */
+    outColor *= 1.0 - ring * 0.4 * k;
+    let oil = mix(outColor, vec3f(0.95, 0.92, 0.85) * (0.35 + 0.65 * outColor), 0.3);
+    let focus = smoothstep(0.5, 1.0, ramp);
+    let lensC = oil * dome + outColor * focus * 0.45 + vec3f(0.9, 0.85, 0.75) * catchL * 0.35;
+    outColor = mix(outColor, lensC, inner * (1.0 - ring) * k);
     auxB = max(auxB, inner * 0.4 * k);
   }
 

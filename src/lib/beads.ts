@@ -1,9 +1,10 @@
 /**
- * Oil beads: the field of small dark-rimmed droplets in the Fillmore stills.
+ * Oil beads: the field of small oil droplets in the Fillmore stills.
  *
  * Oil shaken into water breaks into hundreds of beads that never quite
- * dissolve. Each shows a dark meniscus ring with the ground colour inside,
- * they ride the flow a little behind it, crowd without overlapping, and
+ * dissolve. Each is a small lens: a thin dark edge, paler than the dye around
+ * it (oil takes none of it), with the light gathered in its middle. They
+ * ride the flow a little behind it, crowd without overlapping, and
  * now and then two touch and become one. The solver has no second phase,
  * so, like the bubbles, they live here as particles; unlike the bubbles
  * they are drawn as a mask texture (hundreds of them, too many for
@@ -267,7 +268,8 @@ export class BeadField {
       const fade = Math.min(1, b.age / 0.6);
       const rr = Math.max(1, b.r * k);
       ctx.globalAlpha = fade * (0.8 + 0.2 * b.seed);
-      ctx.lineWidth = Math.max(1.2, rr * 0.28);
+      // Thin: an oil bead's edge is a fine line, not a bubble's heavy ring.
+      ctx.lineWidth = Math.max(1, rr * 0.12);
       ctx.beginPath(); ctx.arc(b.x * k, b.y * k, rr - ctx.lineWidth * 0.5, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.globalAlpha = 1;
