@@ -3663,6 +3663,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     dish and an empty ring, Fillmore after Classic had two. So the layer is laid
     here and again the moment it is built.
   */
+  /** The opening look was laid before the GPU solver existed and still owes it its phase. */
+  const phasePendingRef = useRef(false);
   const laidPresetRef = useRef<string | null>(null);
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
@@ -3706,21 +3708,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         So the phase is only touched when a look actually asks for some.
       */
-      const amt = settingsRef.current.phaseAmount ?? 0;
-      const lead = fluidsRef.current[0]?.gpu;
-      if (amt > 0.002 && lead?.addPhase) {
-        lead.clearPhase?.();
-        const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
-        const count = Math.round(3 + (1 - scale) * 22);
-        const r = 0.04 + scale * 0.16;
-        for (let k = 0; k < count; k++) {
-          // Deterministic placement: the same look laid twice is the same
-          // plate twice, which is what rendering a song depends on.
-          const a = (k * 2.399963229728653);
-          const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
-          lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
-        }
-      }
+      // A look laid before the GPU solver exists (the opening look, laid on
+      // mount) owes its phase to the solver when it attaches: laid here it
+      // went nowhere, and Magnet Garden opened as a bare gold pool.
+      phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      layPhaseRef.current();
     }
     for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -3738,6 +3730,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     macroCamRef.current.reset();
     livePresetRef.current = presetId;
   };
+  /** The second phase for the look being laid, if it asks for some and the GPU solver is there to take it. */
+  const layPhase = () => {
+    const amt = settingsRef.current.phaseAmount ?? 0;
+    const lead = fluidsRef.current[0]?.gpu;
+    if (amt > 0.002 && lead?.addPhase) {
+      lead.clearPhase?.();
+      const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
+      const count = Math.round(3 + (1 - scale) * 22);
+      const r = 0.04 + scale * 0.16;
+      for (let k = 0; k < count; k++) {
+        // Deterministic placement: the same look laid twice is the same
+        // plate twice, which is what rendering a song depends on.
+        const a = (k * 2.399963229728653);
+        const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
+        lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
+      }
+    }
+  };
+  const layPhaseRef = useRef(layPhase);
+  layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
   layPlateRef.current = layPlate;
@@ -4505,6 +4517,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (renderer && !renderer.attachSolver(fluid, gpuSupportedRef.current === false ? 0 : wantRes)) {
             gpuSupportedRef.current = false;
           }
+        }
+        if (phasePendingRef.current && fluidsRef.current[0]?.gpu?.addPhase) {
+          phasePendingRef.current = false;
+          layPhaseRef.current();
         }
         {
           const lead = fluidsRef.current[0];

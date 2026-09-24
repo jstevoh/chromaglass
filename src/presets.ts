@@ -663,6 +663,9 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.1,
       transmission: 0.55,
       lampWarmth: 0.25,
+      glossiness: 0.35,
+      edgeRelief: 0.45,
+      boundaryContrast: 0.5,
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -1183,7 +1186,7 @@ export const PRESETS: Preset[] = [
       advection: 0.6,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.16,
+      automateRate: 0.22,
       platePressure: 0.3,
       glassSmear: 0.2,
       rainDrip: 0.05,
@@ -1567,8 +1570,8 @@ export const PRESETS: Preset[] = [
       lightPlay: 0.6,
       lampMotion: 0.2,
       lampHotspot: 0.45,
-      iridescence: 0.75,           // the reason a soap film is worth looking at
-      thinFilm: 0.8,
+      iridescence: 0.6,
+      thinFilm: 1.0,
       secondLamp: 0,
       audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
     }
