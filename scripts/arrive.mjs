@@ -30,6 +30,7 @@ import { PRESETS } from '../src/presets.ts';
 
 const PORT0 = Number(process.env.ARRIVE_PORT ?? 4580);
 const FROM = process.env.ARRIVE_FROM ?? 'classic';
+const ONLY = process.env.ARRIVE_LOOKS ? process.env.ARRIVE_LOOKS.split(',') : null;
 /*
   The frame, not the dye, decides.
 
@@ -62,7 +63,16 @@ process.on('exit', stop);
 server.on('exit', (c) => { if (!leaving) { console.error(`\npreview exited (${c})`); process.exit(2); } });
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 
-const ids = PRESETS.map(p => p.id);
+/*
+  The ring is every preset; the list is the ones being reported on.
+
+  `preset-next` walks the whole ring, so the budget for reaching a look has to
+  be the ring's size. Sized from the filtered list instead, asking for two
+  looks gave up after four steps and called it a failure to arrive.
+*/
+const ALL = PRESETS.length;
+const ids = PRESETS.map(p => p.id).filter(id => !ONLY || ONLY.includes(id));
+if (ONLY) for (const id of ONLY) if (!ids.includes(id)) { console.error(`no such look: ${id}`); process.exit(2); }
 const browser = await launchChromium(chromium);
 let bad = 0;
 try {
@@ -92,14 +102,35 @@ try {
 
   /** Step with the only action that exists, and stop if it does not land. */
   const goTo = async (want) => {
-    for (let n = 0; n < ids.length + 2; n++) {
+    for (let n = 0; n < ALL + 2; n++) {
       if ((await read()).plate === want) return;
       await page.evaluate(() => window.chromaglassAction?.('preset-next'));
       await page.waitForTimeout(450);
     }
-    throw new Error(`stepped ${ids.length + 2} times and never reached ${want} — ` +
+    throw new Error(`stepped ${ALL + 2} times and never reached ${want} — ` +
       `the plate is on ${(await read()).plate}`);
   };
+
+  /*
+    A frame this harness is known to fail on, before it judges anything.
+
+    Every reading below came out well clear of the bar, and "nothing fired" is
+    the same output a broken instrument gives — which this harness has already
+    produced once, driving the app with an argument the hook ignores and
+    printing 32 rows of an untouched plate. The blackout is a frame that is
+    genuinely black, so if the photograph and the bar cannot agree it is dark,
+    nothing after this means anything.
+  */
+  await page.evaluate(() => window.chromaglassAction?.('blackout-toggle'));
+  await page.waitForTimeout(2500);
+  const black = await luma();
+  await page.evaluate(() => window.chromaglassAction?.('blackout-toggle'));
+  await page.waitForTimeout(2500);
+  const lit = await luma();
+  if (!(black < DARK)) throw new Error(`the control failed: a blacked-out plate read ${black.toFixed(3)}, ` +
+    `which this harness would call a picture — it cannot tell a dark frame from a lit one`);
+  if (!(lit > DARK)) throw new Error(`the control failed: the plate stayed dark (${lit.toFixed(3)}) after the blackout lifted`);
+  console.log(`  control: blacked out reads ${black.toFixed(3)}, lit reads ${lit.toFixed(3)}, bar at ${DARK}`);
 
   console.log(`\n  every look arriving mid-show, on a plate filled by ${FROM}\n`);
   console.log('  look                    luma 1s    2s    4s    8s   14s   (dye at 14s)');
