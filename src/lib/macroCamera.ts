@@ -301,10 +301,22 @@ export class MacroCamera {
 
           The fault is real and reproducible — `npm run gig` has killed a show
           on the macro-toggle alone, twice, over a plate 96% wet with 125
-          colours on it — but it is not here. The next thing to rule out is
-          whether a look that was never built for a closeup simply has nothing
-          to resolve at 4x, in which case the picker is choosing perfectly well
-          between equally smooth places.
+          colours on it — but it is not here.
+
+          Nor is it that a look built for the whole plate has nothing to resolve
+          this close, which was the next suspect. Flatness against magnification
+          on one plate, eight frames a step, peaks in the middle and comes back
+          down: soap-film 10% at 1x, 60% at 2x, 30% at 4x, 27% at 8x, and
+          classic 7%, 50%, 40%, 25%. Deeper is not flatter.
+
+          What is left is that it happens to *some shots and not others*. Over
+          fourteen seconds at 4x, soap-film's median frame is 19% in one colour
+          and its worst is 100% — the camera cuts on a hold of about two
+          seconds, so roughly every other reading catches a bad one. So the
+          question is not how close it goes or which pool it prefers, but what
+          a shot looks like in the moment it lands: whether the frame is one
+          colour while the ease is still running, or whether some subjects are
+          simply uniform all the way across at that magnification.
         */
         let score = d * (0.25 + compactness * 1.75);
         if (avoid) {
