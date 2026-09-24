@@ -18,7 +18,7 @@ import { DEFAULT_LIQUID_TYPES } from './types';
 // slow harmony rotation all pick from inside that set. A user's palette lock
 // still wins outright.
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [17, 20, 18],
+  'classic':            [0, 2, 8],           // yellow, pink, blue: also the picture npm run fx measures, so it stays put
   'galaxy':             [18, 23, 16],
   'deep-ocean':         [16, 22, 7, 19],
   'cyberpunk':          [20, 16, 6],

@@ -41,6 +41,9 @@ seconds, with the band playing, and puts them all on one contact sheet.
   so a switch is never hidden behind a dip.
 - Classic is the harnesses' plate (`wall`, `qa`, `fx`, `depth`, `crash` all
   load it), and `wall` needs its frame lit edge to edge: no round dish or
-  vignette on Classic.
+  vignette on Classic. `fx` compares the post chain against the plain frame
+  on it to within ten 8-bit steps, and that margin moved with Classic's
+  colours: amber, magenta and ultramarine or lavender left it at ten or
+  eleven. Classic keeps its original yellow, pink and blue.
 - A preset id, once shipped, stays: songs, cue lists and MIDI pads refer to
   it. A look that is replaced keeps its id and gets a new name and settings.
