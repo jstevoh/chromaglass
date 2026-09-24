@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the rest of the stability plan
+
+Every job in `docs/stability-plan.md` except S7 (an hour in CI):
+
+- **The plate survives a rebuild.** A lost device or a self-heal carries the
+  plate across on its last readback instead of laying the look again. Two
+  quick rung changes no longer blank it.
+- **GPU errors name their frame.** Sampled error scopes say which frame, and
+  what had just been built, when something fails.
+- **Every door S0 closed is now tested.** `npm run crash` walks through each
+  one: out of memory, an error storm, no adapter, a request that hangs, and a
+  loss that keeps the plate.
+- **Less churn.** One pipeline cache per device, so a rung change no longer
+  recompiles every shader. Readbacks reuse their buffer. Beads reuse their
+  buckets. `WebGPUChemistry` is deleted.
+- **The fingerprint index grows a song at a time,** in typed arrays, built in
+  a worker. The song-map decode trims before it resamples.
+- **Cast state goes out at 15 Hz** instead of every frame of a fade.
+- **Crash reports can arrive.** A Worker receives them and keeps a daily
+  digest. It needs deploying once; the steps are in `docs/crash-plan.md`.
+
 ### Fixed — a show that stops and does not come back
 
 A single failure used to be a one-way door, and the live site hit these

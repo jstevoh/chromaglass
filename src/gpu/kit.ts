@@ -26,15 +26,77 @@ export class Disposer {
 
 // ── Pipelines ────────────────────────────────────────────────────────
 
+type Pipelines = {
+  /** By name (and entry point), then by source. */
+  compute: Map<string, Map<string, GPUComputePipeline>>;
+  /** By name alone: the descriptor is only built on a miss. */
+  render: Map<string, GPURenderPipeline>;
+};
+
+/**
+ * One set of pipelines per device, shared by everything drawing on it (S4,
+ * docs/stability-plan.md).
+ *
+ * Every solver used to build its own cache, so a rung change — a new
+ * `WebGPUFluid`, and with it new particles and air — compiled every shader
+ * over again: a CPU and driver spike landing on the same frame as the memory
+ * swap, for pipelines identical to the ones just thrown away. Only the grid
+ * had changed, and the grid is in the uniforms, not the shaders. Now the new
+ * solver finds the old one's pipelines waiting.
+ *
+ * A WeakMap so the pipelines go with their device: a lost device's are no
+ * use to its replacement, and nothing here should keep it alive. Nothing
+ * ever empties a store either. Pipelines hold nothing a `destroy()` would
+ * free (WebGPU has none for them), and a solver disposed mid-show must not
+ * take its successor's pipelines with it.
+ */
+const shared = new WeakMap<GPUDevice, { modules: Map<string, GPUShaderModule>; scopes: Map<string, Pipelines> }>();
+
 /**
  * Compute and render pipelines, built once per name. Shader modules are
  * shared by source, so two pipelines from one WGSL file compile it once.
+ *
+ * `new PipelineCache(device)` is a private cache, for the self-tests, which
+ * want to see a pipeline built; the show asks `PipelineCache.for` for the
+ * device's shared one.
  */
 export class PipelineCache {
-  private readonly modules = new Map<string, GPUShaderModule>();
-  private readonly compute = new Map<string, GPUComputePipeline>();
-  private readonly render = new Map<string, GPURenderPipeline>();
-  constructor(private readonly device: GPUDevice) {}
+  private readonly modules: Map<string, GPUShaderModule>;
+  private readonly compute: Pipelines['compute'];
+  private readonly render: Pipelines['render'];
+  constructor(
+    private readonly device: GPUDevice,
+    store: { modules: Map<string, GPUShaderModule> } & Pipelines = { modules: new Map(), compute: new Map(), render: new Map() },
+  ) {
+    this.modules = store.modules;
+    this.compute = store.compute;
+    this.render = store.render;
+  }
+
+  /**
+   * The device's shared cache, under `scope` — one per owning class.
+   *
+   * Scoped because a shared cache is only as safe as its keys. Names were
+   * picked file by file, for a cache that file had to itself — the plate's
+   * `derive`, the probe's `solid` — and nothing stops two files choosing the
+   * same one for different pipelines. A render pipeline can be told apart by
+   * nothing but its name, since its descriptor is only made on a miss, so
+   * each owner gets names of its own and two owners cannot collide. Within a
+   * scope the rule is the one each owner already kept across its own calls:
+   * the name says everything that shapes the pipeline, the target format
+   * included. Now it has to hold across instances too, which it does for
+   * everything that shares (the formats that vary are in the names).
+   *
+   * Shader modules stay shared across scopes. They are keyed by their
+   * source, which cannot collide.
+   */
+  static for(device: GPUDevice, scope: string): PipelineCache {
+    let dev = shared.get(device);
+    if (!dev) { dev = { modules: new Map(), scopes: new Map() }; shared.set(device, dev); }
+    let pipes = dev.scopes.get(scope);
+    if (!pipes) { pipes = { compute: new Map(), render: new Map() }; dev.scopes.set(scope, pipes); }
+    return new PipelineCache(device, { modules: dev.modules, ...pipes });
+  }
 
   module(code: string, label?: string): GPUShaderModule {
     let m = this.modules.get(code);
@@ -50,13 +112,21 @@ export class PipelineCache {
    * use, so a pass that ignores one of its uniforms (a fill, say) refuses the
    * bind group every one of its siblings takes. The declarations are the
    * truth, and they are right there in the source.
+   *
+   * Keyed by the name, the entry point and the source, not the name alone.
+   * Here the source is in hand, so a name two callers gave different shaders
+   * gets two pipelines rather than whichever was built first; and one file
+   * with two entry points (the pressure self-test's) gets both.
    */
   computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline {
-    let p = this.compute.get(name);
+    const key = entryPoint === 'main' ? name : `${name}@${entryPoint}`;
+    let bySource = this.compute.get(key);
+    if (!bySource) { bySource = new Map(); this.compute.set(key, bySource); }
+    let p = bySource.get(code);
     if (!p) {
       const layout = this.device.createPipelineLayout({ label: name, bindGroupLayouts: [layoutFromWgsl(this.device, code, name)] });
       p = this.device.createComputePipeline({ label: name, layout, compute: { module: this.module(code, name), entryPoint } });
-      this.compute.set(name, p);
+      bySource.set(code, p);
     }
     return p;
   }
@@ -210,7 +280,17 @@ export class ReadbackRing {
       // never comes back, and with two or three of them that is the flash
       // guard and the dye readback stopped for the rest of the show.
       try {
-        if (slot.seq > this.landedSeq) { this.data = buf.getMappedRange().slice(0); this.landedSeq = slot.seq; }
+        if (slot.seq > this.landedSeq) {
+          // Into the ring's one buffer, made on the first landing — and only
+          // published once the copy is done, so a mapping that throws on the
+          // first read leaves `latest` null rather than a buffer of zeros
+          // that looks like an empty plate.
+          const mapped = new Uint8Array(buf.getMappedRange());
+          const into = this.data ?? new ArrayBuffer(this.bytes);
+          new Uint8Array(into).set(mapped);
+          this.data = into;
+          this.landedSeq = slot.seq;
+        }
       } finally {
         try { buf.unmap(); } catch { /* destroyed under it */ }
         slot.busy = false;
@@ -218,7 +298,22 @@ export class ReadbackRing {
     }, () => { slot.busy = false; });
   }
 
-  /** The newest data that has come back, or null before the first. */
+  /**
+   * The newest data that has come back, or null before the first.
+   *
+   * One buffer for the life of the ring, overwritten in place as each read
+   * lands (S5, docs/stability-plan.md). It was a fresh `slice` per landing:
+   * ~590 KB a field, two fields a layer, every frame, which is ~70 MB/s of
+   * garbage a layer and a collector that never gets to rest.
+   *
+   * So what this returns is a window, not a snapshot. It changes only in the
+   * mapping callback, which cannot run in the middle of anyone's synchronous
+   * code, so reading it through in the task that asked is safe — and every
+   * reader does just that: the solver copies the fields out into `rbDye` and
+   * `rbVel`, and the stats, the probe, the profiler and the self-test read
+   * their few numbers and let go. A reader that wants the data past an
+   * `await` or into the next frame copies it.
+   */
   get latest(): ArrayBuffer | null { return this.data; }
 
   /** Which copy the newest data came from: it rises each time a fresh one lands. */

@@ -15,7 +15,7 @@ laptop mid-set is exactly where GPUs reset, run short of memory, or hand back
 a frame that will not upload.
 
 **S0**, below, closes the doors that are cheap to close. **S1–S13** are the
-larger jobs, in the order they should be taken.
+larger jobs; all but S7 (an hour in CI) have shipped.
 
 ## S0: shipped with the black box (#127)
 
@@ -49,28 +49,34 @@ out-of-memory and backoff paths have no harness yet; see S6.
 Ranked by what they cost a show.
 
 1. **S1 — Restore the plate, not just the look, after a rebuild.**
+   - **Shipped.** A loss or self-heal carries the plate across on its last readback (non-finite values zeroed); the look is laid again only when there is nothing to carry, or after two rebuilds in a minute.
    - The dye lives in the solver's textures, so every recovery (a loss, and now a self-heal) lays the look again from nothing.
 
    **Do:** keep a CPU snapshot a few seconds old (the readback ring already brings the fields back) and seed the new solver from it.
 2. **S2 — Error scopes on the frame, not a heuristic.**
+   - **Shipped.** One frame in sixty, and the two after a resize or a newly built camera, post chain or projector pass, runs inside validation and out-of-memory scopes; a caught error names the frame and what was built.
    - `ERROR_STORM` is a count; it cannot say which pass is broken.
 
    **Do:** sample `pushErrorScope('validation')` and `('out-of-memory')` around `stage.frame()` every N frames, and around every allocation that scales with the canvas (post chain, camera, projector targets, canvas resize). The first error then names its pass in the crash log, and the governor can step down for the target that did not fit, not only for the solver.
 3. **S3 — The first readback after a rung change.**
+   - **Shipped.** Each attach keeps the state its solver was seeded with, and a solver swapped out before its first readback gives that back.
    - `attachGpu` pulls from `rbDye`/`rbVel`, which start as zeros until the first ring readback lands.
    - Two rung changes within ~2 frames copy zeros, and the plate goes blank while the show runs on.
 
    **Do:** a `landed` flag; skip the pull and keep the CPU arrays until one has landed.
 4. **S4 — One pipeline cache per device.**
+   - **Shipped.** `PipelineCache.for(device, scope)`: shader modules shared per device, pipelines per owner, compute pipelines keyed by source as well as name.
    - Every `WebGPUFluid`, and every `WebGPUParticles` toggle, builds its own `PipelineCache`.
    - So each rung change recompiles every shader, which is a CPU and driver spike at the same moment as the memory swap.
 
    **Do:** share one cache per device, owned by the stage.
 5. **S5 — Readback garbage.**
+   - **Shipped.** Each ring copies into one buffer it keeps; no reader holds `latest` past its own call.
    - `ReadbackRing` does `getMappedRange().slice(0)`: ~590 KB per field, two fields per layer, every frame. That is ~70 MB/s of allocation per layer and constant GC pressure.
 
    **Do:** copy into a buffer kept across frames.
 6. **S6 — A harness for the doors in S0.** None of these can be reached from a page today:
+   - **Shipped.** `simulateOutOfMemory`, `stepDownFrames`, `errorStorm` and `gridCap` under `?debug`; `npm run crash` walks through each door, plus a null and a hung `requestAdapter`.
    - out of memory: a debug hook that makes `WebGPUFluid` allocate past `maxBufferSize`, or pins the grid cap
    - a null adapter on recovery: stub `navigator.gpu.requestAdapter` to answer null twice
    - a request that never answers
@@ -85,28 +91,34 @@ Ranked by what they cost a show.
 
    Everything above is about what happens *after* hours; nothing checks for it.
 8. **S8 — Crash reports that arrive.**
+   - **Shipped, not yet switched on.** `server/report-worker.js` (`wrangler.report.toml`, `npm run deploy:reports`, tested by `npm run report-worker`): reports into R2, an index in KV, a digest route and a daily digest file. Send appears once the Worker is deployed and `VITE_CRASH_REPORT_URL` is set; the steps are in `crash-plan.md`.
     - A `/report` path on a Worker (the fingerprint Worker, or its own), with storage and a daily digest.
     - Build with `VITE_CRASH_REPORT_URL` so **Send** appears.
     - Grouped by the black box's `last()` line, so the next round of this plan is picked from what the field actually reports.
 9. **S9 — The fingerprint index.**
+   - **Shipped.** Typed-array segments that merge as they grow; a new song is added, not rebuilt; the first build runs in a worker. Matches are byte-identical to the old index.
     - `buildIndex` rebuilds a `Map<hash, number[]>` of every song ever stored, on the main thread, after every newly mapped song.
     - Its memory and the stall grow with the library, across sessions.
 
     **Do:** add to it incrementally, store it in typed arrays, and build it in a worker.
 10. **S10 — Cast state rate.**
+    - **Shipped, at 15 Hz rather than 10.** The receiver does not interpolate — it draws the steps it is sent — and at 10 Hz a two-second fade to black is a visible staircase.
     - Even without the logo, a state goes out every frame of a fade.
 
     **Do:** throttle to ~10 Hz. The receiver interpolates anyway.
 11. **S11 — The song-map decode.**
+    - **Shipped.** The resample renders only the kept duration; the full-rate buffer never leaves `decodeToMono`.
     - Even capped at ten minutes, `decodeToMono` decodes at the file's rate and in stereo before resampling: ~230 MB at 48 kHz.
 
     **Do:** decode in slices, or trim before resampling.
 12. **S12 — Dev-only teardown race.**
+    - **Shipped.** The cancelled path destroys its device and leaves the canvas alone.
     - In StrictMode a late first stage runs `context.unconfigure()` on the canvas the second run is using, so `getCurrentTexture()` throws.
     - Only in dev, but it is the same symptom and confuses the hunt.
 
     **Do:** destroy only the device on the cancelled path.
 13. **S13 — Small change.**
+    - **Shipped.** The compositor is disposed by name; the beads reuse their buckets; `WebGPUChemistry` and its shader are deleted (`depositChemistry` is now unused as well).
     - `WebGPUPlate` is never disposed in the cleanup (the device's destroy covers it, but it should say so).
     - `beads.ts` allocates a `Map`, a `Set` and arrays every crowding step.
     - `WebGPUChemistry` is never imported; delete it.

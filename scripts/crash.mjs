@@ -109,6 +109,9 @@ try {
     check('the loss is logged', after.some((e) => e.source === 'gpu' && /device lost/.test(e.msg)));
     check('and so is the recovery', recovered, after.find((e) => e.source === 'recovery')?.msg ?? 'none in 15s');
     check('one loss is not a fatal', !after.some((e) => e.level === 'fatal'));
+    // S1: the plate came back, not a freshly laid look.
+    const recoveryLine = after.find((e) => e.source === 'recovery')?.msg ?? '';
+    check('the plate is carried across the loss, not laid again', /carried across/.test(recoveryLine), recoveryLine || 'no recovery line');
 
     // ── 3b. A frame that throws is not the end of the show ───────────
     // It used to be: the next frame was only asked for on the loop's last
@@ -139,6 +142,92 @@ try {
     await page.evaluate(() => window.chromaglassDebug().throwFrames(0));
     await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 10, null, { timeout: 15_000 }).catch(() => {});
 
+    // ── 3c. The doors S0 closed, each walked through (stability S6) ──
+    // In an order that keeps the stage's own limit in mind: it rebuilds
+    // itself at most three times a minute, and the throws above spent one.
+    const litShare = () => page.evaluate(async () => {
+      for (let i = 0; i < 20; i++) {
+        const g = await window.chromaglassDebug().grabFrame?.();
+        if (g?.painted) {
+          let lit = 0;
+          for (let p = 0; p < g.pixels.length; p += 4) if (g.pixels[p] + g.pixels[p + 1] + g.pixels[p + 2] > 30) lit++;
+          return lit / (g.pixels.length / 4);
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      return 0;
+    });
+    const recoveries = () => page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length);
+    const waitRecovery = (n, ms) => page.waitForFunction((k) => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length > k, n, { timeout: ms })
+      .then(() => true).catch(() => false);
+    const grid = () => page.evaluate(() => window.chromaglassDebug().status?.grid ?? 0);
+    // Frames again, and then past the five seconds after which a device
+    // counts as healthy: each door here is its own incident, not a device
+    // dying at birth, and must not inherit the last one's backoff.
+    const settleFrames = async () => {
+      await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 20, null, { timeout: 20_000 }).catch(() => {});
+      await page.waitForTimeout(6000);
+    };
+
+    // S3: two rungs lost on consecutive frames — a solver swapped out before
+    // its first readback lands — used to carry a blank plate across.
+    await settleFrames();
+    const litBefore = await litShare();
+    const gridBefore = await grid();
+    await page.evaluate(() => window.chromaglassDebug().stepDownFrames(2));
+    await page.waitForTimeout(3000);
+    const litAfter = await litShare();
+    const gridAfter = await grid();
+    check('two rung changes a frame apart keep the plate', litAfter > 0.2 && litAfter > litBefore * 0.5,
+      `${gridBefore}² → ${gridAfter}²; ${(litBefore * 100).toFixed(0)}% lit before, ${(litAfter * 100).toFixed(0)}% after`);
+
+    // Out of memory at the bottom rung: capped, and rebuilt rather than stopped.
+    let before = await recoveries();
+    await page.evaluate(() => window.chromaglassDebug().simulateOutOfMemory());
+    const oomRebuilt = await waitRecovery(before, 20_000);
+    const oom = await page.evaluate(() => ({
+      cap: window.chromaglassDebug().gridCap?.(),
+      line: window.chromaglassDebug().crash.thisLoad().find((e) => /out of GPU memory/.test(e.msg))?.msg ?? '',
+    }));
+    check('out of memory caps the grid and the show carries on', Number.isFinite(oom.cap) && oomRebuilt && !!oom.line,
+      `cap ${oom.cap}; ${oom.line.slice(0, 120) || 'no line'}${oomRebuilt ? '' : '; no rebuild'}`);
+    await settleFrames();
+
+    // A storm of GPU errors: the objects have gone invalid; rebuild.
+    before = await recoveries();
+    await page.evaluate(() => window.chromaglassDebug().errorStorm(600));
+    check('a storm of GPU errors rebuilds the stage', await waitRecovery(before, 30_000));
+    await page.evaluate(() => window.chromaglassDebug().errorStorm(0));
+    await settleFrames();
+
+    // No adapter on the first asks after a loss: asked again, not given up on.
+    before = await recoveries();
+    await page.evaluate(() => {
+      const gpu = navigator.gpu;
+      const real = gpu.requestAdapter.bind(gpu);
+      let nulls = 2;
+      gpu.requestAdapter = (o) => (nulls-- > 0 ? Promise.resolve(null) : real(o));
+      window.chromaglassDebug().loseDevice();
+    });
+    const adapterBack = await waitRecovery(before, 30_000);
+    const retries = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => /no device yet after a loss/.test(e.msg)).length);
+    check('no adapter after a loss is asked for again', adapterBack && retries >= 2, `${retries} retries${adapterBack ? ', then back' : ', never back'}`);
+    await settleFrames();
+
+    // A request that never answers: it times out, and the retry brings it back.
+    before = await recoveries();
+    await page.evaluate(() => {
+      const gpu = navigator.gpu;
+      const real = gpu.requestAdapter.bind(gpu);
+      let hangs = 1;
+      gpu.requestAdapter = (o) => (hangs-- > 0 ? new Promise(() => {}) : real(o));
+      window.chromaglassDebug().loseDevice();
+    });
+    const hangBack = await waitRecovery(before, 45_000);
+    const timedOut = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().some((e) => /did not answer/.test(e.msg)));
+    check('a GPU request that never answers times out and recovers', hangBack && timedOut, `${timedOut ? 'timed out' : 'no timeout line'}${hangBack ? ', then back' : ', never back'}`);
+    await settleFrames();
+
     // ── 4. Frames that stop ──────────────────────────────────────────
     await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 10, null, { timeout: 15_000 }).catch(() => {});
     await page.evaluate(() => { window.requestAnimationFrame = () => 0; });
@@ -149,8 +238,11 @@ try {
     check('frames that stop are first a stall', !!stallLine, stallLine?.msg ?? 'no stall line');
     check('and then a fatal', !!fatal, fatal?.msg ?? 'none in 35s');
     check('the fatal carries the state it stopped in', !!fatal?.snap?.rung && !!fatal?.snap?.engine, JSON.stringify(fatal?.snap ?? {}).slice(0, 160));
+    // Waited for, not read at once: the log records the fatal synchronously
+    // and React draws the chip a moment later.
+    const chipUp = await page.locator('[data-testid="crash-chip"]').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
     const lit = await page.locator('[data-testid="crash-report-button"][data-lit="true"]').count();
-    check('the button lights, and the chip asks', lit === 1 && await page.locator('[data-testid="crash-chip"]').isVisible());
+    check('the button lights, and the chip asks', lit === 1 && chipUp, `lit ${lit}, chip ${chipUp ? 'up' : 'not up'}`);
   } else {
     skip('a destroyed device, the loss, the recovery, the stall', 'no drawing device');
     // Without one, a fatal can still be written by hand to prove the rest.
@@ -169,6 +261,16 @@ try {
   ]);
   check('Save file downloads a report', !!download && /chromaglass-report-.*\.json$/.test(download.suggestedFilename()), download?.suggestedFilename() ?? 'no download');
   await page.keyboard.press('Escape');
+
+  // The corner dot: one click, no sheet, a report in Downloads with the whole ring.
+  const [dotFile] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15_000 }).catch(() => null),
+    page.locator('[data-testid="quick-report"]').click(),
+  ]);
+  let dotHistory = -1;
+  if (dotFile) { try { dotHistory = JSON.parse(await (await import('node:fs/promises')).readFile(await dotFile.path(), 'utf8')).history?.length ?? -1; } catch { /* unreadable */ } }
+  check('the corner dot saves a report in one click, with the whole ring', !!dotFile && dotHistory > 0,
+    dotFile ? `${dotFile.suggestedFilename()}, ${dotHistory} lines of history` : 'no download');
 
   // ── 5. Across the reload ─────────────────────────────────────────
   const beforeReload = await page.evaluate(() => { window.chromaglassDebug().crash.record('error', 'soak', 'the line before the reload'); return window.chromaglassDebug().crash.load; });

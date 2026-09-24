@@ -63,7 +63,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
-import { CrashReportButton, openCrashReport } from './components/CrashReportButton';
+import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -1689,20 +1689,74 @@ export default function App() {
    */
   const markUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
+  /*
+    The state, at most fifteen times a second.
+
+    It used to go out every time `castState` changed, and during a look fade
+    that is every tick of the fade (thirty a second), plus every override the
+    ear writes: a full settings object, stringified, down the Presentation
+    channel and again down the relay to every mirror, and at the other end a
+    React render of the whole receiver and a solver retune for each one. The
+    stability plan (S10) asked for ~10 Hz on the grounds that "the receiver
+    interpolates anyway". It does not: `CastDisplay` hands `state.settings`
+    straight to its own visualizer, so a receiver shows a fade as exactly the
+    staircase it was sent. At 10 Hz a two-second fade to black is twenty steps
+    of 5% brightness a tenth of a second apart, which reads as a staircase on
+    a dark wall. Fifteen is half the fade's own tick, so it still halves the
+    traffic, and gives thirty steps a fifteenth of a second apart, which does
+    not.
+
+    So: a leading and trailing throttle. The first change after a quiet spell
+    goes at once; changes inside the window are held, and one trailing send at
+    the end of it carries whatever the state is *then* (read from a ref, not
+    captured) — so the last value of a fade always arrives, and a receiver
+    never rests on a value from the middle of one.
+
+    Three things skip the wait:
+    - A receiver's hello, or a new cast or mirror (`castReadyRef`, `joined`):
+      a new receiver has nothing, and the mark goes with it on those alone,
+      exactly as before.
+    - A trigger: `presetSeq`, `seedCount`, `clearTrigger`, `drainTrigger`.
+      Those are events carried as counters, and the receiver acts on each
+      change; two coalesced into one window would be one seed or one clear
+      where the operator pressed twice, or a preset re-seed that arrives up
+      to a fifteenth of a second after the settings that follow it.
+    - Nothing else. `isActive`, the output, the harmony lock and the rest are
+      levels, and a level only needs its last value.
+  */
+  const CAST_STATE_MS = 66;
+  const castStateRef = useRef(castState);
+  castStateRef.current = castState;
+  const castSendRef = useRef(castSend);
+  castSendRef.current = castSend;
+  const mirrorCountRef = useRef(mirrorCount);
+  mirrorCountRef.current = mirrorCount;
+  const castSentAtRef = useRef(-Infinity);
+  const castSentTriggersRef = useRef('');
+  const castTrailRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const castTriggers = (s: CastState) => `${s.presetSeq}:${s.seedCount}:${s.clearTrigger}:${s.drainTrigger}`;
+  // Stable, and reads everything through refs, so the trailing timer can
+  // never send a state (or a mirror count) older than the one it was set for.
   const sendCastState = useCallback((withMark = false) => {
-    castSend({ type: 'state', state: castState });
+    if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
+    const state = castStateRef.current;
+    const send = castSendRef.current;
+    castSentAtRef.current = performance.now();
+    castSentTriggersRef.current = castTriggers(state);
+    send({ type: 'state', state });
     // The picture only when a receiver is new — on its hello, or when a cast
     // or a mirror starts — because that is the one moment it needs it.
     // It used to ride along with every state, and the state changes twice a
     // second while a track is identified and every frame of a fade: a data
     // URL of up to several megabytes, sixty times a second, down the channel
     // and the relay, each one decoded and re-uploaded at the other end.
-    if (withMark) castSend({ type: 'mark', dataUrl: markUrlRef.current });
-    if (mirrorCount > 0) {
-      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
+    if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
+    if (mirrorCountRef.current > 0) {
+      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
       if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
     }
-  }, [castSend, castState, mirrorCount]);
+  }, []);
+  useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
   const loadMark = useCallback((file: File) => {
     const reader = new FileReader();
@@ -1733,12 +1787,21 @@ export default function App() {
   castReadyRef.current = () => sendCastState(true);
   const castLinkRef = useRef('');
   useEffect(() => {
-    if (!isCasting && mirrorCount === 0) { castLinkRef.current = ''; return; }
+    if (!isCasting && mirrorCount === 0) {
+      castLinkRef.current = '';
+      if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
+      return;
+    }
     const link = `${isCasting}:${mirrorCount}`;
     const joined = link !== castLinkRef.current;
     castLinkRef.current = link;
-    sendCastState(joined);
-  }, [isCasting, mirrorCount, sendCastState]);
+    if (joined || castTriggers(castState) !== castSentTriggersRef.current) { sendCastState(joined); return; }
+    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
+    if (wait <= 0) { sendCastState(false); return; }
+    // One trailing send per window; it reads the state when it fires.
+    if (!castTrailRef.current) castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCasting, mirrorCount, castState, sendCastState]);
   /*
     The live state, for a harness to read.
 
@@ -3697,6 +3760,8 @@ export default function App() {
           button that is idle nearly always, so the chip says when there is
           news and ⌘K opens the sheet. */}
       {deskUp && <CrashReportButton floating />}
+      {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
+      {overlaysVisible && <QuickReportDot />}
 
       {showSave && (
         <SaveLookSheet

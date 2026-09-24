@@ -32,6 +32,18 @@ export class BeadField {
   /** A per-population offset for the patch field, so every plate clusters differently. */
   private patchSeed = Math.random() * 1000;
 
+  /*
+    The crowding step's scratch, kept from one step to the next (S13,
+    docs/stability-plan.md). It ran every frame and made a Map, a Set and an
+    array per occupied cell each time, all garbage by the end of the step —
+    a few hundred small allocations a frame for as long as the beads are
+    out. Emptied at the end of each step rather than the start, so no
+    dropped or merged bead is kept alive by a bucket until the next one.
+  */
+  private readonly buckets = new Map<number, Bead[]>();
+  private readonly spareLists: Bead[][] = [];
+  private readonly gone = new Set<Bead>();
+
   constructor(private readonly grid: number) {}
 
   clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = Math.random() * 1000; }
@@ -155,13 +167,12 @@ export class BeadField {
     }
     // Crowding: beads touching push apart; two pressed hard together merge.
     const cell = 8;
-    const buckets = new Map<number, Bead[]>();
+    const buckets = this.buckets, gone = this.gone, spare = this.spareLists;
     for (const b of bs) {
       const k = Math.floor(b.x / cell) + Math.floor(b.y / cell) * 4096;
-      let list = buckets.get(k); if (!list) { list = []; buckets.set(k, list); }
+      let list = buckets.get(k); if (!list) { list = spare.pop() ?? []; buckets.set(k, list); }
       list.push(b);
     }
-    const gone = new Set<Bead>();
     for (const b of bs) {
       if (gone.has(b)) continue;
       const cx = Math.floor(b.x / cell), cy = Math.floor(b.y / cell);
@@ -190,6 +201,9 @@ export class BeadField {
       }
     }
     if (gone.size) { for (let i = bs.length - 1; i >= 0; i--) if (gone.has(bs[i])) bs.splice(i, 1); }
+    for (const list of buckets.values()) { list.length = 0; spare.push(list); }
+    buckets.clear();
+    gone.clear();
     for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
     this.dirty = true;
   }

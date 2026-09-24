@@ -47,7 +47,7 @@ export class WebGPUAir {
   private disposed = false;
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'air');
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'air discs',
       size: Math.max(1, capacity) * STRIDE,

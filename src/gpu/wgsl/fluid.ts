@@ -1235,7 +1235,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /**
-   * Dye laid down by the reaction (see `gpu/chemistry.ts`). The activator is
+   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`). The activator is
    * on the logical grid, so it is read bilinearly, exactly as a CPU delta
    * would have been; above the threshold it deposits colour the way
    * `addDensity` does — absorption in rgb, density in a.

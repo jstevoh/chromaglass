@@ -17,8 +17,8 @@ import {
   LyricTrigger, SongSection, LyricLine, GestureEvent,
 } from '../lib/musicTypes';
 import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '../lib/fingerprint';
-import { buildIndex, matchSnippet, FingerprintIndex } from '../lib/localFingerprint';
-import { getAllFingerprints } from '../lib/musicDb';
+import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
+import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
 import {
@@ -128,10 +128,38 @@ export function useMusicIntelligence(
   const gestureSeqRef = useRef(0);
   const firedGestureIdxRef = useRef(new Set<number>());     // replay: gestures already fired
 
-  // Local fingerprint index — recognized-before tracks match without the API
+  // Local fingerprint index — recognized-before tracks match without the API.
+  // Built whole once, off the main thread; after that each newly mapped song
+  // is added on its own (see addToIndex) rather than the library being read
+  // and rebuilt around it. A song that lands while the first build is still
+  // out waits in fpPendingRef, since that build may have read the library
+  // before the song was stored — or after, which addToIndex notices.
+  // Only the latest build lands: an earlier one may have read the library
+  // before a song that has since been stored.
+  const fpPendingRef = useRef<TrackFingerprint[] | null>(null);
+  const fpLoadSeqRef = useRef(0);
   const reloadFpIndex = useCallback(() => {
-    getAllFingerprints().then(records => { fpIndexRef.current = buildIndex(records); });
+    fpPendingRef.current ??= [];
+    const seq = ++fpLoadSeqRef.current;
+    loadFingerprintIndex().then(index => {
+      if (seq !== fpLoadSeqRef.current) return;
+      const pending = fpPendingRef.current ?? [];
+      fpPendingRef.current = null;
+      for (const rec of pending) addToIndex(index, rec);
+      fpIndexRef.current = index;
+    }).catch(e => {
+      console.warn('fingerprint index build failed', e);
+      // The next new song finds no index and asks for a build again.
+      if (seq === fpLoadSeqRef.current) fpPendingRef.current = null;
+    });
   }, []);
+  const addToFpIndex = useCallback((rec: TrackFingerprint) => {
+    if (fpPendingRef.current) { fpPendingRef.current.push(rec); return; }
+    const index = fpIndexRef.current;
+    // Already indexed: a re-mapped song whose stored fingerprint was just
+    // replaced. Its old entries are in there too, so build it again whole.
+    if (!index || !addToIndex(index, rec)) reloadFpIndex();
+  }, [reloadFpIndex]);
   useEffect(() => { reloadFpIndex(); }, [reloadFpIndex]);
   const firedTriggerIdxRef = useRef(new Set<number>());
   const paramsRef = useRef<MusicVisualParams | null>(null);
@@ -212,14 +240,15 @@ export function useMusicIntelligence(
     // Generate + cache the song map from the first-listen recording
     if (recording && !songMapRef.current && listenMs > MIN_LISTEN_MS) {
       setAnalyzing(true);
-      const map = await generateSongMap(currentTrack.isrc, recording, {
+      const generated = await generateSongMap(currentTrack.isrc, recording, {
         title: currentTrack.title, artist: currentTrack.artist,
       }, trimToSec);
       setAnalyzing(false);
-      if (map) {
+      if (generated) {
+        const { map, fingerprint } = generated;
         await putSongMap(map);
         if (trackRef.current?.isrc === currentTrack.isrc) setSongMap(map);
-        reloadFpIndex(); // the analysis also stored a local recognition fingerprint
+        if (fingerprint) addToFpIndex(fingerprint); // the analysis also stored a local recognition fingerprint
       }
     }
 
@@ -249,7 +278,7 @@ export function useMusicIntelligence(
       setTrack(null); setSongMap(null); setLyrics(null);
       setPositionSec(0);
     }
-  }, [refreshTracks, reloadFpIndex]);
+  }, [refreshTracks, addToFpIndex]);
 
   // ── Identification + position + trigger loop ────────────────────────
   useEffect(() => {
