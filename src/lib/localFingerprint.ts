@@ -151,29 +151,156 @@ export function extractPeakHashes(pcm: Float32Array, sampleRate: number): { hash
 }
 
 // ── In-memory inverted index over all stored track fingerprints ────────
+//
+// Every hash of every song ever mapped lives here, for the whole session, and
+// the library only grows. It used to be a Map from hash to a plain array of
+// packed numbers — a Map entry and a JS array (header, spare capacity, a
+// double per entry once the packing passed the small-integer range) for each
+// distinct hash — built on the main thread, and built again, from scratch,
+// after every newly mapped song. Both the memory and the stall grew with the
+// library, across sessions.
+//
+// Now it is a handful of segments, each a sorted run of hashes over flat typed
+// arrays (compressed-sparse-row: key k's entries are starts[k]..starts[k+1]),
+// eight bytes an entry and eight a distinct hash, and nothing for the
+// collector to walk. A new
+// song is one small segment of its own; segments of like size merge pairwise,
+// the way a binary counter carries, so a lookup binary-searches a few
+// segments (log of the library, not its size) and each entry is re-merged
+// only a logarithmic number of times over its life. The first build, which
+// is the big one, runs in a worker (see fingerprintIndexBuild.ts).
+
+export interface IndexSegment {
+  /** Distinct hashes, ascending. */
+  keys: Uint32Array;
+  /** keys.length + 1 offsets into track/frame. */
+  starts: Uint32Array;
+  /** Per entry: index into FingerprintIndex.tracks. */
+  track: Uint32Array;
+  /** Per entry: the anchor frame in that track. */
+  frame: Uint32Array;
+}
 
 export interface FingerprintIndex {
   trackCount: number;
   tracks: { isrc: string; title?: string; artist?: string }[];
-  /** hash → packed entries (trackIdx * 2^20 + anchorFrame) */
-  inverted: Map<number, number[]>;
+  /** Oldest (largest) first. Structured-cloneable, so a worker can hand one over. */
+  segments: IndexSegment[];
 }
 
-const FRAME_BITS = 20; // frames fit easily (a 10-min track ≈ 13k frames)
+// Hashes are 24 bits (9 + 9 + 6); an entry's position rides below them in one
+// double for a native numeric sort, exact while the two together stay under
+// 2^53 — 2^28 entries, some twenty thousand songs, in one segment.
+const HASH_SPAN = 2 ** 28;
 
-export function buildIndex(records: TrackFingerprint[]): FingerprintIndex {
-  const inverted = new Map<number, number[]>();
-  const tracks = records.map(r => ({ isrc: r.isrc, title: r.title, artist: r.artist }));
-  records.forEach((rec, trackIdx) => {
-    const packBase = trackIdx * (1 << FRAME_BITS);
-    for (let i = 0; i < rec.hashes.length; i++) {
-      const h = rec.hashes[i];
-      let list = inverted.get(h);
-      if (!list) { list = []; inverted.set(h, list); }
-      list.push(packBase + rec.frames[i]);
+function buildSegment(records: TrackFingerprint[], firstTrack: number): IndexSegment {
+  let total = 0;
+  for (const r of records) total += r.hashes.length;
+  const order = new Float64Array(total);
+  const track = new Uint32Array(total);
+  const frame = new Uint32Array(total);
+  let n = 0;
+  records.forEach((rec, i) => {
+    for (let j = 0; j < rec.hashes.length; j++, n++) {
+      order[n] = rec.hashes[j] * HASH_SPAN + n;
+      track[n] = firstTrack + i;
+      frame[n] = rec.frames[j];
     }
   });
-  return { trackCount: records.length, tracks, inverted };
+  // Ascending by hash, and within one hash by position — so a hash's entries
+  // keep the order they were added in.
+  order.sort();
+
+  const sortedTrack = new Uint32Array(total);
+  const sortedFrame = new Uint32Array(total);
+  let distinct = 0;
+  let prev = -1;
+  for (let i = 0; i < total; i++) {
+    const h = Math.floor(order[i] / HASH_SPAN);
+    if (h !== prev) { distinct++; prev = h; }
+  }
+  const keys = new Uint32Array(distinct);
+  const starts = new Uint32Array(distinct + 1);
+  prev = -1;
+  let k = -1;
+  for (let i = 0; i < total; i++) {
+    const h = Math.floor(order[i] / HASH_SPAN);
+    const from = order[i] - h * HASH_SPAN;
+    if (h !== prev) { keys[++k] = h; starts[k] = i; prev = h; }
+    sortedTrack[i] = track[from];
+    sortedFrame[i] = frame[from];
+  }
+  starts[distinct] = total;
+  return { keys, starts, track: sortedTrack, frame: sortedFrame };
+}
+
+/** Merge two segments in one linear pass; for a shared hash, a's entries come first. */
+function mergeSegments(a: IndexSegment, b: IndexSegment): IndexSegment {
+  const total = a.track.length + b.track.length;
+  const track = new Uint32Array(total);
+  const frame = new Uint32Array(total);
+  const keys = new Uint32Array(a.keys.length + b.keys.length);
+  const starts = new Uint32Array(keys.length + 1);
+  let i = 0, j = 0, n = 0, k = 0;
+  const copy = (s: IndexSegment, k: number) => {
+    for (let e = s.starts[k]; e < s.starts[k + 1]; e++, n++) { track[n] = s.track[e]; frame[n] = s.frame[e]; }
+  };
+  while (i < a.keys.length || j < b.keys.length) {
+    const ka = i < a.keys.length ? a.keys[i] : Infinity;
+    const kb = j < b.keys.length ? b.keys[j] : Infinity;
+    const key = Math.min(ka, kb);
+    keys[k] = key;
+    starts[k++] = n;
+    if (ka === key) copy(a, i++);
+    if (kb === key) copy(b, j++);
+  }
+  starts[k] = n;
+  // Shared hashes leave the key arrays a little long; trim them to fit.
+  return { keys: keys.slice(0, k), starts: starts.slice(0, k + 1), track, frame };
+}
+
+/** Build the whole index at once — the first load. */
+export function buildIndex(records: TrackFingerprint[]): FingerprintIndex {
+  const tracks = records.map(r => ({ isrc: r.isrc, title: r.title, artist: r.artist }));
+  const segments = records.length ? [buildSegment(records, 0)] : [];
+  return { trackCount: records.length, tracks, segments };
+}
+
+/**
+ * Add one newly stored fingerprint to the index, in place, without touching
+ * the rest. Returns false if that track is already indexed — a re-mapped song
+ * whose stored fingerprint was just replaced — which the caller settles with
+ * a full build, since its old entries are in there too.
+ */
+export function addToIndex(index: FingerprintIndex, rec: TrackFingerprint): boolean {
+  if (index.tracks.some(t => t.isrc === rec.isrc)) return false;
+  const segs = index.segments;
+  segs.push(buildSegment([rec], index.trackCount));
+  index.tracks.push({ isrc: rec.isrc, title: rec.title, artist: rec.artist });
+  index.trackCount++;
+  while (segs.length >= 2 && segs[segs.length - 2].track.length <= 2 * segs[segs.length - 1].track.length) {
+    const b = segs.pop()!, a = segs.pop()!;
+    segs.push(mergeSegments(a, b));
+  }
+  return true;
+}
+
+/** Visit every entry stored under one hash: fn(trackIdx, anchorFrame). */
+export function forEachEntry(index: FingerprintIndex, hash: number, fn: (trackIdx: number, frame: number) => void) {
+  for (const s of index.segments) {
+    const keys = s.keys;
+    let lo = 0, hi = keys.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      const k = keys[mid];
+      if (k < hash) lo = mid + 1;
+      else if (k > hash) hi = mid - 1;
+      else {
+        for (let e = s.starts[mid]; e < s.starts[mid + 1]; e++) fn(s.track[e], s.frame[e]);
+        break;
+      }
+    }
+  }
 }
 
 const MIN_SCORE = 12;        // aligned hash votes needed for a confident match
@@ -207,17 +334,14 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   const votes = new Map<number, number>();
   let totalVotes = 0;
   for (let i = 0; i < q.hashes.length; i++) {
-    const entries = index.inverted.get(q.hashes[i]);
-    if (!entries) continue;
-    for (const packed of entries) {
-      const trackIdx = Math.floor(packed / (1 << FRAME_BITS));
-      const refFrame = packed % (1 << FRAME_BITS);
-      const delta = refFrame - q.frames[i];
-      if (delta < -2) continue; // snippet can't start before the track
+    const qFrame = q.frames[i];
+    forEachEntry(index, q.hashes[i], (trackIdx, refFrame) => {
+      const delta = refFrame - qFrame;
+      if (delta < -2) return; // snippet can't start before the track
       const key = trackIdx * KEY_STRIDE + delta + DELTA_BIAS;
       votes.set(key, (votes.get(key) ?? 0) + 1);
       totalVotes++;
-    }
+    });
   }
   if (votes.size === 0) return null;
 
