@@ -14,7 +14,7 @@ the show had no way back from. The live site hits these doors often, because a
 laptop mid-set is exactly where GPUs reset, run short of memory, or hand back
 a frame that will not upload.
 
-**S0**, below, closes the doors that are cheap to close. **S1–S15** are the
+**S0**, below, closes the doors that are cheap to close. **S1–S13** are the
 larger jobs, in the order they should be taken.
 
 ## S0: shipped with the black box (#127)
@@ -42,83 +42,71 @@ larger jobs, in the order they should be taken.
 loop surviving throws and rebuilding (`throwFrames` in `npm run crash`), the
 out-of-memory step-down, the retry backoff and the error-storm rebuild. The
 macOS CI job runs `npm run crash`, including the new throw checks. The
-out-of-memory and backoff paths have no harness yet; see S8.
+out-of-memory and backoff paths have no harness yet; see S6.
 
-## S1–S15: the larger jobs
+## S1–S13: the larger jobs
 
 Ranked by what they cost a show.
 
-1. **S1 — The React tree renders every frame.**
-   - `useAudioAnalyzer` calls `setAudioData` inside `requestAnimationFrame` and allocates two `Uint8Array`s each time.
-   - That re-renders `App` (3.7k lines), `LiquidVisualizer` (6.5k), the desks, and any open panel, 60 times a second, with no `memo` anywhere.
-   - `useImperativeHandle` in the visualizer has no dependency array, so ~40 closures are rebuilt per frame.
-   - The cast-audio effect also runs per frame.
-
-   **Do:** audio into a ref that consumers read; a ~10 Hz state copy for the meters only; reused buffers; `[]` deps on the handle (it reads refs); `memo` on the heavy panels. This is the biggest steady main-thread cost, and the main suspect for jank that turns into missed frames on weak laptops.
-2. **S2 — The video recorder holds everything in memory.**
-   - `useRecorder` pushes a chunk a second at 12 Mbps: ~5.4 GB/h, ~18 GB/h at `?rec=40`.
-   - `new Blob(chunks)` at stop doubles the peak.
-
-   **Do:** stream chunks to disk (File System Access `createWritable`, or OPFS), split long recordings, and show the size while recording.
-3. **S3 — Restore the plate, not just the look, after a rebuild.**
+1. **S1 — Restore the plate, not just the look, after a rebuild.**
    - The dye lives in the solver's textures, so every recovery (a loss, and now a self-heal) lays the look again from nothing.
 
    **Do:** keep a CPU snapshot a few seconds old (the readback ring already brings the fields back) and seed the new solver from it.
-4. **S4 — Error scopes on the frame, not a heuristic.**
+2. **S2 — Error scopes on the frame, not a heuristic.**
    - `ERROR_STORM` is a count; it cannot say which pass is broken.
 
    **Do:** sample `pushErrorScope('validation')` and `('out-of-memory')` around `stage.frame()` every N frames, and around every allocation that scales with the canvas (post chain, camera, projector targets, canvas resize). The first error then names its pass in the crash log, and the governor can step down for the target that did not fit, not only for the solver.
-5. **S5 — The first readback after a rung change.**
+3. **S3 — The first readback after a rung change.**
    - `attachGpu` pulls from `rbDye`/`rbVel`, which start as zeros until the first ring readback lands.
    - Two rung changes within ~2 frames copy zeros, and the plate goes blank while the show runs on.
 
    **Do:** a `landed` flag; skip the pull and keep the CPU arrays until one has landed.
-6. **S6 — One pipeline cache per device.**
+4. **S4 — One pipeline cache per device.**
    - Every `WebGPUFluid`, and every `WebGPUParticles` toggle, builds its own `PipelineCache`.
    - So each rung change recompiles every shader, which is a CPU and driver spike at the same moment as the memory swap.
 
    **Do:** share one cache per device, owned by the stage.
-7. **S7 — Readback garbage.**
+5. **S5 — Readback garbage.**
    - `ReadbackRing` does `getMappedRange().slice(0)`: ~590 KB per field, two fields per layer, every frame. That is ~70 MB/s of allocation per layer and constant GC pressure.
 
    **Do:** copy into a buffer kept across frames.
-8. **S8 — A harness for the doors in S0.** None of these can be reached from a page today:
+6. **S6 — A harness for the doors in S0.** None of these can be reached from a page today:
    - out of memory: a debug hook that makes `WebGPUFluid` allocate past `maxBufferSize`, or pins the grid cap
    - a null adapter on recovery: stub `navigator.gpu.requestAdapter` to answer null twice
    - a request that never answers
    - an error storm: a debug hook that submits an invalid bind group each frame
 
    **Do:** give each a hook under `?debug`, and a check in `npm run crash` that the show comes back.
-9. **S9 — An hour in CI.** A nightly macOS job that runs a show for an hour and fails on:
+7. **S7 — An hour in CI.** A nightly macOS job that runs a show for an hour and fails on:
    - growth in `performance.memory.usedJSHeapSize`
    - the device's own memory, where it can be read
    - frame-time drift
    - any fatal in the black box
 
    Everything above is about what happens *after* hours; nothing checks for it.
-10. **S10 — Crash reports that arrive.**
+8. **S8 — Crash reports that arrive.**
     - A `/report` path on a Worker (the fingerprint Worker, or its own), with storage and a daily digest.
     - Build with `VITE_CRASH_REPORT_URL` so **Send** appears.
     - Grouped by the black box's `last()` line, so the next round of this plan is picked from what the field actually reports.
-11. **S11 — The fingerprint index.**
+9. **S9 — The fingerprint index.**
     - `buildIndex` rebuilds a `Map<hash, number[]>` of every song ever stored, on the main thread, after every newly mapped song.
     - Its memory and the stall grow with the library, across sessions.
 
     **Do:** add to it incrementally, store it in typed arrays, and build it in a worker.
-12. **S12 — Cast state rate.**
+10. **S10 — Cast state rate.**
     - Even without the logo, a state goes out every frame of a fade.
 
     **Do:** throttle to ~10 Hz. The receiver interpolates anyway.
-13. **S13 — The song-map decode.**
+11. **S11 — The song-map decode.**
     - Even capped at ten minutes, `decodeToMono` decodes at the file's rate and in stereo before resampling: ~230 MB at 48 kHz.
 
     **Do:** decode in slices, or trim before resampling.
-14. **S14 — Dev-only teardown race.**
+12. **S12 — Dev-only teardown race.**
     - In StrictMode a late first stage runs `context.unconfigure()` on the canvas the second run is using, so `getCurrentTexture()` throws.
     - Only in dev, but it is the same symptom and confuses the hunt.
 
     **Do:** destroy only the device on the cancelled path.
-15. **S15 — Small change.**
+13. **S13 — Small change.**
     - `WebGPUPlate` is never disposed in the cleanup (the device's destroy covers it, but it should say so).
     - `beads.ts` allocates a `Map`, a `Set` and arrays every crowding step.
     - `WebGPUChemistry` is never imported; delete it.
@@ -134,5 +122,5 @@ Ranked by what they cost a show.
    - `chromaglassDebug().throwFrames(200)`: "rebuilding the plate…" appears, then comes back
    - `chromaglassDebug().loseDevice()`: the loss and its recovery
    - `chromaglassDebug().crash.thisLoad()`: all of the above as lines in the log
-3. **After a crash on the live site,** the button lights on the next load. Save the report and attach it to an issue: its `last()` line and log tail are what S10 would collect automatically.
-4. **Then back to the roadmap's running order** (`roadmap.md`, `PLAN.md`). S1 and S2 are the two items here worth taking before new features. S1 also makes everything else cheaper to measure.
+3. **After a crash on the live site,** the button lights on the next load. Save the report and attach it to an issue: its `last()` line and log tail are what S8 would collect automatically.
+4. **Then back to the roadmap's running order** (`roadmap.md`, `PLAN.md`).
