@@ -180,6 +180,29 @@ export class MacroCamera {
       const jumped = Math.hypot(this.beadX - from.x, this.beadY - from.y);
       // Only call it a cut if the camera actually has somewhere to travel.
       if (jumped > size * 0.06) this.whipLeft = WHIP_TIME;
+      /*
+        An edit is a cut. The travel was crossing bare glass.
+
+        The camera used to ease across to the new subject over the whip, and at
+        4x what the frame holds on the way is whatever it is flying over —
+        which on a plate that is wet in patches is the dry part. Photographed
+        at the moment a shot landed and again a second and a half later, the
+        same shot is dye in one corner with three fifths of the frame bare
+        plate, and then a proper closeup. Nine shots in ten did that.
+
+        Reported as the screen going one colour on a setting change, and killed
+        a show in `npm run gig` twice on the macro-toggle alone. Measured by
+        `npm run closeup` over a filled plate, five toggles a look, worst frame
+        in one colour: soap-film 80% -> 41%, galaxy 79% -> 69%, and galaxy's
+        median 61% -> 46%. A three-run baseline had said galaxy's median got
+        *worse*, 27% -> 46%; five runs against five put its own baseline at
+        61%, so that was noise in the control rather than a regression.
+
+        `whipLeft` still runs, so the dolly-out through a cut is unchanged --
+        the gesture is kept, and only the journey across the dry part is not.
+      */
+      this.camX = this.beadX;
+      this.camY = this.beadY;
     }
 
     // ── Lead the subject so a fast bead never trails off-frame ──────
