@@ -530,7 +530,26 @@ fn layerDish(uvScreen: vec2f, layer: i32, aspect: f32) -> vec2f {
   // frame height), so the square plate's corners never show through a dish.
   let s = U.dishSpread;
   let c = select(vec2f(0.5 - 0.304 * s / aspect, 0.5 + 0.06 * s), vec2f(0.5 + 0.144 * s / aspect, 0.5 - 0.02 * s), layer == 0);
-  let rad = select(mix(0.98, 0.36, s), mix(0.98, 0.66, s), layer == 0);
+  /*
+    The dish opens out of the frame rather than snapping into it.
+
+    This began at 0.98 for both layers, which is the plate's *inscribed*
+    circle — so the instant dishSpread crossed the 0.001 gate below, every
+    corner outside that circle became background. On a 1060x700 frame that is
+    48% of it, going black in one step at a setting of 0.003, which produces
+    no visible spread at all to pay for it. Measured as 51-62% of the frame at
+    rgb(0,0,0) with the dye underneath it untouched: 106 colours over 36,789
+    wet cells, the renderer hiding a plate that was perfectly healthy.
+
+    It is a fader a performer can ride, so easing it up from nothing did this
+    too. Now the dish starts big enough to cover the frame's corners — its own
+    diagonal, so it holds at any aspect — and closes to the inscribed circle
+    over the first tenth of the travel. At zero it is the frame; by 0.1 it is
+    the dish it always was; above that nothing has changed.
+  */
+  let cover = sqrt(aspect * aspect + 1.0) * 1.02;
+  let opening = smoothstep(0.0, 0.10, s);
+  let rad = mix(cover, select(mix(0.98, 0.36, s), mix(0.98, 0.66, s), layer == 0), opening);
   let d = (uvScreen - c) * vec2f(aspect, 1.0);
   let dr = length(d) / 0.5;
   let inside = 1.0 - smoothstep(rad - 0.02, rad + 0.012, dr);
@@ -544,7 +563,11 @@ fn layerDish(uvScreen: vec2f, layer: i32, aspect: f32) -> vec2f {
 fn dishToPlate(uvScreen: vec2f, layer: i32, aspect: f32, c: f32, s: f32) -> vec2f {
   let sp = U.dishSpread;
   let cen = select(vec2f(0.5 - 0.304 * sp / aspect, 0.5 + 0.06 * sp), vec2f(0.5 + 0.144 * sp / aspect, 0.5 - 0.02 * sp), layer == 0);
-  let rad = select(mix(0.98, 0.36, sp), mix(0.98, 0.66, sp), layer == 0);
+  // The same opening as layerDish, or the picture would not sit in the dish
+  // that is drawn for it.
+  let cover = sqrt(aspect * aspect + 1.0) * 1.02;
+  let opening = smoothstep(0.0, 0.10, sp);
+  let rad = mix(cover, select(mix(0.98, 0.36, sp), mix(0.98, 0.66, sp), layer == 0), opening);
   var d = (uvScreen - cen) * vec2f(aspect, 1.0) / (rad * 0.5);   // dish edge at |d| = 1
   d = vec2f(c * d.x - s * d.y, s * d.x + c * d.y);
   return 0.5 + d * 0.5;

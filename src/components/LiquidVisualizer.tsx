@@ -5690,6 +5690,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         settings: settingsRef.current,
         /** What Random Evolve has done with its own hands, since the page loaded. */
         autoEvents: { ...autoEventsRef.current },
+        /*
+          The flash guard's own state, which nothing could see from outside.
+
+          It is the one thing that dims the whole show without a setting
+          changing, and it holds once engaged — so when a plate goes dark with
+          no setting moved, this is the first thing worth reading. It was not
+          on the hook, so a harness could watch a show dim and have no way to
+          tell whether the guard had it.
+        */
+        flash: flashRef.current.state,
         ...(renderer?.debug?.() ?? {}),
       });
     }

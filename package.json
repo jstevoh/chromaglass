@@ -69,7 +69,8 @@
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
     "replay": "esbuild scripts/replay.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/replay.mjs && node node_modules/.cache/replay.mjs",
     "evolve": "npm run build && esbuild scripts/evolve.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/evolve.mjs && node node_modules/.cache/evolve.mjs",
-    "evolving": "npm run build && esbuild scripts/evolving.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/evolving.mjs && node node_modules/.cache/evolving.mjs"
+    "evolving": "npm run build && esbuild scripts/evolving.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/evolving.mjs && node node_modules/.cache/evolving.mjs",
+    "killer": "npm run build && esbuild scripts/killer.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/killer.mjs && node node_modules/.cache/killer.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

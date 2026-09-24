@@ -3556,6 +3556,9 @@ export default function App() {
       */}
       {performing && overlaysVisible && (
         <PerformDesk
+          onSendToWall={() => { void startCast('window'); }}
+          onSave={saveLook}
+          dirty={docDirty}
           onOpenSettings={openAllSettings}
           automated={isAutomated}
           onAutomate={setIsAutomated}

@@ -43,6 +43,19 @@ const LATE = Number(process.env.LOOKS_LATE ?? 14000);
   what is reported is the pair.
 */
 const AB = process.env.LOOKS_AB || null;
+/*
+  LOOKS_GAP=1 asks a different question: how far each look's gap between the
+  glasses ever leaves its nominal 0.03.
+
+  It exists because measuring whether `depthDrag` is safe by *looking* at the
+  plate could not resolve it — flat% and dye wander far more, run to run, than
+  the setting moves them, and `macro-bead`'s unchanged baseline swung 17% to
+  40% to 63%. But depth is a mobility of (h/0.03)^depthDrag, so where the gap
+  sits at nominal the multiply is exactly one, bit for bit, whatever the dial
+  says. A look whose gap never leaves 0.03 cannot be affected, and that is an
+  argument rather than a measurement.
+*/
+const GAP = process.env.LOOKS_GAP === '1';
 const AB_FROM = Number(process.env.LOOKS_AB_FROM ?? 0);
 const AB_TO = Number(process.env.LOOKS_AB_TO ?? 1);
 
@@ -149,6 +162,32 @@ try {
       { waitUntil: 'load' });
     await page.waitForTimeout(SETTLE);
 
+    if (GAP) {
+      // Long enough for a beat squeeze or a press to have happened if the
+      // look does that at all; the gap springs back, so this watches rather
+      // than sampling once.
+      const seen = await page.evaluate(async (ms) => {
+        const d = window.chromaglassDebug();
+        let lo = Infinity, hi = -Infinity;
+        const until = performance.now() + ms;
+        while (performance.now() < until) {
+          const sq = await d.readSqueeze?.();
+          if (sq) for (let i = 0; i < sq.gap.length; i++) {
+            if (sq.gap[i] < lo) lo = sq.gap[i];
+            if (sq.gap[i] > hi) hi = sq.gap[i];
+          }
+          await new Promise(r => setTimeout(r, 250));
+        }
+        return { lo, hi };
+      }, LATE);
+      const off = Math.max(Math.abs(seen.lo - 0.03), Math.abs(seen.hi - 0.03));
+      console.log(`  ${preset.id.padEnd(22)} gap ${seen.lo.toFixed(4)}..${seen.hi.toFixed(4)}  ` +
+        `${off < 1e-6 ? 'never leaves nominal — depth cannot touch it' : `departs by ${off.toFixed(4)}`}`);
+      rows.push({ id: preset.id, gap: seen, off, faults: [], errors });
+      await page.close();
+      continue;
+    }
+
     const dyeOf = () => page.evaluate(() => {
       const d = window.chromaglassDebug?.();
       const a = d?.fluids?.[0]?.readDensity;
@@ -228,6 +267,16 @@ try {
 } finally { await browser.close(); stop(); }
 
 console.log('');
+if (GAP) {
+  const moved = rows.filter(r => r.off >= 1e-6);
+  console.log(`${rows.length - moved.length} of ${rows.length} looks never leave the nominal gap, so depth is`);
+  console.log('exactly a no-op on them however high depthDrag goes.');
+  if (moved.length) {
+    console.log(`\nThe ${moved.length} that do depart, which are the only ones depth can reach:`);
+    for (const r of moved) console.log(`  ${r.id.padEnd(22)} by ${r.off.toFixed(4)}`);
+  }
+  process.exit(0);
+}
 if (bad.length) {
   console.log(`${bad.length} of ${rows.length} looks have something wrong:\n`);
   for (const r of rows.filter(x => x.faults.length)) {

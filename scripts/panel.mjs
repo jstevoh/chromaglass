@@ -1317,6 +1317,50 @@ check('and neither starts over the limit',
   }
 }
 
+// ── The two desks carry the same actions on the top bar ───────────
+/*
+  Reported: "the perform and design tabs need the same functions on the top
+  bar. For example, send to wall should be on both."
+
+  They did share the header component — and that is what made the gap easy to
+  miss. `DeskHeader` takes a `trailing` slot, the Design bench filled it with
+  Send to wall and Save, and the Perform desk passed nothing, so the desk you
+  are on when a room is watching was the one that could not throw the plate at
+  a projector. Sharing a component is not sharing a top bar.
+
+  So the actions in that slot are compared between the two files rather than
+  assumed equal because the component is the same one.
+*/
+{
+  const trailingOf = (src) => {
+    const at = src.indexOf('trailing={');
+    if (at < 0) return null;
+    // Walk the braces so a nested {p.dirty ? ...} does not end the slot early.
+    let depth = 0, i = src.indexOf('{', at + 'trailing='.length - 1);
+    const from = i;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) break;
+    }
+    const body = src.slice(from, i + 1);
+    return [...body.matchAll(/testId="([a-z0-9-]+)"/g)].map(m => m[1]).sort();
+  };
+  const perform = trailingOf(readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8'));
+  const design = trailingOf(readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8'));
+  check('both desks put actions on the top bar at all',
+    perform !== null && design !== null,
+    `perform ${perform ? perform.length : 'none'}, design ${design ? design.length : 'none'}`);
+  if (perform && design) {
+    const onlyDesign = design.filter(t => !perform.includes(t));
+    const onlyPerform = perform.filter(t => !design.includes(t));
+    check('and they are the same actions on both',
+      onlyDesign.length === 0 && onlyPerform.length === 0,
+      onlyDesign.length || onlyPerform.length
+        ? `${onlyDesign.map(t => 'design only: ' + t).concat(onlyPerform.map(t => 'perform only: ' + t)).join(', ')}`
+        : perform.join(', '));
+  }
+}
+
 // ── Every command the code tells you to run, exists ─────────────────
 /*
   `npm run evolve` was cited in the roadmap, in `bubbles-plan.md`, in four
