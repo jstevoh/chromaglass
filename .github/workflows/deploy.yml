@@ -23,6 +23,11 @@ name: Deploy to Firebase Hosting
 # Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
 # automatic song identification. Left unset, the build still succeeds and the
 # Track panel falls back to manual tagging.
+#
+# Optional: set VITE_CRASH_REPORT_URL (https://<the report Worker>/report) to
+# give the crash report sheet its Send button. Left unset, the build still
+# succeeds and the sheet offers Save and Copy only. The Worker's setup is in
+# docs/crash-plan.md.
 
 on:
   push:
@@ -64,6 +69,7 @@ jobs:
         run: npm run build
         env:
           VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+          VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
 
       # The secret exists now, so a run that builds but cannot publish means it
       # was removed or renamed. That is worth a red X: it used to be pending

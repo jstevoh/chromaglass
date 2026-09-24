@@ -109,6 +109,16 @@ jobs:
       - name: The mapping
         run: npm run map
 
+      # The crash-report Worker, against in-memory R2 and KV (crash-plan.md):
+      # a report is stored with its picture beside it and indexed by the line
+      # it died on; the wrong kind, bad JSON and an oversized body are refused
+      # without quoting them; the digest folds lines that differ only in their
+      # numbers into one group and is closed without the token; and one
+      # address is held to its hourly limit. The endpoint is public, so most
+      # of what it proves is what it will not do.
+      - name: The report Worker
+        run: npm run report-worker
+
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).
