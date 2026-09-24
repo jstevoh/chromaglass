@@ -28,7 +28,7 @@ seconds, with the band playing, and puts them all on one contact sheet.
   | Film stock | Home Movie |
   | Curved glasses and depth drag | Clock Glass |
   | Gel wheel | Acid Trip, Oil Wheel |
-  | Round dish | Classic, Fractal Dream, Oil Wheel, Home Movie, Clock Glass |
+  | Round dish | Fractal Dream, Oil Wheel, Home Movie, Clock Glass |
   | Light through dye | Deep Ocean, Lava Lamp, Velvet Underground, Glycerine Drift, Clock Glass |
   | Macro music sync | Macro Bead, Cell Bloom, Lacing Run |
 
@@ -39,5 +39,8 @@ seconds, with the band playing, and puts them all on one contact sheet.
   (`npm run plate`).
 - No fade between two presets gets darker than both ends (`npm run desk`),
   so a switch is never hidden behind a dip.
+- Classic is the harnesses' plate (`wall`, `qa`, `fx`, `depth`, `crash` all
+  load it), and `wall` needs its frame lit edge to edge: no round dish or
+  vignette on Classic.
 - A preset id, once shipped, stays: songs, cue lists and MIDI pads refer to
   it. A look that is replaced keeps its id and gets a new name and settings.

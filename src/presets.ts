@@ -18,7 +18,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'Slow, luminous blobs of amber, magenta and ultramarine drift and merge in a round dish: the 1960s overhead projector.',
+    description: 'Slow, luminous blobs of amber, magenta and ultramarine drift and merge: the 1960s overhead projector at its most meditative.',
     settings: {
       globalSpeed: 0.00924,
       surge: 0.5,        // unhurried, dreamlike pace
@@ -50,8 +50,6 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
       postBlurRadius: 0.35,
-      dishVignette: 0.35,
-      lampWarmth: 0.15,
       secondLamp: 0.2,
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
