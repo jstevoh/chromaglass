@@ -1192,7 +1192,7 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.9,             // strong immiscibility — hard color boundaries
-      evaporationRate: 0.012,
+      evaporationRate: 0.006,
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,

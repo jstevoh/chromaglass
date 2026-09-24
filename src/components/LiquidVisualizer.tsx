@@ -3665,6 +3665,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   /** The opening look was laid before the GPU solver existed and still owes it its phase. */
   const phasePendingRef = useRef(false);
+  /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
+  const phaseSolverRef = useRef<unknown>(null);
   const laidPresetRef = useRef<string | null>(null);
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
@@ -4518,9 +4520,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             gpuSupportedRef.current = false;
           }
         }
-        if (phasePendingRef.current && fluidsRef.current[0]?.gpu?.addPhase) {
-          phasePendingRef.current = false;
-          layPhaseRef.current();
+        /*
+          The phase goes to each new solver the lead plate gets, not only
+          the first. The governor rebuilds the solver a few seconds into a
+          show when it moves the grid, and the dye is carried across that
+          but the phase is not: Magnet Garden had its ferrofluid at 8 s and
+          a bare gold pool by 20.
+        */
+        const leadGpu = fluidsRef.current[0]?.gpu ?? null;
+        if (leadGpu !== phaseSolverRef.current) {
+          phaseSolverRef.current = leadGpu;
+          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+            phasePendingRef.current = false;
+            layPhaseRef.current();
+          }
         }
         {
           const lead = fluidsRef.current[0];
