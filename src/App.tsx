@@ -66,6 +66,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
+import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -286,6 +287,23 @@ export default function App() {
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
       (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
     /*
+      Put a track from the shelf on, from outside.
+
+      `npm run shelf` has to answer one question — does music that ships with
+      the show actually reach the analyser, or does it play to a plate that
+      cannot hear it — and driving the desk to ask it means finding a button
+      inside a panel inside a mode, which is a layout test wearing an audio
+      test's clothes. This is the same back door `chromaglassSettings` is: it
+      sets the test up, it does not perform it.
+    */
+    (window as unknown as { chromaglassMusic?: unknown }).chromaglassMusic =
+      (src?: string) => {
+        const t = src ? LIBRARY.find(x => x.src === src) : LIBRARY[0];
+        if (!t) throw new Error(`no such track on the shelf: ${src}`);
+        playTrackRef.current(t);
+        return t;
+      };
+    /*
       A song's show, from outside: the clip tool starts one on the first note of
       a take, with the song's own look already on the plate.
     */
@@ -344,7 +362,20 @@ export default function App() {
   // ── A music file, played here ──
   // The straightest signal there is: no room, no microphone, no loopback
   // driver. The element plays to the speakers and its stream feeds the show.
-  const [musicFile, setMusicFile] = useState<{ name: string; url: string } | null>(null);
+  const [musicFile, setMusicFile] = useState<
+    { name: string; url: string; objectUrl: boolean; track?: Track } | null>(null);
+  /*
+    A track that ends does not end the room.
+
+    The element had no `loop` and `onEnded` only cleared the playing flag, so
+    one file played once and the show went quiet — fine for judging a single
+    song, useless for a projector that has to hold a room all afternoon. A
+    library track hands over to the next one and wraps; a file somebody
+    brought themselves repeats, because there is nothing to hand over to.
+  */
+  const playTrackRef = useRef<(t: Track) => void>(() => {});
+  const [musicLoop, setMusicLoop] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
   const musicElRef = useRef<HTMLAudioElement>(null);
@@ -664,12 +695,17 @@ export default function App() {
   }, [audioSource]);
 
   /** A music file: the element plays it aloud and its stream is what the show hears. */
-  const playMusicFile = useCallback((file: File) => {
+  const startMusic = useCallback((
+    url: string,
+    name: string,
+    opts: { objectUrl: boolean; track?: Track },
+  ) => {
     const el = musicElRef.current;
     if (!el) return;
-    if (musicFile) URL.revokeObjectURL(musicFile.url);
-    const url = URL.createObjectURL(file);
-    setMusicFile({ name: file.name.replace(/\.[^.]+$/, ''), url });
+    // Only a URL we minted needs releasing; revoking a library path does
+    // nothing the first time and would be a bug the moment it did something.
+    if (musicFile?.objectUrl) URL.revokeObjectURL(musicFile.url);
+    setMusicFile({ name, url, objectUrl: opts.objectUrl, track: opts.track });
     setMusicTime({ t: 0, d: 0 });
     if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
     el.src = url;
@@ -700,10 +736,20 @@ export default function App() {
     };
     el.load();
   }, [audioStream, musicFile]);
+  const playMusicFile = useCallback((file: File) => {
+    startMusic(URL.createObjectURL(file), file.name.replace(/\.[^.]+$/, ''), { objectUrl: true });
+  }, [startMusic]);
+  const playTrack = useCallback((track: Track) => {
+    startMusic(track.src, track.title, { objectUrl: false, track });
+    setLibraryOpen(false);
+  }, [startMusic]);
+  // The debug hook is installed once, long before this exists; a ref is how
+  // every other late-defined thing reaches it.
+  playTrackRef.current = playTrack;
   const closeMusicFile = useCallback(() => {
     const el = musicElRef.current;
     if (el) { el.pause(); el.removeAttribute('src'); el.load(); }
-    if (musicFile) URL.revokeObjectURL(musicFile.url);
+    if (musicFile?.objectUrl) URL.revokeObjectURL(musicFile.url);
     setMusicFile(null);
     if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
   }, [musicFile, audioSource]);
@@ -2664,18 +2710,77 @@ export default function App() {
       <audio ref={musicElRef} className="hidden" preload="auto"
         onPlay={() => setMusicPlaying(true)} onPause={() => setMusicPlaying(false)}
         onTimeUpdate={(e) => { const el = e.currentTarget; setMusicTime({ t: el.currentTime, d: el.duration || 0 }); }}
-        onEnded={() => setMusicPlaying(false)} />
+        onEnded={() => {
+          setMusicPlaying(false);
+          if (!musicLoop) return;
+          const el = musicElRef.current;
+          if (musicFile?.track) playTrack(nextTrack(musicFile.track.src));
+          else if (el && musicFile) { el.currentTime = 0; void el.play().catch(() => {}); }
+        }} />
+      {libraryOpen && overlaysVisible && (
+        <div className="fixed bottom-28 left-1/2 z-50 -translate-x-1/2 w-[min(92vw,460px)] rounded-2xl border border-white/10 bg-black/80 p-3 backdrop-blur-xl shadow-2xl" data-testid="music-library">
+          <div className="mb-2 flex items-center justify-between px-1">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">
+              Ambient shelf · {clock(librarySeconds())}
+            </span>
+            <button onClick={() => setLibraryOpen(false)} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close the shelf"><X size={12} /></button>
+          </div>
+          {LIBRARY.map(t => (
+            <button
+              key={t.src}
+              onClick={() => playTrack(t)}
+              className={`flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                musicFile?.track?.src === t.src ? 'bg-amber-400/10 text-amber-200' : 'text-white/70 hover:bg-white/5'
+              }`}
+              data-testid={`music-track-${t.src.split('/').pop()?.replace('.mp3', '')}`}
+            >
+              <span className="text-[12px] font-semibold">{t.title}</span>
+              <span className="text-[11px] text-white/40">{t.artist}</span>
+              <span className="ml-auto font-mono text-[9px] text-white/30">{clock(t.seconds)}</span>
+              <span className="font-mono text-[9px] text-white/25">{t.licence}</span>
+            </button>
+          ))}
+          {/*
+            The credit is on screen, not in a file nobody opens. CC-BY asks to
+            name the artist wherever the work is used, and a projector in a
+            room full of people is where it is being used.
+          */}
+          <p className="mt-2 border-t border-white/10 px-2 pt-2 text-[10px] leading-relaxed text-white/40">
+            Music by {credits()}, and public-domain pieces by Thomas Park. Re-encoded and
+            level-matched for the room. Sources on{' '}
+            <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="underline hover:text-white/70">archive.org</a>.
+          </p>
+        </div>
+      )}
       {musicFile && overlaysVisible && (
         <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-xl shadow-2xl" data-testid="music-player">
           <button onClick={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
             {musicPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
           </button>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate" title={musicFile.name}>{musicFile.name}</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate"
+            title={musicFile.track ? `${musicFile.track.title} — ${musicFile.track.artist} · ${musicFile.track.licence}` : musicFile.name}>
+            {musicFile.name}
+          </span>
+          {musicFile.track?.mustCredit && (
+            <span className="text-[10px] text-white/40 max-w-[120px] truncate" data-testid="music-credit">{musicFile.track.artist}</span>
+          )}
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.t / 60)}:{String(Math.floor(musicTime.t % 60)).padStart(2, '0')}</span>
           <input type="range" min={0} max={Math.max(1, musicTime.d)} step={0.1} value={Math.min(musicTime.t, musicTime.d || 0)}
             onChange={(e) => { const el = musicElRef.current; if (el) el.currentTime = parseFloat(e.target.value); }}
             className="w-40 h-6 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.d / 60)}:{String(Math.floor(musicTime.d % 60)).padStart(2, '0')}</span>
+          <button
+            onClick={() => setMusicLoop(v => !v)}
+            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+              musicLoop ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-white/15 text-white/40 hover:text-white/70'
+            }`}
+            title={musicFile?.track
+              ? 'Hand over to the next track on the shelf when this one ends, and round again'
+              : 'Play this file again when it ends, so the room is never left in silence'}
+            data-testid="music-loop"
+          >
+            {musicFile?.track ? 'rolls on' : 'repeats'}
+          </button>
           <button onClick={closeMusicFile} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
         </div>
       )}
@@ -3229,6 +3334,19 @@ export default function App() {
                   >
                     <FileAudio size={14} />
                     <span>File</span>
+                  </button>
+                  <button
+                    onClick={() => setLibraryOpen(v => !v)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
+                      musicFile?.track
+                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    }`}
+                    title={`Ambient music that ships with the show — ${clock(librarySeconds())} of it, licensed for a room like this one, and played from this tab so a shared tab carries the sound too`}
+                    data-testid="music-library-button"
+                  >
+                    <Music size={14} />
+                    <span>Shelf</span>
                   </button>
                   <button
                     onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}

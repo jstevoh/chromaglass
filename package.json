@@ -77,6 +77,7 @@
     "killer": "npm run build && esbuild scripts/killer.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/killer.mjs && node node_modules/.cache/killer.mjs",
     "arrive": "npm run build && esbuild scripts/arrive.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/arrive.mjs && node node_modules/.cache/arrive.mjs",
     "closeup": "npm run build && esbuild scripts/closeup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/closeup.mjs && node node_modules/.cache/closeup.mjs",
+    "shelf": "npm run build && esbuild scripts/shelf.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/shelf.mjs && node node_modules/.cache/shelf.mjs",
     "gig": "npm run build && esbuild scripts/gig.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gig.mjs && node node_modules/.cache/gig.mjs",
     "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs"
   },
