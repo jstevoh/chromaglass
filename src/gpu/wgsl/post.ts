@@ -32,16 +32,6 @@ ${POST_STRUCT}
 fn tex2(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureSampleLevel(t, samp, uv, 0.0); }
 
 /*
-  The uv at the centre of its texel. A pass drawn into a texture mirrors its
-  geometry, which moves the interpolated uv in its last bit; read through a
-  linear sampler, that is a hair of the neighbouring texel, and across a hard
-  bright edge a hair is ten steps in one pixel. At the centre the sampler
-  returns the texel itself, on either path. The plate's display pass snaps
-  its own uv the same way.
-*/
-fn texel(uv: vec2f) -> vec2f { return (floor(uv * U.resolution) + 0.5) / U.resolution; }
-
-/*
   Which way up this pass stores its picture: see FLIP_Y in wgsl/plate.ts.
   The effects and the ring's blit always write a texture, so the chain always
   compiles them flipped; the finish may write the canvas instead, and takes
@@ -95,7 +85,7 @@ export const FINISH_PASS_WGSL = `${HEAD}${FINISH_WGSL}
   // GL counts fragment rows up from the bottom and the dither hashes that
   // coordinate, so a frame drawn either way dithers the same pixels.
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
-  return finishFrame(tex2(picture, texel(in.uv)).rgb, in.uv, fragGl, markTex);
+  return finishFrame(tex2(picture, in.uv).rgb, in.uv, fragGl, markTex);
 }
 `;
 
@@ -109,7 +99,7 @@ export const TEST_PASS_WGSL = `${HEAD}${FX_RANDOM_WGSL}
 @group(0) @binding(4) var history: texture_2d_array<f32>;
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
-  var c = tex2(picture, texel(in.uv)).rgb;
+  var c = tex2(picture, in.uv).rgb;
   if (U.mode == 1) {
     // The GL's fragment coordinate, taken from the uv rather than from the
     // position: they are the same number unflipped, and this one stays the
