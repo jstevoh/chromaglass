@@ -149,14 +149,55 @@ crashLog.provideReport({ look: () => ({ preset, settings, plate: describePlate()
 <CrashReportButton />
 ```
 
-**Send**, when it is wanted, needs a Worker that accepts
-`POST application/json` and answers 2xx. Then build with
-`VITE_CRASH_REPORT_URL=https://…/report`.
+**Send** goes to its own Worker, `server/report-worker.js`, with its own
+config, `wrangler.report.toml`. The fingerprint Worker keeps `wrangler.toml`,
+so a burst of reports never slows a song lookup and either can be redeployed
+without the other.
 
-- **Where it could live.** The fingerprint Worker could grow a `/report` path,
-  or a separate Worker could take it. Neither is written yet.
+- **What it keeps.** `POST /report` stores the report in R2 as
+  `reports/YYYY-MM-DD/<id>.json`, with the picture decoded beside it as
+  `<id>.jpg` and only a reference to it left in the JSON. A small index record
+  goes to KV: when, the URL, the browser, the note, and the line the report is
+  about. That line is picked the way `last()` picks it: this load's last
+  fatal, or else the previous load's last line that is not its `pagehide`.
+- **What it refuses.** Anything that is not JSON, or not
+  `kind: "chromaglass-crash-report"`, or over 4 MB, and more than 30 reports
+  an hour from one address. The endpoint is public, so no answer ever quotes
+  what was sent: a report is `{ ok, id }` and a refusal is a fixed sentence.
+  CORS grants `chromaglass.web.app`, `chromaglass.firebaseapp.com`, and
+  localhost for `npm run dev`.
+- **Reading it.** Both need `Authorization: Bearer <DIGEST_TOKEN>`:
+  - `GET /digest?days=1` groups the last N days by that line, with its numbers
+    and hex ids folded out, so one failure is one group however many frames it
+    had drawn. It gives counts, first and last seen, and a few ids, most
+    common first.
+  - `GET /report/<id>` returns one report.
+- **The daily digest.** A cron at 00:10 UTC writes yesterday's digest to R2 as
+  `digests/YYYY-MM-DD.json`. That is all it does: nothing is emailed. Read it
+  with `npx wrangler r2 object get chromaglass-reports/digests/<day>.json`, or
+  ask `/digest`.
 - **Size.** A report is roughly 10 kB without the picture (measured with no
-  GPU); the JPEG adds its own size on top.
+  GPU); the JPEG adds 25–150 kB on top.
+
+**Turning Send on** takes these steps, once, from the repository root:
+
+1. Create the bucket: `npx wrangler r2 bucket create chromaglass-reports`.
+2. Create the index:
+   `npx wrangler kv namespace create REPORT_INDEX`, then paste the `id` it
+   prints into `wrangler.report.toml` in place of
+   `REPLACE_WITH_KV_NAMESPACE_ID`.
+3. Set the reading token. Make it long and random:
+   `npx wrangler secret put DIGEST_TOKEN -c wrangler.report.toml`.
+   Unset, the digest and the reports stay closed, never open.
+4. Deploy: `npm run deploy:reports`. It prints the Worker's URL,
+   `https://chromaglass-reports.<account>.workers.dev`.
+5. Add the repository secret: GitHub → Settings → Secrets and variables →
+   Actions → `VITE_CRASH_REPORT_URL` = `https://<that URL>/report`. The next
+   deploy builds with it, and the sheet shows **Send**. Without the secret the
+   build still succeeds, with no Send.
+
+`npm run report-worker` runs the Worker in Node against in-memory R2 and KV,
+and the ubuntu job of `checks.yml` runs it on every pull request.
 
 ### The `ignore` patterns
 

@@ -1,0 +1,26 @@
+# Cloudflare Worker config for the crash-report endpoint (docs/crash-plan.md).
+# The fingerprint proxy keeps wrangler.toml; this one is its own Worker, so a
+# burst of reports can never slow a song lookup, and either can be redeployed
+# without the other.
+#
+# Once:
+#   npx wrangler r2 bucket create chromaglass-reports
+#   npx wrangler kv namespace create REPORT_INDEX     # paste its id below
+#   npx wrangler secret put DIGEST_TOKEN -c wrangler.report.toml
+# Deploy:
+#   npm run deploy:reports
+name = "chromaglass-reports"
+main = "server/report-worker.js"
+compatibility_date = "2026-07-01"
+
+[[r2_buckets]]
+binding = "REPORTS"
+bucket_name = "chromaglass-reports"
+
+[[kv_namespaces]]
+binding = "REPORT_INDEX"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Yesterday's digest, written to R2 as digests/YYYY-MM-DD.json at 00:10 UTC.
+[triggers]
+crons = ["10 0 * * *"]
