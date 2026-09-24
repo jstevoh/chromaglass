@@ -469,7 +469,7 @@ const SECTIONS: Section[] = [
         ]} />
         <H>The show over time</H>
         <Rows items={[
-          ['Automation', <>Dye drops and air blows driven by the music. <Em>Evolve Speed</Em> is how often, from a drop every second or so to the old frenzy.</>],
+          ['Automation', <>Dye drops and air blows driven by the music. <Em>Evolve Speed</Em> is how often: small drops and soft breaths, from one every several seconds to about one a second. Evolve drifts; it never floods the plate.</>],
           ['Sequencer', <>Script how the show evolves over a song or a set: stages with their own presets and durations, saved as <C>.chromaglass-sequence.json</C> with any of your presets it needs, so it arrives whole on another laptop.</>],
           ['Multi-Layer Mixer', <>Up to five fluid layers, each its own plate, composited with screen, lighter, exclusion, multiply or overlay. <Em>Layer Scale Variety</Em> gives each one its own magnification, which is what two projectors at different throws actually look like.</>],
           ['Music intelligence', <>The first listen to a song is recorded and analysed offline into a map — verse and chorus structure, pitch and energy curves — cached locally. On every later listen the show is driven by known structure rather than by the last half-second: choruses surge, intros and outros calm. Lyrics come from LRCLIB, with themed word triggers and a per-section sentiment arc.</>],
@@ -523,8 +523,8 @@ const SECTIONS: Section[] = [
         <P>
           These three are one loop. The plate removes dye faster the fuller it gets, so
           Dye Budget is a <Em>target</Em>, not a cap, and the equilibrium is wherever injection
-          and removal meet. Turning Automation up does not make the plate fuller for long —
-          it makes it churn harder at the same fullness. To actually get a fuller plate,
+          and removal meet. Turning Evolve Speed up does not make the plate fuller for long —
+          it adds more small changes at the same fullness. To actually get a fuller plate,
           raise the budget; to get a sparser one with the same activity, lower it and leave
           Evolve Speed alone.
         </P>
