@@ -100,6 +100,22 @@ export function driftLook(
     const was = typeof anchor[key as keyof VisualizerSettings] === 'number'
       ? anchor[key as keyof VisualizerSettings] as unknown as number : undefined;
     if (now === undefined || was === undefined) continue;
+    /*
+      A look that set something to zero switched it off. Leave it off.
+
+      Drifting a dial a hair off zero is not a small change to that dial — it
+      is switching a feature on at a value too small to see, and several of
+      them are modes rather than amounts. `dishSpread` at 0.003 turned the
+      plate from filling the frame into a disc inscribed in its height and
+      took 48% of the picture with it, showing no spread at all in exchange;
+      that is fixed in the shader now, but it was found by this drift walking
+      into it, and the next one like it should not need finding twice.
+
+      So a drift scales what a look is already doing and never switches on
+      what it switched off. Turning something on is a decision, and it belongs
+      to a hand.
+    */
+    if (was === 0) continue;
     // A nudge of a few percent of the dial's travel, either way.
     const step = span * (0.015 + 0.05 * rate) * (rand() * 2 - 1);
     // And never further than a fifth of the travel from where the look sat,

@@ -25,6 +25,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
+import { driftLook } from '../src/lib/drift.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
@@ -1315,6 +1316,35 @@ check('and neither starts over the limit',
       new RegExp(`type: '${t}'`).test(proto) && new RegExp(`case '${t}':`).test(panel0app),
       proto.includes(`type: '${t}'`) ? 'protocol and dispatch' : 'not in the protocol');
   }
+}
+
+// ── Evolve's drift scales a look, it does not switch things on ─────
+/*
+  Nudging a dial a hair off zero is not a small change to that dial — it is
+  switching a feature on at a value too small to see, and several of them are
+  modes rather than amounts. `dishSpread` at 0.003 turned the plate from
+  filling the frame into a disc inscribed in its height and took 48% of the
+  picture with it, in exchange for no visible spread at all. The shader no
+  longer has that cliff, but the next setting like it should not have to be
+  found the same way.
+*/
+{
+  const anchor = { ...DEFAULT_SETTINGS, dishSpread: 0, dishVignette: 0, bubbles: 0, turbulenceScale: 0.3 };
+  // Its own generator, so a failure here is reproducible rather than a mood.
+  let bits = 20260923;
+  const roll = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
+  let fromZero = 0, live = 0, current = { ...anchor };
+  for (let i = 0; i < 4000; i++) {
+    const patch = driftLook(current, anchor, 1, roll);
+    for (const [k, v] of Object.entries(patch)) {
+      if (anchor[k] === 0 && v !== 0) fromZero++;
+      else live++;
+    }
+    current = { ...current, ...patch };
+  }
+  check('evolve never switches on a dial the look switched off',
+    fromZero === 0, `${fromZero} from zero against ${live} live, over 4000 drifts`);
+  check('and it does move the ones that are in play', live > 100, `${live} moved`);
 }
 
 // ── The two desks carry the same actions on the top bar ───────────

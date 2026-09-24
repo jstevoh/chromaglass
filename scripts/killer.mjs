@@ -152,8 +152,21 @@ try {
     if (baseline.length < 12) baseline.push(j.flat);
     const settled = [...baseline].sort((a, b) => a - b)[Math.floor(baseline.length / 2)] ?? j.flat;
     const darkNow = Math.max(...j.rgb) < 40;
+    /*
+      The share, not the brightness.
+
+      Three detectors so far, each too narrow for the next thing reported. 85%
+      of the frame in one colour printed "the picture held" through a plate
+      that had gone to 52% black. Narrowing to dark-and-large caught that, and
+      dismissed 35% of the frame at pure blue as a big pour. Then: "making the
+      entire screen yellow... trying to go under a completely dye saturated
+      layer" — which is the blue one again in another hue, and the black one
+      is the same shape with the light off. One colour taking a third of a
+      frame that has been running at a twentieth is a picture being covered;
+      what colour the cover is, is a detail of which thing did it.
+    */
     const jumped = baseline.length >= 8 &&
-      ((darkNow && j.flat > Math.max(0.3, settled + 0.2)) || j.luma < 0.03);
+      (j.flat > Math.max(0.28, settled + 0.18) || j.luma < 0.03);
     over = jumped ? over + 1 : 0;
     const dead = over >= 2 || j.flat > 0.9;
     console.log(`  ${String(t).padStart(4)}s   ${(j.flat * 100).toFixed(0).padStart(4)}%  ${j.luma.toFixed(3)}   rgb(${j.rgb.join(',')})` +
@@ -189,6 +202,48 @@ try {
         `${guard.rate.toFixed(1)} flashes/s, amplitude ${guard.amplitude.toFixed(3)}`);
       if (guard.engaged) console.log('  → THE FLASH GUARD IS HOLDING THE SHOW BACK.');
     }
+    console.log(`  the cover is ${darkNow ? 'DARK' : 'LIT'} — rgb(${j.rgb.join(',')}) over ${(j.flat * 100).toFixed(0)}% of the frame`);
+    /*
+      Every plate, because "under a completely dye saturated layer" is a guess
+      worth testing rather than repeating. If one plate's dye has gone to a
+      single colour while the other still has structure, the composite is one
+      plate covering the other — a different fault from both going flat.
+    */
+    const layers = await page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      return (d.fluids ?? []).map((f, i) => {
+        const dye = f?.gpu?.rbDyeView;
+        if (!dye) return { layer: i, read: false };
+        const bins = new Map();
+        let wet = 0, mass = 0, peak = 0;
+        for (let k = 0; k < dye.length; k += 4) {
+          const a = dye[k + 3];
+          mass += a;
+          if (a > peak) peak = a;
+          if (a < 0.05) continue;
+          wet++;
+          const key = (((Math.min(255, dye[k] / a * 255) | 0) >> 4) << 8) |
+                      (((Math.min(255, dye[k + 1] / a * 255) | 0) >> 4) << 4) |
+                      ((Math.min(255, dye[k + 2] / a * 255) | 0) >> 4);
+          bins.set(key, (bins.get(key) ?? 0) + 1);
+        }
+        let top = 0, topKey = 0;
+        for (const [kk, v] of bins) if (v > top) { top = v; topKey = kk; }
+        return { layer: i, read: true, mean: mass / (dye.length / 4), peak,
+          wetShare: wet / (dye.length / 4), colours: bins.size,
+          dominant: wet ? top / wet : 0,
+          rgb: [(topKey >> 8) * 17, ((topKey >> 4) & 15) * 17, (topKey & 15) * 17] };
+      });
+    });
+    for (const L of layers ?? []) {
+      if (!L.read) { console.log(`  layer ${L.layer}: no readback`); continue; }
+      console.log(`  layer ${L.layer}: mean dye ${L.mean.toFixed(2)}, peak ${L.peak.toFixed(2)}, ` +
+        `${(L.wetShare * 100).toFixed(0)}% wet, ${L.colours} colours, ` +
+        `commonest ${(L.dominant * 100).toFixed(0)}% rgb(${L.rgb.join(',')})`);
+    }
+    const flatLayer = (layers ?? []).find(L => L.read && L.dominant > 0.8 && L.wetShare > 0.5);
+    if (flatLayer) console.log(`  → LAYER ${flatLayer.layer} HAS GONE TO ONE COLOUR and is covering the rest.`);
+
     const field = await page.evaluate(() => {
       const dye = window.chromaglassDebug().fluids[0]?.gpu?.rbDyeView;
       if (!dye) return null;
