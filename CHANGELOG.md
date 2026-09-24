@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ran after the clamps that turn an infinity into a NaN. One bad cell then
   poisoned the whole plate for good: five presets drew bare ground from their
   first seconds, and a show could stop the same way and never come back.
-  The guards now test the exponent bits, before the clamps.
+  The guards now test the exponent bits, before the clamps, and dye and
+  motion are held finite, and dye to its cap, where they enter a step as
+  well as where it ends: a dense seed used to overflow the first step.
 - **Macro Bead no longer goes black,** and `npm run gallery` (and the Preset
   gallery workflow) photographs every preset for review.
 

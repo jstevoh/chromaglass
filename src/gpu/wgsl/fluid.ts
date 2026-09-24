@@ -104,18 +104,29 @@ fn finite4(v: vec4f) -> bool {
   return all(e != vec4u(0x7f800000u));
 }
 /*
-  The limits decay applies at the end of a step, applied where things enter
-  one as well. A seed that piles thirty splats into a cell arrives at many
-  times the dye cap, and the tension force scales with that density and the
-  square of the colour step beside it: on the first step, before decay had
-  capped anything, the force could run the velocity past what its half-float
+  Where things enter a step, not only where it ends.
+
+  A seed that piles thirty splats into a cell arrives at many times the dye
+  cap, and the tension force scales with that density and the square of the
+  colour step beside it: on the first step, before decay had capped
+  anything, the force could run the velocity past what its half-float
   texture holds, and an infinity there was the NaN that took the plate.
+
+  The dye gets decay's own cap. The velocity does not get decay's speed
+  limit: that is in the units of the end of the step, and applied at every
+  write it froze the plate (the fastest cell fell from about 1 to 0.0028 on
+  every preset). What a velocity write needs is only to stay finite and
+  inside what rgba16float can hold, so the bound is an overflow guard,
+  hundreds of times any real speed and far under 65504.
 */
+const VEL_BOUND = 1000.0;
 fn safeVel(v: vec4f) -> vec4f {
   if (!finite4(vec4f(v.xyz, 0.0))) { return vec4f(0.0); }
   let sp = length(v.xy);
-  if (sp > S.maxSpeed) { return vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  return v;
+  var o = v;
+  if (sp > VEL_BOUND) { o = vec4f(v.xy * (VEL_BOUND / sp), v.z, v.w); }
+  o.z = clamp(o.z, -VEL_BOUND, VEL_BOUND);
+  return o;
 }
 fn capDye(d: vec4f) -> vec4f {
   if (!finite4(d)) { return vec4f(0.0); }
