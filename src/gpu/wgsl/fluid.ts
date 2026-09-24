@@ -88,6 +88,21 @@ struct Args {
 fn uvOf(id: vec3u) -> vec2f { return (vec2f(id.xy) + 0.5) / S.n; }
 fn inGrid(id: vec3u) -> bool { return id.x < u32(S.n) && id.y < u32(S.n); }
 fn clampP(p: vec2i, n: f32) -> vec2i { return clamp(p, vec2i(0), vec2i(i32(n) - 1)); }
+/*
+  Whether all four numbers are finite, read off the exponent bits.
+
+  The guards this replaces were x == x, which a compiler that assumes no NaN
+  (fast math, as Metal's often does) folds to true and deletes, and which
+  let an infinity through to the clamp after it, where inf * 0 made the NaN.
+  A plate that went non-finite in one cell then stayed non-finite in every
+  cell for good: Acid Trip, Solar Flare, Jellyfish Bloom, Boiling Point and
+  Lacing Run were 36864 of 36864 cells NaN by their eighth second. The bits
+  cannot be optimised away.
+*/
+fn finite4(v: vec4f) -> bool {
+  let e = bitcast<vec4u>(v) & vec4u(0x7f800000u);
+  return all(e != vec4u(0x7f800000u));
+}
 `;
 
 /** Ashima/McEwan simplex noise, as the GLSL has it (`NOISE` in gpuFluid.ts). */
@@ -1174,9 +1189,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var d = textureLoad(dye, vec2i(id.xy), 0) * S.evap;
+  // Before the clamp: an infinity through it is inf * 0, a NaN.
+  if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  // A NaN compares false with everything, including itself.
-  if (!(d.r == d.r && d.g == d.g && d.b == d.b && d.a == d.a)) { d = vec4f(0.0); }
   textureStore(dst, vec2i(id.xy), max(d, vec4f(0.0)));
 }`,
 
@@ -1186,11 +1201,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
+  // Before the speed limit: an infinite speed through it is inf * 0, a NaN.
+  if (!finite4(vec4f(v.xyz, 0.0))) { v = vec4f(0.0); }
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
   v.z *= S.heatDecay;
-  if (!(v.x == v.x && v.y == v.y && v.z == v.z)) { v = vec4f(0.0); }
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 

@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   app opened on was seeded, coloured and poured as Classic until someone
   changed look. The first preset gallery showed two dozen looks in one set
   of colours, which is most of what "the presets all look alike" was.
+- **A plate that goes bad recovers.** The GPU solver's NaN guards compared
+  a number with itself, which a compiler assuming no NaN deletes, and they
+  ran after the clamps that turn an infinity into a NaN. One bad cell then
+  poisoned the whole plate for good: five presets drew bare ground from their
+  first seconds, and a show could stop the same way and never come back.
+  The guards now test the exponent bits, before the clamps.
 - **Macro Bead no longer goes black,** and `npm run gallery` (and the Preset
   gallery workflow) photographs every preset for review.
 
