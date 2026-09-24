@@ -4337,14 +4337,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         photograph of ferrofluid, not ferrofluid. Every other look is handed
         its settings untouched.
       */
-      const magnetFor = <T extends Partial<VisualizerSettings>>(ls: T): T => {
+      const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
         const now = performance.now();
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
-        const strength = ls.magnetStrength ?? 0;
-        const walks = !held && isAutomatedRef.current && isActiveRef.current
-          && strength > 0 && (ls.phaseAmount ?? 0) > 0.002;
-        if (!held && !walks) return ls;
+        const strength = look.magnetStrength ?? 0;
+        // The walk is a look setting, so a look (or a test) that places its
+        // magnet keeps it there; Evolve starts a gentle one on any ferrofluid
+        // look that has none of its own.
+        const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.5 : 0);
+        const walks = !held && walk > 0 && isActiveRef.current
+          && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
+        if (!held && !walks) return look;
         let mx: number, my: number, ms = strength;
         if (held) {
           mx = hand.x; my = hand.y; ms = Math.max(strength, 0.85);
@@ -4352,12 +4356,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           const last = magnetWalkAtRef.current || now;
           magnetWalkAtRef.current = now;
-          magnetWalkRef.current += Math.min(0.1, (now - last) / 1000) * (0.35 + 1.1 * energy);
+          magnetWalkRef.current += Math.min(0.1, (now - last) / 1000) * (0.35 + 1.1 * energy) * (0.6 + 0.6 * walk);
           const t = magnetWalkRef.current;
-          mx = (ls.magnetX ?? 0.5) + 0.24 * Math.sin(t * 0.9);
-          my = (ls.magnetY ?? 0.5) + 0.2 * Math.sin(t * 1.3 + 1.1);
+          mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
+          my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
-        return Object.assign(magnetStepRef.current, ls, {
+        return Object.assign(magnetStepRef.current, look, {
           magnetX: Math.max(0.05, Math.min(0.95, mx)),
           magnetY: Math.max(0.05, Math.min(0.95, my)),
           magnetStrength: ms,

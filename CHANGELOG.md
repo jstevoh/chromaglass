@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Magnet tool (M)** on both desks: hold it on the plate and the
   ferrofluid gathers under the pointer and follows it. On looks without
   ferrofluid it does nothing.
-- **The magnet walks on its own** when automation is on and the look has
-  ferrofluid. It drifts slowly around its resting place, faster when the music
-  is loud, so Magnet Garden no longer sits still in one spot.
+- **The magnet can walk on its own.** A new Magnet Walk setting moves it
+  slowly around its resting place, faster when the music is loud. Magnet
+  Garden has it on, and Evolve starts a gentle walk on any look with
+  ferrofluid. Looks that place their magnet keep it still.
 
 ### Fixed
 
