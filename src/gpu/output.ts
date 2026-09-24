@@ -98,7 +98,7 @@ export class WebGPUOutput {
   private sceneSize = [0, 0];
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'output');
     this.pack = new UniformPack(OUTPUT_LAYOUT);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
@@ -141,7 +141,10 @@ export class WebGPUOutput {
   ): void {
     if (!this.scene) return;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
-    const pipeline = this.pipelines.renderPipeline('output', (module) => ({
+    // The format is in the name because the cache is the device's, not this
+    // projector's (S4): a second one on another format must not be handed
+    // the first one's pipeline.
+    const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, (module) => ({
       layout: this.device.createPipelineLayout({
         // The vertex stage reads the uniforms too — the quad's corners are
         // in the buffer rather than in a vertex attribute — so the layout has

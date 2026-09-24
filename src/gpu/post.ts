@@ -85,7 +85,7 @@ export class WebGPUPostChain {
   private readonly blankMark: GPUTexture;
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'post');
     this.pack = new UniformPack(POST_LAYOUT);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',

@@ -207,7 +207,7 @@ export class WebGPUFluid {
     this.N = physicalSize;
     this.L = logicalSize;
     this.M = Math.max(32, Math.round(physicalSize / 2));
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'fluid');
     this.profiler = new GpuProfiler(device, this.disposer, !!opts.timestamps);
     // As WebGL: the dye is a 32-bit float where one can be filtered, because
     // it is written several times a step and a half float loses a part in a
@@ -543,9 +543,13 @@ export class WebGPUFluid {
   }
 
   /**
-   * Lay down the dye the reaction has grown (`gpu/chemistry.ts`), in the same
-   * breath as the deltas — before the step, so this frame's flow carries it.
-   * `amount` is per cell per step, `colour` the dye's own colour.
+   * Lay down the dye the reaction has grown, in the same breath as the deltas
+   * — before the step, so this frame's flow carries it. `amount` is per cell
+   * per step, `colour` the dye's own colour.
+   *
+   * Nothing calls this now. It was the deposit half of `WebGPUChemistry`, the
+   * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
+   * (S13); the show grows the reaction on the CPU and lays its dye from there.
    */
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
     if (amount <= 0) return;
