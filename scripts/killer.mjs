@@ -133,6 +133,24 @@ try {
     if (!px) throw new Error(`could not photograph: ${JSON.stringify(await page.evaluate(() => window.__cgFrameLast))}`);
     const j = judge(px);
     const t = Math.round((MINUTES * 60000 - (until - Date.now())) / 1000);
+    /*
+      What the plate holds against what it was told to hold.
+
+      The dye budget exists so a plate keeps "plenty of empty glass left — a
+      saturated plate has no boundaries or gradients and reads as a static
+      colour wash", which is the reported fault word for word. So the ratio is
+      worth watching the whole way through rather than only at the death.
+    */
+    const budget = await page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      const f = d.fluids?.[0];
+      const target = d.settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, d.settings.dyeBudget ?? 0.85));
+      return { mean: f?.meanDensity ?? null, target };
+    });
+    if (budget.mean !== null) {
+      process.stdout.write(`  (dye ${budget.mean.toFixed(2)} against a budget of ${budget.target.toFixed(2)} ` +
+        `— ${(budget.mean / budget.target).toFixed(2)}x)\n`);
+    }
     history.push({ t, settings: await page.evaluate(() => ({ ...window.chromaglassDebug().settings })) });
     if (history.length > 9) history.shift();
     /*

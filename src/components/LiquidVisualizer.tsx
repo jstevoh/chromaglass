@@ -2374,7 +2374,29 @@ class FluidSimulation {
     const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
     const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
     const over = Math.max(0, this.meanDensity / targetMean - 1);
-    const regulatorEvap = Math.min(0.02, over * over * 0.012);
+    /*
+      Steep enough to actually hold the budget.
+
+      At 0.012 with a ceiling of 0.02 the plate settled at **2.1x** whatever it
+      was told to hold, and stayed there: measured on soap-film at evolve speed
+      0.2, dye 1.05 against a budget of 0.50, for seven minutes without
+      drifting back. A budget the plate runs at twice is not a budget, and what
+      it produces is the fault this regulator's own comment describes — a
+      saturated plate with no boundaries or gradients, reading as a static
+      colour wash. Reported as "the entire screen yellow... trying to go under
+      a completely dye saturated layer", and measured at the moment it happened
+      as 94-95% of the plate wet with peaks at the 6.0 clamp.
+
+      The response is quadratic in the overshoot, so it is zero at the budget
+      and the plate must settle somewhere above it; the coefficient decides how
+      far above. At 0.012 that was 110% above. This lands it near 15%.
+
+      It cannot dry a plate out, and that is structural rather than a matter of
+      tuning: `over` is clamped at zero, so at or under budget this contributes
+      exactly nothing however steep it is. The only thing a bigger number can
+      do is stop a plate exceeding what it was asked for.
+    */
+    const regulatorEvap = Math.min(0.12, over * over * 0.6);
     /*
       Only ever upward, and H6 tried the other direction and took it out
       again. A bubble's exclusion is a multiply, so it destroys the dye it
