@@ -491,8 +491,25 @@ try {
     }
     return cols;
   };
+  /*
+    Null when there is nothing to correlate, and that distinction cost a deploy.
+
+    This returned 0 for a profile with no variance — a flat frame — which is
+    also what it returns for two profiles that are genuinely uncorrelated. The
+    flip gate below is `reversed > direct`, so a frame that came back empty
+    made both of them 0, `0 > 0` was false, and the run reported *rear
+    projection reverses the picture inside it* as a broken feature:
+
+      FAIL  rear projection reverses the picture — reversed 0.000 vs direct 0.000
+
+    Nothing was wrong with rear projection. The harness had photographed a flat
+    frame and could not tell that from an answer. `null` says so, and the two
+    readers below now have to decide what to do about it rather than being
+    handed a number that looks like a measurement.
+  */
   const corr = (a, b) => {
     const n = Math.min(a.length, b.length);
+    if (n === 0) return null;
     const ma = a.slice(0, n).reduce((s, v) => s + v, 0) / n;
     const mb = b.slice(0, n).reduce((s, v) => s + v, 0) / n;
     let num = 0, da = 0, db = 0;
@@ -500,7 +517,8 @@ try {
       const x = a[i] - ma, y = b[i] - mb;
       num += x * y; da += x * x; db += y * y;
     }
-    return da > 0 && db > 0 ? num / Math.sqrt(da * db) : 0;
+    if (!(da > 0) || !(db > 0)) return null;
+    return num / Math.sqrt(da * db);
   };
 
   // The keystone, before anything repaints the plate.
@@ -537,9 +555,20 @@ try {
   // (measured: 0.007). Rather than encode that mapping here, where it would
   // quietly rot the first time the renderer changed, both stripes are tried
   // and whichever actually makes the picture lopsided is the one used.
+  /*
+    An empty plate used to be the most lopsided plate there is.
+
+    With `corr` returning 0 for a profile it could not correlate, this returned
+    `1 - 0` — a perfect 1.0 — for a frame with nothing on it, sailing past the
+    `asym >= 0.15` gate whose whole job is to prove the stripe is there before
+    the flip is judged against it. The gate that exists to refuse an unmeasurable
+    plate was satisfied by the plate being blank. Null now, and the caller skips
+    it.
+  */
   const lopsidedness = (g) => {
     const prof = profileOf(g, 0.02, 0.48);
-    return 1 - corr(prof, prof.slice().reverse());
+    const c = corr(prof, prof.slice().reverse());
+    return c === null ? null : 1 - c;
   };
   const stripe = async (axis) => {
     await page.evaluate((which) => {
@@ -560,26 +589,47 @@ try {
 
   let pinnedAgain = null;
   let asym = 0;
+  let wonAxis = null;
   for (const axis of ['x', 'y']) {
     const g = await stripe(axis);
     const a = lopsidedness(g);
-    if (a > asym) { asym = a; pinnedAgain = g; }
+    if (a !== null && a > asym) { asym = a; pinnedAgain = g; wonAxis = axis; }
     if (asym >= 0.15) break;
   }
   check('the plate can be made lopsided enough to tell a flip from no flip', asym >= 0.15,
     `asymmetry ${asym.toFixed(3)}`);
 
-  await withOutput({ corners: pinnedLeft, flipX: true });
-  const flipped = await gridOf();
+  /*
+    Laid again if the flipped frame came back with nothing on it.
+
+    The stripe is put down by hand and then photographed twice, and between the
+    two the plate keeps running: it advects, it evaporates, and the dye can
+    leave the window these profiles read. When that happens the flip is not
+    wrong, it is unmeasured — so the stripe is laid again and the photograph
+    retaken, up to three times, and only then does the check speak.
+  */
+  let flipped = null, direct = null, reversed = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (attempt > 1 && wonAxis) pinnedAgain = await stripe(wonAxis);
+    await withOutput({ corners: pinnedLeft, flipX: true });
+    flipped = await gridOf();
+    if (!pinnedAgain) break;
+    const A = profileOf(pinnedAgain, 0.02, 0.48);
+    const B = profileOf(flipped, 0.02, 0.48);
+    direct = corr(A, B);
+    reversed = corr(A, B.slice().reverse());
+    if (direct !== null && reversed !== null) break;
+  }
+
   const flippedOutside = meanOver(flipped, x => x > 0.56);
   check('rear projection leaves the pinned quad where it was', flippedOutside < 0.004, `mean ${flippedOutside.toFixed(4)}`);
 
-  const A = profileOf(pinnedAgain, 0.02, 0.48);
-  const B = profileOf(flipped, 0.02, 0.48);
-  const direct = corr(A, B);
-  const reversed = corr(A, B.slice().reverse());
-  check('rear projection reverses the picture inside it', reversed > direct,
-    `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`);
+  const measured = direct !== null && reversed !== null;
+  check('rear projection reverses the picture inside it', measured && reversed > direct,
+    measured
+      ? `reversed ${reversed.toFixed(3)} vs direct ${direct.toFixed(3)} (asymmetry ${asym.toFixed(3)})`
+      : 'could not measure it: after three tries one of the two profiles still had no ' +
+        'variance in it, so this says nothing about the flip either way');
 
   // ── 5. Grade ───────────────────────────────────────────────────────
   /*
