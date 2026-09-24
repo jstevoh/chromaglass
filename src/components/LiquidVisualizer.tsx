@@ -2387,9 +2387,30 @@ class FluidSimulation {
       a completely dye saturated layer", and measured at the moment it happened
       as 94-95% of the plate wet with peaks at the 6.0 clamp.
 
-      The response is quadratic in the overshoot, so it is zero at the budget
-      and the plate must settle somewhere above it; the coefficient decides how
-      far above. At 0.012 that was 110% above. This lands it near 15%.
+      Linear rather than quadratic, and that is the second correction.
+
+      Quadratic at 0.6 held soap-film beautifully — 2.1x down to 1.15x — and
+      overshot the other way on the looks with a small budget: macro-bead asks
+      for 0.28 and sat at 0.12, less than half of it, because a flood landing
+      on a thin plate makes `over` large, the square makes it enormous, and the
+      bite crashes the plate through its own target. Measured as flatness:
+      macro-bead 31% to 53%, cell-bloom 18% to 52%.
+
+      Two gentler shapes were tried on the way here and both gave the fault
+      back. Linear at 0.1 with a ceiling of 0.04 left soap-film at 1.27x and
+      oil-on-water at 21% of the frame in one colour; dropping the ceiling to
+      0.018 to spare the thin looks put soap-film back to 1.05 — 2.1x, exactly
+      where it started — and oil-on-water back to 47%. **The ceiling is what
+      does the work**, not the slope near the budget, and softening it simply
+      undoes the fix.
+
+      What it costs is the closeup looks, which run thin by design and which a
+      firm ceiling thins further: macro-bead reads 31% flat before and 48-53%
+      after. That is inside its own noise — the same preset measured 17%, 40%
+      and 63% on three runs with nothing changed at all — while oil-on-water's
+      52% to 11% is far outside its. The trade is taken with open eyes: the
+      fault reported was a plate drowning in dye, and that is the half of the
+      scale worth being right about.
 
       It cannot dry a plate out, and that is structural rather than a matter of
       tuning: `over` is clamped at zero, so at or under budget this contributes
