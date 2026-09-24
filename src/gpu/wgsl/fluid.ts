@@ -569,7 +569,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let gy = (packedBilerp(uv + e.yx, S.n) - packedBilerp(uv - e.yx, S.n)) * 0.5;
   let h = textureLoad(sq, p, 0).r;
   let coeff = -(h * h) / (12.0 * S.visc);
-  textureStore(dst, p, vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w)));
 }`,
 
   /*
@@ -870,7 +870,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let gx = packedAt(p.x + 1, p.y, n) - packedAt(p.x - 1, p.y, n);
   let gy = packedAt(p.x, p.y + 1, n) - packedAt(p.x, p.y - 1, n);
-  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w)));
 }`,
 
   gradientSubtract: `${HEAD}
@@ -883,7 +883,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let gx = textureLoad(pr, clampP(p + vec2i(1, 0), S.n), 0).r - textureLoad(pr, clampP(p - vec2i(1, 0), S.n), 0).r;
   let gy = textureLoad(pr, clampP(p + vec2i(0, 1), S.n), 0).r - textureLoad(pr, clampP(p - vec2i(0, 1), S.n), 0).r;
-  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w)));
 }`,
 
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
@@ -897,7 +897,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let uv = uvOf(id);
   let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
   let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
-  textureStore(dst, vec2i(id.xy), textureSampleLevel(src, lin, pos, 0.0));
+  // Finite only: this carries the velocity too, whose signs must survive.
+  let o = textureSampleLevel(src, lin, pos, 0.0);
+  textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
 }`,
 
   // MacCormack: phi1 + ½(phi0 − phi0b), clamped to the four cells the forward step sampled.
@@ -925,7 +927,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let mn = min(min(a, b), min(c, d));
   let mx = max(max(a, b), max(c, d));
   let r = textureSampleLevel(phi1, lin, uv, 0.0) + 0.5 * (textureSampleLevel(phi0, lin, uv, 0.0) - textureSampleLevel(phi0b, lin, uv, 0.0));
-  textureStore(dst, q, clamp(r, mn, mx));
+  let o = clamp(r, mn, mx);
+  textureStore(dst, q, select(vec4f(0.0), o, finite4(o)));
 }`,
 
   // Everything the CPU applies after the projection.
@@ -1114,7 +1117,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
     flow = flow * pow(ratio, A.a.z);
   }
-  textureStore(dst, vec2i(id.xy), vec4f(flow, v.z, v.w));
+  textureStore(dst, vec2i(id.xy), safeVel(vec4f(flow, v.z, v.w)));
 }`,
 
   // The current's own divergence and projection, on the M grid.
