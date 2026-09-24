@@ -24,6 +24,8 @@ on:
       - 'src/presetPlate.ts'
       - 'src/constants.ts'
       - 'src/lib/lookFade.ts'
+      - 'src/lib/beads.ts'
+      - 'src/gpu/wgsl/plate.ts'
       - 'scripts/gallery.mjs'
       - '.github/workflows/gallery.yml'
 
