@@ -161,7 +161,13 @@ try {
     const waitRecovery = (n, ms) => page.waitForFunction((k) => window.chromaglassDebug().crash.thisLoad().filter((e) => e.source === 'recovery').length > k, n, { timeout: ms })
       .then(() => true).catch(() => false);
     const grid = () => page.evaluate(() => window.chromaglassDebug().status?.grid ?? 0);
-    const settleFrames = () => page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 20, null, { timeout: 20_000 }).catch(() => {});
+    // Frames again, and then past the five seconds after which a device
+    // counts as healthy: each door here is its own incident, not a device
+    // dying at birth, and must not inherit the last one's backoff.
+    const settleFrames = async () => {
+      await page.waitForFunction(() => window.chromaglassDebug().webgpu?.frames > 20, null, { timeout: 20_000 }).catch(() => {});
+      await page.waitForTimeout(6000);
+    };
 
     // S3: two rungs lost on consecutive frames — a solver swapped out before
     // its first readback lands — used to carry a blank plate across.
@@ -232,8 +238,11 @@ try {
     check('frames that stop are first a stall', !!stallLine, stallLine?.msg ?? 'no stall line');
     check('and then a fatal', !!fatal, fatal?.msg ?? 'none in 35s');
     check('the fatal carries the state it stopped in', !!fatal?.snap?.rung && !!fatal?.snap?.engine, JSON.stringify(fatal?.snap ?? {}).slice(0, 160));
+    // Waited for, not read at once: the log records the fatal synchronously
+    // and React draws the chip a moment later.
+    const chipUp = await page.locator('[data-testid="crash-chip"]').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
     const lit = await page.locator('[data-testid="crash-report-button"][data-lit="true"]').count();
-    check('the button lights, and the chip asks', lit === 1 && await page.locator('[data-testid="crash-chip"]').isVisible());
+    check('the button lights, and the chip asks', lit === 1 && chipUp, `lit ${lit}, chip ${chipUp ? 'up' : 'not up'}`);
   } else {
     skip('a destroyed device, the loss, the recovery, the stall', 'no drawing device');
     // Without one, a fatal can still be written by hand to prove the rest.

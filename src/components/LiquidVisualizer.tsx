@@ -5897,6 +5897,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return dpr;
     };
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let healthyTimer: ReturnType<typeof setTimeout> | null = null;
     void WebGPUStage.start(canvas).then((s) => {
       // Too late: this effect has already been torn down. Destroy the device
       // and nothing else — `dispose` would also unconfigure the canvas, and in
@@ -5922,6 +5923,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       stage = s;
       const bornAt = performance.now();
+      /*
+        A device that has held for five seconds is a recovery that worked, and
+        the count of tries starts again. Before this it only started again when
+        a device that had lived that long was *lost*, so recoveries in quick
+        succession — a heal, then a loss, then another — kept adding to one
+        count across unrelated incidents, and a long session could spend all
+        eight tries and put up the permanent screen on a loss it would
+        otherwise have come back from. The soak's hung-request check found it.
+      */
+      healthyTimer = setTimeout(() => { if (stage === s) recoveryTriesRef.current = 0; }, 5000);
       // A new device is a new chance for the solver, whatever the last one
       // managed; the failure screen's "Try again" relies on it too.
       gpuSupportedRef.current = null;
@@ -6654,6 +6665,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
       unprovide();
       if (retryTimer) clearTimeout(retryTimer);
+      if (healthyTimer) clearTimeout(healthyTimer);
 
       camera?.dispose();
       camera = null;
