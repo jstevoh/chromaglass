@@ -1696,6 +1696,27 @@ class FluidSimulation {
         break;
       }
 
+      case 'magnet-garden': {
+        // The ferrofluid is dark and only reads against something bright, so
+        // the plate starts as a full pool of light dye for it to stand on.
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2, d = S * (i === 0 ? 0 : 0.26);
+          const c = col(i);
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, S * 0.2, 2.2, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'clock-glass': {
+        // Curved glasses gather the liquid in the middle; seed it there, in
+        // rings, so the dome has something to hold from the first frame.
+        for (let ring = 0; ring < 3; ring++) {
+          const c = col(ring);
+          this.splatBlob(cx, cy, S * (0.3 - ring * 0.09), 2.4, c.r, c.g, c.b);
+        }
+        break;
+      }
+
       // Boyle's bench and Wilfred's lumia start from clean glass: the pattern
       // and the light are the subject, not a seed of blobs.
       case 'sensual-laboratory':

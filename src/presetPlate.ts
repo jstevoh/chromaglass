@@ -18,46 +18,52 @@ import { DEFAULT_LIQUID_TYPES } from './types';
 // slow harmony rotation all pick from inside that set. A user's palette lock
 // still wins outright.
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [0, 2, 8],
-  'galaxy':             [9, 10, 7],
-  'deep-ocean':         [7, 9, 5],
-  'cyberpunk':          [6, 10, 2],
-  'lava-lamp':          [0, 1, 3],
-  'acid-trip':          [8, 3, 0, 10],
-  'bass-drop':          [8, 3, 0],
-  'timbre-shifter':     [2, 8, 0],
-  'boiling-point':      [0, 1, 3],
-  'microscopic-chaos':  [9, 10, 5],
-  'aurora-borealis':    [5, 6, 10, 7],   // greens and purples, as it says: there was no purple in it
-  'solar-flare':        [0, 1, 3],
-  'jellyfish-bloom':    [2, 11, 10],
-  'fractal-dream':      [6, 10, 2],
-  'velvet-underground': [9, 10, 4],
-  'neon-coral-reef':    [0, 6, 2],
-  'stardust-collapse':  [7, 15, 5],
+  'classic':            [17, 20, 18],
+  'galaxy':             [18, 23, 16],
+  'deep-ocean':         [16, 22, 7, 19],
+  'cyberpunk':          [20, 16, 6],
+  'lava-lamp':          [17, 3, 1],
+  'acid-trip':          [18, 21, 6, 20],
+  'bass-drop':          [4, 18, 7],
+  'timbre-shifter':     [23, 16, 17],
+  'boiling-point':      [6, 19, 17],
+  'microscopic-chaos':  [20, 10, 18],
+  'aurora-borealis':    [19, 6, 23, 16],   // jade, lime and lavender: greens and a violet, as the sky has
+  'solar-flare':        [17, 21, 4],
+  'jellyfish-bloom':    [20, 23, 16],
+  'fractal-dream':      [17, 20, 16],
+  'velvet-underground': [22, 20, 11],
+  'neon-coral-reef':    [21, 16, 17],
+  'stardust-collapse':  [15, 23, 17],
   'lumia':              [10, 7, 1],
   'sensual-laboratory': [14, 12],
-  'oil-wheel':          [0, 6, 8],
-  'poster-1969':        [2, 6],
+  'oil-wheel':          [17, 6, 18],
+  'poster-1969':        [1, 18],
   'fillmore-1969':      [1, 0, 3, 7, 5, 10],
-  'fillmore-wash':      [5, 10, 9],            // the second projector: emerald, purple, cobalt
+  'fillmore-wash':      [5, 10, 9],
+  // The three that show off a part of the app nothing else used.
+  'magnet-garden':      [17, 16, 7],           // bright ground for the dark ferrofluid to stand on
+  'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
+  'clock-glass':        [18, 17, 20],            // the second projector: emerald, purple, cobalt
   'oil-on-water':       [0, 1],
-  'colorful-cosmos':    [9, 2, 0],
+  'colorful-cosmos':    [18, 20, 17],
   'sunny-side-up':      [7, 10, 2],
-  // Warm, fully-saturated sets only: white and graphite wash out fast under
+  // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
-  // blacks come from the cell rings and lacing, not from the dye.
-  'macro-bead':         [0, 1, 3, 2],
-  'cell-bloom':         [0, 1, 2, 3],
-  'lace-run':           [0, 1, 4, 3],
+  // blacks come from the cell rings and lacing, not from the dye. The three
+  // used to share one warm set on three dark reds; each now has its own
+  // ground and its own family, so the three read as three.
+  'macro-bead':         [16, 17, 21, 19],
+  'cell-bloom':         [20, 23, 18, 17],
+  'lace-run':           [17, 21, 4, 3],
   // Six dyes rather than the usual two or three: the point of this one is that
   // a person gets a colour of their own, and a crowd wants more than three.
-  'crowd-plate':        [0, 2, 5, 7, 9, 10],
+  'crowd-plate':        [17, 20, 16, 21, 18, 6],
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 2, 8, 6],
-  'soap-film':          [7, 10, 5],
-  'glycerine-drift':    [9, 10, 4, 1],
+  'soap-film':          [23, 16, 17],
+  'glycerine-drift':    [22, 18, 20, 17],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -95,6 +101,9 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'milk-marble':        ['drop'],
   'soap-film':          ['pour', 'drop'],
   'glycerine-drift':    ['pour', 'streak'],
+  'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
+  'home-movie':         ['drop', 'pour'],
+  'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
 };
 
 /**
@@ -135,8 +144,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'bass-drop':          ['water', 'soap'],
   // This one is about colour and rotation; the plate should stay out of it.
   'timbre-shifter':     ['water'],
-  // A film breaking open is what boiling looks like from above.
-  'boiling-point':      ['water', 'soap'],
+  // A film breaking open is what boiling looks like from above, and alcohol
+  // is the liquid that answers the heat.
+  'boiling-point':      ['water', 'soap', 'alcohol'],
   'microscopic-chaos':  ['oil', 'silicone'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
@@ -180,6 +190,13 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'milk-marble':        ['milk', 'milk', 'soap'],
   'soap-film':          ['soap', 'water'],
   'glycerine-drift':    ['glycerine', 'water'],
+
+  // ── The three that show off a part of the app ────────────────────
+  // Oil will not wet the ferrofluid, so the pools stand apart from it.
+  'magnet-garden':      ['water', 'oil'],
+  'home-movie':         ['water', 'water', 'soap'],
+  // Syrup finds the low point of a curved glass, which is the middle.
+  'clock-glass':        ['water', 'syrup'],
 };
 
 /** Liquid id to its definition, for the dose the automation pours. */
