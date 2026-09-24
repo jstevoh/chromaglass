@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while the new look's colours pour in, colours fade through each other
   instead of switching, and the kaleidoscope and film stock change at the
   midpoint in one step instead of passing through every value between.
+- **The look the app opens on is drawn in its own colours.** The opening
+  look's settings were applied, but its plate was never laid: every look the
+  app opened on was seeded, coloured and poured as Classic until someone
+  changed look. The first preset gallery showed two dozen looks in one set
+  of colours, which is most of what "the presets all look alike" was.
 - **Macro Bead no longer goes black,** and `npm run gallery` (and the Preset
   gallery workflow) photographs every preset for review.
 
