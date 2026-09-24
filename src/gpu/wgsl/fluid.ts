@@ -103,6 +103,26 @@ fn finite4(v: vec4f) -> bool {
   let e = bitcast<vec4u>(v) & vec4u(0x7f800000u);
   return all(e != vec4u(0x7f800000u));
 }
+/*
+  The limits decay applies at the end of a step, applied where things enter
+  one as well. A seed that piles thirty splats into a cell arrives at many
+  times the dye cap, and the tension force scales with that density and the
+  square of the colour step beside it: on the first step, before decay had
+  capped anything, the force could run the velocity past what its half-float
+  texture holds, and an infinity there was the NaN that took the plate.
+*/
+fn safeVel(v: vec4f) -> vec4f {
+  if (!finite4(vec4f(v.xyz, 0.0))) { return vec4f(0.0); }
+  let sp = length(v.xy);
+  if (sp > S.maxSpeed) { return vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
+  return v;
+}
+fn capDye(d: vec4f) -> vec4f {
+  if (!finite4(d)) { return vec4f(0.0); }
+  var c = max(d, vec4f(0.0));
+  if (c.a > 6.0) { c *= 6.0 / c.a; }
+  return c;
+}
 `;
 
 /** Ashima/McEwan simplex noise, as the GLSL has it (`NOISE` in gpuFluid.ts). */
@@ -217,7 +237,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  textureStore(dst, p, max(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0), vec4f(0.0)));
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
@@ -230,7 +250,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let v = textureLoad(vel, p, 0);
   let a = textureLoad(addT, p, 0);
-  textureStore(dst, p, vec4f(v.xy + a.xy, v.z + a.z, 0.0));
+  textureStore(dst, p, safeVel(vec4f(v.xy + a.xy, v.z + a.z, 0.0)));
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -1003,7 +1023,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
   }
 
-  textureStore(dst, q, v);
+  textureStore(dst, q, safeVel(v));
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
