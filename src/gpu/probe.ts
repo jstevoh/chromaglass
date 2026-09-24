@@ -32,7 +32,7 @@ export class WebGPUFrameProbe {
   private pixels = 1;
 
   constructor(private readonly device: GPUDevice) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'probe');
     this.args = this.disposer.track(device.createBuffer({
       label: 'probe args', size: 16,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -113,7 +113,10 @@ export class WebGPUFrameProbe {
    * same either way.
    */
   painter(format: GPUTextureFormat, rects: [number, number, number, number][]) {
-    const pipeline = this.pipelines.renderPipeline('solid', (module) => ({
+    // Named by its format: the target is the caller's, and a painter asked
+    // for a second format would otherwise draw with the first one's pipeline
+    // — wrong even before the cache was shared, and now it outlives the probe.
+    const pipeline = this.pipelines.renderPipeline(`solid ${format}`, (module) => ({
       layout: 'auto' as const,
       vertex: { module: module(SOLID_WGSL), entryPoint: 'vs' },
       fragment: { module: module(SOLID_WGSL), entryPoint: 'fs', targets: [{ format }] },

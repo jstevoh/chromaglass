@@ -83,7 +83,7 @@ export class WebGPUParticles {
   private disposed = false;
 
   constructor(private readonly device: GPUDevice, readonly grid: number) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'particles');
     this.capacity = grid * grid * PER_CELL;
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'particles',
