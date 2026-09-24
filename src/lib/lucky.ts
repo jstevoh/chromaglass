@@ -167,7 +167,24 @@ export function luckyLook(
     beatSqueeze: rand(),
     backgroundLoop: rand(),
     kaleidoscope: rand() < 0.2 ? [2, 4, 6][Math.floor(rand() * 3)] : 0,
-    dishVignette: rand() < 0.3 ? 0.4 + rand() * 0.6 : 0,
+    /*
+      A dish edge, not a blackout.
+
+      This rolled 0.4 to 1.0 in three rolls out of ten, and at the top of that
+      range the vignette closes the dish to a pinhole: measured over forty
+      random looks, six came out dark or covered, and `dishVignette` separated
+      those six from the rest by five standard deviations — 0.905 against 0.052
+      — with nothing else within one and a half. One roll in seven was a dark
+      screen, which is a bad thing to press in front of a room.
+
+      No hand-authored look uses this at all: every preset leaves it at zero,
+      and the one that names it sets 0.0. So the range it was rolling was one
+      nobody had ever chosen. It is the same fault as the backdrop's two
+      colours being rolled independently — a randomiser reaching outside what
+      any real look does — and it gets the same answer: keep it inside the
+      range that reads as the round edge of a projected dish.
+    */
+    dishVignette: rand() < 0.3 ? 0.15 + rand() * 0.3 : 0,
     lightPlay: 0.3 + rand() * 0.7,
     lampMotion: rand(),
     lampHotspot: rand() * 0.7,
@@ -198,7 +215,11 @@ export function luckyLook(
     // accident. The zoom decides now, so the roll lands on the zoom and the
     // flag follows it rather than the two disagreeing.
     ...(rand() < 0.25
-      ? { macroMode: true, macroZoom: 4 + rand() * 8 }
+      // 4 to 12 was a range nobody had chosen: the three macro looks in the
+      // tree sit at 3.5, 4.0 and 4.5, and past about five the closeup is a
+      // small dark patch of one bead. It was the second thing separating a
+      // dark random look from a watchable one once the vignette was fixed.
+      ? { macroMode: true, macroZoom: 3.5 + rand() * 1.5 }
       : { macroMode: false, macroZoom: 1 }),
     macroChase: 0.35 + rand() * 0.65,
     macroHold: 2.5 + rand() * 7,

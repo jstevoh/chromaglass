@@ -1211,7 +1211,28 @@ check('and neither starts over the limit',
       const d = Math.hypot(a - x, b - y, c - z);
       if (d < worst) { worst = d; pair = `${r.paperA}/${r.paperB}`; }
     }
-    check('a photo look never puts the plate on one flat colour',
+    /*
+    And it never rolls the dish shut.
+
+    `dishVignette` darkens beyond the dish's rim. Rolled at 0.4 to 1.0 in
+    three rolls out of ten, the top of that range closes the dish to a
+    pinhole: over forty random looks, six came out dark or covered, and this
+    one setting separated those six from the rest by five standard deviations
+    — 0.905 against 0.052 — with nothing else within one and a half. One roll
+    in seven was a dark screen. No preset in the tree raises it at all.
+
+    Same fault as the backdrop's two colours being rolled independently: the
+    randomiser reaching outside the range any real look uses. Measured after:
+    six in forty down to two or three.
+  */
+  {
+    let worst = 0;
+    for (const r of rolls) if ((r.dishVignette ?? 0) > worst) worst = r.dishVignette;
+    check('a random look never rolls the dish shut', worst <= 0.5,
+      `the heaviest vignette over ${ROLLS} rolls was ${worst.toFixed(3)}`);
+  }
+
+  check('a photo look never puts the plate on one flat colour',
       worst >= 60,
       worst === Infinity ? 'no photo rolls' : `closest pair over ${ROLLS} rolls: ${pair}, ${worst.toFixed(0)} apart`);
   }
