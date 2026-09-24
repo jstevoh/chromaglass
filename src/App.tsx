@@ -1443,7 +1443,10 @@ export default function App() {
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
     setCued(null);
-    // Pressing Go is a decision: the whole look, structure and all.
+    // Pressing Go is a decision: the whole look, structure and all — and its
+    // colours with it, handed over across the fade rather than left to
+    // evaporate for minutes under the new ones. A cut still gets a second.
+    visualizerRef.current?.handoff(Math.max(1, seconds));
     fadeSettingsTo(targetLook(from, next.settings), seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
@@ -1468,6 +1471,7 @@ export default function App() {
     if (!prev) return;
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
+    visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
     fadeSettingsTo(prev.settings, fadeSeconds);
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
