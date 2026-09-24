@@ -88,6 +88,52 @@ struct Args {
 fn uvOf(id: vec3u) -> vec2f { return (vec2f(id.xy) + 0.5) / S.n; }
 fn inGrid(id: vec3u) -> bool { return id.x < u32(S.n) && id.y < u32(S.n); }
 fn clampP(p: vec2i, n: f32) -> vec2i { return clamp(p, vec2i(0), vec2i(i32(n) - 1)); }
+/*
+  Whether all four numbers are finite, read off the exponent bits.
+
+  The guards this replaces were x == x, which a compiler that assumes no NaN
+  (fast math, as Metal's often does) folds to true and deletes, and which
+  let an infinity through to the clamp after it, where inf * 0 made the NaN.
+  A plate that went non-finite in one cell then stayed non-finite in every
+  cell for good: Acid Trip, Solar Flare, Jellyfish Bloom, Boiling Point and
+  Lacing Run were 36864 of 36864 cells NaN by their eighth second. The bits
+  cannot be optimised away.
+*/
+fn finite4(v: vec4f) -> bool {
+  let e = bitcast<vec4u>(v) & vec4u(0x7f800000u);
+  return all(e != vec4u(0x7f800000u));
+}
+/*
+  Where things enter a step, not only where it ends.
+
+  A seed that piles thirty splats into a cell arrives at many times the dye
+  cap, and the tension force scales with that density and the square of the
+  colour step beside it: on the first step, before decay had capped
+  anything, the force could run the velocity past what its half-float
+  texture holds, and an infinity there was the NaN that took the plate.
+
+  The dye gets decay's own cap. The velocity does not get decay's speed
+  limit: that is in the units of the end of the step, and applied at every
+  write it froze the plate (the fastest cell fell from about 1 to 0.0028 on
+  every preset). What a velocity write needs is only to stay finite and
+  inside what rgba16float can hold, so the bound is an overflow guard,
+  hundreds of times any real speed and far under 65504.
+*/
+const VEL_BOUND = 1000.0;
+fn safeVel(v: vec4f) -> vec4f {
+  if (!finite4(vec4f(v.xyz, 0.0))) { return vec4f(0.0); }
+  let sp = length(v.xy);
+  var o = v;
+  if (sp > VEL_BOUND) { o = vec4f(v.xy * (VEL_BOUND / sp), v.z, v.w); }
+  o.z = clamp(o.z, -VEL_BOUND, VEL_BOUND);
+  return o;
+}
+fn capDye(d: vec4f) -> vec4f {
+  if (!finite4(d)) { return vec4f(0.0); }
+  var c = max(d, vec4f(0.0));
+  if (c.a > 6.0) { c *= 6.0 / c.a; }
+  return c;
+}
 `;
 
 /** Ashima/McEwan simplex noise, as the GLSL has it (`NOISE` in gpuFluid.ts). */
@@ -202,7 +248,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  textureStore(dst, p, max(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0), vec4f(0.0)));
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
@@ -215,7 +261,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let v = textureLoad(vel, p, 0);
   let a = textureLoad(addT, p, 0);
-  textureStore(dst, p, vec4f(v.xy + a.xy, v.z + a.z, 0.0));
+  textureStore(dst, p, safeVel(vec4f(v.xy + a.xy, v.z + a.z, 0.0)));
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -534,7 +580,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let gy = (packedBilerp(uv + e.yx, S.n) - packedBilerp(uv - e.yx, S.n)) * 0.5;
   let h = textureLoad(sq, p, 0).r;
   let coeff = -(h * h) / (12.0 * S.visc);
-  textureStore(dst, p, vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy + coeff * vec2f(gx, gy), v.z, v.w)));
 }`,
 
   /*
@@ -835,7 +881,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let gx = packedAt(p.x + 1, p.y, n) - packedAt(p.x - 1, p.y, n);
   let gy = packedAt(p.x, p.y + 1, n) - packedAt(p.x, p.y - 1, n);
-  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w)));
 }`,
 
   gradientSubtract: `${HEAD}
@@ -848,7 +894,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let gx = textureLoad(pr, clampP(p + vec2i(1, 0), S.n), 0).r - textureLoad(pr, clampP(p - vec2i(1, 0), S.n), 0).r;
   let gy = textureLoad(pr, clampP(p + vec2i(0, 1), S.n), 0).r - textureLoad(pr, clampP(p - vec2i(0, 1), S.n), 0).r;
-  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w));
+  textureStore(dst, p, safeVel(vec4f(v.xy - 0.5 * vec2f(gx, gy) * S.n, v.z, v.w)));
 }`,
 
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
@@ -862,7 +908,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let uv = uvOf(id);
   let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
   let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
-  textureStore(dst, vec2i(id.xy), textureSampleLevel(src, lin, pos, 0.0));
+  // Finite only: this carries the velocity too, whose signs must survive.
+  let o = textureSampleLevel(src, lin, pos, 0.0);
+  textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
 }`,
 
   // MacCormack: phi1 + ½(phi0 − phi0b), clamped to the four cells the forward step sampled.
@@ -890,7 +938,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let mn = min(min(a, b), min(c, d));
   let mx = max(max(a, b), max(c, d));
   let r = textureSampleLevel(phi1, lin, uv, 0.0) + 0.5 * (textureSampleLevel(phi0, lin, uv, 0.0) - textureSampleLevel(phi0b, lin, uv, 0.0));
-  textureStore(dst, q, clamp(r, mn, mx));
+  let o = clamp(r, mn, mx);
+  textureStore(dst, q, select(vec4f(0.0), o, finite4(o)));
 }`,
 
   // Everything the CPU applies after the projection.
@@ -988,7 +1037,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
   }
 
-  textureStore(dst, q, v);
+  textureStore(dst, q, safeVel(v));
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
@@ -1079,7 +1128,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
     flow = flow * pow(ratio, A.a.z);
   }
-  textureStore(dst, vec2i(id.xy), vec4f(flow, v.z, v.w));
+  textureStore(dst, vec2i(id.xy), safeVel(vec4f(flow, v.z, v.w)));
 }`,
 
   // The current's own divergence and projection, on the M grid.
@@ -1174,9 +1223,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var d = textureLoad(dye, vec2i(id.xy), 0) * S.evap;
+  // Before the clamp: an infinity through it is inf * 0, a NaN.
+  if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  // A NaN compares false with everything, including itself.
-  if (!(d.r == d.r && d.g == d.g && d.b == d.b && d.a == d.a)) { d = vec4f(0.0); }
   textureStore(dst, vec2i(id.xy), max(d, vec4f(0.0)));
 }`,
 
@@ -1186,11 +1235,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
+  // Before the speed limit: an infinite speed through it is inf * 0, a NaN.
+  if (!finite4(vec4f(v.xyz, 0.0))) { v = vec4f(0.0); }
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
   v.z *= S.heatDecay;
-  if (!(v.x == v.x && v.y == v.y && v.z == v.z)) { v = vec4f(0.0); }
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 
@@ -1235,7 +1285,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /**
-   * Dye laid down by the reaction (see `gpu/chemistry.ts`). The activator is
+   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`). The activator is
    * on the logical grid, so it is read bilinearly, exactly as a CPU delta
    * would have been; above the threshold it deposits colour the way
    * `addDensity` does — absorption in rgb, density in a.

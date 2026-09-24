@@ -116,7 +116,22 @@ export class MacroCamera {
 
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
     const { size } = field;
-    const step = clamp(dt, 0, 0.25);
+    const step = clamp(Number.isFinite(dt) ? dt : 0, 0, 0.25);
+    /*
+      Not-a-number is sticky here, and it was black.
+
+      Every position in this camera is eased — `camX += (target - camX) * k` —
+      so one NaN, from a velocity the solver had not settled or a frame time
+      that was not a number, made the camera's position NaN for good, and the
+      shader sampled nowhere: Macro Bead drew a black screen, with `shot`
+      reading { cx: NaN, cy: NaN } in the owner's report. Anything not finite
+      is put back on a real place instead — the bead, or the middle.
+    */
+    if (!Number.isFinite(this.beadX) || !Number.isFinite(this.beadY)) { this.beadX = size / 2; this.beadY = size / 2; }
+    if (!Number.isFinite(this.camX) || !Number.isFinite(this.camY)) { this.camX = this.beadX; this.camY = this.beadY; }
+    if (!Number.isFinite(this.clock)) this.clock = 0;
+    if (!Number.isFinite(this.tremorX) || !Number.isFinite(this.tremorY)) { this.tremorX = 0; this.tremorY = 0; }
+    if (!Number.isFinite(this.smoothZoom) || this.smoothZoom < 1) this.smoothZoom = Math.max(1, Number.isFinite(opts.zoom) ? opts.zoom : 1);
     this.lastStep = Math.max(1 / 240, step);
     this.clock += step;
     this.floor = Math.max(0, opts.floor ?? 0);
@@ -170,8 +185,9 @@ export class MacroCamera {
     // ── Lead the subject so a fast bead never trails off-frame ──────
     const bi = this.gridIndex(this.beadX, this.beadY, size);
     const lead = 6 + opts.chase * 10;
-    const targetX = this.beadX + field.vx[bi] * lead;
-    const targetY = this.beadY + field.vy[bi] * lead;
+    const vx = field.vx[bi], vy = field.vy[bi];
+    const targetX = this.beadX + (Number.isFinite(vx) ? vx : 0) * lead;
+    const targetY = this.beadY + (Number.isFinite(vy) ? vy : 0) * lead;
 
     // ── Follow ─────────────────────────────────────────────────────
     const whip = this.whipLeft / WHIP_TIME;
@@ -208,6 +224,8 @@ export class MacroCamera {
     const cx = this.frameClamp((this.camX + this.tremorX) / size, halfX);
     const cy = this.frameClamp((this.camY + this.tremorY) / size, halfY);
 
+    // And whatever got through, the shot itself is never not a place.
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return { cx: 0.5, cy: 0.5, zoom: Math.max(1, Number.isFinite(this.smoothZoom) ? this.smoothZoom : 1), whip: 0 };
     return { cx, cy, zoom: this.smoothZoom, whip };
   }
 
@@ -226,7 +244,7 @@ export class MacroCamera {
     for (let j = y0; j <= y1; j++) {
       for (let i = x0; i <= x1; i++) {
         const d = density[i + j * size] - this.floor;
-        if (d <= 0.02) continue;
+        if (!(d > 0.02)) continue;   // also skips a cell that is not a number
         const w = d * d;
         sum += w;
         sx += i * w;
@@ -258,7 +276,7 @@ export class MacroCamera {
     for (let j = margin; j < size - margin; j += 3) {
       for (let i = margin; i < size - margin; i += 3) {
         const d = density[i + j * size] - this.floor;
-        if (d < 0.1) continue;
+        if (!(d >= 0.1)) continue;   // also skips a cell that is not a number
 
         // A bead falls off toward its rim; the middle of a wide pool does not.
         const ring = Math.max(0,

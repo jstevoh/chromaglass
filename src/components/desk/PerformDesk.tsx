@@ -9,6 +9,7 @@ import { FADE_CHOICES } from '../../lib/lookFade';
 import type { VisualizerSettings } from '../../types';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
+import { DESK_TOOLS } from './tools';
 
 /**
  * The desk, to the handoff's Perform screen.
@@ -125,9 +126,8 @@ interface PerformDeskProps {
   onDrain: () => void;
 }
 
-// Drop lays liquid, Blow moves it, Press squeezes it — and Finger mixes it,
-// which is the only one that changes what the liquid *is* rather than where.
-const TOOLS = [['dropper', 'Drop', 'D'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P'], ['finger', 'Finger', 'G']] as const;
+/** The same eight tools on both desks (`tools.ts`). */
+const TOOLS = DESK_TOOLS;
 
 /**
  * A dye pad fires by palette index, and the tray holds hexes — so the tray has
@@ -260,6 +260,7 @@ export function PerformDesk(p: PerformDeskProps) {
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
             onChange={p.onTool}
             testId="tool-segmented"
+            compact
           />
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (

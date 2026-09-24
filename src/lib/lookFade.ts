@@ -204,12 +204,24 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
       // two passed the layer count through 1.05, 1.1, … and the visualizer
       // built a whole second solver on one frame and threw it away on the next,
       // for every frame of the fade.
-      if (PIN_RANGE.get(key)?.step) { out[key] = past ? b : a; continue; }
+      if (PIN_RANGE.get(key)?.step || WHOLE_STEPS.has(key)) { out[key] = past ? b : a; continue; }
+      // The closeup's zoom in proportion, not in steps of one: 1 → 4.5 by
+      // halves reads as a lurch at the start and a crawl at the end, where
+      // the same ratio each moment reads as one steady push.
+      if (key === 'macroZoom' && a > 0 && b > 0) {
+        out[key] = k >= 1 ? b : Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * k);
+        continue;
+      }
       // `a + (b - a) * 1` is not `b` in floating point: fading 0.5 to 0.05
       // lands on 0.04999999999999999. A hundredth of a millionth does not
       // show on a wall, but it means the look you cued is not the look you
       // got, so two fades back and forth would drift rather than return.
       out[key] = k >= 1 ? b : a + (b - a) * k;
+    } else if (typeof a === 'string' && typeof b === 'string' && HEX.test(a) && HEX.test(b)) {
+      // A colour is a number in three parts, so it travels too: the LED
+      // backlight and the paper behind a photograph used to change colour in
+      // one frame at the midpoint, the one thing on the wall that visibly cut.
+      out[key] = k >= 1 ? b : mixHex(a, b, k);
     } else {
       out[key] = past ? b : a;
     }
@@ -223,6 +235,22 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
     if (!(key in out)) out[key] = past ? toAny[key] : fromAny[key];
   }
   return out as unknown as VisualizerSettings;
+}
+
+/**
+ * Numbers that are really choices: the kaleidoscope's number of folds and
+ * the film stock's type are rounded where they are used, so faded they
+ * stepped through every value between — 2, 3, 4, 5, 6 folds, or slide film,
+ * faded negative and Super 8 on the way to the stock asked for.
+ */
+const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType']);
+
+const HEX = /^#[0-9a-f]{6}$/i;
+function mixHex(a: string, b: string, k: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  let out = '#';
+  for (let i = 0; i < 3; i++) out += Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k).toString(16).padStart(2, '0');
+  return out;
 }
 
 /** How long a Go takes, in seconds, and what the desk offers. */

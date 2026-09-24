@@ -34,3 +34,4 @@ scratch/
 # `git add -A` has swept it into a commit twice; ignoring it is cheaper than
 # remembering.
 /chromaglass/
+gallery/

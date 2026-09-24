@@ -7,6 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the presets, redone
+
+- **Eight new colours** (teal, amber, ultramarine, jade, magenta, coral,
+  midnight, lavender) and four palettes built on them (Reef, Twilight, Forest,
+  Dusk). Every preset has a new set of dyes, and most have a new ground: half
+  of them used to carry yellow, and the three macro looks shared one warm set
+  on three dark reds.
+- **Four near-copies are new looks.** Fractal Dream is a turning six-way
+  kaleidoscope. Neon Coral Reef grows coral with the chemistry. Stardust
+  Collapse is dye particles. Boiling Point is a green cauldron full of
+  bubbles. Microscopic Chaos is a stained slide on a bright field.
+- **Three new presets** use parts of the app no preset used before: Magnet
+  Garden (ferrofluid and a magnet), Home Movie (Super 8 film stock) and Clock
+  Glass (curved glasses and depth drag).
+- **More of the lamp and the dish:** the gel wheel, the round dish, the second
+  lamp, lamp warmth, light through dye, the macro camera's music sync, drop
+  height and plate drag now appear across the set.
+- **The macro looks slow down.** Lacing Run ran at fifteen times the median
+  speed; it and the other two are now at roughly half of where they were.
+- **A look change in Perform hands over its colours.** The old dye thins out
+  while the new look's colours pour in, colours fade through each other
+  instead of switching, and the kaleidoscope and film stock change at the
+  midpoint in one step instead of passing through every value between.
+- **The look the app opens on is drawn in its own colours.** The opening
+  look's settings were applied, but its plate was never laid: every look the
+  app opened on was seeded, coloured and poured as Classic until someone
+  changed look. The first preset gallery showed two dozen looks in one set
+  of colours, which is most of what "the presets all look alike" was.
+- **A plate that goes bad recovers.** The GPU solver's NaN guards compared
+  a number with itself, which a compiler assuming no NaN deletes, and they
+  ran after the clamps that turn an infinity into a NaN. One bad cell then
+  poisoned the whole plate for good: five presets drew bare ground from their
+  first seconds, and a show could stop the same way and never come back.
+  The guards now test the exponent bits, before the clamps, and dye and
+  motion are held finite, and dye to its cap, where they enter a step as
+  well as where it ends: a dense seed used to overflow the first step.
+- **Macro Bead no longer goes black,** and `npm run gallery` (and the Preset
+  gallery workflow) photographs every preset for review.
+
+### Fixed — the rest of the stability plan
+
+Every job in `docs/stability-plan.md` except S7 (an hour in CI):
+
+- **The plate survives a rebuild.** A lost device or a self-heal carries the
+  plate across on its last readback instead of laying the look again. Two
+  quick rung changes no longer blank it.
+- **GPU errors name their frame.** Sampled error scopes say which frame, and
+  what had just been built, when something fails.
+- **Every door S0 closed is now tested.** `npm run crash` walks through each
+  one: out of memory, an error storm, no adapter, a request that hangs, and a
+  loss that keeps the plate.
+- **Less churn.** One pipeline cache per device, so a rung change no longer
+  recompiles every shader. Readbacks reuse their buffer. Beads reuse their
+  buckets. `WebGPUChemistry` is deleted.
+- **The fingerprint index grows a song at a time,** in typed arrays, built in
+  a worker. The song-map decode trims before it resamples.
+- **Cast state goes out at 15 Hz** instead of every frame of a fade.
+- **Crash reports can arrive.** A Worker receives them and keeps a daily
+  digest. It needs deploying once; the steps are in `docs/crash-plan.md`.
+
+### Fixed — a show that stops and does not come back
+
+A single failure used to be a one-way door, and the live site hit these
+doors often. Closed in this release, all in `docs/stability-plan.md`:
+
+- A frame that throws is logged and the loop goes on. Frames that keep
+  throwing rebuild the stage.
+- A picture that will not upload is left out of that frame instead of ending
+  the loop.
+- Running out of GPU memory steps the quality down and caps the grid size
+  across rebuilds. Before, it was a black plate on a live device.
+- A rung change frees the old solver before building the new one, which
+  halves the memory peak.
+- A solver that will not start steps down a rung. Only the bottom rung
+  failing shows the failure screen, which now has **Try again**.
+- A device that is not back after a loss is asked for again with backoff.
+  GPU requests time out. A sustained stream of GPU errors rebuilds the stage.
+- The first-listen recorder keeps ten minutes, not hours.
+- The logo is sent to a cast receiver once, not with every state.
+
+Thirteen larger jobs are ranked in the plan for later.
+
+### Added — the black box: crash detection and a report button
+
+**Every way a stop can announce itself is now written down, and it outlasts the
+reload.** `src/lib/crashLog.ts` records the following into a 200-line ring in
+localStorage, each line with a snapshot of the rung, engine, fps, steps/s,
+preset and projector:
+
+- uncaught errors and rejections
+- `console.error`/`warn`
+- the device's errors and losses, and the recoveries from them
+- the error boundary
+- a heartbeat that writes a fatal when frames stop in a visible tab
+
+After a crash-and-reload, `chromaglassDebug().crash.last()` is the line that
+preceded it.
+
+**A report button beside Record and Cast** lights when a fatal is logged. It
+builds one JSON report only when asked, and offers Save file, Save screenshot,
+Copy text, and Send (Send appears only when `VITE_CRASH_REPORT_URL` is set). The
+report holds the note, environment, snapshot, debug state, look, log and a
+960-pixel frame taken through `grabFrame`. `npm run crash` proves the box
+records. See `docs/crash-plan.md`.
+
 ### Changed — one engine: the app runs on WebGPU
 
 **The renderer is WebGPU, and nothing else is.** The WebGL2 renderer, every line

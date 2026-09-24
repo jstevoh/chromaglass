@@ -33,6 +33,7 @@ import { LEARNABLE_SETTINGS } from '../lib/midi';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
+import * as crashLog from '../lib/crashLog';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -270,6 +271,18 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
  */
 
 // choice to the frame-time governor.
+/** How many times a lost device is asked for again before the screen says it is gone (~2 min of backoff). */
+const RECOVERY_TRIES = 8;
+/** Consecutive frames that throw before the stage is rebuilt (about 1.5 s at 60 fps). */
+const SELF_HEAL_FRAMES = 90;
+/** How much of the old dye is left when a pressed look change finishes handing over. */
+const HANDOFF_KEEP = 0.45;
+/** How many pours of the new palette arrive through the second half of the handover. */
+const HANDOFF_POURS = 6;
+/** Whether Evolve pours whole-plate floods at the peak of a gust. Off: evolve is subtle. */
+const EVOLVE_FLOODS = false;
+/** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
+const ERROR_STORM = 45;
 const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
   const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
   // A pin is held to what this GPU can actually allocate, so an old saved
@@ -383,6 +396,8 @@ export interface LiquidVisualizerHandle {
    * next to it did not.
    */
   adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
+  /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
+  handoff: (seconds: number) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -581,6 +596,21 @@ class FluidSimulation {
   */
   private rbSeq = 0;
   private rimSeq = -1;
+  /*
+    Whether the attached solver has handed anything back yet, and what it was
+    seeded with (docs/stability-plan.md, S3).
+
+    From the moment a solver is attached until its first readback lands, the
+    plate exists in one place only: the GPU. The CPU arrays have been flushed
+    into it and zeroed, and the solver's readback copy is still the zeros it
+    was allocated as. Two rung changes inside that window — the governor
+    stepping twice, or an out-of-memory step straight after a climb — read
+    those zeros back as the plate and carried a blank field into the next
+    solver while the show ran on. So the opening state is kept, and a solver
+    that is swapped out before it has spoken gives that back instead.
+  */
+  private gpuLanded = false;
+  private seed: Float32Array[] | null = null;
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
@@ -662,6 +692,8 @@ class FluidSimulation {
     }
     this.gpu = gpu;
     gpu.clear();
+    this.keepSeed();
+    this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
     for (let i = 0; i < GRID_AREA; i++) this.gap[i] -= 0.03;
     this.dhdt.fill(0);
@@ -681,10 +713,69 @@ class FluidSimulation {
     this.gpu = null;
   }
 
-  /** Release the GPU solver without a readback — the context is going away. */
-  dropGpu() {
-    this.gpu?.dispose();
+  /**
+   * Release the GPU solver without a readback — the context is going away.
+   *
+   * With `keepPlate`, the plate survives it (S1). The device is gone, but
+   * the last readback it sent is ordinary memory on this side, a frame or two
+   * old, and so is the seed a solver that never spoke was started from: the
+   * field goes back into the CPU arrays, and the next solver opens on it
+   * instead of on a freshly laid look. False when there was nothing to keep.
+   */
+  dropGpu(keepPlate = false): boolean {
+    const gpu = this.gpu;
+    let kept = false;
+    if (gpu && keepPlate) {
+      kept = this.gpuLanded ? this.restoreFrom(gpu.rbDyeView, gpu.rbVelView) : this.restoreSeed();
+    }
+    gpu?.dispose();
     this.gpu = null;
+    return kept;
+  }
+
+  /** The state a new solver opens on, kept for `restoreSeed`. */
+  private keepSeed() {
+    const src = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
+    if (!this.seed) this.seed = src.map(() => new Float32Array(GRID_AREA));
+    for (let k = 0; k < src.length; k++) this.seed[k].set(src[k]);
+  }
+
+  /** Put the attached solver's opening state back; for a solver that never handed anything back. */
+  private restoreSeed(): boolean {
+    if (!this.seed) return false;
+    const dst = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
+    for (let k = 0; k < dst.length; k++) dst[k].set(this.seed[k]);
+    this.restAfterRestore();
+    return true;
+  }
+
+  /**
+   * The plate from a readback, into the CPU arrays. Anything not finite is
+   * zeroed on the way: a plate carried across a rebuild must not carry across
+   * whatever broke the one before it.
+   */
+  private restoreFrom(dye: Float32Array, vel: Float32Array): boolean {
+    const clean = (v: number) => (Number.isFinite(v) ? v : 0);
+    for (let i = 0; i < GRID_AREA; i++) {
+      this.densityR[i] = clean(dye[i * 4]);
+      this.densityG[i] = clean(dye[i * 4 + 1]);
+      this.densityB[i] = clean(dye[i * 4 + 2]);
+      this.density[i] = clean(dye[i * 4 + 3]);
+      this.vx[i] = clean(vel[i * 4]);
+      this.vy[i] = clean(vel[i * 4 + 1]);
+      this.temp[i] = clean(vel[i * 4 + 2]);
+    }
+    this.restAfterRestore();
+    return true;
+  }
+
+  /** The CPU arrays hold absolute state again: the gap at rest, nothing pending. */
+  private restAfterRestore() {
+    this.gap.fill(0.03);
+    this.dhdt.fill(0);
+    this.pressure.fill(0);
+    this.mul.fill(1);
+    this.dirty = false;
   }
 
   /** Once per rendered frame: refresh the readback the CPU-side readers use. */
@@ -692,6 +783,7 @@ class FluidSimulation {
     if (!this.gpu) return;
     // One frame of latency instead of a pipeline stall every frame.
     if (!this.gpu.readbackAsync()) return;
+    this.gpuLanded = true;
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
     for (let i = 0; i < GRID_AREA; i++) {
@@ -709,6 +801,11 @@ class FluidSimulation {
 
   private pullStateFromGpu() {
     const gpu = this.gpu!;
+    // Nothing has come back from this solver yet: its readback is still the
+    // zeros it was allocated as, so the plate is the seed it opened on (S3).
+    // Whatever was added in the frame or two since is let go — a blank plate
+    // is not.
+    if (!this.gpuLanded && this.restoreSeed()) return;
     if (this.dirty) this.flushDeltas(this.dt || 0.01);
     const { dye, vel } = gpu.readback();
     for (let i = 0; i < GRID_AREA; i++) {
@@ -1138,6 +1235,24 @@ class FluidSimulation {
     }
     this.liquid.step(this.readVx, this.readVy, disp, dt);
     this.dirty = true;
+  }
+
+  /**
+   * All the dye on this layer, thinned by `factor` (0..1). A look handing
+   * over to the next one: the old colours make room for the new ones instead
+   * of sitting under them for minutes.
+   */
+  thinDye(factor: number) {
+    const f = Math.max(0, Math.min(1, factor));
+    if (f >= 1) return;
+    if (this.gpu) {
+      for (let i = 0; i < GRID_AREA; i++) this.mul[i] *= f;
+      this.dirty = true;
+    } else {
+      for (let i = 0; i < GRID_AREA; i++) {
+        this.density[i] *= f; this.densityR[i] *= f; this.densityG[i] *= f; this.densityB[i] *= f;
+      }
+    }
   }
 
   addTemp(x: number, y: number, amount: number) {
@@ -1611,6 +1726,27 @@ class FluidSimulation {
             this.splatBlob(x, y + Math.sin(t * 0.13 + b) * 6 * k, 9 * k, 1.5, c.r, c.g, c.b);
             this.addVelocity(Math.floor(x), Math.floor(y), b % 2 === 0 ? 0.05 : -0.05, 0);
           }
+        }
+        break;
+      }
+
+      case 'magnet-garden': {
+        // The ferrofluid is dark and only reads against something bright, so
+        // the plate starts as a full pool of light dye for it to stand on.
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2, d = S * (i === 0 ? 0 : 0.26);
+          const c = col(i);
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, S * 0.2, 2.2, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'clock-glass': {
+        // Curved glasses gather the liquid in the middle; seed it there, in
+        // rings, so the dome has something to hold from the first frame.
+        for (let ring = 0; ring < 3; ring++) {
+          const c = col(ring);
+          this.splatBlob(cx, cy, S * (0.3 - ring * 0.09), 2.4, c.r, c.g, c.b);
         }
         break;
       }
@@ -3410,6 +3546,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const [glEpoch, setGlEpoch] = useState(0);
   /** The look that is on the plate, so a rebuild can put the same one back. */
   const livePresetRef = useRef('classic');
+  /**
+   * Asking again for a device that did not come back. After a loss the
+   * adapter is often not there on the first ask — the GPU process is still
+   * restarting, or the driver is mid-reset — and giving up on that first
+   * answer is what left the plate black until a reload. Reset on a success.
+   */
+  const recoveryTriesRef = useRef(0);
+  /** When the stage was last rebuilt because frames kept throwing (ms), for the three-a-minute limit. */
+  const selfHealsRef = useRef<number[]>([]);
+  /** Whether the loss just handled kept the plate, so the recovery does not lay the look over it (S1). */
+  const plateKeptRef = useRef(false);
+  /*
+    A look handing over to the next (a pressed Go or Back).
+
+    `adoptPreset` changes the palette at once but leaves the plate alone, and
+    at the default evaporation the old dye's half-life is minutes — so after
+    a two-second fade the settings were the new look's and the colours were
+    still the old one's, with the new palette's drops landing in them: for a
+    long while the wall read as neither look. Over the fade now, the old dye
+    thins to a little under half and six pours of the new palette arrive
+    through the second half, so the colours change hands with the settings.
+  */
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number } | null>(null);
+  /**
+   * The largest grid this GPU has shown it can hold, learned the hard way.
+   * A rebuild makes a new governor, which starts at the ladder's usual rung;
+   * without this it would climb straight back into the grid that ran out of
+   * memory and lose the plate again, round and round.
+   */
+  const gridCapRef = useRef(Number.POSITIVE_INFINITY);
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
@@ -3612,6 +3778,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     dish and an empty ring, Fillmore after Classic had two. So the layer is laid
     here and again the moment it is built.
   */
+  /** The opening look was laid before the GPU solver existed and still owes it its phase. */
+  const phasePendingRef = useRef(false);
+  /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
+  const phaseSolverRef = useRef<unknown>(null);
   const laidPresetRef = useRef<string | null>(null);
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
@@ -3655,21 +3825,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         So the phase is only touched when a look actually asks for some.
       */
-      const amt = settingsRef.current.phaseAmount ?? 0;
-      const lead = fluidsRef.current[0]?.gpu;
-      if (amt > 0.002 && lead?.addPhase) {
-        lead.clearPhase?.();
-        const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
-        const count = Math.round(3 + (1 - scale) * 22);
-        const r = 0.04 + scale * 0.16;
-        for (let k = 0; k < count; k++) {
-          // Deterministic placement: the same look laid twice is the same
-          // plate twice, which is what rendering a song depends on.
-          const a = (k * 2.399963229728653);
-          const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
-          lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
-        }
-      }
+      // A look laid before the GPU solver exists (the opening look, laid on
+      // mount) owes its phase to the solver when it attaches: laid here it
+      // went nowhere, and Magnet Garden opened as a bare gold pool.
+      phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      layPhaseRef.current();
     }
     for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -3687,6 +3847,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     macroCamRef.current.reset();
     livePresetRef.current = presetId;
   };
+  /** The second phase for the look being laid, if it asks for some and the GPU solver is there to take it. */
+  const layPhase = () => {
+    const amt = settingsRef.current.phaseAmount ?? 0;
+    const lead = fluidsRef.current[0]?.gpu;
+    if (amt > 0.002 && lead?.addPhase) {
+      lead.clearPhase?.();
+      const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
+      const count = Math.round(3 + (1 - scale) * 22);
+      const r = 0.04 + scale * 0.16;
+      for (let k = 0; k < count; k++) {
+        // Deterministic placement: the same look laid twice is the same
+        // plate twice, which is what rendering a song depends on.
+        const a = (k * 2.399963229728653);
+        const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
+        lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
+      }
+    }
+  };
+  const layPhaseRef = useRef(layPhase);
+  layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
   layPlateRef.current = layPlate;
@@ -3810,6 +3990,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const contract = presetContractRef.current;
         harmonyRef.current = contract ? harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0) : pickHarmony();
       }
+    },
+    handoff: (seconds: number) => {
+      if (!(seconds > 0)) { handoffRef.current = null; return; }
+      const now = performance.now();
+      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0 };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
@@ -4144,10 +4329,60 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     /** When the projector last asked for a frame; see __chromaglassFrame below. */
     let lastExternalFrame = 0;
+    /*
+      The loop, guarded.
+
+      `renderFrame` schedules the next frame as its last line, so anything
+      that threw in the fourteen hundred lines before it ended the show: no
+      error on screen, no recovery, a still plate until a reload. That was
+      the "stops and never comes back" on the live site that no device loss
+      explained. Now a frame that throws is logged and the next one is asked
+      for regardless; and frames that keep throwing — a second and a half of
+      them — are treated like a lost device: the stage is destroyed, which
+      runs the recovery that rebuilds everything from scratch. Three of those
+      inside a minute and it stops trying, says so as a fatal, and keeps the
+      loop alive in case whatever it was clears.
+    */
+    let frameErrors = 0;
+    let lastFrameErrorLog = -Infinity;
+    /** `chromaglassDebug().throwFrames(n)`: the next n frames throw, for the soak that proves the guard. */
+    let throwFrames = 0;
+    /** `stepDownFrames(n)`: a rung lost on each of the next n frames — swaps faster than a readback lands (S3, S6). */
+    let stepDownFrames = 0;
+    /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
+    let stormFrames = 0;
     const render = () => {
+      try {
+        renderFrame();
+        frameErrors = 0;
+      } catch (err) {
+        frameErrors++;
+        const now = performance.now();
+        if (frameErrors === 1 || now - lastFrameErrorLog > 5000) {
+          lastFrameErrorLog = now;
+          console.error(`ChromaGlass: a frame threw (${frameErrors} in a row); the loop carries on.`, err);
+        }
+        if (frameErrors >= SELF_HEAL_FRAMES) {
+          frameErrors = 0;
+          healStage(`frames keep throwing (${String((err as Error)?.message ?? err).slice(0, 160)})`);
+        }
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    const renderFrame = () => {
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
+      if (throwFrames > 0) { throwFrames--; throw new Error('a test throw (throwFrames)'); }
+      if (stepDownFrames > 0) { stepDownFrames--; governorRef.current?.failRung(performance.now() * 0.001); }
+      if (stormFrames > 0 && stage) {
+        stormFrames--;
+        // A buffer with no usage is a validation error, uncaptured by design.
+        try { stage.device.createBuffer({ size: 4, usage: 0 }); } catch { /* some implementations throw instead */ }
+      }
+      // The heartbeat: a visible tab that stops getting here has stopped.
+      crashLog.beat();
       const workStart = performance.now();
       let frameS = 0;
       /** How many solver steps this frame took, for the governor's GPU budget. */
@@ -4400,6 +4635,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             gpuSupportedRef.current = false;
           }
         }
+        /*
+          The phase goes to each new solver the lead plate gets, not only
+          the first. The governor rebuilds the solver a few seconds into a
+          show when it moves the grid, and the dye is carried across that
+          but the phase is not: Magnet Garden had its ferrofluid at 8 s and
+          a bare gold pool by 20.
+        */
+        const leadGpu = fluidsRef.current[0]?.gpu ?? null;
+        if (leadGpu !== phaseSolverRef.current) {
+          phaseSolverRef.current = leadGpu;
+          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+            phasePendingRef.current = false;
+            layPhaseRef.current();
+          }
+        }
         {
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
@@ -4443,7 +4693,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004 * (isAutomatedRef.current ? 2 : 1)) {
+            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004) {
               chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
             }
             // The dividing regime grows at a pace a show can watch; coral is slower than a set.
@@ -4737,10 +4987,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
 
             /*
-              The rate scales everything: at the default it is a drop or a
-              blow every second or so, quickening with the music; at full it
-              is the old frenzy. (Before, the music term stood on its own and
-              the slider hardly mattered.)
+              The rate scales everything: at the default it is one small drop
+              or a soft breath every seven seconds or so, quickening a little
+              with the music; at full, about one a second. Evolve is a
+              slow drift by design — it used to be a drop or a blow every
+              second at the default and a frenzy at full, with floods and the
+              music's reactions doubled, and it read as fast, massive changes.
 
               The phrase is what gives it shape. Without it this is a Poisson
               process at a fixed rate, which means impulses arrive
@@ -4779,7 +5031,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // and a loud one pours often, which is what the dial was for. The
             // size and the force still ride the gust, so a bigger surge is
             // also a bigger pour.
-            if (ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+            /*
+              Evolve is subtle now (the owner's call, after watching it: "fast
+              changes that are massive on the screen"). A flood a third of the
+              plate across is the opposite of subtle, so evolve no longer pours
+              one; the plate is left to change the way a dish left on the
+              projector does — slowly, in small places. `EVOLVE_FLOODS` brings
+              it back.
+            */
+            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
               lastFloodRef.current = now;
               autoEventsRef.current.poured++;
               const af = fluidsRef.current[0];
@@ -4807,7 +5067,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
 
-            if (Math.random() < rate * (0.08 + energy * 0.5) * ph.drive) {
+            // About one small event every seven seconds at the default rate,
+            // about one a second at full — against two or three a
+            // second before, each of them large.
+            if (Math.random() < rate * (0.012 + energy * 0.03) * ph.drive) {
               const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
               if (af) {
                 const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -4817,7 +5080,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 3 + ph.gust * 3), (0.08 + energy * 0.18) * (1 + ph.gust * 1.5));
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
@@ -4829,18 +5092,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
-                  af.autoInject(style, rx, ry, (6.0 + energy * 35) * (1 + ph.gust * 1.3), color.r, color.g, color.b, energy);
-                  af.addTemp(rx, ry, 0.8 + trebleBoost * 5);
+                  af.autoInject(style, rx, ry, 1.5 + energy * 4, color.r, color.g, color.b, energy);
+                  af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
-                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.6 + energy * 0.8);
+                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.25 + energy * 0.25);
                 }
               }
             }
 
             // With no hue journey set, an evolving plate re-picks its palette at
-            // random every ~45 s. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0004) {
+            // random every ~3 min (it was ~45 s). Only the dye still to come
+            // takes the new colours, so with small drops this is a drift, not
+            // a change of scene. The journey itself runs below, evolving or not.
+            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0001) {
               harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
             }
 
@@ -4936,6 +5201,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
 
+          // ── A pressed look change handing over (see `handoffRef`) ──
+          {
+            const h = handoffRef.current;
+            if (h && isActiveRef.current && drainFrameRef.current === 0) {
+              const nowMs = performance.now();
+              const p = Math.min(1, (nowMs - h.start) / h.dur);
+              const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
+              h.last = nowMs;
+              // To HANDOFF_KEEP of the old dye across the whole fade, a little
+              // each frame so it reads as fading and not as a step.
+              const f = Math.pow(HANDOFF_KEEP, dtMs / h.dur);
+              for (const fluid of fluidsRef.current) fluid.thinDye(f);
+              // The new palette arrives through the second half.
+              const due = Math.floor(Math.max(0, Math.min(1, (p - 0.3) / 0.6)) * HANDOFF_POURS + 1e-6);
+              while (h.poured < Math.min(due, HANDOFF_POURS)) {
+                h.poured++;
+                const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
+                if (!fluid) break;
+                const rx = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const ry = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const color = harmonyColor(harmonyRef.current);
+                const styles = injectStyleRef.current;
+                fluid.autoInject(styles[Math.floor(Math.random() * styles.length)] ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                fluid.addTemp(rx, ry, 1.2);
+                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
+              }
+              if (p >= 1) handoffRef.current = null;
+            }
+          }
+
           // ── Seed trigger ───────────────────────────────────────
           if (seedCountRef.current > lastSeedCount.current && drainFrameRef.current === 0) {
             lastSeedCount.current = seedCountRef.current;
@@ -5016,7 +5311,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
                   // At impact=1.0 + auto → ~4.9x baseline
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
-                  const autoAmp = impactMul * (isAutomatedRef.current ? 2.2 : 1.0);
+                  // Evolve used to multiply every music reaction by 2.2 — dye,
+                  // heat, bursts — which is most of why it read as massive. It
+                  // leaves the music's own reactions as the look sets them now.
+                  const autoAmp = impactMul;
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -5031,7 +5329,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                   // A hit on the velocity route: radial burst — scales with impact + auto mode
                   if (vel01 > 0.25) {
-                    const burstR = Math.round((isAutomatedRef.current ? 28 : 18) * GRID_SCALE * Math.max(0.4, impactMul));
+                    const burstR = Math.round(18 * GRID_SCALE * Math.max(0.4, impactMul));
                     const bassStr = (vel01 - 0.25) * autoAmp;
                     for (let bj = -burstR; bj <= burstR; bj += 3) {
                       for (let bi = -burstR; bi <= burstR; bi += 3) {
@@ -5043,10 +5341,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                           activeFluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
                         }
                       }
-                    }
-                    if (isAutomatedRef.current && bass01 > 0.4) {
-                      activeFluid.autoInject(aStyle(), centerX, centerY, bass01 * 0.8, ar_a, ag_a, ab_a, bass01);
-                      activeFluid.addTemp(centerX, centerY, bass01 * 0.5);
                     }
                   }
 
@@ -5096,7 +5390,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const sparkCol = colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
-                    const sparks = Math.floor(treble01 * (isAutomatedRef.current ? 4 : 2) * impactMul);
+                    const sparks = Math.floor(treble01 * 2 * impactMul);
                     for (let s = 0; s < sparks; s++) {
                       const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
                       const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
@@ -5117,11 +5411,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
                     const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
-                    if (isAutomatedRef.current) {
-                      const ex2 = Math.floor(centerX + Math.cos(time * 0.4 + Math.PI) * GRID_SIZE * 0.22);
-                      const ey2 = Math.floor(centerY + Math.sin(time * 0.3 + Math.PI) * GRID_SIZE * 0.22);
-                      activeFluid.autoInject(aStyle(), ex2, ey2, energy01 * 0.05, swellCol.r, swellCol.g, swellCol.b, energy01);
-                    }
                   }
                 }
               }
@@ -5695,8 +5984,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // whatever the renderer wants to add spread in at the top level, so a
     // harness reaching for `chromaglassDebug().gl` finds it where it always
     // was (docs/webgpu-plan.md, P3).
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = () => ({
+    //
+    // Built always, because the crash report carries it; only on `window`
+    // under `?debug`.
+    const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         status: engineStatusRef.current,
         governor: governorRef.current,
@@ -5710,6 +6001,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /*
+          What is on each plate, from the last readback: how full it is, its
+          mean colour, how many cells are not a number, and the fastest cell.
+          A plate that draws as bare ground is either empty or poisoned, and
+          the picture cannot tell those apart; this can.
+        */
+        plateStats: () => fluidsRef.current.map((f) => {
+          const d = f.readDensity, vx = f.readVx, vy = f.readVy;
+          let nan = 0, vmax = 0;
+          for (let i = 0; i < d.length; i++) {
+            if (!Number.isFinite(d[i]) || !Number.isFinite(vx[i]) || !Number.isFinite(vy[i])) { nan++; continue; }
+            const v = Math.abs(vx[i]) + Math.abs(vy[i]);
+            if (v > vmax) vmax = v;
+          }
+          return { mean: f.meanDensity, colour: [...f.meanColor], nan, vmax };
+        }),
         bubbles: bubblesRef.current,
         // What the shader was actually told about them last frame: a bubble
         // that is on the plate but not in these two numbers is not on screen.
@@ -5760,9 +6067,132 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           tell whether the guard had it.
         */
         flash: flashRef.current.state,
+        /** The black box: `.last()` is the line before a stop, `.previous()` the last load's tail. */
+        crash: crashLog.crashApi,
+        /** Make the next `n` frames throw: the guard should carry on, and past SELF_HEAL_FRAMES rebuild. */
+        throwFrames: (n: number) => { throwFrames = Math.max(0, n | 0); },
+        /*
+          The doors S0 closed, made reachable (docs/stability-plan.md, S6).
+          Out of memory cannot be caused on demand in a browser, so the hook
+          runs the response to it — the cap, the step down — which is the
+          half that was never exercised; the detection half is the error
+          scope and the uncaptured-error listener, which S2 samples.
+        */
+        simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
+        stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
+        errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
+        gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
     }
+    // What every line of the log carries, and the report's larger parts.
+    const unprovide = crashLog.provide('visualizer', () => {
+      const status = engineStatusRef.current;
+      const rung = governorRef.current?.rung;
+      return {
+        engine: status?.label ?? 'none',
+        rung: rung ? `${rung.grid}²@${rung.dpr}x` : undefined,
+        fps: status?.frameMs ? +(1000 / status.frameMs).toFixed(1) : undefined,
+        stepsPerSec: +stepsPerSecRef.current.toFixed(1),
+        stats: { simMs: +simMsRef.current.toFixed(2), layers: fluidsRef.current.length, beads: beadsRef.current.beads.length, bubbles: bubblesRef.current.bubbles.length },
+        plate: livePresetRef.current,
+        lost: glLostRef.current,
+      };
+    });
+    crashLog.provideReport({ debug: debugState });
+
+    /**
+     * Rebuild the stage from nothing: destroy the device, and the loss
+     * handler does the rest — a new device, every pass built again, the look
+     * laid again. The one cure for GPU objects that have gone invalid, which
+     * nothing else can repair. Three in a minute and it stops, because
+     * whatever it is is not something a rebuild fixes.
+     */
+    const healStage = (why: string): boolean => {
+      const now = performance.now();
+      const heals = selfHealsRef.current.filter((t) => now - t < 60_000);
+      selfHealsRef.current = heals;
+      if (heals.length >= 3) {
+        crashLog.record('fatal', 'heal', `${why} — and ${heals.length} rebuilds in the last minute did not cure it`);
+        return false;
+      }
+      if (!stage || glLostRef.current) return false;
+      heals.push(now);
+      console.error(`ChromaGlass: ${why}; rebuilding the stage.`);
+      stage.device.destroy();
+      return true;
+    };
+
+    /**
+     * The GPU ran out of memory at this grid. Remember it across rebuilds,
+     * and step down: in place when the governor has a rung to spare, by a
+     * rebuild when it does not.
+     */
+    let lastOutOfMemory = -Infinity;
+    const outOfMemory = (grid: number, detail: string) => {
+      // One shortage reports once per object that failed — a dozen textures
+      // in a solver — and it is one step down, not a dozen.
+      const at = performance.now();
+      if (at - lastOutOfMemory < 2000) return;
+      lastOutOfMemory = at;
+      gridCapRef.current = Math.min(gridCapRef.current, grid - 1);
+      const governor = governorRef.current;
+      console.warn(`ChromaGlass: out of GPU memory at ${grid}² (${detail}); capping the grid below it.`);
+      if (governor && governor.failRung(performance.now() * 0.001)) return;
+      if (!healStage(`out of GPU memory at the smallest grid (${grid}²)`)) {
+        setGpuFailure({ failure: 'no-adapter', detail: `out of GPU memory even at ${grid}²` });
+      }
+    };
+
+    /*
+      Error scopes on the frame (docs/stability-plan.md, S2).
+
+      The uncaptured-error listener can count GPU errors but cannot say which
+      frame, or which of the things built that frame, produced them. So one
+      frame in sixty is drawn inside a validation scope and an out-of-memory
+      scope, and so are the two frames after anything that allocates at the
+      canvas's size — a resize, the camera, the post chain, the projector pass
+      — which is where running out of memory happens that is not the solver's.
+      A caught error is logged with the frame it came from and what had just
+      been built, and out of memory steps the grid down like any other.
+    */
+    const SCOPE_EVERY = 60;
+    let scopeCount = 0;
+    let scopeSoon = 0;
+    const scopedFrame = <T,>(device: GPUDevice, draw: () => T): T => {
+      const soon = scopeSoon > 0;
+      if (soon) scopeSoon--;
+      const scoped = soon || ++scopeCount % SCOPE_EVERY === 0;
+      if (!scoped) return draw();
+      const built = [camera && 'camera', chain && 'post chain', projector && 'projector'].filter(Boolean).join(', ') || 'plate only';
+      device.pushErrorScope('out-of-memory');
+      device.pushErrorScope('validation');
+      try {
+        return draw();
+      } finally {
+        const where = `${soon ? 'the frame after a resize or a new pass' : 'a sampled frame'} (${built})`;
+        void device.popErrorScope().then((err) => {
+          if (err && !cancelled) console.error(`WebGPU validation error in ${where}: ${err.message.slice(0, 300)}`);
+        }, () => { /* the device went; the loss handler has it */ });
+        void device.popErrorScope().then((err) => {
+          if (err && !cancelled) outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, `${where}: ${err.message.slice(0, 200)}`);
+        }, () => { /* as above */ });
+      }
+    };
+
+    /** A picture upload that may throw, logged once per kind rather than every frame. */
+    const uploadFailed = new Set<string>();
+    const upload = (what: string, fn: () => void) => {
+      try {
+        fn();
+        uploadFailed.delete(what);
+      } catch (err) {
+        if (!uploadFailed.has(what)) console.warn(`ChromaGlass: the ${what} picture would not upload; leaving it out.`, err);
+        uploadFailed.add(what);
+      }
+    };
 
     /** The renderer is up: size it, give the governor its ladder, and go. */
     const startWith = (r: PlateRenderer) => {
@@ -5774,6 +6204,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         performance.now() * 0.001,
         PINNED_RUNG !== null,
       );
+      // Below whatever ran out of memory before.
+      const g = governorRef.current;
+      while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }
       r.resize();
       render();
     };
@@ -5788,11 +6221,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let projector: WebGPUOutput | null = null;
     let probe: WebGPUFrameProbe | null = null;
     let chain: WebGPUPostChain | null = null;
+    /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
+    let platePass: WebGPUPlate | null = null;
     let cancelled = false;
     // What the frame costs us, as opposed to how often the display asks for
     // one: a CI runner's display rate says nothing about the stage.
     let cpuMs = 0;
     const size = () => {
+      scopeSoon = 2;   // the canvas's own targets are about to be reallocated
       const dpr = dprRef.current;
       const px = canvasPixelsFor(
         dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
@@ -5802,14 +6238,81 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.height = px.height;
       return dpr;
     };
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let healthyTimer: ReturnType<typeof setTimeout> | null = null;
     void WebGPUStage.start(canvas).then((s) => {
-      if (cancelled) { if (!isGpuFailure(s)) s.dispose(); return; }
+      // Too late: this effect has already been torn down. Destroy the device
+      // and nothing else — `dispose` would also unconfigure the canvas, and in
+      // React's development double-run the canvas is the one the second run
+      // is already drawing on, so its next `getCurrentTexture` threw and the
+      // loop died (S12). Only in dev, but it looked exactly like the real
+      // thing and cost a hunt.
+      if (cancelled) { if (!isGpuFailure(s)) s.device.destroy(); return; }
       if (isGpuFailure(s)) {
+        // Coming back from a loss, the answer is usually "not yet" rather
+        // than "never": ask again, backing off, for about two minutes.
+        const tries = recoveryTriesRef.current;
+        if (glLostRef.current && tries < RECOVERY_TRIES) {
+          recoveryTriesRef.current = tries + 1;
+          const wait = Math.min(30_000, 1000 * 2 ** tries);
+          console.warn(`ChromaGlass: no device yet after a loss (${s.failure}: ${s.detail}); asking again in ${wait / 1000}s.`);
+          retryTimer = setTimeout(() => setGlEpoch((n) => n + 1), wait);
+          return;
+        }
         console.error(`ChromaGlass needs WebGPU: ${s.failure} (${s.detail})`);
         setGpuFailure(s);
         return;
       }
       stage = s;
+      const bornAt = performance.now();
+      /*
+        A device that has held for five seconds is a recovery that worked, and
+        the count of tries starts again. Before this it only started again when
+        a device that had lived that long was *lost*, so recoveries in quick
+        succession — a heal, then a loss, then another — kept adding to one
+        count across unrelated incidents, and a long session could spend all
+        eight tries and put up the permanent screen on a loss it would
+        otherwise have come back from. The soak's hung-request check found it.
+      */
+      healthyTimer = setTimeout(() => { if (stage === s) recoveryTriesRef.current = 0; }, 5000);
+      // A new device is a new chance for the solver, whatever the last one
+      // managed; the failure screen's "Try again" relies on it too.
+      gpuSupportedRef.current = null;
+
+      /*
+        Errors the device reports on its own, counted. One is a bug to log;
+        one every frame is GPU objects gone invalid — a texture that did not
+        allocate, a bind group built on it — and a plate that will stay black
+        with a device that is still alive, which no loss handler hears about.
+        So a sustained stream is treated as a loss: rebuild. Out of memory
+        says so, and caps the grid first.
+      */
+      let errorWindowStart = 0;
+      let errorsInWindow = 0;
+      s.device.addEventListener('uncapturederror', (e) => {
+        if (cancelled || stage !== s) return;
+        const error = (e as GPUUncapturedErrorEvent).error;
+        if (typeof GPUOutOfMemoryError !== 'undefined' && error instanceof GPUOutOfMemoryError) {
+          outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, error.message);
+          return;
+        }
+        const now = performance.now();
+        if (now - errorWindowStart > 3000) { errorWindowStart = now; errorsInWindow = 0; }
+        if (++errorsInWindow === ERROR_STORM) healStage(`${ERROR_STORM} GPU errors in 3s (last: ${error?.message?.slice(0, 160) ?? 'unknown'})`);
+      });
+      // The report's GPU and its frame. `grabFrame` is the only read that
+      // works: a presented WebGPU canvas reads back black.
+      crashLog.provideReport({
+        gpu: () => {
+          const l = s.device.limits;
+          return {
+            label: s.gpu.label, gpuClass: s.gpu.gpuClass, fallback: s.gpu.fallback, format: s.format,
+            limits: { maxTextureDimension2D: l.maxTextureDimension2D, maxBufferSize: l.maxBufferSize, maxStorageBufferBindingSize: l.maxStorageBufferBindingSize, maxComputeWorkgroupStorageSize: l.maxComputeWorkgroupStorageSize },
+            lost: stage !== s,
+          };
+        },
+        grab: () => (stage === s ? s.grabFrame() : null),
+      });
 
       /**
        * The GPU, taken away (docs/webgpu-plan.md, P4).
@@ -5827,9 +6330,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       s.lost.then((info) => {
         if (cancelled) return;
         console.error('WebGPU device lost:', info.reason, info.message);
+        crashLog.deviceLost(info.reason);
+        // A device that dies as soon as it is made is not "back"; asking for
+        // the next one at once only feeds a loop of them. Back off instead.
+        const shortLived = performance.now() - bornAt < 5000;
         // Dropping rather than detaching skips a readback from a dead
-        // device and leaves the CPU's own state alone.
-        for (const fluid of fluidsRef.current) fluid.dropGpu();
+        // device. The plate is carried across on its last readback (S1),
+        // unless the stage has already been rebuilt once in the last minute:
+        // then the plate may be what is broken, and a fresh look is safer.
+        const recentHeals = selfHealsRef.current.filter((t) => performance.now() - t < 60_000).length;
+        const keep = recentHeals < 2;
+        let kept = fluidsRef.current.length > 0;
+        for (const fluid of fluidsRef.current) kept = fluid.dropGpu(keep) && kept;
+        plateKeptRef.current = keep && kept;
         camera = null;
         projector = null;
         probe = null;
@@ -5838,17 +6351,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         flashGainRef.current = 1;
         glLostRef.current = true;
         setGlLost(true);
-        setGlEpoch((n) => n + 1);
+        if (shortLived && recoveryTriesRef.current < RECOVERY_TRIES) {
+          const tries = recoveryTriesRef.current++;
+          retryTimer = setTimeout(() => setGlEpoch((n) => n + 1), Math.min(30_000, 1000 * 2 ** tries));
+        } else {
+          recoveryTriesRef.current = 0;
+          setGlEpoch((n) => n + 1);
+        }
       });
 
-      // Coming back from one. The plate did not survive — the dye lives in
-      // the solver's textures, and they died with the device — so the look
-      // is laid again: not the identical plate, which is not possible, but
-      // the same look, back within a second.
+      // Coming back from one. The dye lived in the solver's textures and they
+      // died with the device, but the last readback did not: the loss handler
+      // put it back into the CPU arrays, and the solver the loop attaches next
+      // opens on it — the same plate, a frame or two old (S1). Only when there
+      // was nothing to carry, or the stage has been rebuilt twice in a minute,
+      // is the look laid again instead.
       if (glLostRef.current) {
-        layPlateRef.current(livePresetRef.current);
+        const kept = plateKeptRef.current;
+        plateKeptRef.current = false;
+        if (!kept) layPlateRef.current(livePresetRef.current);
         glLostRef.current = false;
         setGlLost(false);
+        crashLog.recovered(`a new device (${s.gpu.label}), ${kept ? 'the plate carried across' : `${livePresetRef.current} laid again`}`);
       }
 
       /**
@@ -5861,6 +6385,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
        * flash probe reads back what the wall got.
        */
       const plate = new WebGPUPlate(s.device, s.format);
+      platePass = plate;
       const gpuRenderer: PlateRenderer = {
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
@@ -5871,13 +6396,38 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             return true;
           }
           if (fluid.gpu && fluid.gpu.N === wantRes) return true;
+          /*
+            The old solver goes before the new one is built, not after: at
+            the top rungs a solver is a couple of hundred megabytes a layer,
+            and holding both across the swap doubled the peak at exactly the
+            moment the governor had decided there was room — the moment most
+            likely to find there was not. `detachGpu` carries the field to
+            the CPU arrays, and the new solver starts from them as before.
+          */
+          if (fluid.gpu) fluid.detachGpu();
           try {
+            /*
+              And out of memory is not an exception. A texture the GPU cannot
+              hold comes back as an invalid object, silently, and every frame
+              after that draws nothing — the black plate with a live device
+              that no loss handler ever hears about. The scope is how it is
+              heard: if it catches one, this solver is dropped and the
+              governor steps down (see `outOfMemory`).
+            */
+            s.device.pushErrorScope('out-of-memory');
             const solver = new WebGPUFluid(s.device, wantRes, GRID_SIZE, {
               float32Filterable: s.gpu.float32Filterable,
               timestamps: s.gpu.timestamps,
             });
             solver.stageTimings = STAGE_TIMINGS;
             fluid.attachGpu(solver);
+            void s.device.popErrorScope().then((oom) => {
+              if (!oom || cancelled || stage !== s) return;
+              // Keeping the plate: this solver never spoke, so what comes back
+              // is the seed it opened on, and the smaller one opens on that.
+              if (fluid.gpu === solver) fluid.dropGpu(true);
+              outOfMemory(wantRes, oom.message);
+            }, () => { /* the device went; the loss handler has it */ });
             return true;
           } catch (err) {
             /*
@@ -5893,8 +6443,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               So say so instead. A machine that cannot run the solver gets
               the same screen as a machine with no WebGPU at all.
             */
-            console.error('ChromaGlass: the WebGPU solver would not start.', err);
             fluid.dropGpu();
+            /*
+              But first, smaller. A grid that will not allocate is far more
+              often a GPU short of memory — a projector's framebuffer added
+              mid-set, another tab, the rung the governor had just climbed to
+              — than a GPU that cannot run the show, and this used to end the
+              show on the spot, with no way back but a reload. So the governor
+              drops a rung and never climbs back to this one; the next frame
+              attaches there. Only the bottom rung failing is the screen.
+            */
+            const governor = governorRef.current;
+            if (governor && governor.failRung(performance.now() * 0.001)) {
+              console.warn(`ChromaGlass: the solver would not start at ${wantRes}²; stepping down a rung.`, err);
+              return true;
+            }
+            console.error('ChromaGlass: the WebGPU solver would not start.', err);
             setGpuFailure({
               failure: 'no-adapter',
               detail: `the solver would not start at ${wantRes}²: ${String(err).slice(0, 120)}`,
@@ -5902,7 +6466,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             return false;
           }
         },
-        drawFrame: (view, fluids) => {
+        drawFrame: (view, fluids) => scopedFrame(s.device, () => {
           const t0 = performance.now();
           // Every layer whose solver is the WebGPU one. A field still on
           // the CPU has nothing for the compositor to sample, so it sits
@@ -5917,20 +6481,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // The uniforms are told about each of them in `plateUniforms`,
             // under the same conditions, or the shader would be drawing a
             // picture it had not been given.
-            if (view.beadMask) plate.setSource('beads', view.beadMask);
+            //
+            // Each upload is fenced. `copyExternalImageToTexture` throws on
+            // a picture it cannot take — a video whose camera track ended, a
+            // frame the size of which changed between measuring and copying,
+            // a cross-origin image — and a throw here used to end the loop.
+            // A picture that will not upload is left out of this frame.
+            if (view.beadMask) upload('beads', () => plate.setSource('beads', view.beadMask!));
             const mk = view.mark;
             if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
             else if (mk.dirty) {
-              plate.setSource('mark', mk.source);
-              // The chain's finish lays the mark over the frame when it is
-              // the one finishing, so it needs the picture as well.
-              const [mw, mh] = pictureSize(mk.source);
-              chain?.setMark(mk.source, mw, mh);
+              // Clean whatever happens: a mark that will not upload once will
+              // not upload the next sixty times either.
               mk.dirty = false;
+              upload('mark', () => {
+                plate.setSource('mark', mk.source);
+                // The chain's finish lays the mark over the frame when it is
+                // the one finishing, so it needs the picture as well.
+                const [mw, mh] = pictureSize(mk.source);
+                chain?.setMark(mk.source, mw, mh);
+              });
             }
             const film = view.film;
             if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
-              plate.setSource('film', film.video);
+              upload('film', () => plate.setSource('film', film.video!));
             }
             // Two passes when the camera is on: the plate is
             // drawn into a texture and the camera looks at it, because
@@ -5939,7 +6513,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // frame it would do anything and dropped when it would not, so
             // a show without a camera never pays for the second target.
             const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
-            if (camAmt > 0.001 && !camera) camera = new WebGPUCamera(s.device, s.format);
+            if (camAmt > 0.001 && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
             else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
             const cam = camera;
 
@@ -5954,6 +6528,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const wantPost = view.postForce || (postTest?.mode ?? 0) > 0 || wantStock;
             if (wantPost && !chain) {
               chain = new WebGPUPostChain(s.device, s.format);
+              scopeSoon = 2;
               // A mark that arrived before the chain did: it is uploaded on
               // the frame it arrives and never again, so a chain built
               // later would finish every frame without it.
@@ -5970,7 +6545,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // projector, nothing set — never pays for the extra target or
             // the extra draw.
             const wantOut = !outputIsIdentity(view.outputCfg);
-            if (wantOut && !projector) projector = new WebGPUOutput(s.device, s.format);
+            if (wantOut && !projector) { projector = new WebGPUOutput(s.device, s.format); scopeSoon = 2; }
             else if (!wantOut && projector) { projector.dispose(); projector = null; }
             const out = projector;
             const quads = out ? fillOutputUniforms(out.pack, view.outputCfg, canvas.width, canvas.height) : 0;
@@ -6158,7 +6733,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
           if (probe) { probe.dispose(); probe = null; }
           return null;
-        },
+        }),
         /**
          * The drawing, plus one solver step per layer for each step the
          * loop took. The profiler's numbers are per pass and per step, so
@@ -6430,6 +7005,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       cancelAnimationFrame(animationFrameId);
       // And the frame the projector could ask for goes with it.
       delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
+      unprovide();
+      if (retryTimer) clearTimeout(retryTimer);
+      if (healthyTimer) clearTimeout(healthyTimer);
 
       camera?.dispose();
       camera = null;
@@ -6439,6 +7017,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       probe = null;
       chain?.dispose();
       chain = null;
+      platePass?.dispose();
+      platePass = null;
       stage?.dispose();
       stage = null;
     };
@@ -6510,6 +7090,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 : 'The GPU would not start.'}
             </div>
             <div>It runs in Chrome or Edge on a desktop, Chrome on a recent Android phone, Safari 26 on macOS and iOS, and Firefox on Windows.</div>
+            {gpuFailure.failure !== 'no-webgpu' && (
+              /* A GPU that would not start a minute ago may start now — the
+                 driver finished resetting, the other tab closed — and asking
+                 again costs nothing next to a reload that loses the set. */
+              <button
+                onClick={() => {
+                  recoveryTriesRef.current = 0;
+                  gpuSupportedRef.current = null;
+                  glLostRef.current = true;
+                  setGlLost(true);
+                  setGpuFailure(null);
+                  setGlEpoch((n) => n + 1);
+                }}
+                className="pointer-events-auto mt-5 rounded-md border border-white/20 px-4 py-2 text-[12px] text-white/90 transition-colors hover:bg-white/10"
+                data-testid="gpu-retry"
+              >
+                Try again
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,11 @@
 import {StrictMode, Component, lazy, Suspense, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import './index.css';
+import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
+
+// The black box, first: whatever goes wrong from here on has a line
+// (docs/crash-plan.md).
+installCrashLog();
 
 const params = new URLSearchParams(window.location.search);
 // The phone loads only the control surface — no visualizer, no solver.
@@ -58,6 +63,8 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
     // Chunk-load failures are the recoverable kind: the code the page was
     // told to fetch is not there any more.
     const chunk = /dynamically imported module|Importing a module script failed|Failed to fetch/i.test(String(failed?.message ?? ''));
+    // The whole app is down: the box's line for it, read on the next load.
+    crashRecord('fatal', 'react', `${chunk ? 'a chunk would not load: ' : ''}${String(failed?.message ?? failed)}${failed?.stack ? `\n${String(failed.stack).split('\n').slice(1, 4).join('\n')}` : ''}`);
     if (chunk) {
       this.setState({ recovering: true });
       void startOver().then(reloading => { if (!reloading) this.setState({ recovering: false }); });

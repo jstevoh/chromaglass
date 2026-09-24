@@ -20,6 +20,19 @@ export const PALETTE = [
   { name: 'Coffee',            hex: '#6F4E37', r: 0.44, g: 0.31, b: 0.22 },
   { name: 'Graphite',          hex: '#4B4B4B', r: 0.29, g: 0.29, b: 0.29 },
   { name: 'Pure White',        hex: '#ffffff', r: 1.0,  g: 1.0,  b: 1.0  },
+  // The second eight (2026-09-24). The first sixteen were eight hot colours,
+  // three blues, two greens and four neutrals, so half the looks carried
+  // yellow and nearly every cool look was the same two blues. These fill the
+  // gaps between them: the blue-greens, a deep gold, a violet-blue, a forest
+  // green, a true magenta, a soft warm, a night blue and a pale violet.
+  { name: 'Teal',              hex: '#00A99D', r: 0.0,  g: 0.66, b: 0.62 },
+  { name: 'Amber',             hex: '#FFB300', r: 1.0,  g: 0.70, b: 0.0  },
+  { name: 'Ultramarine',       hex: '#4B2DFF', r: 0.29, g: 0.18, b: 1.0  },
+  { name: 'Jade',              hex: '#00875A', r: 0.0,  g: 0.53, b: 0.35 },
+  { name: 'Magenta',           hex: '#E0119D', r: 0.88, g: 0.07, b: 0.62 },
+  { name: 'Coral',             hex: '#FF6F59', r: 1.0,  g: 0.44, b: 0.35 },
+  { name: 'Midnight',          hex: '#14286E', r: 0.08, g: 0.16, b: 0.43 },
+  { name: 'Lavender',          hex: '#B58CFF', r: 0.71, g: 0.55, b: 1.0  },
 ] as const;
 
 // Hex-only list for the dropper UI (App.tsx, SettingsPanel.tsx).
@@ -46,13 +59,17 @@ export const COLOR_HARMONIES: number[][] = [
   [8, 3, 0, 10],       // Contrast shock: Blue, Red, Yellow, Purple
   [5, 2, 8, 0],        // Carnival: Emerald, Hot Pink, Blue, Yellow
   [9, 10, 7, 15],      // Galaxy: Cobalt, Purple, Icy Blue, White
+  [16, 21, 17, 7],     // Reef: Teal, Coral, Amber, Icy Blue
+  [22, 18, 20, 23],    // Twilight: Midnight, Ultramarine, Magenta, Lavender
+  [19, 16, 17, 5],     // Forest: Jade, Teal, Amber, Emerald
+  [21, 23, 17, 11],    // Dusk: Coral, Lavender, Amber, Raspberry
 ];
 
 // Display names for COLOR_HARMONIES, index-aligned.
 export const COLOR_HARMONY_NAMES: string[] = [
   'Warm Sunset', 'Cool Ocean', 'Neon Electric', 'Fire & Ice', 'Royal Garden',
   'Tropical', 'Deep Jewel', 'Pastel Glow', 'Magenta Dream', 'Citrus Pop',
-  'Contrast Shock', 'Carnival', 'Galaxy',
+  'Contrast Shock', 'Carnival', 'Galaxy', 'Reef', 'Twilight', 'Forest', 'Dusk',
 ];
 
 /** Pick a random color harmony index set */

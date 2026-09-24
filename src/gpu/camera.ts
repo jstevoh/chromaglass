@@ -66,7 +66,7 @@ export class WebGPUCamera {
   private sceneSize = [0, 0];
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'camera');
     this.pack = new UniformPack(CAMERA_LAYOUT);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',

@@ -41,7 +41,7 @@ export class WebGPUStage {
   private constructor(readonly gpu: Gpu, readonly canvas: HTMLCanvasElement, context: GPUCanvasContext) {
     this.context = context;
     this.format = navigator.gpu.getPreferredCanvasFormat();
-    this.pipelines = new PipelineCache(gpu.device);
+    this.pipelines = PipelineCache.for(gpu.device, 'stage');
     this.profiler = new GpuProfiler(gpu.device, this.disposer, gpu.timestamps);
     this.configure();
   }

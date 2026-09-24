@@ -69,7 +69,7 @@ export class WebGPUPlate {
   private readonly blank: GPUTexture;
 
   constructor(private readonly device: GPUDevice, readonly format: GPUTextureFormat) {
-    this.pipelines = new PipelineCache(device);
+    this.pipelines = PipelineCache.for(device, 'plate');
     this.pack = new UniformPack(PLATE_LAYOUT);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',

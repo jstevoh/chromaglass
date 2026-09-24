@@ -5,8 +5,12 @@
 
 import { SongMap, SongSection } from './musicTypes';
 import { putFingerprint } from './musicDb';
+import { TrackFingerprint } from './localFingerprint';
 
 const ANALYSIS_SAMPLE_RATE = 22050;
+
+/** Five-second chunks: ten minutes of first listen, the longest a song map is made from. */
+const MAX_LISTEN_CHUNKS = 120;
 
 /** Records mono audio from a MediaStream until stop() is called. */
 export class ListenRecorder {
@@ -23,7 +27,13 @@ export class ListenRecorder {
         .find(m => MediaRecorder.isTypeSupported(m)) || '';
       this.recorder = new MediaRecorder(audioOnly, this.mime ? { mimeType: this.mime, audioBitsPerSecond: 64000 } : undefined);
       this.chunks = [];
-      this.recorder.ondataavailable = e => { if (e.data.size > 0) this.chunks.push(e.data); };
+      // The first ten minutes and no more. The recorder only stops on a
+      // silence or a confirmed track change, and in a continuous mix that
+      // re-identification keeps missing, neither comes: it ran for hours,
+      // and the decode at the end — the whole recording, at full rate, in
+      // float, before any trim — took the tab down. The leading chunks of a
+      // WebM are still a valid WebM, so the tail is simply not kept.
+      this.recorder.ondataavailable = e => { if (e.data.size > 0 && this.chunks.length < MAX_LISTEN_CHUNKS) this.chunks.push(e.data); };
       this.recorder.start(5000); // chunk every 5s
       return true;
     } catch (e) {
@@ -57,21 +67,37 @@ export class ListenRecorder {
 
 interface DecodedAudio { pcm: Float32Array; sampleRate: number }
 
-/** Decode a recorded blob to mono PCM at the analysis sample rate. */
-async function decodeToMono(blob: Blob): Promise<DecodedAudio | null> {
+/**
+ * Decode a recorded blob to mono PCM at the analysis sample rate, keeping at
+ * most maxDurationSec of it.
+ *
+ * decodeAudioData has no way to decode part of a file: it hands back the
+ * whole recording, at the file's own rate (48 kHz, usually) and in as many
+ * channels as it has, as float — ten minutes of stereo is ~230 MB before
+ * anything here gets a say, and that part is unavoidable. What this does
+ * control is everything after it. The trim used to happen once the audio
+ * had been resampled, so the OfflineAudioContext rendered the whole recording
+ * first; now it renders only the frames that will be kept. The full-rate
+ * buffer never leaves this function, so it is garbage the moment the render
+ * is done — only the 22 kHz mono copy goes on to the analysis.
+ */
+async function decodeToMono(blob: Blob, maxDurationSec?: number): Promise<DecodedAudio | null> {
   try {
     const arrayBuf = await blob.arrayBuffer();
     const probeCtx = new AudioContext();
     const decoded = await probeCtx.decodeAudioData(arrayBuf);
     await probeCtx.close();
 
-    // Resample + downmix via OfflineAudioContext
-    const targetLen = Math.ceil(decoded.duration * ANALYSIS_SAMPLE_RATE);
+    // Resample + downmix via OfflineAudioContext, rendering only what is kept
+    const keepSec = maxDurationSec && maxDurationSec > 20 ? Math.min(decoded.duration, maxDurationSec) : decoded.duration;
+    const targetLen = Math.max(1, keepSec < decoded.duration
+      ? Math.floor(keepSec * ANALYSIS_SAMPLE_RATE)
+      : Math.ceil(decoded.duration * ANALYSIS_SAMPLE_RATE));
     const offline = new OfflineAudioContext(1, targetLen, ANALYSIS_SAMPLE_RATE);
     const src = offline.createBufferSource();
     src.buffer = decoded;
     src.connect(offline.destination);
-    src.start();
+    src.start(0, 0, keepSec);
     const rendered = await offline.startRendering();
     return { pcm: rendered.getChannelData(0), sampleRate: ANALYSIS_SAMPLE_RATE };
   } catch (e) {
@@ -93,22 +119,24 @@ interface WorkerResult {
   fpDurationSec?: number;
 }
 
+export interface GeneratedSongMap {
+  map: SongMap;
+  /** The recognition fingerprint just stored with it, if the listen made one — for the live index. */
+  fingerprint: TrackFingerprint | null;
+}
+
 /** Run the offline analysis worker over a recorded listen. */
 export async function generateSongMap(
   isrc: string,
   recording: Blob,
   meta?: { title?: string; artist?: string },
   maxDurationSec?: number,
-): Promise<SongMap | null> {
-  const decoded = await decodeToMono(recording);
+): Promise<GeneratedSongMap | null> {
+  // maxDurationSec trims audio recorded past the track boundary (the recorder
+  // keeps rolling until the next identification confirms a track change); it
+  // is applied inside the decode, before the resample, not after it.
+  let decoded = await decodeToMono(recording, maxDurationSec);
   if (!decoded || decoded.pcm.length < ANALYSIS_SAMPLE_RATE * 20) return null; // need ≥20s
-
-  // Trim audio recorded past the track boundary (the recorder keeps rolling
-  // until the next identification confirms a track change).
-  if (maxDurationSec && maxDurationSec > 20) {
-    const maxSamples = Math.floor(maxDurationSec * decoded.sampleRate);
-    if (maxSamples < decoded.pcm.length) decoded.pcm = decoded.pcm.subarray(0, maxSamples);
-  }
 
   const result = await new Promise<WorkerResult | null>(resolve => {
     let worker: Worker;
@@ -123,7 +151,9 @@ export async function generateSongMap(
     worker.onmessage = e => { clearTimeout(timeout); worker.terminate(); resolve(e.data as WorkerResult); };
     worker.onerror = err => { clearTimeout(timeout); worker.terminate(); console.warn('song map worker error', err.message); resolve(null); };
     // Copy the PCM buffer — transferring would detach the rendered AudioBuffer's data
-    worker.postMessage({ pcm: decoded.pcm.slice(), sampleRate: decoded.sampleRate });
+    worker.postMessage({ pcm: decoded!.pcm.slice(), sampleRate: decoded!.sampleRate });
+    // The worker has its copy; ours need not live through the analysis.
+    decoded = null;
   });
 
   if (!result || !result.ok) {
@@ -133,8 +163,9 @@ export async function generateSongMap(
 
   // Store the local recognition fingerprint alongside the song map, so this
   // track is identified instantly (and offline) on every future listen.
+  let fingerprint: TrackFingerprint | null = null;
   if (result.fpHashes && result.fpFrames && result.fpHashes.length > 100) {
-    await putFingerprint({
+    fingerprint = {
       isrc,
       title: meta?.title,
       artist: meta?.artist,
@@ -142,10 +173,11 @@ export async function generateSongMap(
       frames: result.fpFrames,
       durationSec: result.fpDurationSec ?? result.durationSec,
       createdAt: Date.now(),
-    });
+    };
+    await putFingerprint(fingerprint);
   }
 
-  return {
+  const map: SongMap = {
     isrc,
     title: meta?.title,
     artist: meta?.artist,
@@ -156,6 +188,7 @@ export async function generateSongMap(
     frameRate: result.frameRate,
     generatedAt: Date.now(),
   };
+  return { map, fingerprint };
 }
 
 /** Find the section containing a given playback position. */

@@ -64,6 +64,8 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
+import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
+import * as crashLog from './lib/crashLog';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -1017,6 +1019,16 @@ export default function App() {
     if (paletteLock != null) visualizerRef.current?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Lay the opening look's plate: its dyes, its seed, its injection styles and
+  // its liquids. The settings above arrive with the first render, but the
+  // plate is the visualizer's and it seeds Classic until told otherwise — so
+  // every look the app opened on used to be drawn in Classic's yellow, pink
+  // and blue, poured Classic's way, until someone changed look. The preset
+  // gallery showed it: two dozen looks, one set of colours. After the lock
+  // above, so a pinned palette is honoured by the plate it lays.
+  useEffect(() => {
+    visualizerRef.current?.applyPreset(OPENING_LOOK);
+  }, []);
 
   // Overlay music-driven parameters onto the user's settings for rendering only
   // (the settings state itself is untouched, so preset detection keeps working).
@@ -1485,7 +1497,10 @@ export default function App() {
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
     setCued(null);
-    // Pressing Go is a decision: the whole look, structure and all.
+    // Pressing Go is a decision: the whole look, structure and all — and its
+    // colours with it, handed over across the fade rather than left to
+    // evaporate for minutes under the new ones. A cut still gets a second.
+    visualizerRef.current?.handoff(Math.max(1, seconds));
     fadeSettingsTo(targetLook(from, next.settings), seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
@@ -1510,6 +1525,7 @@ export default function App() {
     if (!prev) return;
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
+    visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
     fadeSettingsTo(prev.settings, fadeSeconds);
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
@@ -1731,16 +1747,74 @@ export default function App() {
    */
   const markUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
-  const sendCastState = useCallback(() => {
-    castSend({ type: 'state', state: castState });
-    // On the same call as the state, because the one moment a receiver needs
-    // the picture is the moment it says hello and gets its first state.
-    castSend({ type: 'mark', dataUrl: markUrlRef.current });
-    if (mirrorCount > 0) {
-      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
-      relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+  /*
+    The state, at most fifteen times a second.
+
+    It used to go out every time `castState` changed, and during a look fade
+    that is every tick of the fade (thirty a second), plus every override the
+    ear writes: a full settings object, stringified, down the Presentation
+    channel and again down the relay to every mirror, and at the other end a
+    React render of the whole receiver and a solver retune for each one. The
+    stability plan (S10) asked for ~10 Hz on the grounds that "the receiver
+    interpolates anyway". It does not: `CastDisplay` hands `state.settings`
+    straight to its own visualizer, so a receiver shows a fade as exactly the
+    staircase it was sent. At 10 Hz a two-second fade to black is twenty steps
+    of 5% brightness a tenth of a second apart, which reads as a staircase on
+    a dark wall. Fifteen is half the fade's own tick, so it still halves the
+    traffic, and gives thirty steps a fifteenth of a second apart, which does
+    not.
+
+    So: a leading and trailing throttle. The first change after a quiet spell
+    goes at once; changes inside the window are held, and one trailing send at
+    the end of it carries whatever the state is *then* (read from a ref, not
+    captured) — so the last value of a fade always arrives, and a receiver
+    never rests on a value from the middle of one.
+
+    Three things skip the wait:
+    - A receiver's hello, or a new cast or mirror (`castReadyRef`, `joined`):
+      a new receiver has nothing, and the mark goes with it on those alone,
+      exactly as before.
+    - A trigger: `presetSeq`, `seedCount`, `clearTrigger`, `drainTrigger`.
+      Those are events carried as counters, and the receiver acts on each
+      change; two coalesced into one window would be one seed or one clear
+      where the operator pressed twice, or a preset re-seed that arrives up
+      to a fifteenth of a second after the settings that follow it.
+    - Nothing else. `isActive`, the output, the harmony lock and the rest are
+      levels, and a level only needs its last value.
+  */
+  const CAST_STATE_MS = 66;
+  const castStateRef = useRef(castState);
+  castStateRef.current = castState;
+  const castSendRef = useRef(castSend);
+  castSendRef.current = castSend;
+  const mirrorCountRef = useRef(mirrorCount);
+  mirrorCountRef.current = mirrorCount;
+  const castSentAtRef = useRef(-Infinity);
+  const castSentTriggersRef = useRef('');
+  const castTrailRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const castTriggers = (s: CastState) => `${s.presetSeq}:${s.seedCount}:${s.clearTrigger}:${s.drainTrigger}`;
+  // Stable, and reads everything through refs, so the trailing timer can
+  // never send a state (or a mirror count) older than the one it was set for.
+  const sendCastState = useCallback((withMark = false) => {
+    if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
+    const state = castStateRef.current;
+    const send = castSendRef.current;
+    castSentAtRef.current = performance.now();
+    castSentTriggersRef.current = castTriggers(state);
+    send({ type: 'state', state });
+    // The picture only when a receiver is new — on its hello, or when a cast
+    // or a mirror starts — because that is the one moment it needs it.
+    // It used to ride along with every state, and the state changes twice a
+    // second while a track is identified and every frame of a fade: a data
+    // URL of up to several megabytes, sixty times a second, down the channel
+    // and the relay, each one decoded and re-uploaded at the other end.
+    if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
+    if (mirrorCountRef.current > 0) {
+      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
     }
-  }, [castSend, castState, mirrorCount]);
+  }, []);
+  useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
   const loadMark = useCallback((file: File) => {
     const reader = new FileReader();
@@ -1768,8 +1842,24 @@ export default function App() {
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
-  castReadyRef.current = sendCastState;
-  useEffect(() => { if (isCasting || mirrorCount > 0) sendCastState(); }, [isCasting, mirrorCount, sendCastState]);
+  castReadyRef.current = () => sendCastState(true);
+  const castLinkRef = useRef('');
+  useEffect(() => {
+    if (!isCasting && mirrorCount === 0) {
+      castLinkRef.current = '';
+      if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
+      return;
+    }
+    const link = `${isCasting}:${mirrorCount}`;
+    const joined = link !== castLinkRef.current;
+    castLinkRef.current = link;
+    if (joined || castTriggers(castState) !== castSentTriggersRef.current) { sendCastState(joined); return; }
+    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
+    if (wait <= 0) { sendCastState(false); return; }
+    // One trailing send per window; it reads the state when it fires.
+    if (!castTrailRef.current) castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCasting, mirrorCount, castState, sendCastState]);
   /*
     The live state, for a harness to read.
 
@@ -2347,6 +2437,7 @@ export default function App() {
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
       { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];
@@ -2507,6 +2598,33 @@ export default function App() {
     if (!activePresetId) return null;
     return allPresets.find(p => p.id === activePresetId)?.name ?? null;
   }, [activePresetId, allPresets]);
+
+  // The black box's half from here: which look, where the picture is going,
+  // and the look itself for a report (docs/crash-plan.md).
+  const crashStateRef = useRef({ activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated });
+  crashStateRef.current = { activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated };
+  useEffect(() => {
+    const unprovide = crashLog.provide('app', () => {
+      const c = crashStateRef.current;
+      const p = c.projector;
+      return {
+        preset: c.activePresetName ?? 'custom',
+        // Whether Evolve is on, and how fast: the one switch a report about
+        // "the plate changing too much" could not answer without.
+        evolve: c.isAutomated ? `on at ${Math.round((c.settings.automateRate ?? 0) * 100)}%, surge ${Math.round((c.settings.surge ?? 0) * 100)}%` : 'off',
+        projector: c.isCasting ? `casting${p ? ` to ${p.availWidth}x${p.availHeight}` : ''}` : p ? `found ${p.availWidth}x${p.availHeight}` : 'none',
+      };
+    });
+    crashLog.provideReport({
+      look: () => ({
+        preset: crashStateRef.current.activePresetName,
+        settings: crashStateRef.current.settings,
+        plate: visualizerRef.current?.describePlate() ?? null,
+        output: crashStateRef.current.output,
+      }),
+    });
+    return unprovide;
+  }, []);
 
   return (
     <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
@@ -3528,6 +3646,7 @@ export default function App() {
               </div>
             )}
           </div>
+          <CrashReportButton />
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
@@ -3702,6 +3821,12 @@ export default function App() {
       {deskUp && (
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       )}
+      {/* The crash report, under a desk: its header has no room for a
+          button that is idle nearly always, so the chip says when there is
+          news and ⌘K opens the sheet. */}
+      {deskUp && <CrashReportButton floating />}
+      {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
+      {overlaysVisible && <QuickReportDot />}
 
       {showSave && (
         <SaveLookSheet
