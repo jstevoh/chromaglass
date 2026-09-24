@@ -284,6 +284,28 @@ export class MacroCamera {
            density[i + (j + r) * size] + density[i + (j - r) * size]) * 0.25 - this.floor);
         const compactness = clamp((d - ring) / (d + 0.001), 0, 1);
 
+        /*
+          Raw density here is not what blacks the closeup out, and the control
+          is worth keeping because the arithmetic says otherwise.
+
+          `d` runs to the 6.0 clamp and `compactness` cannot pass 1, so the
+          middle of a saturated pool scores 6.0 * 0.25 = 1.5 while a real bead
+          at d = 0.5 scores 0.5 * 2.0 = 1.0 — which reads as a proof that a
+          filled plate makes the camera cut into its flattest place. Scoring on
+          the fall-off instead (`(d - ring) * (0.25 + compactness * 1.75)`),
+          which is zero for a uniform pool, changed nothing: measured by
+          `npm run closeup` over a filled plate, three toggles a look, the
+          worst frame went 100% -> 100% on soap-film, 96% -> 96% on classic,
+          68% -> 60% on galaxy, and classic's median frame got *worse*, 35% ->
+          82%. So the subject it picks is not what fills the frame.
+
+          The fault is real and reproducible — `npm run gig` has killed a show
+          on the macro-toggle alone, twice, over a plate 96% wet with 125
+          colours on it — but it is not here. The next thing to rule out is
+          whether a look that was never built for a closeup simply has nothing
+          to resolve at 4x, in which case the picker is choosing perfectly well
+          between equally smooth places.
+        */
         let score = d * (0.25 + compactness * 1.75);
         if (avoid) {
           const dist = Math.hypot(i - avoid.x, j - avoid.y);
