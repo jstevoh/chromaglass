@@ -981,8 +981,8 @@ export class WebGPUFluid {
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => {
       this.macCormack(pass, this.dye, this.velForced, disp, 'dye');
-      // What the spreading flow copied over more plate, thinned back (conserveDye).
-      this.run(pass, 'conserveDye', this.dye.write, [this.dye.read, this.velForced], this.arg('conserve dye', [disp, 0, 0, 0]));
+      // The dye per depth is what the flow carries: scaled by how the gap moved (conserveDye).
+      this.run(pass, 'conserveDye', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read], this.arg('conserve dye', [disp, 0, 0, 0]));
       this.dye.swap();
     });
     /*

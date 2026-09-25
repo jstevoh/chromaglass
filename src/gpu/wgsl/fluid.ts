@@ -2143,29 +2143,50 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   /*
     The dye is an amount per area of plate, and advection alone keeps a
     concentration: a semi-Lagrangian step carries each value along the flow
-    unchanged. Where the flow the dye rides spreads (a press squeezing the
-    film out from under a palm, the beat squeeze, a pour landing) the same
-    value was copied over more plate than it came from, and the dye grew:
-    Press added a quarter again of what it pressed. The column amount obeys
-    dq/dt + div(q u) = 0, so after the carry each cell is thinned by the
-    flow's spreading there, exp(-div u * dt), and thickened where it
-    converges, and what a press pushes out a release brings back.
+    unchanged. Where the film is squeezed (a press, the beat squeeze) the
+    liquid runs out from under the glass, and the dye it carries was copied
+    over more plate than it came from, or less.
 
-    A.a.x is the displacement per unit velocity (uv), as the advection's;
-    the factor is held to 0.8-1.25 a step so one bad velocity cannot empty
-    or flood a cell.
+    In a thin film the only real spreading is the gap changing: div(h u) =
+    -dh/dt, so on a plate whose gap holds still the flow has no divergence
+    and nothing here may act. What is conserved along the flow is the dye
+    per depth, q/h, and the flow's own divergence is what the carry actually
+    did, so where the gap is moving each cell is scaled by exp(-div u dt): a
+    press thins the dye under the palm as the liquid leaves, and the release
+    brings it back.
+
+    The first version took the flow's own divergence instead, and a flat
+    plate is not quite divergence-free on the grid (the current is projected
+    on a coarser one, the hand's kicks land after the projection): a small
+    steady convergence, compounded every step, piled the dye up fortyfold
+    (npm run depth, "a flat plate does not notice the drag"). So it acts only
+    where the gap's rate says something is pressing, and that is zero
+    everywhere else, exactly. (The gap's rate alone, (h + dh)/h, was tried
+    as the factor: it lost a sixth of a pressed disc, since the flow it
+    drives is not quite the flow the dye is carried by.)
+
+    Held to 0.8-1.25 a step so one bad reading cannot empty or flood a cell.
   */
   conserveDye: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let ux = textureLoad(vel, clampP(p + vec2i(1, 0), S.n), 0).x - textureLoad(vel, clampP(p - vec2i(1, 0), S.n), 0).x;
-  let vy = textureLoad(vel, clampP(p + vec2i(0, 1), S.n), 0).y - textureLoad(vel, clampP(p - vec2i(0, 1), S.n), 0).y;
-  let div = 0.5 * (ux + vy) * S.n * A.a.x;
-  let k = clamp(exp(-clamp(div, -1.0, 1.0)), 0.8, 1.25);
+  let g = textureLoad(sq, p, 0).rg;
+  let rate = abs(g.g) * S.dt / max(g.r, 0.002);
+  // Only where the gap is moving: everywhere else the flow is meant to be
+  // divergence-free, and what the grid leaves of it must not compound.
+  let gate = smoothstep(0.00001, 0.0001, rate);
+  var k = 1.0;
+  if (gate > 0.0) {
+    let ux = textureLoad(vel, clampP(p + vec2i(1, 0), S.n), 0).x - textureLoad(vel, clampP(p - vec2i(1, 0), S.n), 0).x;
+    let vy = textureLoad(vel, clampP(p + vec2i(0, 1), S.n), 0).y - textureLoad(vel, clampP(p - vec2i(0, 1), S.n), 0).y;
+    let div = 0.5 * (ux + vy) * S.n * A.a.x;
+    k = mix(1.0, clamp(exp(-clamp(div, -1.0, 1.0)), 0.8, 1.25), gate);
+  }
   let o = textureLoad(src, p, 0) * k;
   textureStore(dst, p, select(vec4f(0.0), o, finite4(o)));
 }`,
