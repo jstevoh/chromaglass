@@ -649,6 +649,25 @@ class FluidSimulation {
     this.dt = dt;
     this.diff = diffusion;
     this.visc = viscosity;
+    /*
+      A pour reaches the GPU's own fields as well (docs/physics-plan.md): oil
+      and silicone into the oil, soap into the surfactant, acid and base into
+      the acidity. Only into a field whose effect is on, so a look that doses
+      soap for what it already does pays nothing for the passes that would
+      move it.
+    */
+    this.liquid.onDeposit = (cx, cy, radius, what, amount) => {
+      const g = this.gpu;
+      const s = this.lastSettings;
+      if (!g?.addMix || !s || amount <= 0) return;
+      const oilOn = (s.oilTension ?? 0) > 0.001;
+      const oil = oilOn ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
+      const soap = (s.surfactantFlow ?? 0) > 0.001 ? (what.soap ?? 0) * Math.min(1, amount) : 0;
+      const acid = (s.phIndicator ?? 0) > 0.001 ? (what.acid ?? 0) * Math.min(1, amount) : 0;
+      if (oil <= 0 && soap <= 0 && acid === 0) return;
+      const L = this.size;
+      g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
+    };
 
     this.s = new Float32Array(GRID_AREA);
     this.sR = new Float32Array(GRID_AREA);
@@ -1199,6 +1218,8 @@ class FluidSimulation {
    * plate of ordinary dye runs exactly the arithmetic it always did.
    */
   readonly liquid = new LiquidPhase(GRID_SIZE);
+  /** The settings the last step ran with, for deciding what a pour feeds. */
+  private lastSettings: VisualizerSettings | null = null;
 
   /**
    * Let the liquid field act, then carry it along with the plate.
@@ -2224,6 +2245,7 @@ class FluidSimulation {
   }
 
   step(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number) {
+    this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
     dynamicSpeed += settings.platePressure * 0.02;
@@ -2683,6 +2705,15 @@ class FluidSimulation {
       magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
+      vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
+      oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
+      surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
+      solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
+      plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
+      doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
+      ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
+      bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
+      liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
@@ -3600,6 +3631,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const beatClockRef = useRef(new BeatClock());
   /** The music's pace on the plate's clock (lib/tempoPace.ts), slewed, and the loudness it is taken from. */
   const tempoMulRef = useRef(1);
+  /** When the reactions were last seeded (see the reactions' note in the loop). */
+  const bzSeedAtRef = useRef(0);
+  /** When the last Soap Burst landed. */
+  const soapAtRef = useRef(0);
+  const liesSeedAtRef = useRef(0);
   const loudnessRef = useRef(0);
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
@@ -4517,6 +4553,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
+          /*
+            Soap Bursts: with Soap Flow up, a drop of soap lands on the beat
+            somewhere on the plate and the Marangoni flow blows the dye out
+            from it (docs/physics-plan.md). The dial is how often: at full,
+            most kicks; with no beat, every couple of seconds. A performer's
+            control that does something on any look, rather than waiting for
+            the look to have poured soap of its own.
+          */
+          const soapDial = currentSettings.surfactantFlow ?? 0;
+          const leadSolver = fluidsRef.current[0]?.gpu;
+          if (soapDial > 0.001 && leadSolver?.addMix && isActiveRef.current) {
+            const beat = kickRef.current.kick && Math.random() < 0.25 + 0.7 * soapDial;
+            const idle = nowMs - soapAtRef.current > (2600 - 1800 * soapDial);
+            if (beat || idle) {
+              soapAtRef.current = nowMs;
+              leadSolver.addMix(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 0.03 + 0.04 * Math.random(), { soap: 1 });
+            }
+          }
         }
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
@@ -4745,6 +4799,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
             phasePendingRef.current = false;
             layPhaseRef.current();
+          }
+        }
+        /*
+          The reactions start themselves (docs/physics-plan.md).
+
+          BZ: a broken wave, which is how every spiral in a dish of it
+          begins. A disc of activator with a wake of oxidised catalyst on one
+          side cannot spread into its own wake, so its two free ends curl
+          round and keep turning. A new one every half minute or so, where
+          the dish has gone quiet, as a stray bubble or speck does in a real
+          one. Liesegang: the outer electrolyte poured at the plate's centre
+          and kept topped up, a reservoir the rings grow out from.
+        */
+        {
+          const g = leadGpu;
+          const s = settingsRef.current;
+          const nowMs = performance.now();
+          const live = g?.chemistryLive;
+          if (g?.addRxn && (s.bzReaction ?? 0) > 0.001 && (!live?.rxn || nowMs - bzSeedAtRef.current > 30000)) {
+            bzSeedAtRef.current = nowMs;
+            for (let k = 0; k < (live?.rxn ? 1 : 3); k++) {
+              const x = 0.2 + Math.random() * 0.6, y = 0.2 + Math.random() * 0.6, a = Math.random() * Math.PI * 2;
+              g.addRxn(x, y, 0.035, { bz: 0.9 });
+              g.addRxn(x + Math.cos(a) * 0.03, y + Math.sin(a) * 0.03, 0.035, { bzWake: 0.9 });
+            }
+          }
+          if (g?.addLiesegang && (s.liesegang ?? 0) > 0.001 && nowMs - liesSeedAtRef.current > 1000) {
+            liesSeedAtRef.current = nowMs;
+            g.addLiesegang(0.5, 0.5, 0.06, 4);
           }
         }
         /*

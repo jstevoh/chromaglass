@@ -45,6 +45,10 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // amber over teal is a flat green and amber over ultramarine is mud, which
   // is what the first gallery of this set showed on four plates.
   // The three that show off a part of the app nothing else used.
+  'oil-and-water':      [17, 16],             // amber oil, teal water
+  'red-cabbage':        [23, 10],             // the indicator itself: violet, and its deep purple
+  'chemical-clock':     [7, 15],              // a pale dish for the reaction's own red and blue
+  'agate':              [12, 13],             // sienna and coffee, an agate's browns
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
   'clock-glass':        [23, 7, 20],            // the second projector: emerald, purple, cobalt
@@ -104,6 +108,10 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'milk-marble':        ['drop'],
   'soap-film':          ['pour', 'drop'],
   'glycerine-drift':    ['pour', 'streak'],
+  'oil-and-water':      ['drop', 'pour'],
+  'red-cabbage':        ['drop'],
+  'chemical-clock':     ['drop'],
+  'agate':              ['drop'],
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
@@ -196,6 +204,10 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
 
   // ── The three that show off a part of the app ────────────────────
   // Oil will not wet the ferrofluid, so the pools stand apart from it.
+  'oil-and-water':      ['oil', 'water', 'oil'],
+  'red-cabbage':        ['acid', 'base', 'water'],
+  'chemical-clock':     ['water'],
+  'agate':              ['water'],
   'magnet-garden':      ['water', 'oil'],
   'home-movie':         ['water', 'water', 'soap'],
   // Syrup finds the low point of a curved glass, which is the middle.

@@ -67,6 +67,8 @@ export class WebGPUPlate {
   private auxSize = [0, 0];
   /** A stand-in for a texture the frame does not have: one transparent texel. */
   private readonly blank: GPUTexture;
+  /** The same, for the packed view (unsigned integers). */
+  private readonly blankU: GPUTexture;
 
   constructor(private readonly device: GPUDevice, readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'plate');
@@ -88,6 +90,11 @@ export class WebGPUPlate {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     }));
     device.queue.writeTexture({ texture: this.blank }, new Uint8Array(4), { bytesPerRow: 4 }, [1, 1]);
+    this.blankU = this.disposer.track(device.createTexture({
+      label: 'blank u', size: [1, 1], format: 'rgba32uint',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    }));
+    device.queue.writeTexture({ texture: this.blankU }, new Uint32Array(4), { bytesPerRow: 16 }, [1, 1]);
   }
 
   // ── What the frame is drawn from ──────────────────────────────────
@@ -165,7 +172,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; phase: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
     velRange: number,
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
@@ -272,8 +279,8 @@ export class WebGPUPlate {
     // The air field, or a black 1×1 where a layer carries no bubbles. Read
     // unconditionally and multiplied by the strength, which is 0 with none.
     const air = (i: number) => fields[i]?.air ?? this.blank;
-    // The second phase (H7), black where a layer carries none.
-    const phase = (i: number) => fields[i]?.phase ?? this.blank;
+    // The front plate's physics, packed (packView), or zeros before a step has run.
+    const view = (i: number) => fields[i]?.view ?? this.blankU;
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments: [
@@ -305,7 +312,7 @@ export class WebGPUPlate {
         { binding: 14, resource: parts(1).createView() },
         { binding: 15, resource: air(0).createView() },
         { binding: 16, resource: air(1).createView() },
-        { binding: 17, resource: phase(0).createView() },
+        { binding: 17, resource: view(0).createView() },
       ],
     }));
     pass.draw(6);

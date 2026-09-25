@@ -185,6 +185,18 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'physics' },
   { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'physics' },
   { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1, section: 'master' },
+  { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
+  { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'physics' },
+  { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'physics' },
+  { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 1, section: 'physics' },
+  { key: 'plateUpright', label: "Gravity", min: 0, max: 1, section: 'physics' },
+  { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 1, section: 'physics' },
+  { key: 'ferroLabyrinth', label: "Labyrinth", min: 0, max: 1, section: 'physics' },
+  { key: 'phIndicator', label: "pH Indicator", min: 0, max: 1, section: 'physics' },
+  { key: 'bzReaction', label: "BZ Reaction", min: 0, max: 1, section: 'physics' },
+  { key: 'liesegang', label: "Liesegang Rings", min: 0, max: 1, section: 'physics' },
+  { key: 'thicknessOptics', label: "Layer Depth", min: 0, max: 1, section: 'physics' },
+  { key: 'spectralOptics', label: "Spectral Mix", min: 0, max: 1, section: 'physics' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'physics' },
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
@@ -268,8 +280,10 @@ export type DeskSurface = 'perform' | 'design';
  * be changed — the eight were the right eight and also the only eight.
  */
 export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
-  'globalSpeed', 'turbulenceScale', 'audioImpact', 'beatSqueeze',
-  'bloom', 'granulation', 'macroZoom', 'automateRate',
+  // Granulation is off the strip: it made a few jagged cuts in the dye and
+  // read as a fault. The physics dials in its place each do something large.
+  'globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright',
+  'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate',
 ];
 
 /** How many a strip will hold before it stops being a surface you can read. */

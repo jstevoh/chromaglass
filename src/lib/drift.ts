@@ -46,7 +46,7 @@ import { STRUCTURE } from './lookFade';
  */
 const LIGHT_STACK = new Set([
   'saturationBoost', 'bloom', 'lumia', 'gelWheel', 'secondLamp', 'dimmer',
-  'exposure', 'transmission', 'iridescence',
+  'exposure', 'transmission', 'iridescence', 'thicknessOptics', 'spectralOptics',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

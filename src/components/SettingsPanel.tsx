@@ -2549,6 +2549,117 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="magnetWalk"
         />
 
+        {/* The liquids' own physics and chemistry (docs/physics-plan.md): each
+            one off until it is turned up. */}
+        <div className="mt-2 mb-2 text-[11px] uppercase tracking-wider text-muted">Physics &amp; chemistry</div>
+        <Slider
+          label="Swirl"
+          value={settings.vorticityConfinement ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
+          settingKey="vorticityConfinement"
+        />
+        <Slider
+          label="Oil Tension"
+          value={settings.oilTension ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilTension: v })}
+          settingKey="oilTension"
+        />
+        <Slider
+          label="Soap Bursts"
+          value={settings.surfactantFlow ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ surfactantFlow: v })}
+          settingKey="surfactantFlow"
+        />
+        <Slider
+          label="Dye Weight"
+          value={settings.solutalBuoyancy ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
+          settingKey="solutalBuoyancy"
+        />
+        <Slider
+          label="Gravity"
+          value={settings.plateUpright ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateUpright: v })}
+          settingKey="plateUpright"
+        />
+        <Slider
+          label="Heat Spread"
+          value={settings.doubleDiffusion ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
+          settingKey="doubleDiffusion"
+        />
+        <Slider
+          label="Labyrinth"
+          value={settings.ferroLabyrinth ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ ferroLabyrinth: v })}
+          settingKey="ferroLabyrinth"
+        />
+        <Slider
+          label="pH Indicator"
+          value={settings.phIndicator ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ phIndicator: v })}
+          settingKey="phIndicator"
+        />
+        <Slider
+          label="BZ Reaction"
+          value={settings.bzReaction ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bzReaction: v })}
+          settingKey="bzReaction"
+        />
+        <Slider
+          label="Liesegang Rings"
+          value={settings.liesegang ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ liesegang: v })}
+          settingKey="liesegang"
+        />
+        <Slider
+          label="Layer Depth"
+          value={settings.thicknessOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ thicknessOptics: v })}
+          settingKey="thicknessOptics"
+        />
+        <Slider
+          label="Spectral Mix"
+          value={settings.spectralOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spectralOptics: v })}
+          settingKey="spectralOptics"
+        />
         <Slider
           label="Plate Shape"
           value={settings.plateCurve ?? 0}

@@ -77,10 +77,53 @@ fn textureBicubic(t: texture_2d<f32>, uv: vec2f) -> vec4f {
 
 fn decodeDensity(a: f32) -> f32 { return a * a * DENSITY_SCALE; }
 
+/*
+  How much deeper than nominal the liquid is here: the gap between the two
+  glasses over its resting 0.03, where the thickness optics is on. Beer and
+  Lambert say what light gets through goes as exp(−absorbance × path), and
+  the path is the gap: a press pales the colour under the palm, a deep pool
+  saturates. Set per layer by the display pass (the front plate's gap is the
+  only one it has), 1 everywhere else.
+*/
+var<private> gapScale: f32 = 1.0;
+
+/*
+  Dyes mixed across six bands of the spectrum instead of three.
+
+  A dye's colour is a spectrum, and light through two dyes is the product of
+  their transmissions wavelength by wavelength; only then does the eye sum it
+  into three responses. Doing the product on the three sums instead is the
+  shortcut every RGB mixer takes, and it is why mixtures go muddy and
+  thickness only darkens instead of shifting hue (dichromatism, which is why
+  a deep glass of a yellow dye goes red). So the RGB absorbance is spread
+  over six overlapping bands (420–670 nm), each band is attenuated by the
+  path on its own, and the eye's three responses sum them back. White stays
+  white: every row of the response sums to one.
+*/
+fn spectralThrough(unit: vec3f, path: f32) -> vec3f {
+  let a = -log(max(unit, vec3f(1e-4)));
+  let b0 = dot(a, vec3f(0.10, 0.10, 0.80));
+  let b1 = dot(a, vec3f(0.05, 0.35, 0.60));
+  let b2 = dot(a, vec3f(0.05, 0.80, 0.15));
+  let b3 = dot(a, vec3f(0.35, 0.60, 0.05));
+  let b4 = dot(a, vec3f(0.80, 0.20, 0.00));
+  let b5 = dot(a, vec3f(0.95, 0.05, 0.00));
+  let t0 = exp(-b0 * path); let t1 = exp(-b1 * path); let t2 = exp(-b2 * path);
+  let t3 = exp(-b3 * path); let t4 = exp(-b4 * path); let t5 = exp(-b5 * path);
+  return vec3f(
+    0.30 * t3 + 0.45 * t4 + 0.25 * t5,
+    0.05 * t0 + 0.20 * t1 + 0.45 * t2 + 0.30 * t3,
+    0.45 * t0 + 0.40 * t1 + 0.15 * t2);
+}
+
 fn lightThrough(unit: vec3f, thickness: f32) -> vec3f {
-  if (U.transmission <= 0.001) { return unit; }
-  let t = pow(max(unit, vec3f(1e-4)), vec3f(clamp(thickness, 0.35, 4.0)));
-  return mix(unit, t, U.transmission);
+  var base = unit;
+  if (U.spectral > 0.001) { base = mix(unit, spectralThrough(unit, gapScale), U.spectral); }
+  if (U.transmission <= 0.001) { return base; }
+  let th = clamp(thickness * gapScale, 0.35, 4.0);
+  var t = pow(max(unit, vec3f(1e-4)), vec3f(th));
+  if (U.spectral > 0.001) { t = mix(t, spectralThrough(unit, th), U.spectral); }
+  return mix(base, t, U.transmission);
 }
 
 fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t, uv); }
@@ -142,7 +185,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
   let exposed = max(0.0, totalDensity - U.filmLevel) * U.filmGain;
   let m = clamp(U.macroOn, 0.0, 1.0);
-  let thickness = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7);
+  let thickness = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7) * gapScale;
   var alpha = 1.0 - exp(-thickness);
   alpha = min(mix(0.95, 0.995, m), alpha);
 
@@ -852,7 +895,8 @@ export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
   // MACRO because WGSL wants a function declared before it is called and
   // `decodeFluidDof`, which it falls back to, is declared in there.
   const particles = bindings === DISPLAY_BINDINGS ? PARTICLE_FOLD : '';
-  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${FINISH_WGSL}${VERT}${main}`;
+  const view = bindings === DISPLAY_BINDINGS ? VIEW : '';
+  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${view}${FINISH_WGSL}${VERT}${main}`;
 }
 
 /** The pieces, for the slices still being ported to build on. */
@@ -915,8 +959,36 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 /** The air field (H6): coverage in 0–1, where a bubble has pushed the dye out. */
 @group(0) @binding(15) var air0: texture_2d<f32>;
 @group(0) @binding(16) var air1: texture_2d<f32>;
-/** The second phase on the front plate (H7): how much dark liquid is here. */
-@group(0) @binding(17) var phase0: texture_2d<f32>;
+/**
+ * The front plate's own physics and chemistry, packed (see packView in
+ * wgsl/fluid.ts): the ferrofluid, oil, acidity, soap, the BZ reaction,
+ * Liesegang's precipitate and the gap, in the one binding the ferrofluid
+ * used to have, because this pass is at WebGPU's limit of sixteen.
+ */
+@group(0) @binding(17) var view0: texture_2d<u32>;
+`;
+
+/** Reading view0, between its texels. Only with the display's own bindings. */
+export const VIEW = /* wgsl */ `
+struct View { phase: f32, oil: f32, acid: f32, soap: f32, bz: f32, pr: f32, gap: f32, bzu: f32 };
+fn viewTexel(p: vec2i) -> array<f32, 8> {
+  let d = vec2i(textureDimensions(view0)) - 1;
+  let q = textureLoad(view0, clamp(p, vec2i(0), d), 0);
+  let a = unpack2x16unorm(q.x); let b = unpack2x16unorm(q.y);
+  let c = unpack2x16unorm(q.z); let e = unpack2x16unorm(q.w);
+  return array<f32, 8>(a.x, a.y, b.x, b.y, c.x, c.y, e.x, e.y);
+}
+fn viewAt(uv: vec2f) -> View {
+  let n = vec2f(textureDimensions(view0));
+  let q = uv * n - 0.5;
+  let i = vec2i(floor(q));
+  let f = q - floor(q);
+  let t00 = viewTexel(i); let t10 = viewTexel(i + vec2i(1, 0));
+  let t01 = viewTexel(i + vec2i(0, 1)); let t11 = viewTexel(i + vec2i(1, 1));
+  var o = array<f32, 8>();
+  for (var k = 0; k < 8; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
+  return View(o[0], o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7]);
+}
 `;
 
 /*
@@ -1108,7 +1180,11 @@ struct FsOut {
     flow0 = fluidFlow(vel0, fuv0) * macroAmt;
     fuv0 = macroWarp(fuv0);
   }
+  // The front plate's own physics, once, where it sits on the plate.
+  let view = viewAt(fuvBase);
+  gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
+  gapScale = 1.0;
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
   if (U.dishSpread > 0.001 && !closeup) {
@@ -1226,13 +1302,11 @@ struct FsOut {
       picture.
     */
     if (U.phaseAmount > 0.002) {
-      let ph = clamp(textureSampleLevel(phase0, samp, fuvBase, 0.0).r, 0.0, 1.0);
+      let ph = clamp(view.phase, 0.0, 1.0);
       if (ph > 0.004) {
         let e = 1.6 / U.logicalGrid;
-        let gx = textureSampleLevel(phase0, samp, fuvBase + vec2f(e, 0.0), 0.0).r
-               - textureSampleLevel(phase0, samp, fuvBase - vec2f(e, 0.0), 0.0).r;
-        let gy = textureSampleLevel(phase0, samp, fuvBase + vec2f(0.0, e), 0.0).r
-               - textureSampleLevel(phase0, samp, fuvBase - vec2f(0.0, e), 0.0).r;
+        let gx = viewAt(fuvBase + vec2f(e, 0.0)).phase - viewAt(fuvBase - vec2f(e, 0.0)).phase;
+        let gy = viewAt(fuvBase + vec2f(0.0, e)).phase - viewAt(fuvBase - vec2f(0.0, e)).phase;
         let edge = clamp(length(vec2f(gx, gy)) * 3.0, 0.0, 1.0);
         // Brown where it is thin, black where it is thick: a real film, not a
         // silhouette with a hard edge.
@@ -1252,6 +1326,43 @@ struct FsOut {
         pc += vec3f(1.0, 0.97, 0.92) * hi * 0.35 * opac;
         outColor = pc;
       }
+    }
+
+    /*
+      The liquids' own chemistry, drawn over the dye (docs/physics-plan.md).
+    */
+    // Oil in water: where the two meet the light bends away, so a real oil
+    // drop on a projector is ringed by a thin dark line (the meniscus), and
+    // its body, a weak lens, is a touch brighter than the water around it.
+    if (view.oil > 0.004) {
+      let e = 1.2 / U.logicalGrid;
+      let og = vec2f(viewAt(fuvBase + vec2f(e, 0.0)).oil - viewAt(fuvBase - vec2f(e, 0.0)).oil,
+                     viewAt(fuvBase + vec2f(0.0, e)).oil - viewAt(fuvBase - vec2f(0.0, e)).oil);
+      let rim = clamp(length(og) * 2.2, 0.0, 1.0);
+      outColor = outColor * (1.0 - 0.55 * rim) + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
+    }
+    // A pH indicator in the dye (red cabbage's anthocyanin): red-pink in
+    // acid, purple near neutral, green then yellow in base. Where there is no
+    // acid or base the dye keeps its own colour.
+    if (U.phIndicator > 0.001) {
+      let a = clamp(view.acid, -1.0, 1.0);
+      let neutral = vec3f(0.62, 0.35, 0.85);
+      let ind = select(mix(neutral, vec3f(0.45, 0.85, 0.25), clamp(-a * 1.4, 0.0, 1.0)),
+                       mix(neutral, vec3f(1.0, 0.25, 0.45), clamp(a * 1.4, 0.0, 1.0)), a >= 0.0);
+      let w = U.phIndicator * clamp(abs(a) * 2.5, 0.0, 1.0) * fluid0.a;
+      outColor = mix(outColor, outColor * ind * 1.7 + ind * 0.05, w);
+    }
+    // The BZ reaction in ferroin: red where the catalyst is reduced, blue
+    // where the wave has oxidised it, over a pale dish.
+    if (U.bzShow > 0.001 && (view.bz > 0.0005 || view.bzu > 0.0005)) {
+      let ox = clamp(view.bz * 3.5, 0.0, 1.0);
+      let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
+      outColor = mix(outColor, col, U.bzShow * 0.85);
+    }
+    // Liesegang's precipitate: brick-red bands (silver chromate) in the gel.
+    if (U.liesShow > 0.001) {
+      let band = clamp(view.pr * 1.5, 0.0, 1.0);
+      outColor = mix(outColor, vec3f(0.62, 0.26, 0.14), U.liesShow * band * 0.9);
     }
   }
   auxN = -normal0.xy * fluid0.a;

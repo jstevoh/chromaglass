@@ -1443,6 +1443,498 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // Interface sharpening: anti-diffusion with a clamp (see the GLSL for why).
+  // ─── The liquids' own physics and chemistry (docs/physics-plan.md) ───
+  /*
+    Vorticity confinement (Fedkiw, Stam & Jensen 2001), as a look option.
+
+    Every grid solver loses small swirls to its own numerical smoothing, and
+    this puts back a force along ∇|ω| × ω that spins up what is left of each
+    eddy. It is not physics a thin film has: a liquid between two glasses is
+    heavily damped. It is the swirl a projected show is loved for, so it is a
+    dial, off by default. Two passes: the curl, then the push.
+  */
+  curl: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let w = (textureLoad(vel, clampP(p + vec2i(1, 0), n), 0).y - textureLoad(vel, clampP(p - vec2i(1, 0), n), 0).y)
+        - (textureLoad(vel, clampP(p + vec2i(0, 1), n), 0).x - textureLoad(vel, clampP(p - vec2i(0, 1), n), 0).x);
+  textureStore(dst, p, vec4f(0.5 * w, 0.0, 0.0, 0.0));
+}`,
+
+  // A.a.x = how hard, per step.
+  confine: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var cw: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+fn wa(p: vec2i, n: f32) -> f32 { return abs(textureLoad(cw, clampP(p, n), 0).r); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let v = textureLoad(vel, p, 0);
+  let g = vec2f(wa(p + vec2i(1, 0), n) - wa(p - vec2i(1, 0), n), wa(p + vec2i(0, 1), n) - wa(p - vec2i(0, 1), n));
+  let gl = length(g);
+  var f = vec2f(0.0);
+  if (gl > 1e-6) {
+    let nn = g / gl;
+    let w = textureLoad(cw, p, 0).r;
+    f = vec2f(nn.y * w, -nn.x * w) * A.a.x;
+  }
+  textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
+}`,
+
+  /*
+    The mix: three things a cell of liquid carries besides its dye.
+
+      r  oil: how much of the cell is oil rather than water, 0..1
+      g  surfactant (soap), 0..1
+      b  acidity: + acid, − base, −1..1 (they neutralise by cancelling)
+      a  the oil's chemical potential μ, recomputed every step (mixMu)
+
+    A pour: A.a = (x, y, radius, amount), A.b = how much of the amount goes to
+    each channel.
+  */
+  mixSplat: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let d = length(uvOf(id) - A.a.xy) / max(A.a.z, 1e-4);
+  let f = select(0.0, (1.0 - d * d) * A.a.w, d < 1.0);
+  let m = textureLoad(src, p, 0) + A.b * f;
+  textureStore(dst, p, vec4f(clamp(m.r, 0.0, 1.0), clamp(m.g, 0.0, 1.0), clamp(m.b, -1.0, 1.0), m.a));
+}`,
+
+  /*
+    The mix rides the flow in flux form, as the ferrofluid does (see
+    phaseAdvect): each face's flux computed the same way from both sides, so
+    none of it is made or lost. μ (a) is derived and is not carried.
+  */
+  mixAdvect: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+fn mx(p: vec2i, n: i32) -> vec3f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).rgb; }
+fn mm(a: vec3f, b: vec3f) -> vec3f {
+  return select(vec3f(0.0), select(max(a, b), min(a, b), a > vec3f(0.0)), a * b > vec3f(0.0));
+}
+fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
+  let b = a + e;
+  if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec3f(0.0); }
+  let ve = dot(textureLoad(vel, a, 0).xy + textureLoad(vel, b, 0).xy, vec2f(e)) * 0.5;
+  let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
+  if (c >= 0.0) {
+    let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
+    return c * (mx(a, n) + 0.5 * (1.0 - c) * s);
+  }
+  let s = mm(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
+  return c * (mx(b, n) - 0.5 * (1.0 + c) * s);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let here = textureLoad(src, p, 0);
+  let d = flux(p, vec2i(1, 0), n) - flux(p - vec2i(1, 0), vec2i(1, 0), n)
+        + flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
+  let m = here.rgb - d;
+  textureStore(dst, p, vec4f(m.r, max(m.g, 0.0), m.b, here.a));
+}`,
+
+  /*
+    The oil cannot be packed past full, nor go below empty: the same pressure
+    as phaseRelax. Whatever a cell holds above 1 (or below 0) is shared with
+    its neighbours, each pair's exchange computed the same way from both
+    sides, so it conserves. Measured without it: the flow's leftover
+    compression piled the oil past full and the guard clamp lost a third of
+    it in a second.
+  */
+  mixRelax: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn bad(p: vec2i, n: i32) -> vec2f {
+  if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) { return vec2f(0.0, 0.0); }
+  let c = textureLoad(src, p, 0).r;
+  return vec2f(max(c - 1.0, 0.0) + min(c, 0.0), 1.0);
+}
+fn pair(a: f32, b: vec2f) -> f32 { return select(0.0, 0.24 * (a - b.x), b.y > 0.5); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let m = textureLoad(src, p, 0);
+  let e = max(m.r - 1.0, 0.0) + min(m.r, 0.0);
+  let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
+          + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
+  textureStore(dst, p, vec4f(m.r - out, m.gba));
+}`,
+
+  /*
+    Marangoni flow: what rides the surface is carried away from soap.
+
+    Soap lowers the surface tension, and a surface pulls toward where its
+    tension is higher, so it streams away from the soap at a speed that goes
+    with the tension's gradient: u = −k ∇Γ. It is a surface flow, and a
+    spreading one. Added to the velocity it did not work either way it was
+    tried: before the projection it is a pure gradient and was deleted whole
+    (a soap drop moved no dye), and after it the dye's backtrace, which has
+    no term for a spreading flow, made twice the dye there had been.
+
+    So what rides the surface (the dye, the soap itself, the oil) is moved
+    along that flow directly, in flux form: each face's flux the same from
+    both sides, so the surface thins where it spreads and piles up at the
+    front and nothing is made or lost. The milk-and-soap burst, and the
+    fronts a drop of detergent sends across a plate.
+
+    A.a.x = k (face speed per unit of Γ across it, in cells a step).
+  */
+  marangoniFlux: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var mix: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn gm(p: vec2i, n: i32) -> f32 { return textureLoad(mix, clamp(p, vec2i(0), vec2i(n - 1)), 0).g; }
+fn face(a: vec2i, e: vec2i, n: i32) -> vec4f {
+  let b = a + e;
+  if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
+  let c = clamp(-A.a.x * (gm(b, n) - gm(a, n)), -0.24, 0.24);
+  return c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let d = face(p, vec2i(1, 0), n) - face(p - vec2i(1, 0), vec2i(1, 0), n)
+        + face(p, vec2i(0, 1), n) - face(p - vec2i(0, 1), vec2i(0, 1), n);
+  textureStore(dst, p, textureLoad(src, p, 0) - d);
+}`,
+
+  /*
+    Oil and water: the Cahn–Hilliard chemical potential.
+
+    μ = f′(c) − κ∇²c, with f(c) = c²(1 − c)², the double well whose two floors
+    are pure water and pure oil. The first term drives a mixed cell toward
+    one or the other; the second charges for every bit of boundary, which is
+    what surface tension *is*: a blob rounds up because a circle is the
+    shortest boundary for its area, and a thin thread breaks into drops for
+    the same reason (Rayleigh–Plateau). Neither is drawn; both fall out.
+    Stored in the mix's alpha for the update and the force to read.
+  */
+  mixMu: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let m = textureLoad(src, p, 0);
+  let c = m.r;
+  let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
+  let mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  textureStore(dst, p, vec4f(m.rgb, mu));
+}`,
+
+  /*
+    One step of the mix's own evolution.
+
+      oil         ∂c/∂t = M ∇²μ         (Cahn–Hilliard: conserves the oil)
+      surfactant  diffuses (A.a.y) and breaks down (A.a.z, a factor a step)
+      acidity     diffuses (A.a.w); acid and base neutralise by cancelling
+
+    A.a.x = M × dt in cell units, kept under the explicit limit (1/64 for
+    this stencil) by the host.
+  */
+  mixUpdate: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn mm4(p: vec2i, n: f32) -> vec4f { return textureLoad(src, clampP(p, n), 0); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let m = mm4(p, n);
+  let lap = mm4(p + vec2i(1, 0), n) + mm4(p - vec2i(1, 0), n) + mm4(p + vec2i(0, 1), n) + mm4(p - vec2i(0, 1), n) - 4.0 * m;
+  // Not clamped to 0..1: Cahn–Hilliard overshoots a little either side of an
+  // interface and its own double well brings it back, where a clamp would
+  // make or destroy oil every step (measured: the oil swung ±30%). The wide
+  // band is only a guard against a runaway.
+  let c = clamp(m.r + A.a.x * lap.a, -0.25, 1.25);
+  let s = clamp((m.g + A.a.y * lap.g) * A.a.z, 0.0, 1.0);
+  let a = clamp(m.b + A.a.w * lap.b, -1.0, 1.0);
+  textureStore(dst, p, vec4f(c, s, a, m.a));
+}`,
+
+  /*
+    What the mix does to the flow, and what gravity does to the dye.
+
+    **Capillary (Korteweg) force**, −σ c ∇μ: the Cahn–Hilliard free energy's
+    own force on the liquid, which is surface tension in a diffuse
+    interface. It is what makes an oil blob in water pull itself round and
+    carry the dye inside it along. A.a.x = σ.
+
+    (Marangoni flow is not here: see marangoniFlux.)
+
+    **Buoyancy**, g (βₛ(ρ − ρ̄) − β_T T): dye makes the liquid heavier, heat
+    makes it lighter. On a plate standing up (or tilted) that is a
+    Rayleigh–Taylor instability: heavy dye above light sinks in fingers. With
+    heat diffusing faster than the dye (the double-diffusive case, see
+    doubleDiffusion) it makes salt fingers. A.b.xy = gravity in the plate
+    (with its size), A.b.z = βₛ, A.b.w = β_T.
+  */
+  mixForce: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var mix: texture_2d<f32>;
+@group(0) @binding(4) var dye: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn mm4(p: vec2i, n: f32) -> vec4f { return textureLoad(mix, clampP(p, n), 0); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  var v = textureLoad(vel, p, 0);
+  let m = mm4(p, n);
+  let gx = mm4(p + vec2i(1, 0), n) - mm4(p - vec2i(1, 0), n);
+  let gy = mm4(p + vec2i(0, 1), n) - mm4(p - vec2i(0, 1), n);
+  // In the potential form, −c ∇μ: equal to μ ∇c up to a gradient the
+  // projection removes, and far smoother, because μ varies gently across a
+  // drop where ∇c is a spike on its edge. The spike form left compression
+  // behind that piled the oil past full and lost it at the guard.
+  let capillary = -clamp(m.r, 0.0, 1.0) * vec2f(gx.a, gy.a) * 0.5 * A.a.x;
+  let marangoni = -vec2f(gx.g, gy.g) * 0.5 * A.a.y;
+  let rho = textureLoad(dye, p, 0).a - S.meanD;
+  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
+  v = vec4f(v.xy + capillary + marangoni + buoy, v.z, v.w);
+  textureStore(dst, p, safeVel(v));
+}`,
+
+  /*
+    The ferrofluid under a strong field: labyrinths (Ohta–Kawasaki).
+
+    A thin layer of ferrofluid in a field perpendicular to it is a sheet of
+    parallel magnetic dipoles, and parallel dipoles repel. Surface tension
+    wants one round blob; the repulsion wants the ferrofluid spread out. They
+    settle on stripes a fixed width apart, bent into a maze: the labyrinthine
+    instability. The model is Cahn–Hilliard with the repulsion added to the
+    chemical potential, μ + α ψ, where (−∇² + m²) ψ = c (the Ohta–Kawasaki
+    long-range term, screened: see screenJacobi). Then ∇²ψ = m²ψ − c, and
+    the update carries −Mα(c − m²ψ), which is the maze-making term and
+    sums to zero over the plate, so it conserves. Two earlier tries did
+    not: subtracting α(c − c̄) with c̄ a local average drained half the
+    ferrofluid, and smearing c over a ring was a diffusion, which smooths. α is scaled by how saturated the
+    field is here, so the maze appears over the magnet and fades away from
+    it.
+
+    Two passes, as the oil: μ (into a scratch texture), then the update.
+    A.a = the magnet, A.b.x = M × dt, A.b.y = α.
+  */
+  /*
+    ψ, the ferrofluid's long-range repulsion: (−∇² + m²) ψ = c, a screened
+    Poisson equation, relaxed a few Jacobi sweeps a step from where it was
+    (it changes slowly). A.a.x = m², in cells.
+  */
+  screenJacobi: `${HEAD}
+@group(0) @binding(2) var psi: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+fn ps(p: vec2i, n: f32) -> f32 { return textureLoad(psi, clampP(p, n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let s = ps(p + vec2i(1, 0), n) + ps(p - vec2i(1, 0), n) + ps(p + vec2i(0, 1), n) + ps(p - vec2i(0, 1), n);
+  let c = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  textureStore(dst, p, vec4f((s + c) / (4.0 + A.a.x), 0.0, 0.0, 0.0));
+}`,
+
+  phaseMu: `${HEAD}${MAGNET_WGSL}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var psi: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+fn cc(p: vec2i, n: f32) -> f32 { return clamp(textureLoad(src, clampP(p, n), 0).r, 0.0, 1.0); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let c = cc(p, n);
+  let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
+  let e = magnetEnergy(uvOf(id), A.a);
+  let sat = e / (e + 2000.0);
+  let w = textureLoad(psi, p, 0).r;
+  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap + A.b.y * sat * w, 0.0, 0.0, 0.0));
+}`,
+
+  phaseCH: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var mu: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let lap = uu(p + vec2i(1, 0), n) + uu(p - vec2i(1, 0), n) + uu(p + vec2i(0, 1), n) + uu(p - vec2i(0, 1), n) - 4.0 * uu(p, n);
+  // Not clamped: Cahn–Hilliard dips a little either side of an edge and
+  // brings itself back, and a clamp there makes or loses ferrofluid.
+  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * lap, 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    The reactions run in a gel, on grids of their own (256² for BZ, 128² for
+    Liesegang): a gel does not flow, and reaction-diffusion patterns are
+    counted in cells, so on the solver's grid they would come out a
+    different size at every resolution and need hundreds of steps a frame on
+    the big ones. A pour into one: A.a = (x, y, radius, grid size), A.b =
+    what to add.
+  */
+  gridSplat: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let g = A.a.w;
+  if (id.x >= u32(g) || id.y >= u32(g)) { return; }
+  let p = vec2i(id.xy);
+  let uv = (vec2f(id.xy) + 0.5) / g;
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let f = select(0.0, 1.0, d < 1.0);
+  // Up to 8: an outer electrolyte is poured far stronger than the inner one it meets.
+  textureStore(dst, p, clamp(textureLoad(src, p, 0) + A.b * f, vec4f(0.0), vec4f(8.0)));
+}`,
+
+  /*
+    One small step of the Belousov–Zhabotinsky reaction, the two-variable
+    Oregonator (Tyson & Fife):
+      ∂u/∂t = (u − u² − f v (u − q)/(u + q)) / ε + D ∇²u
+      ∂v/∂t = u − v
+    with ε = 0.05, q = 0.002, f = 1.4: an excitable medium. A disturbance
+    sends out a wave that cannot pass through its own wake, so a broken wave
+    front curls into a spiral, the patterns a dish of BZ is famous for.
+    u is the activator (HBrO₂), v the oxidised catalyst (ferroin's blue).
+
+    A.a.x = the step, A.a.z = the grid, A.a.w = D for u, in cells² per unit
+    time.
+  */
+  rxnStep: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn r4(p: vec2i, n: f32) -> vec4f { return textureLoad(src, clampP(p, n), 0); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = A.a.z;
+  if (id.x >= u32(n) || id.y >= u32(n)) { return; }
+  let p = vec2i(id.xy);
+  let m = r4(p, n);
+  let lap = r4(p + vec2i(1, 0), n) + r4(p - vec2i(1, 0), n) + r4(p + vec2i(0, 1), n) + r4(p - vec2i(0, 1), n) - 4.0 * m;
+  let dt = A.a.x;
+  let u = m.r;
+  let v = m.g;
+  let eps = 0.05;
+  let q = 0.002;
+  let f = 1.4;
+  let du = (u - u * u - f * v * (u - q) / (u + q)) / eps + A.a.w * lap.r;
+  let dv = u - v;
+  textureStore(dst, p, vec4f(clamp(u + dt * du, 0.0, 1.0), clamp(v + dt * dv, 0.0, 1.0), m.b, m.a));
+}`,
+
+  /*
+    Liesegang rings: the Keller–Rubinow model, with Ostwald's
+    supersaturation.
+
+      A  the outer electrolyte, poured at a spot and diffusing out
+      B  the inner electrolyte, spread evenly through the plate
+      C  their product, dissolved: A + B → C at rate k A B
+      P  C come out of solution as a solid, which does not move
+
+    C precipitates only once it passes a high threshold (nucleation), or a
+    much lower one next to precipitate already there (growth on it). A band
+    therefore forms at the front, then eats the C and, through it, the A and
+    B around it, and the front has to travel on before the next nucleates:
+    the bands come out spaced ever wider (the Jablczynski law), which is the
+    whole signature of the thing and is not drawn anywhere.
+
+    A.a.x = the step, A.a.z = the grid.
+  */
+  liesStep: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn l4(p: vec2i, n: f32) -> vec4f { return textureLoad(src, clampP(p, n), 0); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = A.a.z;
+  if (id.x >= u32(n) || id.y >= u32(n)) { return; }
+  let p = vec2i(id.xy);
+  let m = l4(p, n);
+  let lap = l4(p + vec2i(1, 0), n) + l4(p - vec2i(1, 0), n) + l4(p + vec2i(0, 1), n) + l4(p - vec2i(0, 1), n) - 4.0 * m;
+  let dt = A.a.x;
+  let react = 4.0 * m.r * m.g;
+  var a = m.r + dt * (6.0 * lap.r - react);
+  var b = m.g + dt * (6.0 * lap.g - react);
+  var c = m.b + dt * (0.5 * lap.b + react);
+  // Growth only on precipitate already in this cell: letting it grow onto
+  // a neighbour made the band creep outward a cell at a time instead of
+  // starving the gap ahead of it, and one solid disc came out, not rings.
+  var g = 0.0;
+  if (c > 0.12) { g = 5.0 * (c - 0.02); }
+  else if (m.a > 0.01 && c > 0.02) { g = 5.0 * (c - 0.02); }
+  let dp = min(dt * g, max(c, 0.0));
+  c = c - dp;
+  textureStore(dst, p, vec4f(max(a, 0.0), max(b, 0.0), max(c, 0.0), min(m.a + dp, 4.0)));
+}`,
+
+
+  /*
+    Everything the plate draws from the liquids' own physics, in one texel.
+
+    The display pass already reads sixteen textures, which is WebGPU's
+    default limit for one shader stage, so these ride in the one binding the
+    ferrofluid used to have: eight numbers a cell, as four pairs of 16-bit
+    fixed point (pack2x16unorm).
+
+      x  ferrofluid, oil
+      y  acidity (−1..1 as 0..1), soap
+      z  BZ's oxidised catalyst, Liesegang's precipitate (0..4 as 0..1)
+      w  the gap between the glasses (0..0.06 as 0..1), BZ's activator
+
+    The reactions live on grids of their own and are read between their
+    texels. A.a = which inputs are real (ferrofluid, mix, BZ, Liesegang);
+    A.b.x, A.b.y = the BZ and Liesegang grids.
+  */
+  packView: `${HEAD}
+@group(0) @binding(2) var phase: texture_2d<f32>;
+@group(0) @binding(3) var mixT: texture_2d<f32>;
+@group(0) @binding(4) var rxn: texture_2d<f32>;
+@group(0) @binding(5) var lies: texture_2d<f32>;
+@group(0) @binding(6) var sq: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba32uint, write>;
+fn grid(t: texture_2d<f32>, uv: vec2f, g: f32) -> vec4f {
+  let q = uv * g - 0.5;
+  let i = vec2i(floor(q));
+  let f = q - floor(q);
+  let m = i32(g) - 1;
+  let a = textureLoad(t, clamp(i, vec2i(0), vec2i(m)), 0);
+  let b = textureLoad(t, clamp(i + vec2i(1, 0), vec2i(0), vec2i(m)), 0);
+  let c = textureLoad(t, clamp(i + vec2i(0, 1), vec2i(0), vec2i(m)), 0);
+  let d = textureLoad(t, clamp(i + vec2i(1, 1), vec2i(0), vec2i(m)), 0);
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let uv = uvOf(id);
+  let ph = select(0.0, textureLoad(phase, p, 0).r, A.a.x > 0.5);
+  let m = select(vec4f(0.0), textureLoad(mixT, p, 0), A.a.y > 0.5);
+  let r = select(vec4f(0.0), grid(rxn, uv, A.b.x), A.a.z > 0.5);
+  let l = select(vec4f(0.0), grid(lies, uv, A.b.y), A.a.w > 0.5);
+  let gap = textureLoad(sq, p, 0).r;
+  textureStore(dst, p, vec4u(
+    pack2x16unorm(clamp(vec2f(ph, m.r), vec2f(0.0), vec2f(1.0))),
+    pack2x16unorm(clamp(vec2f(m.b * 0.5 + 0.5, m.g), vec2f(0.0), vec2f(1.0))),
+    pack2x16unorm(clamp(vec2f(r.g, l.a * 0.25), vec2f(0.0), vec2f(1.0))),
+    pack2x16unorm(clamp(vec2f(gap / 0.06, r.r), vec2f(0.0), vec2f(1.0)))));
+}`,
+
   sharpenDye: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;

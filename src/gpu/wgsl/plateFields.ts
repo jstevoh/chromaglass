@@ -114,6 +114,12 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'transmission', type: 'f32' },
   /** How much of the second phase to draw (H7): 0 keeps it off the picture. */
   { name: 'phaseAmount', type: 'f32' },
+  /* The liquids' own physics and chemistry, drawn (docs/physics-plan.md). */
+  { name: 'phIndicator', type: 'f32', note: 'how strongly the dye changes colour with acidity (a pH indicator)' },
+  { name: 'bzShow', type: 'f32', note: 'the Belousov–Zhabotinsky reaction, in ferroin red and blue' },
+  { name: 'liesShow', type: 'f32', note: 'Liesegang precipitate bands' },
+  { name: 'thickOptics', type: 'f32', note: 'how far colour depth follows the gap between the glasses' },
+  { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

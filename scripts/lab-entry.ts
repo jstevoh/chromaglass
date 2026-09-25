@@ -26,6 +26,7 @@ const api = {
     if (!adapter) throw new Error('no adapter');
     const device = await adapter.requestDevice({ requiredFeatures: adapter.features.has('float32-filterable') ? ['float32-filterable'] : [] });
     device.lost.then((i) => console.log('device lost', i.message));
+    device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
     lab = { solver, L, N, time: 0, dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };

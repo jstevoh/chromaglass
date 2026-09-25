@@ -10,6 +10,10 @@
  *      red-black sweeps alone, on the same violent, messy forcing
  *   2. the magnet draws ferrofluid toward it, as a force on the liquid
  *   3. and neither makes nor loses any, nor packs a cell past full
+ *   4–10. the liquids' own physics and chemistry (docs/physics-plan.md):
+ *      surface tension, Marangoni flow, buoyancy, vorticity confinement,
+ *      the BZ reaction and Liesegang rings,
+ *      each against the same plate with it off
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
  * a Linux box's software WebGPU anywhere else.
@@ -72,6 +76,85 @@ try {
   check('and none is made or lost', Math.abs(on.after.mass / on.before.mass - 1) < 0.01,
     `${on.before.mass.toFixed(1)} → ${on.after.mass.toFixed(1)}`);
   check('and no cell is packed past full', on.after.peak < 1.02, `peak ${on.after.peak.toFixed(3)}`);
+
+  // ── 4: surface tension between oil and water ──
+  const strip = async (tension) => {
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { for (let k = 0; k < 9; k++) lab.solver().addMix(0.3 + k * 0.05, 0.5, 0.045, { oil: 1 }); });
+    const read = () => page.evaluate(async () => {
+      const f = await lab.solver().readChemistry('mix'); const n = f.n; let t = 0, cx = 0, cy = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const c = f.data[(x + y * n) * 4]; t += c; cx += c * x; cy += c * y; }
+      cx /= t; cy /= t; let xx = 0, yy = 0, xy = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const c = f.data[(x + y * n) * 4]; xx += c * (x - cx) ** 2; yy += c * (y - cy) ** 2; xy += c * (x - cx) * (y - cy); }
+      const tr = xx + yy, det = xx * yy - xy * xy, d = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      return { mass: t, aspect: Math.sqrt((tr / 2 + d) / (tr / 2 - d)) };
+    });
+    const before = await read();
+    await page.evaluate((t) => lab.step(180, { oilTension: t, dt: 0.004 }), tension);
+    return { before, after: await read() };
+  };
+  const flat = await strip(0), tense = await strip(1);
+  check('surface tension pulls a strip of oil round', tense.after.aspect < tense.before.aspect * 0.7 && flat.after.aspect > flat.before.aspect * 0.95,
+    `aspect ${tense.before.aspect.toFixed(2)} → ${tense.after.aspect.toFixed(2)}, against ${flat.after.aspect.toFixed(2)} with none`);
+  check('and keeps all the oil', Math.abs(tense.after.mass / tense.before.mass - 1) < 0.01,
+    `${tense.before.mass.toFixed(1)} → ${tense.after.mass.toFixed(1)}`);
+
+  // ── 5: Marangoni flow ──
+  const soapDrop = async (on) => {
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { lab.dye(0.5, 0.5, 0.35, [1, 1, 1], 1); lab.flush(); lab.solver().addMix(0.5, 0.5, 0.06, { soap: 1 }); });
+    await page.evaluate((s) => lab.step(90, { surfactantFlow: s, dt: 0.004 }), on);
+    return page.evaluate(async () => {
+      const d = await lab.field('dye'); const L = 192; let inner = 0, tot = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const a = d[(i + j * L) * 4 + 3]; tot += a; if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) < 0.1) inner += a; }
+      return { inner, tot };
+    });
+  };
+  const still = await soapDrop(0), burst = await soapDrop(1);
+  check('soap drives the dye away from where it lands', burst.inner < still.inner * 0.6,
+    `dye within a tenth of the drop ${still.inner.toFixed(0)} without the flow, ${burst.inner.toFixed(0)} with it`);
+  check('and carries it rather than making or losing any', Math.abs(burst.tot / still.tot - 1) < 0.01,
+    `${still.tot.toFixed(0)} → ${burst.tot.toFixed(0)}`);
+
+  // ── 6: buoyancy ──
+  const sink = async (b) => {
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { lab.dye(0.5, 0.7, 0.12, [1, 1, 1], 1); lab.flush(); });
+    await page.evaluate((b) => lab.step(120, { solutalBuoyancy: b, plateUpright: b, dt: 0.004 }), b);
+    return page.evaluate(async () => { const d = await lab.field('dye'); const L = 192; let t = 0, cy = 0; for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const a = d[(i + j * L) * 4 + 3]; t += a; cy += a * j / L; } return cy / t; });
+  };
+  const floats = await sink(0), sinks = await sink(1);
+  check('stand the plate up and heavy dye sinks', sinks < floats - 0.04, `centre of mass ${floats.toFixed(3)} lying flat, ${sinks.toFixed(3)} standing up`);
+
+  // ── 7: vorticity confinement ──
+  const spin = async (v) => {
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { let q = 3; const r = () => (q = (q * 16807) % 2147483647) / 2147483647; for (let k = 0; k < 30; k++) lab.vel(r(), r(), 0.05, [(r() - 0.5) * 6, (r() - 0.5) * 6, 0, 0]); lab.flush(); });
+    await page.evaluate((v) => lab.step(90, { vorticity: v, dt: 0.004 }), v);
+    return page.evaluate(async () => { const f = await lab.field('vel'); const L = 192; let w = 0; const at = (i, j, c) => f[(i + j * L) * 4 + c]; for (let j = 1; j < L - 1; j++) for (let i = 1; i < L - 1; i++) w += Math.abs((at(i + 1, j, 1) - at(i - 1, j, 1)) - (at(i, j + 1, 0) - at(i, j - 1, 0))); return w; });
+  };
+  const calm = await spin(0), swirl = await spin(1);
+  check('vorticity confinement keeps the eddies spinning', swirl > calm * 3, `|curl| ${calm.toFixed(1)} → ${swirl.toFixed(1)}`);
+
+  // ── 8: the BZ reaction ──
+  await page.evaluate(() => lab.create(128));
+  await page.evaluate(() => lab.solver().addRxn(0.5, 0.5, 0.04, { bz: 0.9 }));
+  const front = async () => { await page.evaluate(() => lab.step(40, { bzReaction: 1, dt: 0.004 })); return page.evaluate(async () => { const f = await lab.solver().readChemistry('rxn'); const n = f.n; let far = 0; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (f.data[(x + y * n) * 4] > 0.3) far = Math.max(far, Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5)); return far; }); };
+  const f1 = await front(), f2 = await front();
+  check('a BZ wave travels out from where it was started', f1 > 0.08 && f2 > f1 + 0.05, `front at ${f1.toFixed(3)}, then ${f2.toFixed(3)} of the plate`);
+
+  // ── 9: Liesegang rings ──
+  await page.evaluate(() => lab.create(128));
+  for (let t = 0; t < 8; t++) await page.evaluate(() => { lab.solver().addLiesegang(0.5, 0.5, 0.06, 4); return lab.step(60, { liesegang: 1, dt: 0.004 }); });
+  const bands = await page.evaluate(async () => {
+    const f = await lab.solver().readChemistry('lies'); const n = f.n; const y = n / 2; const starts = []; let prev = 0;
+    for (let x = n / 2 + 8; x < n; x++) { const on = f.data[(x + y * n) * 4 + 3] > 0.2 ? 1 : 0; if (on && !prev) starts.push(x); prev = on; }
+    return starts;
+  });
+  const gaps = bands.slice(1).map((b, i) => b - bands[i]);
+  check('Liesegang bands form, spaced wider as they go out', bands.length >= 4 && gaps[gaps.length - 1] > gaps[0],
+    `${bands.length} bands, gaps ${gaps.join(', ')} cells`);
+
 } finally {
   await close();
 }

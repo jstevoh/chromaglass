@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the liquids' own physics and chemistry
+
+Each is a setting, off by default (docs/physics-plan.md has the models and
+the measurements):
+
+- **Oil Tension**: oil and water separate, oil rounds into drops, threads
+  break into beads (Cahn–Hilliard with its capillary force), ringed by a
+  dark meniscus.
+- **Soap Bursts**: soap lands on the beat and the surface streams away from
+  it, carrying the dye (Marangoni flow).
+- **Gravity** and **Dye Weight**: stand the plate up and heavy dye pours
+  down it in fingers (Rayleigh–Taylor); **Heat Spread** lets heat diffuse
+  faster than dye, as it does in water.
+- **Swirl**: small eddies spun back up (vorticity confinement).
+- **Labyrinth**: the ferrofluid's own repulsion under a strong field breaks a
+  pool into rings (Ohta–Kawasaki); more to come.
+- **pH Indicator**, with new **Acid** and **Base** bottles: the dye turns pink
+  in acid and green in base, like red cabbage.
+- **BZ Reaction**: the Belousov–Zhabotinsky reaction's turning spirals.
+- **Liesegang Rings**: bands of precipitate spaced ever wider.
+- **Layer Depth** and **Spectral Mix**: colour depth follows the gap between
+  the glasses, and dyes mix across six bands of the spectrum.
+- Four new looks: **Oil & Water**, **Red Cabbage**, **Chemical Clock** and
+  **Agate**. Lava Lamp stands up; Oil on Water, Milk Marble, Soap Film,
+  Galaxy and Magnet Garden use the new physics.
+
+### Changed — the Perform desk
+
+- The rides are now Speed, Evolve Speed, Swirl, Gravity, Soap Bursts, Beat
+  Press and Zoom (with the Dimmer): each does something large and different.
+  Granulation is off the desk (it made a few jagged cuts in the dye).
+
 ### Added — the plate's speed follows the music
 
 - **Tempo Sync.** The presets ran their liquid at speeds nearly two thousand

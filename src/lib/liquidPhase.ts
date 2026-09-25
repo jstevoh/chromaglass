@@ -45,6 +45,11 @@ export interface LiquidDeposit {
   weight?: number;
   /** Polar against water. A *kind*, so it mixes, not sums. */
   polarity?: number;
+  /**
+    Acid (+) or base (−), for a pH indicator in the dye. Nothing here on the
+    CPU reads it: it goes to the GPU's mix, through `onDeposit`.
+  */
+  acid?: number;
 }
 
 /**
@@ -275,7 +280,15 @@ export class LiquidPhase {
    * went in, and the falloff is the same soft disc the dye injection uses so
    * the property and the colour arrive on the same shape.
    */
+  /**
+   * Told of every pour, before anything here decides whether it matters, so
+   * the GPU's own fields (oil, soap, acidity: see WebGPUFluid.addMix) hear of
+   * the same liquid on the same disc. Set by the plate.
+   */
+  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number) => void;
+
   deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1): void {
+    this.onDeposit?.(cx, cy, radius, what, amount);
     const s = this.size;
     const r = Math.max(1, radius);
     const r2 = r * r;

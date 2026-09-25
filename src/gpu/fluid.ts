@@ -78,6 +78,31 @@ const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
+/*
+  The mix's forces, each in plate widths a second at full strength (see
+  mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
+  there at full and gone at zero.
+*/
+const OIL_TENSION = 10;
+const SOAP_PULL = 0.5;
+const DYE_WEIGHT = 0.12;
+const HEAT_LIFT = 0.06;
+/** Vorticity confinement's push, as a fraction of the local spin, per step. */
+const CONFINE = 0.35;
+/** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
+const CH_SUBSTEPS = 4;
+/** Liesegang's inner electrolyte, spread evenly through the gel. */
+const LIES_B0 = 0.2;
+/*
+  The ferrofluid's dipole repulsion at full Labyrinth (see phaseCH), against
+  a screening length of 32 cells. From the lab: below 0.03 a pool stays one
+  disc (surface tension wins); by 0.1 it splits into a core and rings, the
+  target pattern a labyrinth grows from.
+*/
+const LABYRINTH = 0.08;
+/** The reactions' own grids (see gridSplat). */
+const BZ_GRID = 256;
+const LIES_GRID = 128;
 const CURRENT_ITERS = 10;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
@@ -227,6 +252,29 @@ export class WebGPUFluid {
   private airPush = 0;
   /** Whether any of the second phase is on the plate; nothing runs without it. */
   private phaseLive = false;
+  /*
+    The liquids' own physics and chemistry (docs/physics-plan.md), made only
+    when a look uses them: the mix (oil, surfactant, acidity, and the oil's
+    chemical potential) and the reactions (BZ's two species, the Liesegang
+    reagent and its precipitate). 16 bytes a texel each, so a plate that
+    never pours any pays nothing.
+  */
+  private mix: PingPong | null = null;
+  private rxn: PingPong | null = null;
+  /** Liesegang's four species (A, B, their product C, the precipitate P). */
+  private lies: PingPong | null = null;
+  private liesLive = false;
+  private mixLive = false;
+  private rxnLive = false;
+  get chemistryLive(): { rxn: boolean; lies: boolean } { return { rxn: this.rxnLive, lies: this.liesLive }; }
+  /** What the plate draws from the liquids' own physics, packed (see packView). */
+  private viewTex: GPUTexture | null = null;
+  private blankR: GPUTexture | null = null;
+  private blankRGBA: GPUTexture | null = null;
+  /** Scratch for the vorticity and the ferrofluid's chemical potential. */
+  private scratchR: GPUTexture | null = null;
+  /** The ferrofluid's long-range repulsion ψ (see screenJacobi), kept between steps. */
+  private psi: PingPong | null = null;
   /** For the harness: whether the phase stage is running at all. */
   get phaseIsLive(): boolean { return this.phaseLive; }
   private airCover = 0;
@@ -413,6 +461,13 @@ export class WebGPUFluid {
       this.run(pass, 'seedGrain', this.grain.a, [this.grain.b], identity);
       this.run(pass, 'seedGrain', this.grain.b, [this.grain.a], identity);
     }
+    // The mix and the reactions go with the plate they were poured on.
+    if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+    if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    this.mixLive = false;
+    this.rxnLive = false;
+    this.liesLive = false;
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.grainAge = 0;
@@ -758,7 +813,14 @@ export class WebGPUFluid {
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
-    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * p.diff * n2, 0];
+    /*
+      Heat diffuses through water about a hundred times faster than a dye or
+      a salt does (a Lewis number near 100). The two used to share one
+      diffusivity, which rules out the double-diffusive instabilities (salt
+      fingers) altogether. doubleDiffusion raises the heat's alone.
+    */
+    const heatDiff = p.diff * (1 + 99 * Math.max(0, Math.min(1, p.doubleDiffusion ?? 0)));
+    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * heatDiff * n2, 0];
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
@@ -780,6 +842,47 @@ export class WebGPUFluid {
         this.vel.swap();
       });
     }
+    /*
+      What the mix does to the flow (see mixForce): surface tension round the
+      oil, Marangoni flow away from soap, buoyancy from the dye's weight and
+      the heat. Here, before the projection, for the same two reasons as the
+      magnet: the projection keeps the part of each that is real flow, and
+      the step's flow is built from what is added before it (the velocity
+      carried from step to step is capped small in \`decayVel\`; what moves
+      the plate is what each step adds and the lasting current).
+      In real seconds: each strength is plate widths a second.
+    */
+    const oil = Math.max(0, Math.min(1, p.oilTension ?? 0));
+    const soap = Math.max(0, Math.min(1, p.surfactantFlow ?? 0));
+    /*
+      Dye weighs something whether or not a look says how much, so standing
+      the plate up (Gravity) pours it downhill on any look; Dye Weight, where
+      a look sets it, says how much. Flat on the projector gravity is
+      straight through the glass and this is zero either way.
+    */
+    const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+    const buoy = Math.max(Math.max(0, Math.min(1, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
+    if (buoy > 0.001) this.ensureMix();
+    const mix = this.mix;
+    const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+    stage('mix force', (pass) => {
+      // Gravity in the plate: how far it stands up. (Its rock and tilt move
+      // the dye already, through the lasting current.)
+      const gx = 0, gy = -upright;
+      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read],
+        this.arg('mix force', [oil * OIL_TENSION * perSecond, 0, 0, 0,
+          gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
+      this.vel.swap();
+    }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
+    // Vorticity confinement, a look option (see `curl` in wgsl/fluid.ts).
+    stage('confine', (pass) => {
+      const w = this.scratch();
+      // The spin of the flow the plate actually moved by last step: the
+      // velocity carried between steps is capped small (decayVel).
+      this.run(pass, 'curl', w, [this.velForced], none);
+      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(1, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
+      this.vel.swap();
+    }, (p.vorticity ?? 0) > 0.001);
     stage('project 1', (pass) => this.project(pass));
     stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
     stage('project 2', (pass) => this.project(pass));
@@ -803,6 +906,20 @@ export class WebGPUFluid {
     const a = p.dt * p.diff * n2;
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
+    /*
+      Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
+      away from soap along the surface, conservatively. The mix goes second,
+      reading the same soap the dye was moved by.
+    */
+    stage('marangoni', (pass) => {
+      const k = this.arg('marangoni', [soap * SOAP_PULL * (p.magnetSeconds ?? 1 / 60) * N, 0, 0, 0]);
+      for (let s2 = 0; s2 < 2; s2++) {
+        this.run(pass, 'marangoniFlux', this.dye.write, [this.dye.read, mix!.read], k);
+        this.dye.swap();
+        this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read], k);
+        mix!.swap();
+      }
+    }, !!mix && this.mixLive && soap > 0.001);
 
     /*
       Where air is, dye is not (H6 · A).
@@ -844,10 +961,101 @@ export class WebGPUFluid {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
         this.phase.swap();
       }
-      this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
-        this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
-      this.phase.swap();
+      if ((p.ferroLabyrinth ?? 0) > 0.001) {
+        // Cahn–Hilliard with the Ohta–Kawasaki term (see phaseCH), which
+        // does the separating as well, so the plain sharpening stands aside.
+        const mu = this.scratch();
+        if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
+        const psi = this.psi;
+        // A screening length (32 cells) longer than a pool is wide, so
+        // splitting it into stripes is what lowers the repulsion.
+        const screen = this.arg('screen', [1 / 1024, 0, 0, 0]);
+        for (let k = 0; k < 16; k++) {
+          this.run(pass, 'screenJacobi', psi.write, [psi.read, this.phase.read], screen);
+          psi.swap();
+        }
+        const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, 0.012, LABYRINTH * Math.min(1, p.ferroLabyrinth ?? 0), 0, 0]);
+        for (let k = 0; k < CH_SUBSTEPS; k++) {
+          this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
+          this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
+          this.phase.swap();
+        }
+      } else {
+        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
+          this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
+        this.phase.swap();
+      }
     }, this.phaseLive);
+
+    /*
+      The mix: oil and water, soap, acidity (docs/physics-plan.md).
+
+      Carried by the flow in flux form, then its own evolution: the oil
+      separates from the water (Cahn–Hilliard), the soap spreads and breaks
+      down, acid and base diffuse and cancel. And then what it does to the
+      flow, for the next step's projection to shape: surface tension round
+      the oil, Marangoni flow away from the soap, buoyancy from the dye's
+      weight and the heat. The buoyancy needs no mix, but it shares the pass,
+      so a plate asking for it gets an empty mix to read.
+    */
+    stage('mix', (pass) => {
+      const m = mix!;
+      if (this.mixLive) {
+        this.run(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 0, 0]));
+        m.swap();
+        for (let k = 0; k < PHASE_RELAX; k++) {
+          this.run(pass, 'mixRelax', m.write, [m.read], none);
+          m.swap();
+        }
+        /*
+          M dt under the explicit limit (1/64 for this stencil), in several
+          substeps: the flow smears the oil's edge every step and the
+          separation has to win it back as fast. Surfactant diffuses and
+          lasts about ten seconds; acidity diffuses slowly. Only the first
+          substep diffuses those two, so their rates do not depend on how
+          many the oil takes.
+        */
+        const subs = oil > 0 ? CH_SUBSTEPS : 1;
+        for (let k = 0; k < subs; k++) {
+          this.run(pass, 'mixMu', m.write, [m.read], none);
+          m.swap();
+          this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), 0.08, Math.pow(0.1, (p.magnetSeconds ?? 1 / 60) / 10), 0.04])
+            : this.arg('mix update oil', [0.012, 0, 1, 0]));
+          m.swap();
+        }
+      }
+    }, !!mix && this.mixLive);
+
+    /*
+      The reactions: BZ's spirals and Liesegang's rings, each in a gel on a
+      grid of its own (see gridSplat). Several small steps a frame: the
+      Oregonator is stiff, and its step has to stay near a hundredth of its
+      own time. A gel does not flow, which is the point of one: the bands
+      are laid where the front was, and stay.
+    */
+    const bz = Math.max(0, Math.min(1, p.bzReaction ?? 0));
+    const lies = Math.max(0, Math.min(1, p.liesegang ?? 0));
+    const rxn = this.rxn;
+    stage('bz', (pass) => {
+      const r = rxn!;
+      const args = this.arg('bz step', [0.01, 0, BZ_GRID, 1.0]);
+      const steps = Math.max(1, Math.round(12 * bz));
+      for (let k = 0; k < steps; k++) {
+        this.run(pass, 'rxnStep', r.write, [r.read], args, BZ_GRID);
+        r.swap();
+      }
+    }, !!rxn && this.rxnLive && bz > 0.001);
+    const gel = this.lies;
+    stage('liesegang', (pass) => {
+      const l = gel!;
+      const args = this.arg('lies step', [0.01, 0, LIES_GRID, 0]);
+      const steps = Math.max(1, Math.round(24 * lies));
+      for (let k = 0; k < steps; k++) {
+        this.run(pass, 'liesStep', l.write, [l.read], args, LIES_GRID);
+        l.swap();
+      }
+    }, !!gel && this.liesLive && lies > 0.001);
 
     // 9.5. Sharpen what the advection and the diffusion softened
     if (p.sharpness > 0.0001) {
@@ -881,6 +1089,9 @@ export class WebGPUFluid {
       this.run(pass, 'decayVel', this.vel.write, [this.vel.read], none);
       this.vel.swap();
     });
+
+    // What the plate draws from all of it, once the step has settled it.
+    stage('view', (pass) => this.packView(pass));
 
     shared?.end();
 
@@ -958,6 +1169,157 @@ export class WebGPUFluid {
     for (const t of [this.phase.a, this.phase.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
     this.device.queue.submit([enc.finish()]);
+  }
+
+  private ensureMix(): PingPong {
+    if (!this.mix) {
+      this.mix = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'mix');
+      const enc = this.device.createCommandEncoder({ label: 'mix clear' });
+      const pass = enc.beginComputePass();
+      for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      pass.end();
+      this.device.queue.submit([enc.finish()]);
+    }
+    return this.mix;
+  }
+
+  private ensureRxn(): PingPong {
+    if (!this.rxn) {
+      this.rxn = new PingPong(this.device, this.disposer, [BZ_GRID, BZ_GRID], 'rgba32float', 'rxn');
+      const enc = this.device.createCommandEncoder({ label: 'rxn clear' });
+      const pass = enc.beginComputePass();
+      for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+      pass.end();
+      this.device.queue.submit([enc.finish()]);
+    }
+    return this.rxn;
+  }
+
+  private packView(pass: GPUComputePassEncoder): void {
+    if (!this.viewTex) {
+      const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+      this.viewTex = this.disposer.track(this.device.createTexture({ label: 'view', size: [this.N, this.N], format: 'rgba32uint', usage }));
+      this.blankR = this.disposer.track(this.device.createTexture({ label: 'blank r', size: [1, 1], format: R32, usage }));
+      this.blankRGBA = this.disposer.track(this.device.createTexture({ label: 'blank rgba', size: [1, 1], format: 'rgba32float', usage }));
+    }
+    const has = [this.phaseLive, this.mixLive && !!this.mix, this.rxnLive && !!this.rxn, this.liesLive && !!this.lies];
+    this.run(pass, 'packView', this.viewTex, [
+      has[0] ? this.phase.read : this.blankR!,
+      has[1] ? this.mix!.read : this.blankRGBA!,
+      has[2] ? this.rxn!.read : this.blankRGBA!,
+      has[3] ? this.lies!.read : this.blankRGBA!,
+      this.squeeze.read,
+    ], this.arg('view', [...has.map((h) => (h ? 1 : 0)), BZ_GRID, LIES_GRID, 0, 0]));
+  }
+
+  private ensureLies(): PingPong {
+    if (!this.lies) {
+      this.lies = new PingPong(this.device, this.disposer, [LIES_GRID, LIES_GRID], 'rgba32float', 'liesegang');
+      this.fillLies();
+    }
+    return this.lies;
+  }
+
+  /** The gel as it starts: B spread evenly, nothing else. */
+  private fillLies(): void {
+    const enc = this.device.createCommandEncoder({ label: 'liesegang fill' });
+    const pass = enc.beginComputePass();
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    for (const t of [this.lies!.a, this.lies!.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /** Pour Liesegang's outer electrolyte (A) at a spot. */
+  addLiesegang(x: number, y: number, radius: number, amount = 1): void {
+    const l = this.ensureLies();
+    const enc = this.device.createCommandEncoder({ label: 'add liesegang' });
+    const pass = enc.beginComputePass({ label: 'add liesegang' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'gridSplat', l.write, [l.read], this.arg('lies splat', [x, y, radius, LIES_GRID, amount, 0, 0, 0]), LIES_GRID);
+    l.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.liesLive = true;
+  }
+
+  private scratch(): GPUTexture {
+    if (!this.scratchR) {
+      this.scratchR = this.disposer.track(this.device.createTexture({
+        label: 'scratch r', size: [this.N, this.N], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.scratchR;
+  }
+
+  /**
+   * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
+   * amount in `what`, as a soft disc at (x, y) in plate units.
+   */
+  addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
+    const m = this.ensureMix();
+    const enc = this.device.createCommandEncoder({ label: 'add mix' });
+    const pass = enc.beginComputePass({ label: 'add mix' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'mixSplat', m.write, [m.read],
+      this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
+    m.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.mixLive = true;
+  }
+
+  /** Pour into the BZ reaction: its activator, and a wake of oxidised catalyst behind it (a wave broken on one side curls into a spiral). */
+  addRxn(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void {
+    const r = this.ensureRxn();
+    const enc = this.device.createCommandEncoder({ label: 'add rxn' });
+    const pass = enc.beginComputePass({ label: 'add rxn' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'gridSplat', r.write, [r.read],
+      this.arg('rxn splat', [x, y, radius, BZ_GRID, what.bz ?? 0, what.bzWake ?? 0, 0, 0]), BZ_GRID);
+    r.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.rxnLive = true;
+  }
+
+  /** Take the mix and the reactions off the plate. */
+  clearChemistry(): void {
+    const enc = this.device.createCommandEncoder({ label: 'clear chemistry' });
+    const pass = enc.beginComputePass();
+    if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+    if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.mixLive = false;
+    this.rxnLive = false;
+    this.liesLive = false;
+  }
+
+  /** The mix or the reactions, read back whole (RGBA per texel). For checks. */
+  async readChemistry(which: 'mix' | 'rxn' | 'lies'): Promise<{ n: number; data: Float32Array } | null> {
+    const pp = which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
+    if (!pp) return null;
+    const n = pp.size[0];
+    const row = Math.ceil((n * 16) / 256) * 256;
+    const buf = this.device.createBuffer({ label: `read ${which}`, size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: `read ${which}` });
+    enc.copyTextureToBuffer({ texture: pp.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n * 4);
+    const stride = row / 4;
+    for (let y = 0; y < n; y++) out.set(all.subarray(y * stride, y * stride + n * 4), y * n * 4);
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
   }
 
   setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
@@ -1475,6 +1837,12 @@ export class WebGPUFluid {
       air: this.air?.any ? this.air.field : null,
       /** The second phase (H7), or null when none has been poured. */
       phase: this.phaseLive ? this.phase.read : null,
+      /** The mix (oil, soap, acidity) and the reactions, or null where none. */
+      mix: this.mixLive && this.mix ? this.mix.read : null,
+      rxn: this.rxnLive && this.rxn ? this.rxn.read : null,
+      lies: this.liesLive && this.lies ? this.lies.read : null,
+      /** All of it packed for the plate (see packView), once a step has run. */
+      view: this.viewTex,
     };
   }
 

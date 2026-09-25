@@ -29,7 +29,7 @@ export async function openLab() {
     args: process.platform === 'darwin' ? [] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader'],
   });
   const page = await browser.newPage();
-  page.on('console', (m) => { if (/lost|error/i.test(m.text())) console.log('  [lab]', m.text().slice(0, 200)); });
+  page.on('console', (m) => { if (process.env.LAB_ALL || /lost|error/i.test(m.text())) console.log('  [lab]', m.text().slice(0, 300)); });
   page.on('pageerror', (e) => console.log('  [lab error]', e.message.slice(0, 300)));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => window.labReady === true);

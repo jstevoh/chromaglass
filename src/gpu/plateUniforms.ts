@@ -261,6 +261,11 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const pa = hexToRgb(s.paperA ?? '#1e5fb8');
     const pb = hexToRgb(s.paperB ?? '#f4c04a');
     pack.set('phaseAmount', clamp01(s.phaseAmount ?? 0));
+    pack.set('phIndicator', clamp01(s.phIndicator ?? 0));
+    pack.set('bzShow', clamp01(s.bzReaction ?? 0));
+    pack.set('liesShow', clamp01(s.liesegang ?? 0));
+    pack.set('thickOptics', clamp01(s.thicknessOptics ?? 0));
+    pack.set('spectral', clamp01(s.spectralOptics ?? 0));
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     pack.set('droplets', clamp01(s.microDroplets ?? 0));
