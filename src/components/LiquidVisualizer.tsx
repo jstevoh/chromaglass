@@ -5159,7 +5159,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const heat = liq?.heatAmount ?? 0.05;
               // The Amount set for this tool (1 is what it always did).
               const k = toolAmountRef.current;
-              const kSoft = Math.sqrt(k);   // for a push: twice the dye is not twice the shove
+              // Its square root for a push and a reach: twice the dye is not twice the shove, and a drop with twice the dye in it covers twice the area.
+              const kSoft = Math.sqrt(k);
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
@@ -5216,7 +5217,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
-                const sprayR = 10 * GRID_SCALE;
+                const sprayR = 10 * GRID_SCALE * kSoft;
                 for (let p = 0; p < 12; p++) {
                   const angle = Math.random() * Math.PI * 2;
                   const dist = Math.random() * sprayR;
@@ -5256,7 +5257,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               } else if (tool === 'pour') {
                 // Heavy thick stream — wide, dense, with downward velocity
-                const pourR = Math.round(4 * GRID_SCALE);
+                const pourR = Math.max(1, Math.round(4 * GRID_SCALE * kSoft));
                 const amt = 2.0 * k;
                 for (let ddy = -pourR; ddy <= pourR; ddy++) {
                   for (let ddx = -pourR; ddx <= pourR; ddx++) {
@@ -5307,7 +5308,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
               } else {
                 // dropper (default)
-                const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);
+                // Wider as well as denser: a held drop fills to the plate's
+                // density ceiling in its middle, so more dye there alone would
+                // not show; a drop with more in it spreads further.
+                const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
