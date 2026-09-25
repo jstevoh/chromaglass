@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { PALETTE } from '../../constants';
+import { PerformanceButton } from './PerformanceButton';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
@@ -258,30 +259,14 @@ export function PerformDesk(p: PerformDeskProps) {
 
       {/* ── Plate ───────────────────────────────────────────── */}
       <section className="flex min-h-0 flex-col px-4 py-3">
-        <div className="mb-3 flex h-8 shrink-0 items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: 'var(--color-live)' }} />
-            <span className="text-[16px] font-medium">{live?.name ?? '—'}</span>
-            <span className="font-mono text-[12px] text-dim">live · {p.liveFor}</span>
+        <div className="mb-3 flex h-8 shrink-0 items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--color-live)' }} />
+            <span className="truncate text-[16px] font-medium">{live?.name ?? '—'}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-[12px] text-dim">live · {p.liveFor}</span>
           </span>
-          {/*
-            Record a performance: what you paint until you stop, kept with the
-            song that is playing (lib/performanceTake.ts). Here, beside the
-            look that is live, because a dot in the header was the only way
-            in and nobody could find it.
-          */}
-          <Button
-            height={32}
-            variant={p.performance ? 'danger' : 'secondary'}
-            kbd="T"
-            onClick={p.onPerformance}
-            midiKey="action:performance-toggle"
-            testId="performance-button"
-          >
-            {p.performance
-              ? `■ Stop · ${p.performance.clock}${p.performance.title ? ` · ${p.performance.title.length > 22 ? `${p.performance.title.slice(0, 21)}…` : p.performance.title}` : ''}`
-              : '● Record performance'}
-          </Button>
+          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
+          <div className="shrink-0">
           <Segmented
             value={String(p.layer)}
             options={Array.from({ length: Math.max(1, p.layers) }, (_, i) => [String(i), `Layer ${i + 1}`] as const)}
@@ -289,6 +274,7 @@ export function PerformDesk(p: PerformDeskProps) {
             height={32}
             testId="layer-segmented"
           />
+          </div>
         </div>
         {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />

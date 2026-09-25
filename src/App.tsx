@@ -4020,6 +4020,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onPhone={deskOpen.phone}
           onPerformance={togglePerformance}
+          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />

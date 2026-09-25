@@ -58,12 +58,22 @@ try {
   }));
   const note = async () => (await page.locator('[data-testid=performance-note]').textContent({ timeout: 3000 }).catch(() => null)) ?? '';
 
+  // 0. There is a button to do it with, labelled, on the Perform desk: the
+  //    only way in used to be an unlabelled dot (reported: "I'm not seeing
+  //    any new performance controls or stop/start").
+  const button = page.locator('[data-testid=performance-button]');
+  const idleLabel = (await button.count()) ? ((await button.first().textContent()) ?? '') : '';
+  check('the desk has a Record performance button', (await button.count()) === 1 && /Record/.test(idleLabel)
+    && await button.first().isVisible(), idleLabel || 'no button');
+
   // 1. T starts one.
   await page.mouse.click(5, 5);
   await page.keyboard.press('t');
   await page.waitForTimeout(1500);
   const liveTitle = (await dot.first().getAttribute('title')) ?? '';
   check('T starts a performance, and the Performance dot says so', /^Recording a performance/.test(liveTitle), liveTitle.slice(0, 60));
+  const liveLabel = (await button.first().textContent().catch(() => '')) ?? '';
+  check('and the button turns to Stop with the clock', /Stop · \d+:\d\d/.test(liveLabel), liveLabel);
 
   // 2. Stopped with nothing painted.
   await page.keyboard.press('t');
