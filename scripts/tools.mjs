@@ -238,6 +238,15 @@ try {
     await hold(t, A, 1500);
     await settle(700);
     await snap(`${t}1`);
+    if (t === 'blow') {
+      // Held still, the Blow is a straw: say what it blew.
+      const bub = await page.evaluate(() => {
+        const d = window.chromaglassDebug(); const n = d.gridSize;
+        return (d.bubbles?.bubbles ?? []).map((b) => ({ x: +(b.x / n).toFixed(2), y: +(b.y / n).toFixed(2), r: +(b.r / n).toFixed(3), straw: !!b.straw }));
+      });
+      const straw = bub.filter((b) => b.straw);
+      console.log(`     the straw blew ${straw.length} bubble(s): ${JSON.stringify(straw.slice(0, 3))}; ${bub.length} on the plate; the hand at ${JSON.stringify(p)}`);
+    }
     const a = await measure(`${t}0`, p, 0.05, 0.25), b = await measure(`${t}1`, p, 0.05, 0.25);
     if (t === 'blow') {
       check('Blow clears the dye from under it', b.disc < 0.7 * a.disc,
