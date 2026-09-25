@@ -7272,6 +7272,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       if (!activeFluid) return;
+      /*
+        The magnet in the hand moves no liquid itself: the pull does. This
+        pressed the glass under the pointer and stirred along its path on
+        every move, whatever the tool, and under the magnet that press spread
+        the ferrofluid into a ring round the hand and the stir swept it on.
+        Measured by npm run magnet on the app's own step replayed in the lab:
+        the magnet alone gathers 46 to 275 at the hand, and in the app the
+        hand's spot emptied (187 to 108) while a ring 0.15-0.2 out filled.
+      */
+      if (activeToolRef.current === 'magnet') return;
       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
@@ -7299,7 +7309,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
-      if (activeFluid && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+      // Not under the magnet, as for the mouse above.
+      if (activeFluid && activeToolRef.current !== 'magnet' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
       }
     };
