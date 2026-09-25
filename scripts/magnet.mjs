@@ -117,6 +117,14 @@ try {
     Object.assign(d.settings, {
       rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
       turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      /*
+        And an ordinary plate clock. The magnet acts in plate time, and
+        Classic runs the plate slowest of any look (0.00924); the music was
+        nudging it up, and with the sound drive held at zero the ferrofluid
+        had a third of the time to move in the same four seconds (CI: +47 at
+        best along the whole path, against +111 to +124 with the music on).
+      */
+      globalSpeed: 0.025,
     });
   });
   await page.waitForTimeout(3000);
