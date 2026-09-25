@@ -821,8 +821,16 @@ try {
       const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
       const moved = before && typeof aim.x === 'number' ? Math.hypot(aim.x - 0.35, aim.y - 0.6) : 0;
       const probe = await page.evaluate(() => window.chromaglassDebug?.().aimProbe ?? null);
-      check('and an Alt-click on the plate aims it at the spot under the pointer', moved > 0.02 && aim.mode === 'hold',
-        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(2) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(2) : '?'} (${aim.mode})` +
+      // Zoomed in five times the frame holds about a seventh of the plate, so a
+      // click this far off the middle moves the aim by about a sixtieth of it:
+      // expected, from where the click was and how far in the camera is.
+      const want = await page.evaluate(({ x, y, zoom }) => {
+        const r = document.getElementById('liquid-canvas').getBoundingClientRect();
+        return Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) / (Math.max(r.width, r.height) * 1.5 * zoom);
+      }, { x: spot.x, y: spot.y, zoom: before?.zoom ?? 5 });
+      check('and an Alt-click on the plate aims it at the spot under the pointer',
+        aim.mode === 'hold' && moved > want * 0.6 && moved < want * 1.6 + 0.01,
+        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(3) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(3) : '?'} (${aim.mode}), moved ${moved.toFixed(4)} against ${want.toFixed(4)} expected` +
         `; ${spot.clear ? 'clicked' : `pressed the plate directly (over it: ${spot.over})`} at ${Math.round(spot.x)},${Math.round(spot.y)}; the plate saw ${JSON.stringify(probe)}`);
     }
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false, macroAimX: 0.5, macroAimY: 0.5 }));
