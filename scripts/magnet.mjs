@@ -53,10 +53,12 @@ try {
    * How much ferrofluid is on the lead plate, where its centre of mass is
    * (plate 0..1), and how much sits within 0.12 of a point (the hand).
    */
-  const phase = (at = null) => page.evaluate(async (at) => {
+  const phase = (at = null, keep = null) => page.evaluate(async ({ at, keep }) => {
     const f = await window.chromaglassDebug().readPhase();
     if (!f) return { total: -1, x: 0, y: 0, near: 0, n: 0 };
     const { n, data } = f;
+    // Kept in the page, to be read again near a point known only later.
+    if (keep) (window.__phaseSnaps ??= {})[keep] = { n, data: Float32Array.from(data) };
     let total = 0, cx = 0, cy = 0, near = 0;
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
       const v = data[x + y * n];
@@ -66,7 +68,18 @@ try {
     // Near and total as fractions of the plate's cells, so a grid change
     // does not read as liquid made or lost (n is reported for that too).
     return { total: total / (n * n), x: total ? cx / total : 0, y: total ? cy / total : 0, near: near / (n * n) * 1e4, n };
-  }, at);
+  }, { at, keep });
+  /** A kept reading, near a point: in the same units as phase().near. */
+  const nearIn = (keep, at) => page.evaluate(({ keep, at }) => {
+    const f = window.__phaseSnaps?.[keep];
+    if (!f || !at) return 0;
+    const { n, data } = f;
+    let near = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      if (Math.hypot((x + 0.5) / n - at.x, (y + 0.5) / n - at.y) < 0.12) near += data[x + y * n];
+    }
+    return near / (n * n) * 1e4;
+  }, { keep, at });
   const amount = () => page.evaluate(() => window.chromaglassDebug().settings?.phaseAmount ?? 0);
 
   const before = await phase();
@@ -97,14 +110,14 @@ try {
     the ferrofluid is conserved exactly now, but the check should not fail a
     drag for something the plate does on its own.
   */
-  const end = at(0.85);
-  await page.mouse.move(...end);
-  await page.mouse.down();
-  await page.waitForTimeout(300);
-  const spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
-  await page.mouse.up();
-  await page.waitForTimeout(500);
   /*
+    Where the hand ends is read at the end of the drag, with the mouse still
+    down, and every reading is measured around that point. It was read once
+    before the control, eight seconds earlier, and the plate turns under the
+    pointer (the layer's rotation, which the pointer mapping follows): the
+    same screen point read 0.68,0.64 on one run and 0.31,0.36 on the next,
+    so the check was counting liquid round a point the hand had long left.
+
     Each window is measured on one grid. The quality governor may move the
     solver to another a few seconds in, and the phase is laid afresh on the
     new one (CI: "44% kept" alone, which is (256/384)²: a grid change, not
@@ -112,25 +125,27 @@ try {
   */
   let idle0, idle1;
   for (let k = 0; k < 3; k++) {
-    idle0 = await phase(spot);
+    idle0 = await phase(null, 'idle0');
     await page.waitForTimeout(6000);
-    idle1 = await phase(spot);
+    idle1 = await phase(null, 'idle1');
     if (idle0.n === idle1.n) break;
     console.log(`     the grid moved ${idle0.n} → ${idle1.n} while the plate was left alone; again`);
   }
-  let drag0, drag1;
+  let drag0, drag1, spot = null;
   for (let k = 0; k < 3; k++) {
-    drag0 = await phase(spot);
+    drag0 = await phase(null, 'drag0');
     await page.mouse.move(...at(0.2));
     await page.mouse.down();
     for (let i = 0; i <= 40; i++) { await page.mouse.move(...at(0.2 + 0.65 * i / 40)); await page.waitForTimeout(100); }
     await page.waitForTimeout(2000);
-    drag1 = await phase(spot);
+    spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+    drag1 = await phase(null, 'drag1');
     await page.mouse.up();
     if (drag0.n === drag1.n) break;
     console.log(`     the grid moved ${drag0.n} → ${drag1.n} during the drag; again`);
     await page.waitForTimeout(1000);
   }
+  for (const [r, k] of [[idle0, 'idle0'], [idle1, 'idle1'], [drag0, 'drag0'], [drag1, 'drag1']]) r.near = await nearIn(k, spot);
   console.log(`     the hand ends at ${spot ? `${spot.x.toFixed(2)},${spot.y.toFixed(2)}` : 'nowhere'}; ferrofluid within 0.12 of it: ` +
     `alone ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)}, dragged ${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)}`);
   check('dragging the Magnet gathers the ferrofluid where the hand ends up',
