@@ -96,6 +96,20 @@ try {
     amountAfter > 0.002 && poured.total > Math.max(0.01, before.total * 2),
     `setting ${amountBefore} → ${amountAfter}, covering ${(before.total * 100).toFixed(1)}% → ${(poured.total * 100).toFixed(1)}% of the plate`);
 
+  /*
+    Hold the plate still under the hand for the drag. Classic turns, and the
+    pointer mapping follows it, so a held pointer drags the magnet across the
+    plate and the ferrofluid smears along a moving path behind it (CI read
+    the gathering 0.11 to 0.19 away from where the hand stopped, and the
+    check failed by one unit). The turning is the look's, not the magnet's,
+    so it is a control here, the way ferro.mjs sets the look it measures on.
+  */
+  await page.evaluate(() => {
+    const d = window.chromaglassDebug();
+    Object.assign(d.settings, { rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' } });
+  });
+  await page.waitForTimeout(3000);
+
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   const at = (fx) => [box.x + box.width * fx, box.y + box.height * 0.5];
@@ -146,7 +160,7 @@ try {
       await page.waitForTimeout(100);
       if (i >= 20 && i % 4 === 0) await sample();
     }
-    for (let k = 0; k < 8; k++) { await page.waitForTimeout(250); await sample(); }
+    for (let k = 0; k < 12; k++) { await page.waitForTimeout(250); await sample(); }
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
     drag1 = await phase(null, 'drag1');
     await page.mouse.up();
