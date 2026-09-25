@@ -155,8 +155,11 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           Performances start and stop here, by hand (T). They used to follow
           the song detection, which started late and ran on into the next
           song; the song that is playing is still attached, on its own.
+          Bare, with the clock in its tooltip: a label here pushed Mic and
+          Wall under the centred mode switch at 1440 (npm run qa).
         */}
         <StatusDot
+          bare
           on={!!dots.perf}
           tone="live"
           label={dots.perf ? `Performance ${dots.perf}` : 'Performance'}
