@@ -168,6 +168,24 @@ try {
   check('Splat flings dye round the hand', laid.splatter.total > 5 && laid.splatter.disc + laid.splatter.ring > 0.7 * laid.splatter.total,
     `${laid.splatter.total.toFixed(0)} laid, ${(100 * (laid.splatter.disc + laid.splatter.ring) / Math.max(1e-6, laid.splatter.total)).toFixed(0)}% within 0.16`);
 
+  // ── The Amount ──────────────────────────────────────────────────
+  // A mouse can say where and for how long, not how much; each tool's Amount
+  // says how much. Turned up, the same hold of the dropper lays more dye.
+  {
+    await clear();
+    await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 2.5));
+    await page.mouse.move(...screen(...A));
+    const p = await snap('amt0');
+    await hold('dropper', A, 1200);
+    await settle(700);
+    await snap('amt1');
+    const a = await measure('amt0', p), b = await measure('amt1', p);
+    await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 1));
+    const more = b.total - a.total;
+    check("a tool's Amount turned up does more — the dropper at 2.5x lays more dye", more > 1.6 * laid.dropper.total,
+      `${more.toFixed(0)} against ${laid.dropper.total.toFixed(0)} at 1x`);
+  }
+
   // ── Streak ──────────────────────────────────────────────────────
   await clear();
   await page.mouse.move(...screen(...A));

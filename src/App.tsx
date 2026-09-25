@@ -22,6 +22,8 @@ import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Ey
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { ToolAmount } from './components/ToolAmount';
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
@@ -297,6 +299,9 @@ export default function App() {
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
+    // And its Amount, as the Amount slider does (npm run tools).
+    (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
+      (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };
     /*
       Put a track from the shelf on, from outside.
 
@@ -497,6 +502,13 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
+  // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
+  const [toolAmounts, setToolAmounts] = useState<Record<string, number>>(() => loadToolAmounts());
+  useEffect(() => { saveToolAmounts(toolAmounts); }, [toolAmounts]);
+  const toolAmount = toolAmounts[activeTool] ?? 1;
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
+  const setToolAmount = useCallback((tool: string, v: number) => setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })), []);
   // The message handler is built once and must not go stale when a liquid's
   // colour is edited.
   const liquidTypesRef = useRef(liquidTypes);
@@ -2158,6 +2170,11 @@ export default function App() {
       if (e.key === '?') setShowHelp(h => !h);
       if (e.key === '+' || e.key === '=') zoomMacro(1);
       if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      // The tool in hand's Amount, a step at a time, at any width.
+      if (e.key === '[' || e.key === ']') {
+        const tool = activeToolRef.current;
+        setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(Math.round(((prev[tool] ?? 1) + (e.key === ']' ? 0.1 : -0.1)) * 10) / 10) }));
+      }
     };
     // The wheel over the plate zooms the closeup in and out while it is on
     // (never turns it on: a trackpad brush must not become a camera cut).
@@ -2828,6 +2845,7 @@ export default function App() {
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
+        toolAmount={toolAmount}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
         filmSenseRef={filmSense.reading}
@@ -3224,6 +3242,7 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  <ToolAmount tool={activeTool} value={toolAmount} onChange={(v) => setToolAmount(activeTool, v)} className="mt-1 text-white/80" />
                 </div>
 
                 <div className="h-px w-full bg-white/10"></div>
@@ -3992,6 +4011,8 @@ export default function App() {
           onLayer={setActiveLayer}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
+          toolAmount={toolAmount}
+          onToolAmount={(v) => setToolAmount(activeTool, v)}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -4061,6 +4082,8 @@ export default function App() {
           onImageDye={() => fileInputRef.current?.click()}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
+          toolAmount={toolAmount}
+          onToolAmount={(v) => setToolAmount(activeTool, v)}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}

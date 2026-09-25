@@ -490,6 +490,8 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
           ['+ / −', <>Macro zoom, 1× to 16×. <C>+</C> with the closeup off turns it on gently at 2×; <C>−</C> never turns it off.</>],
+          ['[ / ]', <>Less or more of the tool in hand: the dye a drop lays, the pressure of a press, the wind, the drag, the magnet's pull. Each tool keeps its own <Em>Amount</Em>; 1× is the usual.</>],
+          ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer. <Em>Hold</Em>, <Em>Follow</Em> and <Em>Auto</Em> on the zoom chip say who moves it.</>],
           ['?', <>This manual.</>],
           ['Esc', <>Brings the overlays back after Clean Screen; with them up, closes whatever panel is open.</>],
           ['Wheel over the plate', <>Zooms the closeup while it is running. It will not turn it on — a trackpad brush must not become a camera cut.</>],

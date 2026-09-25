@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { ToolAmount } from '../ToolAmount';
 import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
@@ -47,6 +48,9 @@ export interface DesignDeskProps {
 
   tool: string;
   onTool: (t: string) => void;
+  /** How much the tool in hand does (ToolAmount). */
+  toolAmount?: number;
+  onToolAmount?: (v: number) => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -337,6 +341,7 @@ export function DesignDesk(p: DesignDeskProps) {
             onChange={p.onTool}
             testId="tool-segmented"
           />
+          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="ml-3 w-56 text-muted" />}
         </div>
       </section>
 
