@@ -1430,13 +1430,28 @@ class FluidSimulation {
       }
 
       case 'classic': {
-        const positions: [number, number][] = [
-          [0.22, 0.22], [0.78, 0.22], [0.50, 0.50],
-          [0.22, 0.78], [0.78, 0.78], [0.35, 0.50], [0.65, 0.50],
-        ];
-        positions.forEach(([fx, fy], idx) => {
+        /*
+          Luminous, not thick, and on the screen.
+
+          Seven blobs 2.5 deep, four of them at the plate's corners: the
+          corners are off the screen (it shows the middle two thirds across
+          and less than half down), and 2.5 is deep enough that light through
+          the dye (Beer–Lambert) comes out near black. The gallery's Classic
+          was a grey plate with dark rings where the three middle blobs were,
+          lit only at their rims, for its first forty seconds and more; it
+          only came alive once something spread the dye thin. So a ring of
+          lighter blobs round the middle, where the screen is, and the
+          corners as they were, thinner.
+        */
+        const blobs: [number, number, number][] = [[0.5, 0.5, 11]];
+        for (let i = 0; i < 6; i++) {
+          const a = i * Math.PI / 3 + 0.3;
+          blobs.push([0.5 + Math.cos(a) * 0.19, 0.5 + Math.sin(a) * 0.15, 9 + (i % 2) * 2]);
+        }
+        blobs.push([0.22, 0.22, 16], [0.78, 0.22, 16], [0.22, 0.78, 16], [0.78, 0.78, 16]);
+        blobs.forEach(([fx, fy, rad], idx) => {
           const c = col(idx);
-          this.splatBlob(fx * S, fy * S, 18, 2.5, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, rad, 1.1, c.r, c.g, c.b);
         });
         break;
       }
