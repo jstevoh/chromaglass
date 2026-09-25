@@ -1378,6 +1378,28 @@ check('and neither starts over the limit',
     fromZero === 0, `${fromZero} from zero against ${live} live, over 4000 drifts`);
   check('and it does move the ones that are in play', live > 100, `${live} moved`);
 }
+/*
+  The one dial that exception is written for: on a look with ferrofluid and a
+  magnet under it, a still magnet is the only reason the ferrofluid sits
+  still, so Random Evolve walks it even when the look never set a walk. It
+  stays a gentle one (around the middle, never the full sweep), and on a look
+  without ferrofluid the walk stays off like everything else (checked above:
+  the default look has none).
+*/
+{
+  const anchor = { ...DEFAULT_SETTINGS, phaseAmount: 0.8, magnetStrength: 0.8, magnetWalk: 0 };
+  let bits = 20260925;
+  const roll = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
+  let current = { ...anchor }, walked = 0, lo = 1, hi = 0;
+  for (let i = 0; i < 4000; i++) {
+    const patch = driftLook(current, anchor, 1, roll);
+    if ('magnetWalk' in patch) { walked++; lo = Math.min(lo, patch.magnetWalk); hi = Math.max(hi, patch.magnetWalk); }
+    current = { ...current, ...patch };
+  }
+  check('evolve walks the magnet on a ferrofluid look that set no walk',
+    walked > 20 && lo >= 0.29 && hi <= 0.71,
+    `walked ${walked} times, between ${lo.toFixed(2)} and ${hi.toFixed(2)}`);
+}
 
 // ── The two desks carry the same actions on the top bar ───────────
 /*

@@ -2678,6 +2678,7 @@ class FluidSimulation {
       magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
       magnetPolarity: (settings.magnetPolarity ?? 1) >= 0 ? 1 : -1,
+      magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
@@ -3801,6 +3802,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const magnetStepRef = useRef<Record<string, unknown>>({});
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
   const phaseSolverRef = useRef<unknown>(null);
+  /** Last frame's ferrofluid amount, to catch it being turned up mid-show. */
+  const phaseAmountRef = useRef(0);
   const laidPresetRef = useRef<string | null>(null);
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
@@ -4458,15 +4461,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const held = hand !== null && now - hand.at < 250;
         const strength = look.magnetStrength ?? 0;
         // The walk is a look setting, so a look (or a test) that places its
-        // magnet keeps it there; Evolve starts a gentle one on any ferrofluid
-        // look that has none of its own.
-        const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.5 : 0);
+        // magnet keeps it there. Random Evolve walks it on any ferrofluid
+        // look: at once, gently, and from then on its drift wanders the
+        // setting itself (lib/drift.ts), which is what the slider shows.
+        const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.35 : 0);
         const walks = !held && walk > 0 && isActiveRef.current
           && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
         if (!held && !walks) return look;
-        let mx: number, my: number, ms = strength;
+        let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
         if (held) {
-          mx = hand.x; my = hand.y; ms = Math.max(strength, 0.85);
+          // A magnet in the hand is pressed up under the glass: low and
+          // strong, so it grabs what is near it and drags it along, where a
+          // look's own magnet is held further off and gathers broadly.
+          mx = hand.x; my = hand.y; ms = Math.max(strength, 0.9); mh = Math.min(mh, 0.15);
         } else {
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           const last = magnetWalkAtRef.current || now;
@@ -4480,6 +4487,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           magnetX: Math.max(0.05, Math.min(0.95, mx)),
           magnetY: Math.max(0.05, Math.min(0.95, my)),
           magnetStrength: ms,
+          magnetHeight: mh,
         }) as T;
       };
 
@@ -4710,6 +4718,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
+        }
+        /*
+          Ferrofluid turned up on a plate that has none: pour it. The phase
+          was only ever laid with a look, so the Ferrofluid slider raised
+          mid-show (or the Magnet picked on a look without any) changed the
+          setting and left the plate bare.
+        */
+        {
+          const amt = settingsRef.current.phaseAmount ?? 0;
+          if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
+              && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
+            layPhaseRef.current();
+          }
+          phaseAmountRef.current = amt;
         }
         {
           const lead = fluidsRef.current[0];

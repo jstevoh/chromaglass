@@ -10,8 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — a magnet you can move
 
 - **The Magnet tool (M)** on both desks: hold it on the plate and the
-  ferrofluid gathers under the pointer and follows it. On looks without
-  ferrofluid it does nothing.
+  ferrofluid gathers under the pointer and follows it. Picked on a look with
+  no ferrofluid, it pours some rather than doing nothing.
+- **The magnet pulls in real time.** Its pull used to be scaled by the flow's
+  own step, which slow looks keep tiny, so a dragged magnet crept at a few
+  hundredths of the plate a second and left the ferrofluid behind. A magnet
+  in the hand is also held closer and stronger now, so it grabs what is near
+  it and drags it along.
+- **Turning Ferrofluid up mid-show pours it.** It was only ever laid with a
+  look, so raising the slider changed the setting and left the plate bare.
+- **Random Evolve walks the magnet** on any look with ferrofluid, and drifts
+  Magnet Walk like its other dials, so the slider shows what it is doing.
 - **The magnet can walk on its own.** A new Magnet Walk setting moves it
   slowly around its resting place, faster when the music is loud. Magnet
   Garden has it on, and Evolve starts a gentle walk on any look with

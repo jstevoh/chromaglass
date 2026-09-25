@@ -56,6 +56,13 @@ export interface GpuStepParams {
   magnetStrength: number;
   /** Which way up it is held: +1 pulls the phase in, −1 pushes it away. */
   magnetPolarity: number;
+  /**
+    Seconds of real time this step stands for, as the magnet counts it. The
+    flow moves by `dt × advection`, which a slow look keeps tiny on purpose;
+    a magnet pulls in real time however slow the look is, or a hand dragging
+    it leaves the ferrofluid behind.
+  */
+  magnetSeconds: number;
   plateCurve: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   depthDrag: number;

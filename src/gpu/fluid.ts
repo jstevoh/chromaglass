@@ -74,6 +74,14 @@ const VISC_ITERS = 4;
 const DYE_ITERS = 4;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
+/*
+  How far the magnet carries the phase per second, per unit of pull. At 0.1 a
+  hand-held magnet (low, strong) drags ferrofluid within a tenth of the plate
+  at about 0.4 plate-widths a second, fast enough to follow a hand, while a
+  look's own magnet held higher still gathers over seconds rather than
+  snapping everything to one point.
+*/
+const MAGNET_RATE = 0.1;
 const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
@@ -773,7 +781,7 @@ export class WebGPUFluid {
       this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced, this.sampler],
         this.arg('phase advect', [
           p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength * (this.phaseLive ? 1 : 0),
-          p.magnetPolarity, disp, 0, 0,
+          p.magnetPolarity, disp, (p.magnetSeconds ?? 0) * MAGNET_RATE, 0,
         ]));
       this.phase.swap();
       this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],

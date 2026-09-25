@@ -159,6 +159,12 @@ jobs:
       # not a tuning.
       - name: Depth reaches the flow
         run: npm run depth
+      # The Magnet in the hand (reported: "magnet tool isn't really
+      # working"): picked on a look with no ferrofluid it pours some, and
+      # dragged across the plate the ferrofluid goes with it, against the
+      # same plate left alone.
+      - name: The magnet moves the ferrofluid
+        run: npm run magnet
       # The black box records (crash-plan.md): errors land with a snapshot,
       # a device loss and its recovery are logged, frames that stop become a
       # fatal and light the button, a report from a destroyed device still

@@ -1319,6 +1319,24 @@ export default function App() {
   }, [isAutomated, isActive]);
 
   /*
+    The Magnet brings its ferrofluid. A magnet over a plate with none on it
+    does nothing at all, which read as the tool being broken, so picking it
+    on such a look pours some (the visualizer lays it when the amount rises)
+    and gives the magnet enough strength to be felt. The look keeps it, and
+    the Ferrofluid slider takes it away again.
+  */
+  useEffect(() => {
+    if (activeTool !== 'magnet') return;
+    const s = settingsRef.current;
+    if ((s.phaseAmount ?? 0) > 0.002 && (s.magnetStrength ?? 0) > 0) return;
+    updateSettings({
+      phaseAmount: Math.max(s.phaseAmount ?? 0, 0.6),
+      magnetStrength: Math.max(s.magnetStrength ?? 0, 0.8),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool]);
+
+  /*
     A hand on a hardware fader, answered at once and rendered once a frame.
 
     See `lib/ride.ts` for why this is not just `setSettings`. `observe` runs

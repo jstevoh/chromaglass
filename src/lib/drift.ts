@@ -97,9 +97,19 @@ export function driftLook(
     const span = max - min;
     const now = typeof current[key as keyof VisualizerSettings] === 'number'
       ? current[key as keyof VisualizerSettings] as unknown as number : undefined;
-    const was = typeof anchor[key as keyof VisualizerSettings] === 'number'
+    let was = typeof anchor[key as keyof VisualizerSettings] === 'number'
       ? anchor[key as keyof VisualizerSettings] as unknown as number : undefined;
     if (now === undefined || was === undefined) continue;
+    /*
+      The one exception to leaving zero alone: a look with ferrofluid and a
+      magnet under it has the walk *implied*, since a still magnet is the
+      only reason that ferrofluid sits still. So on such a look the walk
+      wanders around a gentle middle even if the look never set one, and on
+      any other look it stays off like everything else.
+    */
+    if (key === 'magnetWalk' && (anchor.phaseAmount ?? 0) > 0.002 && (anchor.magnetStrength ?? 0) > 0) {
+      was = Math.max(was, 0.5);
+    }
     /*
       A look that set something to zero switched it off. Leave it off.
 

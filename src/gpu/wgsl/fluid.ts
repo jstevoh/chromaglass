@@ -381,7 +381,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     power law, and the height sits inside it rather than beside it.
 
     A.a = (magnet x, magnet y, height, strength), A.b.x = polarity (which way
-    up the magnet is held), A.b.y the displacement the flow advects by.
+    up the magnet is held), A.b.y the displacement the flow advects by, A.b.z
+    the magnet's own step in real time.
   */
   /** A soft disc of the second phase, poured onto the plate. A.a = (x, y, r, amount). */
   phaseSplat: `${HEAD}
@@ -438,7 +439,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       (0.329 against 0.250), it pushed harder held close than held away, and
       turning it over gathered. Three readings, one sign.
     */
-    d = d - (toM / r) * clamp(pull, -4.0, 4.0) * A.b.y;
+    //
+    // In real time (A.b.z), not the flow's displacement (A.b.y): a slow look
+    // keeps the flow's step tiny, and a magnet scaled by it crept at a few
+    // hundredths of the plate a second, so a hand dragging it left the
+    // ferrofluid behind.
+    d = d - (toM / r) * clamp(pull, -4.0, 4.0) * A.b.z;
   }
   let pos = clamp(uv - d, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
   textureStore(dst, vec2i(id.xy), vec4f(textureSampleLevel(src, lin, pos, 0.0).r, 0.0, 0.0, 0.0));
