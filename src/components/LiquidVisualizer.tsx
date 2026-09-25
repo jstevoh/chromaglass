@@ -7323,7 +7323,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       if (!isMouseDownRef.current) return;
       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        activeFluid.applySquish(x, y, 8, 0.005);
+        /*
+          Not under the Finger either: it carries the dye it touches
+          (carryDye) and does not press the glass. A press here is a squeeze-
+          film source, a flow that spreads out from under it, and dye
+          advected through a spreading flow is copied over more plate than it
+          came from: a stroke is thirty of these, and npm run tools measured
+          the Finger adding dye (512 -> 1484 against +216 left alone) after
+          its own carry had been made to conserve.
+        */
+        if (activeToolRef.current !== 'finger') activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
         const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
         const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
@@ -7349,8 +7358,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
-      // Not under the magnet, as for the mouse above.
-      if (activeFluid && activeToolRef.current !== 'magnet' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+      // Not under the magnet or the finger, as for the mouse above.
+      if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
       }
     };
