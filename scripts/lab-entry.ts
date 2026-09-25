@@ -2,6 +2,7 @@
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid } from '../src/gpu/fluid';
+import { WebGPUPlate } from '../src/gpu/plate';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 
 export const BASE: GpuStepParams = {
@@ -72,6 +73,8 @@ const api = {
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
+  /** The plate renderer, for checks on what it derives from the fields. */
+  WebGPUPlate,
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

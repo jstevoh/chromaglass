@@ -108,7 +108,8 @@ export class WebGPUParticles {
       label: 'particle splat',
       size: [this.splatEdge, this.splatEdge],
       format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      // COPY_SRC so npm run particles can read where they were drawn.
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
   }
 

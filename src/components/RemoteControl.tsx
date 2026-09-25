@@ -9,7 +9,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
-import { curveOf, valueAt, travelOf } from '../lib/midi';
+import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
 
 /**
@@ -70,7 +70,7 @@ function Slider({ label, field, step, format, value, connected, onDrag, onChange
         onChange={(e) => {
           const raw = parseFloat(e.target.value);
           if (curve === 1) { onChange(field, raw); return; }
-          onChange(field, Math.round(valueAt(raw, min, max, curve) / step) * step);
+          onChange(field, handValueAt(raw, min, max, curve));
         }}
         className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
         style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}

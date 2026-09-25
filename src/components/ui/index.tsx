@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
-import { curveOf, settingKeyOf, valueAt, travelOf } from '../../lib/midi';
+import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -315,8 +315,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
         onChange={e => {
           const raw = Number(e.target.value);
           if (curve === 1) { onChange(raw); return; }
-          const grain = step ?? (max - min) / 200;
-          onChange(Math.round(valueAt(raw, min, max, curve) / grain) * grain);
+          onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
         className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}

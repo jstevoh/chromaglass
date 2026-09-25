@@ -2,14 +2,29 @@
 /**
  * A drop lands where it is dropped, and nowhere else.
  *
- * Reported: on the Design desk, the Drop tool on the lead plate (not the
- * second) laid its dye under the hand and, in "the mirrored section above
- * it", the same gesture again, looking like a press. This drops on a calm
- * plate low in the preview and measures how much the picture changed in a
- * grid of cells over the preview, against the plate's own drift over the
- * same time: the cell under the hand should change and its mirror image
- * across the middle should not. It prints the map, so where an echo lands is
- * evidence rather than a description.
+ * Reported twice: on the Design desk, the Drop tool on the lead plate (not
+ * the second) lays its dye under the hand and, somewhere across the plate, a
+ * second reaction "like a press or a blow" — first mirrored top to bottom,
+ * then left to right. The report that came with the second (Timbre Shifter,
+ * two layers turned to 271 and 43 degrees, bubbles and beads on, output gain
+ * 1.45 and gamma 2.5) is reproduced here as closely as a harness can, next to
+ * a calm Classic plate, and each is judged the same way: the tool used low and
+ * to one side of the preview, and how much every cell of a 6x6 grid over the
+ * preview changed, against the plate's own drift over the same time. The
+ * cells round the hand must change; no cell away from them may change by much
+ * more than the plate does on its own. Where one does, it is printed, with
+ * whether it is the hand's mirror image across either axis or the centre.
+ *
+ * Four times over, at the same spot, and the maps averaged. Judged on one
+ * drop, a calm Classic plate "echoed" in a different cell every run, with no
+ * bubble on it: a bead merging or a drip landing in the window. An echo of
+ * the hand comes back every time; those do not.
+ *
+ * The echo itself was the derive pass lighting each plate's relief from its
+ * mirror (npm run derive pins that, in the lab): it showed here as the calm
+ * Classic lead plate changing at the hand's mirror, 35 to 53 against a drift
+ * of 15, and after the fix 1.5 against 1.9. So the calm plate is what this
+ * judges, turned and not turned.
  *
  *   node scripts/mirror.mjs        (needs a WebGPU browser: CI's macOS runner)
  */
@@ -31,71 +46,135 @@ const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* go
 process.on('exit', stop);
 await new Promise((r) => setTimeout(r, 2500));
 
-const G = 6;   // the grid over the preview, G x G cells
+const G = 6, REPS = 4;
+// Nothing but the hand moves the dye: the music, the turbulence, the drips and the turning held still.
+const CALM = {
+  turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+  rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0,
+  audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+};
+const REPORTED_OUTPUT = {
+  flipX: false, flipY: false, corners: [0, 0, 1, 0, 1, 1, 0, 1], maskTop: 0, maskRight: 0, maskBottom: 0,
+  maskLeft: 0, maskFeather: 0, gain: 1.45, gamma: 2.5, flashGuard: true, surfaces: [],
+};
+const PLAIN_OUTPUT = { ...REPORTED_OUTPUT, gain: 1, gamma: 1 };
+const TIMBRE = { look: 'timbre-shifter', rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} };
+// Judged: the calm plate, where anything the hand did not do stands out.
+// Printed only (judge: false): the reported plate, which moves by itself far
+// more than a drop does (a drift of 40-160 a cell against 1-5 on Classic, so
+// its averaged maps still swing by a few tens), and the Press, which by
+// design moves the whole plate: the liquid it squeezes out has to go
+// somewhere (30-100 a cell against a drift of 3-8, everywhere). Neither is an
+// echo; both are kept on the record next to the cells an echo would light.
+const SCENARIOS = [
+  { name: 'Classic, calm, layer 1', look: 'classic', layer: 0, rotation: [0, 0], settings: { layerCount: 2 } },
+  { name: 'Classic, calm, layer 2', look: 'classic', layer: 1, rotation: [0, 0], settings: { layerCount: 2 } },
+  { name: 'Classic, calm, layer 1 turned a quarter', look: 'classic', layer: 0, rotation: [4.73, 0], settings: { layerCount: 2 } },
+  { ...TIMBRE, name: 'Timbre Shifter as reported, layer 1', layer: 0, judge: false },
+  { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press', judge: false },
+];
+
 const browser = await launchChromium(chromium);
 try {
-  for (const layer of [0, 1]) {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  for (const sc of SCENARIOS) {
+    const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     await page.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* none */ } });
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${sc.look}${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(8000);
-    // A calm plate, as npm run tools has it, and two layers so either can be picked.
-    await page.evaluate((layer) => {
-      window.chromaglassSettings?.({
-        rotationSpeed: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
-        rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, layerCount: 2,
-        audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
-      });
-      window.chromaglassAction?.('clear');
-      window.chromaglassLayer?.(layer);
-    }, layer);
+    await page.evaluate(({ sc, CALM }) => {
+      window.chromaglassSettings?.({ ...CALM, ...sc.settings });
+      if (sc.output) window.chromaglassOutput?.(sc.output);
+      if (sc.rotation) window.chromaglassRotation?.(sc.rotation);
+      window.chromaglassLayer?.(sc.layer);
+      window.chromaglassTool?.(sc.tool ?? 'dropper');
+    }, { sc, CALM });
     await page.waitForTimeout(3000);
-    await page.evaluate(() => window.chromaglassTool?.('dropper'));
-    await page.waitForTimeout(400);
     const hole = await page.getByTestId('desk-preview').boundingBox();
-    if (!hole) { check(`layer ${layer + 1}: the Design desk's preview is there`, false); await page.close(); continue; }
+    if (!hole) { check(`${sc.name}: the Design desk's preview is there`, false); await page.close(); continue; }
+    // Pictures stay in the page and only the 6x6 means come back: shipping
+    // every pixel out as JSON made ten scenarios outrun the job's timeout.
+    let shots = 0;
     const shot = async () => {
       const png = await page.screenshot({ clip: hole });
-      return page.evaluate(async (b64) => {
+      const id = shots++;
+      await page.evaluate(async ({ b64, id }) => {
         const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
         const c = new OffscreenCanvas(img.width, img.height); const x = c.getContext('2d');
         x.drawImage(img, 0, 0);
-        return { w: img.width, h: img.height, px: Array.from(x.getImageData(0, 0, img.width, img.height).data) };
-      }, png.toString('base64'));
+        (window.__shots ??= {})[id] = x.getImageData(0, 0, img.width, img.height);
+      }, { b64: png.toString('base64'), id });
+      return id;
     };
-    const grid = (a, b) => {
+    const grid = (ia, ib) => page.evaluate(({ ia, ib, G }) => {
+      const a = window.__shots[ia], b = window.__shots[ib];
       const out = Array.from({ length: G }, () => Array(G).fill(0));
       const n = Array.from({ length: G }, () => Array(G).fill(0));
-      for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) {
-        const i = (y * a.w + x) * 4;
-        const d = Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1]) + Math.abs(a.px[i + 2] - b.px[i + 2]);
-        const gx = Math.min(G - 1, Math.floor(x / a.w * G)), gy = Math.min(G - 1, Math.floor(y / a.h * G));
+      for (let y = 0; y < a.height; y++) for (let x = 0; x < a.width; x++) {
+        const i = (y * a.width + x) * 4;
+        const d = Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]);
+        const gx = Math.min(G - 1, Math.floor(x / a.width * G)), gy = Math.min(G - 1, Math.floor(y / a.height * G));
         out[gy][gx] += d; n[gy][gx]++;
       }
       return out.map((row, y) => row.map((v, x) => v / Math.max(1, n[y][x])));
-    };
-    // The plate's own drift over the same time, then the drop.
-    const s0 = await shot(); await page.waitForTimeout(1600); const s1 = await shot();
-    const drift = grid(s0, s1);
-    const at = { fx: 0.5, fy: 0.8 };   // low in the preview; its mirror is at 0.2
-    await page.mouse.move(hole.x + hole.width * at.fx, hole.y + hole.height * at.fy);
-    await page.mouse.down(); await page.waitForTimeout(600); await page.mouse.up();
-    await page.mouse.move(hole.x + hole.width * 0.98, hole.y + hole.height * 0.02);
-    await page.waitForTimeout(1000);
-    const s2 = await shot();
-    const change = grid(s1, s2);
-    const cell = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
-    const [hy, hx] = cell(at.fx, at.fy), [my, mx] = cell(at.fx, 1 - at.fy);
-    const here = change[hy][hx], mirror = change[my][mx], floor = Math.max(1, drift[my][mx]);
-    console.log(`     layer ${layer + 1}: change by cell (rows top to bottom), against the plate's own drift`);
-    for (let y = 0; y < G; y++) console.log('       ' + change[y].map((v, x) => `${v.toFixed(1).padStart(6)}${y === hy && x === hx ? '*' : y === my && x === mx ? 'm' : ' '}`).join(''));
-    const settings = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { camera: s.camera, kaleido: s.kaleidoscope, beads: s.beads, bubbles: s.bubbles, dishSpread: s.dishSpread, layerCount: s.layerCount }; });
-    console.log(`     (${JSON.stringify(settings)})`);
-    check(`layer ${layer + 1}: a drop changes the picture where it lands`, here > 3 * Math.max(1, drift[hy][hx]),
-      `${here.toFixed(1)} under the hand, against ${drift[hy][hx].toFixed(1)} of drift`);
-    check(`layer ${layer + 1}: and not in its mirror image across the middle`, mirror < Math.max(3 * floor, 0.2 * here),
-      `${mirror.toFixed(1)} at the mirror, against ${drift[my][mx].toFixed(1)} of drift there`);
+    }, { ia, ib, G });
+    const add = (acc, m) => acc.forEach((row, y) => row.forEach((_, x) => { row[x] += m[y][x] / REPS; }));
+    const zero = () => Array.from({ length: G }, () => Array(G).fill(0));
+    // Low and to the right, so its mirror images across each axis and the centre are three different cells.
+    const at = { fx: 0.75, fy: 0.75 };
+    const hx = hole.x + hole.width * at.fx, hy = hole.y + hole.height * at.fy;
+    const drift = zero(), change = zero();
+    let hand = null;
+    for (let rep = 0; rep < REPS; rep++) {
+      const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
+      await page.mouse.move(hx, hy);
+      await page.mouse.down();
+      if (!hand) hand = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
+      for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
+      await page.mouse.up();
+      await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
+      await page.waitForTimeout(500);
+      const c = await shot();
+      add(drift, await grid(a, b)); add(change, await grid(b, c));
+      await page.evaluate(() => { window.__shots = {}; });
+    }
+    const cellOf = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
+    const [cy, cx] = cellOf(at.fx, at.fy);
+    const tags = new Map([
+      [cellOf(at.fx, 1 - at.fy).join(), 'mirror top/bottom'],
+      [cellOf(1 - at.fx, at.fy).join(), 'mirror left/right'],
+      [cellOf(1 - at.fx, 1 - at.fy).join(), 'mirror through the centre'],
+    ]);
+    const near = (y, x) => Math.abs(y - cy) <= 1 && Math.abs(x - cx) <= 1;
+    const here = Math.max(...[-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => change[cy + dy]?.[cx + dx] ?? 0)));
+    const away = [];
+    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+      if (near(y, x)) continue;
+      // How far past what the plate does alone, in its own terms.
+      const allowed = Math.max(2 * drift[y][x] + 4, 0.3 * here);
+      away.push({ y, x, v: change[y][x], allowed, over: change[y][x] / allowed, tag: tags.get(`${y},${x}`) ?? '' });
+    }
+    away.sort((a, b) => b.over - a.over);
+    const rot = await page.evaluate(() => window.chromaglassDebug?.().rotation?.current ?? null);
+    const handAt = (hand ? ` — the hand on the plate at ${(hand.x / hand.grid).toFixed(2)},${(hand.y / hand.grid).toFixed(2)}` : '')
+      + (rot ? `, plates turned ${rot.map((r) => r.toFixed(2)).join(', ')}` : '');
+    console.log(`     ${sc.name}: mean change by cell over ${REPS} (rows top to bottom; * the hand, m its mirror images), drift in brackets${handAt}`);
+    for (let y = 0; y < G; y++) {
+      console.log('       ' + change[y].map((v, x) => {
+        const mark = y === cy && x === cx ? '*' : tags.has(`${y},${x}`) ? 'm' : ' ';
+        return `${v.toFixed(1).padStart(6)}${mark}(${drift[y][x].toFixed(1)})`;
+      }).join(''));
+    }
+    const worst = away[0];
+    if (sc.judge !== false) check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
+      `${here.toFixed(1)} round the hand`);
+    if (sc.judge === false) {
+      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
+      await page.close();
+      continue;
+    }
+    check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
+      worst ? `most away from the hand ${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand` : 'nothing');
     await page.close();
   }
 } finally {

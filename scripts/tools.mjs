@@ -221,7 +221,10 @@ try {
   const along = ((fs.cx - fa.cx) * dirB.x + (fs.cy - fa.cy) * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
   check('Finger carries the dye along the stroke', along > 0.005,
     `centre of mass moved ${(along * 100).toFixed(1)}% of the plate toward where the stroke went`);
-  check('and adds none', Math.abs((fb.total - fa.total) - fIdle) < 0.15 * fa.total + 5,
+  // The plate's own change over the same time is part of the slack, as for
+  // the Press below: it is measured once, and it moved by +68 on a run where
+  // the stroke landed 82 under it against an allowance of 80.
+  check('and adds none', Math.abs((fb.total - fa.total) - fIdle) < 0.15 * fa.total + 5 + Math.abs(fIdle),
     `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} with the plate left alone as long`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
@@ -253,8 +256,17 @@ try {
         where the flow spreads, which touches the beat squeeze, bubbles and
         currents too).
       */
+      /*
+        The slack is the plate's own: what it did alone over the same time,
+        not a fixed 5. The pool a press sits in varies by run (90 to 374 of
+        dye round the hand), and on a small one a fixed 5 was less than the
+        plate moves by itself (-11 to +70 left alone), so the check failed on
+        whether the idle sample landed high or low (CI: 90 -> 194 against -11,
+        the same press that passed at 374 -> 554 against +70).
+      */
+      const slack = 5 + 3 * Math.abs(idle);
       const made = (b.total - a.total) - idle;
-      check('and keeps it', made > -0.15 * a.total - 5 && made < 1.0 * a.total + 5,
+      check('and keeps it', made > -0.15 * a.total - slack && made < 1.0 * a.total + slack,
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
   }

@@ -16,6 +16,9 @@
  * exceptions below.
  */
 
+import type { VisualizerSettings } from '../types';
+import { curveOf, travelOf } from './midi';
+
 /** The settings a number reads better on than a percentage. */
 const UNITS: Record<string, (v: number) => string> = {
   macroZoom:  v => `${v.toFixed(2)}×`,
@@ -35,7 +38,12 @@ export function readSetting(key: string, value: number, min: number, max: number
   if (unit) return unit(value);
   const span = max - min;
   if (span === 0) return '0%';
-  const pct = Math.round(((value - min) / span) * 100);
+  /*
+    Where the knob is, on a curved control too. Speed's travel is cubed, and
+    this read the value's share of 0..0.3: the knob a fifth of the way along
+    said 1%, and the next notch down said 0%.
+  */
+  const pct = Math.round(travelOf(value, min, max, curveOf(key as keyof VisualizerSettings)) * 100);
   return `${pct < 0 ? 0 : pct > 100 ? 100 : pct}%`;
 }
 

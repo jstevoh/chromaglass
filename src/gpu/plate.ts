@@ -116,7 +116,8 @@ export class WebGPUPlate {
         size,
         dye: tex('packed dye', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
         vel: tex('packed velocity', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
-        derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING),
+        // COPY_SRC so npm run derive can read where the slopes were found.
+        derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
       };
     }
   }
@@ -221,7 +222,16 @@ export class WebGPUPlate {
       layout: this.device.createPipelineLayout({
         bindGroupLayouts: [layoutFromWgsl(this.device, DERIVE_WGSL, 'derive', GPUShaderStage.FRAGMENT)],
       }),
-      vertex: { module: module(DERIVE_WGSL), entryPoint: 'vs' },
+      /*
+        Flipped, as every pass into a texture another pass samples is (the
+        FLIP_Y note in wgsl/plate.ts). It was not, so the display, reading
+        this the way it reads the dye, lit each layer's relief from the
+        mirror of the plate across its middle: a drop or a press on the lead
+        plate was lit again on the other side, top to bottom, or left to
+        right on a plate turned a quarter. npm run derive measured the slopes
+        at 0.72,0.76 for dye at 0.72,0.24.
+      */
+      vertex: { module: module(DERIVE_WGSL), entryPoint: 'vs', constants: { FLIP_Y: -1 } },
       fragment: { module: module(DERIVE_WGSL), entryPoint: 'fs', targets: [{ format: 'rgba16float' as GPUTextureFormat }] },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     }));

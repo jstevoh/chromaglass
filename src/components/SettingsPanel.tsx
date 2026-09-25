@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
-import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, valueAt, travelOf, type FactoryMapId } from '../lib/midi';
+import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
@@ -292,10 +292,8 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
         onChange={(e) => {
           const raw = parseFloat(e.target.value);
           if (curve === 1) { onChange(raw); return; }
-          // Back onto the setting's own step, so a curved control still lands
-          // on values a preset could have written rather than on 0.0374213.
-          const v = valueAt(raw, min, max, curve);
-          onChange(Math.round(v / step) * step);
+          // Three figures, not the setting's step: see handValueAt.
+          onChange(handValueAt(raw, min, max, curve));
         }}
         className={`w-full h-1 bg-white/10 rounded-full appearance-none accent-white transition-all ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:accent-gray-300'}`}
       />
