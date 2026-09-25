@@ -167,6 +167,21 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 export const valueAt = (t: number, min: number, max: number, curve = 1): number =>
   min + (max - min) * (curve === 1 ? clamp01(t) : Math.pow(clamp01(t), curve));
 
+/**
+ * A curved control moved by hand to `t` of its travel, as the value it sets.
+ *
+ * Kept to three significant figures rather than put back onto the setting's
+ * step. Speed is cubed onto 0..0.3 with a step of 0.001, and the step is a
+ * sixth of the travel down there: the knob could sit at 0 or at 15% and
+ * nowhere between, and read 1% while it sat a fifth of the way along.
+ * Reported as "the scale should be continuous". Three figures keep the
+ * values readable and the travel smooth to the bottom.
+ */
+export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
+  const v = valueAt(t, min, max, curve);
+  return v === 0 ? 0 : Number(v.toPrecision(3));
+};
+
 /** The inverse: where a value sits on the control, 0..1. */
 export const travelOf = (value: number, min: number, max: number, curve = 1): number => {
   const at = clamp01((value - min) / (max - min || 1));

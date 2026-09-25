@@ -29,7 +29,8 @@
  */
 
 import { qualityLadder, canvasPixelsFor } from '../src/lib/platform';
-import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf } from '../src/lib/midi';
+import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
+import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
 
 const checks = [];
@@ -192,6 +193,21 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     const mid = valueAt(0.5, spec.min, spec.max, spec.curve);
     check(`${key}: half the travel is ${mid.toFixed(4)}, not ${((spec.min + spec.max) / 2).toFixed(4)}`,
       mid < (spec.min + spec.max) / 2);
+    // Reported: Speed at 1% sat a fifth of the way along, and the next notch
+    // down threw it to the bottom. Swept a thousandth at a time by hand, the
+    // knob lands where the hand put it and the chip reads where the knob is.
+    let jump = 0, worstAt = 0, misread = '';
+    for (let i = 0; i <= 1000; i++) {
+      const t = i / 1000;
+      const v = handValueAt(t, spec.min, spec.max, spec.curve);
+      const lands = travelOf(v, spec.min, spec.max, spec.curve);
+      if (Math.abs(lands - t) > jump) { jump = Math.abs(lands - t); worstAt = t; }
+      const shown = readSetting(key, v, spec.min, spec.max);
+      if (!misread && shown.endsWith('%') && Math.abs(parseInt(shown, 10) - lands * 100) > 0.51) misread = `${shown} with the knob at ${(lands * 100).toFixed(1)}%`;
+    }
+    check(`${key}: the knob lands where the hand puts it, all the way to the bottom`, jump < 0.01,
+      `worst ${(jump * 100).toFixed(1)}% off, at ${(worstAt * 100).toFixed(1)}%`);
+    check(`${key}: and its chip reads where the knob is`, !misread, misread || 'every step');
   }
 }
 
