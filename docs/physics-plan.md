@@ -82,16 +82,54 @@ dial. It measures the spin of the flow the plate actually moved by
 
 ## The ferrofluid's labyrinth (`ferroLabyrinth`)
 
-A thin layer of ferrofluid in a field perpendicular to it is a sheet of
-parallel dipoles, which repel. The model is Cahn–Hilliard with the repulsion
-in the chemical potential, μ + αψ, where (−∇² + m²)ψ = c is relaxed a few
-Jacobi sweeps a step (screening length 32 cells). Then the update carries
-−Mα(c − m²ψ), which conserves. α is scaled by how saturated the field is.
+What it should look like (Dickstein et al., *Science* 261, 1993; Jackson's
+Hele-Shaw images in Kent-Dobias & Bernoff, PRE 91, 2015): a drop of black
+ferrofluid between glass plates, in a field perpendicular to them, fingers
+out into a dense maze of roughly constant width, half ferrofluid and half
+carrier, with dead ends, Y-junctions and few loops. The width is set by the
+gap and the field (stronger is finer), not by the drop; it forms in a second
+or a few, and relaxes into rounded drops when the field goes.
 
-A linear stability check sets α: the growth rate of a ripple of wavenumber q
-is −Mq²(f″ + q² + α/(q² + m²)). Measured: below α 0.03 a pool stays one disc;
-at 0.1 it splits into a core and rings, the target pattern a labyrinth grows
-from. This is the weakest of the set and the next piece of work.
+A thin layer in that field is a sheet of parallel dipoles, which repel; the
+repulsion is a negative line tension that surface tension holds at one
+wavelength. The model is Cahn–Hilliard with the repulsion in the chemical
+potential, μ = f′(c) − ∇²c + χαψ with (−∇² + m²)ψ = c relaxed by Jacobi
+sweeps (Ohta–Kawasaki), and — the piece that makes it a Hele-Shaw maze
+rather than a slow diffusion — the flow driven by it, −c∇μ before the
+projection. For Ohta–Kawasaki the fastest wavenumber is k*² = √α − m², so
+the constants come from the period wanted (0.045 of the plate, never under
+twelve cells): m = 0.4k*, α = (k*² + m²)².
+
+Three things turned a target pattern into a maze:
+
+- **The field has a uniform part.** χ is 0.45 everywhere (a coil under the
+  plate) and the magnet's saturation adds the rest, with a slow noise, since
+  a labyrinth's disorder comes from noise. With χ only over the magnet, its
+  radial gradient ordered the stripes into rings round it. The magnet's pull
+  also yields (to a quarter) under a full field.
+- **The flow, not diffusion, carries it.** With Cahn–Hilliard alone eight
+  seconds left the drops as blobs.
+- **The flux is divergence-free on its own stencil (Rhie–Chow).** The
+  projection subtracts the wide gradient but solves the compact Laplacian,
+  which leaves (L_compact − L_wide)p, all at the finest scale. The maze's
+  sharp force made a sharp pressure, and the flux step drew lines every
+  other cell through the black: its grid-scale part 0.045. Each face now
+  swaps the two cells' wide gradients for its compact one: 0.003. The oil
+  uses the same face velocity.
+
+In performance the field breathes with the music (0.55 of the setting, plus
+loudness, plus a kick envelope over a second), so the maze sharpens on the
+hits and fattens between them. `npm run physics` checks the field alone
+doubles the edge of eighteen drops (2866 against 1352), conserves them, and
+leaves the black solid.
+
+The same work fixed the magnet on its own. The sharpening pass that stood in
+for Cahn–Hilliard without a maze clamped to its neighbourhood, and lost an
+eighth of the ferrofluid at ten frames a second; its pairwise replacement
+set drops into blocky squares; Cahn–Hilliard now keeps the phases apart in
+every case (Phase Edge is its mobility). And the magnet's force is φ∇ψ, on
+the smooth field, rather than −ψ∇φ, which turned every ripple in a pool over
+the magnet into a grid of holes.
 
 ## Chemistry
 

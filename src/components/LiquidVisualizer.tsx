@@ -3843,6 +3843,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const magnetWalkAtRef = useRef(0);
   /** The settings handed to the lead plate's step, with the magnet where it is now. */
   const magnetStepRef = useRef<Record<string, unknown>>({});
+  /** The maze field's kick envelope: 1 on a kick, falling over about a second (see magnetFor). */
+  const mazeKickRef = useRef({ env: 0, at: 0 });
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
   const phaseSolverRef = useRef<unknown>(null);
   /** Last frame's ferrofluid amount, to catch it being turned up mid-show. */
@@ -4510,7 +4512,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.35 : 0);
         const walks = !held && walk > 0 && isActiveRef.current
           && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
-        if (!held && !walks) return look;
+        /*
+          The maze field plays the music: its strength breathes with how
+          loud it is and steps up on a kick, and a stronger field makes the
+          labyrinth finer and busier while a weaker one lets the fingers
+          fatten and round (Zakinyan et al.; the ferrofluid speakers that
+          drive a coil from the audio do the same). Slewed, so the maze
+          breathes rather than flickers.
+        */
+        const lab = look.ferroLabyrinth ?? 0;
+        let field = lab;
+        if (lab > 0.001 && isActiveRef.current && currentAudioData) {
+          const k = mazeKickRef.current;
+          const dtS = k.at ? Math.min(0.1, (now - k.at) / 1000) : 0;
+          k.at = now;
+          k.env = kickRef.current?.kick ? 1 : k.env * Math.exp(-dtS / 0.8);
+          const energy = Math.min(1, currentAudioData.energy);
+          field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
+        }
+        if (!held && !walks) {
+          return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
+        }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
         if (held) {
           // A magnet in the hand is pressed up under the glass: low and
@@ -4531,6 +4553,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           magnetY: Math.max(0.05, Math.min(0.95, my)),
           magnetStrength: ms,
           magnetHeight: mh,
+          ferroLabyrinth: field,
         }) as T;
       };
 

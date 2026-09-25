@@ -1818,9 +1818,9 @@ export const PRESETS: Preset[] = [
   {
     id: 'magnet-garden',
     name: 'Magnet Garden',
-    description: 'Black ferrofluid on a bright golden pool, a magnet held under the glass: it gathers into spikes and labyrinths and lets go on the beat.',
+    description: 'Black ferrofluid on a bright golden pool over a field coil, with a magnet under the glass: it fingers into a labyrinth that sharpens on the beat.',
     settings: {
-      ferroLabyrinth: 0.5,
+      ferroLabyrinth: 0.8,
       globalSpeed: 0.0105,
       surge: 0.35,
       layerCount: 1,

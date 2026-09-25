@@ -1309,10 +1309,15 @@ struct FsOut {
         let gy = viewAt(fuvBase + vec2f(0.0, e)).phase - viewAt(fuvBase - vec2f(0.0, e)).phase;
         let edge = clamp(length(vec2f(gx, gy)) * 3.0, 0.0, 1.0);
         // Brown where it is thin, black where it is thick: a real film, not a
-        // silhouette with a hard edge.
-        let body = vec3f(0.07, 0.035, 0.02) * (1.0 - ph * 0.7);
-        let opac = clamp(ph * ph * 1.6, 0.0, 1.0) * clamp(U.phaseAmount, 0.0, 1.0);
-        var pc = mix(outColor, body, opac);
+        // silhouette with a hard edge. Beer–Lambert, the light through it
+        // filtered by its thickness (ph^1.5 over a diffuse edge), and blue
+        // most, as the magnetite does: amber at a finger's edge, then
+        // brown, then ink over the full gap (optical depth 5), out of the
+        // plate's own light rather than a painted brown.
+        let amt = clamp(U.phaseAmount, 0.0, 1.0);
+        let opac = clamp(ph * ph * 1.6, 0.0, 1.0) * amt;
+        let depth = 5.0 * pow(ph, 1.5) * (0.4 + 0.6 * amt);
+        var pc = outColor * exp(-depth * vec3f(0.35, 0.6, 1.0));
         // The rim: the dye beyond the boundary, bent back through the edge.
         let outward = select(vec2f(0.0), -normalize(vec2f(gx, gy)), length(vec2f(gx, gy)) > 1e-5);
         let beyond = decodeFluid(layer0, fuvBase + outward * 0.02, 0.0, false);

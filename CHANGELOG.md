@@ -21,8 +21,10 @@ the measurements):
   down it in fingers (Rayleigh–Taylor); **Heat Spread** lets heat diffuse
   faster than dye, as it does in water.
 - **Swirl**: small eddies spun back up (vorticity confinement).
-- **Labyrinth**: the ferrofluid's own repulsion under a strong field breaks a
-  pool into rings (Ohta–Kawasaki); more to come.
+- **Labyrinth**: under a strong field the ferrofluid fingers out into a
+  maze, as it does between glass plates (Hele-Shaw flow driven by its own
+  repulsion), and the field breathes with the music: finer on the hits,
+  rounder between them.
 - **pH Indicator**, with new **Acid** and **Base** bottles: the dye turns pink
   in acid and green in base, like red cabbage.
 - **BZ Reaction**: the Belousov–Zhabotinsky reaction's turning spirals.
@@ -76,6 +78,11 @@ the measurements):
 - **Magnet Polarity is gone.** It pushed the ferrofluid away with the magnet
   turned over, which no ferrofluid does: magnetised by the field itself, it is
   drawn to either pole.
+- **The ferrofluid keeps every drop, at any frame rate.** On a machine
+  drawing ten frames a second the edge sharpening lost an eighth of it in a
+  few seconds, and a pool gathered on the magnet was printed with a grid of
+  holes. Its edge is now kept by the same physics as the oil's, which
+  conserves and rounds drops properly; Phase Edge sets how quickly.
 - **Turning Ferrofluid up mid-show pours it.** It was only ever laid with a
   look, so raising the slider changed the setting and left the plate bare.
 - **Random Evolve walks the magnet** on any look with ferrofluid, and drifts
