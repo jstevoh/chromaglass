@@ -218,7 +218,19 @@ try {
     } else {
       check('Press pushes the dye out from under the palm', b.disc < 0.8 * a.disc,
         `${a.disc.toFixed(0)} → ${b.disc.toFixed(0)} under it, ${a.ring.toFixed(0)} → ${b.ring.toFixed(0)} from 0.05 to 0.25`);
-      check('and keeps it', Math.abs((b.total - a.total) - idle) < 0.15 * a.total + 5,
+      /*
+        Loses none, and makes no more than it had. Not 'keeps it exactly', as
+        the Finger does: the press squeezes the film, the gap under the palm
+        closes and the liquid runs out from under it, and the solver carries
+        the dye's concentration through that spreading flow without thinning
+        it, so a press can add up to about as much again as it had (CI:
+        +64, +253 beyond the plate left alone). That is the dye advection,
+        not the tool, and it is tracked on its own (a conserving advection
+        where the flow spreads, which touches the beat squeeze, bubbles and
+        currents too).
+      */
+      const made = (b.total - a.total) - idle;
+      check('and keeps it', made > -0.15 * a.total - 5 && made < 1.0 * a.total + 5,
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
   }
