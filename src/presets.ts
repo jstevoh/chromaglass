@@ -1120,6 +1120,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
+      beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
       globalSpeed: 0.06,
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,

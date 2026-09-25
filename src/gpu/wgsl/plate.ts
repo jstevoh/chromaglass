@@ -989,6 +989,40 @@ fn viewAt(uv: vec2f) -> View {
   for (var k = 0; k < 8; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
   return View(o[0], o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7]);
 }
+
+/*
+  A drop of oil sitting on the plate is a lens: a spherical cap, thick in the
+  middle and thin at its edge, so what lies under it is seen magnified at the
+  centre and squeezed toward the rim, the way a drop under a microscope shows
+  the pattern beneath it bigger than the pattern round it.
+
+  The bead mask's blue is a ramp 1 - d/R (d from the bead's centre, R its
+  radius), times the bead's fade in red. Its gradient points at the centre
+  with length 1/R, so from any point inside, the centre is (1 - h)/|grad h|
+  away along it, which finds the drop's middle without a list of beads. The
+  point at radius r (0 centre, 1 rim) shows what lies at radius rs, with rs =
+  r(a + (1 - a) r^2): a = 1/magnification at the centre, and rs = r at the
+  rim, so the view joins the plate outside without a seam.
+
+  Returns the offset to add (plate uv) and r, or r = -1 outside every drop.
+*/
+const DROP_MAGNIFY: f32 = 1.7;
+fn dropLens(uv: vec2f) -> vec3f {
+  let px = 1.0 / f32(textureDimensions(beadTex).x);
+  let m = tex2(beadTex, uv);
+  if (m.r < 0.02) { return vec3f(0.0, 0.0, -1.0); }
+  let h = clamp(m.b / m.r, 0.0, 1.0);
+  let hx = tex2(beadTex, uv + vec2f(px, 0.0)); let hx2 = tex2(beadTex, uv - vec2f(px, 0.0));
+  let hy = tex2(beadTex, uv + vec2f(0.0, px)); let hy2 = tex2(beadTex, uv - vec2f(0.0, px));
+  let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
+  let g2 = dot(g, g);
+  let r = clamp(1.0 - h, 0.0, 1.0);
+  if (g2 < 1.0) { return vec3f(0.0, 0.0, r); }
+  let toC = g * (1.0 - h) / g2;
+  let a = 1.0 / DROP_MAGNIFY;
+  let rs = r * (a + (1.0 - a) * r * r);
+  return vec3f(toC * (1.0 - rs / max(r, 1e-4)), r);
+}
 `;
 
 /*
@@ -1173,6 +1207,15 @@ struct FsOut {
   let s0 = sin(-U.rotation0);
   var fuv0 = uvToFluid(uv, c0, s0);
   if (U.dishSpread > 0.001 && !closeup) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
+  // Where the eye meets the plate's surface: the drops sit here, and what is
+  // under a drop is read through it (dropLens), before anything is sampled,
+  // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
+  let fuvSurf = fuv0;
+  var drop = vec3f(0.0, 0.0, -1.0);
+  if (U.beads > 0.001) {
+    drop = dropLens(fuvSurf);
+    if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
+  }
   let fuvBase = fuv0;
 
   var flow0 = vec2f(0.0);
@@ -1670,43 +1713,43 @@ struct FsOut {
     }
   }
 
-  // ── Oil beads ────────────────────────────────────────────────────
-  if (U.beads > 0.001 && !closeup) {
-    let bm = tex2(beadTex, fuvBase);
+  // ── Oil drops ────────────────────────────────────────────────────
+  /*
+    A drop of oil on the plate, as a microscope sees one: the pattern under
+    it magnified (dropLens, above, moved where everything is read), a dark
+    band just inside the edge where the surface is steep enough that light
+    from below is bent away from the eye, a thin bright line where the drop
+    meets the film round it, and one hard highlight where its dome faces the
+    lamp. Oil takes none of the water's dye, so it is faintly paler and warm.
+    In the closeup too, where a drop fills the frame.
+  */
+  if (U.beads > 0.001 && drop.z >= 0.0) {
+    let bm = tex2(beadTex, fuvSurf);
     let inner = bm.r;
     let ring = bm.g;
-    let ramp = bm.b;
+    let r = drop.z;
     let inDye = smoothstep(0.015, 0.2, auxH);
-    let k = U.beads * inDye;
-    // GL counts framebuffer rows up and WebGPU counts them down, so dpdy is
-    // the other way round from dFdy: without the sign the dome's slope faces
-    // the wrong way and every bead catches the lamp on its wrong side.
-    //
-    // And FLIP_Y mirrors the geometry when this pass draws into a texture, so
-    // it mirrors the derivative too — which would put the lamp back on the
-    // wrong side for exactly the frames that go through the camera or the
-    // post chain. The sign carries it.
-    let slope = vec2f(dpdx(ramp), -FLIP_Y * dpdy(ramp));
-    let sl = length(slope);
-    let Lb = lampDir(fuvBase, U.lamp);
-    let lampS = Lb.xy / max(length(Lb.xy), 0.06);
-    var facing = 0.0;
-    if (sl > 1e-5) { facing = dot(slope / sl, lampS); }
-    let dome = 0.78 + 0.32 * ramp;
-    let catchL = max(0.0, facing) * (1.0 - ramp) * smoothstep(0.0, 0.5, ramp) * 0.5;
-    /*
-      A bead is oil, not air, and it has to read that way. An air bubble in
-      water spreads the light, so it projects as a heavy dark ring. Oil is
-      only a little denser than water, so a bead is a weak converging lens: a
-      thin, soft edge, and the light gathered into a bright core. The oil
-      takes none of the water's dye either, so the bead is the colour around
-      it thinned by the lamp, paler than the liquid it sits in.
-    */
-    outColor *= 1.0 - ring * 0.4 * k;
-    let oil = mix(outColor, vec3f(0.95, 0.92, 0.85) * (0.35 + 0.65 * outColor), 0.3);
-    let focus = smoothstep(0.5, 1.0, ramp);
-    let lensC = oil * dome + outColor * focus * 0.45 + vec3f(0.9, 0.85, 0.75) * catchL * 0.35;
-    outColor = mix(outColor, lensC, inner * (1.0 - ring) * k);
+    let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
+    // The dome: tilted outward toward the edge, steepest at the rim.
+    let off = drop.xy;
+    var outward = vec2f(0.0);
+    if (dot(off, off) > 1e-12) { outward = -normalize(off); }
+    let tilt = 0.85 * r;
+    let n = vec3f(outward * tilt, sqrt(max(0.0, 1.0 - tilt * tilt)));
+    let Lb = lampDir(fuvSurf, U.lamp);
+    let H = normalize(Lb + vec3f(0.0, 0.0, 1.0));
+    let spec = pow(max(0.0, dot(n, H)), 90.0);
+    // Light under the steep edge is refracted out of view: a dark band.
+    let band = smoothstep(0.7, 0.92, r) * (1.0 - smoothstep(0.97, 1.0, r));
+    let oilTint = mix(outColor, vec3f(0.96, 0.93, 0.84) * (0.3 + 0.7 * outColor), 0.18);
+    var dropC = oilTint * (1.0 - 0.72 * band);
+    // The meniscus catches the room: a fine bright line at the contact.
+    dropC += vec3f(0.85, 0.87, 0.9) * ring * 0.35;
+    // Fresnel: the dome's flank reflects a little of the light above.
+    let fres = 0.04 + 0.96 * pow(1.0 - n.z, 5.0);
+    dropC += vec3f(0.8, 0.82, 0.86) * fres * 0.25;
+    dropC += vec3f(1.0, 0.98, 0.94) * spec * 1.1;
+    outColor = mix(outColor, dropC, k);
     auxB = max(auxB, inner * 0.4 * k);
   }
 
