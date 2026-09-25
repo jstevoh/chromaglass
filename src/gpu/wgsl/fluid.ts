@@ -1826,13 +1826,29 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var phase: texture_2d<f32>;
 @group(0) @binding(4) var mu: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
-fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).r; }
+// Both blurred [1 2 1]²: μ carries −∇²c, which is grid-scale, and a
+// grid-scale force is the part a collocated projection cannot remove (see
+// phaseForce); unblurred, it printed a mesh into the black.
+fn uu(p: vec2i, n: f32) -> f32 {
+  var t = 0.0;
+  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) {
+    t += f32((2 - abs(i)) * (2 - abs(j))) * textureLoad(mu, clampP(p + vec2i(i, j), n), 0).r;
+  } }
+  return t / 16.0;
+}
+fn cb(p: vec2i, n: f32) -> f32 {
+  var t = 0.0;
+  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) {
+    t += f32((2 - abs(i)) * (2 - abs(j))) * clamp(textureLoad(phase, clampP(p + vec2i(i, j), n), 0).r, 0.0, 1.0);
+  } }
+  return t / 16.0;
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let v = textureLoad(vel, p, 0);
-  let c = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  let c = cb(p, n);
   let g = vec2f(uu(p + vec2i(1, 0), n) - uu(p - vec2i(1, 0), n), uu(p + vec2i(0, 1), n) - uu(p - vec2i(0, 1), n)) * 0.5;
   var f = -c * g * A.a.x;
   let fl = length(f);

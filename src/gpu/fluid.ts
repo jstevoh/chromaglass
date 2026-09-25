@@ -105,11 +105,11 @@ const LIES_B0 = 0.2;
 const MAZE_PERIOD = 0.045;
 /*
   How hard the maze's own potential moves the liquid, in plate widths a
-  second per unit of its gradient (per cell). From the lab: a pool fingers
-  out in about a second and a half, the range the experiments give for a
-  viscous Hele-Shaw maze.
+  second per unit of its gradient (per cell). From the lab at 256²: drops
+  turn to starfish in two seconds and to a branched maze in eight; the
+  experiments give a second or a few for a viscous Hele-Shaw maze.
 */
-const MAZE_GAIN = 0.3;
+const MAZE_GAIN = 2;
 /** The share of the maze's field that is uniform (a coil under the whole plate); the hand magnet adds the rest where it is. */
 const MAZE_UNIFORM = 0.45;
 /** The reactions' own grids (see gridSplat). */

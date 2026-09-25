@@ -55,7 +55,7 @@ try {
    */
   const phase = (at = null) => page.evaluate(async (at) => {
     const f = await window.chromaglassDebug().readPhase();
-    if (!f) return { total: -1, x: 0, y: 0, near: 0 };
+    if (!f) return { total: -1, x: 0, y: 0, near: 0, n: 0 };
     const { n, data } = f;
     let total = 0, cx = 0, cy = 0, near = 0;
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
@@ -63,13 +63,15 @@ try {
       total += v; cx += v * (x / n); cy += v * (y / n);
       if (at && Math.hypot((x + 0.5) / n - at.x, (y + 0.5) / n - at.y) < 0.12) near += v;
     }
-    return { total, x: total ? cx / total : 0, y: total ? cy / total : 0, near };
+    // Near and total as fractions of the plate's cells, so a grid change
+    // does not read as liquid made or lost (n is reported for that too).
+    return { total: total / (n * n), x: total ? cx / total : 0, y: total ? cy / total : 0, near: near / (n * n) * 1e4, n };
   }, at);
   const amount = () => page.evaluate(() => window.chromaglassDebug().settings?.phaseAmount ?? 0);
 
   const before = await phase();
   const amountBefore = await amount();
-  console.log(`     classic: ferrofluid ${amountBefore}, ${before.total.toFixed(0)} on the plate`);
+  console.log(`     classic: ferrofluid ${amountBefore}, ${(before.total * 100).toFixed(1)}% of the plate`);
 
   // 1. Pick the Magnet the way a hand does.
   await page.mouse.click(5, 5);
@@ -78,8 +80,8 @@ try {
   const poured = await phase();
   const amountAfter = await amount();
   check('picking the Magnet on a look without ferrofluid pours some',
-    amountAfter > 0.002 && poured.total > Math.max(50, before.total * 2),
-    `setting ${amountBefore} → ${amountAfter}, on the plate ${before.total.toFixed(0)} → ${poured.total.toFixed(0)}`);
+    amountAfter > 0.002 && poured.total > Math.max(0.01, before.total * 2),
+    `setting ${amountBefore} → ${amountAfter}, covering ${(before.total * 100).toFixed(1)}% → ${(poured.total * 100).toFixed(1)}% of the plate`);
 
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
@@ -102,22 +104,39 @@ try {
   const spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   await page.mouse.up();
   await page.waitForTimeout(500);
-  const idle0 = await phase(spot);
-  await page.waitForTimeout(6000);
-  const idle1 = await phase(spot);
-  const drag0 = await phase(spot);
-  await page.mouse.move(...at(0.2));
-  await page.mouse.down();
-  for (let i = 0; i <= 40; i++) { await page.mouse.move(...at(0.2 + 0.65 * i / 40)); await page.waitForTimeout(100); }
-  await page.waitForTimeout(2000);
-  const drag1 = await phase(spot);
-  await page.mouse.up();
+  /*
+    Each window is measured on one grid. The quality governor may move the
+    solver to another a few seconds in, and the phase is laid afresh on the
+    new one (CI: "44% kept" alone, which is (256/384)²: a grid change, not
+    a leak). A window the grid moved in is measured again.
+  */
+  let idle0, idle1;
+  for (let k = 0; k < 3; k++) {
+    idle0 = await phase(spot);
+    await page.waitForTimeout(6000);
+    idle1 = await phase(spot);
+    if (idle0.n === idle1.n) break;
+    console.log(`     the grid moved ${idle0.n} → ${idle1.n} while the plate was left alone; again`);
+  }
+  let drag0, drag1;
+  for (let k = 0; k < 3; k++) {
+    drag0 = await phase(spot);
+    await page.mouse.move(...at(0.2));
+    await page.mouse.down();
+    for (let i = 0; i <= 40; i++) { await page.mouse.move(...at(0.2 + 0.65 * i / 40)); await page.waitForTimeout(100); }
+    await page.waitForTimeout(2000);
+    drag1 = await phase(spot);
+    await page.mouse.up();
+    if (drag0.n === drag1.n) break;
+    console.log(`     the grid moved ${drag0.n} → ${drag1.n} during the drag; again`);
+    await page.waitForTimeout(1000);
+  }
   console.log(`     the hand ends at ${spot ? `${spot.x.toFixed(2)},${spot.y.toFixed(2)}` : 'nowhere'}; ferrofluid within 0.12 of it: ` +
     `alone ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)}, dragged ${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)}`);
   check('dragging the Magnet gathers the ferrofluid where the hand ends up',
     !!spot && drag1.near > drag0.near + Math.max(0, idle1.near - idle0.near) + 0.1 * Math.max(1, drag0.near) && drag1.near > 1.5 * Math.max(1, idle1.near),
     `${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)} dragged, against ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)} left alone`);
-  const keptDrag = drag1.total / Math.max(1, drag0.total), keptIdle = idle1.total / Math.max(1, idle0.total);
+  const keptDrag = drag1.total / Math.max(1e-6, drag0.total), keptIdle = idle1.total / Math.max(1e-6, idle0.total);
   check('and dragging it neither makes nor loses more liquid than the plate does alone',
     Math.abs(keptDrag - keptIdle) < 0.08,
     `kept ${(keptDrag * 100).toFixed(0)}% dragged, ${(keptIdle * 100).toFixed(0)}% left alone`);
