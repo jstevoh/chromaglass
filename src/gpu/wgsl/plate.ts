@@ -1312,12 +1312,14 @@ struct FsOut {
         // silhouette with a hard edge. Beer–Lambert, the light through it
         // filtered by its thickness (ph^1.5 over a diffuse edge), and blue
         // most, as the magnetite does: amber at a finger's edge, then
-        // brown, then ink over the full gap (optical depth 5), out of the
-        // plate's own light rather than a painted brown.
+        // brown, then ink over the full gap, out of the plate's own light
+        // rather than a painted brown. Optical depth 9: at 5 a finger over a
+        // gold plate stayed reddish brown and the gallery's maze read as thin
+        // lines, with the plate's own texture showing through the ink.
         let amt = clamp(U.phaseAmount, 0.0, 1.0);
         let opac = clamp(ph * ph * 1.6, 0.0, 1.0) * amt;
-        let depth = 5.0 * pow(ph, 1.5) * (0.4 + 0.6 * amt);
-        var pc = outColor * exp(-depth * vec3f(0.35, 0.6, 1.0));
+        let depth = 9.0 * pow(ph, 1.5) * (0.4 + 0.6 * amt);
+        var pc = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
         // The rim: the dye beyond the boundary, bent back through the edge.
         let outward = select(vec2f(0.0), -normalize(vec2f(gx, gy)), length(vec2f(gx, gy)) > 1e-5);
         let beyond = decodeFluid(layer0, fuvBase + outward * 0.02, 0.0, false);
