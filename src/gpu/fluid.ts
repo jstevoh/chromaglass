@@ -992,9 +992,23 @@ export class WebGPUFluid {
       // than one flux step may (0.45 of a cell): so in substeps.
       const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001) ? PHASE_SUBSTEPS : 1;
       const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 0, 0]);
+      /*
+        Under a maze, the grid-scale filter alone after each substep
+        (phaseSeparate with no sharpening or tension). A collocated
+        projection leaves divergence of (L_compact − L_wide) p, which is
+        grid-scale by construction, and the maze's force at every finger's
+        edge makes a sharp pressure: the flux step turned what was left into
+        lines every other cell through the black (measured, the grid-scale
+        part inside the maze 0.011 with its force on, 0.0015 without).
+      */
+      const grid = maze > 0.001 ? this.arg('phase grid', [0, 0, 0, 0]) : null;
       for (let k = 0; k < subs; k++) {
         this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
         this.phase.swap();
+        if (grid) {
+          this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read], grid);
+          this.phase.swap();
+        }
       }
       for (let k = 0; k < PHASE_RELAX; k++) {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);

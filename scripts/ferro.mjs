@@ -166,23 +166,23 @@ try {
     if (!ok) check(`the ${name} arm has ferrofluid on it`, false, `total ${p ? p.total.toFixed(0) : 'none'}`);
     return ok;
   };
-  console.log(`     near the magnet: ${off.near.toFixed(0)} with it off, ${on.near.toFixed(0)} with it on` +
-    `  (of ${off.total.toFixed(0)} and ${on.total.toFixed(0)} on the plate)`);
   /*
-    The amount near the magnet, not its share of the plate.
+    The share of what was poured that sits near the magnet.
 
-    A share has the plate's total underneath it, and the total *grows* under a
-    pull: the advection is value transport, so a converging flow samples the
-    same cells repeatedly and makes liquid — 13825 to 17076 in six seconds.
-    So the denominator inflates exactly when the magnet works, and the share
-    falls while the liquid is gathering. Measured as a share, a magnet that
-    gathered read as a magnet that pushed, at every strength and both signs,
-    which is how three sign flips got argued for.
-
-    The centre of mass said so all along and was believed too late.
+    Not of the plate's total at the end: that grew under a pull while the
+    advection was value transport (13825 to 17076 in six seconds), so a
+    magnet that gathered read as one that pushed. And not the raw amount
+    either: the quality governor can move the solver to another grid
+    between arms, and the pour on 256² is (256/384)² of the pour on 384²
+    (CI: 2198 near the magnet on 256² against 2676 without it on 384², a
+    magnet gathering 36% of its plate against 20%). The poured amount is
+    fixed before anything moves, and the ferrofluid is conserved now.
   */
-  check('a magnet gathers the phase toward it', on.near > off.near * 1.15,
-    `${on.near.toFixed(0)} of it near the magnet against ${off.near.toFixed(0)} with the magnet off`);
+  const of = (p) => p.near / Math.max(1e-6, p.laid);
+  console.log(`     near the magnet: ${(100 * of(off)).toFixed(1)}% of the pour with it off, ${(100 * of(on)).toFixed(1)}% with it on` +
+    `  (poured ${off.laid.toFixed(0)} and ${on.laid.toFixed(0)})`);
+  check('a magnet gathers the phase toward it', of(on) > of(off) * 1.15,
+    `${(100 * of(on)).toFixed(1)}% of it near the magnet against ${(100 * of(off)).toFixed(1)}% with the magnet off`);
   const toMagnet = Math.hypot(on.px - MX, on.py - GY);
   const toMirror = Math.hypot(on.px - MX, on.py - (1 - GY));
   const driftedTo = Math.hypot(off.px - MX, off.py - GY);
@@ -194,8 +194,8 @@ try {
   // ── 3: height is the control that matters ──
   const far = await lay({ x: MX, y: MY, h: 0.9, s: 0.8 });
   armed(far, 'lifted-away');
-  check('held close it gathers harder than held away', armed(far, 'lifted-away') && on.near > far.near,
-    `${on.near.toFixed(0)} near it at height 0.2 against ${far.near.toFixed(0)} at 0.9`);
+  check('held close it gathers harder than held away', armed(far, 'lifted-away') && of(on) > of(far),
+    `${(100 * of(on)).toFixed(1)}% near it at height 0.2 against ${(100 * of(far)).toFixed(1)}% at 0.9`);
 
   // ── 4: the magnet neither makes nor loses liquid ──
   // Conservative fluxes, capped at a full cell: pulled together it pools, and
