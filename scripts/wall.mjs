@@ -429,8 +429,22 @@ try {
 
   // ── 1. Identity ────────────────────────────────────────────────────
   await withOutput({});
-  const plain = await gridOf();
-  const plainMean = plain ? meanOver(plain, () => true) : 0;
+  /*
+    And a lit one, waited for a few seconds rather than taken at once.
+
+    A rung change builds a fresh plate, which is black until it is laid, and
+    a frame from that moment is a real frame (it passes the painted check
+    above) of an empty plate. The deploy of #138 met one: "the plate is
+    drawing something to measure — mean 0.000", on the commit whose PR run
+    had read 0.091, and the whole wall suite stopped there.
+  */
+  let plain = await gridOf();
+  let plainMean = plain ? meanOver(plain, () => true) : 0;
+  for (let tries = 0; plainMean <= LIT && tries < 20; tries++) {
+    await page.waitForTimeout(500);
+    plain = await gridOf();
+    plainMean = plain ? meanOver(plain, () => true) : 0;
+  }
   check('the plate is drawing something to measure', plainMean > LIT,
     plain ? `mean ${plainMean.toFixed(3)}` : 'no canvas');
   if (plainMean <= LIT) throw new Error('nothing on the plate — nothing below would mean anything');
