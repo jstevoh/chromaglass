@@ -161,15 +161,17 @@ try {
     drag0 = await phase(null, 'drag0');
     await page.mouse.move(...at(0.2));
     await page.mouse.down();
-    // The hand's path on the plate over the last two seconds of the drag and
-    // the hold: the plate turns under a held pointer, so the magnet keeps
-    // moving on it, and the ferrofluid trails it by a little.
+    // The hand's path on the plate, the whole drag and the hold. It was the
+    // last two seconds only, when the plate turned under the hand; it is held
+    // still now, and a magnet crossing 0.4 of the plate in four seconds pulls
+    // the ferrofluid part of the way and outruns it: on CI it gathered +124
+    // mid-drag, 0.19 behind where the hand stopped, twice running.
     trail = [];
     const sample = async () => { const h = await page.evaluate(() => window.chromaglassDebug().magnetHand?.()); if (h) trail.push({ x: h.x, y: h.y }); };
     for (let i = 0; i <= 40; i++) {
       await page.mouse.move(...at(0.2 + 0.65 * i / 40));
       await page.waitForTimeout(100);
-      if (i >= 20 && i % 4 === 0) await sample();
+      if (i % 4 === 0) await sample();
     }
     for (let k = 0; k < 12; k++) { await page.waitForTimeout(250); await sample(); }
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
@@ -223,7 +225,7 @@ try {
     if (!best || g.gain > best.gain) best = g;
   }
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
-  console.log(`     along the hand's last ${trail.length} positions, the drag gathered most at ` +
+  console.log(`     along the hand's ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
   check('dragging the Magnet gathers the ferrofluid along where the hand goes',
     !!best && best.gain > 0.1 * Math.max(1, best.d0) && best.d1 > 1.2 * Math.max(1, best.i1),
