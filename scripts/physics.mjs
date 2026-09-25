@@ -126,6 +126,34 @@ try {
   const floats = await sink(0), sinks = await sink(1);
   check('stand the plate up and heavy dye sinks', sinks < floats - 0.04, `centre of mass ${floats.toFixed(3)} lying flat, ${sinks.toFixed(3)} standing up`);
 
+  // Down is the room's, not the dish's: the dish is drawn turned, and on a
+  // turned dish Lava Lamp's wax poured off toward a corner and the plate was
+  // empty in twenty seconds. With the lamp under the plate, where it goes
+  // out of view, the wax sinks down the screen and is sent back up.
+  const turned = await (async () => {
+    const a = 1, reach = 0.25, gx = -Math.sin(a), gy = -Math.cos(a);
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { lab.dye(0.5, 0.5, 0.12, [1, 1, 1], 1); lab.flush(); });
+    const P = { solutalBuoyancy: 0.6, plateUpright: 1, heatDecay: 0.995, dt: 0.004, gravityX: gx, gravityY: gy, gravityReach: reach };
+    const at = () => page.evaluate(({ gx, gy, reach }) => lab.field('dye').then((d) => {
+      const L = 192; let t = 0, along = 0, across = 0, seen = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+        const m = d[(i + j * L) * 4 + 3], x = (i + 0.5) / L - 0.5, y = (j + 0.5) / L - 0.5, s = x * gx + y * gy;
+        t += m; along += m * s; across += m * (x * gy - y * gx); if (s < reach) seen += m;
+      }
+      return { along: along / t, across: across / t, seen: seen / t };
+    }), { gx, gy, reach });
+    await page.evaluate((P) => lab.step(120, P), P);
+    const early = await at();
+    await page.evaluate((P) => lab.step(600, P), P);
+    return { early, late: await at() };
+  })();
+  check('on a turned dish it sinks down the screen, not down the dish',
+    turned.early.along > 0.03 && Math.abs(turned.early.across) < turned.early.along * 0.3,
+    `${turned.early.along.toFixed(3)} down the screen, ${turned.early.across.toFixed(3)} across it`);
+  check('and the lamp under the plate keeps it in view', turned.late.seen > 0.8,
+    `${(100 * turned.late.seen).toFixed(0)}% above the bottom of the screen after twelve seconds`);
+
   // ── 7: vorticity confinement ──
   const spin = async (v) => {
     await page.evaluate(() => lab.create(128));

@@ -543,6 +543,13 @@ class FluidSimulation {
    * it is doing, which after a flick are very different numbers.
    */
   plateSpin = 0;
+  /**
+   * The angle the dish is drawn turned to, and how far down from its centre
+   * the plate is still on screen (in plate widths). Gravity is the room's,
+   * not the dish's: set by the frame, read by the step below.
+   */
+  plateAngle = 0;
+  viewReach = 0.3;
   meanDensity = 0; // rolling measure of how full the plate is
   /**
    * The average colour on this layer, 0..1 per channel.
@@ -2710,6 +2717,11 @@ class FluidSimulation {
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
+      // Down the screen, in the plate: the screen is the plate turned by
+      // `plateAngle` (see uvToFluid in wgsl/plate.ts).
+      gravityX: -Math.sin(this.plateAngle),
+      gravityY: -Math.cos(this.plateAngle),
+      gravityReach: this.viewReach,
       doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
@@ -5923,6 +5935,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const turn = (spinVelRef.current[l] ?? 0) * realDt;
             if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
+            const fl = fluidsRef.current[l];
+            if (fl) {
+              fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
+              // Half the screen's height over the plate's drawn width (1.5× the long side).
+              fl.viewReach = 0.5 * canvas.clientHeight / Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
+            }
           }
         }
 

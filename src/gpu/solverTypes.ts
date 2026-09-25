@@ -78,6 +78,14 @@ export interface GpuStepParams {
   solutalBuoyancy?: number;
   /** How far the plate stands up (0 flat on the projector, 1 upright). */
   plateUpright?: number;
+  /**
+   * Which way is down in the plate, as a unit vector: the bottom of the room,
+   * wherever the dish has been turned to. (0, −1) when it is not turned.
+   */
+  gravityX?: number;
+  gravityY?: number;
+  /** How far down from the centre the plate is still in view, in plate widths: the lamp sits just below. */
+  gravityReach?: number;
   /** Heat diffusing faster than dye (the double-diffusive case). */
   doubleDiffusion?: number;
   /** The Belousov–Zhabotinsky reaction's spirals. */

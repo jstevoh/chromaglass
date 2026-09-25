@@ -193,9 +193,15 @@ export const PRESETS: Preset[] = [
     name: 'Lava Lamp',
     description: 'Amber and red wax rises and sinks through violet liquid: heavy blobs that stretch, pinch off and fall back.',
     settings: {
-      plateUpright: 1,
+      /*
+        Stood partway up, with the lamp under it (see mixForce): the wax sinks
+        toward the bottom of the screen, is warmed there and rises again. Stood
+        fully up it poured off the plate. No double diffusion: the lamp's heat
+        is in the wax, and heat running fifty times faster than the dye bled
+        it into the liquid before it could lift anything.
+      */
+      plateUpright: 0.6,
       solutalBuoyancy: 0.6,
-      doubleDiffusion: 0.5,
       globalSpeed: 0.0168,
       surge: 0.4,
       layerCount: 2,
@@ -211,7 +217,7 @@ export const PRESETS: Preset[] = [
       buoyancy: 0.9,
       advection: 0.15,
       damping: 0.97,
-      heatDecay: 0.99,
+      heatDecay: 0.995,          // warmed wax stays warm long enough to reach the top
       automateRate: 0.1,
       platePressure: 0.2,
       glassSmear: 0.3,
