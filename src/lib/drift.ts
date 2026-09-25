@@ -60,6 +60,8 @@ const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
+  // Evolve moves the camera's aim itself, as a camera move (App.tsx).
+  'macroAimX', 'macroAimY',
 ]);
 
 /** Dials that move in whole steps, where a nudge would be a jump. */

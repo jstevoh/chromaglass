@@ -2342,13 +2342,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         {(settings.macroZoom ?? 1) <= 1.05 && (
           <Info>
-            At 1× this is the whole plate. Push the zoom in and the camera picks a bead and follows it — the exposure,
+            At 1× this is the whole plate. Push the zoom in and the camera goes where it is aimed — the exposure,
             the depth of field and the surface under the dye all arrive with the magnification rather than switching on
             at a threshold. Everything below shapes that closeup and takes effect as you come in.
           </Info>
         )}
         {(settings.macroZoom ?? 1) > 1.05 && (
           <>
+            {/*
+              Who moves the camera. It used to be the camera alone: it picked a
+              subject, held it a few seconds and cut to another, so a closeup
+              could not be kept on anything. Now it goes where it is aimed
+              (Hold), rides what it is aimed at (Follow), or roams (Auto).
+              Alt-drag on the plate pans it and Alt-click fixes it on a spot;
+              Random Evolve wanders the aim when it is on.
+            */}
+            <div className="mb-3">
+              <div className="text-[12px] opacity-60 mb-1">Camera</div>
+              <Segmented
+                value={settings.macroCamera ?? 'hold'}
+                options={[['hold', 'Hold'], ['follow', 'Follow'], ['auto', 'Auto']]}
+                onChange={(v) => onUpdate({ macroCamera: v as 'hold' | 'follow' | 'auto' })}
+              />
+            </div>
+            {(settings.macroCamera ?? 'hold') !== 'auto' && (
+              <>
+                <Slider
+                  label="Macro Aim Across"
+                  value={settings.macroAimX ?? 0.5}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onChange={(v: number) => onUpdate({ macroAimX: v })}
+          settingKey="macroAimX"
+        />
+                <Slider
+                  label="Macro Aim Up"
+                  value={settings.macroAimY ?? 0.5}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onChange={(v: number) => onUpdate({ macroAimY: v })}
+          settingKey="macroAimY"
+        />
+                <Info>
+                  Alt-drag (Option-drag) on the plate pans the camera; Alt-click fixes it on the spot under the pointer.
+                  {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
+                  {' '}With Random Evolve on, the aim wanders slowly.
+                </Info>
+              </>
+            )}
             <Slider
               label="Chase Speed"
               value={settings.macroChase}
@@ -2358,6 +2401,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onChange={(v: number) => onUpdate({ macroChase: v })}
           settingKey="macroChase"
         />
+            {(settings.macroCamera ?? 'hold') === 'auto' && (
             <Slider
               label="Shot Length"
               value={settings.macroHold}
@@ -2367,6 +2411,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onChange={(v: number) => onUpdate({ macroHold: v })}
           settingKey="macroHold"
         />
+            )}
             <Slider
               label="Music Sync"
               value={settings.macroSync ?? 0.6}

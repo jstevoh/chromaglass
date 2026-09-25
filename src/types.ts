@@ -541,7 +541,16 @@ export interface VisualizerSettings {
   /** How far the plate's speed follows the music rather than the look (lib/tempoPace.ts): 0 the look as written, 1 the music alone. */
   tempoSync: number;
   macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
-  macroHold: number;          // seconds spent on one bead before cutting to the next
+  macroHold: number;          // seconds spent on one bead before cutting to the next (Auto camera only)
+  /**
+   * Who moves the closeup camera (lib/macroCamera.ts): 'hold' sits on the
+   * aim, 'follow' locks onto the liquid under the aim and rides with it,
+   * 'auto' picks its own subjects and cuts between them. Absent is hold.
+   */
+  macroCamera?: 'hold' | 'follow' | 'auto';
+  /** Where the closeup camera is aimed, across and up the plate (0-1). */
+  macroAimX?: number;
+  macroAimY?: number;
   macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
@@ -772,6 +781,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tempoSync: 0.5,            // halfway: the look keeps its character, the music sets the pace
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
+  macroCamera: 'hold',       // the camera goes where it is aimed, and nowhere else
+  macroAimX: 0.5,
+  macroAimY: 0.5,
   macroSync: 0.5,
   macroCells: 0.75,
   macroCellScale: 0.5,

@@ -56,6 +56,20 @@ export interface MacroCameraOptions {
   /** Visible fraction of the grid at zoom 1, used to keep the frame in bounds. */
   spanX: number;
   spanY: number;
+  /**
+   * Who moves the camera.
+   *
+   *   hold    it sits on the aim, and goes only where it is aimed
+   *   follow  it locks onto the liquid under the aim and rides with it, and
+   *           never cuts away on its own; aimed again, it locks on there
+   *   auto    it picks its own subjects and cuts between them (the old rig)
+   *
+   * Absent is auto, for anything that drives the camera without saying.
+   */
+  mode?: 'hold' | 'follow' | 'auto';
+  /** Where it is aimed, in plate uv (0..1), for hold and follow. */
+  aimX?: number;
+  aimY?: number;
 }
 
 export interface MacroShot {
@@ -102,6 +116,9 @@ export class MacroCamera {
   private smoothZoom = 0;
   private initialized = false;
   private lastStep = 1 / 60;
+  /** The aim last acted on (grid cells), so follow locks on again only when it moves. */
+  private lastAimX = NaN;
+  private lastAimY = NaN;
 
   /** Force a cut to a new bead on the next update (preset change, drain, seed). */
   reset() {
@@ -112,6 +129,8 @@ export class MacroCamera {
     this.initialized = false;
     this.holdLeft = 0;
     this.whipLeft = 0;
+    this.lastAimX = NaN;
+    this.lastAimY = NaN;
   }
 
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
@@ -149,6 +168,9 @@ export class MacroCamera {
     const energy = clamp(opts.energy ?? 0, 0, 1);
     const bass = clamp(opts.bass ?? 0, 0, 1);
     const treble = clamp(opts.treble ?? 0, 0, 1);
+
+    const mode = opts.mode ?? 'auto';
+    if (mode !== 'auto') return this.aimed(field, step, opts, mode, { sync, energy, bass, treble });
 
     // ── Stay on the bead ────────────────────────────────────────────
     const tracked = this.recenter(field);
@@ -250,6 +272,94 @@ export class MacroCamera {
     // And whatever got through, the shot itself is never not a place.
     if (!Number.isFinite(cx) || !Number.isFinite(cy)) return { cx: 0.5, cy: 0.5, zoom: Math.max(1, Number.isFinite(this.smoothZoom) ? this.smoothZoom : 1), whip: 0 };
     return { cx, cy, zoom: this.smoothZoom, whip };
+  }
+
+  /**
+   * The camera someone is holding: on the aim (hold), or on the liquid under
+   * it (follow). No cuts, no whip, no breathing zoom; the music may still push
+   * in on a kick and shake the frame with the treble, by Macro Sync, because
+   * that is a setting the person chose too.
+   */
+  private aimed(field: MacroField, step: number, opts: MacroCameraOptions, mode: 'hold' | 'follow',
+    m: { sync: number; energy: number; bass: number; treble: number }): MacroShot {
+    const { size } = field;
+    const ax = clamp(Number.isFinite(opts.aimX) ? opts.aimX! : 0.5, 0, 1) * size;
+    const ay = clamp(Number.isFinite(opts.aimY) ? opts.aimY! : 0.5, 0, 1) * size;
+    const aimMoved = !(Math.hypot(ax - this.lastAimX, ay - this.lastAimY) < 0.25);
+    const first = !Number.isFinite(this.lastAimX);
+    this.lastAimX = ax; this.lastAimY = ay;
+    this.whipLeft = 0;
+    this.punchLeft = Math.max(0, this.punchLeft - step / 0.6);
+    if (opts.beat && m.bass > 0.6) this.punchLeft = Math.max(this.punchLeft, (m.bass - 0.6) * 2.5 * m.sync);
+
+    let targetX = ax, targetY = ay;
+    if (mode === 'follow') {
+      if (aimMoved) this.lockNear(field, ax, ay);
+      const tracked = this.recenter(field);
+      // Lost it (it thinned away, or ran into the wall): find what is nearest
+      // where it was, rather than cutting across the plate.
+      if (tracked.mass < this.beadMass * 0.18 || tracked.mass < 0.5) this.lockNear(field, this.beadX, this.beadY);
+      const margin = size * EDGE_MARGIN;
+      this.beadX = clamp(this.beadX, margin, size - margin);
+      this.beadY = clamp(this.beadY, margin, size - margin);
+      const bi = this.gridIndex(this.beadX, this.beadY, size);
+      const lead = 6 + opts.chase * 10;
+      const vx = field.vx[bi], vy = field.vy[bi];
+      targetX = this.beadX + (Number.isFinite(vx) ? vx : 0) * lead;
+      targetY = this.beadY + (Number.isFinite(vy) ? vy : 0) * lead;
+    } else {
+      this.beadX = ax; this.beadY = ay;
+    }
+    if (first) { this.camX = targetX; this.camY = targetY; }
+    // A hand on the aim should be answered at once; a follow eases like a rig.
+    const rate = mode === 'hold' ? 6 + opts.chase * 6 : 1.0 + opts.chase * 5;
+    const k = 1 - Math.exp(-rate * step);
+    this.camX += (targetX - this.camX) * k;
+    this.camY += (targetY - this.camY) * k;
+
+    const tremorAmp = size * 0.0012 * m.sync * m.treble;
+    const tx = (Math.sin(this.clock * 3.1) + Math.sin(this.clock * 7.3 + 1.3) * 0.5) * tremorAmp;
+    const ty = (Math.sin(this.clock * 3.9 + 0.7) + Math.sin(this.clock * 6.4 + 2.1) * 0.5) * tremorAmp;
+    this.tremorX += (tx - this.tremorX) * (1 - Math.exp(-8 * step));
+    this.tremorY += (ty - this.tremorY) * (1 - Math.exp(-8 * step));
+
+    const push = 1 + m.energy * m.sync * 0.08;
+    const punch = 1 + this.punchLeft * this.punchLeft * 0.06;
+    const wantZoom = Math.max(1, opts.zoom * push * punch);
+    const zoomRate = wantZoom > this.smoothZoom ? 4 + m.sync * 4 : 3;
+    this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-zoomRate * step));
+
+    const halfX = clamp(opts.spanX / this.smoothZoom, 0, 1) * 0.5;
+    const halfY = clamp(opts.spanY / this.smoothZoom, 0, 1) * 0.5;
+    const cx = this.frameClamp((this.camX + this.tremorX) / size, halfX);
+    const cy = this.frameClamp((this.camY + this.tremorY) / size, halfY);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return { cx: 0.5, cy: 0.5, zoom: Math.max(1, Number.isFinite(this.smoothZoom) ? this.smoothZoom : 1), whip: 0 };
+    return { cx, cy, zoom: this.smoothZoom, whip: 0 };
+  }
+
+  /**
+   * Lock onto the densest liquid near (x, y), grid cells: within about a
+   * tenth of the plate, nearer counting for more; the point itself if there
+   * is none, so a follow aimed at bare glass waits there for something.
+   */
+  private lockNear(field: MacroField, x: number, y: number) {
+    const { density, size } = field;
+    const reach = Math.max(4, size * 0.1);
+    let best = -Infinity, bx = x, by = y;
+    const x0 = Math.max(1, Math.floor(x - reach)), x1 = Math.min(size - 2, Math.ceil(x + reach));
+    const y0 = Math.max(1, Math.floor(y - reach)), y1 = Math.min(size - 2, Math.ceil(y + reach));
+    for (let j = y0; j <= y1; j += 2) {
+      for (let i = x0; i <= x1; i += 2) {
+        const d = density[i + j * size] - this.floor;
+        if (!(d >= 0.1)) continue;
+        const dist = Math.hypot(i - x, j - y);
+        if (dist > reach) continue;
+        const score = d * (1 - 0.7 * dist / reach);
+        if (score > best) { best = score; bx = i; by = j; }
+      }
+    }
+    this.beadX = bx; this.beadY = by;
+    this.beadMass = this.recenter(field).mass;
   }
 
   /**

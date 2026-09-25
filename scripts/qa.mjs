@@ -775,7 +775,32 @@ try {
     await settle(600);
     const readout = await page.evaluate(() => document.querySelector('[data-testid="macro-zoom-value"]')?.textContent ?? null);
     check('and the frame says how far in it is', readout === '5.0×', `readout ${readout}`);
-    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+
+    // The camera is the person's: held, it stays where it is aimed, for as
+    // long as it is held. It used to cut to a new subject every few seconds
+    // whatever anyone wanted, and there was no way to keep it on anything.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroCamera: 'hold', macroAimX: 0.35, macroAimY: 0.6 }));
+    await settle(1500);
+    const held = [];
+    for (let i = 0; i < 6; i++) { held.push(await page.evaluate(() => window.chromaglassDebug?.().shot ?? null)); await settle(700); }
+    const worst = Math.max(...held.map((sh) => (sh ? Math.hypot(sh.cx - 0.35, sh.cy - 0.6) : 1)));
+    check('held, the closeup camera stays where it is aimed', worst < 0.03,
+      `${(worst * 100).toFixed(1)}% of the plate from the aim at worst over four seconds`);
+
+    // Alt-click on the plate aims it there, and lays no dye while it does.
+    {
+      const box = await page.locator('canvas').first().boundingBox();
+      const before = await page.evaluate(() => window.chromaglassDebug?.().shot ?? null);
+      await page.keyboard.down('Alt');
+      await page.mouse.click(box.x + box.width * 0.7, box.y + box.height * 0.5);
+      await page.keyboard.up('Alt');
+      await settle(300);
+      const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
+      const moved = before && typeof aim.x === 'number' ? Math.hypot(aim.x - 0.35, aim.y - 0.6) : 0;
+      check('and an Alt-click on the plate aims it at the spot under the pointer', moved > 0.02 && aim.mode === 'hold',
+        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(2) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(2) : '?'} (${aim.mode})`);
+    }
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false, macroAimX: 0.5, macroAimY: 0.5 }));
     await settle(800);
   }
 

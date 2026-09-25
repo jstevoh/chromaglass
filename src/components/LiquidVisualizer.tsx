@@ -108,6 +108,12 @@ interface LiquidVisualizerProps {
   filmSenseRef?: React.MutableRefObject<SceneReading | null>;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
+  /**
+   * A hand on the closeup camera: Alt-drag on the plate pans it, Alt-click
+   * fixes it on the spot under the pointer. Plate uv (0-1), where the camera
+   * should now be aimed.
+   */
+  onAim?: (x: number, y: number) => void;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
   /**
@@ -3438,7 +3444,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null,
+  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef,
@@ -3694,6 +3700,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
   const activeToolRef = useRef(activeTool);
+  const onAimRef = useRef(onAim);
+  onAimRef.current = onAim;
+  /** An Alt-drag on the closeup camera: where it started, and the aim it moves. */
+  const aimDragRef = useRef<{ x0: number; y0: number; moved: number; aimX: number; aimY: number; sent: number } | null>(null);
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
   const isMouseDownRef = useRef(false);
@@ -6090,6 +6100,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,
                 spanX: canvas.width / maxDim,
                 spanY: canvas.height / maxDim,
+                mode: currentSettings.macroCamera ?? 'hold',
+                aimX: currentSettings.macroAimX ?? 0.5,
+                aimY: currentSettings.macroAimY ?? 0.5,
               },
             );
             camBassRef.current = camBass;
@@ -7312,7 +7325,34 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return { x: Math.floor(fx), y: Math.floor(fy) };
     };
 
+    /*
+      The closeup camera by hand. Alt (Option) and drag grabs the view and
+      pans it, the way a map moves under a hand; Alt-click fixes the camera
+      on the spot under the pointer. The tools do nothing meanwhile. Only
+      while zoomed in: at 1x there is nothing to aim.
+    */
+    const aimAtPointer = (clientX: number, clientY: number) => {
+      const p = getTransformedMousePos(clientX, clientY, drawnRect());
+      onAimRef.current?.(Math.min(1, Math.max(0, (p.x + 0.5) / GRID_SIZE)), Math.min(1, Math.max(0, (p.y + 0.5) / GRID_SIZE)));
+    };
+    const panAim = (e: MouseEvent) => {
+      const drag = aimDragRef.current!;
+      drag.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
+      const rect = drawnRect();
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
+      const sx = e.movementX, sy = -e.movementY;   // the plate's uv counts up
+      const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
+      const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
+      drag.aimX = Math.min(1, Math.max(0, drag.aimX - du));
+      drag.aimY = Math.min(1, Math.max(0, drag.aimY - dv));
+      // At most once a frame: each is a settings write.
+      const now = performance.now();
+      if (now - drag.sent > 16) { drag.sent = now; onAimRef.current?.(drag.aimX, drag.aimY); }
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
+      if (aimDragRef.current) { panAim(e); return; }
       const rect = drawnRect();
       const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
       lastMousePosRef.current = { ...mousePosRef.current };
@@ -7354,8 +7394,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
 
-    const handleMouseDown = () => { isMouseDownRef.current = true; };
-    const handleMouseUp = () => { isMouseDownRef.current = false; };
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.altKey && macroShotRef.current.zoom > 1.005 && onAimRef.current) {
+        // Start from where the camera is looking now, whoever was moving it.
+        const shot = macroShotRef.current;
+        aimDragRef.current = { x0: e.clientX, y0: e.clientY, moved: 0, aimX: shot.cx, aimY: shot.cy, sent: 0 };
+        e.preventDefault();
+        return;
+      }
+      isMouseDownRef.current = true;
+    };
+    const handleMouseUp = (e: MouseEvent) => {
+      const drag = aimDragRef.current;
+      if (drag) {
+        aimDragRef.current = null;
+        if (drag.moved < 4) aimAtPointer(e.clientX, e.clientY);
+        else onAimRef.current?.(drag.aimX, drag.aimY);
+        return;
+      }
+      isMouseDownRef.current = false;
+    };
 
     const handleTouchStart = (e: TouchEvent) => {
       isMouseDownRef.current = true;
