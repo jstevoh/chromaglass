@@ -253,8 +253,17 @@ try {
         where the flow spreads, which touches the beat squeeze, bubbles and
         currents too).
       */
+      /*
+        The slack is the plate's own: what it did alone over the same time,
+        not a fixed 5. The pool a press sits in varies by run (90 to 374 of
+        dye round the hand), and on a small one a fixed 5 was less than the
+        plate moves by itself (-11 to +70 left alone), so the check failed on
+        whether the idle sample landed high or low (CI: 90 -> 194 against -11,
+        the same press that passed at 374 -> 554 against +70).
+      */
+      const slack = 5 + 3 * Math.abs(idle);
       const made = (b.total - a.total) - idle;
-      check('and keeps it', made > -0.15 * a.total - 5 && made < 1.0 * a.total + 5,
+      check('and keeps it', made > -0.15 * a.total - slack && made < 1.0 * a.total + slack,
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
   }
