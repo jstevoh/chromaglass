@@ -299,6 +299,9 @@ export default function App() {
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
+    // Which layer the hand is on, as the layer switch does (scripts/mirror.mjs).
+    (window as unknown as { chromaglassLayer?: unknown }).chromaglassLayer =
+      (layer: number) => { setActiveLayer(Math.max(0, Math.min(1, Math.round(layer)))); };
     // And its Amount, as the Amount slider does (npm run tools).
     (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
       (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };

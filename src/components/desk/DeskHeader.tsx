@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 
@@ -49,6 +49,44 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
   /** Design's Save and Send to wall; Perform has nothing here. */
   trailing?: ReactNode;
 }) {
+  /*
+    Whether the status dots' words fit, measured rather than guessed.
+
+    The mode switch is pinned to the header's centre, out of the flow, so it
+    pushes nothing: the right-hand cluster runs underneath it once it is wider
+    than the room to the right of the switch. How wide that is depends on the
+    desk (Design adds Save and Send to wall), the controller's name and the
+    window, so a breakpoint was always wrong somewhere: at 1400 the words came
+    back and on Design, at about 1440, "Mic" was painted under "Songs"
+    (reported, with a screenshot). The header measures instead: when the
+    cluster would reach the switch, the words go and the dots stay; they come
+    back when the cluster as it was with them fits again.
+  */
+  const headerRef = useRef<HTMLElement>(null);
+  const switchRef = useRef<HTMLDivElement>(null);
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const [tight, setTight] = useState(false);
+  const wideW = useRef(0);
+  useLayoutEffect(() => {
+    const fit = () => {
+      const h = headerRef.current, sw = switchRef.current, c = clusterRef.current;
+      if (!h || !sw || !c) return;
+      const hr = h.getBoundingClientRect(), sr = sw.getBoundingClientRect(), cr = c.getBoundingClientRect();
+      const room = hr.right - 16 - sr.right - 12;
+      if (!tight) {
+        wideW.current = cr.width;
+        if (cr.left < sr.right + 12) setTight(true);
+      } else if (wideW.current + 4 < room) {
+        setTight(false);
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    if (headerRef.current) ro.observe(headerRef.current);
+    if (clusterRef.current) ro.observe(clusterRef.current);
+    return () => ro.disconnect();
+  }, [tight]);
+
   return (
     /*
       Three columns, not `justify-between`.
@@ -65,7 +103,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
       centre off true again. The sides can now give way, and the breadcrumb
       truncates instead.
     */
-    <header className="relative col-span-3 flex items-center justify-between gap-4 border-b border-border px-4">
+    <header ref={headerRef} className="relative col-span-3 flex items-center justify-between gap-4 border-b border-border px-4">
       <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">
         {/*
           The name where there is room for it, the mark alone where there is
@@ -111,7 +149,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         and hover.
       */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="pointer-events-auto">
+        <div ref={switchRef} className="pointer-events-auto">
           <Segmented
             value={mode}
             options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Songs']] as const}
@@ -121,36 +159,36 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+      <div ref={clusterRef} className="flex shrink-0 items-center gap-3 whitespace-nowrap">
         <StatusDot
           on={dots.mic}
-          label="Mic"
+          label="Mic" tight={tight}
           onClick={onMic}
           title={dots.mic ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
           testId="dot-mic"
         />
         <StatusDot
           on={dots.wall}
-          label="Wall"
+          label="Wall" tight={tight}
           onClick={onWall}
           title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
           testId="dot-wall"
         />
         <StatusDot
           on={dots.midi}
-          label={midiName ?? 'MIDI'}
+          label={midiName ?? 'MIDI'} tight={tight}
           onClick={onMidi}
           title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
           testId="dot-midi"
         />
         <StatusDot
           on={dots.phone}
-          label="Phone"
+          label="Phone" tight={tight}
           onClick={onPhone}
           title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
           testId="dot-phone"
         />
-        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} testId="dot-rec" />}
+        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} tight={tight} testId="dot-rec" />}
         {/*
           Performances start and stop here, by hand (T). They used to follow
           the song detection, which started late and ran on into the next
