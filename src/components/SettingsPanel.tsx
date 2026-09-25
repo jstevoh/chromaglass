@@ -574,6 +574,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ globalSpeed: v })}
           settingKey="globalSpeed"
         />
+        {/* How far the speed follows the music instead of the look: the
+            tempo and how loud it has been. Random Evolve leans harder. */}
+        <Slider
+          label="Tempo Sync"
+          value={settings.tempoSync ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ tempoSync: v })}
+          settingKey="tempoSync"
+        />
       </section>
 
       {/* Sound Section */}

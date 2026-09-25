@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the plate's speed follows the music
+
+- **Tempo Sync.** The presets ran their liquid at speeds nearly two thousand
+  times apart on screen, and none of it had anything to do with what was
+  playing. Each look's speed is now pulled toward a pace set by the music:
+  the tempo (from the beat clock once it has locked, or a MIDI clock, a tap
+  or a typed tempo) and how loud it has been over the last several seconds.
+  Silence calms the plate. The new Tempo Sync slider (beside Speed) sets how
+  far: 0 is the look as written, 1 the music alone, and the default is
+  halfway. Random Evolve follows the music harder. It eases in over a few
+  seconds, so a new song is a change of pace rather than a jolt.
+
 ### Added — a magnet you can move
 
 - **The Magnet tool (M)** on both desks: hold it on the plate and the

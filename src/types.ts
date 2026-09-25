@@ -470,6 +470,8 @@ export interface VisualizerSettings {
   // Macro Closeup — magnified camera that chases a single bead of liquid
   macroMode: boolean;         // enable the tracking macro camera + micro-detail pass
   macroZoom: number;          // 1 = full plate, 16 = extreme magnification
+  /** How far the plate's speed follows the music rather than the look (lib/tempoPace.ts): 0 the look as written, 1 the music alone. */
+  tempoSync: number;
   macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
   macroHold: number;          // seconds spent on one bead before cutting to the next
   macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
@@ -686,6 +688,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // 4 with the slider inert unless `macroMode` was on, which made a control on
   // the desk — where there is no such switch — do nothing at all.
   macroZoom: 1.0,
+  tempoSync: 0.5,            // halfway: the look keeps its character, the music sets the pace
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
   macroSync: 0.5,

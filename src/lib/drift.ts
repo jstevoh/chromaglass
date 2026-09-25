@@ -53,6 +53,8 @@ const CALIBRATION = new Set([
   'beatLead', 'filmDrive', 'filmImpact', 'filmMix', 'filmKey', 'soundImpact',
   'shapeImpact', 'sceneDrive', 'sceneHands', 'sceneImpact', 'sceneDeadzone',
   'sceneSmooth', 'camera',
+  // How the show follows the music, not what the look is (lib/tempoPace.ts).
+  'tempoSync',
 ]);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',

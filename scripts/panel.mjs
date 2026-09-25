@@ -26,6 +26,7 @@ import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { driftLook } from '../src/lib/drift.ts';
+import { lookSpeed, musicPace, tempoMultiplier } from '../src/lib/tempoPace.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
@@ -1399,6 +1400,35 @@ check('and neither starts over the limit',
   check('evolve walks the magnet on a ferrofluid look that set no walk',
     walked > 20 && lo >= 0.29 && hi <= 0.71,
     `walked ${walked} times, between ${lo.toFixed(2)} and ${hi.toFixed(2)}`);
+}
+
+// ── The plate's speed follows the music (lib/tempoPace.ts) ─────────
+/*
+  Reported: "the presets are more often than not too fast (and sometimes too
+  slow). Matching them with the music would be helpful to get the speed
+  right." The presets' own speeds are 180 times apart; with the music setting
+  the pace at Tempo Sync's default, the spread has to come down to something a
+  room would call one show, and the music has to be the thing that moves it.
+*/
+{
+  const speeds = PRESETS.map(p => lookSpeed({ ...DEFAULT_SETTINGS, ...p.settings }));
+  const synced = speeds.map(v => v * tempoMultiplier(v, 1, 0.5, false));
+  const spread = (xs) => Math.max(...xs) / Math.min(...xs);
+  check('with Tempo Sync at its default, the presets\' speeds come far closer together',
+    spread(synced) < spread(speeds) / 8,
+    `slowest to fastest ${spread(speeds).toFixed(0)}× as written, ${spread(synced).toFixed(1)}× following the music`);
+  const mid = lookSpeed({ ...DEFAULT_SETTINGS, ...PRESETS.find(p => p.id === 'classic').settings });
+  check('Tempo Sync at zero leaves the look alone', tempoMultiplier(mid, 1.4, 0, false) === 1);
+  const slow = tempoMultiplier(mid, musicPace(72, 0.4, true), 0.5, false);
+  const fast = tempoMultiplier(mid, musicPace(174, 0.4, true), 0.5, false);
+  const loud = tempoMultiplier(mid, musicPace(120, 0.9, true), 0.5, false);
+  const quiet = tempoMultiplier(mid, musicPace(120, 0.1, true), 0.5, false);
+  const silent = tempoMultiplier(mid, musicPace(0, 0, false), 0.5, false);
+  check('a faster track and a louder one move the plate faster, and silence calms it',
+    fast > slow * 1.3 && loud > quiet * 1.15 && silent < quiet,
+    `72 bpm ×${slow.toFixed(2)}, 174 bpm ×${fast.toFixed(2)}; quiet ×${quiet.toFixed(2)}, loud ×${loud.toFixed(2)}; silence ×${silent.toFixed(2)}`);
+  check('and Random Evolve follows the music harder',
+    Math.abs(Math.log(tempoMultiplier(mid * 4, 1, 0.5, true))) > Math.abs(Math.log(tempoMultiplier(mid * 4, 1, 0.5, false))));
 }
 
 // ── The two desks carry the same actions on the top bar ───────────

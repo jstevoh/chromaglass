@@ -16,6 +16,7 @@ import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
 import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
+import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
@@ -630,6 +631,8 @@ class FluidSimulation {
   get clockLeanNow(): number { return this.clockLean; }
   /** Wall-clock seconds this step covers, for smoothing that means the same thing at any frame rate. */
   dtSeconds = 1 / 60;
+  /** How much faster or slower the music wants this plate than its look (see `lib/tempoPace.ts`); set by the frame. */
+  tempoMul = 1;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
   /** The thickness as the sharpening pass found it: every channel gates on this. */
@@ -2281,6 +2284,8 @@ class FluidSimulation {
     */
     this.clockLean += (want - this.clockLean) * (1 - Math.exp(-this.dtSeconds / 2.5));
     dynamicSpeed *= this.clockLean;
+    // And the music's own pace (lib/tempoPace.ts), already slewed by the frame.
+    dynamicSpeed *= Number.isFinite(this.tempoMul) ? this.tempoMul : 1;
 
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
@@ -3593,6 +3598,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const lastBass01Ref = useRef(0); // for beat edge detection
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
+  /** The music's pace on the plate's clock (lib/tempoPace.ts), slewed, and the loudness it is taken from. */
+  const tempoMulRef = useRef(1);
+  const loudnessRef = useRef(0);
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
@@ -4519,6 +4527,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         let speedMultiplier = currentSettings.globalSpeed / 0.05;
         if (speedMultiplier < 1.0) speedMultiplier *= speedMultiplier;
         dynamicSpeed *= speedMultiplier;
+        /*
+          The music's pace (lib/tempoPace.ts): the look's speed pulled toward
+          what the track asks for, by Tempo Sync, and harder under Random
+          Evolve. The tempo comes from the beat clock once it has locked, or
+          from a clock, tap or typed tempo; the loudness is averaged over
+          about eight seconds. The result is slewed over three, so the plate
+          eases into a new song rather than jumping to it.
+        */
+        {
+          const clock = beatClockRef.current;
+          const heard = clock.period > 0 && clock.confidence >= 0.5 ? 60000 / clock.period : 0;
+          const bpm = tempoRef?.current?.bpm || heard;
+          const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
+          loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / 8));
+          const playing = isActiveRef.current && !!currentAudioData && loudnessRef.current > 0.01;
+          const want = tempoMultiplier(lookSpeed(currentSettings), musicPace(bpm, loudnessRef.current, playing),
+            currentSettings.tempoSync ?? 0.5, isAutomatedRef.current);
+          tempoMulRef.current += (want - tempoMulRef.current) * (1 - Math.exp(-realDt / 3));
+          for (const f of fluidsRef.current) if (f) f.tempoMul = tempoMulRef.current;
+        }
+        dynamicSpeed *= tempoMulRef.current;
         const timeMultiplier = dynamicSpeed * 20.0;
 
         /*
