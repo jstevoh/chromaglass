@@ -549,7 +549,9 @@ class FluidSimulation {
    * not the dish's: set by the frame, read by the step below.
    */
   plateAngle = 0;
-  viewReach = 0.3;
+  /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
+  viewHalfW = 0.33;
+  viewHalfH = 0.21;
   meanDensity = 0; // rolling measure of how full the plate is
   /**
    * The average colour on this layer, 0..1 per channel.
@@ -2467,6 +2469,28 @@ class FluidSimulation {
    * Everything one step needs, derived once from settings and audio so the CPU
    * and GPU solvers run from the same numbers.
    */
+  /**
+   * Downhill, in the plate, for a tilt pointing `degrees` round the screen
+   * (0 the top, 90 right, 180 the bottom, 270 left).
+   *
+   * The camera looks straight down, so the screen has no "up": the tilt is
+   * which edge of the plate stands propped, and it belongs to the stage, not
+   * the dish, so it stays put while the dish turns under it. The screen is
+   * the plate turned by `plateAngle` (uvToFluid in wgsl/plate.ts), so the
+   * screen direction is turned back by it. The reach is how far the screen
+   * extends that way from the centre: the lamp sits just past it.
+   */
+  private downhill(degrees: number): { gravityX: number; gravityY: number; gravityReach: number } {
+    const t = (Number.isFinite(degrees) ? degrees : 180) * Math.PI / 180;
+    const dx = Math.sin(t), dy = Math.cos(t);
+    const c = Math.cos(this.plateAngle), s = Math.sin(this.plateAngle);
+    return {
+      gravityX: dx * c + dy * s,
+      gravityY: -dx * s + dy * c,
+      gravityReach: Math.abs(dx) * this.viewHalfW + Math.abs(dy) * this.viewHalfH,
+    };
+  }
+
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
@@ -2732,11 +2756,7 @@ class FluidSimulation {
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
-      // Down the screen, in the plate: the screen is the plate turned by
-      // `plateAngle` (see uvToFluid in wgsl/plate.ts).
-      gravityX: -Math.sin(this.plateAngle),
-      gravityY: -Math.cos(this.plateAngle),
-      gravityReach: this.viewReach,
+      ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
@@ -5957,8 +5977,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
-              // Half the screen's height over the plate's drawn width (1.5× the long side).
-              fl.viewReach = 0.5 * canvas.clientHeight / Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
+              const drawn = Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
+              fl.viewHalfW = 0.5 * canvas.clientWidth / drawn;
+              fl.viewHalfH = 0.5 * canvas.clientHeight / drawn;
             }
           }
         }

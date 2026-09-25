@@ -79,12 +79,12 @@ export interface GpuStepParams {
   /** How far the plate stands up (0 flat on the projector, 1 upright). */
   plateUpright?: number;
   /**
-   * Which way is down in the plate, as a unit vector: the bottom of the room,
-   * wherever the dish has been turned to. (0, −1) when it is not turned.
+   * Which way is downhill in the plate, as a unit vector: Tilt Direction on
+   * the screen, wherever the dish has been turned to. (0, −1) by default.
    */
   gravityX?: number;
   gravityY?: number;
-  /** How far down from the centre the plate is still in view, in plate widths: the lamp sits just below. */
+  /** How far downhill from the centre the plate is still in view, in plate widths: the lamp sits just beyond. */
   gravityReach?: number;
   /** Heat diffusing faster than dye (the double-diffusive case). */
   doubleDiffusion?: number;

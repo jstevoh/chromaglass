@@ -347,6 +347,13 @@ export interface VisualizerSettings {
   solutalBuoyancy: number;
   /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
   plateUpright: number;
+  /**
+   * Which way the tilted plate runs downhill, as a compass on the screen:
+   * 0 toward the top, 90 right, 180 the bottom, 270 left. The camera looks
+   * straight down, so this is which edge of the plate is propped up — held
+   * where it is on the stage while the dish turns under it.
+   */
+  tiltDirection: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -612,6 +619,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   surfactantFlow: 0,
   solutalBuoyancy: 0,
   plateUpright: 0,
+  tiltDirection: 180,
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
   phIndicator: 0,

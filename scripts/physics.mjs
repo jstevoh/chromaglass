@@ -151,6 +151,20 @@ try {
   check('on a turned dish it sinks down the screen, not down the dish',
     turned.early.along > 0.03 && Math.abs(turned.early.across) < turned.early.along * 0.3,
     `${turned.early.along.toFixed(3)} down the screen, ${turned.early.across.toFixed(3)} across it`);
+  // Tilt Direction: the propped edge can be any side. Tipped to the right
+  // (downhill +x in the plate), the dye runs right, not down.
+  const sideways = await (async () => {
+    await page.evaluate(() => lab.create(128));
+    await page.evaluate(() => { lab.dye(0.5, 0.5, 0.12, [1, 1, 1], 1); lab.flush(); });
+    await page.evaluate(() => lab.step(120, { solutalBuoyancy: 0.6, plateUpright: 1, dt: 0.004, gravityX: 1, gravityY: 0, gravityReach: 0.33 }));
+    return page.evaluate(() => lab.field('dye').then((d) => {
+      const L = 192; let t = 0, cx = 0, cy = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const m = d[(i + j * L) * 4 + 3]; t += m; cx += m * ((i + 0.5) / L - 0.5); cy += m * ((j + 0.5) / L - 0.5); }
+      return { x: cx / t, y: cy / t };
+    }));
+  })();
+  check('tilted to the right, it runs right', sideways.x > 0.03 && Math.abs(sideways.y) < sideways.x * 0.3,
+    `centre of mass ${sideways.x.toFixed(3)} across, ${sideways.y.toFixed(3)} down`);
   check('and the lamp under the plate keeps it in view', turned.late.seen > 0.8,
     `${(100 * turned.late.seen).toFixed(0)}% above the bottom of the screen after twelve seconds`);
 

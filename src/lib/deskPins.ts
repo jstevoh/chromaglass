@@ -190,6 +190,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'physics' },
   { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 1, section: 'physics' },
   { key: 'plateUpright', label: "Gravity", min: 0, max: 1, section: 'physics' },
+  { key: 'tiltDirection', label: "Tilt Direction", min: 0, max: 360, section: 'physics' },
   { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 1, section: 'physics' },
   { key: 'ferroLabyrinth', label: "Labyrinth", min: 0, max: 1, section: 'physics' },
   { key: 'phIndicator', label: "pH Indicator", min: 0, max: 1, section: 'physics' },

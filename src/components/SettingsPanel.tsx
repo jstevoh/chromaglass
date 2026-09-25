@@ -2598,6 +2598,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="plateUpright"
         />
         <Slider
+          label="Tilt Direction"
+          value={settings.tiltDirection ?? 180}
+          min={0}
+          max={360}
+          step={5}
+          onChange={(v: number) => onUpdate({ tiltDirection: v })}
+          settingKey="tiltDirection"
+        />
+        <Slider
           label="Heat Spread"
           value={settings.doubleDiffusion ?? 0}
           min={0}
