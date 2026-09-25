@@ -187,6 +187,8 @@ try {
       hold.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
     }
     console.log(`     the solver's magnet through the hold: ${hold.join(' ')}`);
+    // The whole step as the solver got it, so the lab can replay it (scripts/lab.mjs).
+    console.log(`     STEP ${await page.evaluate(() => JSON.stringify(window.chromaglassDebug().fluids?.[0]?.lastStep ?? null))}`);
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
     solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
     drag1 = await phase(null, 'drag1');

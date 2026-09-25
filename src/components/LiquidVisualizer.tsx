@@ -549,6 +549,8 @@ class FluidSimulation {
    * not the dish's: set by the frame, read by the step below.
    */
   plateAngle = 0;
+  /** The last step's parameters as the solver was given them, for the harness to replay in the lab. */
+  lastStep: GpuStepParams | null = null;
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
   viewHalfW = 0.33;
   viewHalfH = 0.21;
@@ -2355,6 +2357,7 @@ class FluidSimulation {
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
+    this.lastStep = p;
 
     if (this.gpu) {
       const applied = this.dirty;
