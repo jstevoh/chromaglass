@@ -49,18 +49,22 @@ try {
   check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
   if (!isGpuEngine(engine)) process.exit(1);
 
-  /** How much ferrofluid is on the lead plate, and where its centre of mass is (plate 0..1). */
-  const phase = () => page.evaluate(async () => {
+  /**
+   * How much ferrofluid is on the lead plate, where its centre of mass is
+   * (plate 0..1), and how much sits within 0.12 of a point (the hand).
+   */
+  const phase = (at = null) => page.evaluate(async (at) => {
     const f = await window.chromaglassDebug().readPhase();
-    if (!f) return { total: -1, x: 0, y: 0 };
+    if (!f) return { total: -1, x: 0, y: 0, near: 0 };
     const { n, data } = f;
-    let total = 0, cx = 0, cy = 0;
+    let total = 0, cx = 0, cy = 0, near = 0;
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
       const v = data[x + y * n];
       total += v; cx += v * (x / n); cy += v * (y / n);
+      if (at && Math.hypot((x + 0.5) / n - at.x, (y + 0.5) / n - at.y) < 0.12) near += v;
     }
-    return { total, x: total ? cx / total : 0, y: total ? cy / total : 0 };
-  });
+    return { total, x: total ? cx / total : 0, y: total ? cy / total : 0, near };
+  }, at);
   const amount = () => page.evaluate(() => window.chromaglassDebug().settings?.phaseAmount ?? 0);
 
   const before = await phase();
@@ -81,29 +85,42 @@ try {
   const box = await canvas.boundingBox();
   const at = (fx) => [box.x + box.width * fx, box.y + box.height * 0.5];
 
-  // 2a. The control: the same plate, left alone for as long as the drag takes.
-  const idle0 = await phase();
+  /*
+    2. The drag. Measured where the hand ends up, not over the whole plate:
+    a magnet drags the ferrofluid it passes near and leaves the rest, so the
+    plate's centre of mass hardly moves even when the pull is doing exactly
+    its job (the first version of this check asked for that and failed a
+    magnet that worked). The control is the same plate left alone as long,
+    read at the same spot; it also carries the plate's own slow losses (the
+    edge sharpening is not conservative), which the drag is compared against
+    rather than blamed for.
+  */
+  const end = at(0.85);
+  await page.mouse.move(...end);
+  await page.mouse.down();
+  await page.waitForTimeout(300);
+  const spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  const idle0 = await phase(spot);
   await page.waitForTimeout(6000);
-  const idle1 = await phase();
-  const drift = idle1.x - idle0.x;
-
-  // 2b. The drag: from the left of the plate to the right, slowly, then held.
-  const drag0 = await phase();
+  const idle1 = await phase(spot);
+  const drag0 = await phase(spot);
   await page.mouse.move(...at(0.2));
   await page.mouse.down();
   for (let i = 0; i <= 40; i++) { await page.mouse.move(...at(0.2 + 0.65 * i / 40)); await page.waitForTimeout(100); }
   await page.waitForTimeout(2000);
-  const drag1 = await phase();
+  const drag1 = await phase(spot);
   await page.mouse.up();
-  const moved = drag1.x - drag0.x;
-  console.log(`     centre of mass across: alone ${idle0.x.toFixed(3)} → ${idle1.x.toFixed(3)}, dragged ${drag0.x.toFixed(3)} → ${drag1.x.toFixed(3)}`);
-  check('dragging the Magnet carries the ferrofluid toward the hand',
-    moved > drift + 0.05,
-    `moved ${moved.toFixed(3)} of the plate toward the hand, against ${drift.toFixed(3)} on its own`);
-  // Conservative transport: dragged, the liquid is moved, not made or lost.
-  // The margin is the flow's own advection and the edge sharpening.
-  check('and dragging it neither makes nor loses the liquid', drag1.total > poured.total * 0.85 && drag1.total < poured.total * 1.15,
-    `${poured.total.toFixed(0)} → ${drag1.total.toFixed(0)}`);
+  console.log(`     the hand ends at ${spot ? `${spot.x.toFixed(2)},${spot.y.toFixed(2)}` : 'nowhere'}; ferrofluid within 0.12 of it: ` +
+    `alone ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)}, dragged ${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)}`);
+  check('dragging the Magnet gathers the ferrofluid where the hand ends up',
+    !!spot && drag1.near > drag0.near + Math.max(0, idle1.near - idle0.near) + 0.1 * Math.max(1, drag0.near) && drag1.near > 1.5 * Math.max(1, idle1.near),
+    `${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)} dragged, against ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)} left alone`);
+  const keptDrag = drag1.total / Math.max(1, drag0.total), keptIdle = idle1.total / Math.max(1, idle0.total);
+  check('and dragging it neither makes nor loses more liquid than the plate does alone',
+    Math.abs(keptDrag - keptIdle) < 0.08,
+    `kept ${(keptDrag * 100).toFixed(0)}% dragged, ${(keptIdle * 100).toFixed(0)}% left alone`);
 } finally {
   await browser.close();
 }

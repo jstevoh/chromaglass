@@ -6887,6 +6887,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             return g instanceof WebGPUFluid ? { live: g.phaseIsLive } : null;
           },
           /** The second phase (H7), for the harness. */
+          /** Where the hand holds the magnet (plate units), while it does. */
+          magnetHand: () => magnetHandRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
