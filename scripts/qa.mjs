@@ -793,16 +793,29 @@ try {
       const spot = await page.evaluate(() => {
         const c = document.getElementById('liquid-canvas');
         const r = c?.getBoundingClientRect();
-        if (!r) return null;
+        if (!r) return { x: 0, y: 0, clear: false, over: 'no plate' };
+        const over = [];
         for (const [fx, fy] of [[0.62, 0.5], [0.4, 0.5], [0.5, 0.35], [0.5, 0.65], [0.62, 0.38], [0.38, 0.62]]) {
           const x = r.left + r.width * fx, y = r.top + r.height * fy;
-          if (document.elementFromPoint(x, y) === c) return { x, y };
+          const el = document.elementFromPoint(x, y);
+          if (el === c) return { x, y, clear: true, over: '' };
+          over.push(el?.dataset?.testid || el?.id || el?.className?.toString().slice(0, 40) || el?.tagName || 'nothing');
         }
-        return null;
+        return { x: r.left + r.width * 0.62, y: r.top + r.height * 0.5, clear: false, over: [...new Set(over)].join(' | ') };
       });
       const before = await page.evaluate(() => window.chromaglassDebug?.().shot ?? null);
       await page.keyboard.down('Alt');
-      if (spot) await page.mouse.click(spot.x, spot.y);
+      if (spot.clear) await page.mouse.click(spot.x, spot.y);
+      else {
+        // Something is over the plate here (named in the detail): press the
+        // plate itself, so the handler is what is measured.
+        await page.evaluate(({ x, y }) => {
+          const c = document.getElementById('liquid-canvas');
+          const o = { bubbles: true, cancelable: true, clientX: x, clientY: y, altKey: true, button: 0 };
+          c?.dispatchEvent(new MouseEvent('mousedown', o));
+          window.dispatchEvent(new MouseEvent('mouseup', o));
+        }, spot);
+      }
       await page.keyboard.up('Alt');
       await settle(300);
       const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
@@ -810,7 +823,7 @@ try {
       const probe = await page.evaluate(() => window.chromaglassDebug?.().aimProbe ?? null);
       check('and an Alt-click on the plate aims it at the spot under the pointer', moved > 0.02 && aim.mode === 'hold',
         `aim ${typeof aim.x === 'number' ? aim.x.toFixed(2) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(2) : '?'} (${aim.mode})` +
-        `; clicked ${spot ? `${Math.round(spot.x)},${Math.round(spot.y)}` : 'nowhere: no point on the plate was clear'}; the plate saw ${JSON.stringify(probe)}`);
+        `; ${spot.clear ? 'clicked' : `pressed the plate directly (over it: ${spot.over})`} at ${Math.round(spot.x)},${Math.round(spot.y)}; the plate saw ${JSON.stringify(probe)}`);
     }
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false, macroAimX: 0.5, macroAimY: 0.5 }));
     await settle(800);
