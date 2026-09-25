@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
+import { PerformanceButton } from './PerformanceButton';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { PIN_RANGE } from '../../lib/deskPins';
@@ -84,6 +85,8 @@ export interface DesignDeskProps {
   onMidi: () => void;
   onPhone: () => void;
   onPerformance: () => void;
+  /** The performance being recorded: its clock and the song attached so far. */
+  performance: { clock: string; title?: string } | null;
   onSearch: () => void;
   /** Open the settings sheet showing everything — the bench's way to the rest. */
   onOpenSettings: () => void;
@@ -273,6 +276,7 @@ export function DesignDesk(p: DesignDeskProps) {
             <span className="text-[16px] font-medium">{p.lookName ?? 'Untitled'}</span>
             <span className="font-mono text-[12px] text-dim">not on wall</span>
           </span>
+          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
           <span className="flex items-center gap-2">
             {/*
               Each layer says what is on it.

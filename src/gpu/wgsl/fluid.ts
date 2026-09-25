@@ -75,6 +75,8 @@ struct Sim {
   plateCurve: f32,
   gapSpring: f32,
   gapMemory: f32,
+  // Up the screen, in the plate: the dish is drawn turned, the room is not.
+  up: vec2f,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -1342,8 +1344,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let uv = (vec2f(id.xy) + 0.5) / m;
   var c = textureLoad(cur, q, 0).xy;
   let temp = bilerpN(vel, uv, S.n).z;
-  let dd = tanh(bilerpN(dye, uv, S.n).a - S.meanD);
-  var f = vec2f(0.0, S.curBuoy * tanh(max(temp, 0.0) * 20.0));
+  /*
+    tanh with its argument held in range: some GPUs take tanh as a ratio of
+    exponentials, and past about 88 the exponential is infinite and the
+    ratio is NaN. A plate anywhere hotter than 4.4 (the lamp under a standing
+    plate reaches that) turned the whole current NaN, and the flow was
+    wiped every step after it. tanh is ±1 to float precision well before 10.
+  */
+  let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
+  var f = S.up * (S.curBuoy * tanh(min(max(temp, 0.0) * 20.0, 10.0)));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -1730,6 +1739,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     heat diffusing faster than the dye (the double-diffusive case, see
     doubleDiffusion) it makes salt fingers. A.b.xy = gravity in the plate
     (with its size), A.b.z = βₛ, A.b.w = β_T.
+
+    **The lamp**: heat A.a.z a step into the dye below A.a.w plate widths
+    from the centre, downhill, where a standing plate goes out of view.
   */
   mixForce: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -1751,9 +1763,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // behind that piled the oil past full and lost it at the guard.
   let capillary = -clamp(m.r, 0.0, 1.0) * vec2f(gx.a, gy.a) * 0.5 * A.a.x;
   let marangoni = -vec2f(gx.g, gy.g) * 0.5 * A.a.y;
-  let rho = textureLoad(dye, p, 0).a - S.meanD;
+  let wax = textureLoad(dye, p, 0).a;
+  let rho = wax - S.meanD;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
-  v = vec4f(v.xy + capillary + marangoni + buoy, v.z, v.w);
+  var heat = v.z;
+  if (A.a.z > 0.0) {
+    /*
+      Into the dye, not the water round it. Warming everything in the band
+      alike lifts nothing: the wax is still the heaviest thing there, and a
+      force the same everywhere is a pressure. The wax is what swells with
+      heat in a lava lamp, so that is where the lamp's heat goes.
+    */
+    let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
+    heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0);
+  }
+  v = vec4f(v.xy + capillary + marangoni + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));
 }`,
 

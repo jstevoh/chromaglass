@@ -36,6 +36,8 @@ export type MidiAction =
   | 'blackout-toggle'
   /** Record the show to a video file / stop recording. */
   | 'record-toggle'
+  /** Start or stop recording a performance (what is painted, with the song playing). */
+  | 'performance-toggle'
   /** Open or close the camera that watches the room. */
   | 'scene-toggle'
   /**
@@ -187,7 +189,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
-  'blackout-toggle': 'Blackout', 'record-toggle': 'Record',
+  'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record Performance',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
   'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',

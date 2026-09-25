@@ -173,6 +173,11 @@ jobs:
       # same plate left alone.
       - name: The magnet moves the ferrofluid
         run: npm run magnet
+      # Every other tool in the hand (asked for: "check all of the tools to
+      # make sure they work in expected ways"): each does what it says and
+      # nothing else, and hovering does nothing (scripts/tools.mjs).
+      - name: Every tool does what it says
+        run: node scripts/tools.mjs
       # And the physics under it: the ferrofluid gathers where the magnet is
       # (not at its mirror), held close pulls harder than held away, and the
       # magnet neither makes nor loses liquid.

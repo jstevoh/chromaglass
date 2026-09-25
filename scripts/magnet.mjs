@@ -103,10 +103,29 @@ try {
     the gathering 0.11 to 0.19 away from where the hand stopped, and the
     check failed by one unit). The turning is the look's, not the magnet's,
     so it is a control here, the way ferro.mjs sets the look it measures on.
+
+    And the plate's own currents, for the same reason. With the band playing,
+    Classic's turbulence, sound drive, beat rock and squeeze and its heat
+    lift churn the plate as hard as the magnet pulls, differently on every
+    run: the check went fail, pass, fail across three heads with no magnet
+    change between them (on the last, the solver's magnet was at the hand and
+    the ferrofluid gathered 0.25 away). In the lab, where nothing else moves,
+    a held magnet gathers 123 -> 317 in three seconds.
   */
   await page.evaluate(() => {
     const d = window.chromaglassDebug();
-    Object.assign(d.settings, { rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' } });
+    Object.assign(d.settings, {
+      rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
+      turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      /*
+        And an ordinary plate clock. The magnet acts in plate time, and
+        Classic runs the plate slowest of any look (0.00924); the music was
+        nudging it up, and with the sound drive held at zero the ferrofluid
+        had a third of the time to move in the same four seconds (CI: +47 at
+        best along the whole path, against +111 to +124 with the music on).
+      */
+      globalSpeed: 0.025,
+    });
   });
   await page.waitForTimeout(3000);
 
@@ -145,23 +164,33 @@ try {
     if (idle0.n === idle1.n) break;
     console.log(`     the grid moved ${idle0.n} → ${idle1.n} while the plate was left alone; again`);
   }
-  let drag0, drag1, spot = null, trail = [];
+  let drag0, drag1, spot = null, trail = [], solverMagnet = null;
   for (let k = 0; k < 3; k++) {
     drag0 = await phase(null, 'drag0');
     await page.mouse.move(...at(0.2));
     await page.mouse.down();
-    // The hand's path on the plate over the last two seconds of the drag and
-    // the hold: the plate turns under a held pointer, so the magnet keeps
-    // moving on it, and the ferrofluid trails it by a little.
+    // The hand's path on the plate, the whole drag and the hold. It was the
+    // last two seconds only, when the plate turned under the hand; it is held
+    // still now, and a magnet crossing 0.4 of the plate in four seconds pulls
+    // the ferrofluid part of the way and outruns it: on CI it gathered +124
+    // mid-drag, 0.19 behind where the hand stopped, twice running.
     trail = [];
     const sample = async () => { const h = await page.evaluate(() => window.chromaglassDebug().magnetHand?.()); if (h) trail.push({ x: h.x, y: h.y }); };
     for (let i = 0; i <= 40; i++) {
       await page.mouse.move(...at(0.2 + 0.65 * i / 40));
       await page.waitForTimeout(100);
-      if (i >= 20 && i % 4 === 0) await sample();
+      if (i % 4 === 0) await sample();
     }
-    for (let k = 0; k < 12; k++) { await page.waitForTimeout(250); await sample(); }
+    const hold = [];
+    for (let k = 0; k < 12; k++) {
+      await page.waitForTimeout(250); await sample();
+      hold.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
+    }
+    console.log(`     the solver's magnet through the hold: ${hold.join(' ')}`);
+    // The whole step as the solver got it, so the lab can replay it (scripts/lab.mjs).
+    console.log(`     STEP ${await page.evaluate(() => JSON.stringify(window.chromaglassDebug().fluids?.[0]?.lastStep ?? null))}`);
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+    solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
     drag1 = await phase(null, 'drag1');
     await page.mouse.up();
     if (drag0.n === drag1.n) break;
@@ -190,6 +219,23 @@ try {
     }
     return best;
   });
+  // Where the ferrofluid went, coarsely: the drag's change in each 0.2 square, top row y = 0.9.
+  const map = await page.evaluate(() => {
+    const a = window.__phaseSnaps?.drag0, b = window.__phaseSnaps?.drag1;
+    if (!a || !b || a.n !== b.n) return null;
+    const n = a.n, rows = [];
+    for (let j = 4; j >= 0; j--) {
+      const row = [];
+      for (let i = 0; i < 5; i++) {
+        let g = 0;
+        for (let y = Math.floor(j * n / 5); y < Math.floor((j + 1) * n / 5); y++) for (let x = Math.floor(i * n / 5); x < Math.floor((i + 1) * n / 5); x++) g += b.data[x + y * n] - a.data[x + y * n];
+        row.push((g / (n * n) * 1e4).toFixed(0).padStart(5));
+      }
+      rows.push(row.join(''));
+    }
+    return rows;
+  });
+  if (map) console.log(`     the drag's change by 0.2 square (x across, y up):\n       ${map.join('\n       ')}`);
   const mirror = spot ? await nearIn('drag1', { x: spot.x, y: 1 - spot.y }) : 0;
   console.log(`     it gathered most at ${gathered ? `${gathered.x.toFixed(2)},${gathered.y.toFixed(2)} (+${gathered.gain.toFixed(0)})` : '?'}; ` +
     `at the hand's mirror ${mirror.toFixed(0)}; centre of mass ${drag0.x.toFixed(2)},${drag0.y.toFixed(2)} → ${drag1.x.toFixed(2)},${drag1.y.toFixed(2)}`);
@@ -210,7 +256,8 @@ try {
     g.gain = (g.d1 - g.d0) - (g.i1 - g.i0);
     if (!best || g.gain > best.gain) best = g;
   }
-  console.log(`     along the hand's last ${trail.length} positions, the drag gathered most at ` +
+  console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
+  console.log(`     along the hand's ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
   check('dragging the Magnet gathers the ferrofluid along where the hand goes',
     !!best && best.gain > 0.1 * Math.max(1, best.d0) && best.d1 > 1.2 * Math.max(1, best.i1),

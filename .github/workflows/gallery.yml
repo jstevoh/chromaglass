@@ -29,6 +29,7 @@ on:
       - 'src/gpu/fluid.ts'
       - 'src/gpu/wgsl/fluid.ts'
       - 'scripts/gallery.mjs'
+      - 'scripts/judge.mjs'
       - '.github/workflows/gallery.yml'
 
 # A run that is photographing finishes: its sheet is the "before" the next

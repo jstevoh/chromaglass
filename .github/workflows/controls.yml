@@ -1,0 +1,62 @@
+name: Controls
+
+# Does every control do something you can see, on every look, and undo it?
+# (scripts/controls.mjs). The rides and the candidate rides on every look,
+# split over five runners by look; and every control the desks can carry on
+# four looks, split over three by control. Evidence rather than a gate: the
+# numbers are in the log, and each look's sheet (the look, then each control
+# at the far end of its range) comes back as an artifact.
+
+#
+# On request only (Actions → Controls → Run workflow). It holds eight macOS
+# runners for three quarters of an hour, and on a pull request every push
+# re-ran it (a PR's paths are its whole diff, so any push matched) and
+# cancelled the run before: the gallery and the checks queued behind it for
+# a runner, and no run of it ever finished while a PR was being worked on.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: controls-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controls:
+    name: Controls ${{ matrix.mode }} ${{ matrix.shard }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { mode: rides, shard: 1/5 }
+          - { mode: rides, shard: 2/5 }
+          - { mode: rides, shard: 3/5 }
+          - { mode: rides, shard: 4/5 }
+          - { mode: rides, shard: 5/5 }
+          - { mode: all, shard: 1/3 }
+          - { mode: all, shard: 2/3 }
+          - { mode: all, shard: 3/3 }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Every control, measured
+        run: npm run controls
+        env:
+          CONTROLS_MODE: ${{ matrix.mode }}
+          CONTROLS_SHARD: ${{ matrix.shard }}
+      - name: Name the artifact
+        id: name
+        run: echo "slug=$(echo '${{ matrix.mode }}-${{ matrix.shard }}' | sed 's|/|of|')" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: controls-${{ steps.name.outputs.slug }}
+          path: controls/
+          retention-days: 14

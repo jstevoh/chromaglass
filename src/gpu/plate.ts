@@ -251,7 +251,9 @@ export class WebGPUPlate {
       }),
       vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
       fragment: {
-        module: module(code), entryPoint: 'fs',
+        // The fragment stage needs to know too: an override is set per stage,
+        // and without it the fragment read FLIP_Y as 1 on both paths.
+        module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
         targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },

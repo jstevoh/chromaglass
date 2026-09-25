@@ -87,6 +87,8 @@ const OIL_TENSION = 10;
 const SOAP_PULL = 0.5;
 const DYE_WEIGHT = 0.12;
 const HEAT_LIFT = 0.06;
+/** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
+const LAMP_HEAT = 6;
 /** Vorticity confinement's push, as a fraction of the local spin, per step. */
 const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
@@ -166,7 +168,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 36;      // 33 used, rounded up for the uniform's 16-byte tail
+const SIM_FLOATS = 36;      // 35 used (33 is the vec2's alignment), rounded up for the uniform's 16-byte tail
 
 export class WebGPUFluid {
   readonly N: number;
@@ -469,6 +471,8 @@ export class WebGPUFluid {
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
     f[28] = p.rockX; f[29] = p.rockY;
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
+    const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
+    f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -924,11 +928,23 @@ export class WebGPUFluid {
     const mix = this.mix;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
     stage('mix force', (pass) => {
-      // Gravity in the plate: how far it stands up. (Its rock and tilt move
-      // the dye already, through the lasting current.)
-      const gx = 0, gy = -upright;
+      /*
+        Gravity in the plate: how far it stands up, toward the bottom of the
+        room. The dish is drawn turned (Rotation, and a flick), and gravity
+        does not turn with it: reported, Lava Lamp's wax poured off toward
+        whichever corner the dish had started turned to and the plate was
+        empty in twenty seconds. (Its rock and tilt move the dye already,
+        through the lasting current.)
+
+        And a lamp under it, just where the plate goes out of view: what
+        sinks there is warmed, rises, cools as it goes and sinks again,
+        which is what keeps a lava lamp going rather than settled.
+      */
+      const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
+      const gx = upright * (p.gravityX ?? 0) / gl, gy = upright * (p.gravityY ?? -1) / gl;
+      const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read],
-        this.arg('mix force', [oil * OIL_TENSION * perSecond, 0, 0, 0,
+        this.arg('mix force', [oil * OIL_TENSION * perSecond, 0, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
           gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
@@ -1867,6 +1883,9 @@ export class WebGPUFluid {
   }
 
   get rbDyeView(): Float32Array { return this.rbDye; }
+  /** The dye readback's sequence: the newest copy issued, and the newest landed in `rbDyeView`. */
+  get rbDyeIssued(): number { return this.rbRings.dye.issued; }
+  get rbDyeLanded(): number { return this.rbRings.dye.landed; }
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */

@@ -78,6 +78,14 @@ export interface GpuStepParams {
   solutalBuoyancy?: number;
   /** How far the plate stands up (0 flat on the projector, 1 upright). */
   plateUpright?: number;
+  /**
+   * Which way is downhill in the plate, as a unit vector: Tilt Direction on
+   * the screen, wherever the dish has been turned to. (0, −1) by default.
+   */
+  gravityX?: number;
+  gravityY?: number;
+  /** How far downhill from the centre the plate is still in view, in plate widths: the lamp sits just beyond. */
+  gravityReach?: number;
   /** Heat diffusing faster than dye (the double-diffusive case). */
   doubleDiffusion?: number;
   /** The Belousov–Zhabotinsky reaction's spirals. */
@@ -167,6 +175,9 @@ export interface PlateSolver {
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;
+  /** The dye readback's newest copy issued, and the one `rbDyeView` holds. */
+  readonly rbDyeIssued: number;
+  readonly rbDyeLanded: number;
   readonly rbVelView: Float32Array;
   /** The fields as the CPU last saw them, for carrying state across a change. */
   readback(): { dye: Float32Array; vel: Float32Array };

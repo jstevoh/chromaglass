@@ -189,62 +189,6 @@ export const PRESETS: Preset[] = [
     }
   },
   {
-    id: 'lava-lamp',
-    name: 'Lava Lamp',
-    description: 'Amber and red wax rises and sinks through violet liquid: heavy blobs that stretch, pinch off and fall back.',
-    settings: {
-      plateUpright: 1,
-      solutalBuoyancy: 0.6,
-      doubleDiffusion: 0.5,
-      globalSpeed: 0.0168,
-      surge: 0.4,
-      layerCount: 2,
-      blendMode: 'screen',
-      gooeyEffect: 1,
-      rotationSpeed: 0.01,
-      centerGravity: 0,          // the wax wanders the lamp; the music already pours it in the middle
-      ledPlatform: true,
-      ledMode: 'single',         // one dim ember under the whole lamp, not a colour wheel
-      ledColor: '#2a0620',
-      ledSpeed: 0.02,
-      diffusionRate: 0.00005,
-      buoyancy: 0.9,
-      advection: 0.15,
-      damping: 0.97,
-      heatDecay: 0.99,
-      automateRate: 0.1,
-      platePressure: 0.2,
-      glassSmear: 0.3,
-      rainDrip: 0.1,
-      viscosity: 'thick',
-      polarity: 0.95,
-      evaporationRate: 0.02,
-      airVelocity: 0.05,
-      vibrationFrequency: 0.1,
-      turbulenceScale: 0.05,     // lava moves as whole blobs: no ripple to tear their edges
-      turbulenceDetail: 2,
-      blobSurfaceTension: 1,     // as round as the plate will hold them
-      boundaryContrast: 0.3,
-      saturationBoost: 1.3,
-      glossiness: 0.3,           // a wax sheen, the one look that earns one
-      edgeRelief: 0.6,           // and a rim, so a blob reads as a body rather than a stain
-      // The liquid is clear and the wax is not. A full plate is a red wash (which is
-      // what this look was with music on): at 0.45 the wax has somewhere to be, and
-      // the exposure keeps the thin film between blobs as the liquid, not a tint.
-      dyeBudget: 0.45,
-      exposure: 0.9,
-      postBlurRadius: 0.55,      // softer edges than the flat-dye presets
-      lampWarmth: 0.4,
-      transmission: 0.75,
-      audioMappings: {
-        velocity: 'bass',
-        density: 'volume',
-        color: 'none',
-        rotation: 'none',
-      },
-    }
-  },
-  {
     id: 'acid-trip',
     name: 'Acid Trip',
     description: 'Clashing ultramarine, coral, lime and magenta under a turning colour gel: everything inverts where it overlaps.',

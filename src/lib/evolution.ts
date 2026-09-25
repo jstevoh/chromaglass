@@ -61,7 +61,7 @@ export function trackSeed(isrc: string): TrackSeed {
 // deterministic per ISRC (a song keeps its preset across listens) but the
 // bucket comes from the live audio profile at identification time.
 const PRESET_BUCKETS = {
-  calm:   ['classic', 'deep-ocean', 'velvet-underground', 'lava-lamp', 'jellyfish-bloom', 'clock-glass', 'home-movie'],
+  calm:   ['classic', 'deep-ocean', 'velvet-underground', 'jellyfish-bloom', 'clock-glass', 'home-movie'],
   dreamy: ['galaxy', 'aurora-borealis', 'fractal-dream', 'timbre-shifter', 'soap-film'],
   bright: ['cyberpunk', 'neon-coral-reef', 'stardust-collapse', 'acid-trip', 'crowd-plate'],
   heavy:  ['bass-drop', 'solar-flare', 'boiling-point', 'microscopic-chaos', 'magnet-garden'],

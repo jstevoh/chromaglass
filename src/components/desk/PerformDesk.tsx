@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { PALETTE } from '../../constants';
+import { PerformanceButton } from './PerformanceButton';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
@@ -50,16 +51,23 @@ export interface Cue {
  * on stage.
  */
 /*
-  What a performer rides, chosen for effects that are drastic and different
-  from one another rather than refinements of the look (reported: the old
-  set were subtle, and Granulation made a few jagged cuts in the dye and
-  nothing else). Speed and Evolve Speed stay; Swirl spins the eddies up,
-  Gravity stands the plate up so the dye pours down it, Soap Bursts blow the
-  dye apart on the beat, Beat Press squeezes the glass on the kick, and Zoom
-  dives into the liquid.
+  What a performer rides. Each has to pass three tests: it shows on any look
+  within a second, pulling it back undoes it, and it does something no other
+  ride does.
+
+  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
+  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
+  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
+  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
+  on its own; raising it from zero switches Random Evolve on).
+
+  Swirl and Gravity were here and are not now, though Choose still has both.
+  Swirl only spins up eddies a look already has, so on a calm one it did
+  next to nothing. Gravity pours the dye down the plate and pulling it back
+  does not bring the dye up again: it is a scene change, not a ride.
 */
 export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
-  'dimmer', 'globalSpeed', 'automateRate', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom',
+  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
 ];
 
 const RANGE = PIN_RANGE;
@@ -98,6 +106,8 @@ interface PerformDeskProps {
   onMidi: () => void;
   onPhone: () => void;
   onPerformance: () => void;
+  /** The performance being recorded: its clock and the song attached so far. */
+  performance: { clock: string; title?: string } | null;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -249,12 +259,14 @@ export function PerformDesk(p: PerformDeskProps) {
 
       {/* ── Plate ───────────────────────────────────────────── */}
       <section className="flex min-h-0 flex-col px-4 py-3">
-        <div className="mb-3 flex h-8 shrink-0 items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: 'var(--color-live)' }} />
-            <span className="text-[16px] font-medium">{live?.name ?? '—'}</span>
-            <span className="font-mono text-[12px] text-dim">live · {p.liveFor}</span>
+        <div className="mb-3 flex h-8 shrink-0 items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--color-live)' }} />
+            <span className="truncate text-[16px] font-medium">{live?.name ?? '—'}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-[12px] text-dim">live · {p.liveFor}</span>
           </span>
+          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
+          <div className="shrink-0">
           <Segmented
             value={String(p.layer)}
             options={Array.from({ length: Math.max(1, p.layers) }, (_, i) => [String(i), `Layer ${i + 1}`] as const)}
@@ -262,6 +274,7 @@ export function PerformDesk(p: PerformDeskProps) {
             height={32}
             testId="layer-segmented"
           />
+          </div>
         </div>
         {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
@@ -333,7 +346,16 @@ export function PerformDesk(p: PerformDeskProps) {
                 display={readSetting(String(key), v, spec.min, spec.max)}
                 cc={p.ccFor(key)}
                 white={WHITE.has(String(key))}
-                onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                onChange={n => {
+                  p.onSetting({ [key]: n } as Partial<VisualizerSettings>);
+                  // Evolve Speed does nothing with Random Evolve off, so the
+                  // ride is the switch as well: up from zero turns it on,
+                  // down to zero turns it off.
+                  if (key === 'automateRate') {
+                    if (n > 0.005 && !p.automated) p.onAutomate(true);
+                    else if (n <= 0.005 && p.automated) p.onAutomate(false);
+                  }
+                }}
                 midiKey={`setting:${String(key)}`}
                 testId={`ride-${String(key)}`}
               />

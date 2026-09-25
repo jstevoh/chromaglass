@@ -543,6 +543,17 @@ class FluidSimulation {
    * it is doing, which after a flick are very different numbers.
    */
   plateSpin = 0;
+  /**
+   * The angle the dish is drawn turned to, and how far down from its centre
+   * the plate is still on screen (in plate widths). Gravity is the room's,
+   * not the dish's: set by the frame, read by the step below.
+   */
+  plateAngle = 0;
+  /** The last step's parameters as the solver was given them, for the harness to replay in the lab. */
+  lastStep: GpuStepParams | null = null;
+  /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
+  viewHalfW = 0.33;
+  viewHalfH = 0.21;
   meanDensity = 0; // rolling measure of how full the plate is
   /**
    * The average colour on this layer, 0..1 per channel.
@@ -596,6 +607,27 @@ class FluidSimulation {
     refilling to 124% of what had been there.
   */
   private rbSeq = 0;
+  /**
+   * The dye readback a hand's move must wait for: one copied after its last
+   * move reached the plate.
+   *
+   * Press and Finger move dye by reading how much is under the hand from the
+   * readback mirror, taking it out with a multiply and putting it down
+   * elsewhere. They ran every step, several a frame, and the mirror is a frame
+   * or two old, so each step read the dye the steps before had already moved
+   * and put it down again: the multiply compounded and the deposit repeated.
+   * npm run tools measured it: Finger 159 -> 566 and Press 89 -> 206 against
+   * -4 and -10 for the same pool left alone. Now each acts once per reading
+   * that already includes its last move, and takes more when it does.
+   */
+  private dyeMoveAfter = 0;
+  private dyeMirrorCurrent(): boolean {
+    return !!this.gpu && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
+  }
+  private dyeMoved(): void {
+    // The next copy issued may be taken before this step's deltas are flushed, so the one after it.
+    if (this.gpu) this.dyeMoveAfter = this.gpu.rbDyeIssued + 2;
+  }
   private rimSeq = -1;
   /*
     Whether the attached solver has handed anything back yet, and what it was
@@ -885,7 +917,7 @@ class FluidSimulation {
    * halves read the same mirror.
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
-    if (!this.gpu) return;
+    if (!this.gpu || !this.dyeMirrorCurrent()) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
     const R = Math.max(2, radius);
@@ -905,7 +937,9 @@ class FluidSimulation {
     let mass = 0, aR = 0, aG = 0, aB = 0;
     // How much of what is under the palm goes, this press. A share rather
     // than all of it: a hand squeezes the film thin, it does not scrape it.
-    const take = Math.max(0, Math.min(0.6, amount * 12));
+    // Once per current reading now (see dyeMoveAfter), a few frames apart, so a
+    // bigger share each time for the same press.
+    const take = Math.max(0, Math.min(0.6, amount * 48));
     for (const i of disc) {
       const i4 = i * 4;
       const v = dye[i4 + 3];
@@ -924,6 +958,7 @@ class FluidSimulation {
       this.density[i] += mass * w;
       this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
     }
+    this.dyeMoved();
   }
 
   /**
@@ -1423,13 +1458,28 @@ class FluidSimulation {
       }
 
       case 'classic': {
-        const positions: [number, number][] = [
-          [0.22, 0.22], [0.78, 0.22], [0.50, 0.50],
-          [0.22, 0.78], [0.78, 0.78], [0.35, 0.50], [0.65, 0.50],
-        ];
-        positions.forEach(([fx, fy], idx) => {
+        /*
+          Luminous, not thick, and on the screen.
+
+          Seven blobs 2.5 deep, four of them at the plate's corners: the
+          corners are off the screen (it shows the middle two thirds across
+          and less than half down), and 2.5 is deep enough that light through
+          the dye (Beer–Lambert) comes out near black. The gallery's Classic
+          was a grey plate with dark rings where the three middle blobs were,
+          lit only at their rims, for its first forty seconds and more; it
+          only came alive once something spread the dye thin. So a ring of
+          lighter blobs round the middle, where the screen is, and the
+          corners as they were, thinner.
+        */
+        const blobs: [number, number, number][] = [[0.5, 0.5, 11]];
+        for (let i = 0; i < 6; i++) {
+          const a = i * Math.PI / 3 + 0.3;
+          blobs.push([0.5 + Math.cos(a) * 0.19, 0.5 + Math.sin(a) * 0.15, 9 + (i % 2) * 2]);
+        }
+        blobs.push([0.22, 0.22, 16], [0.78, 0.22, 16], [0.22, 0.78, 16], [0.78, 0.78, 16]);
+        blobs.forEach(([fx, fy, rad], idx) => {
           const c = col(idx);
-          this.splatBlob(fx * S, fy * S, 18, 2.5, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, rad, 1.1, c.r, c.g, c.b);
         });
         break;
       }
@@ -1460,19 +1510,6 @@ class FluidSimulation {
             this.splatBlob(x, y, 2.5, 2.0, c.r, c.g, c.b);
           }
         }
-        break;
-      }
-
-      case 'lava-lamp': {
-        const blobs: [number, number, number][] = [
-          [0.3, 0.75, 22], [0.7, 0.80, 18], [0.5, 0.60, 25], [0.4, 0.45, 15], [0.6, 0.35, 12],
-        ];
-        blobs.forEach(([fx, fy, rad], idx) => {
-          const c = col(idx);
-          this.splatBlob(fx * S, fy * S, rad, 3.0, c.r, c.g, c.b);
-          this.addTemp(Math.floor(fx * S), Math.floor(fy * S), 3.0);
-        });
-        for (let i = 5; i < S - 5; i += 3) this.addTemp(i, Math.floor(S * 0.85), 1.5);
         break;
       }
 
@@ -2006,7 +2043,8 @@ class FluidSimulation {
       Dye is taken from behind the finger and put in front of it, conserving
       because both halves read the same mirror.
     */
-    this.carryDye(x, y, r, ux, uy, Math.min(0.45, strength * 4));
+    // More per act than it was: it acts once per current reading, not every step.
+    this.carryDye(x, y, r, ux, uy, Math.min(0.75, strength * 8));
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
@@ -2018,7 +2056,8 @@ class FluidSimulation {
    * because both are read from the same mirror in the same pass.
    */
   private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): void {
-    if (!this.gpu) return;
+    if (!this.gpu || !this.dyeMirrorCurrent()) return;
+    let moved = false;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
     // A short hop: far enough to read as carried, short enough that the dye
@@ -2040,6 +2079,7 @@ class FluidSimulation {
         const w = take * (1 - Math.sqrt(d2) / r);
         if (!(w > 1e-4)) continue;
         this.dirty = true;
+        moved = true;
         this.mul[si] *= 1 - w;
         this.density[ti] += amount * w;
         this.densityR[ti] += dye[s4] * w;
@@ -2047,6 +2087,7 @@ class FluidSimulation {
         this.densityB[ti] += dye[s4 + 2] * w;
       }
     }
+    if (moved) this.dyeMoved();
   }
 
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
@@ -2331,6 +2372,7 @@ class FluidSimulation {
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
+    this.lastStep = p;
 
     if (this.gpu) {
       const applied = this.dirty;
@@ -2445,6 +2487,28 @@ class FluidSimulation {
    * Everything one step needs, derived once from settings and audio so the CPU
    * and GPU solvers run from the same numbers.
    */
+  /**
+   * Downhill, in the plate, for a tilt pointing `degrees` round the screen
+   * (0 the top, 90 right, 180 the bottom, 270 left).
+   *
+   * The camera looks straight down, so the screen has no "up": the tilt is
+   * which edge of the plate stands propped, and it belongs to the stage, not
+   * the dish, so it stays put while the dish turns under it. The screen is
+   * the plate turned by `plateAngle` (uvToFluid in wgsl/plate.ts), so the
+   * screen direction is turned back by it. The reach is how far the screen
+   * extends that way from the centre: the lamp sits just past it.
+   */
+  private downhill(degrees: number): { gravityX: number; gravityY: number; gravityReach: number } {
+    const t = (Number.isFinite(degrees) ? degrees : 180) * Math.PI / 180;
+    const dx = Math.sin(t), dy = Math.cos(t);
+    const c = Math.cos(this.plateAngle), s = Math.sin(this.plateAngle);
+    return {
+      gravityX: dx * c + dy * s,
+      gravityY: -dx * s + dy * c,
+      gravityReach: Math.abs(dx) * this.viewHalfW + Math.abs(dy) * this.viewHalfH,
+    };
+  }
+
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
@@ -2710,6 +2774,7 @@ class FluidSimulation {
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
+      ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
@@ -3624,6 +3689,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Where the finger and the streak last acted, consumed each step.
+   *
+   * They took their direction from the pointer's move between the last two
+   * mouse events, and the plate steps several times a frame with no event
+   * while the pointer is still: so the last move was applied again every
+   * step for as long as the button was held, and a finger that had stopped
+   * went on pushing the liquid. This is the move since the tool last acted.
+   */
+  const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
   const lastBass01Ref = useRef(0); // for beat edge detection
@@ -3843,6 +3918,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const magnetWalkAtRef = useRef(0);
   /** The settings handed to the lead plate's step, with the magnet where it is now. */
   const magnetStepRef = useRef<Record<string, unknown>>({});
+  /** What the lead plate's magnet was last given, for the harness: where, how strong, and whether a hand held it. */
+  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; held: boolean; field: number } | null>(null);
   /** The maze field's kick envelope: 1 on a kick, falling over about a second (see magnetFor). */
   const mazeKickRef = useRef({ env: 0, at: 0 });
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
@@ -4531,6 +4608,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
         }
         if (!held && !walks) {
+          // Said as it is, so the harness does not read the last held magnet
+          // as still held once the hand has gone stale.
+          lastMagnetRef.current = { x: look.magnetX ?? 0.5, y: look.magnetY ?? 0.5, strength, height: look.magnetHeight ?? 0.25, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
@@ -4548,6 +4628,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
+        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
         return Object.assign(magnetStepRef.current, look, {
           magnetX: Math.max(0.05, Math.min(0.95, mx)),
           magnetY: Math.max(0.05, Math.min(0.95, my)),
@@ -5028,7 +5109,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // ── Manual injection ───────────────────────────────────
           // The dropper's clock runs while it is held and starts again at 0 on
           // the next press, so every press lands a drop at once.
-          if (!isMouseDownRef.current) dropClockRef.current = 0;
+          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; }
           else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
           if (isMouseDownRef.current && drainFrameRef.current === 0) {
             const { x, y } = mousePosRef.current;
@@ -5036,6 +5117,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
               const tool = activeToolRef.current;
               const liq = selectedLiquidRef.current;
+              const strokeFrom = strokeLastRef.current ?? { x, y };
+              const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
+              strokeLastRef.current = { x, y };
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
               const heat = liq?.heatAmount ?? 0.05;
               // Whatever lands on the lead plate lands on its bubbles too:
@@ -5088,9 +5172,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   the same way the directed blow takes its. A finger standing
                   still does nothing, which is right — you mix by moving.
                 */
-                const fdx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? mousePosRef.current.x);
-                const fdy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? mousePosRef.current.y);
-                af.fingerDrag(x, y, 7, 0.09, fdx, fdy);
+                af.fingerDrag(x, y, 7, 0.09, strokeDx, strokeDy);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
@@ -5143,15 +5225,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                     const w = (1 - dd / pourR) ** 1.5;
                     af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                    af.addVelocity(nx, ny, 0, 0.12 * w); // downward gravity
+                    /*
+                      Spreading from where it lands. This pushed toward the
+                      plate's +y as "downward gravity", but the camera looks
+                      straight down: a stream poured from above lands and
+                      runs outward, and any downhill is Gravity's, not the
+                      pour's.
+                    */
+                    if (dd > 0) af.addVelocity(nx, ny, ddx / dd * 0.12 * w, ddy / dd * 0.12 * w);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
 
               } else if (tool === 'streak') {
                 // Thin high-velocity smear along mouse movement direction
-                const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
-                const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+                const mvx = strokeDx, mvy = strokeDy;
                 const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
                 const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
                 const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
@@ -5648,8 +5736,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
             if (R > 0 && kickStep) {
-              rock.vx += Math.cos(rock.phase) * bass01 * 7 * R;
-              rock.vy += Math.sin(rock.phase) * bass01 * 7 * R;
+              // Twice what it was: at full, with the band playing, the rock
+              // showed on 7 looks of 24 (npm run controls). A ride at full
+              // should be unmistakable.
+              rock.vx += Math.cos(rock.phase) * bass01 * 14 * R;
+              rock.vy += Math.sin(rock.phase) * bass01 * 14 * R;
               rock.phase += 2.4;   // successive kicks go different ways
             }
             // The rhythm plate: on a kick the projectionist presses the top
@@ -5662,7 +5753,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const cy = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
-                const a = 0.0012 * squeezeAmt * bass01;
+                // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
+                const a = 0.0024 * squeezeAmt * bass01;
                 const fg = currentSettings.fingering ?? 0;
                 leadPlate.applySquish(cx, cy, 40, a, fg, true);
                 leadPlate.applySquish(cx, cy, 27, a, fg);
@@ -5920,6 +6012,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const turn = (spinVelRef.current[l] ?? 0) * realDt;
             if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
+            const fl = fluidsRef.current[l];
+            if (fl) {
+              fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
+              const drawn = Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
+              fl.viewHalfW = 0.5 * canvas.clientWidth / drawn;
+              fl.viewHalfH = 0.5 * canvas.clientHeight / drawn;
+            }
           }
         }
 
@@ -6018,7 +6117,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (acc >= peakCount && peakBin === FILM_BINS - 1) peakBin = b;
             if (acc >= paintCount) { levelBin = b; break; }
           }
-          const level = levelBin / FILM_BIN_SCALE;
+          let level = levelBin / FILM_BIN_SCALE;
+          /*
+            Never above what is in the frame.
+
+            The level is the plate's: where its densest seventh begins. Zoomed
+            far in, the frame is a small patch of that plate, and on a look
+            that fills evenly the patch can sit wholly under the level, so all
+            of it rendered as bare ground. Measured (npm run controls), Macro
+            Zoom at 16 turned Poster 1969, Fractal Dream and Clock Glass black.
+            So the level stays under the patch actually being shown.
+          */
+          if (macroOn) {
+            const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
+            const hx = 0.5 * canvas.width / maxDim / Math.max(1, shot.zoom);
+            const hy = 0.5 * canvas.height / maxDim / Math.max(1, shot.zoom);
+            let inView = 0, n = 0;
+            for (let sj = -3; sj <= 3; sj++) {
+              for (let si = -3; si <= 3; si++) {
+                const gx = Math.floor((shot.cx + si / 3 * hx) * GRID_SIZE);
+                const gy = Math.floor((shot.cy + sj / 3 * hy) * GRID_SIZE);
+                if (gx < 0 || gy < 0 || gx >= GRID_SIZE || gy >= GRID_SIZE) continue;
+                inView += Math.max(0, f0.readDensity[gx + gy * GRID_SIZE]);
+                n++;
+              }
+            }
+            if (n > 0) level = Math.min(level, 0.6 * inView / n);
+          }
           // Floor the spread: a nearly flat histogram would otherwise produce a
           // huge gain and a hard-edged, binary-looking frame.
           const peak = Math.max(level + 0.35, peakBin / FILM_BIN_SCALE);
@@ -6244,6 +6369,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The phrasing, so a check can watch the signal rather than guess from
         // the picture whether it is arriving.
         phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
+        /** Where the pointer is on the plate, in grid cells: where a tool acts. */
+        pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
+        /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
+        kicks: () => kickCountRef.current,
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,
@@ -7024,6 +7153,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The second phase (H7), for the harness. */
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
+          magnetNow: () => lastMagnetRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
@@ -7176,8 +7306,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       if (!activeFluid) return;
+      /*
+        The magnet in the hand moves no liquid itself: the pull does. This
+        pressed the glass under the pointer and stirred along its path on
+        every move, whatever the tool, and under the magnet that press spread
+        the ferrofluid into a ring round the hand and the stir swept it on.
+        Measured by npm run magnet on the app's own step replayed in the lab:
+        the magnet alone gathers 46 to 275 at the hand, and in the app the
+        hand's spot emptied (187 to 108) while a ring 0.15-0.2 out filled.
+      */
+      if (activeToolRef.current === 'magnet') return;
+      /*
+        And only while the button is down. This ran on every move, so moving
+        the mouse across the plate to reach a control pressed and stirred the
+        picture on the wall without anything having been clicked.
+      */
+      if (!isMouseDownRef.current) return;
       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        activeFluid.applySquish(x, y, 8, 0.005);
+        /*
+          Not under the Finger either: it carries the dye it touches
+          (carryDye) and does not press the glass. A press here is a squeeze-
+          film source, a flow that spreads out from under it, and dye
+          advected through a spreading flow is copied over more plate than it
+          came from: a stroke is thirty of these, and npm run tools measured
+          the Finger adding dye (512 -> 1484 against +216 left alone) after
+          its own carry had been made to conserve.
+        */
+        if (activeToolRef.current !== 'finger') activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
         const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
         const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
@@ -7203,7 +7358,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
-      if (activeFluid && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+      // Not under the magnet or the finger, as for the mouse above.
+      if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
       }
     };

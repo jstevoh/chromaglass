@@ -733,7 +733,11 @@ try {
     // first, so this measures the camera rather than the plate's state.
     await page.evaluate(() => window.chromaglassAction?.('seed'));
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
-    await settle(1800);
+    // Longer than the seed's own burst: fresh blobs spread fast for a few
+    // seconds, and measured inside that the drift read 18.7 (against 4.0 on
+    // a settled plate) once Classic opened lit rather than dark, and a zoom
+    // that moved the picture 73.7 failed the 4x margin.
+    await settle(4500);
     const plate = await frame();
 
     // The plate goes on moving under all of this, so measure how far it
@@ -786,9 +790,12 @@ try {
   {
     await clickOn('settings-nav-mark');
     await settle(300);
-    // Eight magenta pixels. Magenta because nothing the plate does on its own
-    // is full red and full blue with no green at all, so finding it on the
-    // canvas cannot be the liquid having a moment.
+    // Eight magenta pixels: full red and full blue with no green. The plate
+    // can make that too — Classic's pink, lit thin rather than drowned, read
+    // as 7.5% of the frame here, carried into Crowd Plate by the look change,
+    // which keeps the dye. So "no mark" is measured with the lamp out
+    // (`unlit`): the dimmer blacks the plate and leaves the mark, which is
+    // its own check below, and then only the mark can be magenta.
     const MAGENTA_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGP4z/D/Pz7MMDIUAACD5r9BB2dd7wAAAABJRU5ErkJggg==';
     const magentaShare = () => page.evaluate(async () => {
       const d = await window.__cgFrame(160, 90);
@@ -800,7 +807,14 @@ try {
       return n / (d.length / 4);
     });
 
-    const before = await magentaShare();
+    const set = (patch) => page.evaluate((p) => window.chromaglassSettings?.(p), patch);
+    const unlit = async (ok) => {
+      await set({ dimmer: 0 });
+      const v = await reaches(magentaShare, ok);
+      await set({ dimmer: 1 });
+      return v;
+    };
+    const before = await unlit(v => v < 0.02);
     await page.setInputFiles('#mark-file', {
       name: 'mark.png', mimeType: 'image/png', buffer: Buffer.from(MAGENTA_PNG, 'base64'),
     });
@@ -826,13 +840,13 @@ try {
 
     // Its own opacity is the control for taking it off, and it has to reach 0.
     await page.evaluate(() => window.chromaglassSettings?.({ markMix: 0 }));
-    const faded = await reaches(magentaShare, v => v < 0.02);
+    const faded = await unlit(v => v < 0.02);
     check('and its opacity takes it off', faded < 0.02, `${(faded * 100).toFixed(1)}% left`);
     await page.evaluate(() => window.chromaglassSettings?.({ markMix: 1 }));
     await reaches(magentaShare, v => v > 0.15);
 
     await clickOn('mark-clear');
-    const cleared = await reaches(magentaShare, v => v < 0.02);
+    const cleared = await unlit(v => v < 0.02);
     check('and taking it off leaves nothing behind', cleared < 0.02, `${(cleared * 100).toFixed(1)}% left`);
   }
 

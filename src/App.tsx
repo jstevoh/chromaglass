@@ -99,6 +99,8 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
+/** Random Evolve's drift lands over four seconds in this many steps. */
+const DRIFT_GLIDE_STEPS = 20;
 const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
@@ -287,6 +289,9 @@ export default function App() {
     */
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
       (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+    // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
+    (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
+      (tool: typeof activeTool) => { setActiveTool(tool); };
     /*
       Put a track from the shelf on, from outside.
 
@@ -420,9 +425,9 @@ export default function App() {
     reason the panel was the only place most of the app existed.
   */
   const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('perform', DEFAULT_RIDES));
-  useEffect(() => { savePins('perform', rideKeys); }, [rideKeys]);
+  useEffect(() => { savePins('perform', rideKeys, DEFAULT_RIDES); }, [rideKeys]);
   const [recipeKeys, setRecipeKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('design', DEFAULT_RECIPE));
-  useEffect(() => { savePins('design', recipeKeys); }, [recipeKeys]);
+  useEffect(() => { savePins('design', recipeKeys, DEFAULT_RECIPE); }, [recipeKeys]);
   /** Put a control on a surface, or take it off, from the settings panel. */
   const pinSetting = useCallback((desk: DeskSurface, key: keyof VisualizerSettings, on: boolean) => {
     const set = desk === 'perform' ? setRideKeys : setRecipeKeys;
@@ -1152,10 +1157,20 @@ export default function App() {
     a reference reaching forward past four hundred lines.
   */
   const driftAnchor = useRef(settings);
+  /** The drift's moves in flight: each dial from where it was to where it is going, and how far along. */
+  const driftGlide = useRef(new Map<string, { from: number; to: number; at: number }>());
 
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
+    /*
+      A hand's move is where the drift wanders from now on (lib/drift.ts).
+      The drift holds each dial inside a window round its anchor, and the
+      anchor was the look as laid, so a ride pushed past the window was
+      pulled back on the next drift: reported as the sliders jumping.
+    */
+    driftAnchor.current = { ...driftAnchor.current, ...newSettings };
+    for (const k of Object.keys(newSettings)) driftGlide.current.delete(k);
   };
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
@@ -1339,12 +1354,35 @@ export default function App() {
       driftAnchor.current = settingsRef.current;
       return;
     }
+    /*
+      Glided, not stepped. Each drift used to land in one frame, so a ride on
+      the desk visibly jumped every six seconds and the plate lurched with
+      it. The move is now spread over four seconds in small steps; a dial a
+      hand takes in the meantime is dropped from the glide (updateSettings),
+      and the hand wins.
+    */
     const id = setInterval(() => {
       const rate = settingsRef.current.automateRate ?? 0.12;
-      const patch = driftLook(settingsRef.current, driftAnchor.current, rate);
-      if (Object.keys(patch).length) updateSettings(patch);
+      const patch = driftLook(settingsRef.current, driftAnchor.current, rate) as Record<string, number>;
+      for (const [k, to] of Object.entries(patch)) {
+        const from = (settingsRef.current as unknown as Record<string, number>)[k];
+        if (typeof from === 'number' && Number.isFinite(to)) driftGlide.current.set(k, { from, to, at: 0 });
+      }
     }, 6000);
-    return () => clearInterval(id);
+    const glide = setInterval(() => {
+      if (driftGlide.current.size === 0) return;
+      const step: Record<string, number> = {};
+      for (const [k, g] of driftGlide.current) {
+        g.at = Math.min(1, g.at + 1 / DRIFT_GLIDE_STEPS);
+        const e = g.at * g.at * (3 - 2 * g.at);
+        step[k] = g.from + (g.to - g.from) * e;
+        if (g.at >= 1) driftGlide.current.delete(k);
+      }
+      // Not through updateSettings: that is a hand, and re-anchors.
+      setSettings(prev => ({ ...prev, ...step }));
+      setDocDirty(true);
+    }, 4000 / DRIFT_GLIDE_STEPS);
+    return () => { clearInterval(id); clearInterval(glide); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
 
@@ -2146,6 +2184,7 @@ export default function App() {
       case 'blackout-toggle': toggleBlackout(); break;
       case 'scene-toggle':    toggleScene(!sceneOn); break;
       case 'record-toggle':   toggleRecording(); break;
+      case 'performance-toggle': togglePerformance(); break;
       // Cue and Go, from a pad. `go` is the whole reason the desk's look
       // change is safe in front of a room, and until now it was reachable
       // only from this laptop's keyboard.
@@ -2267,6 +2306,7 @@ export default function App() {
             case 'preset-prev':   stepPreset(-1); break;
             case 'blackout-toggle': toggleBlackout(); break;
             case 'record-toggle': toggleRecording(); break;
+            case 'performance-toggle': togglePerformance(); break;
             case 'go':            goLook(); break;
             case 'back':          revertLook(); break;
             // A phone may be a newer build than the display, so an action
@@ -2435,7 +2475,7 @@ export default function App() {
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
       paletteColor: (i) => PALETTE_RGB[i] ?? null,
-      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording },
+      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording, performance: !!musicIntel.performance.live },
     },
     allPresetIds,
     // The tempo, if the desk is sending it. Straight into the tempo source:
@@ -3873,6 +3913,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onPhone={deskOpen.phone}
           onPerformance={togglePerformance}
+          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
@@ -3982,6 +4023,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onPhone={deskOpen.phone}
           onPerformance={togglePerformance}
+          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />

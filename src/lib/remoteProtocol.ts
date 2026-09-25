@@ -58,7 +58,9 @@ export type RemoteAction =
   | 'go'
   | 'back'
   /** Record the show to a video file / stop. */
-  | 'record-toggle';
+  | 'record-toggle'
+  /** Start or stop recording a performance: what is painted, with the song playing. */
+  | 'performance-toggle';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
