@@ -6265,6 +6265,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The phrasing, so a check can watch the signal rather than guess from
         // the picture whether it is arriving.
         phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
+        /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
+        kicks: () => kickCountRef.current,
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,

@@ -98,11 +98,12 @@ try {
   for (const id of looks) {
     const page = await browser.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
     /*
-      With the simulated band playing, as a show is. The first run was
-      silent, and a silent plate is a different app: the looks the music
-      pours (Stardust Collapse) drained to black, and every ride that follows
-      the beat (Beat Squeeze, Plate Rock, Sound Drive, Tempo Sync) read as
-      doing nothing because there was no beat.
+      With the simulated band playing, as a show is, chosen outright rather
+      than left to the first-visit gesture. A silent plate is a different
+      app: the looks the music pours drain, and the rides that follow the
+      beat (Beat Squeeze, Plate Rock, Sound Drive, Tempo Sync) have nothing
+      to follow. How many kicks each look heard is logged, so a run that
+      says a beat ride does nothing also says whether there was a beat.
     */
     await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await installFrameReader(page);
@@ -133,6 +134,8 @@ try {
     const readAfter = async (keep) => { await page.waitForTimeout(WAIT); return read(keep); };
 
     // The look's own drift, with nothing touched: the noise every effect is judged against.
+    const kicks = () => page.evaluate(() => window.chromaglassDebug?.().kicks?.() ?? -1);
+    const kicks0 = await kicks();
     const idle = [];
     for (let k = 0; k < 4; k++) idle.push(await readAfter(k === 0 ? 'base' : null));
     if (idle.some((r) => !r)) { console.log(`  ${id}: could not photograph`); await page.close(); continue; }
@@ -142,8 +145,10 @@ try {
       for (let k = 1; k < idle.length; k++) d = Math.max(d, Math.abs(idle[k][m] - idle[k - 1][m]));
       noise[m] = d;
     }
-    const lookRow = { id, noise, base: idle[0], controls: [] };
-    console.log(`  ${id}: luma ${idle[0].luma.toFixed(3)} colours ${(idle[0].colours * 100).toFixed(0)}% flat ${(idle[0].flat * 100).toFixed(0)}% motion ${idle[0].motion.toFixed(4)} detail ${idle[0].detail.toFixed(4)}`);
+    // Four readings a WAIT apart: at 122 bpm the band should have kicked a dozen times.
+    const heard = (await kicks()) - kicks0;
+    const lookRow = { id, noise, base: idle[0], kicks: heard, controls: [] };
+    console.log(`  ${id}: ${heard} kicks heard, luma ${idle[0].luma.toFixed(3)} colours ${(idle[0].colours * 100).toFixed(0)}% flat ${(idle[0].flat * 100).toFixed(0)}% motion ${idle[0].motion.toFixed(4)} detail ${idle[0].detail.toFixed(4)}`);
 
     for (const key of keys) {
       const spec = PIN_RANGE.get(key);
