@@ -20,10 +20,11 @@
  * bubble on it: a bead merging or a drip landing in the window. An echo of
  * the hand comes back every time; those do not.
  *
- * The Press echoes on the reported plate (the same cell, the hand's mirror
- * top to bottom on the screen, three runs out of three), so its variants
- * switch one suspect off at a time — the plate's turn, the bubbles, the
- * beads, the output pass — and a failure says which one it follows.
+ * The echo itself was the derive pass lighting each plate's relief from its
+ * mirror (npm run derive pins that, in the lab): it showed here as the calm
+ * Classic lead plate changing at the hand's mirror, 35 to 53 against a drift
+ * of 15, and after the fix 1.5 against 1.9. So the calm plate is what this
+ * judges, turned and not turned.
  *
  *   node scripts/mirror.mjs        (needs a WebGPU browser: CI's macOS runner)
  */
@@ -58,18 +59,19 @@ const REPORTED_OUTPUT = {
 };
 const PLAIN_OUTPUT = { ...REPORTED_OUTPUT, gain: 1, gamma: 1 };
 const TIMBRE = { look: 'timbre-shifter', rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} };
+// Judged: the calm plate, where anything the hand did not do stands out.
+// Printed only (judge: false): the reported plate, which moves by itself far
+// more than a drop does (a drift of 40-160 a cell against 1-5 on Classic, so
+// its averaged maps still swing by a few tens), and the Press, which by
+// design moves the whole plate: the liquid it squeezes out has to go
+// somewhere (30-100 a cell against a drift of 3-8, everywhere). Neither is an
+// echo; both are kept on the record next to the cells an echo would light.
 const SCENARIOS = [
   { name: 'Classic, calm, layer 1', look: 'classic', layer: 0, rotation: [0, 0], settings: { layerCount: 2 } },
   { name: 'Classic, calm, layer 2', look: 'classic', layer: 1, rotation: [0, 0], settings: { layerCount: 2 } },
-  { ...TIMBRE, name: 'Timbre Shifter as reported, layer 1', layer: 0 },
-  { ...TIMBRE, name: 'Timbre Shifter as reported, layer 2', layer: 1 },
-  { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press' },
-  { ...TIMBRE, name: 'the Press, plate not turned', layer: 0, tool: 'press', rotation: [0, 0.75] },
-  { ...TIMBRE, name: 'the Press, no beads', layer: 0, tool: 'press', settings: { beads: 0 } },
-  { ...TIMBRE, name: 'the Press, no output pass', layer: 0, tool: 'press', output: PLAIN_OUTPUT },
-  { ...TIMBRE, name: 'the Press, layer 2', layer: 1, tool: 'press' },
-  // Does pressing the front glass press the second plate too, turned its own way?
-  { ...TIMBRE, name: 'the Press, one plate only', layer: 0, tool: 'press', settings: { layerCount: 1 } },
+  { name: 'Classic, calm, layer 1 turned a quarter', look: 'classic', layer: 0, rotation: [4.73, 0], settings: { layerCount: 2 } },
+  { ...TIMBRE, name: 'Timbre Shifter as reported, layer 1', layer: 0, judge: false },
+  { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press', judge: false },
 ];
 
 const browser = await launchChromium(chromium);
@@ -164,8 +166,13 @@ try {
       }).join(''));
     }
     const worst = away[0];
-    check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
+    if (sc.judge !== false) check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
       `${here.toFixed(1)} round the hand`);
+    if (sc.judge === false) {
+      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
+      await page.close();
+      continue;
+    }
     check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
       worst ? `most away from the hand ${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand` : 'nothing');
     await page.close();
