@@ -25,7 +25,8 @@
  * The plate is chaotic, so nothing here compares pixels: each reading is a
  * handful of numbers about the whole frame, and each look first has its own
  * drift measured with nothing touched, which is the noise every effect is
- * judged against.
+ * judged against. The simulated band plays throughout, because a show has
+ * music and half the rides follow it.
  *
  * Writes controls/<mode>-<shard>.json and a sheet per look (controls/<look>.jpg)
  * with the look as it was and at each control's far end, side by side.
@@ -96,6 +97,14 @@ try {
   console.log(`  ${MODE}: ${keys.length} controls × ${looks.length} looks (shard ${shardI}/${shardN}), ${WAIT} ms a reading\n`);
   for (const id of looks) {
     const page = await browser.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
+    /*
+      With the simulated band playing, as a show is. The first run was
+      silent, and a silent plate is a different app: the looks the music
+      pours (Stardust Collapse) drained to black, and every ride that follows
+      the beat (Beat Squeeze, Plate Rock, Sound Drive, Tempo Sync) read as
+      doing nothing because there was no beat.
+    */
+    await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await installFrameReader(page);
     await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=${id}${engineQuery()}`, { waitUntil: 'load' });
     await page.mouse.click(8, 8);   // the gesture the band needs: the rides that follow the beat need a beat
@@ -143,19 +152,34 @@ try {
       const v0 = v0raw;
       // The far end of the range from where the look has it.
       const far = Math.abs(spec.max - v0) >= Math.abs(v0 - spec.min) ? spec.max : spec.min;
+      /*
+        Evolve Speed does nothing with Random Evolve off, so the desk's ride
+        switches it on when raised from zero and off at zero (PerformDesk).
+        The harness does what the ride does.
+      */
+      const evolve = key === 'automateRate';
       const a0 = await read();
       await set({ [key]: far });
-      const b1 = await readAfter(null);
+      if (evolve) await page.evaluate(() => window.chromaglassAction?.('automate-toggle'));
+      await page.waitForTimeout(WAIT);
       const b2 = await readAfter('far');
       const nanAtFar = await health();
       await set({ [key]: v0 });
+      if (evolve) await page.evaluate(() => window.chromaglassAction?.('automate-toggle'));
       const a1 = await readAfter(null);
-      if (!a0 || !b1 || !b2 || !a1) continue;
+      if (!a0 || !b2 || !a1) continue;
       let best = null;
+      /*
+        Judged where it has got to (b2), against the look's own drift. The
+        first version also demanded two readings at the far end agree, and a
+        control that glides there (Macro Zoom, a dolly over seconds) was
+        still moving between them, so a plainly different picture read as
+        "nothing".
+      */
       for (const m of METRICS) {
-        const b = (b1[m] + b2[m]) / 2;
+        const b = b2[m];
         const d = Math.abs(b - a0[m]);
-        const threshold = Math.max(FLOOR[m], 2 * noise[m], 1.5 * Math.abs(b1[m] - b2[m]));
+        const threshold = Math.max(FLOOR[m], 2 * noise[m]);
         const score = d / threshold;
         if (!best || score > best.score) {
           const back = d > 0 ? 1 - Math.abs(a1[m] - a0[m]) / d : 1;
@@ -165,8 +189,9 @@ try {
       const visible = best.score >= 1;
       const reversible = !visible || best.back >= 0.4;
       const faults = [];
+      // The dimmer's far end is a blackout, which is what it is for.
       if (b2.luma < 0.015 && key !== 'dimmer') faults.push('black');
-      if (b2.flat > 0.85) faults.push('flat');
+      if (b2.flat > 0.85 && key !== 'dimmer') faults.push('flat');
       if (nanAtFar > 0) faults.push(`NaN×${nanAtFar}`);
       const row = { key, label: spec.label, v0, far, visible, reversible, faults, ...best, thumb: b2.thumb };
       lookRow.controls.push(row);
