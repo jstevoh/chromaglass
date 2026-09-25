@@ -129,6 +129,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
     terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction' },
+  // The bottles themselves: design one, load one from a file, save them.
+  { id: 'liquids', name: 'Liquids', category: 'plate',
+    terms: 'liquid liquids bottle bottles shelf custom design make create own import upload load export save file json ferrofluid magnetic oil water soap polarity weight' },
   { id: 'interaction', name: 'Manual Interaction', category: 'plate',
     terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency drop height fall splash impact crown satellite droplets' },
 

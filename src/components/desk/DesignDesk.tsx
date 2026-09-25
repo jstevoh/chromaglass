@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { ToolAmount } from '../ToolAmount';
 import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
@@ -47,6 +48,9 @@ export interface DesignDeskProps {
 
   tool: string;
   onTool: (t: string) => void;
+  /** How much the tool in hand does (ToolAmount). */
+  toolAmount?: number;
+  onToolAmount?: (v: number) => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -330,13 +334,20 @@ export function DesignDesk(p: DesignDeskProps) {
           </span>
         </div>
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
-        <div className="mt-3 flex h-9 shrink-0 items-center">
+        {/*
+          The tools, and the Amount beside them when there is room and on a
+          line of its own when there is not: squeezed into what the tools left
+          at 1280 it was a sliver (reported). Wrapping, the row is no wider
+          than its widest item, so it cannot push the preview narrower.
+        */}
+        <div className="mt-3 flex min-h-9 shrink-0 flex-wrap items-center gap-y-2">
           <Segmented
             value={p.tool}
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
             onChange={p.onTool}
             testId="tool-segmented"
           />
+          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="ml-3 min-w-48 max-w-64 flex-1 text-muted" />}
         </div>
       </section>
 

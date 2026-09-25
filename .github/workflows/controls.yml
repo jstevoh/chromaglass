@@ -13,16 +13,21 @@ name: Controls
 # re-ran it (a PR's paths are its whole diff, so any push matched) and
 # cancelled the run before: the gallery and the checks queued behind it for
 # a runner, and no run of it ever finished while a PR was being worked on.
+# Or on a pull request by labelling it `controls`: once per labelling, not
+# per push (remove and add the label again to re-run).
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 concurrency:
-  group: controls-${{ github.ref }}
+  group: controls-${{ github.ref }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:
   controls:
     name: Controls ${{ matrix.mode }} ${{ matrix.shard }}
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'controls'
     runs-on: macos-15
     timeout-minutes: 60
     strategy:

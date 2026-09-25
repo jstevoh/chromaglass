@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, valueAt, travelOf, type FactoryMapId } from '../lib/midi';
@@ -8,6 +8,7 @@ import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
+import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
 import { Segmented, Sheet } from './ui';
@@ -133,6 +134,8 @@ interface SettingsPanelProps {
    * top of a panel with seventeen of them.
    */
   focusSection?: string | null;
+  /** The shelf, for the Liquids section: design, load and save liquids (LiquidDesigner). */
+  liquids?: LiquidDesignerProps;
   /** What is already on each desk, and how to put something there. */
   pins?: PinApi;
   /** The controller, for the Controller section and its one-click setup. */
@@ -300,7 +303,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -2339,13 +2342,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         {(settings.macroZoom ?? 1) <= 1.05 && (
           <Info>
-            At 1× this is the whole plate. Push the zoom in and the camera picks a bead and follows it — the exposure,
+            At 1× this is the whole plate. Push the zoom in and the camera goes where it is aimed — the exposure,
             the depth of field and the surface under the dye all arrive with the magnification rather than switching on
             at a threshold. Everything below shapes that closeup and takes effect as you come in.
           </Info>
         )}
         {(settings.macroZoom ?? 1) > 1.05 && (
           <>
+            {/*
+              Who moves the camera. It used to be the camera alone: it picked a
+              subject, held it a few seconds and cut to another, so a closeup
+              could not be kept on anything. Now it goes where it is aimed
+              (Hold), rides what it is aimed at (Follow), or roams (Auto).
+              Alt-drag on the plate pans it and Alt-click fixes it on a spot;
+              Random Evolve wanders the aim when it is on.
+            */}
+            <div className="mb-3">
+              <div className="text-[12px] opacity-60 mb-1">Camera</div>
+              <Segmented
+                value={settings.macroCamera ?? 'hold'}
+                options={[['hold', 'Hold'], ['follow', 'Follow'], ['auto', 'Auto']]}
+                onChange={(v) => onUpdate({ macroCamera: v as 'hold' | 'follow' | 'auto' })}
+              />
+            </div>
+            {(settings.macroCamera ?? 'hold') !== 'auto' && (
+              <>
+                <Slider
+                  label="Macro Aim Across"
+                  value={settings.macroAimX ?? 0.5}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onChange={(v: number) => onUpdate({ macroAimX: v })}
+          settingKey="macroAimX"
+        />
+                <Slider
+                  label="Macro Aim Up"
+                  value={settings.macroAimY ?? 0.5}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onChange={(v: number) => onUpdate({ macroAimY: v })}
+          settingKey="macroAimY"
+        />
+                <Info>
+                  Alt-drag (Option-drag) on the plate pans the camera; Alt-click fixes it on the spot under the pointer.
+                  {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
+                  {' '}With Random Evolve on, the aim wanders slowly.
+                </Info>
+              </>
+            )}
             <Slider
               label="Chase Speed"
               value={settings.macroChase}
@@ -2355,6 +2401,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onChange={(v: number) => onUpdate({ macroChase: v })}
           settingKey="macroChase"
         />
+            {(settings.macroCamera ?? 'hold') === 'auto' && (
             <Slider
               label="Shot Length"
               value={settings.macroHold}
@@ -2364,6 +2411,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               onChange={(v: number) => onUpdate({ macroHold: v })}
           settingKey="macroHold"
         />
+            )}
             <Slider
               label="Music Sync"
               value={settings.macroSync ?? 0.6}
@@ -2809,6 +2857,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ dropHeight: v })}
           settingKey="dropHeight"
         />
+      </section>
+
+      {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
+      <section id="settings-liquids" className={`mb-8 scroll-mt-4 ${shown('liquids') ? '' : 'hidden'} ${focusSection === 'liquids' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="liquids">
+        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <FlaskConical size={12} /> Liquids
+        </h3>
+        {liquids ? <LiquidDesigner {...liquids} /> : <div className="text-[12px] opacity-35">The shelf is not available here.</div>}
       </section>
 
       {/* Fluid Physics Section */}

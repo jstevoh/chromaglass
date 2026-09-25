@@ -775,7 +775,65 @@ try {
     await settle(600);
     const readout = await page.evaluate(() => document.querySelector('[data-testid="macro-zoom-value"]')?.textContent ?? null);
     check('and the frame says how far in it is', readout === '5.0×', `readout ${readout}`);
-    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
+
+    // The camera is the person's: held, it stays where it is aimed, for as
+    // long as it is held. It used to cut to a new subject every few seconds
+    // whatever anyone wanted, and there was no way to keep it on anything.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroCamera: 'hold', macroAimX: 0.35, macroAimY: 0.6 }));
+    await settle(1500);
+    const held = [];
+    for (let i = 0; i < 6; i++) { held.push(await page.evaluate(() => window.chromaglassDebug?.().shot ?? null)); await settle(700); }
+    const worst = Math.max(...held.map((sh) => (sh ? Math.hypot(sh.cx - 0.35, sh.cy - 0.6) : 1)));
+    check('held, the closeup camera stays where it is aimed', worst < 0.03,
+      `${(worst * 100).toFixed(1)}% of the plate from the aim at worst over four seconds`);
+
+    // Alt-click on the plate aims it there, and lays no dye while it does.
+    {
+      // A point off the middle where the plate itself is what the pointer is over.
+      const spot = await page.evaluate(() => {
+        const c = document.getElementById('liquid-canvas');
+        const r = c?.getBoundingClientRect();
+        if (!r) return { x: 0, y: 0, clear: false, over: 'no plate' };
+        const over = [];
+        for (const [fx, fy] of [[0.62, 0.5], [0.4, 0.5], [0.5, 0.35], [0.5, 0.65], [0.62, 0.38], [0.38, 0.62]]) {
+          const x = r.left + r.width * fx, y = r.top + r.height * fy;
+          const el = document.elementFromPoint(x, y);
+          if (el === c) return { x, y, clear: true, over: '' };
+          over.push(el?.dataset?.testid || el?.id || el?.className?.toString().slice(0, 40) || el?.tagName || 'nothing');
+        }
+        return { x: r.left + r.width * 0.62, y: r.top + r.height * 0.5, clear: false, over: [...new Set(over)].join(' | ') };
+      });
+      const before = await page.evaluate(() => window.chromaglassDebug?.().shot ?? null);
+      await page.keyboard.down('Alt');
+      if (spot.clear) await page.mouse.click(spot.x, spot.y);
+      else {
+        // Something is over the plate here (named in the detail): press the
+        // plate itself, so the handler is what is measured.
+        await page.evaluate(({ x, y }) => {
+          const c = document.getElementById('liquid-canvas');
+          const o = { bubbles: true, cancelable: true, clientX: x, clientY: y, altKey: true, button: 0 };
+          c?.dispatchEvent(new MouseEvent('mousedown', o));
+          window.dispatchEvent(new MouseEvent('mouseup', o));
+        }, spot);
+      }
+      await page.keyboard.up('Alt');
+      await settle(300);
+      const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
+      const moved = before && typeof aim.x === 'number' ? Math.hypot(aim.x - 0.35, aim.y - 0.6) : 0;
+      const probe = await page.evaluate(() => window.chromaglassDebug?.().aimProbe ?? null);
+      // Zoomed in five times the frame holds about a seventh of the plate, so a
+      // click this far off the middle moves the aim by about a sixtieth of it:
+      // expected, from where the click was and how far in the camera is.
+      const want = await page.evaluate(({ x, y, zoom }) => {
+        const r = document.getElementById('liquid-canvas').getBoundingClientRect();
+        return Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) / (Math.max(r.width, r.height) * 1.5 * zoom);
+      }, { x: spot.x, y: spot.y, zoom: before?.zoom ?? 5 });
+      check('and an Alt-click on the plate aims it at the spot under the pointer',
+        aim.mode === 'hold' && moved > want * 0.6 && moved < want * 1.6 + 0.01,
+        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(3) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(3) : '?'} (${aim.mode}), moved ${moved.toFixed(4)} against ${want.toFixed(4)} expected` +
+        `; ${spot.clear ? 'clicked' : `pressed the plate directly (over it: ${spot.over})`} at ${Math.round(spot.x)},${Math.round(spot.y)}; the plate saw ${JSON.stringify(probe)}`);
+    }
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false, macroAimX: 0.5, macroAimY: 0.5 }));
     await settle(800);
   }
 

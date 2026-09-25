@@ -1111,6 +1111,7 @@ export const PRESETS: Preset[] = [
     description: 'The camera chases one travelling bead — teal, amber and coral on a deep sea-green ground — cells, lacing and razor edges filling the frame.',
     settings: {
       macroMode: true,
+      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
       macroZoom: 4.5,            // ~28 sim cells across — bead plus its surroundings
       macroChase: 0.55,          // a quick follow with a whip on each cut
       macroHold: 4.5,
@@ -1120,6 +1121,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
+      beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
       globalSpeed: 0.06,
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,
@@ -1170,6 +1172,7 @@ export const PRESETS: Preset[] = [
     description: 'Packed rings of paint cells — dark cores in bright magenta and lavender halos — breathing across a magnified violet pool.',
     settings: {
       macroMode: true,
+      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
       macroZoom: 3.5,
       macroChase: 0.45,          // slower drift — this one lingers on a pool
       macroHold: 7.0,
@@ -1229,6 +1232,7 @@ export const PRESETS: Preset[] = [
     description: 'A tongue of amber dye spreading over dark red ground, dragging black dendritic lacing behind it; the camera cuts on the kick.',
     settings: {
       macroMode: true,
+      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
       macroZoom: 4.0,
       macroChase: 0.7,           // the liveliest of the three
       macroHold: 4.0,            // short takes

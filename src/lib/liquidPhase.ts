@@ -50,6 +50,8 @@ export interface LiquidDeposit {
     CPU reads it: it goes to the GPU's mix, through `onDeposit`.
   */
   acid?: number;
+  /** Ferrofluid, into the GPU's second phase through `onDeposit`; nothing here reads it. */
+  magnetic?: number;
 }
 
 /**

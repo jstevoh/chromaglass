@@ -108,6 +108,18 @@ interface LiquidVisualizerProps {
   filmSenseRef?: React.MutableRefObject<SceneReading | null>;
   /** Called (throttled) while the user paints — feeds performance recording. */
   onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
+  /**
+   * A hand on the closeup camera: Alt-drag on the plate pans it, Alt-click
+   * fixes it on the spot under the pointer. Plate uv (0-1), where the camera
+   * should now be aimed.
+   */
+  onAim?: (x: number, y: number) => void;
+  /**
+   * How much the tool in hand does, 1 being what it always did: the dye it
+   * lays, the pressure of a press, the wind of a blow, the drag of a finger,
+   * the pull of the magnet (lib/toolAmount.ts). Kept per tool by the app.
+   */
+  toolAmount?: number;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
   /**
@@ -691,9 +703,19 @@ class FluidSimulation {
     this.liquid.onDeposit = (cx, cy, radius, what, amount) => {
       const g = this.gpu;
       const s = this.lastSettings;
-      if (!g?.addMix || !s || amount <= 0) return;
+      if (!g || !s || amount <= 0) return;
+      /*
+        A magnetic liquid pours into the second phase, where it lands and
+        nowhere else. The phase is additive and full at 1, so a held drop
+        builds a pool over a few steps rather than filling it at once.
+      */
+      if ((what.magnetic ?? 0) > 0 && g.addPhase) {
+        const L = this.size;
+        g.addPhase(cx / L, cy / L, Math.max(1.5, radius * 1.4) / L, 0.25 * Math.min(1, what.magnetic ?? 0) * Math.min(1, amount));
+      }
+      if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
-      const oil = oilOn ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
+      const oil = oilOn && !(what.magnetic ?? 0) ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
       const soap = (s.surfactantFlow ?? 0) > 0.001 ? (what.soap ?? 0) * Math.min(1, amount) : 0;
       const acid = (s.phIndicator ?? 0) > 0.001 ? (what.acid ?? 0) * Math.min(1, amount) : 0;
       if (oil <= 0 && soap <= 0 && acid === 0) return;
@@ -3428,7 +3450,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null,
+  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef,
@@ -3684,6 +3706,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
   const activeToolRef = useRef(activeTool);
+  const onAimRef = useRef(onAim);
+  onAimRef.current = onAim;
+  const toolAmountRef = useRef(toolAmount);
+  toolAmountRef.current = Math.max(0.1, Math.min(3, Number.isFinite(toolAmount) ? toolAmount : 1));
+  /** An Alt-drag on the closeup camera: where it started, and the aim it moves. */
+  const aimDragRef = useRef<{ x0: number; y0: number; moved: number; aimX: number; aimY: number; sent: number } | null>(null);
+  /** What the plate's pointer saw of Alt, for the harness (chromaglassDebug().aimProbe). */
+  const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
   const isMouseDownRef = useRef(false);
@@ -3811,7 +3841,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
     const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
-    const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2;
+    // And the amount set for this tool, on top of how hard this hand pressed.
+    const kTool = toolAmountRef.current;
+    const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2 * kTool;
 
     switch (g.tool) {
       case 'blow':
@@ -3871,16 +3903,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         break;
       }
       case 'spray':
-        af.autoInject('spray', x, y, 5, rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('spray', x, y, 5 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
         break;
       case 'splatter':
-        af.autoInject('splatter', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('splatter', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
         break;
       case 'pour':
-        af.autoInject('pour', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('pour', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
         break;
       default: // dropper
-        af.autoInject('drop', x, y, 4, rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('drop', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
     }
   };
 
@@ -4618,7 +4650,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // A magnet in the hand is pressed up under the glass: low and
           // strong, so it grabs what is near it and drags it along, where a
           // look's own magnet is held further off and gathers broadly.
-          mx = hand.x; my = hand.y; ms = Math.max(strength, 0.9); mh = Math.min(mh, 0.15);
+          mx = hand.x; my = hand.y; ms = Math.max(strength, 0.9) * toolAmountRef.current; mh = Math.min(mh, 0.15);
         } else {
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           const last = magnetWalkAtRef.current || now;
@@ -4942,8 +4974,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         {
           const amt = settingsRef.current.phaseAmount ?? 0;
+          // Not when it was turned up for the Ferrofluid bottle: that one
+          // goes where it is dropped, not over the whole plate.
+          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0 && activeToolRef.current !== 'magnet';
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
-              && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
+              && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
             layPhaseRef.current();
           }
           phaseAmountRef.current = amt;
@@ -5122,6 +5157,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               strokeLastRef.current = { x, y };
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
               const heat = liq?.heatAmount ?? 0.05;
+              // The Amount set for this tool (1 is what it always did).
+              const k = toolAmountRef.current;
+              // Its square root for a push and a reach: twice the dye is not twice the shove, and a drop with twice the dye in it covers twice the area.
+              const kSoft = Math.sqrt(k);
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
@@ -5151,14 +5190,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
                 const fg = currentSettings.fingering ?? 0;
-                af.applySquish(x, y, 30, 0.004, fg, true);
-                af.applySquish(x, y, 18, 0.004, fg);
-                af.applySquish(x, y, 8, 0.004, fg);
+                const pa = 0.004 * k;
+                af.applySquish(x, y, 30, pa, fg, true);
+                af.applySquish(x, y, 18, pa, fg);
+                af.applySquish(x, y, 8, pa, fg);
                 // And the liquid goes where a squeezed film sends it.
-                af.squeezeOut(x, y, 30 * GRID_SCALE, 0.004);
+                af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
-                af.blowAir(x, y, 4, 0.06);
+                af.blowAir(x, y, 4, 0.06 * k);
                 if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                   bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                 }
@@ -5172,26 +5212,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   the same way the directed blow takes its. A finger standing
                   still does nothing, which is right — you mix by moving.
                 */
-                af.fingerDrag(x, y, 7, 0.09, strokeDx, strokeDy);
+                af.fingerDrag(x, y, 7, Math.min(0.25, 0.09 * k), strokeDx, strokeDy);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
-                const sprayR = 10 * GRID_SCALE;
+                const sprayR = 10 * GRID_SCALE * kSoft;
                 for (let p = 0; p < 12; p++) {
                   const angle = Math.random() * Math.PI * 2;
                   const dist = Math.random() * sprayR;
                   const px = Math.floor(x + Math.cos(angle) * dist);
                   const py = Math.floor(y + Math.sin(angle) * dist);
                   if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                  const w = (1 - dist / sprayR) * 0.4;
+                  const w = (1 - dist / sprayR) * 0.4 * k;
                   af.addDensity(px, py, w, rgb.r, rgb.g, rgb.b);
                   if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
                 }
 
               } else if (tool === 'splatter') {
                 // Fling droplets outward from cursor — random sizes, random directions
-                for (let p = 0; p < 5; p++) {
+                // More droplets, not bigger ones, for a heavier hand.
+                const flings = Math.max(1, Math.round(5 * k));
+                for (let p = 0; p < flings; p++) {
                   const angle = Math.random() * Math.PI * 2;
                   const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
                   const px = Math.floor(x + Math.cos(angle) * flingDist);
@@ -5210,13 +5252,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
                   // Fling velocity outward
-                  af.addVelocity(px, py, Math.cos(angle) * 0.5, Math.sin(angle) * 0.5);
+                  af.addVelocity(px, py, Math.cos(angle) * 0.5 * kSoft, Math.sin(angle) * 0.5 * kSoft);
                 }
 
               } else if (tool === 'pour') {
                 // Heavy thick stream — wide, dense, with downward velocity
-                const pourR = Math.round(4 * GRID_SCALE);
-                const amt = 2.0;
+                const pourR = Math.max(1, Math.round(4 * GRID_SCALE * kSoft));
+                const amt = 2.0 * k;
                 for (let ddy = -pourR; ddy <= pourR; ddy++) {
                   for (let ddx = -pourR; ddx <= pourR; ddx++) {
                     const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -5232,7 +5274,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       runs outward, and any downhill is Gravity's, not the
                       pour's.
                     */
-                    if (dd > 0) af.addVelocity(nx, ny, ddx / dd * 0.12 * w, ddy / dd * 0.12 * w);
+                    if (dd > 0) af.addVelocity(nx, ny, ddx / dd * 0.12 * w * kSoft, ddy / dd * 0.12 * w * kSoft);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
@@ -5248,8 +5290,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const sy = Math.floor(y + ny_dir * t);
                   if (sx < 1 || sx >= GRID_SIZE - 1 || sy < 1 || sy >= GRID_SIZE - 1) continue;
                   const w = 1.0 - Math.abs(t) / streakLen;
-                  af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
-                  af.addVelocity(sx, sy, nx_dir * 0.3 * w, ny_dir * 0.3 * w);
+                  af.addDensity(sx, sy, 0.6 * w * k, rgb.r, rgb.g, rgb.b);
+                  af.addVelocity(sx, sy, nx_dir * 0.3 * w * kSoft, ny_dir * 0.3 * w * kSoft);
                 }
 
               } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
@@ -5259,15 +5301,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // stream would have laid in that time and each landing with its
                 // splash (autoInject's drop reads the height).
                 if (dropClockRef.current % DROP_EVERY === 0) {
-                  const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY;
+                  const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
-                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, 1);
+                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k);
                 }
               } else {
                 // dropper (default)
-                const r = Math.round((liq?.injectRadius ?? 3) * GRID_SCALE);
-                const amt = liq?.injectAmount ?? 0.8;
+                // Wider as well as denser: a held drop fills to the plate's
+                // density ceiling in its middle, so more dye there alone would
+                // not show; a drop with more in it spreads further.
+                const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
+                const amt = (liq?.injectAmount ?? 0.8) * k;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -5282,7 +5327,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Soap, milk, silicone and glycerine put their properties into
                 // the plate on the same disc as their colour, and the plate
                 // keeps acting on them long after the drop.
-                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, 1);
+                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
               }
             }
           }
@@ -6077,6 +6122,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,
                 spanX: canvas.width / maxDim,
                 spanY: canvas.height / maxDim,
+                mode: currentSettings.macroCamera ?? 'hold',
+                aimX: currentSettings.macroAimX ?? 0.5,
+                aimY: currentSettings.macroAimY ?? 0.5,
               },
             );
             camBassRef.current = camBass;
@@ -6397,6 +6445,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           markRef.current = { source: c, aspect: 4, dirty: true };
         },
         shot: macroShotRef.current,
+        aimProbe: { ...aimProbeRef.current },
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
         contract: presetContractRef.current,
@@ -7299,7 +7348,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return { x: Math.floor(fx), y: Math.floor(fy) };
     };
 
+    /*
+      The closeup camera by hand. Alt (Option) and drag grabs the view and
+      pans it, the way a map moves under a hand; Alt-click fixes the camera
+      on the spot under the pointer. The tools do nothing meanwhile. Only
+      while zoomed in: at 1x there is nothing to aim.
+    */
+    const aimAtPointer = (clientX: number, clientY: number) => {
+      const p = getTransformedMousePos(clientX, clientY, drawnRect());
+      aimProbeRef.current.aims++;
+      onAimRef.current?.(Math.min(1, Math.max(0, (p.x + 0.5) / GRID_SIZE)), Math.min(1, Math.max(0, (p.y + 0.5) / GRID_SIZE)));
+    };
+    const panAim = (e: MouseEvent) => {
+      const drag = aimDragRef.current!;
+      drag.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
+      const rect = drawnRect();
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
+      const sx = e.movementX, sy = -e.movementY;   // the plate's uv counts up
+      const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
+      const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
+      drag.aimX = Math.min(1, Math.max(0, drag.aimX - du));
+      drag.aimY = Math.min(1, Math.max(0, drag.aimY - dv));
+      // At most once a frame: each is a settings write.
+      const now = performance.now();
+      if (now - drag.sent > 16) { drag.sent = now; onAimRef.current?.(drag.aimX, drag.aimY); }
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
+      if (aimDragRef.current) { panAim(e); return; }
       const rect = drawnRect();
       const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
       lastMousePosRef.current = { ...mousePosRef.current };
@@ -7341,8 +7418,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
 
-    const handleMouseDown = () => { isMouseDownRef.current = true; };
-    const handleMouseUp = () => { isMouseDownRef.current = false; };
+    const handleMouseDown = (e: MouseEvent) => {
+      const probe = aimProbeRef.current;
+      probe.downs++; if (e.altKey) probe.altDowns++;
+      probe.zoom = macroShotRef.current.zoom; probe.hasAim = !!onAimRef.current;
+      if (e.altKey && macroShotRef.current.zoom > 1.005 && onAimRef.current) {
+        // Start from where the camera is looking now, whoever was moving it.
+        const shot = macroShotRef.current;
+        aimDragRef.current = { x0: e.clientX, y0: e.clientY, moved: 0, aimX: shot.cx, aimY: shot.cy, sent: 0 };
+        e.preventDefault();
+        return;
+      }
+      isMouseDownRef.current = true;
+    };
+    const handleMouseUp = (e: MouseEvent) => {
+      const drag = aimDragRef.current;
+      if (drag) {
+        aimDragRef.current = null;
+        if (drag.moved < 4) aimAtPointer(e.clientX, e.clientY);
+        else onAimRef.current?.(drag.aimX, drag.aimY);
+        return;
+      }
+      isMouseDownRef.current = false;
+    };
 
     const handleTouchStart = (e: TouchEvent) => {
       isMouseDownRef.current = true;

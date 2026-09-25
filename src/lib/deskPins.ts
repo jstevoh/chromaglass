@@ -167,6 +167,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
   { key: 'filmKey', label: "Film Key", min: 0, max: 0.9, section: 'film' },
   { key: 'macroHold', label: "Shot Length", min: 1, max: 15, section: 'macro' },
+  { key: 'macroAimX', label: "Macro Aim Across", min: 0, max: 1, section: 'macro' },
+  { key: 'macroAimY', label: "Macro Aim Up", min: 0, max: 1, section: 'macro' },
   { key: 'macroCells', label: "Paint Cells", min: 0, max: 1, section: 'macro' },
   { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 1.5, section: 'macro' },
   { key: 'macroLacing', label: "Macro Lacing", min: 0, max: 1, section: 'macro' },

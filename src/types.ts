@@ -42,6 +42,12 @@ export interface LiquidBehaviour {
   polarity?: number;
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
+  /**
+   * Ferrofluid: how much of each drop goes into the dark liquid a magnet
+   * pulls (the solver's second phase). That liquid never mixes with the dye;
+   * the magnet, and the maze field, move it.
+   */
+  magnetic?: number;
 }
 
 export interface LiquidType {
@@ -129,6 +135,17 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
     behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8 } },
+  /*
+    Ferrofluid was the plate's, not a bottle: a look laid it, or picking the
+    Magnet poured some over the whole plate. As a bottle it goes where it is
+    dropped, and only there. Its colour is its own (the dark liquid is drawn
+    by the plate, not by the dye), so it lays next to no dye; heavy, oily and
+    immiscible, as a real one is (magnetite in a carrier oil).
+  */
+  { id: 'ferrofluid', name: 'Ferrofluid', color: '#1b1c22',
+    description: 'Black and magnetic: it will not mix, and the Magnet pulls it into spikes and mazes',
+    injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0,
+    behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**
@@ -524,7 +541,16 @@ export interface VisualizerSettings {
   /** How far the plate's speed follows the music rather than the look (lib/tempoPace.ts): 0 the look as written, 1 the music alone. */
   tempoSync: number;
   macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
-  macroHold: number;          // seconds spent on one bead before cutting to the next
+  macroHold: number;          // seconds spent on one bead before cutting to the next (Auto camera only)
+  /**
+   * Who moves the closeup camera (lib/macroCamera.ts): 'hold' sits on the
+   * aim, 'follow' locks onto the liquid under the aim and rides with it,
+   * 'auto' picks its own subjects and cuts between them. Absent is hold.
+   */
+  macroCamera?: 'hold' | 'follow' | 'auto';
+  /** Where the closeup camera is aimed, across and up the plate (0-1). */
+  macroAimX?: number;
+  macroAimY?: number;
   macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
@@ -755,6 +781,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tempoSync: 0.5,            // halfway: the look keeps its character, the music sets the pace
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
+  macroCamera: 'hold',       // the camera goes where it is aimed, and nowhere else
+  macroAimX: 0.5,
+  macroAimY: 0.5,
   macroSync: 0.5,
   macroCells: 0.75,
   macroCellScale: 0.5,

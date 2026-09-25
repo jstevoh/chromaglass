@@ -187,10 +187,12 @@ export function Swatch({ hex, selected, onClick, midiKey, className = '', gap = 
 
 // ── Status dot ───────────────────────────────────────────────────────
 
-export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare = false }: {
+export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare = false, tight = false }: {
   on: boolean; label: string; tone?: 'ok' | 'live'; testId?: string;
   /** The dot alone at every width, its label only in the tooltip and to a screen reader. */
   bare?: boolean;
+  /** The dot alone for now: the header has measured that the words do not fit (DeskHeader). */
+  tight?: boolean;
   /**
    * What clicking it opens. A dot that reports a thing you cannot reach is
    * half a control: the MIDI dot said "no controller" all evening with no way
@@ -217,7 +219,7 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare
         does. A dot with no word beside it is worth more than a word painted
         underneath a control.
       */}
-      <span className={`${bare ? 'sr-only' : 'hidden min-[1400px]:inline'} text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
+      <span className={`${bare || tight ? 'sr-only' : 'hidden min-[1100px]:inline'} text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
     </>
   );
   const tip = title ?? `${label}: ${on ? 'yes' : 'no'}`;

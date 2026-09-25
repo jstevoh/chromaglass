@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ToolAmount } from '../ToolAmount';
 import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
@@ -113,6 +114,9 @@ interface PerformDeskProps {
   onLayer: (n: number) => void;
   tool: string;
   onTool: (t: string) => void;
+  /** How much the tool in hand does (ToolAmount). */
+  toolAmount?: number;
+  onToolAmount?: (v: number) => void;
   dyes: string[];
   dye: string | null;
   onDye: (hex: string) => void;
@@ -286,6 +290,7 @@ export function PerformDesk(p: PerformDeskProps) {
             testId="tool-segmented"
             compact
           />
+          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="hidden w-0 max-w-44 flex-1 overflow-hidden text-muted xl:flex" />}
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
               <Swatch

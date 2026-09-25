@@ -86,6 +86,11 @@ jobs:
       - name: The liquids
         run: npm run liquids
 
+      # A liquid someone made: the file reads back as what they meant, a bad
+      # one says why, and "how it meets the others" agrees with the shelf.
+      - name: The liquids file
+        run: npm run liquidfile
+
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
       - name: The room
@@ -178,6 +183,16 @@ jobs:
       # nothing else, and hovering does nothing (scripts/tools.mjs).
       - name: Every tool does what it says
         run: node scripts/tools.mjs
+
+      # A drop lands where it is dropped: on the Design desk, on either layer,
+      # the cell under the hand changes and its mirror image across the middle
+      # does not (reported: an echo of the gesture "in the mirrored section").
+      # It runs even when an earlier step failed, so the map it prints is
+      # there to read whatever else is red.
+      - name: A drop lands only where it is dropped
+        if: success() || failure()
+        run: node scripts/mirror.mjs
+
       # And the physics under it: the ferrofluid gathers where the magnet is
       # (not at its mirror), held close pulls harder than held away, and the
       # magnet neither makes nor loses liquid.

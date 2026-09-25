@@ -21,6 +21,9 @@ import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
+import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { ToolAmount } from './components/ToolAmount';
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
@@ -288,10 +291,20 @@ export default function App() {
       different look each time; this changes one value on the running plate.
     */
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
-      (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+      (patch?: Partial<VisualizerSettings>) => {
+        if (patch) setSettings(prev => ({ ...prev, ...patch }));
+        // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
+        return settingsRef.current;
+      };
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
+    // Which layer the hand is on, as the layer switch does (scripts/mirror.mjs).
+    (window as unknown as { chromaglassLayer?: unknown }).chromaglassLayer =
+      (layer: number) => { setActiveLayer(Math.max(0, Math.min(1, Math.round(layer)))); };
+    // And its Amount, as the Amount slider does (npm run tools).
+    (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
+      (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };
     /*
       Put a track from the shelf on, from outside.
 
@@ -472,11 +485,33 @@ export default function App() {
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
-  const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
+  // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
+  const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
+  useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
+  /** Put made liquids on the shelf, replacing any with the same id. */
+  const shelveLiquids = useCallback((made: LiquidType[]) => {
+    setLiquidTypes(prev => {
+      const byId = new Map(made.map(l => [l.id, l]));
+      const kept = prev.map(l => byId.get(l.id) ?? l);
+      return [...kept, ...made.filter(l => !prev.some(p => p.id === l.id))];
+    });
+  }, []);
+  const removeLiquid = useCallback((id: string) => {
+    if (!isCustomLiquid({ id })) return;
+    setLiquidTypes(prev => prev.filter(l => l.id !== id));
+    setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
+  }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
   const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
+  // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
+  const [toolAmounts, setToolAmounts] = useState<Record<string, number>>(() => loadToolAmounts());
+  useEffect(() => { saveToolAmounts(toolAmounts); }, [toolAmounts]);
+  const toolAmount = toolAmounts[activeTool] ?? 1;
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
+  const setToolAmount = useCallback((tool: string, v: number) => setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })), []);
   // The message handler is built once and must not go stale when a liquid's
   // colour is edited.
   const liquidTypesRef = useRef(liquidTypes);
@@ -1331,6 +1366,17 @@ export default function App() {
   // slider, so the phone and the panel show the glide as it happens.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const aimTick = useRef(0);
+  /*
+    A hand on the closeup camera (Alt-drag or Alt-click on the plate): it goes
+    where it is aimed. Taken off Auto, since a camera that roams on its own
+    would leave the spot the hand just chose.
+  */
+  const aimMacro = useCallback((x: number, y: number) => {
+    const auto = (settingsRef.current.macroCamera ?? 'hold') === 'auto';
+    updateSettings({ macroAimX: x, macroAimY: y, ...(auto ? { macroCamera: 'hold' as const } : {}) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /*
     Evolve, as a wander rather than a jump (lib/drift.ts).
@@ -1368,6 +1414,21 @@ export default function App() {
         const from = (settingsRef.current as unknown as Record<string, number>)[k];
         if (typeof from === 'number' && Number.isFinite(to)) driftGlide.current.set(k, { from, to, at: 0 });
       }
+      /*
+        The closeup camera is Evolve's to move too, when it is zoomed in and
+        held or following: every other drift the aim glides a short way, so
+        the camera wanders the plate slowly instead of sitting on one spot
+        for the whole song. Auto moves itself; a hand on the aim takes it
+        (updateSettings drops a dial a hand touches from the glide).
+      */
+      const cur = settingsRef.current;
+      aimTick.current = (aimTick.current + 1) % 2;
+      if (aimTick.current === 0 && (cur.macroZoom ?? 1) > 1.05 && (cur.macroCamera ?? 'hold') !== 'auto') {
+        const wander = (v: number) => Math.min(0.85, Math.max(0.15, v + (Math.random() - 0.5) * 0.24));
+        const ax = cur.macroAimX ?? 0.5, ay = cur.macroAimY ?? 0.5;
+        driftGlide.current.set('macroAimX', { from: ax, to: wander(ax), at: 0 });
+        driftGlide.current.set('macroAimY', { from: ay, to: wander(ay), at: 0 });
+      }
     }, 6000);
     const glide = setInterval(() => {
       if (driftGlide.current.size === 0) return;
@@ -1385,6 +1446,18 @@ export default function App() {
     return () => { clearInterval(id); clearInterval(glide); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
+
+  /*
+    The Ferrofluid bottle needs the plate to draw ferrofluid at all: picking
+    it on a look with none turns the amount up, and the visualizer, seeing
+    the bottle, leaves the plate bare for the drops to land on.
+  */
+  useEffect(() => {
+    if (!((selectedLiquid.behaviour?.magnetic ?? 0) > 0)) return;
+    if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
+    updateSettings({ phaseAmount: 0.6 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLiquid, presetSeq]);
 
   /*
     The Magnet brings its ferrofluid. A magnet over a plate with none on it
@@ -2100,6 +2173,11 @@ export default function App() {
       if (e.key === '?') setShowHelp(h => !h);
       if (e.key === '+' || e.key === '=') zoomMacro(1);
       if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      // The tool in hand's Amount, a step at a time, at any width.
+      if (e.key === '[' || e.key === ']') {
+        const tool = activeToolRef.current;
+        setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(Math.round(((prev[tool] ?? 1) + (e.key === ']' ? 0.1 : -0.1)) * 10) / 10) }));
+      }
     };
     // The wheel over the plate zooms the closeup in and out while it is on
     // (never turns it on: a trackpad brush must not become a camera cut).
@@ -2769,6 +2847,8 @@ export default function App() {
         ref={visualizerRef}
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
+        onAim={aimMacro}
+        toolAmount={toolAmount}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
         filmSenseRef={filmSense.reading}
@@ -2902,6 +2982,19 @@ export default function App() {
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
           <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
+          {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot. */}
+          <span className="mx-1 h-3 w-px bg-white/20" />
+          {([
+            ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Random Evolve wanders it slowly.'],
+            ['follow', 'Follow', 'Lock onto the liquid where it is aimed and ride with it. Alt-click on something to follow it.'],
+            ['auto', 'Auto', 'The camera picks its own subjects and cuts between them.'],
+          ] as const).map(([mode, label, title]) => (
+            <button key={mode} onClick={() => updateSettings({ macroCamera: mode })} title={title}
+              aria-pressed={(settings.macroCamera ?? 'hold') === mode} data-testid={`macro-camera-${mode}`}
+              className={`rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              {label}
+            </button>
+          ))}
         </div>
       )}
       {blackout && overlaysVisible && (
@@ -3152,6 +3245,7 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  <ToolAmount tool={activeTool} value={toolAmount} onChange={(v) => setToolAmount(activeTool, v)} className="mt-1 text-white/80" />
                 </div>
 
                 <div className="h-px w-full bg-white/10"></div>
@@ -3546,6 +3640,7 @@ export default function App() {
             midiClocked={midi.clocked}
             timecode={timecode ? formatTimecode(timecode) : null}
             focusSection={settingsSection}
+            liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
             /*
               The panel can put any of its controls on either desk, so it needs
               to know what is already on them. One list per surface, shared with
@@ -3919,6 +4014,8 @@ export default function App() {
           onLayer={setActiveLayer}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
+          toolAmount={toolAmount}
+          onToolAmount={(v) => setToolAmount(activeTool, v)}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -3988,6 +4085,8 @@ export default function App() {
           onImageDye={() => fileInputRef.current?.click()}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
+          toolAmount={toolAmount}
+          onToolAmount={(v) => setToolAmount(activeTool, v)}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}

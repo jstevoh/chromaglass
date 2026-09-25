@@ -237,6 +237,8 @@ export class WebGPUFluid {
   private readonly rbStaging: { dye: GPUBuffer; vel: GPUBuffer };
   private readonly rbRings: { dye: ReadbackRing; vel: ReadbackRing };
   private readonly rbDye: Float32Array;
+  /** The reading `rbDye` holds: the ring's sequence when it was copied in, not when the next one landed. */
+  private rbDyeSeq = -1;
   private readonly rbVel: Float32Array;
 
   private grainAge = 0;
@@ -1772,6 +1774,7 @@ export class WebGPUFluid {
       const dst = which === 'dye' ? this.rbDye : this.rbVel;
       const stride = this.rbRow / 4;
       for (let y = 0; y < this.L; y++) dst.set(src.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
+      if (which === 'dye') this.rbDyeSeq = this.rbRings.dye.landed;
       fresh = true;
     }
     return fresh;
@@ -1885,7 +1888,15 @@ export class WebGPUFluid {
   get rbDyeView(): Float32Array { return this.rbDye; }
   /** The dye readback's sequence: the newest copy issued, and the newest landed in `rbDyeView`. */
   get rbDyeIssued(): number { return this.rbRings.dye.issued; }
-  get rbDyeLanded(): number { return this.rbRings.dye.landed; }
+  /*
+    The reading in rbDyeView, not the newest to land in the ring. A copy lands
+    asynchronously and waits in the ring until the next readbackAsync copies
+    it across, so the ring's `landed` ran up to a frame ahead of the view:
+    Finger and Press, told their last move was in the reading, read the one
+    before it and put the dye they had already moved down again, and the
+    Finger added a third of what it stroked (npm run tools, +172 on 426).
+  */
+  get rbDyeLanded(): number { return this.rbDyeSeq; }
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
