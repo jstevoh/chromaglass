@@ -807,8 +807,10 @@ try {
       await settle(300);
       const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
       const moved = before && typeof aim.x === 'number' ? Math.hypot(aim.x - 0.35, aim.y - 0.6) : 0;
+      const probe = await page.evaluate(() => window.chromaglassDebug?.().aimProbe ?? null);
       check('and an Alt-click on the plate aims it at the spot under the pointer', moved > 0.02 && aim.mode === 'hold',
-        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(2) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(2) : '?'} (${aim.mode})`);
+        `aim ${typeof aim.x === 'number' ? aim.x.toFixed(2) : '?'},${typeof aim.y === 'number' ? aim.y.toFixed(2) : '?'} (${aim.mode})` +
+        `; clicked ${spot ? `${Math.round(spot.x)},${Math.round(spot.y)}` : 'nowhere: no point on the plate was clear'}; the plate saw ${JSON.stringify(probe)}`);
     }
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false, macroAimX: 0.5, macroAimY: 0.5 }));
     await settle(800);

@@ -3712,6 +3712,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   toolAmountRef.current = Math.max(0.1, Math.min(3, Number.isFinite(toolAmount) ? toolAmount : 1));
   /** An Alt-drag on the closeup camera: where it started, and the aim it moves. */
   const aimDragRef = useRef<{ x0: number; y0: number; moved: number; aimX: number; aimY: number; sent: number } | null>(null);
+  /** What the plate's pointer saw of Alt, for the harness (chromaglassDebug().aimProbe). */
+  const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
   const isMouseDownRef = useRef(false);
@@ -6439,6 +6441,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           markRef.current = { source: c, aspect: 4, dirty: true };
         },
         shot: macroShotRef.current,
+        aimProbe: { ...aimProbeRef.current },
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
         contract: presetContractRef.current,
@@ -7349,6 +7352,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     const aimAtPointer = (clientX: number, clientY: number) => {
       const p = getTransformedMousePos(clientX, clientY, drawnRect());
+      aimProbeRef.current.aims++;
       onAimRef.current?.(Math.min(1, Math.max(0, (p.x + 0.5) / GRID_SIZE)), Math.min(1, Math.max(0, (p.y + 0.5) / GRID_SIZE)));
     };
     const panAim = (e: MouseEvent) => {
@@ -7411,6 +7415,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
 
     const handleMouseDown = (e: MouseEvent) => {
+      const probe = aimProbeRef.current;
+      probe.downs++; if (e.altKey) probe.altDowns++;
+      probe.zoom = macroShotRef.current.zoom; probe.hasAim = !!onAimRef.current;
       if (e.altKey && macroShotRef.current.zoom > 1.005 && onAimRef.current) {
         // Start from where the camera is looking now, whoever was moving it.
         const shot = macroShotRef.current;

@@ -341,7 +341,7 @@ export function DesignDesk(p: DesignDeskProps) {
             onChange={p.onTool}
             testId="tool-segmented"
           />
-          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="ml-3 min-w-0 max-w-56 flex-1 text-muted" />}
+          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="ml-3 w-0 max-w-56 flex-1 overflow-hidden text-muted" />}
         </div>
       </section>
 
