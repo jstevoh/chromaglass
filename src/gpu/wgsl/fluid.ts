@@ -467,6 +467,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(5) var<storage, read> pr: array<f32>;
+${PACKED}
 fn ph(p: vec2i, n: i32) -> f32 { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
 fn minmod(a: f32, b: f32) -> f32 { return select(0.0, select(max(a, b), min(a, b), a > 0.0), a * b > 0.0); }
 // The flux across the face between cell a and cell a + e, in the +e direction.
@@ -481,7 +483,20 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let t = vec2i(e.y, e.x);
   let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
   let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let ve = dot(va + vb, vec2f(e)) * 0.125;
+  /*
+    And corrected by the last projection's pressure (Rhie–Chow). That
+    projection subtracted the wide gradient, (p[j+1] − p[j−1]) / 2, from
+    each cell, but solved the compact Laplacian, so the flow it left has a
+    divergence of (L_compact − L_wide) p on the stencil this flux uses, all
+    of it at the finest scale: where a force is sharp (every finger of the
+    maze, the rim of a pool on the magnet) the flux step printed a grid of
+    lines through the black. Swapping the two cells' wide gradients for the
+    face's compact one makes the face flux divergence-free on this stencil.
+  */
+  let pa = packedAt(a.x, a.y, n);
+  let pb = packedAt(b.x, b.y, n);
+  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
+  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
   if (c >= 0.0) {
     let s = minmod(ph(a, n) - ph(a - e, n), ph(b, n) - ph(a, n));
@@ -1539,6 +1554,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+// The face velocity is built as phaseAdvect's is, for the same reasons: the
+// oil's capillary force is as sharp at a drop's rim as the maze's.
+@group(0) @binding(5) var<storage, read> pr: array<f32>;
+${PACKED}
 fn mx(p: vec2i, n: i32) -> vec3f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).rgb; }
 fn mm(a: vec3f, b: vec3f) -> vec3f {
   return select(vec3f(0.0), select(max(a, b), min(a, b), a > vec3f(0.0)), a * b > vec3f(0.0));
@@ -1546,15 +1565,13 @@ fn mm(a: vec3f, b: vec3f) -> vec3f {
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec3f(0.0); }
-  // The face's velocity, filtered [1 2 1] along the face: the collocated
-  // projection leaves the flow a mode that alternates cell to cell, which the
-  // two cells' plain mean passes across the other axis, and where the magnet
-  // crowds the ferrofluid it printed a grid into the pool. The filter is
-  // linear, so the flux field is as divergence-free as the flow it came from.
   let t = vec2i(e.y, e.x);
   let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
   let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let ve = dot(va + vb, vec2f(e)) * 0.125;
+  let pa = packedAt(a.x, a.y, n);
+  let pb = packedAt(b.x, b.y, n);
+  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
+  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
   if (c >= 0.0) {
     let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));

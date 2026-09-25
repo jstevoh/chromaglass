@@ -107,7 +107,9 @@ const MAZE_PERIOD = 0.045;
   How hard the maze's own potential moves the liquid, in plate widths a
   second per unit of its gradient (per cell). From the lab at 256²: drops
   turn to starfish in two seconds and to a branched maze in eight; the
-  experiments give a second or a few for a viscous Hele-Shaw maze.
+  experiments give a second or a few for a viscous Hele-Shaw maze. Scaled
+  by the grid over 256: the maze is the same size in the plate on every
+  grid, so on a finer one its potential changes less per cell.
 */
 const MAZE_GAIN = 2;
 /** The share of the maze's field that is uniform (a coil under the whole plate); the hand magnet adds the rest where it is. */
@@ -436,6 +438,21 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(w, w);
   }
 
+  /** As run, with the pressure buffer bound after the texture written. */
+  private runPressed(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
+    const pipe = this.pipeline(name, dst.format);
+    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => r.label).join(',')}:${args.label}:press`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst, this.press]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   private fill(pass: GPUComputePassEncoder, dst: GPUTexture, value: [number, number, number, number], size: number): void {
     this.run(pass, 'fill', dst, [], this.arg(`fill ${dst.label}`, [...value, size, size, 0, 0]), size);
   }
@@ -693,7 +710,9 @@ export class WebGPUFluid {
     const disp = p.dt * p.advection * ((N - 2) / N);
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
-    const kk = (2 * Math.PI / (MAZE_PERIOD * N)) ** 2;
+    // Never under twelve cells a period: the edge is three or four wide, and
+    // on 192² (8.6 cells) the stripes washed out to grey.
+    const kk = (2 * Math.PI / Math.max(MAZE_PERIOD * N, 12)) ** 2;
     const mazeK = { m2: 0.16 * kk, alpha: (1.16 * kk) ** 2 };
     if (maze <= 0.001) this.mazeReady = false;
     this.writeSim(p, disp);
@@ -877,7 +896,7 @@ export class WebGPUFluid {
       stage('maze force', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
-          this.arg('maze force', [MAZE_GAIN * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+          this.arg('maze force', [MAZE_GAIN * (N / 256) * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
         this.vel.swap();
       });
     }
@@ -991,59 +1010,62 @@ export class WebGPUFluid {
       // With a magnet on, the flow near it can carry the ferrofluid further
       // than one flux step may (0.45 of a cell): so in substeps.
       const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001) ? PHASE_SUBSTEPS : 1;
-      const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 0, 0]);
+      // A.b.z: the Rhie–Chow correction on (see phaseAdvect), which needs the
+      // projection's pressure to still be the one velForced was made with.
+      const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 1, 0]);
       /*
-        Under a maze, the grid-scale filter alone after each substep
-        (phaseSeparate with no sharpening or tension). A collocated
-        projection leaves divergence of (L_compact − L_wide) p, which is
-        grid-scale by construction, and the maze's force at every finger's
-        edge makes a sharp pressure: the flux step turned what was left into
-        lines every other cell through the black (measured, the grid-scale
-        part inside the maze 0.011 with its force on, 0.0015 without).
+        And the grid-scale filter alone after each substep (phaseSeparate
+        with no sharpening or tension). The Rhie–Chow correction removes
+        most of what a collocated projection leaves at the finest scale;
+        this takes what remains, which a maze's sharp forces otherwise drew
+        as lines every other cell through the black.
       */
-      const grid = maze > 0.001 ? this.arg('phase grid', [0, 0, 0, 0]) : null;
+      const grid = this.arg('phase grid', [0, 0, 0, 0]);
       for (let k = 0; k < subs; k++) {
-        this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
+        this.runPressed(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
         this.phase.swap();
-        if (grid) {
-          this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read], grid);
-          this.phase.swap();
-        }
+        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read], grid);
+        this.phase.swap();
       }
       for (let k = 0; k < PHASE_RELAX; k++) {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
         this.phase.swap();
       }
+      /*
+        Cahn–Hilliard keeps the two liquids apart, maze or not: it conserves
+        and it rounds. The pairwise sharpening that stood in for it without
+        a maze (phaseSeparate) exchanged only along the axes, and a plate of
+        drops set into blocky squares with holes punched in them. Under a
+        maze field the dipoles' repulsion (phaseMu's ψ term) is added.
+      */
+      if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
+      if (!this.phaseMuT) {
+        this.phaseMuT = this.disposer.track(this.device.createTexture({
+          label: 'phase mu', size: [this.N, this.N], format: R32,
+          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        }));
+      }
+      const psi = this.psi, mu = this.phaseMuT;
       if (maze > 0.001) {
-        // Cahn–Hilliard with the Ohta–Kawasaki term (see phaseMu), which
-        // does the separating as well, so the plain sharpening stands aside.
-        if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
-        if (!this.phaseMuT) {
-          this.phaseMuT = this.disposer.track(this.device.createTexture({
-            label: 'phase mu', size: [this.N, this.N], format: R32,
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-          }));
-        }
-        const psi = this.psi, mu = this.phaseMuT;
         const screen = this.arg('screen', [mazeK.m2, 0, 0, 0]);
         for (let k = 0; k < 16; k++) {
           this.run(pass, 'screenJacobi', psi.write, [psi.read, this.phase.read], screen);
           psi.swap();
         }
-        const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
-          0.012, mazeK.alpha * (0.5 + 0.5 * maze), MAZE_UNIFORM, p.time ?? 0]);
-        for (let k = 0; k < CH_SUBSTEPS; k++) {
-          this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
-          this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
-          this.phase.swap();
-        }
+      }
+      // Phase Edge is how fast it separates: its mobility, M dt, from 0.006
+      // to 0.018 (under the explicit limit, about 0.028).
+      const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
+        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), maze > 0.001 ? mazeK.alpha * (0.5 + 0.5 * maze) : 0, MAZE_UNIFORM, p.time ?? 0]);
+      for (let k = 0; k < CH_SUBSTEPS; k++) {
+        this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
+        this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
+        this.phase.swap();
+      }
+      if (maze > 0.001) {
         // Once more on where the phase ended, for the next step's force.
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.mazeReady = true;
-      } else {
-        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
-          this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
-        this.phase.swap();
       }
     }, this.phaseLive);
 
@@ -1061,7 +1083,7 @@ export class WebGPUFluid {
     stage('mix', (pass) => {
       const m = mix!;
       if (this.mixLive) {
-        this.run(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 0, 0]));
+        this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
         m.swap();
         for (let k = 0; k < PHASE_RELAX; k++) {
           this.run(pass, 'mixRelax', m.write, [m.read], none);

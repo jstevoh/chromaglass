@@ -40,11 +40,11 @@ export interface GpuStepParams {
   /*
     The second phase and the magnet under the glass (H7).
 
-    `phaseSharp` and `phaseTension` are the two that make the shapes: tension
-    smooths the boundary by its curvature and so decides how big a droplet has
-    to be to keep its shape, and sharpness is what stops advection blurring the
-    phase into a grey wash. Between them, spikes, labyrinths and lattices fall
-    out rather than being drawn.
+    The two liquids are kept apart by Cahn–Hilliard (see the phase stage in
+    fluid.ts), which conserves and rounds; `phaseSharp` is its mobility, how
+    fast a blurred edge separates again. `phaseTension` no longer reaches the
+    GPU: Cahn–Hilliard carries its own surface tension, and the pairwise
+    sharpening that took it set drops into blocky squares.
   */
   phaseSharp: number;
   phaseTension: number;

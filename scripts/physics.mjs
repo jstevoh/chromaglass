@@ -12,7 +12,7 @@
  *   3. and neither makes nor loses any, nor packs a cell past full
  *   4–10. the liquids' own physics and chemistry (docs/physics-plan.md):
  *      surface tension, Marangoni flow, buoyancy, vorticity confinement,
- *      the BZ reaction and Liesegang rings,
+ *      the BZ reaction, Liesegang rings and the ferrofluid maze,
  *      each against the same plate with it off
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
@@ -154,6 +154,46 @@ try {
   const gaps = bands.slice(1).map((b, i) => b - bands[i]);
   check('Liesegang bands form, spaced wider as they go out', bands.length >= 4 && gaps[gaps.length - 1] > gaps[0],
     `${bands.length} bands, gaps ${gaps.join(', ')} cells`);
+
+  // ── 10: the ferrofluid maze ──
+  /*
+    Eighteen drops, eight seconds with the maze field on and with it off,
+    and no magnet in either: the field's uniform part alone (a coil under
+    the plate) is what is being tested, since a magnet's pull breaks a
+    plate into fragments with as much edge as a maze. A labyrinth is edge: its length (cell pairs either
+    side of half full) against the same plate without the field, the
+    ferrofluid all still there, and the black solid, with no grid printed
+    through it by the projection (see phaseAdvect's Rhie–Chow correction).
+  */
+  const maze = async (on) => {
+    await page.evaluate(() => lab.create(256));
+    await page.evaluate(() => { for (let k = 0; k < 18; k++) { const a = k * 2.399963229728653, rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
+      lab.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, 0.088, 0.9); } });
+    const read = () => page.evaluate(async () => {
+      const f = await lab.phase(); const n = f.n, d = f.data; let mass = 0, edge = 0, hf = 0, inner = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const v = d[x + y * n]; mass += v;
+        if (x + 1 < n && (v > 0.5) !== (d[x + 1 + y * n] > 0.5)) edge++;
+        if (y + 1 < n && (v > 0.5) !== (d[x + (y + 1) * n] > 0.5)) edge++;
+        if (x > 0 && y > 0 && x < n - 1 && y < n - 1 && v > 0.9 && Math.min(d[x + 1 + y * n], d[x - 1 + y * n], d[x + (y + 1) * n], d[x + (y - 1) * n]) > 0.6) {
+          const b = (4 * v + 2 * (d[x + 1 + y * n] + d[x - 1 + y * n] + d[x + (y + 1) * n] + d[x + (y - 1) * n])
+            + d[x + 1 + (y + 1) * n] + d[x - 1 + (y + 1) * n] + d[x + 1 + (y - 1) * n] + d[x - 1 + (y - 1) * n]) / 16;
+          hf += Math.abs(v - b); inner++;
+        }
+      }
+      return { mass, edge, grid: hf / Math.max(1, inner) };
+    });
+    const before = await read();
+    await page.evaluate((on) => lab.step(480, { magnetStrength: 0, ferroLabyrinth: on ? 1 : 0, phaseSharp: 0.75 }), on);
+    return { before, after: await read() };
+  };
+  const loose = await maze(false), laby = await maze(true);
+  check('a strong field turns the ferrofluid into a labyrinth', laby.after.edge > loose.after.edge * 1.5,
+    `edge ${laby.after.edge} cells with the field, ${loose.after.edge} without (${laby.before.edge} poured)`);
+  check('and keeps all of it', Math.abs(laby.after.mass / laby.before.mass - 1) < 0.01,
+    `${laby.before.mass.toFixed(1)} → ${laby.after.mass.toFixed(1)}`);
+  check('with the black solid, no grid through it', laby.after.grid < 0.01,
+    `grid-scale part inside it ${laby.after.grid.toFixed(4)} (0.045 before the correction)`);
 
 } finally {
   await close();
