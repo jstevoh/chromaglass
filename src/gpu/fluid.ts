@@ -101,6 +101,19 @@ const MAGNET_GAIN = 6e-6;
   0.023 of the plate against a hand that crossed 0.65 of it).
 */
 const MAGNET_CAP = 3;
+/*
+  And never more than this many cells a step, whatever the look's clock.
+
+  The pull is in real seconds, so a slow look (a tiny step) multiplies it:
+  on Classic, five times the lab's, it asked for velocities of several
+  hundred, fifty cells a step, which the velocity's own advection and the
+  ferrofluid's flux step (0.45 of a cell) cannot carry, and the dragged
+  ferrofluid went nowhere (CI: 0.003 of the plate). In cells a step the cap
+  means the same on every look and every grid. The ferrofluid's flux step is
+  substepped to match (PHASE_SUBSTEPS).
+*/
+const MAGNET_CELLS = 6;
+const PHASE_SUBSTEPS = 6;
 const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
@@ -762,7 +775,8 @@ export class WebGPUFluid {
       stage('magnet', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
-          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep, MAGNET_CAP * perStep, 0, 0]));
+          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep,
+            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
         this.vel.swap();
       });
     }
@@ -818,9 +832,14 @@ export class WebGPUFluid {
       Skipped entirely on a plate with no phase on it, which is most looks.
     */
     stage('phase', (pass) => {
-      this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced],
-        this.arg('phase advect', [0, 0, 0, 0, 0, disp, 0, 0]));
-      this.phase.swap();
+      // With a magnet on, the flow near it can carry the ferrofluid further
+      // than one flux step may (0.45 of a cell): so in substeps.
+      const subs = this.phaseLive && p.magnetStrength > 0.0001 ? PHASE_SUBSTEPS : 1;
+      const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 0, 0]);
+      for (let k = 0; k < subs; k++) {
+        this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
+        this.phase.swap();
+      }
       for (let k = 0; k < PHASE_RELAX; k++) {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
         this.phase.swap();
