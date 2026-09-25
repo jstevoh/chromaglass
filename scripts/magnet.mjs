@@ -181,7 +181,12 @@ try {
       await page.waitForTimeout(100);
       if (i % 4 === 0) await sample();
     }
-    for (let k = 0; k < 12; k++) { await page.waitForTimeout(250); await sample(); }
+    const hold = [];
+    for (let k = 0; k < 12; k++) {
+      await page.waitForTimeout(250); await sample();
+      hold.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
+    }
+    console.log(`     the solver's magnet through the hold: ${hold.join(' ')}`);
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
     solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
     drag1 = await phase(null, 'drag1');
@@ -212,6 +217,23 @@ try {
     }
     return best;
   });
+  // Where the ferrofluid went, coarsely: the drag's change in each 0.2 square, top row y = 0.9.
+  const map = await page.evaluate(() => {
+    const a = window.__phaseSnaps?.drag0, b = window.__phaseSnaps?.drag1;
+    if (!a || !b || a.n !== b.n) return null;
+    const n = a.n, rows = [];
+    for (let j = 4; j >= 0; j--) {
+      const row = [];
+      for (let i = 0; i < 5; i++) {
+        let g = 0;
+        for (let y = Math.floor(j * n / 5); y < Math.floor((j + 1) * n / 5); y++) for (let x = Math.floor(i * n / 5); x < Math.floor((i + 1) * n / 5); x++) g += b.data[x + y * n] - a.data[x + y * n];
+        row.push((g / (n * n) * 1e4).toFixed(0).padStart(5));
+      }
+      rows.push(row.join(''));
+    }
+    return rows;
+  });
+  if (map) console.log(`     the drag's change by 0.2 square (x across, y up):\n       ${map.join('\n       ')}`);
   const mirror = spot ? await nearIn('drag1', { x: spot.x, y: 1 - spot.y }) : 0;
   console.log(`     it gathered most at ${gathered ? `${gathered.x.toFixed(2)},${gathered.y.toFixed(2)} (+${gathered.gain.toFixed(0)})` : '?'}; ` +
     `at the hand's mirror ${mirror.toFixed(0)}; centre of mass ${drag0.x.toFixed(2)},${drag0.y.toFixed(2)} → ${drag1.x.toFixed(2)},${drag1.y.toFixed(2)}`);

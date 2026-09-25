@@ -4580,6 +4580,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
         }
         if (!held && !walks) {
+          // Said as it is, so the harness does not read the last held magnet
+          // as still held once the hand has gone stale.
+          lastMagnetRef.current = { x: look.magnetX ?? 0.5, y: look.magnetY ?? 0.5, strength, height: look.magnetHeight ?? 0.25, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
