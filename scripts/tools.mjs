@@ -170,10 +170,12 @@ try {
 
   // ── The Amount ──────────────────────────────────────────────────
   // A mouse can say where and for how long, not how much; each tool's Amount
-  // says how much. Turned up, the same hold of the dropper lays more dye.
+  // says how much. Turned down, the same hold of the dropper lays less dye.
+  // Down rather than up: the middle of a drop reaches the plate's density
+  // ceiling, so more is not all measurable as more, and less always is.
   {
     await clear();
-    await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 2.5));
+    await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 0.4));
     await page.mouse.move(...screen(...A));
     const p = await snap('amt0');
     await hold('dropper', A, 1200);
@@ -181,9 +183,9 @@ try {
     await snap('amt1');
     const a = await measure('amt0', p), b = await measure('amt1', p);
     await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 1));
-    const more = b.total - a.total;
-    check("a tool's Amount turned up does more — the dropper at 2.5x lays more dye", more > 1.6 * laid.dropper.total,
-      `${more.toFixed(0)} against ${laid.dropper.total.toFixed(0)} at 1x`);
+    const less = b.total - a.total;
+    check("a tool's Amount sets how much it does — the dropper at 0.4x lays less dye", less > 0 && less < 0.7 * laid.dropper.total,
+      `${less.toFixed(0)} against ${laid.dropper.total.toFixed(0)} at 1x`);
   }
 
   // ── Streak ──────────────────────────────────────────────────────
@@ -202,6 +204,10 @@ try {
   // ── Finger ──────────────────────────────────────────────────────
   await clear();
   await pool(A);
+  // Past the drop's own settling (its splash presses the film, and the film
+  // coming back carries dye with it for a few seconds), so the plate left
+  // alone and the plate stroked are the same plate at the same stage.
+  await settle(3000);
   const fIdle = await idleChange(A, 3800);
   const f0p = await snap('finger0');
   await stroke('finger', A, B, 1500, 1500);
