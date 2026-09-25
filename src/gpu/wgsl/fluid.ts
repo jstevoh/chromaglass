@@ -488,7 +488,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
   let dx = flux(p, vec2i(1, 0), n) - flux(p - vec2i(1, 0), vec2i(1, 0), n);
   let dy = flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
-  textureStore(dst, p, vec4f(max(ph(p, n) - dx - dy, 0.0), 0.0, 0.0, 0.0));
+  // Not clamped at zero: that made ferrofluid wherever the limiter
+  // undershot. phaseRelax fills a dip below empty from its neighbours instead.
+  textureStore(dst, p, vec4f(ph(p, n) - dx - dy, 0.0, 0.0, 0.0));
 }`,
 
   /*
@@ -557,22 +559,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     this: whatever a cell holds above full diffuses to its neighbours, each
     pair's exchange computed the same way from both sides, so it conserves;
     and a full neighbour passes it on in the next iteration until it reaches
-    one with room.
+    one with room. A dip below empty (the flux step's limiter undershooting)
+    is filled from the neighbours the same way.
   */
   phaseRelax: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
-fn over(p: vec2i, n: i32) -> f32 {
-  if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) { return -1.0; }
-  return max(textureLoad(src, p, 0).r - 1.0, 0.0);
+// What a cell holds outside 0..1: above full (positive) or below empty
+// (negative), and whether the neighbour exists at all.
+fn bad(p: vec2i, n: i32) -> vec2f {
+  if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) { return vec2f(0.0, 0.0); }
+  let c = textureLoad(src, p, 0).r;
+  return vec2f(max(c - 1.0, 0.0) + min(c, 0.0), 1.0);
 }
-fn pair(a: f32, b: f32) -> f32 { return select(0.24 * (a - b), 0.0, b < 0.0); }
+fn pair(a: f32, b: vec2f) -> f32 { return select(0.0, 0.24 * (a - b.x), b.y > 0.5); }
+fn over(p: vec2i, n: i32) -> vec2f { return bad(p, n); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
   let c = textureLoad(src, p, 0).r;
-  let e = max(c - 1.0, 0.0);
+  let e = max(c - 1.0, 0.0) + min(c, 0.0);
   let out = pair(e, over(p + vec2i(1, 0), n)) + pair(e, over(p - vec2i(1, 0), n))
           + pair(e, over(p + vec2i(0, 1), n)) + pair(e, over(p - vec2i(0, 1), n));
   textureStore(dst, p, vec4f(c - out, 0.0, 0.0, 0.0));

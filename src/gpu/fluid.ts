@@ -88,10 +88,19 @@ const MAX_SPEED = 0.002;
   How hard the magnet pulls the liquid where the ferrofluid is, per unit of
   magnetic energy gradient, in real seconds (phaseForce). Calibrated in the
   lab (scripts/lab.mjs): a hand-held magnet a fifth of the plate from a pool
-  draws it in at about a tenth of the plate a second at first, faster as it
-  closes, and the pool arrives in a couple of seconds.
+  draws it in at a quarter of the plate a second, fast enough to follow a
+  hand dragging it, and a pool a sixth of the plate off arrives in about a
+  second.
 */
-const MAGNET_GAIN = 1.5e-6;
+const MAGNET_GAIN = 6e-6;
+/*
+  The most one step of the magnet may add to a cell, in plate widths a
+  second: a guard, not a limit on the pull. At half a plate a second it
+  clipped the edge of a pool nearest the magnet and not the far one, which
+  flattened the pull, and a dragged magnet left the ferrofluid behind (CI:
+  0.023 of the plate against a hand that crossed 0.65 of it).
+*/
+const MAGNET_CAP = 3;
 const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
@@ -753,7 +762,7 @@ export class WebGPUFluid {
       stage('magnet', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
-          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep, 0.5 * perStep, 0, 0]));
+          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep, MAGNET_CAP * perStep, 0, 0]));
         this.vel.swap();
       });
     }
