@@ -733,7 +733,11 @@ try {
     // first, so this measures the camera rather than the plate's state.
     await page.evaluate(() => window.chromaglassAction?.('seed'));
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1, macroMode: false }));
-    await settle(1800);
+    // Longer than the seed's own burst: fresh blobs spread fast for a few
+    // seconds, and measured inside that the drift read 18.7 (against 4.0 on
+    // a settled plate) once Classic opened lit rather than dark, and a zoom
+    // that moved the picture 73.7 failed the 4x margin.
+    await settle(4500);
     const plate = await frame();
 
     // The plate goes on moving under all of this, so measure how far it
