@@ -979,7 +979,12 @@ export class WebGPUFluid {
     // 9. Dye: diffuse, then advect through the forced velocity
     const a = p.dt * p.diff * n2;
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
-    stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
+    stage('advect dye', (pass) => {
+      this.macCormack(pass, this.dye, this.velForced, disp, 'dye');
+      // What the spreading flow copied over more plate, thinned back (conserveDye).
+      this.run(pass, 'conserveDye', this.dye.write, [this.dye.read, this.velForced], this.arg('conserve dye', [disp, 0, 0, 0]));
+      this.dye.swap();
+    });
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
