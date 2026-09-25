@@ -7,15 +7,14 @@ name: Controls
 # numbers are in the log, and each look's sheet (the look, then each control
 # at the far end of its range) comes back as an artifact.
 
+#
+# On request only (Actions → Controls → Run workflow). It holds eight macOS
+# runners for three quarters of an hour, and on a pull request every push
+# re-ran it (a PR's paths are its whole diff, so any push matched) and
+# cancelled the run before: the gallery and the checks queued behind it for
+# a runner, and no run of it ever finished while a PR was being worked on.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'scripts/controls.mjs'
-      - 'scripts/judge.mjs'
-      - '.github/workflows/controls.yml'
-      - 'src/lib/deskPins.ts'
-      - 'src/components/desk/PerformDesk.tsx'
 
 concurrency:
   group: controls-${{ github.ref }}
