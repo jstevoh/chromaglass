@@ -53,6 +53,12 @@ const PLAIN_OUTPUT = { ...REPORTED_OUTPUT, gain: 1, gamma: 1 };
 const SCENARIOS = [
   { name: 'Classic, calm, layer 1', look: 'classic', layer: 0, settings: { layerCount: 2 } },
   { name: 'Classic, calm, layer 2', look: 'classic', layer: 1, settings: { layerCount: 2 } },
+  // Classic, calm, echoed on layer 1 with the Drop laying paint alone: what
+  // else a drop on the lead plate does is burst and shove its bubbles, shove
+  // its beads, and put the liquid's properties down. One of each off.
+  { name: 'Classic, layer 1, no bubbles', look: 'classic', layer: 0, settings: { layerCount: 2, bubbles: 0 } },
+  { name: 'Classic, layer 1, no beads', look: 'classic', layer: 0, settings: { layerCount: 2, beads: 0 } },
+  { name: 'Classic, layer 1, neither', look: 'classic', layer: 0, settings: { layerCount: 2, bubbles: 0, beads: 0 } },
   { name: 'Timbre Shifter as reported, layer 1', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} },
   { name: '… without bubbles', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: { bubbles: 0 } },
   { name: '… without the output pass', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: PLAIN_OUTPUT, settings: {} },
