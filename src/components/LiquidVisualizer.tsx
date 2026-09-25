@@ -5678,8 +5678,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
             if (R > 0 && kickStep) {
-              rock.vx += Math.cos(rock.phase) * bass01 * 7 * R;
-              rock.vy += Math.sin(rock.phase) * bass01 * 7 * R;
+              // Twice what it was: at full, with the band playing, the rock
+              // showed on 7 looks of 24 (npm run controls). A ride at full
+              // should be unmistakable.
+              rock.vx += Math.cos(rock.phase) * bass01 * 14 * R;
+              rock.vy += Math.sin(rock.phase) * bass01 * 14 * R;
               rock.phase += 2.4;   // successive kicks go different ways
             }
             // The rhythm plate: on a kick the projectionist presses the top
@@ -5692,7 +5695,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const cy = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
-                const a = 0.0012 * squeezeAmt * bass01;
+                // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
+                const a = 0.0024 * squeezeAmt * bass01;
                 const fg = currentSettings.fingering ?? 0;
                 leadPlate.applySquish(cx, cy, 40, a, fg, true);
                 leadPlate.applySquish(cx, cy, 27, a, fg);
@@ -6054,7 +6058,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (acc >= peakCount && peakBin === FILM_BINS - 1) peakBin = b;
             if (acc >= paintCount) { levelBin = b; break; }
           }
-          const level = levelBin / FILM_BIN_SCALE;
+          let level = levelBin / FILM_BIN_SCALE;
+          /*
+            Never above what is in the frame.
+
+            The level is the plate's: where its densest seventh begins. Zoomed
+            far in, the frame is a small patch of that plate, and on a look
+            that fills evenly the patch can sit wholly under the level, so all
+            of it rendered as bare ground. Measured (npm run controls), Macro
+            Zoom at 16 turned Poster 1969, Fractal Dream and Clock Glass black.
+            So the level stays under the patch actually being shown.
+          */
+          if (macroOn) {
+            const maxDim = Math.max(canvas.width, canvas.height) * 1.5;
+            const hx = 0.5 * canvas.width / maxDim / Math.max(1, shot.zoom);
+            const hy = 0.5 * canvas.height / maxDim / Math.max(1, shot.zoom);
+            let inView = 0, n = 0;
+            for (let sj = -3; sj <= 3; sj++) {
+              for (let si = -3; si <= 3; si++) {
+                const gx = Math.floor((shot.cx + si / 3 * hx) * GRID_SIZE);
+                const gy = Math.floor((shot.cy + sj / 3 * hy) * GRID_SIZE);
+                if (gx < 0 || gy < 0 || gx >= GRID_SIZE || gy >= GRID_SIZE) continue;
+                inView += Math.max(0, f0.readDensity[gx + gy * GRID_SIZE]);
+                n++;
+              }
+            }
+            if (n > 0) level = Math.min(level, 0.6 * inView / n);
+          }
           // Floor the spread: a nearly flat histogram would otherwise produce a
           // huge gain and a hard-edged, binary-looking frame.
           const peak = Math.max(level + 0.35, peakBin / FILM_BIN_SCALE);
