@@ -294,19 +294,49 @@ const KEYS: Record<DeskSurface, string> = {
   design: 'chromaglass-recipe-keys',
 };
 
+/*
+  The defaults each desk has shipped with before, so a strip saved as one of
+  them is read as never chosen.
+
+  The strip used to be written to storage the first time a desk opened,
+  whether or not anyone had chosen anything, so everyone who had ever opened
+  the Perform desk kept the rides it shipped with that day, and a new default
+  set never reached them (reported: "I'm not seeing any new performance
+  controls"). A strip is now stored only when it differs from the defaults,
+  and one that matches a set the app used to ship is the defaults.
+*/
+const SHIPPED: Record<DeskSurface, string[][]> = {
+  perform: [
+    ['dimmer', 'audioImpact', 'globalSpeed', 'automateRate', 'beatSqueeze', 'macroZoom'],
+    ['dimmer', 'globalSpeed', 'automateRate', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom'],
+  ],
+  design: [
+    ['globalSpeed', 'turbulenceScale', 'audioImpact', 'beatSqueeze', 'bloom', 'granulation', 'macroZoom', 'automateRate'],
+  ],
+};
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every(k => b.includes(k));
+
 export function loadPins(desk: DeskSurface, fallback: (keyof VisualizerSettings)[]): (keyof VisualizerSettings)[] {
   try {
     const saved = JSON.parse(localStorage.getItem(KEYS[desk]) ?? 'null');
-    // A key saved by an older build may no longer exist; dropping it here
-    // rather than at render time means the strip and this list agree about
-    // how many things are on it.
-    if (Array.isArray(saved)) return saved.filter((k: string) => PIN_RANGE.has(k));
+    if (Array.isArray(saved)) {
+      if (SHIPPED[desk].some(set => sameSet(saved, set))) return fallback;
+      // A key saved by an older build may no longer exist; dropping it here
+      // rather than at render time means the strip and this list agree about
+      // how many things are on it.
+      return saved.filter((k: string) => PIN_RANGE.has(k));
+    }
   } catch { /* private window */ }
   return fallback;
 }
 
-export function savePins(desk: DeskSurface, keys: (keyof VisualizerSettings)[]): void {
-  try { localStorage.setItem(KEYS[desk], JSON.stringify(keys)); } catch { /* private window */ }
+/** Stored only when it is a choice: the defaults are not written, so a new set of them reaches this desk. */
+export function savePins(desk: DeskSurface, keys: (keyof VisualizerSettings)[], defaults: readonly (keyof VisualizerSettings)[]): void {
+  try {
+    if (sameSet(keys.map(String), defaults.map(String))) localStorage.removeItem(KEYS[desk]);
+    else localStorage.setItem(KEYS[desk], JSON.stringify(keys));
+  } catch { /* private window */ }
 }
 
 /** Add or remove one, keeping the order a strip was built in. */

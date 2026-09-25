@@ -50,16 +50,23 @@ export interface Cue {
  * on stage.
  */
 /*
-  What a performer rides, chosen for effects that are drastic and different
-  from one another rather than refinements of the look (reported: the old
-  set were subtle, and Granulation made a few jagged cuts in the dye and
-  nothing else). Speed and Evolve Speed stay; Swirl spins the eddies up,
-  Gravity stands the plate up so the dye pours down it, Soap Bursts blow the
-  dye apart on the beat, Beat Press squeezes the glass on the kick, and Zoom
-  dives into the liquid.
+  What a performer rides. Each has to pass three tests: it shows on any look
+  within a second, pulling it back undoes it, and it does something no other
+  ride does.
+
+  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
+  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
+  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
+  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
+  on its own; raising it from zero switches Random Evolve on).
+
+  Swirl and Gravity were here and are not now, though Choose still has both.
+  Swirl only spins up eddies a look already has, so on a calm one it did
+  next to nothing. Gravity pours the dye down the plate and pulling it back
+  does not bring the dye up again: it is a scene change, not a ride.
 */
 export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
-  'dimmer', 'globalSpeed', 'automateRate', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom',
+  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
 ];
 
 const RANGE = PIN_RANGE;
@@ -98,6 +105,8 @@ interface PerformDeskProps {
   onMidi: () => void;
   onPhone: () => void;
   onPerformance: () => void;
+  /** The performance being recorded: its clock and the song attached so far. */
+  performance: { clock: string; title?: string } | null;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -255,6 +264,24 @@ export function PerformDesk(p: PerformDeskProps) {
             <span className="text-[16px] font-medium">{live?.name ?? '—'}</span>
             <span className="font-mono text-[12px] text-dim">live · {p.liveFor}</span>
           </span>
+          {/*
+            Record a performance: what you paint until you stop, kept with the
+            song that is playing (lib/performanceTake.ts). Here, beside the
+            look that is live, because a dot in the header was the only way
+            in and nobody could find it.
+          */}
+          <Button
+            height={32}
+            variant={p.performance ? 'danger' : 'secondary'}
+            kbd="T"
+            onClick={p.onPerformance}
+            midiKey="action:performance-toggle"
+            testId="performance-button"
+          >
+            {p.performance
+              ? `■ Stop · ${p.performance.clock}${p.performance.title ? ` · ${p.performance.title.length > 22 ? `${p.performance.title.slice(0, 21)}…` : p.performance.title}` : ''}`
+              : '● Record performance'}
+          </Button>
           <Segmented
             value={String(p.layer)}
             options={Array.from({ length: Math.max(1, p.layers) }, (_, i) => [String(i), `Layer ${i + 1}`] as const)}
@@ -333,7 +360,16 @@ export function PerformDesk(p: PerformDeskProps) {
                 display={readSetting(String(key), v, spec.min, spec.max)}
                 cc={p.ccFor(key)}
                 white={WHITE.has(String(key))}
-                onChange={n => p.onSetting({ [key]: n } as Partial<VisualizerSettings>)}
+                onChange={n => {
+                  p.onSetting({ [key]: n } as Partial<VisualizerSettings>);
+                  // Evolve Speed does nothing with Random Evolve off, so the
+                  // ride is the switch as well: up from zero turns it on,
+                  // down to zero turns it off.
+                  if (key === 'automateRate') {
+                    if (n > 0.005 && !p.automated) p.onAutomate(true);
+                    else if (n <= 0.005 && p.automated) p.onAutomate(false);
+                  }
+                }}
                 midiKey={`setting:${String(key)}`}
                 testId={`ride-${String(key)}`}
               />
