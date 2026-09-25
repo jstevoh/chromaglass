@@ -65,10 +65,11 @@ const SCENARIOS = [
   { ...TIMBRE, name: 'Timbre Shifter as reported, layer 2', layer: 1 },
   { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press' },
   { ...TIMBRE, name: 'the Press, plate not turned', layer: 0, tool: 'press', rotation: [0, 0.75] },
-  { ...TIMBRE, name: 'the Press, no bubbles', layer: 0, tool: 'press', settings: { bubbles: 0 } },
   { ...TIMBRE, name: 'the Press, no beads', layer: 0, tool: 'press', settings: { beads: 0 } },
   { ...TIMBRE, name: 'the Press, no output pass', layer: 0, tool: 'press', output: PLAIN_OUTPUT },
   { ...TIMBRE, name: 'the Press, layer 2', layer: 1, tool: 'press' },
+  // Does pressing the front glass press the second plate too, turned its own way?
+  { ...TIMBRE, name: 'the Press, one plate only', layer: 0, tool: 'press', settings: { layerCount: 1 } },
 ];
 
 const browser = await launchChromium(chromium);
@@ -89,26 +90,32 @@ try {
     await page.waitForTimeout(3000);
     const hole = await page.getByTestId('desk-preview').boundingBox();
     if (!hole) { check(`${sc.name}: the Design desk's preview is there`, false); await page.close(); continue; }
+    // Pictures stay in the page and only the 6x6 means come back: shipping
+    // every pixel out as JSON made ten scenarios outrun the job's timeout.
+    let shots = 0;
     const shot = async () => {
       const png = await page.screenshot({ clip: hole });
-      return page.evaluate(async (b64) => {
+      const id = shots++;
+      await page.evaluate(async ({ b64, id }) => {
         const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
         const c = new OffscreenCanvas(img.width, img.height); const x = c.getContext('2d');
         x.drawImage(img, 0, 0);
-        return { w: img.width, h: img.height, px: Array.from(x.getImageData(0, 0, img.width, img.height).data) };
-      }, png.toString('base64'));
+        (window.__shots ??= {})[id] = x.getImageData(0, 0, img.width, img.height);
+      }, { b64: png.toString('base64'), id });
+      return id;
     };
-    const grid = (a, b) => {
+    const grid = (ia, ib) => page.evaluate(({ ia, ib, G }) => {
+      const a = window.__shots[ia], b = window.__shots[ib];
       const out = Array.from({ length: G }, () => Array(G).fill(0));
       const n = Array.from({ length: G }, () => Array(G).fill(0));
-      for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) {
-        const i = (y * a.w + x) * 4;
-        const d = Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1]) + Math.abs(a.px[i + 2] - b.px[i + 2]);
-        const gx = Math.min(G - 1, Math.floor(x / a.w * G)), gy = Math.min(G - 1, Math.floor(y / a.h * G));
+      for (let y = 0; y < a.height; y++) for (let x = 0; x < a.width; x++) {
+        const i = (y * a.width + x) * 4;
+        const d = Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]);
+        const gx = Math.min(G - 1, Math.floor(x / a.width * G)), gy = Math.min(G - 1, Math.floor(y / a.height * G));
         out[gy][gx] += d; n[gy][gx]++;
       }
       return out.map((row, y) => row.map((v, x) => v / Math.max(1, n[y][x])));
-    };
+    }, { ia, ib, G });
     const add = (acc, m) => acc.forEach((row, y) => row.forEach((_, x) => { row[x] += m[y][x] / REPS; }));
     const zero = () => Array.from({ length: G }, () => Array(G).fill(0));
     // Low and to the right, so its mirror images across each axis and the centre are three different cells.
@@ -126,7 +133,8 @@ try {
       await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
       await page.waitForTimeout(500);
       const c = await shot();
-      add(drift, grid(a, b)); add(change, grid(b, c));
+      add(drift, await grid(a, b)); add(change, await grid(b, c));
+      await page.evaluate(() => { window.__shots = {}; });
     }
     const cellOf = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
     const [cy, cx] = cellOf(at.fx, at.fy);
@@ -145,7 +153,9 @@ try {
       away.push({ y, x, v: change[y][x], allowed, over: change[y][x] / allowed, tag: tags.get(`${y},${x}`) ?? '' });
     }
     away.sort((a, b) => b.over - a.over);
-    const handAt = hand ? ` — the hand on the plate at ${(hand.x / hand.grid).toFixed(2)},${(hand.y / hand.grid).toFixed(2)}` : '';
+    const rot = await page.evaluate(() => window.chromaglassDebug?.().rotation?.current ?? null);
+    const handAt = (hand ? ` — the hand on the plate at ${(hand.x / hand.grid).toFixed(2)},${(hand.y / hand.grid).toFixed(2)}` : '')
+      + (rot ? `, plates turned ${rot.map((r) => r.toFixed(2)).join(', ')}` : '');
     console.log(`     ${sc.name}: mean change by cell over ${REPS} (rows top to bottom; * the hand, m its mirror images), drift in brackets${handAt}`);
     for (let y = 0; y < G; y++) {
       console.log('       ' + change[y].map((v, x) => {

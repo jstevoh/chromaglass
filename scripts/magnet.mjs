@@ -259,8 +259,17 @@ try {
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
   console.log(`     along the hand's ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
+  /*
+    On the gain alone: what the drag added at that point beyond what the plate
+    did there on its own, at least a tenth of what was there. It also asked
+    that the dragged plate end with a fifth more than the idle one ended with,
+    and the two windows do not start from the same plate: 157 against 203 at
+    the same point on one CI run, so the drag gathered +34 beyond the idle
+    plate's change and still failed on where the idle window happened to
+    begin (two runs in five, on commits that do not touch the magnet).
+  */
   check('dragging the Magnet gathers the ferrofluid along where the hand goes',
-    !!best && best.gain > 0.1 * Math.max(1, best.d0) && best.d1 > 1.2 * Math.max(1, best.i1),
+    !!best && best.gain > 0.1 * Math.max(1, best.d0),
     best ? `${best.d0.toFixed(0)} → ${best.d1.toFixed(0)} dragged, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'no hand');
   const keptDrag = drag1.total / Math.max(1e-6, drag0.total), keptIdle = idle1.total / Math.max(1e-6, idle0.total);
   check('and dragging it neither makes nor loses more liquid than the plate does alone',
