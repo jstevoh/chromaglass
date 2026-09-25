@@ -28,6 +28,8 @@ export class WebGPUAir {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
   private readonly buffer: GPUBuffer;
+  /** Each disc's rim: fingering, finger count, finger phase, 0 (bubbles.ts, packedFinger). */
+  private readonly fingers: GPUBuffer;
   private readonly uniform: GPUBuffer;
   /*
     Two fields, and the second is not a convenience.
@@ -50,6 +52,11 @@ export class WebGPUAir {
     this.pipelines = PipelineCache.for(device, 'air');
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'air discs',
+      size: Math.max(1, capacity) * STRIDE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }));
+    this.fingers = this.disposer.track(device.createBuffer({
+      label: 'air fingers',
       size: Math.max(1, capacity) * STRIDE,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }));
@@ -87,10 +94,15 @@ export class WebGPUAir {
    * The bubbles as the field should hold them, from `BubbleField.packed`
    * (x/N, y/N, r/N, opacity). `count` is how many of them are real.
    */
-  setBubbles(packed: Float32Array, count: number, soft: number): void {
+  setBubbles(packed: Float32Array, count: number, soft: number, finger?: Float32Array): void {
     this.live = Math.max(0, Math.min(count, Math.floor(this.buffer.size / STRIDE)));
     this.packed = packed;
-    if (this.live > 0) this.device.queue.writeBuffer(this.buffer, 0, packed, 0, this.live * 4);
+    if (this.live > 0) {
+      this.device.queue.writeBuffer(this.buffer, 0, packed, 0, this.live * 4);
+      // Round when nobody says otherwise.
+      const f = finger && finger.length >= this.live * 4 ? finger : new Float32Array(this.live * 4);
+      this.device.queue.writeBuffer(this.fingers, 0, f, 0, this.live * 4);
+    }
     this.device.queue.writeBuffer(this.uniform, 0, new Uint32Array([this.live]));
     this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, 0, 0]));
   }
@@ -171,7 +183,7 @@ export class WebGPUAir {
     });
     if (this.live > 0) {
       pass.setPipeline(pipeline);
-      pass.setBindGroup(0, bindGroup(this.device, pipeline, [this.uniform, this.buffer]));
+      pass.setBindGroup(0, bindGroup(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
       pass.draw(4, this.live);
     }
     pass.end();

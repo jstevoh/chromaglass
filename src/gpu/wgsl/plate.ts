@@ -185,11 +185,23 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
   let exposed = max(0.0, totalDensity - U.filmLevel) * U.filmGain;
   let m = clamp(U.macroOn, 0.0, 1.0);
-  let thickness = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7) * gapScale;
+  /*
+    Colour Body: dye that reads as a solid body of colour rather than a
+    tint the light shows through. Thin dye goes opaque sooner, and its
+    colour is pushed away from grey, so a thin wash is still the colour
+    itself, not a paler one. At 0 this is the dye as it always was.
+  */
+  let body = clamp(U.colourBody, 0.0, 1.0);
+  let thickness = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7) * gapScale * (1.0 + 3.0 * body);
   var alpha = 1.0 - exp(-thickness);
   alpha = min(mix(0.95, 0.995, m), alpha);
+  var ltBody = lt;
+  if (body > 0.001) {
+    let l = dot(lt, vec3f(0.299, 0.587, 0.114));
+    ltBody = clamp(vec3f(l) + (lt - vec3f(l)) * (1.0 + 0.8 * body), vec3f(0.0), vec3f(1.0));
+  }
 
-  return vec4f(lt, alpha);
+  return vec4f(ltBody, alpha);
 }
 
 fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {

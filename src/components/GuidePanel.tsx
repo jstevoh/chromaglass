@@ -92,7 +92,7 @@ const SECTIONS: Section[] = [
           ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
           ['3. Pick a look', <>Click the name under the ChromaGlass title. Thirty-two presets in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
-          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
+          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
         <P>

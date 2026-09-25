@@ -109,6 +109,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'rotation0', type: 'f32' },
   { name: 'rotation1', type: 'f32' },
   { name: 'saturation', type: 'f32', note: 'final grade saturation multiplier' },
+  { name: 'colourBody', type: 'f32', note: 'how solid thin dye reads: opacity and body saturation, 0-1' },
   { name: 'thinFilm', type: 'f32', note: 'interference colour where the dye runs thinnest' },
   { name: 'time', type: 'f32' },
   { name: 'transmission', type: 'f32' },

@@ -5198,9 +5198,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
-                af.blowAir(x, y, 4, 0.06 * k);
-                if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                  bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                /*
+                  Held still on the lead plate, the Blow is a straw: one
+                  bubble on the end of it, growing while the breath goes on,
+                  its rim breaking into fingers and shedding a ring of small
+                  ones (bubbles.ts, blow). Moving, it is the wind it was.
+                */
+                const still = Math.hypot(strokeDx, strokeDy) < 0.75;
+                if (activeLayerRef.current === 0 && still) {
+                  bubblesRef.current.blow(x, y, simStepS, k);
+                } else {
+                  af.blowAir(x, y, 4, 0.06 * k);
+                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
+                    bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                  }
                 }
 
               } else if (tool === 'finger') {
@@ -5876,9 +5887,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // ── Bubbles ─────────────────────────────────────────
             const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
             const bubbles = bubblesRef.current;
+            // A look with no bubbles of its own keeps the ones blown by hand.
             if (bubbleAmt <= 0) {
-              if (bubbles.bubbles.length) bubbles.clear();
-            } else if (isActiveRef.current && drainFrameRef.current === 0) {
+              if (bubbles.anyBlown) bubbles.clearLooks();
+              else if (bubbles.bubbles.length) bubbles.clear();
+            }
+            if ((bubbleAmt > 0 || bubbles.anyBlown) && isActiveRef.current && drainFrameRef.current === 0) {
               // A few bubbles at a time, not a foam: one on a kick (usually),
               // the odd extra under sustained bass, and none once the plate
               // already carries as many as the setting allows.
@@ -6266,7 +6280,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // invisible — the harness caught it as "0 pixels changed".
         {
           const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
-          const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          // And the ones blown by hand on a look with none of its own.
+          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
           bubbleDebugRef.current = {
             count: Math.min(MAX_BUBBLES, count),
             strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
@@ -7117,7 +7132,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
-              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25);
+              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
               /*
                 And the dye those bubbles displace, put back as a ring
                 (H6 · A). Before the hand-off in reading order but after it in

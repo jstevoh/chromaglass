@@ -154,6 +154,9 @@ jobs:
       # The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.
       - name: The relief
         run: npm run derive
+      # Held still, the Blow grows a bubble with a fingered rim and a ring of satellites.
+      - name: The straw bubble
+        run: npm run straw
       - run: npm run webgpu
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's

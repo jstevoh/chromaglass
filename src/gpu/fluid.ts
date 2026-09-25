@@ -1422,9 +1422,9 @@ export class WebGPUFluid {
     return { n, data: out };
   }
 
-  setBubbles(packed: Float32Array, count: number, soft = 0.25): void {
+  setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
-    this.air.setBubbles(packed, count, soft);
+    this.air.setBubbles(packed, count, soft, finger);
   }
 
   /**
