@@ -13,11 +13,11 @@ export function ToolAmount({ tool, value, onChange, className = '' }: {
 }) {
   const means = TOOL_AMOUNT_MEANS[tool] ?? 'amount';
   return (
-    <label className={`flex items-center gap-2 text-[11px] ${className}`} title={`How much the tool does: its ${means}. 1× is the usual; double-click to reset.`} data-testid="tool-amount">
+    <label className={`flex min-w-0 items-center gap-2 text-[11px] ${className}`} title={`How much the tool does: its ${means}. 1× is the usual; double-click to reset.`} data-testid="tool-amount">
       <span className="whitespace-nowrap opacity-60">Amount</span>
       <input
         type="range"
-        className="min-w-0 flex-1"
+        className="h-6 w-0 min-w-0 flex-1"
         min={TOOL_AMOUNT.min}
         max={TOOL_AMOUNT.max}
         step={TOOL_AMOUNT.step}

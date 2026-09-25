@@ -290,7 +290,7 @@ export function PerformDesk(p: PerformDeskProps) {
             testId="tool-segmented"
             compact
           />
-          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="hidden w-44 shrink-0 text-muted xl:flex" />}
+          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="hidden min-w-0 max-w-44 flex-1 text-muted xl:flex" />}
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
               <Swatch

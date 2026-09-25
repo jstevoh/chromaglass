@@ -789,10 +789,20 @@ try {
 
     // Alt-click on the plate aims it there, and lays no dye while it does.
     {
-      const box = await page.locator('canvas').first().boundingBox();
+      // A point off the middle where the plate itself is what the pointer is over.
+      const spot = await page.evaluate(() => {
+        const c = document.getElementById('liquid-canvas');
+        const r = c?.getBoundingClientRect();
+        if (!r) return null;
+        for (const [fx, fy] of [[0.62, 0.5], [0.4, 0.5], [0.5, 0.35], [0.5, 0.65], [0.62, 0.38], [0.38, 0.62]]) {
+          const x = r.left + r.width * fx, y = r.top + r.height * fy;
+          if (document.elementFromPoint(x, y) === c) return { x, y };
+        }
+        return null;
+      });
       const before = await page.evaluate(() => window.chromaglassDebug?.().shot ?? null);
       await page.keyboard.down('Alt');
-      await page.mouse.click(box.x + box.width * 0.7, box.y + box.height * 0.5);
+      if (spot) await page.mouse.click(spot.x, spot.y);
       await page.keyboard.up('Alt');
       await settle(300);
       const aim = await page.evaluate(() => { const s = window.chromaglassSettings?.() ?? {}; return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
