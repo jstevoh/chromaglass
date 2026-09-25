@@ -33,6 +33,7 @@
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",
+    "liquidfile": "node --experimental-strip-types scripts/liquidfile.mjs",
     "qa": "npm run build && node scripts/qa.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",

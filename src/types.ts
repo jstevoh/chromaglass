@@ -42,6 +42,12 @@ export interface LiquidBehaviour {
   polarity?: number;
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
+  /**
+   * Ferrofluid: how much of each drop goes into the dark liquid a magnet
+   * pulls (the solver's second phase). That liquid never mixes with the dye;
+   * the magnet, and the maze field, move it.
+   */
+  magnetic?: number;
 }
 
 export interface LiquidType {
@@ -129,6 +135,17 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
     behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8 } },
+  /*
+    Ferrofluid was the plate's, not a bottle: a look laid it, or picking the
+    Magnet poured some over the whole plate. As a bottle it goes where it is
+    dropped, and only there. Its colour is its own (the dark liquid is drawn
+    by the plate, not by the dye), so it lays next to no dye; heavy, oily and
+    immiscible, as a real one is (magnetite in a carrier oil).
+  */
+  { id: 'ferrofluid', name: 'Ferrofluid', color: '#1b1c22',
+    description: 'Black and magnetic: it will not mix, and the Magnet pulls it into spikes and mazes',
+    injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0,
+    behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**

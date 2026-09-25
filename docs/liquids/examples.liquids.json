@@ -1,0 +1,27 @@
+{
+  "format": "chromaglass.liquids",
+  "version": 1,
+  "liquids": [
+    {
+      "name": "Mercury Silk",
+      "color": "#c8d0e0",
+      "description": "Heavy and slick: it sinks, and keeps its edge against everything",
+      "drop": { "size": 3, "amount": 1.2, "heat": 0 },
+      "behaviour": { "weight": 0.4, "polarity": -0.7, "repel": 0.5 }
+    },
+    {
+      "name": "Swamp Soap",
+      "color": "#7fbf5a",
+      "description": "Green and soapy: colour runs from it in filaments",
+      "drop": { "size": 4, "amount": 0.6 },
+      "behaviour": { "soap": 0.9, "polarity": -0.2 }
+    },
+    {
+      "name": "Lodestone Ink",
+      "color": "#3a2a55",
+      "description": "A violet dye with ferrofluid in it: the Magnet pulls the dark part",
+      "drop": { "size": 3, "amount": 0.9 },
+      "behaviour": { "magnetic": 0.6, "weight": 0.2, "polarity": -0.4 }
+    }
+  ]
+}

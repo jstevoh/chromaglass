@@ -85,7 +85,11 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 
 // ── 4. Each liquid that does something is actually poured ────────────
 {
-  const behavioural = DEFAULT_LIQUID_TYPES.filter(l => l.behaviour).map(l => l.id);
+  // A magnetic bottle is the second phase in a bottle, and a look that lays
+  // the phase (phaseAmount) is what uses it: the dish's liquids are dosed by
+  // the automation, and dosing ferrofluid for an hour would fill the plate.
+  const laysPhase = PRESETS.some(p => (p.settings.phaseAmount ?? 0) > 0.002);
+  const behavioural = DEFAULT_LIQUID_TYPES.filter(l => l.behaviour && !(l.behaviour.magnetic && laysPhase)).map(l => l.id);
   const used = new Set(Object.values(PRESET_LIQUIDS).flat());
   const unused = behavioural.filter(id => !used.has(id));
   check('every liquid with physics in it is used by some preset', unused.length === 0, unused.join(', '));
@@ -108,7 +112,8 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     const c = [0, 1, 2].map(i => Math.exp(-(plate * ab(YELLOW[i]) + amount * ab(RED[i])) / d));
     return c[0] > c[1] * 1.5 && c[0] > c[2] * 1.5;
   };
-  const invisible = DEFAULT_LIQUID_TYPES.filter(l => !showsUp(l.injectAmount ?? 0));
+  // Except the ferrofluid, whose colour is the plate's dark liquid, not dye.
+  const invisible = DEFAULT_LIQUID_TYPES.filter(l => !l.behaviour?.magnetic && !showsUp(l.injectAmount ?? 0));
   check('every bottle lays enough dye to show the colour you picked',
     invisible.length === 0,
     invisible.map(l => `${l.id} at ${l.injectAmount}`).join(', '));

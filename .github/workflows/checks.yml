@@ -86,6 +86,11 @@ jobs:
       - name: The liquids
         run: npm run liquids
 
+      # A liquid someone made: the file reads back as what they meant, a bad
+      # one says why, and "how it meets the others" agrees with the shelf.
+      - name: The liquids file
+        run: npm run liquidfile
+
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
       - name: The room

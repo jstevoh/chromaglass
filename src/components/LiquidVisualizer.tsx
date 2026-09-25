@@ -691,9 +691,19 @@ class FluidSimulation {
     this.liquid.onDeposit = (cx, cy, radius, what, amount) => {
       const g = this.gpu;
       const s = this.lastSettings;
-      if (!g?.addMix || !s || amount <= 0) return;
+      if (!g || !s || amount <= 0) return;
+      /*
+        A magnetic liquid pours into the second phase, where it lands and
+        nowhere else. The phase is additive and full at 1, so a held drop
+        builds a pool over a few steps rather than filling it at once.
+      */
+      if ((what.magnetic ?? 0) > 0 && g.addPhase) {
+        const L = this.size;
+        g.addPhase(cx / L, cy / L, Math.max(1.5, radius * 1.4) / L, 0.25 * Math.min(1, what.magnetic ?? 0) * Math.min(1, amount));
+      }
+      if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
-      const oil = oilOn ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
+      const oil = oilOn && !(what.magnetic ?? 0) ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
       const soap = (s.surfactantFlow ?? 0) > 0.001 ? (what.soap ?? 0) * Math.min(1, amount) : 0;
       const acid = (s.phIndicator ?? 0) > 0.001 ? (what.acid ?? 0) * Math.min(1, amount) : 0;
       if (oil <= 0 && soap <= 0 && acid === 0) return;
@@ -4942,8 +4952,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         {
           const amt = settingsRef.current.phaseAmount ?? 0;
+          // Not when it was turned up for the Ferrofluid bottle: that one
+          // goes where it is dropped, not over the whole plate.
+          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0 && activeToolRef.current !== 'magnet';
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
-              && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
+              && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
             layPhaseRef.current();
           }
           phaseAmountRef.current = amt;

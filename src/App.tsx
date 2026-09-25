@@ -21,6 +21,7 @@ import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
+import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
 import { PRESETS } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
@@ -472,7 +473,22 @@ export default function App() {
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
-  const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES]);
+  // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
+  const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
+  useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
+  /** Put made liquids on the shelf, replacing any with the same id. */
+  const shelveLiquids = useCallback((made: LiquidType[]) => {
+    setLiquidTypes(prev => {
+      const byId = new Map(made.map(l => [l.id, l]));
+      const kept = prev.map(l => byId.get(l.id) ?? l);
+      return [...kept, ...made.filter(l => !prev.some(p => p.id === l.id))];
+    });
+  }, []);
+  const removeLiquid = useCallback((id: string) => {
+    if (!isCustomLiquid({ id })) return;
+    setLiquidTypes(prev => prev.filter(l => l.id !== id));
+    setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
+  }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
   const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
 
@@ -1385,6 +1401,18 @@ export default function App() {
     return () => { clearInterval(id); clearInterval(glide); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
+
+  /*
+    The Ferrofluid bottle needs the plate to draw ferrofluid at all: picking
+    it on a look with none turns the amount up, and the visualizer, seeing
+    the bottle, leaves the plate bare for the drops to land on.
+  */
+  useEffect(() => {
+    if (!((selectedLiquid.behaviour?.magnetic ?? 0) > 0)) return;
+    if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
+    updateSettings({ phaseAmount: 0.6 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLiquid, presetSeq]);
 
   /*
     The Magnet brings its ferrofluid. A magnet over a plate with none on it
@@ -3546,6 +3574,7 @@ export default function App() {
             midiClocked={midi.clocked}
             timecode={timecode ? formatTimecode(timecode) : null}
             focusSection={settingsSection}
+            liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
             /*
               The panel can put any of its controls on either desk, so it needs
               to know what is already on them. One list per surface, shared with
