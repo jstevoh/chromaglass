@@ -1883,6 +1883,9 @@ export class WebGPUFluid {
   }
 
   get rbDyeView(): Float32Array { return this.rbDye; }
+  /** The dye readback's sequence: the newest copy issued, and the newest landed in `rbDyeView`. */
+  get rbDyeIssued(): number { return this.rbRings.dye.issued; }
+  get rbDyeLanded(): number { return this.rbRings.dye.landed; }
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */

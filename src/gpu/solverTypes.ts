@@ -175,6 +175,9 @@ export interface PlateSolver {
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;
+  /** The dye readback's newest copy issued, and the one `rbDyeView` holds. */
+  readonly rbDyeIssued: number;
+  readonly rbDyeLanded: number;
   readonly rbVelView: Float32Array;
   /** The fields as the CPU last saw them, for carrying state across a change. */
   readback(): { dye: Float32Array; vel: Float32Array };

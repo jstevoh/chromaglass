@@ -265,6 +265,9 @@ export class ReadbackRing {
     }));
   }
 
+  /** The newest copy asked for: a reading is of the GPU as of its copy (see `landed`). */
+  get issued(): number { return this.seq; }
+
   /** Copy `src` into a free slot as part of `encoder`; false when every slot is still in flight (skip this frame). */
   copyFrom(encoder: GPUCommandEncoder, src: GPUBuffer, offset = 0): GPUBuffer | null {
     const slot = this.slots.find((s) => !s.busy);

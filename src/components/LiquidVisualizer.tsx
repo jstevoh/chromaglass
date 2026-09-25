@@ -607,6 +607,27 @@ class FluidSimulation {
     refilling to 124% of what had been there.
   */
   private rbSeq = 0;
+  /**
+   * The dye readback a hand's move must wait for: one copied after its last
+   * move reached the plate.
+   *
+   * Press and Finger move dye by reading how much is under the hand from the
+   * readback mirror, taking it out with a multiply and putting it down
+   * elsewhere. They ran every step, several a frame, and the mirror is a frame
+   * or two old, so each step read the dye the steps before had already moved
+   * and put it down again: the multiply compounded and the deposit repeated.
+   * npm run tools measured it: Finger 159 -> 566 and Press 89 -> 206 against
+   * -4 and -10 for the same pool left alone. Now each acts once per reading
+   * that already includes its last move, and takes more when it does.
+   */
+  private dyeMoveAfter = 0;
+  private dyeMirrorCurrent(): boolean {
+    return !!this.gpu && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
+  }
+  private dyeMoved(): void {
+    // The next copy issued may be taken before this step's deltas are flushed, so the one after it.
+    if (this.gpu) this.dyeMoveAfter = this.gpu.rbDyeIssued + 2;
+  }
   private rimSeq = -1;
   /*
     Whether the attached solver has handed anything back yet, and what it was
@@ -896,7 +917,7 @@ class FluidSimulation {
    * halves read the same mirror.
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
-    if (!this.gpu) return;
+    if (!this.gpu || !this.dyeMirrorCurrent()) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
     const R = Math.max(2, radius);
@@ -916,7 +937,9 @@ class FluidSimulation {
     let mass = 0, aR = 0, aG = 0, aB = 0;
     // How much of what is under the palm goes, this press. A share rather
     // than all of it: a hand squeezes the film thin, it does not scrape it.
-    const take = Math.max(0, Math.min(0.6, amount * 12));
+    // Once per current reading now (see dyeMoveAfter), a few frames apart, so a
+    // bigger share each time for the same press.
+    const take = Math.max(0, Math.min(0.6, amount * 48));
     for (const i of disc) {
       const i4 = i * 4;
       const v = dye[i4 + 3];
@@ -935,6 +958,7 @@ class FluidSimulation {
       this.density[i] += mass * w;
       this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
     }
+    this.dyeMoved();
   }
 
   /**
@@ -2019,7 +2043,8 @@ class FluidSimulation {
       Dye is taken from behind the finger and put in front of it, conserving
       because both halves read the same mirror.
     */
-    this.carryDye(x, y, r, ux, uy, Math.min(0.45, strength * 4));
+    // More per act than it was: it acts once per current reading, not every step.
+    this.carryDye(x, y, r, ux, uy, Math.min(0.75, strength * 8));
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
@@ -2031,7 +2056,8 @@ class FluidSimulation {
    * because both are read from the same mirror in the same pass.
    */
   private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): void {
-    if (!this.gpu) return;
+    if (!this.gpu || !this.dyeMirrorCurrent()) return;
+    let moved = false;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
     // A short hop: far enough to read as carried, short enough that the dye
@@ -2053,6 +2079,7 @@ class FluidSimulation {
         const w = take * (1 - Math.sqrt(d2) / r);
         if (!(w > 1e-4)) continue;
         this.dirty = true;
+        moved = true;
         this.mul[si] *= 1 - w;
         this.density[ti] += amount * w;
         this.densityR[ti] += dye[s4] * w;
@@ -2060,6 +2087,7 @@ class FluidSimulation {
         this.densityB[ti] += dye[s4 + 2] * w;
       }
     }
+    if (moved) this.dyeMoved();
   }
 
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
