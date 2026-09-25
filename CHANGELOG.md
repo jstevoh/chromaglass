@@ -17,15 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hundredths of the plate a second and left the ferrofluid behind. A magnet
   in the hand is also held closer and stronger now, so it grabs what is near
   it and drags it along.
-- **The ferrofluid follows real magnetics.** The pull is the gradient of the
-  field squared from a magnet below the glass: zero straight over it, so the
-  liquid pools there instead of being yanked to a point, and falling away as
-  the seventh power of distance, so lifting the magnet weakens it everywhere.
-  The ferrofluid moves at a speed proportional to the force, as a viscous
-  liquid does between two glasses, and it is moved conservatively and cannot
-  be packed past full, so it pools to its own volume and none is made or lost.
-  It shoves the dyed water it moves through, which now flows around a dragged
-  drop instead of the drop passing through it like a ghost.
+- **The ferrofluid follows real magnetics.** The pull comes from the
+  gradient of the magnetic energy of a magnet below the glass: zero straight
+  over it, falling away steeply with distance, and saturating close in the way
+  a real ferrofluid's magnetisation does. It acts as a force on the liquid
+  where the ferrofluid is, so a dragged pool pushes the dyed water aside
+  instead of passing through it, and the ferrofluid is carried in a form that
+  neither makes nor loses any and never packs it past full.
+- **The flow is properly incompressible.** The pressure solve is now a
+  multigrid V-cycle instead of twelve sweeps from scratch, which only ever
+  cancelled the flow's compression at the scale of a few cells. Measured, it
+  leaves a twelfth of the divergence. Every look's liquid swirls and closes
+  around itself more like water now, rather than spreading and bunching.
 - **Magnet Polarity is gone.** It pushed the ferrofluid away with the magnet
   turned over, which no ferrofluid does: magnetised by the field itself, it is
   drawn to either pole.

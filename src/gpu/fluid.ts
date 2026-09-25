@@ -68,6 +68,16 @@ export interface FieldStats {
  * the only honest way to claim the two are equivalent.
  */
 const PRESSURE_SWEEPS = 12;
+/*
+  The projection as multigrid V-cycles rather than sweeps alone (see
+  mgRestrict0 in wgsl/fluid.ts): two cycles of two sweeps each way per level,
+  and enough sweeps at the coarsest (a few cells across) to finish it there.
+*/
+const MG_CYCLES = 2;
+const MG_SWEEPS = 2;
+const MG_COARSE_SWEEPS = 16;
+/** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
+const PHASE_RELAX = 6;
 const CURRENT_ITERS = 10;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
@@ -75,15 +85,13 @@ const DYE_ITERS = 4;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
 /*
-  The ferrofluid's terminal speed under the magnet, in plate widths a second:
-  a viscous liquid in a thin gap moves at a speed proportional to the force on
-  it (Darcy), and this is where the force stops mattering. Fast enough for a
-  hand-held magnet to drag a pool along, and the substeps are counted from
-  it so no face moves more than a quarter of a cell.
+  How hard the magnet pulls the liquid where the ferrofluid is, per unit of
+  magnetic energy gradient, in real seconds (phaseForce). Calibrated in the
+  lab (scripts/lab.mjs): a hand-held magnet a fifth of the plate from a pool
+  draws it in at about a tenth of the plate a second at first, faster as it
+  closes, and the pool arrives in a couple of seconds.
 */
-const MAGNET_VMAX = 0.4;
-/** How much of the gap between the water's velocity and the ferrofluid's drift closes per step, inside the ferrofluid. */
-const MAGNET_DRAG = 0.2;
+const MAGNET_GAIN = 1.5e-6;
 const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
@@ -119,6 +127,10 @@ export class WebGPUFluid {
    * lost by keeping it as one.
    */
   private readonly press: GPUBuffer;
+  /** The multigrid's coarse levels (level 0 is `press` itself): each half the size of the one above. */
+  private readonly mg: { n: number; p: GPUBuffer; b: GPUBuffer }[] = [];
+  /** How the projection solves: multigrid V-cycles (the show), or the sweeps alone (kept for A/B checks). */
+  pressureSolver: 'multigrid' | 'sweeps' = 'multigrid';
   /** The squeeze film's pressure, packed as two colour planes like `press`. */
   private readonly spress: GPUBuffer;
   private readonly cur: PingPong;
@@ -249,6 +261,11 @@ export class WebGPUFluid {
       size: this.N * this.N * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
+    for (let n = this.N; n % 2 === 0 && n / 2 >= 4;) {
+      n /= 2;
+      const make = (label: string) => this.disposer.track(device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE }));
+      this.mg.push({ n, p: make(`mg p ${n}`), b: make(`mg b ${n}`) });
+    }
     this.spress = this.disposer.track(device.createBuffer({
       label: 'squeeze pressure',
       size: this.N * this.N * 4,
@@ -726,18 +743,20 @@ export class WebGPUFluid {
 
     // 4. Project, 5. advect velocity by itself, 6. project again
     /*
-      The ferrofluid shoves the water it moves through (H7): inside it, the
-      water is carried at the magnet's drift, and the projection that follows
-      turns that into the flow around the drop. Only with a magnet under a
-      plate that has ferrofluid on it.
+      The magnet, as a force on the liquid where the ferrofluid is (H7,
+      phaseForce): before the projection, which keeps the part that carries a
+      drop toward the magnet and the water around it. Real seconds over the
+      flow's own displacement is what makes the pull the same on a slow look
+      as a fast one. Only with a magnet under a plate that has ferrofluid.
     */
-    const magnetOn = this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0;
-    stage('phase drag', (pass) => {
-      const gain = Math.min(400, (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7));
-      this.run(pass, 'phaseDrag', this.vel.write, [this.vel.read, this.phase.read],
-        this.arg('phase drag', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, gain, MAGNET_VMAX, MAGNET_DRAG, 0]));
-      this.vel.swap();
-    }, magnetOn);
+    if (this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0) {
+      stage('magnet', (pass) => {
+        const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
+        this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
+          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep, 0.5 * perStep, 0, 0]));
+        this.vel.swap();
+      });
+    }
     stage('project 1', (pass) => this.project(pass));
     stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
     stage('project 2', (pass) => this.project(pass));
@@ -783,28 +802,19 @@ export class WebGPUFluid {
       together — and before anything reads the plate, so the compositor sees
       the phase where it actually is this frame.
 
-      The flow carries it first, then the magnet pulls it, as conservative
-      fluxes rather than a backtrace (a backtrace along a converging field
-      makes and loses liquid). The water feels the same pull earlier in the
-      step (phase drag), where the projection can turn it into flow.
+      The flow carries it, in flux form so none is made or lost, and its own
+      pressure keeps it from packing past full. The magnet acts on the flow,
+      earlier in the step.
 
       Skipped entirely on a plate with no phase on it, which is most looks.
     */
     stage('phase', (pass) => {
-      this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced, this.sampler],
+      this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced],
         this.arg('phase advect', [0, 0, 0, 0, 0, disp, 0, 0]));
       this.phase.swap();
-      // The magnet's pull, in substeps short enough that no face carries
-      // more than a quarter of a cell (phaseMagnet keeps 0..1 that way).
-      if (magnetOn) {
-        const seconds = p.magnetSeconds ?? 0;
-        const subs = Math.max(1, Math.min(24, Math.ceil(MAGNET_VMAX * seconds * N / 0.25)));
-        const vmax = Math.min(MAGNET_VMAX, (0.25 * subs) / Math.max(1e-6, seconds * N));
-        const args = this.arg('phase magnet', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, (seconds / subs) * N, vmax, 0, 0]);
-        for (let k = 0; k < subs; k++) {
-          this.run(pass, 'phaseMagnet', this.phase.write, [this.phase.read], args);
-          this.phase.swap();
-        }
+      for (let k = 0; k < PHASE_RELAX; k++) {
+        this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
+        this.phase.swap();
       }
       this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
         this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
@@ -1089,6 +1099,76 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(Math.ceil((this.N * this.N) / 64));
   }
 
+  /** Red-black sweeps on level 0, the packed buffer. */
+  private smooth0(pass: GPUComputePassEncoder, sweeps: number): void {
+    const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
+    const half = Math.ceil((this.N * (this.N / 2)) / 64);
+    for (let k = 0; k < sweeps; k++) {
+      for (const parity of [0, 1]) {
+        const args = this.arg(`pressure ${parity}`, [parity, 0, 0, 0]);
+        const key = `pressureRedBlack:${parity}`;
+        let group = this.groups.get(key);
+        if (!group) {
+          group = bindGroup(this.device, pipe, [this.sim, args, this.div, this.press]);
+          this.groups.set(key, group);
+        }
+        pass.setPipeline(pipe);
+        pass.setBindGroup(0, group);
+        pass.dispatchWorkgroups(half);
+      }
+    }
+  }
+
+  /** A one-dimensional dispatch over buffers, its bind group cached under `key`. */
+  private dispatchBuf(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count: number): void {
+    const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(Math.ceil(count / 64));
+  }
+
+  /**
+   * One multigrid V-cycle from level `l` down (see `mgRestrict0` in
+   * `wgsl/fluid.ts` for why). Smooth, hand the residual to the level below,
+   * solve there, bring the correction back, smooth again; the coarsest level
+   * is small enough for sweeps alone to finish it.
+   */
+  private vcycle(pass: GPUComputePassEncoder, l: number): void {
+    const smooth = (level: number, sweeps: number) => {
+      if (level === 0) { this.smooth0(pass, sweeps); return; }
+      const lv = this.mg[level - 1];
+      for (let k = 0; k < sweeps; k++) {
+        for (const parity of [0, 1]) {
+          this.dispatchBuf(pass, 'mgSmooth', `mgSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+            [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
+        }
+      }
+    };
+    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS); return; }
+    smooth(l, MG_SWEEPS);
+    const below = this.mg[l];
+    if (l === 0) {
+      this.dispatchBuf(pass, 'mgRestrict0', 'mgRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.press, below.b], below.n * below.n);
+    } else {
+      const here = this.mg[l - 1];
+      this.dispatchBuf(pass, 'mgRestrict', `mgRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, below.b], below.n * below.n);
+    }
+    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.vcycle(pass, l + 1);
+    if (l === 0) {
+      this.dispatchBuf(pass, 'mgProlong0', 'mgProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.press], this.N * this.N);
+    } else {
+      const here = this.mg[l - 1];
+      this.dispatchBuf(pass, 'mgProlong', `mgProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p], here.n * here.n);
+    }
+    smooth(l, MG_SWEEPS);
+  }
+
   /**
    * Make the velocity divergence-free: find the pressure whose gradient
    * cancels the divergence, and subtract it.
@@ -1113,21 +1193,10 @@ export class WebGPUFluid {
         this.squeezeMean, this.squeezeGain, 0]));
     this.clearBuffer(pass, this.press, 'clear pressure');
 
-    const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
-    const half = Math.ceil((this.N * (this.N / 2)) / 64);
-    for (let k = 0; k < PRESSURE_SWEEPS; k++) {
-      for (const parity of [0, 1]) {
-        const args = this.arg(`pressure ${parity}`, [parity, 0, 0, 0]);
-        const key = `pressureRedBlack:${parity}`;
-        let group = this.groups.get(key);
-        if (!group) {
-          group = bindGroup(this.device, pipe, [this.sim, args, this.div, this.press]);
-          this.groups.set(key, group);
-        }
-        pass.setPipeline(pipe);
-        pass.setBindGroup(0, group);
-        pass.dispatchWorkgroups(half);
-      }
+    if (this.pressureSolver === 'multigrid' && this.mg.length > 0) {
+      for (let c = 0; c < MG_CYCLES; c++) this.vcycle(pass, 0);
+    } else {
+      this.smooth0(pass, PRESSURE_SWEEPS);
     }
 
     const grad = this.pipelines.computePipeline('gradientSubtractBuf', kernel('gradientSubtractBuf', 'rgba16float'));
