@@ -41,6 +41,18 @@ the measurements):
   Press and Zoom (with the Dimmer): each does something large and different.
   Granulation is off the desk (it made a few jagged cuts in the dye).
 
+### Changed — performances start and stop by hand
+
+- **T on either desk, the Performance dot in the desk header, or Start in
+  the Track panel** starts recording a performance, and the same stops it:
+  everything painted in between is kept. It used to be tied to song
+  detection, so a performance started late, ran on into the next song, and
+  with no song identified was never kept at all.
+- **The song is attached for you**: the one playing when it started, or the
+  one identified by the time it stopped. Its gestures are timed in the song,
+  so a replay lands them at the same moments; with no song, it replays on its
+  own clock. Performances are listed in the Track panel to replay or delete.
+
 ### Added — the plate's speed follows the music
 
 - **Tempo Sync.** The presets ran their liquid at speeds nearly two thousand

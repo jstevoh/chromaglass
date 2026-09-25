@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Sparkles } from 'lucide-react';
-import { MusicIntelState } from '../hooks/useMusicIntelligence';
+import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Sparkles, Circle, Trash2 } from 'lucide-react';
+import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence';
+import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
 
 interface TrackPanelProps {
@@ -11,6 +12,14 @@ interface TrackPanelProps {
   onManualTag: (artist: string, title: string) => void;
   onReplayListen: (listenNumber: number) => void;
   onStopReplay: () => void;
+  /** Performances, started and stopped by hand (lib/performanceTake.ts). */
+  performance: PerformanceState;
+  /** The live one's clock, "1:23", or null. */
+  performanceClock: string | null;
+  onTogglePerformance: () => void;
+  onReplayPerformance: (id: string) => void;
+  onStopPerformanceReplay: () => void;
+  onDeletePerformance: (id: string) => void;
   onClose: () => void;
 }
 
@@ -38,7 +47,8 @@ const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onC
 );
 
 export const TrackPanel: React.FC<TrackPanelProps> = ({
-  state, musicSettings, onUpdateMusicSettings, onManualTag, onReplayListen, onStopReplay, onClose,
+  state, musicSettings, onUpdateMusicSettings, onManualTag, onReplayListen, onStopReplay,
+  performance, performanceClock, onTogglePerformance, onReplayPerformance, onStopPerformanceReplay, onDeletePerformance, onClose,
 }) => {
   const [tagArtist, setTagArtist] = useState('');
   const [tagTitle, setTagTitle] = useState('');
@@ -179,6 +189,72 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           </div>
         </section>
       )}
+
+      {/* ── Performances ─────────────────────────────────────────── */}
+      <section className="mb-8" data-testid="performances">
+        <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+          <Circle size={12} /> Performances
+        </h3>
+        <button
+          onClick={onTogglePerformance}
+          data-testid="performance-toggle"
+          className={`flex items-center justify-center gap-2 w-full mb-2 px-3 py-2.5 rounded-lg border text-[12px] font-bold uppercase tracking-widest transition-colors ${
+            performance.live
+              ? 'bg-red-500/25 border-red-400/50 text-red-100 hover:bg-red-500/35'
+              : 'bg-white/5 border-white/15 hover:bg-white/10'
+          }`}
+        >
+          {performance.live
+            ? <><Square size={11} /> Stop and keep · {performanceClock ?? '0:00'}</>
+            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a performance</>}
+        </button>
+        <p className="text-[9px] opacity-40 mb-3 leading-relaxed">
+          {performance.live
+            ? (performance.live.title ? `With “${performance.live.title}”. ` : 'No song identified yet; one that is by the time you stop is attached. ')
+              + 'Everything you paint until you stop is kept.'
+            : 'Start, paint, stop: what you painted is kept with the song that is playing, and replays at the same moments in it. T on the desks.'}
+        </p>
+        {performance.saved.length > 0 && (
+          <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto">
+            {performance.saved.map(perf => {
+              const replaying = performance.replayingId === perf.id;
+              return (
+                <div
+                  key={perf.id}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${
+                    replaying ? 'bg-purple-500/20 border-purple-400/40' : 'bg-white/5 border-white/10'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold truncate">{perf.title ?? 'No song'}{perf.artist ? ` — ${perf.artist}` : ''}</div>
+                    <div className="text-[9px] opacity-50">
+                      {new Date(perf.date).toLocaleString()} · {clockText(perf.durationSec)} · {perf.gestures.length} gestures
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => (replaying ? onStopPerformanceReplay() : onReplayPerformance(perf.id))}
+                      title={replaying ? 'Stop the replay' : perf.clock === 'song'
+                        ? 'Replay it: with its song playing it follows the song, otherwise it plays on its own'
+                        : 'Replay it on its own clock'}
+                      className="p-1.5 rounded-md hover:bg-white/10"
+                    >
+                      {replaying ? <Square size={11} /> : <Play size={11} />}
+                    </button>
+                    <button
+                      onClick={() => onDeletePerformance(perf.id)}
+                      title="Delete this performance"
+                      className="p-1.5 rounded-md hover:bg-white/10 opacity-60 hover:opacity-100"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* ── History / Replay ─────────────────────────────────────── */}
       {trackState && trackState.listens.length > 0 && (

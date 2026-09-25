@@ -97,6 +97,7 @@ interface PerformDeskProps {
   onWall: () => void;
   onMidi: () => void;
   onPhone: () => void;
+  onPerformance: () => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -169,6 +170,7 @@ export function PerformDesk(p: PerformDeskProps) {
         onWall={p.onWall}
         onMidi={p.onMidi}
         onPhone={p.onPhone}
+        onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
           <>

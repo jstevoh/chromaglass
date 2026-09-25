@@ -27,6 +27,7 @@ import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/li
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { driftLook } from '../src/lib/drift.ts';
 import { lookSpeed, musicPace, tempoMultiplier } from '../src/lib/tempoPace.ts';
+import { finishTake, takeSong, replayPosition, dueGestures, songStartMs } from '../src/lib/performanceTake.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
@@ -1429,6 +1430,41 @@ check('and neither starts over the limit',
     `72 bpm ×${slow.toFixed(2)}, 174 bpm ×${fast.toFixed(2)}; quiet ×${quiet.toFixed(2)}, loud ×${loud.toFixed(2)}; silence ×${silent.toFixed(2)}`);
   check('and Random Evolve follows the music harder',
     Math.abs(Math.log(tempoMultiplier(mid * 4, 1, 0.5, true))) > Math.abs(Math.log(tempoMultiplier(mid * 4, 1, 0.5, false))));
+}
+
+// ── Performances start and stop by hand (lib/performanceTake.ts) ──
+/*
+  Reported: "the performance auto detect doesn't work well. lets instead
+  focus first on starting/stopping performances manually. The automatic
+  aspect can simply be taking the already running song ID and attaching it
+  to the performance that was started/stopped."
+*/
+{
+  // A song identified 30 s in at 100 000 ms: it began at 70 000.
+  const song = { isrc: 'US1', title: 'Song', identifiedAtMs: 100000, offsetSec: 30 };
+  const start = songStartMs(song);
+  check('a song\'s start is where it was identified, less the offset it matched at', start === 70000, String(start));
+  const running = { isrc: 'US1', title: 'Song', startMs: start };
+  // Started at 90 000 (20 s into the song), two gestures 1 s and 5 s in, stopped at 100 000.
+  const gs = [{ t: 1, tool: 'dropper', x: 0.5, y: 0.5 }, { t: 5, tool: 'spray', x: 0.2, y: 0.3 }];
+  const perf = finishTake(gs, 90000, 100000, takeSong(running, null), 'a', 'd');
+  check('with a song running, the gestures are timed in the song, so a replay lands them where they were painted',
+    perf.clock === 'song' && perf.isrc === 'US1' && perf.gestures[0].t === 21 && perf.gestures[1].t === 25 && perf.durationSec === 10,
+    `${perf.clock}, ${perf.gestures.map(g => g.t).join(', ')} s into the song`);
+  const later = takeSong(null, running);
+  check('a song identified only after it started is attached when it stops', later?.isrc === 'US1');
+  const other = { isrc: 'US2', startMs: 95000 };
+  check('and the song it started with wins over one that came on after', takeSong(running, other)?.isrc === 'US1');
+  const bare = finishTake(gs, 90000, 100000, null, 'b', 'd');
+  check('with no song at all it keeps its own clock', bare.clock === 'wall' && !bare.isrc && bare.gestures[1].t === 5);
+  // Replay: with its song playing it follows the song; without, its own clock from its first gesture.
+  const withSong = replayPosition(perf, 0, 95000, { isrc: 'US1', identifiedAtMs: 100000, offsetSec: 30 });
+  const alone = replayPosition(perf, 50000, 52000, null);
+  check('a replay follows the song when its song is playing, and runs on its own when it is not',
+    withSong === 25 && Math.abs(alone - (21 - 0.25 + 2)) < 1e-9, `${withSong} s with the song; ${alone.toFixed(2)} s alone`);
+  const fired = new Set();
+  const first = dueGestures(perf.gestures, 20, 22, fired), again = dueGestures(perf.gestures, 20, 26, fired);
+  check('and fires each gesture once', first.length === 1 && again.length === 1 && again[0].tool === 'spray');
 }
 
 // ── The two desks carry the same actions on the top bar ───────────

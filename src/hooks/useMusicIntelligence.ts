@@ -14,8 +14,9 @@ import { AudioData } from './useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import {
   TrackIdentity, SongMap, TrackEvolutionState, MusicSettings,
-  LyricTrigger, SongSection, LyricLine, GestureEvent,
+  LyricTrigger, SongSection, LyricLine, GestureEvent, SavedPerformance,
 } from '../lib/musicTypes';
+import { songStartMs, finishTake, takeSong, replayPosition, dueGestures, type TakeSong } from '../lib/performanceTake';
 import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '../lib/fingerprint';
 import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
 import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
@@ -25,7 +26,10 @@ import {
   trackSeed, newTrackState, evolveAfterListen, buildVisualParams,
   paramsToSnapshot, pickPresetForTrack, MusicVisualParams,
 } from '../lib/evolution';
-import { getSongMap, putSongMap, getTrackState, putTrackState, getAllTrackStates } from '../lib/musicDb';
+import {
+  getSongMap, putSongMap, getTrackState, putTrackState, getAllTrackStates,
+  putPerformance, getAllPerformances, deletePerformance as dbDeletePerformance,
+} from '../lib/musicDb';
 
 const IDENTIFY_INTERVAL_MS = 35_000; // API re-check cadence while a track is identified
 const IDENTIFY_RETRY_MS = 10_000;    // API retry cadence while nothing is identified
@@ -63,6 +67,16 @@ export interface MusicIntelState {
   allTracks: TrackEvolutionState[];
 }
 
+export interface PerformanceState {
+  /** The one being recorded: when it started, and the song attached so far. */
+  live: { startedAtMs: number; title?: string } | null;
+  /** Newest first. */
+  saved: SavedPerformance[];
+  replayingId: string | null;
+  /** What the last stop did, for the moment after: kept, or nothing painted. */
+  lastStop: { at: number; kept: boolean; gestures: number; title?: string } | null;
+}
+
 export interface MusicIntelResult {
   state: MusicIntelState;
   /** Settings overlay to merge into the visualizer settings (never mutates presets). */
@@ -74,11 +88,14 @@ export interface MusicIntelResult {
   presetPick: { seq: number; presetId: string } | null;
   /** Batch of replayed performance gestures to re-fire — seq increments per batch. */
   gestureFire: { seq: number; gestures: GestureEvent[] } | null;
-  /** Unsaved performance from the listen that just ended — save it or it evaporates. */
-  pendingPerformance: { isrc: string; title?: string; listenNumber: number; gestureCount: number } | null;
+  /** Performances, started and stopped by hand (lib/performanceTake.ts). */
+  performance: PerformanceState;
   recordGesture: (g: Omit<GestureEvent, 't'>) => void;
-  savePendingPerformance: () => void;
-  discardPendingPerformance: () => void;
+  startPerformance: () => void;
+  stopPerformance: () => void;
+  replayPerformance: (id: string) => void;
+  stopPerformanceReplay: () => void;
+  deletePerformance: (id: string) => void;
   manualTag: (artist: string, title: string) => void;
   clearTrack: () => void;
   replayListen: (listenNumber: number) => void;
@@ -105,7 +122,10 @@ export function useMusicIntelligence(
   const [trigger, setTrigger] = useState<{ seq: number; trigger: LyricTrigger } | null>(null);
   const [presetPick, setPresetPick] = useState<{ seq: number; presetId: string } | null>(null);
   const [gestureFire, setGestureFire] = useState<{ seq: number; gestures: GestureEvent[] } | null>(null);
-  const [pendingPerformance, setPendingPerformance] = useState<{ isrc: string; title?: string; listenNumber: number; gestureCount: number } | null>(null);
+  const [livePerformance, setLivePerformance] = useState<PerformanceState['live']>(null);
+  const [savedPerformances, setSavedPerformances] = useState<SavedPerformance[]>([]);
+  const [replayingPerformance, setReplayingPerformance] = useState<SavedPerformance | null>(null);
+  const [lastStop, setLastStop] = useState<PerformanceState['lastStop']>(null);
 
   const recorderRef = useRef(new ListenRecorder());
   const trackRef = useRef<TrackIdentity | null>(null);
@@ -123,8 +143,9 @@ export function useMusicIntelligence(
   const gapPendingRef = useRef(false); // saw a between-song dip; identify as soon as sound returns
   const fpIndexRef = useRef<FingerprintIndex | null>(null);
   const lastLocalMatchMsRef = useRef(-Infinity);
-  const gestureBufferRef = useRef<GestureEvent[]>([]);      // this listen's unsaved performance
-  const pendingGesturesRef = useRef<GestureEvent[] | null>(null); // awaiting the save decision
+  // The performance being recorded: gestures timed from its start, and the
+  // song that was running when it started, if one was.
+  const takeRef = useRef<{ startedAtMs: number; date: string; gestures: GestureEvent[]; song: TakeSong | null } | null>(null);
   const gestureSeqRef = useRef(0);
   const firedGestureIdxRef = useRef(new Set<number>());     // replay: gestures already fired
 
@@ -186,7 +207,6 @@ export function useMusicIntelligence(
     lastPosRef.current = identity.offsetSec ?? 0;
     firedTriggerIdxRef.current = new Set();
     firedGestureIdxRef.current = new Set();
-    gestureBufferRef.current = [];
     listenStartMsRef.current = performance.now();
 
     let state = await getTrackState(identity.isrc);
@@ -259,20 +279,7 @@ export function useMusicIntelligence(
       await putTrackState(evolved);
       if (trackRef.current?.isrc === currentTrack.isrc) setTrackState(evolved);
       refreshTracks();
-
-      // Performance is offered, not auto-saved: hold this listen's gestures
-      // until the user decides — unsaved ones simply evaporate.
-      if (gestureBufferRef.current.length >= 5) {
-        pendingGesturesRef.current = gestureBufferRef.current;
-        setPendingPerformance({
-          isrc: currentTrack.isrc,
-          title: currentTrack.title,
-          listenNumber: evolved.listenCount,
-          gestureCount: gestureBufferRef.current.length,
-        });
-      }
     }
-    gestureBufferRef.current = [];
 
     if (reason !== 'trackChange') {
       setTrack(null); setSongMap(null); setLyrics(null);
@@ -501,37 +508,95 @@ export function useMusicIntelligence(
   }, []);
   const stopReplay = useCallback(() => setReplayListenNumber(null), []);
 
-  // ── Performance recording (kept in memory until the user opts to save) ─
-  const recordGesture = useCallback((g: Omit<GestureEvent, 't'>) => {
+  // ── Performances, started and stopped by hand (lib/performanceTake.ts) ─
+  const refreshPerformances = useCallback(() => {
+    getAllPerformances().then(all => setSavedPerformances(all.sort((x, y) => y.date.localeCompare(x.date))));
+  }, []);
+  useEffect(() => { refreshPerformances(); }, [refreshPerformances]);
+
+  /** The song running now, if one is identified, as a performance attaches it. */
+  const runningSong = (): TakeSong | null => {
     const tr = trackRef.current;
-    if (!musicRef.current.enabled || !tr || tr.identifiedAtMs == null) return;
-    if (gestureBufferRef.current.length >= 5000) return; // ~5 min of continuous painting
-    const t = (tr.offsetSec ?? 0) + (performance.now() - tr.identifiedAtMs) / 1000;
-    gestureBufferRef.current.push({ t, ...g });
+    const start = songStartMs(tr);
+    return tr && start !== null ? { isrc: tr.isrc, title: tr.title, artist: tr.artist, startMs: start } : null;
+  };
+
+  const startPerformance = useCallback(() => {
+    if (takeRef.current) return;
+    const song = runningSong();
+    takeRef.current = { startedAtMs: performance.now(), date: new Date().toISOString(), gestures: [], song };
+    setLivePerformance({ startedAtMs: takeRef.current.startedAtMs, title: song?.title });
+    setLastStop(null);
   }, []);
 
-  const savePendingPerformance = useCallback(async () => {
-    const meta = pendingPerformance;
-    const gestures = pendingGesturesRef.current;
-    if (!meta || !gestures) return;
-    const state = await getTrackState(meta.isrc);
-    if (state) {
-      const next = {
-        ...state,
-        listens: state.listens.map(l => l.listenNumber === meta.listenNumber ? { ...l, gestures } : l),
-      };
-      await putTrackState(next);
-      if (trackRef.current?.isrc === meta.isrc) setTrackState(next);
-      refreshTracks();
+  const stopPerformance = useCallback(() => {
+    const take = takeRef.current;
+    if (!take) return;
+    takeRef.current = null;
+    setLivePerformance(null);
+    const song = takeSong(take.song, runningSong());
+    if (take.gestures.length === 0) {
+      setLastStop({ at: Date.now(), kept: false, gestures: 0, title: song?.title });
+      return;
     }
-    pendingGesturesRef.current = null;
-    setPendingPerformance(null);
-  }, [pendingPerformance, refreshTracks]);
+    const id = `perf-${take.startedAtMs.toFixed(0)}-${Math.random().toString(36).slice(2, 8)}`;
+    const perf = finishTake(take.gestures, take.startedAtMs, performance.now(), song, id, take.date);
+    putPerformance(perf).then(ok => {
+      setLastStop({ at: Date.now(), kept: ok, gestures: perf.gestures.length, title: perf.title });
+      refreshPerformances();
+    });
+  }, [refreshPerformances]);
 
-  const discardPendingPerformance = useCallback(() => {
-    pendingGesturesRef.current = null;
-    setPendingPerformance(null);
+  const recordGesture = useCallback((g: Omit<GestureEvent, 't'>) => {
+    const take = takeRef.current;
+    if (!take) return;
+    if (take.gestures.length >= 20000) return; // twenty minutes of continuous painting
+    take.gestures.push({ t: (performance.now() - take.startedAtMs) / 1000, ...g });
+    // A song identified after the start is attached when it stops; say so now.
+    if (!take.song) {
+      const tr = trackRef.current;
+      if (tr?.title) setLivePerformance(l => (l && l.title !== tr.title ? { ...l, title: tr.title } : l));
+    }
   }, []);
+
+  // Replay: its own clock (replayPosition), so it plays with the song when
+  // the song is on and on its own when it is not, music layer or no.
+  const perfReplayRef = useRef<{ perf: SavedPerformance; startMs: number; last: number; fired: Set<number>; end: number } | null>(null);
+  const replayPerformance = useCallback((id: string) => {
+    const perf = savedPerformances.find(p => p.id === id);
+    if (!perf) return;
+    const now = performance.now();
+    const last = replayPosition(perf, now, now, trackRef.current) - 0.001;
+    perfReplayRef.current = { perf, startMs: now, last, fired: new Set(), end: Math.max(0, ...perf.gestures.map(g => g.t)) };
+    setReplayingPerformance(perf);
+  }, [savedPerformances]);
+  const stopPerformanceReplay = useCallback(() => { perfReplayRef.current = null; setReplayingPerformance(null); }, []);
+  useEffect(() => {
+    if (!replayingPerformance) return;
+    const tick = window.setInterval(() => {
+      const r = perfReplayRef.current;
+      if (!r) return;
+      const pos = replayPosition(r.perf, r.startMs, performance.now(), trackRef.current);
+      const batch = dueGestures(r.perf.gestures, r.last, pos, r.fired);
+      r.last = Math.max(r.last, pos);
+      if (batch.length > 0) {
+        gestureSeqRef.current++;
+        setGestureFire({ seq: gestureSeqRef.current, gestures: batch });
+      }
+      if (r.fired.size >= r.perf.gestures.length || pos > r.end + 2) stopPerformanceReplay();
+    }, 100);
+    return () => window.clearInterval(tick);
+  }, [replayingPerformance, stopPerformanceReplay]);
+
+  const deletePerformance = useCallback((id: string) => {
+    if (perfReplayRef.current?.perf.id === id) stopPerformanceReplay();
+    dbDeletePerformance(id).then(refreshPerformances);
+  }, [refreshPerformances, stopPerformanceReplay]);
+
+  const performanceState = useMemo<PerformanceState>(() => ({
+    live: livePerformance, saved: savedPerformances,
+    replayingId: replayingPerformance?.id ?? null, lastStop,
+  }), [livePerformance, savedPerformances, replayingPerformance, lastStop]);
 
   return {
     state: {
@@ -539,8 +604,8 @@ export function useMusicIntelligence(
       sectionSentimentValue, identifying, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },
-    overrides, harmonyIndex, trigger, presetPick, gestureFire, pendingPerformance,
-    recordGesture, savePendingPerformance, discardPendingPerformance,
+    overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
+    recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
   };
 }

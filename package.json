@@ -65,6 +65,7 @@
     "plates": "npm run build && node scripts/plates.mjs",
     "ferro": "npm run build && node scripts/ferro.mjs",
     "magnet": "npm run build && node scripts/magnet.mjs",
+    "take": "npm run build && node scripts/take.mjs",
     "wgsl": "node scripts/wgsl.mjs",
     "physics": "node scripts/physics.mjs",
     "press": "npm run build && node scripts/press.mjs",

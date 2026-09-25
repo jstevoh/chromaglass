@@ -178,6 +178,11 @@ jobs:
       # magnet neither makes nor loses liquid.
       - name: The ferrofluid's physics
         run: node scripts/ferro.mjs
+      # Performances start and stop by hand (reported: "the performance auto
+      # detect doesn't work well"): T starts one, nothing painted keeps
+      # nothing, and what is painted is kept, on its own clock with no song.
+      - name: A performance starts and stops by hand
+        run: node scripts/take.mjs
       # The black box records (crash-plan.md): errors land with a snapshot,
       # a device loss and its recovery are logged, frames that stop become a
       # fatal and light the button, a report from a destroyed device still

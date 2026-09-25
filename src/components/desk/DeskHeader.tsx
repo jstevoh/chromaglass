@@ -19,9 +19,11 @@ export interface DeskDots {
   midi: boolean;
   phone: boolean;
   rec: string | null;
+  /** The performance being recorded, as its clock ("1:23"), or null. */
+  perf: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, onWall, onMidi, onPhone, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, onWall, onMidi, onPhone, onPerformance, onSearch, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -41,6 +43,8 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
+  /** Start or stop a performance (T). */
+  onPerformance?: () => void;
   onSearch: () => void;
   /** Design's Save and Send to wall; Perform has nothing here. */
   trailing?: ReactNode;
@@ -147,6 +151,21 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           testId="dot-phone"
         />
         {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} testId="dot-rec" />}
+        {/*
+          Performances start and stop here, by hand (T). They used to follow
+          the song detection, which started late and ran on into the next
+          song; the song that is playing is still attached, on its own.
+        */}
+        <StatusDot
+          on={!!dots.perf}
+          tone="live"
+          label={dots.perf ? `Performance ${dots.perf}` : 'Performance'}
+          onClick={onPerformance}
+          title={dots.perf
+            ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
+            : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
+          testId="dot-performance"
+        />
         <button
           onClick={onSearch}
           className="ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong px-3 text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"

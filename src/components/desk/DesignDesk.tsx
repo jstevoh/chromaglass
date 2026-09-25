@@ -83,6 +83,7 @@ export interface DesignDeskProps {
   onWall: () => void;
   onMidi: () => void;
   onPhone: () => void;
+  onPerformance: () => void;
   onSearch: () => void;
   /** Open the settings sheet showing everything — the bench's way to the rest. */
   onOpenSettings: () => void;
@@ -167,6 +168,7 @@ export function DesignDesk(p: DesignDeskProps) {
         onWall={p.onWall}
         onMidi={p.onMidi}
         onPhone={p.onPhone}
+        onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
           <>
