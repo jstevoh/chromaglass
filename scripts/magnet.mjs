@@ -148,6 +148,28 @@ try {
   for (const [r, k] of [[idle0, 'idle0'], [idle1, 'idle1'], [drag0, 'drag0'], [drag1, 'drag1']]) r.near = await nearIn(k, spot);
   console.log(`     the hand ends at ${spot ? `${spot.x.toFixed(2)},${spot.y.toFixed(2)}` : 'nowhere'}; ferrofluid within 0.12 of it: ` +
     `alone ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)}, dragged ${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)}`);
+  /*
+    Where it did gather: the 0.12 disc that gained most over the drag, and
+    what sits at the hand's mirror point, so a failure says whether the
+    liquid went somewhere else or nowhere.
+  */
+  const gathered = await page.evaluate(() => {
+    const a = window.__phaseSnaps?.drag0, b = window.__phaseSnaps?.drag1;
+    if (!a || !b || a.n !== b.n) return null;
+    const n = a.n, step = Math.max(1, Math.round(n / 48));
+    let best = { x: 0, y: 0, gain: -Infinity };
+    for (let cy = 0.12; cy <= 0.88; cy += 0.04) for (let cx = 0.12; cx <= 0.88; cx += 0.04) {
+      let g = 0;
+      for (let y = 0; y < n; y += step) for (let x = 0; x < n; x += step) {
+        if (Math.hypot((x + 0.5) / n - cx, (y + 0.5) / n - cy) < 0.12) g += b.data[x + y * n] - a.data[x + y * n];
+      }
+      if (g > best.gain) best = { x: cx, y: cy, gain: g * step * step / (n * n) * 1e4 };
+    }
+    return best;
+  });
+  const mirror = spot ? await nearIn('drag1', { x: spot.x, y: 1 - spot.y }) : 0;
+  console.log(`     it gathered most at ${gathered ? `${gathered.x.toFixed(2)},${gathered.y.toFixed(2)} (+${gathered.gain.toFixed(0)})` : '?'}; ` +
+    `at the hand's mirror ${mirror.toFixed(0)}; centre of mass ${drag0.x.toFixed(2)},${drag0.y.toFixed(2)} → ${drag1.x.toFixed(2)},${drag1.y.toFixed(2)}`);
   check('dragging the Magnet gathers the ferrofluid where the hand ends up',
     !!spot && drag1.near > drag0.near + Math.max(0, idle1.near - idle0.near) + 0.1 * Math.max(1, drag0.near) && drag1.near > 1.5 * Math.max(1, idle1.near),
     `${drag0.near.toFixed(0)} → ${drag1.near.toFixed(0)} dragged, against ${idle0.near.toFixed(0)} → ${idle1.near.toFixed(0)} left alone`);
