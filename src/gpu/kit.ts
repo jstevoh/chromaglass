@@ -166,6 +166,10 @@ export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, 
       // `texture_2d_array`: matched the other way round, the layout asks for a
       // flat texture and the entry point does not match it.
       entries.push({ binding, visibility, texture: { sampleType: 'float', viewDimension: '2d-array' } });
+    } else if (/^texture_2d\s*<\s*[ui]32\s*>/.test(type)) {
+      // Integer textures are read with textureLoad, never sampled, and the
+      // layout has to say which kind of integer they hold.
+      entries.push({ binding, visibility, texture: { sampleType: /u32/.test(type) ? 'uint' : 'sint' } });
     } else if (type.startsWith('texture_2d')) {
       // Is it read through the sampler? A compute pass usually names the
       // texture at the sample site, so the regex can tell. A fragment shader
