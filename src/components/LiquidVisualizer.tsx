@@ -3674,6 +3674,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Where the finger and the streak last acted, consumed each step.
+   *
+   * They took their direction from the pointer's move between the last two
+   * mouse events, and the plate steps several times a frame with no event
+   * while the pointer is still: so the last move was applied again every
+   * step for as long as the button was held, and a finger that had stopped
+   * went on pushing the liquid. This is the move since the tool last acted.
+   */
+  const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(Date.now() * 0.001);
   const lastBass01Ref = useRef(0); // for beat edge detection
@@ -5084,7 +5094,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // ── Manual injection ───────────────────────────────────
           // The dropper's clock runs while it is held and starts again at 0 on
           // the next press, so every press lands a drop at once.
-          if (!isMouseDownRef.current) dropClockRef.current = 0;
+          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; }
           else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
           if (isMouseDownRef.current && drainFrameRef.current === 0) {
             const { x, y } = mousePosRef.current;
@@ -5092,6 +5102,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
               const tool = activeToolRef.current;
               const liq = selectedLiquidRef.current;
+              const strokeFrom = strokeLastRef.current ?? { x, y };
+              const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
+              strokeLastRef.current = { x, y };
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
               const heat = liq?.heatAmount ?? 0.05;
               // Whatever lands on the lead plate lands on its bubbles too:
@@ -5144,9 +5157,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   the same way the directed blow takes its. A finger standing
                   still does nothing, which is right — you mix by moving.
                 */
-                const fdx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? mousePosRef.current.x);
-                const fdy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? mousePosRef.current.y);
-                af.fingerDrag(x, y, 7, 0.09, fdx, fdy);
+                af.fingerDrag(x, y, 7, 0.09, strokeDx, strokeDy);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
@@ -5199,15 +5210,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                     const w = (1 - dd / pourR) ** 1.5;
                     af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                    af.addVelocity(nx, ny, 0, 0.12 * w); // downward gravity
+                    /*
+                      Spreading from where it lands. This pushed toward the
+                      plate's +y as "downward gravity", but the camera looks
+                      straight down: a stream poured from above lands and
+                      runs outward, and any downhill is Gravity's, not the
+                      pour's.
+                    */
+                    if (dd > 0) af.addVelocity(nx, ny, ddx / dd * 0.12 * w, ddy / dd * 0.12 * w);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
 
               } else if (tool === 'streak') {
                 // Thin high-velocity smear along mouse movement direction
-                const mvx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
-                const mvy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
+                const mvx = strokeDx, mvy = strokeDy;
                 const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
                 const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
                 const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
@@ -6337,6 +6354,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The phrasing, so a check can watch the signal rather than guess from
         // the picture whether it is arriving.
         phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
+        /** Where the pointer is on the plate, in grid cells: where a tool acts. */
+        pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
         beads: beadsRef.current.beads.length,
@@ -7282,6 +7301,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         hand's spot emptied (187 to 108) while a ring 0.15-0.2 out filled.
       */
       if (activeToolRef.current === 'magnet') return;
+      /*
+        And only while the button is down. This ran on every move, so moving
+        the mouse across the plate to reach a control pressed and stirred the
+        picture on the wall without anything having been clicked.
+      */
+      if (!isMouseDownRef.current) return;
       if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;

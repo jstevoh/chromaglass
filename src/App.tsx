@@ -289,6 +289,9 @@ export default function App() {
     */
     (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
       (patch: Partial<VisualizerSettings>) => { setSettings(prev => ({ ...prev, ...patch })); };
+    // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
+    (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
+      (tool: typeof activeTool) => { setActiveTool(tool); };
     /*
       Put a track from the shelf on, from outside.
 
