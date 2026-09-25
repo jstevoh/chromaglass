@@ -205,18 +205,11 @@ try {
   // ── Finger ──────────────────────────────────────────────────────
   await clear();
   await pool(A);
-  /*
-    The control is a second pool, well off the stroke's path, left alone
-    through the same seconds as the stroke. A plate left alone gains or loses
-    dye on its own for a while after a pool is laid (+29 to +139 over the
-    runs so far), and measuring that before the stroke measured a different
-    stage of it; the second pool is the same plate at the same moment.
-  */
-  const C = [0.5, 0.78];   // below the stroke, clear of it and of the panels
-  await pool(C);
-  const pC = await (async () => { await page.mouse.move(...screen(...C)); return page.evaluate(() => window.chromaglassDebug().pointer()); })();
+  // Past the pool's own settling, so the plate left alone and the plate
+  // stroked are the same plate at the same stage.
   await settle(3000);
-  const f0p = await (async () => { await page.mouse.move(...screen(...A)); return snap('finger0'); })();
+  const fIdle = await idleChange(A, 3800);
+  const f0p = await snap('finger0');
   await stroke('finger', A, B, 1500, 1500);
   await settle(700);
   await snap('finger1');
@@ -228,11 +221,8 @@ try {
   const along = ((fs.cx - fa.cx) * dirB.x + (fs.cy - fa.cy) * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
   check('Finger carries the dye along the stroke', along > 0.005,
     `centre of mass moved ${(along * 100).toFixed(1)}% of the plate toward where the stroke went`);
-  const c0 = await measure('finger0', pC, 0.05), c1 = await measure('finger1', pC, 0.05);
-  // What the whole plate would have done untouched, scaled from the control pool.
-  const fIdle = c0.disc > 1 ? (c1.disc - c0.disc) * fa.total / c0.disc : 0;
   check('and adds none', Math.abs((fb.total - fa.total) - fIdle) < 0.15 * fa.total + 5,
-    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} for the plate left alone the same seconds (the control pool ${c0.disc.toFixed(0)} → ${c1.disc.toFixed(0)})`);
+    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} with the plate left alone as long`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
 
