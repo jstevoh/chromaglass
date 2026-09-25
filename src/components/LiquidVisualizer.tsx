@@ -7414,11 +7414,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           the Finger adding dye (512 -> 1484 against +216 left alone) after
           its own carry had been made to conserve.
         */
+        /*
+          Nor under the Drop: it puts paint down and that is all. Reported
+          twice as a "press or blow" going off with every drop; whatever else
+          is found, a drop that also squeezes the film and shoves it along the
+          stroke is not a drop.
+        */
+        if (activeToolRef.current === 'dropper') return;
         if (activeToolRef.current !== 'finger') activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
         const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
-        const mx = (e.movementX * Math.cos(-angle) - e.movementY * Math.sin(-angle)) / scale * 5;
-        const my = (e.movementX * Math.sin(-angle) + e.movementY * Math.cos(-angle)) / scale * 5;
+        // The plate's uv counts up and CSS counts down (getTransformedMousePos):
+        // unflipped, a stroke up the screen shoved the liquid down it.
+        const sx = e.movementX, sy = -e.movementY;
+        const mx = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale * 5;
+        const my = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale * 5;
         activeFluid.addVelocity(x, y, mx, my);
       }
     };
@@ -7461,8 +7471,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
-      // Not under the magnet or the finger, as for the mouse above.
-      if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+      // Not under the magnet, the finger or the drop, as for the mouse above.
+      if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
         activeFluid.applySquish(x, y, 8, 0.005);
       }
     };

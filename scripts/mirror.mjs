@@ -57,6 +57,9 @@ const SCENARIOS = [
   { name: '… without bubbles', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: { bubbles: 0 } },
   { name: '… without the output pass', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: PLAIN_OUTPUT, settings: {} },
   { name: '… layer 2', look: 'timbre-shifter', layer: 1, rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} },
+  // The Drop no longer presses the glass; the Press still does, so whatever
+  // echoed the drop's press would echo this.
+  { name: '… the Press, layer 1', look: 'timbre-shifter', layer: 0, rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {}, tool: 'press' },
 ];
 
 const browser = await launchChromium(chromium);
@@ -72,7 +75,7 @@ try {
       if (sc.output) window.chromaglassOutput?.(sc.output);
       if (sc.rotation) window.chromaglassRotation?.(sc.rotation);
       window.chromaglassLayer?.(sc.layer);
-      window.chromaglassTool?.('dropper');
+      window.chromaglassTool?.(sc.tool ?? 'dropper');
     }, { sc, CALM });
     await page.waitForTimeout(3000);
     const hole = await page.getByTestId('desk-preview').boundingBox();
