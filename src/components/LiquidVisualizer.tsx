@@ -6493,6 +6493,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       });
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
+      // Turn the plates to given angles (radians), for scripts/mirror.mjs to
+      // reproduce a report's plate exactly.
+      (window as unknown as { chromaglassRotation?: unknown }).chromaglassRotation = (angles: number[]) => {
+        angles.forEach((a, i) => { if (Number.isFinite(a) && i < rotationAnglesRef.current.length) rotationAnglesRef.current[i] = a; });
+      };
     }
     // What every line of the log carries, and the report's larger parts.
     const unprovide = crashLog.provide('visualizer', () => {
