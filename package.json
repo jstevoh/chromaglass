@@ -70,6 +70,7 @@
     "take": "npm run build && node scripts/take.mjs",
     "wgsl": "node scripts/wgsl.mjs",
     "physics": "node scripts/physics.mjs",
+    "particles": "node scripts/particles.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
     "finger": "npm run build && node scripts/finger.mjs",

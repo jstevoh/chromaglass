@@ -265,10 +265,13 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> Out {
     o.off = corner;
     return o;
   }
-  // Grid uv to clip space. This target is sampled by the compositor, which
-  // reads uv.y = 1 at row 0, so y is not flipped here — see FLIP_Y in
-  // wgsl/plate.ts for the rule and what it cost to learn it.
-  let centre = vec2f(p.pos.x * 2.0 - 1.0, p.pos.y * 2.0 - 1.0);
+  // Grid uv to clip space, flipped: clip space is y-up and the compositor
+  // reads this target y-down, uv.y = 0 at row 0, the same as the dye (see
+  // "The orientation trap" in wgsl/air.ts, whose splat does the same). This
+  // said the compositor read uv.y = 1 at row 0 and did not flip, so every
+  // particle was drawn at its mirror across the plate's middle; npm run
+  // particles measured them at 0.72,0.76 from dye at 0.72,0.24.
+  let centre = vec2f(p.pos.x * 2.0 - 1.0, 1.0 - p.pos.y * 2.0);
   let half = RADIUS / U.splat * 2.0;
   o.at = vec4f(centre + corner * half, 0.0, 1.0);
   let fade = sin(3.14159265 * clamp(p.tint.w, 0.0, 1.0));
