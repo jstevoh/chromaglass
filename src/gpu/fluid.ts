@@ -94,12 +94,24 @@ const CH_SUBSTEPS = 4;
 /** Liesegang's inner electrolyte, spread evenly through the gel. */
 const LIES_B0 = 0.2;
 /*
-  The ferrofluid's dipole repulsion at full Labyrinth (see phaseCH), against
-  a screening length of 32 cells. From the lab: below 0.03 a pool stays one
-  disc (surface tension wins); by 0.1 it splits into a core and rings, the
-  target pattern a labyrinth grows from.
+  The ferrofluid maze (see phaseMu, mazeForce). Its period, in plate widths:
+  set from the field's own stability analysis rather than tuned, so the maze
+  is the same size on every grid. For the Ohta–Kawasaki energy with a
+  screened repulsion α/(k² + m²) and unit surface stiffness, the fastest
+  growing wavenumber is k*² = √α − m²; so from the period wanted, k*, then
+  m = 0.4 k* (a screening longer than a stripe, shorter than a pool) and
+  α = (k*² + m²)².
 */
-const LABYRINTH = 0.08;
+const MAZE_PERIOD = 0.045;
+/*
+  How hard the maze's own potential moves the liquid, in plate widths a
+  second per unit of its gradient (per cell). From the lab: a pool fingers
+  out in about a second and a half, the range the experiments give for a
+  viscous Hele-Shaw maze.
+*/
+const MAZE_GAIN = 0.3;
+/** The share of the maze's field that is uniform (a coil under the whole plate); the hand magnet adds the rest where it is. */
+const MAZE_UNIFORM = 0.45;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 const LIES_GRID = 128;
@@ -136,8 +148,13 @@ const MAGNET_CAP = 3;
   ferrofluid went nowhere (CI: 0.003 of the plate). In cells a step the cap
   means the same on every look and every grid. The ferrofluid's flux step is
   substepped to match (PHASE_SUBSTEPS).
+
+  And no more than those substeps can carry (0.45 of a cell each): at 6,
+  on a machine drawing ten frames a second (each step then a tenth of a
+  second of pull), the flux step was asked for more than its limit and the
+  plate lost an eighth of its ferrofluid in a few seconds (CI: 86% kept).
 */
-const MAGNET_CELLS = 6;
+const MAGNET_CELLS = 2.4;
 const PHASE_SUBSTEPS = 6;
 const GRAIN_PERIOD = 6;
 
@@ -275,6 +292,9 @@ export class WebGPUFluid {
   private scratchR: GPUTexture | null = null;
   /** The ferrofluid's long-range repulsion ψ (see screenJacobi), kept between steps. */
   private psi: PingPong | null = null;
+  /** Its chemical potential (phaseMu), kept for the next step's maze force. */
+  private phaseMuT: GPUTexture | null = null;
+  private mazeReady = false;
   /** For the harness: whether the phase stage is running at all. */
   get phaseIsLive(): boolean { return this.phaseLive; }
   private airCover = 0;
@@ -671,6 +691,11 @@ export class WebGPUFluid {
   step(p: GpuStepParams, deltasApplied: boolean): void {
     const N = this.N;
     const disp = p.dt * p.advection * ((N - 2) / N);
+    // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
+    const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
+    const kk = (2 * Math.PI / (MAZE_PERIOD * N)) ** 2;
+    const mazeK = { m2: 0.16 * kk, alpha: (1.16 * kk) ** 2 };
+    if (maze <= 0.001) this.mazeReady = false;
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
@@ -836,9 +861,23 @@ export class WebGPUFluid {
     if (this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0) {
       stage('magnet', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
+        // Under a maze field the magnet's pull gives way to the dipoles'
+        // repulsion: pulled hard to one spot, the ferrofluid stacks into
+        // rings round it rather than a maze (the gradient orders the
+        // stripes across it). Still enough that the maze follows the hand.
+        const pull = 1 - 0.75 * maze;
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
-          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep,
+          this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
             Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
+        this.vel.swap();
+      });
+    }
+    // The maze's own flow (mazeForce), from last step's chemical potential.
+    if (this.mazeReady && this.phaseMuT && (p.magnetSeconds ?? 0) > 0) {
+      stage('maze force', (pass) => {
+        const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
+        this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
+          this.arg('maze force', [MAZE_GAIN * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
         this.vel.swap();
       });
     }
@@ -951,7 +990,7 @@ export class WebGPUFluid {
     stage('phase', (pass) => {
       // With a magnet on, the flow near it can carry the ferrofluid further
       // than one flux step may (0.45 of a cell): so in substeps.
-      const subs = this.phaseLive && p.magnetStrength > 0.0001 ? PHASE_SUBSTEPS : 1;
+      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001) ? PHASE_SUBSTEPS : 1;
       const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 0, 0]);
       for (let k = 0; k < subs; k++) {
         this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
@@ -961,25 +1000,32 @@ export class WebGPUFluid {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
         this.phase.swap();
       }
-      if ((p.ferroLabyrinth ?? 0) > 0.001) {
-        // Cahn–Hilliard with the Ohta–Kawasaki term (see phaseCH), which
+      if (maze > 0.001) {
+        // Cahn–Hilliard with the Ohta–Kawasaki term (see phaseMu), which
         // does the separating as well, so the plain sharpening stands aside.
-        const mu = this.scratch();
         if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
-        const psi = this.psi;
-        // A screening length (32 cells) longer than a pool is wide, so
-        // splitting it into stripes is what lowers the repulsion.
-        const screen = this.arg('screen', [1 / 1024, 0, 0, 0]);
+        if (!this.phaseMuT) {
+          this.phaseMuT = this.disposer.track(this.device.createTexture({
+            label: 'phase mu', size: [this.N, this.N], format: R32,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        const psi = this.psi, mu = this.phaseMuT;
+        const screen = this.arg('screen', [mazeK.m2, 0, 0, 0]);
         for (let k = 0; k < 16; k++) {
           this.run(pass, 'screenJacobi', psi.write, [psi.read, this.phase.read], screen);
           psi.swap();
         }
-        const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, 0.012, LABYRINTH * Math.min(1, p.ferroLabyrinth ?? 0), 0, 0]);
+        const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
+          0.012, mazeK.alpha * (0.5 + 0.5 * maze), MAZE_UNIFORM, p.time ?? 0]);
         for (let k = 0; k < CH_SUBSTEPS; k++) {
           this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
           this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
           this.phase.swap();
         }
+        // Once more on where the phase ended, for the next step's force.
+        this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
+        this.mazeReady = true;
       } else {
         this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
           this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));

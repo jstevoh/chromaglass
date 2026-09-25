@@ -91,9 +91,9 @@ try {
     plate's centre of mass hardly moves even when the pull is doing exactly
     its job (the first version of this check asked for that and failed a
     magnet that worked). The control is the same plate left alone as long,
-    read at the same spot; it also carries the plate's own slow losses (the
-    edge sharpening is not conservative), which the drag is compared against
-    rather than blamed for.
+    read at the same spot. The liquid is compared against that control too:
+    the ferrofluid is conserved exactly now, but the check should not fail a
+    drag for something the plate does on its own.
   */
   const end = at(0.85);
   await page.mouse.move(...end);

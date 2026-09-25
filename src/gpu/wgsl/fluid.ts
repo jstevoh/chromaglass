@@ -473,7 +473,15 @@ fn minmod(a: f32, b: f32) -> f32 { return select(0.0, select(max(a, b), min(a, b
 fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return 0.0; }
-  let ve = dot(textureLoad(vel, a, 0).xy + textureLoad(vel, b, 0).xy, vec2f(e)) * 0.5;
+  // The face's velocity, filtered [1 2 1] along the face: the collocated
+  // projection leaves the flow a mode that alternates cell to cell, which the
+  // two cells' plain mean passes across the other axis, and where the magnet
+  // crowds the ferrofluid it printed a grid into the pool. The filter is
+  // linear, so the flux field is as divergence-free as the flow it came from.
+  let t = vec2i(e.y, e.x);
+  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let ve = dot(va + vb, vec2f(e)) * 0.125;
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
   if (c >= 0.0) {
     let s = minmod(ph(a, n) - ph(a - e, n), ph(b, n) - ph(a, n));
@@ -494,34 +502,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    The phase separates instead of blurring.
-
-    Semi-Lagrangian advection smears an interface a little every step, and a
-    phase that blurs is a grey wash rather than two liquids. This pushes each
-    cell away from the mean of its neighbours — anti-diffusion — which sharpens
-    a boundary at exactly the rate advection softens it, and the clamp to the
-    neighbourhood is what stops it running away into stripes.
-
-    It is the same operator as sharpenDye above, with one difference that
-    matters: the phase is also pulled toward 0 or 1 by the cubic term, so a
-    cell that is nearly all phase becomes all phase and a cell that is nearly
-    empty empties. That is the Cahn-Hilliard part, and it is what makes a
-    domain keep an edge for minutes rather than a second.
-
-    A.a.x is how hard, A.a.y the surface tension, which smooths the boundary's
-    curvature and therefore sets how big a droplet has to be to keep its shape.
-  */
-  /*
     The magnet as a force on the liquid, where the ferrofluid is.
 
-    φ ∇ψ = ∇(φψ) − ψ ∇φ, and the first term is a gradient the projection
-    removes whatever its size, so what is applied is −ψ ∇φ: on the edges,
-    larger on the side nearer the magnet. ∇φ is taken across a smoothed
-    edge, three cells wide: this solver keeps velocity and pressure on one
-    grid, and a projection like that cannot remove the finest-scale part of
-    a force; a force on a one-cell interface is nearly all finest scale, and
-    what the projection left of it was compression that made and lost
-    liquid. A diffuse interface is also what the physics has at this scale.
+    φ ∇ψ, applied as it is: on a smoothed φ, with ∇ψ from the magnet's own
+    smooth energy. For a while it was −ψ ∇φ instead (equal up to a gradient
+    the projection removes), on the argument that a force on a one-cell
+    edge is all finest scale; but over the magnet ψ is hundreds, so every
+    ripple in a gathered pool became a large fine-scale force, which a
+    collocated projection cannot remove, and the pool on the magnet printed
+    a grid of holes (and the flux step, asked to carry it, lost liquid).
+    This form puts the gradient on ψ, which is smooth everywhere, and has
+    the same curl, which is all that survives the projection.
 
     A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add.
   */
@@ -540,9 +531,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let n = S.n;
   let v = textureLoad(vel, p, 0);
-  let g = vec2f(phs(p + vec2i(2, 0), n) - phs(p - vec2i(2, 0), n),
-                phs(p + vec2i(0, 2), n) - phs(p - vec2i(0, 2), n)) * (0.25 * n);
-  var f = -magnetEnergy(uvOf(id), A.a) * g * A.b.x;
+  let uv = uvOf(id);
+  let h = 1.0 / n;
+  let gpsi = vec2f(magnetEnergy(uv + vec2f(h, 0.0), A.a) - magnetEnergy(uv - vec2f(h, 0.0), A.a),
+                   magnetEnergy(uv + vec2f(0.0, h), A.a) - magnetEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
+  var f = phs(p, n) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -588,37 +581,64 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   phaseSeparate: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
-fn ph(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
+/*
+  Tension smooths the edge by its curvature; sharpening pushes back against
+  what the advection blurred; the balance sets the edge. Both are written as
+  exchanges between neighbours, each computed the same from both sides, so
+  nothing is made or lost.
+
+  They were not, before. The first version pulled each cell toward 0 or 1
+  with a pointwise cubic, and the phase evaporated in six seconds. The
+  second was diffusion plus anti-diffusion clamped to the neighbourhood's
+  range, and the clamp was a leak: on a machine drawing ten frames a second
+  the magnet's drag lost an eighth of the ferrofluid (CI: 86% kept, and
+  113% on another run). Now sharpening moves liquid from the emptier cell
+  of a pair to the fuller one, at most in proportion to what the emptier
+  has and the room the fuller has left, which keeps every cell inside 0..1
+  without a clamp (a quarter of that each way, over four neighbours).
+*/
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+// The field blurred by the binomial [1 2 1]² kernel, which both cells of a
+// pair read alike. The sharpening follows it: the kernel's response to a
+// checkerboard is exactly zero, so one is never fed (a plain 3×3 mean passes
+// a ninth of it, and the plate grew a checkerboard over the magnet).
+fn mean3(p: vec2i, n: i32) -> f32 {
+  var t = 0.0;
+  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) {
+    let w = f32((2 - abs(i)) * (2 - abs(j)));
+    t += w * clamp(raw(clamp(p + vec2i(i, j), vec2i(0), vec2i(n - 1))), 0.0, 1.0);
+  } }
+  return t / 16.0;
+}
+fn exchange(p: vec2i, q: vec2i, sp: f32, n: i32) -> f32 {
+  // What flows into p from its neighbour q.
+  let a = raw(p);
+  let b = raw(q);
+  let sq = mean3(q, n);
+  let lo = min(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let hi = max(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let sharpen = 0.25 * clamp(A.a.x, 0.0, 1.0) * min(1.0, 3.0 * abs(sp - sq)) * min(lo, 1.0 - hi);
+  let toFuller = select(-sharpen, sharpen, sp > sq);
+  // And the grid-scale part alone diffused away: the raw difference less
+  // the blurred one. The collocated projection cannot see a checkerboard
+  // pressure, so where the magnet crowds the ferrofluid the flow carries a
+  // checkerboard into it, which the old clamp hid and this removes: at an
+  // eighth a pair, exactly one step's worth of a checkerboard.
+  let grid = 0.125 * ((b - a) - (sq - sp));
+  return toFuller + 0.125 * clamp(A.a.y, 0.0, 1.0) * (b - a) + grid;
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let n = S.n;
-  let c = ph(p, n);
-  let l = ph(p - vec2i(1, 0), n); let r = ph(p + vec2i(1, 0), n);
-  let d = ph(p - vec2i(0, 1), n); let u = ph(p + vec2i(0, 1), n);
-  let mean = (l + r + d + u) * 0.25;
-  /*
-    Both halves conserve, and the first version did not.
-
-    It had a pointwise cubic pulling each cell toward 0 or 1 — the tidy way to
-    write "the phase separates" and a mass leak: once advection smears a cell
-    below half, the cubic drives it to zero and that liquid is *gone*. Measured,
-    the whole phase evaporated inside six seconds and the plate read empty.
-
-    Diffusion and anti-diffusion both leave the total alone, because the sum of
-    (neighbour mean − centre) over a symmetric stencil is zero. So the sharp
-    boundary comes from the balance of the two: tension smooths it by its own
-    curvature, which is what sets how big a droplet has to be to keep its
-    shape, and the sharpening pushes back against what the advection blurred.
-    Nothing here creates or destroys the liquid.
-  */
-  let smoothed = c + (mean - c) * clamp(A.a.y, 0.0, 1.0) * 0.5;
-  let out = smoothed + (smoothed - mean) * clamp(A.a.x, 0.0, 1.0);
-  // Never outside what the neighbourhood already holds: anti-diffusion that
-  // is not fenced in makes stripes out of a smooth field.
-  let lo = min(min(min(l, r), min(d, u)), c);
-  let hi = max(max(max(l, r), max(d, u)), c);
-  textureStore(dst, p, vec4f(clamp(out, min(lo, 0.0), max(hi, 1.0)), 0.0, 0.0, 0.0));
+  let n = i32(S.n);
+  let c = raw(p);
+  let sp = mean3(p, n);
+  var d = 0.0;
+  if (p.x > 0) { d += exchange(p, p - vec2i(1, 0), sp, n); }
+  if (p.x < n - 1) { d += exchange(p, p + vec2i(1, 0), sp, n); }
+  if (p.y > 0) { d += exchange(p, p - vec2i(0, 1), sp, n); }
+  if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
+  textureStore(dst, p, vec4f(c + d, 0.0, 0.0, 0.0));
 }`,
 
   squeezeUpdate: `${HEAD}
@@ -1526,7 +1546,15 @@ fn mm(a: vec3f, b: vec3f) -> vec3f {
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec3f(0.0); }
-  let ve = dot(textureLoad(vel, a, 0).xy + textureLoad(vel, b, 0).xy, vec2f(e)) * 0.5;
+  // The face's velocity, filtered [1 2 1] along the face: the collocated
+  // projection leaves the flow a mode that alternates cell to cell, which the
+  // two cells' plain mean passes across the other axis, and where the magnet
+  // crowds the ferrofluid it printed a grid into the pool. The filter is
+  // linear, so the flux field is as divergence-free as the flow it came from.
+  let t = vec2i(e.y, e.x);
+  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let ve = dot(va + vb, vec2f(e)) * 0.125;
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
   if (c >= 0.0) {
     let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
@@ -1751,7 +1779,20 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, vec4f((s + c) / (4.0 + A.a.x), 0.0, 0.0, 0.0));
 }`,
 
-  phaseMu: `${HEAD}${MAGNET_WGSL}
+  /*
+    μ, the ferrofluid's chemical potential under the field, kept between
+    steps: it drives the maze's flow (mazeForce) as well as its Cahn–Hilliard
+    sharpening (phaseCH). The double well and −∇²c are the surface tension;
+    χψ is the dipoles' repulsion, where χ is how strongly the field
+    magnetises the layer here. A field coil's uniform part everywhere
+    (A.b.z of the full strength) and the hand magnet's saturation on top,
+    so the maze covers the plate and is finest over the magnet; with a
+    slow noise on it, because a real labyrinth's disorder comes from noise
+    (Kent-Dobias & Bernoff 2015) and without it the pattern copies the
+    magnet's symmetry into rings. A.a = the magnet, A.b = (M dt, α, uniform
+    share, time).
+  */
+  phaseMu: `${HEAD}${MAGNET_WGSL}${NOISE_WGSL}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var psi: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
@@ -1762,10 +1803,41 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = S.n;
   let c = cc(p, n);
   let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
-  let e = magnetEnergy(uvOf(id), A.a);
-  let sat = e / (e + 2000.0);
+  let uv = uvOf(id);
+  let e = magnetEnergy(uv, A.a);
+  let sat = e / (e + 800.0);
+  let chi = (A.b.z + (1.0 - A.b.z) * sat) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
   let w = textureLoad(psi, p, 0).r;
-  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap + A.b.y * sat * w, 0.0, 0.0, 0.0));
+  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap + A.b.y * chi * w, 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    The maze's flow. Between glass plates the ferrofluid moves as the whole
+    layer does (Darcy), pushed down the gradient of its own chemical
+    potential: −c ∇μ, surface tension and dipole repulsion together (the
+    Hele-Shaw–Cahn–Hilliard model). This is what lets a pool finger out in
+    a second or two; Cahn–Hilliard's own diffusion alone takes minutes to
+    carry the liquid a finger's length. Before the projection, which keeps
+    the part that moves liquid and the water it displaces. A.a.x = the
+    gain, A.a.y = the most a step may add.
+  */
+  mazeForce: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var mu: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let v = textureLoad(vel, p, 0);
+  let c = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  let g = vec2f(uu(p + vec2i(1, 0), n) - uu(p - vec2i(1, 0), n), uu(p + vec2i(0, 1), n) - uu(p - vec2i(0, 1), n)) * 0.5;
+  var f = -c * g * A.a.x;
+  let fl = length(f);
+  if (fl > A.a.y) { f = f * (A.a.y / fl); }
+  textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
 }`,
 
   phaseCH: `${HEAD}
