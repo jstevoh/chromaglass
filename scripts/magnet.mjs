@@ -103,10 +103,21 @@ try {
     the gathering 0.11 to 0.19 away from where the hand stopped, and the
     check failed by one unit). The turning is the look's, not the magnet's,
     so it is a control here, the way ferro.mjs sets the look it measures on.
+
+    And the plate's own currents, for the same reason. With the band playing,
+    Classic's turbulence, sound drive, beat rock and squeeze and its heat
+    lift churn the plate as hard as the magnet pulls, differently on every
+    run: the check went fail, pass, fail across three heads with no magnet
+    change between them (on the last, the solver's magnet was at the hand and
+    the ferrofluid gathered 0.25 away). In the lab, where nothing else moves,
+    a held magnet gathers 123 -> 317 in three seconds.
   */
   await page.evaluate(() => {
     const d = window.chromaglassDebug();
-    Object.assign(d.settings, { rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' } });
+    Object.assign(d.settings, {
+      rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
+      turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+    });
   });
   await page.waitForTimeout(3000);
 
