@@ -106,18 +106,43 @@ try {
       }
       return out.map((row, y) => row.map((v, x) => v / Math.max(1, n[y][x])));
     };
+    // The bubbles, in plate units (y up), to say what they did when the echo follows them.
+    const bubblesNow = () => page.evaluate(() => {
+      const d = window.chromaglassDebug?.(); const f = d?.bubbles; const n = d?.pointer?.().grid ?? 192;
+      return (f?.bubbles ?? []).map((b) => ({ x: b.x / n, y: b.y / n, r: b.r / n }));
+    });
+    const moves = (a, b) => {
+      const out = [];
+      for (const p of a) {
+        let best = null, bd = Infinity;
+        for (const q of b) { const dd = Math.hypot(q.x - p.x, q.y - p.y); if (dd < bd) { bd = dd; best = q; } }
+        if (!best || bd > 0.02) out.push(`${p.x.toFixed(2)},${p.y.toFixed(2)} r${p.r.toFixed(3)} ${best && bd < 0.2 ? `→ ${best.x.toFixed(2)},${best.y.toFixed(2)}` : 'gone'}`);
+      }
+      for (const q of b) if (!a.some((p) => Math.hypot(q.x - p.x, q.y - p.y) < 0.2)) out.push(`new ${q.x.toFixed(2)},${q.y.toFixed(2)} r${q.r.toFixed(3)}`);
+      return out.length ? out.join('; ') : 'none';
+    };
+    const b0 = await bubblesNow();
     const s0 = await shot(); await page.waitForTimeout(1800); const s1 = await shot();
+    const b1 = await bubblesNow();
     const drift = grid(s0, s1);
     // Low and to the right, so its mirror images across each axis and the centre are three different cells.
     const at = { fx: 0.75, fy: 0.75 };
     const hx = hole.x + hole.width * at.fx, hy = hole.y + hole.height * at.fy;
     await page.mouse.move(hx, hy);
     await page.mouse.down();
+    const hand = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
     for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
     await page.mouse.up();
     await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
     await page.waitForTimeout(1200);
     const s2 = await shot();
+    const b2 = await bubblesNow();
+    if (hand) {
+      const px = hand.x / hand.grid, py = hand.y / hand.grid;
+      console.log(`     the hand on the plate ${px.toFixed(2)},${py.toFixed(2)} (its mirror across the plate's y ${px.toFixed(2)},${(1 - py).toFixed(2)}); ${b1.length} bubbles`);
+    }
+    console.log(`     bubbles that moved or popped while left alone: ${moves(b0, b1)}`);
+    console.log(`     and across the drop: ${moves(b1, b2)}`);
     const change = grid(s1, s2);
     const cellOf = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
     const [cy, cx] = cellOf(at.fx, at.fy);

@@ -7421,7 +7421,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           stroke is not a drop.
         */
         if (activeToolRef.current === 'dropper') return;
-        if (activeToolRef.current !== 'finger') activeFluid.applySquish(x, y, 8, 0.005);
+        /*
+          And the Finger neither presses nor stirs: its carry moves the dye.
+          With the stir's vertical sign put right it pushed along the stroke,
+          and a push through the film spreads the dye it carries over more
+          plate than it came from, the same copying the press did (npm run
+          tools: 310 -> 459 against +57 left alone).
+        */
+        if (activeToolRef.current === 'finger') return;
+        activeFluid.applySquish(x, y, 8, 0.005);
         const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
         const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
         // The plate's uv counts up and CSS counts down (getTransformedMousePos):
