@@ -99,7 +99,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
     is simply the front plate's hand.
   */
   'phaseScale', 'phaseSharp',
-  'magnetX', 'magnetY', 'magnetHeight', 'magnetStrength', 'magnetPolarity',
+  'magnetX', 'magnetY', 'magnetHeight', 'magnetStrength',
   // `particles` and not `particleMix`: each plate has its own solver and its
   // own population, so the amount is that plate's. How far their colour is
   // trusted is read by the render pass, which sees one picture.

@@ -11,7 +11,10 @@
  *      against the same plate with the magnet switched off
  *   3. height is the control that matters: held close it gathers harder
  *      than held away, at the same strength
- *   4. polarity reverses it: held the other way up it pushes the phase off
+ *   4. it neither makes nor loses liquid: a ferrofluid is incompressible, so
+ *      pulled together it pools, and the total on the plate stays what was poured
+ *      (and it has no polarity to reverse: magnetised by the field itself, it is
+ *      drawn to either pole, which is why there is no longer a control for it)
  *
  * The magnet is deliberately put somewhere off-centre in both axes, because a
  * field that is flipped in y still gathers *something* near the middle and
@@ -79,7 +82,7 @@ try {
         phaseAmount: 0.9, phaseScale: 0.35, phaseSharp: 0.4,
         globalSpeed: 0.02, automateRate: 0,
         magnetX: m.x, magnetY: m.y, magnetHeight: m.h,
-        magnetStrength: m.s, magnetPolarity: m.p,
+        magnetStrength: m.s,
       });
     }, magnet);
     // Long enough for any seeding the settings change provoked to finish.
@@ -116,7 +119,7 @@ try {
     const live = await page.evaluate(() => window.chromaglassDebug().phaseState?.());
     console.log(`     poured ${laid.toFixed(0)}, six seconds later ${kept.toFixed(0)}` +
       `  (stage ${live?.live ? 'running' : 'OFF'})`);
-    return page.evaluate(async ({ mx, my }) => {
+    const stats = await page.evaluate(async ({ mx, my }) => {
       const d = window.chromaglassDebug();
       const f = await d.readPhase();
       if (!f) return null;
@@ -139,16 +142,17 @@ try {
       return { total, near, peak, px: total ? cx / total : 0, py: total ? cy / total : 0,
                share: total > 0 ? near / total : 0 };
     }, { mx: MX, my: GY });
+    return stats && { ...stats, laid };
   };
 
   // ── 1: it is there ──
-  const off = await lay({ x: MX, y: MY, h: 0.2, s: 0, p: 1 });
+  const off = await lay({ x: MX, y: MY, h: 0.2, s: 0 });
   check('there is ferrofluid on the plate', off !== null && off.total > 50,
     off ? `total ${off.total.toFixed(0)}, peak ${off.peak.toFixed(2)}` : 'no phase field');
   if (!off) process.exit(1);
 
   // ── 2: a magnet gathers it, against the same plate with none ──
-  const on = await lay({ x: MX, y: MY, h: 0.2, s: 0.8, p: 1 });
+  const on = await lay({ x: MX, y: MY, h: 0.2, s: 0.8 });
   /*
     Every arm has to have liquid on it before it can say anything.
 
@@ -188,15 +192,18 @@ try {
     `${toMirror.toFixed(3)} from its mirror, ${driftedTo.toFixed(3)} with the magnet off`);
 
   // ── 3: height is the control that matters ──
-  const far = await lay({ x: MX, y: MY, h: 0.9, s: 0.8, p: 1 });
+  const far = await lay({ x: MX, y: MY, h: 0.9, s: 0.8 });
   armed(far, 'lifted-away');
   check('held close it gathers harder than held away', armed(far, 'lifted-away') && on.near > far.near,
     `${on.near.toFixed(0)} near it at height 0.2 against ${far.near.toFixed(0)} at 0.9`);
 
-  // ── 4: the other way up pushes it off ──
-  const rev = await lay({ x: MX, y: MY, h: 0.2, s: 0.8, p: -1 });
-  check('and turned over it pushes the phase away', armed(rev, 'reversed') && rev.near < on.near,
-    `${rev.near.toFixed(0)} near it reversed against ${on.near.toFixed(0)}`);
+  // ── 4: the magnet neither makes nor loses liquid ──
+  // Conservative fluxes, capped at a full cell: pulled together it pools, and
+  // what was poured is what is there. The flow's own advection and the edge
+  // sharpening are not exactly conservative, so the margin is theirs.
+  const kept = on && on.laid > 0 ? on.total / on.laid : 0;
+  check('and the magnet neither makes nor loses the liquid', kept > 0.9 && kept < 1.1,
+    `${on?.laid.toFixed(0)} poured, ${on?.total.toFixed(0)} there six seconds under the magnet`);
 } finally { await browser.close(); stop(); }
 
 const bad = checks.filter(c => !c.ok).length;

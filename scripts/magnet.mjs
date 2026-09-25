@@ -100,7 +100,9 @@ try {
   check('dragging the Magnet carries the ferrofluid toward the hand',
     moved > drift + 0.05,
     `moved ${moved.toFixed(3)} of the plate toward the hand, against ${drift.toFixed(3)} on its own`);
-  check('and the ferrofluid is still there after it', drag1.total > poured.total * 0.5,
+  // Conservative transport: dragged, the liquid is moved, not made or lost.
+  // The margin is the flow's own advection and the edge sharpening.
+  check('and dragging it neither makes nor loses the liquid', drag1.total > poured.total * 0.85 && drag1.total < poured.total * 1.15,
     `${poured.total.toFixed(0)} → ${drag1.total.toFixed(0)}`);
 } finally {
   await browser.close();

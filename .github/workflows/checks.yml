@@ -165,6 +165,11 @@ jobs:
       # same plate left alone.
       - name: The magnet moves the ferrofluid
         run: npm run magnet
+      # And the physics under it: the ferrofluid gathers where the magnet is
+      # (not at its mirror), held close pulls harder than held away, and the
+      # magnet neither makes nor loses liquid.
+      - name: The ferrofluid's physics
+        run: node scripts/ferro.mjs
       # The black box records (crash-plan.md): errors land with a snapshot,
       # a device loss and its recovery are logged, frames that stop become a
       # fatal and light the button, a report from a destroyed device still

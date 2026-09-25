@@ -233,6 +233,50 @@ fn packedBilerp(uv: vec2f, n: f32) -> f32 {
 const HEAD = SIM_STRUCT;
 const W = '@compute @workgroup_size(8, 8)';
 
+/*
+  What a magnet under the glass does to the ferrofluid, as a drift velocity in
+  plate widths a second. m = (x, y, height, strength), vmax the terminal speed.
+
+  The force on a magnetisable liquid is not the field, it is the field's
+  *gradient*: a soft magnetic fluid is pulled toward where the field is
+  stronger, with a force density that goes as ∇|B|² (the linear, unsaturated
+  case, which is where a hand-held magnet at a few centimetres sits). The
+  magnet is a dipole a height h below the plate, pointing up, so in the plate
+  |B|² ∝ (r² + 4h²) / (r² + h²)⁴, and its radial gradient is
+
+      F(r) ∝ r (r² + 5h²) / (r² + h²)⁵
+
+  toward the magnet. Three things follow, and all three are how a real one
+  behaves: the pull is zero directly over the magnet (the liquid pools there
+  rather than being yanked through a point), it peaks just off-axis, and it
+  falls away as the seventh power of distance, so lifting the magnet weakens
+  it everywhere and fast.
+
+  And it does not care which way up the magnet is. A ferrofluid is
+  magnetised *by* the field, so its moment always lines up with it and both
+  poles attract. (The old model pushed the liquid away with the magnet
+  flipped, which no ferrofluid does.)
+
+  The liquid answers the force as anything does in a thin gap between two
+  glasses: at a speed proportional to it (Darcy flow, a Hele-Shaw cell), up
+  to a terminal speed set by how viscous it is. MAGNET_K sets that mobility.
+*/
+const MAGNET_WGSL = /* wgsl */ `
+const MAGNET_K = 9e-6;
+fn magnetDrift(uv: vec2f, m: vec4f, vmax: f32) -> vec2f {
+  if (m.w <= 0.0) { return vec2f(0.0); }
+  let toM = m.xy - uv;
+  let r2 = dot(toM, toM);
+  let h = max(m.z, 0.02);
+  let h2 = h * h;
+  let q = r2 + h2;
+  let q2 = q * q;
+  let v = toM * ((r2 + 5.0 * h2) / (q2 * q2 * q)) * (m.w * MAGNET_K);
+  let sp = length(v);
+  return select(v, v * (vmax / sp), sp > vmax);
+}
+`;
+
 /**
  * The kernels. Bindings are always: 0 the Sim, 1 the Args, then the textures
  * a pass reads, then the one it writes, then a sampler if it needs one.
@@ -364,25 +408,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     the same flow as everything else — and then two things that are not
     advection, because a phase that only advects is a phase that blurs away.
 
-    ── The magnet moves the phase, not the velocity ──
+    ── The magnet, and what it moves ──
 
-    This is the one decision worth stating loudly, and it is the lesson H6
-    paid for three times. A magnet pulls radially, a radial field is
-    curl-free, and curl-free is exactly what the pressure projection exists to
-    remove — so a magnetic body force added to the fluid velocity would be
-    deleted at the end of the very step that applied it. Instead the pull is
-    added to the *displacement this kernel backtraces along*: the phase is
-    carried toward the magnet directly, as transport, where no projection can
-    reach it.
+    The magnet pulls the ferrofluid, and the pull is the gradient of the field
+    squared (magnetDrift, above, which says why). It moves the phase in its own
+    pass, as conservative, volume-filling fluxes (phaseMagnet), at a speed in
+    real seconds: a slow look keeps the flow's own step tiny, and a magnet
+    scaled by it crept, so a hand dragging it left the liquid behind.
 
-    A real magnet's pull follows the steepness of its own field and falls away
-    sharply, so height is the control that matters most: close is a hard,
-    narrow pull and lifting it away spreads and weakens it. That is an inverse
-    power law, and the height sits inside it rather than beside it.
+    It moves the water as well (phaseDrag). The note that used to sit here
+    said a magnetic force on the velocity would be deleted by the projection,
+    because a radial force is curl-free. That holds for a liquid that is
+    magnetic everywhere, and this one is magnetic only where the ferrofluid
+    is: the force density is φ ∇ψ, its curl is ∇φ × ∇ψ on the drop's edge, and
+    the projection keeps exactly that part, which is the flow a moving drop
+    pushes around itself.
 
-    A.a = (magnet x, magnet y, height, strength), A.b.x = polarity (which way
-    up the magnet is held), A.b.y the displacement the flow advects by, A.b.z
-    the magnet's own step in real time.
+    A.a = (magnet x, magnet y, height, strength), A.b.y the displacement the
+    flow advects by.
   */
   /** A soft disc of the second phase, poured onto the plate. A.a = (x, y, r, amount). */
   phaseSplat: `${HEAD}
@@ -404,48 +447,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id);
-  var d = textureSampleLevel(vel, lin, uv, 0.0).xy * A.b.y;
-  let m = A.a.xy;
-  let toM = m - uv;
-  let r = length(toM);
-  if (A.a.w > 0.0001 && r > 1e-4) {
-    /*
-      The pull, as a magnet's is: it goes as the steepness of the field, and
-      the height is what keeps it finite over the magnet itself. Held close
-      (small height) this is tall and narrow; lifted away it flattens into
-      something broad and weak, which is exactly how the shapes change.
-    */
-    let h = max(A.a.z, 0.02);
-    /*
-      A dipole's pull, and no normalising by height.
-
-      It was written as fall times h cubed, which holds the pull constant over
-      the magnet and makes it *broader* as the magnet is lifted — so held far
-      away it gathered more of the plate than held close, which is backwards
-      and was measured that way (30.6% against 23.6%). A real magnet's field
-      falls as the cube of the distance, so lifting it weakens it everywhere;
-      that is the whole reason height is the control that matters most, and
-      the h³ was quietly cancelling it.
-    */
-    let fall = 1.0 / pow(r * r + h * h, 1.5);
-    let pull = A.a.w * A.b.x * fall * 0.02;
-    /*
-      Minus, and the sign was settled by the plate rather than by argument.
-
-      The reasoning said plus: this is a backtrace, pos is uv - d, so a
-      displacement pointing at the magnet should fetch from the far side and
-      carry the liquid inward. The plate disagreed flatly and repeatably — with
-      the magnet on, the phase sat *further* from it than with the magnet off
-      (0.329 against 0.250), it pushed harder held close than held away, and
-      turning it over gathered. Three readings, one sign.
-    */
-    //
-    // In real time (A.b.z), not the flow's displacement (A.b.y): a slow look
-    // keeps the flow's step tiny, and a magnet scaled by it crept at a few
-    // hundredths of the plate a second, so a hand dragging it left the
-    // ferrofluid behind.
-    d = d - (toM / r) * clamp(pull, -4.0, 4.0) * A.b.z;
-  }
+  // The flow only. The magnet moves the phase in its own conservative pass
+  // (phaseMagnet), because a backtrace along a converging field is not
+  // conservative: it copied liquid in where the field converged and lost it
+  // where it spread.
+  let d = textureSampleLevel(vel, lin, uv, 0.0).xy * A.b.y;
   let pos = clamp(uv - d, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
   textureStore(dst, vec2i(id.xy), vec4f(textureSampleLevel(src, lin, pos, 0.0).r, 0.0, 0.0, 0.0));
 }`,
@@ -468,6 +474,74 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     A.a.x is how hard, A.a.y the surface tension, which smooths the boundary's
     curvature and therefore sets how big a droplet has to be to keep its shape.
   */
+  /*
+    The magnet's pull on the phase, as fluxes between cells.
+
+    Conservative: each face's flux is computed the same way from both sides
+    (the drift is taken at the face itself), so what leaves one cell arrives
+    in its neighbour and the total is exact. And volume-filling: the flux
+    from a cell into a neighbour goes as φ_from (1 − φ_to), so the liquid
+    cannot be packed past a full cell. Ferrofluid is incompressible; pulled
+    together it becomes a pool the size of its own volume, it does not pile
+    into a point. Run in substeps small enough that no face moves more than a
+    quarter of a cell, which keeps every cell between 0 and 1 without a clamp
+    having to do it.
+
+    A.a = (magnet x, y, height, strength), A.b.x = cells per unit drift this
+    substep (seconds × n), A.b.y = terminal speed.
+  */
+  phaseMagnet: `${HEAD}${MAGNET_WGSL}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn faceOut(p: vec2i, c: f32, uv: vec2f, o: vec2i, n: f32) -> f32 {
+  let q = p + o;
+  if (q.x < 0 || q.y < 0 || q.x >= i32(n) || q.y >= i32(n)) { return 0.0; }
+  let e = vec2f(o);
+  let cf = dot(magnetDrift(uv + e * (0.5 / n), A.a, A.b.y), e) * A.b.x;
+  let nb = textureLoad(src, q, 0).r;
+  return select(cf * nb * (1.0 - c), cf * c * (1.0 - nb), cf > 0.0);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let uv = uvOf(id);
+  let c = textureLoad(src, p, 0).r;
+  let out = faceOut(p, c, uv, vec2i(1, 0), n) + faceOut(p, c, uv, vec2i(-1, 0), n)
+          + faceOut(p, c, uv, vec2i(0, 1), n) + faceOut(p, c, uv, vec2i(0, -1), n);
+  textureStore(dst, p, vec4f(clamp(c - out, 0.0, 1.0), 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    And the liquid it moves through feels it.
+
+    The ferrofluid does not pass through the dyed water like a ghost: it
+    shoves it. The magnetic force acts only where the ferrofluid is, so its
+    density is φ ∇ψ, and that is *not* curl-free (its curl is ∇φ × ∇ψ, which
+    lives on the drop's edge). So the projection removes the part that would
+    compress the water and keeps the part that makes it flow around a moving
+    drop, which is exactly the dipole of flow a real drop pushes ahead of
+    itself. Inside the ferrofluid the water is carried at the drift; outside
+    it, only the projection moves it. Before the projection, for that reason.
+
+    A.a = the magnet, A.b.x = drift → solver velocity (seconds per step over
+    the flow's displacement), A.b.y terminal speed, A.b.z how much of the gap
+    closes per step.
+  */
+  phaseDrag: `${HEAD}${MAGNET_WGSL}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let phi = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  let want = magnetDrift(uvOf(id), A.a, A.b.y) * A.b.x;
+  let k = phi * clamp(A.b.z, 0.0, 1.0);
+  textureStore(dst, p, safeVel(vec4f(v.xy + (want - v.xy) * k, v.z, v.w)));
+}`,
+
   phaseSeparate: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;

@@ -75,13 +75,15 @@ const DYE_ITERS = 4;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
 /*
-  How far the magnet carries the phase per second, per unit of pull. At 0.1 a
-  hand-held magnet (low, strong) drags ferrofluid within a tenth of the plate
-  at about 0.4 plate-widths a second, fast enough to follow a hand, while a
-  look's own magnet held higher still gathers over seconds rather than
-  snapping everything to one point.
+  The ferrofluid's terminal speed under the magnet, in plate widths a second:
+  a viscous liquid in a thin gap moves at a speed proportional to the force on
+  it (Darcy), and this is where the force stops mattering. Fast enough for a
+  hand-held magnet to drag a pool along, and the substeps are counted from
+  it so no face moves more than a quarter of a cell.
 */
-const MAGNET_RATE = 0.1;
+const MAGNET_VMAX = 0.4;
+/** How much of the gap between the water's velocity and the ferrofluid's drift closes per step, inside the ferrofluid. */
+const MAGNET_DRAG = 0.2;
 const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
@@ -723,6 +725,19 @@ export class WebGPUFluid {
     }, visc.some((v) => v > 0));
 
     // 4. Project, 5. advect velocity by itself, 6. project again
+    /*
+      The ferrofluid shoves the water it moves through (H7): inside it, the
+      water is carried at the magnet's drift, and the projection that follows
+      turns that into the flow around the drop. Only with a magnet under a
+      plate that has ferrofluid on it.
+    */
+    const magnetOn = this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0;
+    stage('phase drag', (pass) => {
+      const gain = Math.min(400, (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7));
+      this.run(pass, 'phaseDrag', this.vel.write, [this.vel.read, this.phase.read],
+        this.arg('phase drag', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, gain, MAGNET_VMAX, MAGNET_DRAG, 0]));
+      this.vel.swap();
+    }, magnetOn);
     stage('project 1', (pass) => this.project(pass));
     stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
     stage('project 2', (pass) => this.project(pass));
@@ -768,22 +783,29 @@ export class WebGPUFluid {
       together — and before anything reads the plate, so the compositor sees
       the phase where it actually is this frame.
 
-      The magnet enters here rather than in the forces, and that is the whole
-      trick: it moves the phase by adding to the displacement this advection
-      backtraces along, not by pushing the fluid. A magnet's pull is radial,
-      radial is curl-free, and curl-free is precisely what the projection
-      removes — a magnetic body force on the velocity would be deleted in the
-      same step that applied it, which is the mistake H6 made three times.
+      The flow carries it first, then the magnet pulls it, as conservative
+      fluxes rather than a backtrace (a backtrace along a converging field
+      makes and loses liquid). The water feels the same pull earlier in the
+      step (phase drag), where the projection can turn it into flow.
 
       Skipped entirely on a plate with no phase on it, which is most looks.
     */
     stage('phase', (pass) => {
       this.run(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced, this.sampler],
-        this.arg('phase advect', [
-          p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength * (this.phaseLive ? 1 : 0),
-          p.magnetPolarity, disp, (p.magnetSeconds ?? 0) * MAGNET_RATE, 0,
-        ]));
+        this.arg('phase advect', [0, 0, 0, 0, 0, disp, 0, 0]));
       this.phase.swap();
+      // The magnet's pull, in substeps short enough that no face carries
+      // more than a quarter of a cell (phaseMagnet keeps 0..1 that way).
+      if (magnetOn) {
+        const seconds = p.magnetSeconds ?? 0;
+        const subs = Math.max(1, Math.min(24, Math.ceil(MAGNET_VMAX * seconds * N / 0.25)));
+        const vmax = Math.min(MAGNET_VMAX, (0.25 * subs) / Math.max(1e-6, seconds * N));
+        const args = this.arg('phase magnet', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, (seconds / subs) * N, vmax, 0, 0]);
+        for (let k = 0; k < subs; k++) {
+          this.run(pass, 'phaseMagnet', this.phase.write, [this.phase.read], args);
+          this.phase.swap();
+        }
+      }
       this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read],
         this.arg('phase separate', [p.phaseSharp, p.phaseTension, 0, 0]));
       this.phase.swap();

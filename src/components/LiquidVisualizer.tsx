@@ -2677,7 +2677,6 @@ class FluidSimulation {
       // Held further away for a bigger look, which is what spreads the pull.
       magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
-      magnetPolarity: (settings.magnetPolarity ?? 1) >= 0 ? 1 : -1,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),

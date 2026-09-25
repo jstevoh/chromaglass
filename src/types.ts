@@ -315,8 +315,6 @@ export interface VisualizerSettings {
   /** How far below the glass. The control that matters most. */
   magnetHeight: number;
   magnetStrength: number;
-  /** Which way up it is held: 1 pulls the phase in, −1 pushes it away. */
-  magnetPolarity: number;
   /** How far the magnet wanders on its own around (magnetX, magnetY). 0 holds it still. */
   magnetWalk: number;
   glassSmear: number;
@@ -562,7 +560,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   magnetY: 0.5,
   magnetHeight: 0.25,
   magnetStrength: 0,
-  magnetPolarity: 1,
   magnetWalk: 0,            // still: a look that places its magnet keeps it there
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,

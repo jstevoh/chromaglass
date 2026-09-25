@@ -54,8 +54,6 @@ export interface GpuStepParams {
   /** How far below the glass. The control that matters most: it sets the falloff. */
   magnetHeight: number;
   magnetStrength: number;
-  /** Which way up it is held: +1 pulls the phase in, −1 pushes it away. */
-  magnetPolarity: number;
   /**
     Seconds of real time this step stands for, as the magnet counts it. The
     flow moves by `dt × advection`, which a slow look keeps tiny on purpose;

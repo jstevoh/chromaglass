@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hundredths of the plate a second and left the ferrofluid behind. A magnet
   in the hand is also held closer and stronger now, so it grabs what is near
   it and drags it along.
+- **The ferrofluid follows real magnetics.** The pull is the gradient of the
+  field squared from a magnet below the glass: zero straight over it, so the
+  liquid pools there instead of being yanked to a point, and falling away as
+  the seventh power of distance, so lifting the magnet weakens it everywhere.
+  The ferrofluid moves at a speed proportional to the force, as a viscous
+  liquid does between two glasses, and it is moved conservatively and cannot
+  be packed past full, so it pools to its own volume and none is made or lost.
+  It shoves the dyed water it moves through, which now flows around a dragged
+  drop instead of the drop passing through it like a ghost.
+- **Magnet Polarity is gone.** It pushed the ferrofluid away with the magnet
+  turned over, which no ferrofluid does: magnetised by the field itself, it is
+  drawn to either pole.
 - **Turning Ferrofluid up mid-show pours it.** It was only ever laid with a
   look, so raising the slider changed the setting and left the plate bare.
 - **Random Evolve walks the magnet** on any look with ferrofluid, and drifts

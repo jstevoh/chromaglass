@@ -1680,7 +1680,6 @@ export const PRESETS: Preset[] = [
       phaseSharp: 0.75,
       magnetStrength: 0.9,
       magnetHeight: 0.3,
-      magnetPolarity: 1,
       magnetWalk: 0.7,
       beatSqueeze: 0.4,
       lampHotspot: 0.4,
