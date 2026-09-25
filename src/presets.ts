@@ -663,9 +663,6 @@ export const PRESETS: Preset[] = [
       damping: 0.992,
       heatDecay: 0.997,
       automateRate: 0.04,
-      // Pools over deep violet need violet between them: at the default 0.85
-      // the plate was full and the pools ran together into one gradient.
-      dyeBudget: 0.5,
       platePressure: 0.3,
       glassSmear: 0.25,
       rainDrip: 0.6,
@@ -1636,7 +1633,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       glossiness: 0.1,
       postBlurRadius: 0.25,
-      dyeBudget: 0.55,             // bands need clear glass between them; at 0.9 they were one wash
+      dyeBudget: 0.9,
       edgeRelief: 0.35,
       bubbles: 0.05,
       plateRock: 0.45,             // the rock is what supplies the current
@@ -1955,7 +1952,7 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.45,
-      dyeBudget: 0.55,           // a pool in the middle, not the whole dish filled to one flat disc
+      dyeBudget: 0.9,
       glossiness: 0.25,
       postBlurRadius: 0.15,
       plateCurve: 0.6,
