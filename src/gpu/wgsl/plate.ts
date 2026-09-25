@@ -1776,7 +1776,15 @@ struct FsOut {
     the gate rather than to the picture, so this is also the more correct of
     the two.
   */
-  let grain = (hashFinish(floor(in.pos.xy) + fract(U.time * 47.3)) - 0.5) * 0.03
+  /*
+    The pixel as it lands on the screen. Drawn into a texture the rows run the
+    other way (FLIP_Y), so the same screen pixel was row y on one path and row
+    H-1-y on the other, and got another grain: fx.mjs's identity check read a
+    4x4 block of 5.06 against 4.5 once Classic opened brighter, the grain
+    scaling with the picture. Turned back, both paths hash the same pixel.
+  */
+  let screenPx = vec2f(in.pos.x, select(in.pos.y, U.resolution.y - in.pos.y, FLIP_Y < 0.0));
+  let grain = (hashFinish(floor(screenPx) + fract(U.time * 47.3)) - 0.5) * 0.03
             * (0.05 + 0.95 * smoothstep(0.03, 0.4, grainLuma));
   if (U.cameraOn == 0) { outColor = clamp(outColor + grain, vec3f(0.0), vec3f(1.0)); }
 
