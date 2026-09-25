@@ -39,7 +39,18 @@ export interface Cue {
   swatch: string;
   /** Seconds, or 0 for a cut. */
   fade: number;
+  /** A set item's song, as a line: the item goes up on its own when that song plays. */
+  song?: string;
+  /** What a set item is: a look that ships, one saved, or a stage sequence. */
+  kind?: 'look' | 'saved' | 'sequence';
+  /** A set item whose look or sequence is not here any more. */
+  missing?: boolean;
 }
+
+/** What a set item's menu can do. */
+export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'down' | 'remove';
+/** What the set's own menu can do. */
+export type SetAction = 'import' | 'export' | 'clear' | 'song-shows';
 
 /**
  * What the strip starts with: the controls a light show is actually played on.
@@ -78,6 +89,17 @@ const WHITE = new Set<string>(['dimmer']);
 
 interface PerformDeskProps {
   cues: Cue[];
+  /**
+   * The set's name while the list is the operator's set; null while it is
+   * every look, in which case there is nothing to edit but the Add that
+   * starts one.
+   */
+  setName: string | null;
+  onAddToSet: () => void;
+  onSetAction: (a: SetAction) => void;
+  onItemAction: (id: string, a: SetItemAction) => void;
+  /** The song playing now, if one was identified: a set item can be linked to it. */
+  songNow: string | null;
   liveId: string | null;
   nextId: string | null;
   liveFor: string;
@@ -166,6 +188,11 @@ const dyeKey = (hex: string): string | null => {
 
 export function PerformDesk(p: PerformDeskProps) {
   const [picking, setPicking] = useState(false);
+  /** The row whose menu is open, and the set's own menu. */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [setMenu, setSetMenu] = useState(false);
+  const itemAct = (a: SetItemAction) => { if (menuFor) p.onItemAction(menuFor, a); setMenuFor(null); };
+  const setAct = (a: SetAction) => { p.onSetAction(a); setSetMenu(false); };
   const next = p.cues.find(c => c.id === p.nextId) ?? null;
   const live = p.cues.find(c => c.id === p.liveId) ?? null;
 
@@ -200,9 +227,23 @@ export function PerformDesk(p: PerformDeskProps) {
 
       {/* ── Cues ────────────────────────────────────────────── */}
       <aside className="flex min-h-0 flex-col border-r border-border" data-testid="cue-list">
-        <div className="flex h-11 shrink-0 items-center justify-between px-4">
-          <span className="text-[13px] font-medium text-text">Cues</span>
-          <span className="font-mono text-[12px] text-faint">{p.cues.length}</span>
+        <div className="relative flex h-11 shrink-0 items-center justify-between gap-2 px-4">
+          <span className="min-w-0 truncate text-[13px] font-medium text-text" data-testid="set-name">
+            {p.setName ?? 'All looks'}
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            <span className="mr-1 font-mono text-[12px] text-faint">{p.cues.length}</span>
+            <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
+            <Button height={28} onClick={() => setSetMenu(v => !v)} testId="set-menu" title="The set: import, export, song shows">⋯</Button>
+          </span>
+          {setMenu && (
+            <div className="absolute right-3 top-10 z-30 w-56 rounded-md border border-border-strong bg-elevated p-1 shadow-lg" data-testid="set-menu-list">
+              <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
+              <MenuItem onClick={() => setAct('export')} disabled={!p.setName} testId="set-export">Export this set</MenuItem>
+              <MenuItem onClick={() => setAct('song-shows')} testId="set-song-shows">Song shows…</MenuItem>
+              <MenuItem onClick={() => setAct('clear')} disabled={!p.setName} testId="set-clear">Clear the set (back to all looks)</MenuItem>
+            </div>
+          )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-2 pb-2">
           {p.cues.map((c, i) => (
@@ -213,16 +254,40 @@ export function PerformDesk(p: PerformDeskProps) {
               swatch={c.swatch}
               state={c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle'}
               trailing={
-                c.id === p.liveId ? <Tag tone="live">live</Tag>
-                : c.id === p.nextId ? <Tag tone="next">next</Tag>
-                : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>
+                <>
+                  {c.song && <span className="shrink-0 text-[12px] text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
+                  {c.kind === 'sequence' && <span className="shrink-0 text-[11px] text-faint" title="A stage sequence">seq</span>}
+                  {c.missing && <span className="shrink-0 text-[11px] text-live" title="This look or sequence is not here any more">missing</span>}
+                  {c.id === p.liveId ? <Tag tone="live">live</Tag>
+                  : c.id === p.nextId ? <Tag tone="next">next</Tag>
+                  : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
+                </>
               }
               onClick={() => p.onCue(c.id)}
               onDoubleClick={() => p.onCueNow(c.id)}
+              onContextMenu={p.setName ? (e) => { e.preventDefault(); setMenuFor(c.id); } : undefined}
               midiKey={`preset:${c.id}`}
               testId={`cue-${c.id}`}
             />
           ))}
+          {menuFor && (() => {
+            const c = p.cues.find(x => x.id === menuFor);
+            return (
+              <div className="mx-1 mb-2 rounded-md border border-border-strong bg-elevated p-1" data-testid="cue-menu">
+                <p className="truncate px-2 py-1 text-[12px] text-muted">{c?.name}</p>
+                {p.songNow && <MenuItem onClick={() => itemAct('link-song')} testId="cue-menu-link-song">Goes up when “{p.songNow}” plays</MenuItem>}
+                {c?.song && <MenuItem onClick={() => itemAct('unlink-song')} testId="cue-menu-unlink-song">Unlink from {c.song}</MenuItem>}
+                <MenuItem onClick={() => itemAct('capture')} testId="cue-menu-capture">Keep the controls as they are now</MenuItem>
+                <MenuItem onClick={() => itemAct('up')} testId="cue-menu-up">Move up</MenuItem>
+                <MenuItem onClick={() => itemAct('down')} testId="cue-menu-down">Move down</MenuItem>
+                <MenuItem onClick={() => itemAct('remove')} testId="cue-menu-remove">Remove from the set</MenuItem>
+                <MenuItem onClick={() => setMenuFor(null)} testId="cue-menu-close">Close</MenuItem>
+              </div>
+            );
+          })()}
+          {p.setName && p.cues.length > 0 && (
+            <p className="px-2 pt-1 text-[11px] text-faint">Right-click an item for its song, controls and order.</p>
+          )}
         </div>
         <div className="shrink-0 border-t border-border p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -439,5 +504,18 @@ export function PerformDesk(p: PerformDeskProps) {
         </span>
       </footer>
     </div>
+  );
+}
+
+function MenuItem({ children, onClick, disabled, testId }: { children: ReactNode; onClick: () => void; disabled?: boolean; testId?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[13px] text-text-2 hover:bg-hover disabled:opacity-40"
+      data-testid={testId}
+    >
+      {children}
+    </button>
   );
 }

@@ -93,6 +93,9 @@ jobs:
       # A popped bubble closes back into the liquid, round, not into blocks.
       - name: The popped bubbles
         run: npm run pops
+      # The set list file: a show's running order reads back as it was written.
+      - name: The set list file
+        run: npm run setlist
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.

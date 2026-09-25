@@ -1941,16 +1941,54 @@ try {
       `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
   }
 
+  // ── The set: the operator's own cue list ──────────────────────────
+  //
+  // Empty, the desk lists every look. Two looks added from the sheet make a
+  // set of two, in that order; a row arms its item and Go sends it; cleared,
+  // the desk lists every look again.
+  {
+    await clickOn('mode-segmented-perform');
+    await settle(600);
+    const allLooks = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    await clickOn('set-add');
+    await settle(300);
+    const firstTwo = await page.locator('[data-testid^="add-to-set-look-"]').evaluateAll((els) => els.slice(0, 2).map((e) => e.getAttribute('data-testid')));
+    for (const t of firstTwo) await clickOn(t);
+    await clickOn('add-to-set-done');
+    await settle(400);
+    const rows = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    const name = await page.getByTestId('set-name').innerText().catch(() => '');
+    check('two looks added from the sheet make a set of two', rows === 2 && name !== 'All looks',
+      `${allLooks} looks → ${rows} rows, "${name}"`);
+    const first = page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').first();
+    await first.click();
+    await settle(200);
+    const armed = await first.getAttribute('data-state');
+    await clickOn('go-button');
+    await settle(1500);
+    const live = await first.getAttribute('data-state');
+    check('a set row arms its item and Go sends it', armed === 'next' && live === 'live', `${armed} → ${live}`);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-setlist') || '{"items":[]}').items.length);
+    check('and the set is kept', stored === 2, `${stored} stored`);
+    await clickOn('set-menu');
+    await clickOn('set-clear');
+    await settle(400);
+    const back = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    check('cleared, the desk lists every look again', back === allLooks, `${back} of ${allLooks}`);
+  }
+
   // ── Songs: a look for each song, and what happens while it plays ──
   //
-  // The desk's third mode. A song is added, given an action from the menu,
-  // the action is moved to a time, and the show is run by hand: the action has
-  // to reach the plate when it says, and the song has to be there after.
+  // Folded into the Perform desk: song shows open from the set's menu. A song
+  // is added, given an action from the menu, the action is moved to a time,
+  // and the show is run by hand: the action has to reach the plate when it
+  // says, and the song has to be there after.
   {
-    await clickOn('mode-segmented-sequence');
+    await clickOn('set-menu');
+    await clickOn('set-song-shows');
     let up = 0;
     for (let i = 0; i < 20 && !up; i++) { up = await page.getByTestId('songs-panel').count(); if (!up) await settle(300); }
-    check('the desk\'s third mode opens Songs', up === 1);
+    check('the set\'s menu opens song shows', up === 1);
     if (up) {
       await page.getByTestId('songs-new-title').fill('QA Song');
       await page.getByTestId('songs-new-artist').fill('QA Band');

@@ -289,10 +289,27 @@ function postLevelLabel(governor: QualityGovernor | null | undefined): string {
 const RECOVERY_TRIES = 8;
 /** Consecutive frames that throw before the stage is rebuilt (about 1.5 s at 60 fps). */
 const SELF_HEAL_FRAMES = 90;
-/** How much of the old dye is left when a pressed look change finishes handing over. */
-const HANDOFF_KEEP = 0.45;
-/** How many pours of the new palette arrive through the second half of the handover. */
-const HANDOFF_POURS = 6;
+/*
+  A pressed look change hands over completely.
+
+  Asked for: "as each preset (or user show) loads, the visuals should shift
+  (over the specified time) completely to the new preset and not keep any
+  aspects of the previous preset." It used to thin the old dye to 0.45 and
+  pour the new palette on top, so every look carried the one before it. Now
+  the old dye goes (to HANDOFF_KEEP) through the first part of the fade, and
+  the new look is laid as it would be from cold, in doses: its own seed,
+  its phase, its liquids, on a plate cleared of the old chemistry.
+*/
+/** How much of the old dye is left once the handover is done. */
+const HANDOFF_KEEP = 0.02;
+/**
+  The new look's seed arrives in this many doses through the fade, each at
+  the strength the plate lost since the last, so the old look drains as the
+  new one fills and the stage never sags darker than either end.
+*/
+const HANDOFF_DOSES = 8;
+/** How many pours of the new palette arrive through the fade, on top of its seed. */
+const HANDOFF_POURS = 4;
 /** Whether Evolve pours whole-plate floods at the peak of a gust. Off: evolve is subtle. */
 const EVOLVE_FLOODS = false;
 /** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
@@ -1378,6 +1395,25 @@ class FluidSimulation {
         this.addDensity(nx, ny, amount * w, r, g, b);
       }
     }
+  }
+
+  /**
+   * A look's own seed laid at `w` of its strength (0..1): what `seedPreset`
+   * adds, scaled, on top of what is there. The four dye arrays are the
+   * state on the CPU path and the pending deltas on the GPU path, and a seed
+   * only adds to them, so the difference it made can be scaled either way.
+   */
+  seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
+    const k = Math.max(0, Math.min(1, w));
+    const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
+    const harmony = this.seedPreset(presetId, noise2D);
+    const now = [this.density, this.densityR, this.densityG, this.densityB];
+    for (let c = 0; c < 4; c++) {
+      const a = now[c], b = before[c];
+      for (let i = 0; i < a.length; i++) a[i] = b[i] + (a[i] - b[i]) * k;
+    }
+    this.dirty = true;
+    return harmony;
   }
 
   seedPreset(presetId: string, noise2D: (x: number, y: number) => number): number[] {
@@ -3669,7 +3705,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     thins to a little under half and six pours of the new palette arrive
     through the second half, so the colours change hands with the settings.
   */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number } | null>(null);
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -4182,7 +4218,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     handoff: (seconds: number) => {
       if (!(seconds > 0)) { handoffRef.current = null; return; }
       const now = performance.now();
-      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0 };
+      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0 };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
@@ -5585,12 +5621,38 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const p = Math.min(1, (nowMs - h.start) / h.dur);
               const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
               h.last = nowMs;
-              // To HANDOFF_KEEP of the old dye across the whole fade, a little
-              // each frame so it reads as fading and not as a step.
-              const f = Math.pow(HANDOFF_KEEP, dtMs / h.dur);
-              for (const fluid of fluidsRef.current) fluid.thinDye(f);
-              // The new palette arrives through the second half.
-              const due = Math.floor(Math.max(0, Math.min(1, (p - 0.3) / 0.6)) * HANDOFF_POURS + 1e-6);
+              // Everything on the plate thins, a little each frame, to
+              // HANDOFF_KEEP of itself by the end; the new look is laid back
+              // in at the rate it thins, so what is left of the old look at
+              // the end is HANDOFF_KEEP and the new look is all the rest.
+              const lambda = -Math.log(HANDOFF_KEEP);
+              for (const fluid of fluidsRef.current) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
+              const id = livePresetRef.current;
+              const lead = fluidsRef.current[0];
+              const doses = Math.min(HANDOFF_DOSES, Math.floor(p * HANDOFF_DOSES + 0.5 + 1e-6));
+              while (h.dosed < doses) {
+                h.dosed++;
+                // The first dose clears the old look's chemistry and its
+                // liquids; the middle one lays the new look's phase.
+                if (h.dosed === 1) {
+                  for (const fluid of fluidsRef.current) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                  chemRef.current.reset();
+                }
+                if (h.dosed === Math.ceil(HANDOFF_DOSES / 2)) {
+                  if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
+                  else lead?.gpu?.clearPhase?.();
+                  if (id) for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, id);
+                }
+                if (lead && id) {
+                  const seeded = lead.seedPresetScaled(id, noise2D, Math.min(1, lambda / HANDOFF_DOSES));
+                  if (h.dosed === 1 && !harmonyLockRef.current && !presetContractRef.current) harmonyRef.current = seeded;
+                  for (let i = 0; i < 2; i++) {
+                    doseLiquid(lead, plateLiquidsRef.current, 10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+                  }
+                }
+              }
+              // And its palette, poured through the second half.
+              const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
               while (h.poured < Math.min(due, HANDOFF_POURS)) {
                 h.poured++;
                 const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
