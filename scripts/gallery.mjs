@@ -31,7 +31,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launchChromium } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
-import { engineQuery, installFrameReader, lastFrameRead } from './frame.mjs';
+import { engineQuery, installFrameReader, lastFrameRead, frameOf } from './frame.mjs';
+import { readingOf } from './judge.mjs';
 
 const PORT = Number(process.env.GALLERY_PORT ?? 4344);
 const OUT = process.env.GALLERY_OUT ?? 'gallery';
@@ -92,6 +93,12 @@ try {
         ctx.drawImage(full, 0, 0, out.width, out.height);
         return out.toDataURL('image/jpeg', 0.85);
       }, WIDTH);
+      // The frame as numbers too (scripts/judge.mjs), so the sheet can be read
+      // for dark, flat, grey or frozen looks rather than only looked at.
+      const fa = await frameOf(page, 240, 150);
+      await page.waitForTimeout(150);
+      const fb = await frameOf(page, 240, 150);
+      const m = fa && fb ? readingOf(fa, fb, 240, 150) : null;
       const status = await page.evaluate(() => {
         const d = window.chromaglassDebug?.();
         const r = (n) => (Number.isFinite(n) ? +n.toFixed(4) : String(n));
@@ -105,12 +112,15 @@ try {
       }
       const file = `${preset.id}-${t}s.jpg`;
       fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
-      row.frames.push({ t, file, engine: status.engine, plates: status.plates });
+      const r3 = (n) => +n.toFixed(3);
+      const metrics = m ? { luma: r3(m.luma), colours: r3(m.colours), flat: r3(m.flat), cast: r3(m.cast), motion: +m.motion.toFixed(4), detail: +m.detail.toFixed(4) } : null;
+      row.frames.push({ t, file, engine: status.engine, plates: status.plates, metrics });
     }
     // What was on the plate at each moment: fill, and a count of cells that
     // are not a number. A bare-ground frame is empty or poisoned; this says which.
     const plateNote = row.frames.map((f) => (f.plates ?? []).map((p) => `${p.mean}${p.nan ? ` NaN×${p.nan}` : ''}`).join('/')).join(' ');
-    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length} frames${errors.length ? `, ${errors.length} console errors` : ''}  fill ${plateNote}`);
+    const metricNote = row.frames.map((f) => f.metrics ? `L${f.metrics.luma} C${f.metrics.colours} F${f.metrics.flat} M${f.metrics.motion} D${f.metrics.detail}` : '-').join(' | ');
+    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length} frames${errors.length ? `, ${errors.length} console errors` : ''}  fill ${plateNote}\n      ${metricNote}`);
     index.push(row);
     await page.close();
   }
@@ -120,7 +130,9 @@ try {
   const img = (f) => f?.file ? `data:image/jpeg;base64,${fs.readFileSync(path.join(OUT, f.file)).toString('base64')}` : '';
   const rows = index.map((r) => `<tr><th>${r.name}<br><small>${r.id}</small></th>${TIMES.map((t) => {
     const f = r.frames.find((x) => x.t === t);
-    return `<td>${f?.file ? `<img src="${img(f)}">` : '<div class="miss">no frame</div>'}<small>${t}s</small></td>`;
+    const mm = f?.metrics;
+    const note = mm ? ` · lum ${mm.luma} · colour ${Math.round(mm.colours * 100)}% · flat ${Math.round(mm.flat * 100)}% · motion ${mm.motion}` : '';
+    return `<td>${f?.file ? `<img src="${img(f)}">` : '<div class="miss">no frame</div>'}<small>${t}s${note}</small></td>`;
   }).join('')}</tr>`).join('');
   const sheet = await browser.newPage({ viewport: { width: 200 + TIMES.length * (WIDTH / 2 + 12), height: 600 } });
   await sheet.setContent(`<html><body style="margin:0;background:#111;color:#ddd;font:12px system-ui">

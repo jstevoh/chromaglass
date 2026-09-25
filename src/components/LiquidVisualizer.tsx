@@ -3843,6 +3843,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const magnetWalkAtRef = useRef(0);
   /** The settings handed to the lead plate's step, with the magnet where it is now. */
   const magnetStepRef = useRef<Record<string, unknown>>({});
+  /** What the lead plate's magnet was last given, for the harness: where, how strong, and whether a hand held it. */
+  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; held: boolean; field: number } | null>(null);
   /** The maze field's kick envelope: 1 on a kick, falling over about a second (see magnetFor). */
   const mazeKickRef = useRef({ env: 0, at: 0 });
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
@@ -4548,6 +4550,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
+        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
         return Object.assign(magnetStepRef.current, look, {
           magnetX: Math.max(0.05, Math.min(0.95, mx)),
           magnetY: Math.max(0.05, Math.min(0.95, my)),
@@ -7024,6 +7027,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The second phase (H7), for the harness. */
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
+          magnetNow: () => lastMagnetRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;

@@ -145,7 +145,7 @@ try {
     if (idle0.n === idle1.n) break;
     console.log(`     the grid moved ${idle0.n} → ${idle1.n} while the plate was left alone; again`);
   }
-  let drag0, drag1, spot = null, trail = [];
+  let drag0, drag1, spot = null, trail = [], solverMagnet = null;
   for (let k = 0; k < 3; k++) {
     drag0 = await phase(null, 'drag0');
     await page.mouse.move(...at(0.2));
@@ -162,6 +162,7 @@ try {
     }
     for (let k = 0; k < 12; k++) { await page.waitForTimeout(250); await sample(); }
     spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+    solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
     drag1 = await phase(null, 'drag1');
     await page.mouse.up();
     if (drag0.n === drag1.n) break;
@@ -210,6 +211,7 @@ try {
     g.gain = (g.d1 - g.d0) - (g.i1 - g.i0);
     if (!best || g.gain > best.gain) best = g;
   }
+  console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
   console.log(`     along the hand's last ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
   check('dragging the Magnet gathers the ferrofluid along where the hand goes',
