@@ -1317,20 +1317,29 @@ struct FsOut {
         // gold plate stayed reddish brown and the gallery's maze read as thin
         // lines, with the plate's own texture showing through the ink.
         let amt = clamp(U.phaseAmount, 0.0, 1.0);
-        let opac = clamp(ph * ph * 1.6, 0.0, 1.0) * amt;
         let depth = 9.0 * pow(ph, 1.5) * (0.4 + 0.6 * amt);
         var pc = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
         // The rim: the dye beyond the boundary, bent back through the edge.
         let outward = select(vec2f(0.0), -normalize(vec2f(gx, gy)), length(vec2f(gx, gy)) > 1e-5);
         let beyond = decodeFluid(layer0, fuvBase + outward * 0.02, 0.0, false);
         let rimCol = mix(bgColor, beyond.rgb, beyond.a);
-        pc += rimCol * edge * 0.55 * opac;
+        /*
+          The meniscus is a line where the ferrofluid meets the water, so the
+          rim and the highlight belong to the band round half full, not to
+          every gradient. Weighted by how full it was, they lit every
+          ripple inside a dense pool (the gallery's honeycomb in the ink at
+          8 s), and across a maze finger a few cells wide almost every pixel
+          is within the rim's reach, so the whole finger was washed with the
+          dye's colour and read as brown rather than black.
+        */
+        let band = pow(clamp(4.0 * ph * (1.0 - ph), 0.0, 1.0), 3.0) * amt;
+        pc += rimCol * edge * 0.55 * band;
         // A hard specular dot, which every macro frame of this has.
         // The lamp's direction here, the same way the bubbles take it.
         let Lp = lampDir(fuvBase, U.lamp);
         let lampTo = Lp.xy / max(length(Lp.xy), 0.06);
         let hi = pow(max(0.0, dot(outward, lampTo)), 8.0) * edge;
-        pc += vec3f(1.0, 0.97, 0.92) * hi * 0.35 * opac;
+        pc += vec3f(1.0, 0.97, 0.92) * hi * 0.35 * band;
         outColor = pc;
       }
     }
