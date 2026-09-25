@@ -178,7 +178,7 @@ function drive({ from, to, seconds, clearing }) {
     stale.length === 0 && opened.globalSpeed === 0.05 && opened.lacing === 0.4, stale.slice(0, 4).join(', '));
 
   // The sequencer's stages aim at the same thing.
-  const stage = lookOf(PRESETS.find(p => p.id === 'lava-lamp').settings);
+  const stage = lookOf(PRESETS.find(p => p.id === 'deep-ocean').settings);
   const short = Object.keys(LOOK_BASE).filter(k => !(k in stage));
   check('a sequencer stage that names a look aims at all of it', short.length === 0, short.join(', '));
   const t1 = lookOf({}), t2 = lookOf({});

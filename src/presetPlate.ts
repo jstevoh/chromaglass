@@ -22,7 +22,6 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'galaxy':             [18, 23, 16],
   'deep-ocean':         [16, 22, 7, 19],
   'cyberpunk':          [20, 16, 6],
-  'lava-lamp':          [17, 3, 1],
   'acid-trip':          [18, 21, 6, 20],
   'bass-drop':          [4, 18, 7],
   'timbre-shifter':     [23, 16, 17],
@@ -78,7 +77,6 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'galaxy':             ['spray', 'streak'],
   'deep-ocean':         ['pour', 'drop'],
   'cyberpunk':          ['streak', 'splatter'],
-  'lava-lamp':          ['pour'],
   'acid-trip':          ['splatter', 'spray'],
   'bass-drop':          ['splatter', 'drop'],
   'timbre-shifter':     ['spray'],
@@ -149,7 +147,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // A blob that crawls while the oil around it climbs — which is the lamp.
   // Alcohol is lighter than all of it and carries heat, so it is what goes
   // up: the lamp needs something to rise, not only something to sit.
-  'lava-lamp':          ['oil', 'glycerine', 'milk', 'alcohol'],
   'acid-trip':          ['soap', 'silicone'],
   // Each hit blows a clear hole and the colour runs off the rim of it.
   'bass-drop':          ['water', 'soap'],

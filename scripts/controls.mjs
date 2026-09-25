@@ -62,7 +62,7 @@ const CANDIDATES = ['vorticityConfinement', 'plateUpright', 'rotationSpeed', 'au
   'saturationBoost', 'bubbles', 'fingering', 'lacing', 'ferroLabyrinth', 'tempoSync'];
 const RIDE_KEYS = [...new Set([...DEFAULT_RIDES.map(String), ...CANDIDATES])].filter((k) => PIN_RANGE.has(k));
 const ALL_KEYS = PINNABLE.map((s) => String(s.key));
-const ALL_LOOKS = ['classic', 'oil-on-water', 'magnet-garden', 'lava-lamp'];
+const ALL_LOOKS = ['classic', 'oil-on-water', 'magnet-garden', 'deep-ocean'];
 
 let keys = list(process.env.CONTROLS_KEYS) ?? (MODE === 'all' ? ALL_KEYS : RIDE_KEYS);
 let looks = (list(process.env.CONTROLS_LOOKS) ?? (MODE === 'all' ? ALL_LOOKS : PRESETS.map((p) => p.id)))

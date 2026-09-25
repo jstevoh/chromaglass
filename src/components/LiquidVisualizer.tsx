@@ -1489,19 +1489,6 @@ class FluidSimulation {
         break;
       }
 
-      case 'lava-lamp': {
-        const blobs: [number, number, number][] = [
-          [0.3, 0.75, 22], [0.7, 0.80, 18], [0.5, 0.60, 25], [0.4, 0.45, 15], [0.6, 0.35, 12],
-        ];
-        blobs.forEach(([fx, fy, rad], idx) => {
-          const c = col(idx);
-          this.splatBlob(fx * S, fy * S, rad, 3.0, c.r, c.g, c.b);
-          this.addTemp(Math.floor(fx * S), Math.floor(fy * S), 3.0);
-        });
-        for (let i = 5; i < S - 5; i += 3) this.addTemp(i, Math.floor(S * 0.85), 1.5);
-        break;
-      }
-
       case 'acid-trip': {
         for (let ring = 0; ring < 5; ring++) {
           const r = (8 + ring * 10) * k;
