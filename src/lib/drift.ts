@@ -46,13 +46,15 @@ import { STRUCTURE } from './lookFade';
  */
 const LIGHT_STACK = new Set([
   'saturationBoost', 'bloom', 'lumia', 'gelWheel', 'secondLamp', 'dimmer',
-  'exposure', 'transmission', 'iridescence',
+  'exposure', 'transmission', 'iridescence', 'thicknessOptics', 'spectralOptics',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',
   'beatLead', 'filmDrive', 'filmImpact', 'filmMix', 'filmKey', 'soundImpact',
   'shapeImpact', 'sceneDrive', 'sceneHands', 'sceneImpact', 'sceneDeadzone',
   'sceneSmooth', 'camera',
+  // How the show follows the music, not what the look is (lib/tempoPace.ts).
+  'tempoSync',
 ]);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
@@ -97,9 +99,19 @@ export function driftLook(
     const span = max - min;
     const now = typeof current[key as keyof VisualizerSettings] === 'number'
       ? current[key as keyof VisualizerSettings] as unknown as number : undefined;
-    const was = typeof anchor[key as keyof VisualizerSettings] === 'number'
+    let was = typeof anchor[key as keyof VisualizerSettings] === 'number'
       ? anchor[key as keyof VisualizerSettings] as unknown as number : undefined;
     if (now === undefined || was === undefined) continue;
+    /*
+      The one exception to leaving zero alone: a look with ferrofluid and a
+      magnet under it has the walk *implied*, since a still magnet is the
+      only reason that ferrofluid sits still. So on such a look the walk
+      wanders around a gentle middle even if the look never set one, and on
+      any other look it stays off like everything else.
+    */
+    if (key === 'magnetWalk' && (anchor.phaseAmount ?? 0) > 0.002 && (anchor.magnetStrength ?? 0) > 0) {
+      was = Math.max(was, 0.5);
+    }
     /*
       A look that set something to zero switched it off. Leave it off.
 

@@ -135,6 +135,14 @@ jobs:
       - run: npm ci
       - name: Install Chromium
         run: npx playwright install chromium
+      # Every shader compiles, before anything builds a pipeline from one.
+      - name: The shaders compile
+        run: npm run wgsl
+      # The solver's physics on its own: the projection is incompressible
+      # (multigrid against the sweeps), and the magnet draws ferrofluid in
+      # without making, losing or over-packing any.
+      - name: The physics
+        run: npm run physics
       - run: npm run webgpu
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's
@@ -159,6 +167,22 @@ jobs:
       # not a tuning.
       - name: Depth reaches the flow
         run: npm run depth
+      # The Magnet in the hand (reported: "magnet tool isn't really
+      # working"): picked on a look with no ferrofluid it pours some, and
+      # dragged across the plate the ferrofluid goes with it, against the
+      # same plate left alone.
+      - name: The magnet moves the ferrofluid
+        run: npm run magnet
+      # And the physics under it: the ferrofluid gathers where the magnet is
+      # (not at its mirror), held close pulls harder than held away, and the
+      # magnet neither makes nor loses liquid.
+      - name: The ferrofluid's physics
+        run: node scripts/ferro.mjs
+      # Performances start and stop by hand (reported: "the performance auto
+      # detect doesn't work well"): T starts one, nothing painted keeps
+      # nothing, and what is painted is kept, on its own clock with no song.
+      - name: A performance starts and stops by hand
+        run: node scripts/take.mjs
       # The black box records (crash-plan.md): errors land with a snapshot,
       # a device loss and its recovery are logged, frames that stop become a
       # fatal and light the button, a report from a destroyed device still

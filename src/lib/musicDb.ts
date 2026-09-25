@@ -2,14 +2,15 @@
 // Everything is keyed by ISRC (or pseudo-ISRC for manually tagged tracks),
 // so repeat listens need no server round-trip.
 
-import { SongMap, TrackEvolutionState } from './musicTypes';
+import { SavedPerformance, SongMap, TrackEvolutionState } from './musicTypes';
 import { TrackFingerprint } from './localFingerprint';
 
 const DB_NAME = 'chromaglass-music';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SONG_MAPS = 'songMaps';
 const TRACKS = 'tracks';
 const FINGERPRINTS = 'fingerprints';
+const PERFORMANCES = 'performances';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -22,6 +23,7 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(SONG_MAPS)) db.createObjectStore(SONG_MAPS, { keyPath: 'isrc' });
       if (!db.objectStoreNames.contains(TRACKS)) db.createObjectStore(TRACKS, { keyPath: 'isrc' });
       if (!db.objectStoreNames.contains(FINGERPRINTS)) db.createObjectStore(FINGERPRINTS, { keyPath: 'isrc' });
+      if (!db.objectStoreNames.contains(PERFORMANCES)) db.createObjectStore(PERFORMANCES, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -76,4 +78,19 @@ export async function getAllFingerprints(): Promise<TrackFingerprint[]> {
 export async function hasFingerprint(isrc: string): Promise<boolean> {
   try { return (await txRequest<number>(FINGERPRINTS, 'readonly', s => s.count(isrc))) > 0; }
   catch { return false; }
+}
+
+export async function putPerformance(p: SavedPerformance): Promise<boolean> {
+  try { await txRequest(PERFORMANCES, 'readwrite', s => s.put(p)); return true; }
+  catch (e) { console.warn('musicDb.putPerformance failed', e); return false; }
+}
+
+export async function getAllPerformances(): Promise<SavedPerformance[]> {
+  try { return await txRequest<SavedPerformance[]>(PERFORMANCES, 'readonly', s => s.getAll()); }
+  catch (e) { console.warn('musicDb.getAllPerformances failed', e); return []; }
+}
+
+export async function deletePerformance(id: string): Promise<void> {
+  try { await txRequest(PERFORMANCES, 'readwrite', s => s.delete(id)); }
+  catch (e) { console.warn('musicDb.deletePerformance failed', e); }
 }

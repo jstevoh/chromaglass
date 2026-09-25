@@ -92,6 +92,8 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
+  // The liquids' own physics (docs/physics-plan.md): each plate's solver.
+  'vorticityConfinement', 'oilTension', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'doubleDiffusion', 'ferroLabyrinth', 'bzReaction', 'liesegang',
   /*
     The second phase and its magnet (H7). Each layer is a separate dish with
     its own phase field, so each can have its own domains and its own magnet —
@@ -99,7 +101,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
     is simply the front plate's hand.
   */
   'phaseScale', 'phaseSharp',
-  'magnetX', 'magnetY', 'magnetHeight', 'magnetStrength', 'magnetPolarity',
+  'magnetX', 'magnetY', 'magnetHeight', 'magnetStrength',
   // `particles` and not `particleMix`: each plate has its own solver and its
   // own population, so the amount is that plate's. How far their colour is
   // trusted is read by the render pass, which sees one picture.

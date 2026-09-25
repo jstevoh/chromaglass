@@ -26,6 +26,8 @@ on:
       - 'src/lib/lookFade.ts'
       - 'src/lib/beads.ts'
       - 'src/gpu/wgsl/plate.ts'
+      - 'src/gpu/fluid.ts'
+      - 'src/gpu/wgsl/fluid.ts'
       - 'scripts/gallery.mjs'
       - '.github/workflows/gallery.yml'
 

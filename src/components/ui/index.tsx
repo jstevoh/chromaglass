@@ -187,8 +187,10 @@ export function Swatch({ hex, selected, onClick, midiKey, className = '', gap = 
 
 // ── Status dot ───────────────────────────────────────────────────────
 
-export function StatusDot({ on, label, tone = 'ok', testId, onClick, title }: {
+export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare = false }: {
   on: boolean; label: string; tone?: 'ok' | 'live'; testId?: string;
+  /** The dot alone at every width, its label only in the tooltip and to a screen reader. */
+  bare?: boolean;
   /**
    * What clicking it opens. A dot that reports a thing you cannot reach is
    * half a control: the MIDI dot said "no controller" all evening with no way
@@ -215,7 +217,7 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title }: {
         does. A dot with no word beside it is worth more than a word painted
         underneath a control.
       */}
-      <span className={`hidden min-[1400px]:inline text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
+      <span className={`${bare ? 'sr-only' : 'hidden min-[1400px]:inline'} text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
     </>
   );
   const tip = title ?? `${label}: ${on ? 'yes' : 'no'}`;
@@ -230,7 +232,7 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title }: {
       onClick={onClick}
       data-testid={testId}
       title={tip}
-      className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 transition-colors hover:bg-hover"
+      className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 transition-colors hover:bg-hover${bare ? ' min-h-6 min-w-6 justify-center' : ''}`}
     >
       {body}
     </button>

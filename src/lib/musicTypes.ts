@@ -43,7 +43,7 @@ export interface SongMap {
 
 /** One manual interaction, anchored to song time. Coordinates are normalized 0-1. */
 export interface GestureEvent {
-  t: number;      // seconds into the track
+  t: number;      // seconds into the track (or into the performance, on its own clock)
   tool: string;   // dropper | spray | splatter | pour | streak | blow
   x: number;
   y: number;
@@ -58,6 +58,27 @@ export interface ListenRecord {
   paramSnapshot: Record<string, number>;
   /** Saved light-show performance — present only if the user chose to keep it. */
   gestures?: GestureEvent[];
+}
+
+/**
+ * A performance, started and stopped by hand: the gestures painted between.
+ *
+ * The song is attached when one was running (at the start, or identified
+ * by the time it stopped), and then the gestures are timed in the song, so
+ * a replay lands them at the same moments in it. Without a song they are
+ * timed from the start and replay on their own clock.
+ */
+export interface SavedPerformance {
+  id: string;
+  /** When it started, ISO. */
+  date: string;
+  isrc?: string;
+  title?: string;
+  artist?: string;
+  /** 'song': each gesture's t is seconds into the song; 'wall': seconds since the performance started. */
+  clock: 'song' | 'wall';
+  durationSec: number;
+  gestures: GestureEvent[];
 }
 
 export interface TrackEvolutionState {

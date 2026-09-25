@@ -40,11 +40,11 @@ export interface GpuStepParams {
   /*
     The second phase and the magnet under the glass (H7).
 
-    `phaseSharp` and `phaseTension` are the two that make the shapes: tension
-    smooths the boundary by its curvature and so decides how big a droplet has
-    to be to keep its shape, and sharpness is what stops advection blurring the
-    phase into a grey wash. Between them, spikes, labyrinths and lattices fall
-    out rather than being drawn.
+    The two liquids are kept apart by Cahn–Hilliard (see the phase stage in
+    fluid.ts), which conserves and rounds; `phaseSharp` is its mobility, how
+    fast a blurred edge separates again. `phaseTension` no longer reaches the
+    GPU: Cahn–Hilliard carries its own surface tension, and the pairwise
+    sharpening that took it set drops into blocky squares.
   */
   phaseSharp: number;
   phaseTension: number;
@@ -54,8 +54,36 @@ export interface GpuStepParams {
   /** How far below the glass. The control that matters most: it sets the falloff. */
   magnetHeight: number;
   magnetStrength: number;
-  /** Which way up it is held: +1 pulls the phase in, −1 pushes it away. */
-  magnetPolarity: number;
+  /**
+    Seconds of real time this step stands for, as the magnet counts it. The
+    flow moves by `dt × advection`, which a slow look keeps tiny on purpose;
+    a magnet pulls in real time however slow the look is, or a hand dragging
+    it leaves the ferrofluid behind.
+  */
+  magnetSeconds: number;
+  /*
+    The liquids' own physics and chemistry (docs/physics-plan.md). All 0..1,
+    all off by default, so every look that does not ask for them runs the
+    solver it always did.
+  */
+  /** Vorticity confinement: small eddies spun back up (a look option). */
+  vorticity?: number;
+  /** Surface tension between oil and water (Cahn–Hilliard + capillary force). */
+  oilTension?: number;
+  /** The ferrofluid's labyrinth under a strong field (Ohta–Kawasaki). */
+  ferroLabyrinth?: number;
+  /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
+  surfactantFlow?: number;
+  /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
+  solutalBuoyancy?: number;
+  /** How far the plate stands up (0 flat on the projector, 1 upright). */
+  plateUpright?: number;
+  /** Heat diffusing faster than dye (the double-diffusive case). */
+  doubleDiffusion?: number;
+  /** The Belousov–Zhabotinsky reaction's spirals. */
+  bzReaction?: number;
+  /** Liesegang rings: precipitate bands behind a diffusing front. */
+  liesegang?: number;
   plateCurve: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   depthDrag: number;
@@ -129,6 +157,11 @@ export interface PlateSolver {
    */
   addPhase?(x: number, y: number, radius: number, amount: number): void;
   clearPhase?(): void;
+  /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
+  addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;
+  addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
+  readonly chemistryLive?: { rxn: boolean; lies: boolean };
   step(p: GpuStepParams, deltasApplied: boolean): void;
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
   /** Start a read and take whatever has landed; false before the first. */

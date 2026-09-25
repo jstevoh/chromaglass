@@ -7,11 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the liquids' own physics and chemistry
+
+Each is a setting, off by default (docs/physics-plan.md has the models and
+the measurements):
+
+- **Oil Tension**: oil and water separate, oil rounds into drops, threads
+  break into beads (Cahn–Hilliard with its capillary force), ringed by a
+  dark meniscus.
+- **Soap Bursts**: soap lands on the beat and the surface streams away from
+  it, carrying the dye (Marangoni flow).
+- **Gravity** and **Dye Weight**: stand the plate up and heavy dye pours
+  down it in fingers (Rayleigh–Taylor); **Heat Spread** lets heat diffuse
+  faster than dye, as it does in water.
+- **Swirl**: small eddies spun back up (vorticity confinement).
+- **Labyrinth**: under a strong field the ferrofluid fingers out into a
+  maze, as it does between glass plates (Hele-Shaw flow driven by its own
+  repulsion), and the field breathes with the music: finer on the hits,
+  rounder between them.
+- **pH Indicator**, with new **Acid** and **Base** bottles: the dye turns pink
+  in acid and green in base, like red cabbage.
+- **BZ Reaction**: the Belousov–Zhabotinsky reaction's turning spirals.
+- **Liesegang Rings**: bands of precipitate spaced ever wider.
+- **Layer Depth** and **Spectral Mix**: colour depth follows the gap between
+  the glasses, and dyes mix across six bands of the spectrum.
+- Four new looks: **Oil & Water**, **Red Cabbage**, **Chemical Clock** and
+  **Agate**. Lava Lamp stands up; Oil on Water, Milk Marble, Soap Film,
+  Galaxy and Magnet Garden use the new physics.
+
+### Changed — the Perform desk
+
+- The rides are now Speed, Evolve Speed, Swirl, Gravity, Soap Bursts, Beat
+  Press and Zoom (with the Dimmer): each does something large and different.
+  Granulation is off the desk (it made a few jagged cuts in the dye).
+
+### Changed — performances start and stop by hand
+
+- **T on either desk, the Performance dot in the desk header, or Start in
+  the Track panel** starts recording a performance, and the same stops it:
+  everything painted in between is kept. It used to be tied to song
+  detection, so a performance started late, ran on into the next song, and
+  with no song identified was never kept at all.
+- **The song is attached for you**: the one playing when it started, or the
+  one identified by the time it stopped. Its gestures are timed in the song,
+  so a replay lands them at the same moments; with no song, it replays on its
+  own clock. Performances are listed in the Track panel to replay or delete.
+
+### Added — the plate's speed follows the music
+
+- **Tempo Sync.** The presets ran their liquid at speeds nearly two thousand
+  times apart on screen, and none of it had anything to do with what was
+  playing. Each look's speed is now pulled toward a pace set by the music:
+  the tempo (from the beat clock once it has locked, or a MIDI clock, a tap
+  or a typed tempo) and how loud it has been over the last several seconds.
+  Silence calms the plate. The new Tempo Sync slider (beside Speed) sets how
+  far: 0 is the look as written, 1 the music alone, and the default is
+  halfway. Random Evolve follows the music harder. It eases in over a few
+  seconds, so a new song is a change of pace rather than a jolt.
+
 ### Added — a magnet you can move
 
 - **The Magnet tool (M)** on both desks: hold it on the plate and the
-  ferrofluid gathers under the pointer and follows it. On looks without
-  ferrofluid it does nothing.
+  ferrofluid gathers under the pointer and follows it. Picked on a look with
+  no ferrofluid, it pours some rather than doing nothing.
+- **The magnet pulls in real time.** Its pull used to be scaled by the flow's
+  own step, which slow looks keep tiny, so a dragged magnet crept at a few
+  hundredths of the plate a second and left the ferrofluid behind. A magnet
+  in the hand is also held closer and stronger now, so it grabs what is near
+  it and drags it along.
+- **The ferrofluid follows real magnetics.** The pull comes from the
+  gradient of the magnetic energy of a magnet below the glass: zero straight
+  over it, falling away steeply with distance, and saturating close in the way
+  a real ferrofluid's magnetisation does. It acts as a force on the liquid
+  where the ferrofluid is, so a dragged pool pushes the dyed water aside
+  instead of passing through it, and the ferrofluid is carried in a form that
+  neither makes nor loses any and never packs it past full.
+- **The flow is properly incompressible.** The pressure solve is now a
+  multigrid V-cycle instead of twelve sweeps from scratch, which only ever
+  cancelled the flow's compression at the scale of a few cells. Measured, it
+  leaves a twelfth of the divergence. Every look's liquid swirls and closes
+  around itself more like water now, rather than spreading and bunching.
+- **Magnet Polarity is gone.** It pushed the ferrofluid away with the magnet
+  turned over, which no ferrofluid does: magnetised by the field itself, it is
+  drawn to either pole.
+- **The ferrofluid keeps every drop, at any frame rate.** On a machine
+  drawing ten frames a second the edge sharpening lost an eighth of it in a
+  few seconds, and a pool gathered on the magnet was printed with a grid of
+  holes. Its edge is now kept by the same physics as the oil's, which
+  conserves and rounds drops properly; Phase Edge sets how quickly.
+- **Turning Ferrofluid up mid-show pours it.** It was only ever laid with a
+  look, so raising the slider changed the setting and left the plate bare.
+- **Random Evolve walks the magnet** on any look with ferrofluid, and drifts
+  Magnet Walk like its other dials, so the slider shows what it is doing.
 - **The magnet can walk on its own.** A new Magnet Walk setting moves it
   slowly around its resting place, faster when the music is loud. Magnet
   Garden has it on, and Evolve starts a gentle walk on any look with

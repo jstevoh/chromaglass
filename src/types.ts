@@ -40,6 +40,8 @@ export interface LiquidBehaviour {
    * than with a particular other liquid.
    */
   polarity?: number;
+  /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
+  acid?: number;
 }
 
 export interface LiquidType {
@@ -110,6 +112,19 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     // The least polar thing on the shelf, which is why it shoulders colour
     // aside instead of tinting it.
     behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95 } },
+  /*
+    Acid and base, for a pH indicator in the dye (docs/physics-plan.md): they
+    do nothing to the flow, and with pH Indicator up the dye they land in
+    turns pink (acid) or green (base), and they neutralise where they meet.
+  */
+  { id: 'acid',      name: 'Acid',      color: '#ffd6e0',
+    description: 'Vinegar: turns a pH indicator in the dye pink, and neutralises a base',
+    injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
+    behaviour: { acid: 1 } },
+  { id: 'base',      name: 'Base',      color: '#d8f5d0',
+    description: 'Washing soda: turns a pH indicator in the dye green, and neutralises an acid',
+    injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
+    behaviour: { acid: -1 } },
   { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff',
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
@@ -315,10 +330,37 @@ export interface VisualizerSettings {
   /** How far below the glass. The control that matters most. */
   magnetHeight: number;
   magnetStrength: number;
-  /** Which way up it is held: 1 pulls the phase in, −1 pushes it away. */
-  magnetPolarity: number;
   /** How far the magnet wanders on its own around (magnetX, magnetY). 0 holds it still. */
   magnetWalk: number;
+  /*
+    The liquids' own physics and chemistry (docs/physics-plan.md). All 0..1
+    and off by default, so a look that does not ask for them is the look it
+    always was.
+  */
+  /** Small eddies spun back up, which every grid solver smooths away (a look option: a thin film is heavily damped, so this is flair, not physics). */
+  vorticityConfinement: number;
+  /** Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge (Cahn–Hilliard with its capillary force). */
+  oilTension: number;
+  /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
+  surfactantFlow: number;
+  /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor). */
+  solutalBuoyancy: number;
+  /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
+  plateUpright: number;
+  /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
+  doubleDiffusion: number;
+  /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
+  ferroLabyrinth: number;
+  /** The dye changes colour with acidity, like red cabbage: pink in acid, purple neutral, green in base. Pour Acid or Base. */
+  phIndicator: number;
+  /** The Belousov–Zhabotinsky reaction in a gel: excitable waves that curl into spirals, in ferroin red and blue. */
+  bzReaction: number;
+  /** A reagent diffusing into a gel precipitates in rings spaced ever wider (the Jablczynski law). */
+  liesegang: number;
+  /** Colour depth follows the gap between the glasses (Beer–Lambert): a press pales the dye under the palm, a deep pool saturates. */
+  thicknessOptics: number;
+  /** Dyes mixed across six bands of the spectrum rather than three: cleaner mixtures, and hue that shifts with depth. */
+  spectralOptics: number;
   glassSmear: number;
   rainDrip: number;
   viscosity: 'thick' | 'thin';
@@ -472,6 +514,8 @@ export interface VisualizerSettings {
   // Macro Closeup — magnified camera that chases a single bead of liquid
   macroMode: boolean;         // enable the tracking macro camera + micro-detail pass
   macroZoom: number;          // 1 = full plate, 16 = extreme magnification
+  /** How far the plate's speed follows the music rather than the look (lib/tempoPace.ts): 0 the look as written, 1 the music alone. */
+  tempoSync: number;
   macroChase: number;         // camera follow speed (0 = drifting, 1 = whip-fast)
   macroHold: number;          // seconds spent on one bead before cutting to the next
   macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
@@ -562,8 +606,19 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   magnetY: 0.5,
   magnetHeight: 0.25,
   magnetStrength: 0,
-  magnetPolarity: 1,
   magnetWalk: 0,            // still: a look that places its magnet keeps it there
+  vorticityConfinement: 0,
+  oilTension: 0,
+  surfactantFlow: 0,
+  solutalBuoyancy: 0,
+  plateUpright: 0,
+  doubleDiffusion: 0,
+  ferroLabyrinth: 0,
+  phIndicator: 0,
+  bzReaction: 0,
+  liesegang: 0,
+  thicknessOptics: 0,
+  spectralOptics: 0,
   glassSmear: 0.3,          // gentle smear from plate contact
   rainDrip: 0.0,
   viscosity: 'thick',
@@ -689,6 +744,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // 4 with the slider inert unless `macroMode` was on, which made a control on
   // the desk — where there is no such switch — do nothing at all.
   macroZoom: 1.0,
+  tempoSync: 0.5,            // halfway: the look keeps its character, the music sets the pace
   macroChase: 0.4,          // a steady follow with a short whip on each new bead
   macroHold: 5.0,
   macroSync: 0.5,

@@ -59,6 +59,7 @@ import { sameSong, songRefFromTrack, type SongRef } from './lib/songRef';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
+import { clockText } from './lib/performanceTake';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
@@ -1045,6 +1046,35 @@ export default function App() {
   }, []);
 
   const musicIntel = useMusicIntelligence(audioStream, audioData, musicSettings, settings);
+  /*
+    Performances, started and stopped by hand: T on either desk, the
+    Performance dot in the desk header, or the Track panel. The note after a
+    stop says what was kept, for four seconds.
+  */
+  const perfLive = !!musicIntel.performance.live;
+  const { startPerformance, stopPerformance } = musicIntel;
+  const togglePerformance = useCallback(() => {
+    if (perfLive) stopPerformance();
+    else startPerformance();
+  }, [perfLive, startPerformance, stopPerformance]);
+  const perfLastStop = musicIntel.performance.lastStop;
+  const [perfNote, setPerfNote] = useState<typeof perfLastStop>(null);
+  useEffect(() => {
+    if (!perfLastStop) return;
+    setPerfNote(perfLastStop);
+    const t = window.setTimeout(() => setPerfNote(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [perfLastStop]);
+  // The live performance's clock, for the header: a second's resolution.
+  const [perfNow, setPerfNow] = useState(0);
+  useEffect(() => {
+    if (!musicIntel.performance.live) return;
+    const t = window.setInterval(() => setPerfNow(performance.now()), 500);
+    return () => window.clearInterval(t);
+  }, [musicIntel.performance.live]);
+  const perfClock = musicIntel.performance.live
+    ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
+    : null;
 
   // ── User palette lock ───────────────────────────────────────────
   const [paletteLock, setPaletteLock] = useState<number | null>(() => {
@@ -1317,6 +1347,24 @@ export default function App() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
+
+  /*
+    The Magnet brings its ferrofluid. A magnet over a plate with none on it
+    does nothing at all, which read as the tool being broken, so picking it
+    on such a look pours some (the visualizer lays it when the amount rises)
+    and gives the magnet enough strength to be felt. The look keeps it, and
+    the Ferrofluid slider takes it away again.
+  */
+  useEffect(() => {
+    if (activeTool !== 'magnet') return;
+    const s = settingsRef.current;
+    if ((s.phaseAmount ?? 0) > 0.002 && (s.magnetStrength ?? 0) > 0) return;
+    updateSettings({
+      phaseAmount: Math.max(s.phaseAmount ?? 0, 0.6),
+      magnetStrength: Math.max(s.magnetStrength ?? 0, 0.8),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool]);
 
   /*
     A hand on a hardware fader, answered at once and rendered once a frame.
@@ -2573,6 +2621,7 @@ export default function App() {
         return;
       }
       if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
+      if (e.key === 't' || e.key === 'T') { togglePerformance(); return; }
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
@@ -2589,7 +2638,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueLook, allPresets]);
+  }, [performing, designing, deskUp, goLook, revertLook, cueLook, allPresets, togglePerformance]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -2607,7 +2656,8 @@ export default function App() {
     midi: midi.enabled,
     phone: remoteLink.status === 'connected',
     rec: recorder.recording ? String(recorder.seconds) : null,
-  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds]);
+    perf: perfClock,
+  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.
@@ -3567,6 +3617,12 @@ export default function App() {
             onManualTag={musicIntel.manualTag}
             onReplayListen={musicIntel.replayListen}
             onStopReplay={musicIntel.stopReplay}
+            performance={musicIntel.performance}
+            performanceClock={perfClock}
+            onTogglePerformance={togglePerformance}
+            onReplayPerformance={musicIntel.replayPerformance}
+            onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
+            onDeletePerformance={musicIntel.deletePerformance}
             onClose={() => setShowTrackPanel(false)}
           />
         )}
@@ -3580,34 +3636,27 @@ export default function App() {
         />
       )}
 
-      {/* ── Save-performance prompt (post-song, otherwise discarded) ── */}
+      {/* ── What stopping a performance did (lib/performanceTake.ts) ── */}
       <AnimatePresence>
-        {musicIntel.pendingPerformance && (
+        {perfNote && (
           <motion.div
+            key={perfNote.at}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-purple-400/30 rounded-2xl px-5 py-3 shadow-2xl"
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-purple-400/30 rounded-2xl px-5 py-3 shadow-2xl text-xs"
+            data-testid="performance-note"
           >
-            <div className="text-xs">
-              <div className="font-bold">Keep your light-show performance?</div>
-              <div className="opacity-60 text-[10px] mt-0.5">
-                {musicIntel.pendingPerformance.gestureCount} gestures painted during
-                {musicIntel.pendingPerformance.title ? ` “${musicIntel.pendingPerformance.title}”` : ' this listen'}
+            {perfNote.kept ? (
+              <div>
+                <div className="font-bold">Performance kept</div>
+                <div className="opacity-60 text-[10px] mt-0.5">
+                  {perfNote.gestures} gestures{perfNote.title ? `, with “${perfNote.title}”` : ', on its own clock (no song was playing)'}
+                </div>
               </div>
-            </div>
-            <button
-              onClick={musicIntel.savePendingPerformance}
-              className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-[11px] font-bold uppercase tracking-widest transition-colors"
-            >
-              Save
-            </button>
-            <button
-              onClick={musicIntel.discardPendingPerformance}
-              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold uppercase tracking-widest text-white/60 transition-colors"
-            >
-              Discard
-            </button>
+            ) : (
+              <div className="font-bold">{perfNote.gestures === 0 ? 'Nothing was painted, so nothing was kept' : 'The performance could not be saved'}</div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -3823,6 +3872,7 @@ export default function App() {
           onWall={deskOpen.wall}
           onMidi={deskOpen.midi}
           onPhone={deskOpen.phone}
+          onPerformance={togglePerformance}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
@@ -3931,6 +3981,7 @@ export default function App() {
           onWall={deskOpen.wall}
           onMidi={deskOpen.midi}
           onPhone={deskOpen.phone}
+          onPerformance={togglePerformance}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />

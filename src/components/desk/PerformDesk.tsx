@@ -49,8 +49,17 @@ export interface Cue {
  * disagree about what is rideable, and the first time anyone noticed would be
  * on stage.
  */
+/*
+  What a performer rides, chosen for effects that are drastic and different
+  from one another rather than refinements of the look (reported: the old
+  set were subtle, and Granulation made a few jagged cuts in the dye and
+  nothing else). Speed and Evolve Speed stay; Swirl spins the eddies up,
+  Gravity stands the plate up so the dye pours down it, Soap Bursts blow the
+  dye apart on the beat, Beat Press squeezes the glass on the kick, and Zoom
+  dives into the liquid.
+*/
 export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
-  'dimmer', 'audioImpact', 'globalSpeed', 'automateRate', 'beatSqueeze', 'macroZoom',
+  'dimmer', 'globalSpeed', 'automateRate', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom',
 ];
 
 const RANGE = PIN_RANGE;
@@ -88,6 +97,7 @@ interface PerformDeskProps {
   onWall: () => void;
   onMidi: () => void;
   onPhone: () => void;
+  onPerformance: () => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -160,6 +170,7 @@ export function PerformDesk(p: PerformDeskProps) {
         onWall={p.onWall}
         onMidi={p.onMidi}
         onPhone={p.onPhone}
+        onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
           <>
