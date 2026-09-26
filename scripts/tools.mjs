@@ -238,19 +238,29 @@ try {
     await hold(t, A, 1500);
     await settle(700);
     await snap(`${t}1`);
+    // Held still, the Blow is a straw: it blows a bubble, and what it clears
+    // is what is under the bubble, pushed out to the bubble's rim.
+    let bubble = null;
     if (t === 'blow') {
-      // Held still, the Blow is a straw: say what it blew.
       const bub = await page.evaluate(() => {
         const d = window.chromaglassDebug(); const n = d.gridSize;
-        return (d.bubbles?.bubbles ?? []).map((b) => ({ x: +(b.x / n).toFixed(2), y: +(b.y / n).toFixed(2), r: +(b.r / n).toFixed(3), straw: !!b.straw }));
+        return (d.bubbles?.bubbles ?? []).filter((b) => b.straw).map((b) => ({ x: b.x, y: b.y, r: b.r / n }));
       });
-      const straw = bub.filter((b) => b.straw);
-      console.log(`     the straw blew ${straw.length} bubble(s): ${JSON.stringify(straw.slice(0, 3))}; ${bub.length} on the plate; the hand at ${JSON.stringify(p)}`);
+      bubble = bub.sort((u, v) => v.r - u.r)[0] ?? null;
+      console.log(`     the straw blew ${bub.length} bubble(s)${bubble ? `, the biggest ${bubble.r.toFixed(3)} of the plate across its radius` : ''}`);
     }
     const a = await measure(`${t}0`, p, 0.05, 0.25), b = await measure(`${t}1`, p, 0.05, 0.25);
     if (t === 'blow') {
-      check('Blow clears the dye from under it', b.disc < 0.7 * a.disc,
-        `${a.disc.toFixed(0)} → ${b.disc.toFixed(0)} within 0.05 of the hand`);
+      if (!bubble) { check('Blow held still blows a bubble', false, 'no bubble on the plate'); continue; }
+      const at = { x: bubble.x, y: bubble.y };
+      const under0 = await measure(`${t}0`, at, bubble.r * 0.6, bubble.r * 1.6);
+      const under1 = await measure(`${t}1`, at, bubble.r * 0.6, bubble.r * 1.6);
+      check('Blow held still clears the dye from under the bubble it blows', under1.disc < 0.3 * under0.disc + 2,
+        `${under0.disc.toFixed(0)} → ${under1.disc.toFixed(0)} under it`);
+      // Moved to the rim, not made: what was under it and round it, against the plate left alone.
+      const was = under0.disc + under0.ring, now = under1.disc + under1.ring;
+      check('and pushes it out to the rim rather than making more', now - was - idle < 0.5 * was + 5 + 3 * Math.abs(idle),
+        `${was.toFixed(0)} → ${now.toFixed(0)} under it and round it, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
     } else {
       check('Press pushes the dye out from under the palm', b.disc < 0.8 * a.disc,
         `${a.disc.toFixed(0)} → ${b.disc.toFixed(0)} under it, ${a.ring.toFixed(0)} → ${b.ring.toFixed(0)} from 0.05 to 0.25`);

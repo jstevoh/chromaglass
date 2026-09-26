@@ -659,6 +659,13 @@ class FluidSimulation {
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
+  /**
+   * The bubbles as they stood at the last rim deposit, live ones only: a
+   * cell a bubble already covered then has had its dye moved to the rim
+   * once, and is not counted again.
+   */
+  private coverPacked = new Float32Array(0);
+  private coverCount = 0;
   /** Holes still closing: carried so the fill converges instead of running once. */
   private fillingHoles: { at: Float32Array; left: number }[] = [];
   private rbDensity: Float32Array;  // downsampled readback
@@ -1065,6 +1072,23 @@ class FluidSimulation {
       if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
       const clear = Math.max(0, Math.min(1, b.opacity));
       if (clear < 0.02) continue;
+      /*
+        Only cells it did not already cover at the last deposit.
+
+        The mirror is a few frames behind the GPU, which has already taken the
+        dye out from under the bubble as it stood then. A bubble sitting still
+        or drifting shows that as nothing under it; a bubble growing fast (the
+        straw's) covers, deposit after deposit, cells the mirror still shows
+        full, and the same dye went to the rim once per deposit: the Blow's
+        bubble turned 36 of dye into 358 in the tools check. Each cell's dye
+        now goes to the rim once, the first time the bubble covers it.
+      */
+      let was: { x: number; y: number; r: number } | null = null;
+      for (let j = 0; j < this.coverCount; j++) {
+        const q = j * 4;
+        const px = this.coverPacked[q] * N, py = this.coverPacked[q + 1] * N, pr = this.coverPacked[q + 2] * N;
+        if (Math.hypot(px - b.x, py - b.y) < Math.max(2, R * 0.5) && (!was || pr > was.r)) was = { x: px, y: py, r: pr };
+      }
       let mass = 0, aR = 0, aG = 0, aB = 0;
       const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
       const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
@@ -1072,6 +1096,7 @@ class FluidSimulation {
         for (let x = xl; x <= xh; x++) {
           const dx = x - b.x, dy = y - b.y;
           if (dx * dx + dy * dy > R * R) continue;
+          if (was && (x - was.x) * (x - was.x) + (y - was.y) * (y - was.y) <= was.r * was.r) continue;
           const i4 = (x + y * N) * 4;
           const d = dye[i4 + 3];
           if (!(d > 1e-5)) continue;
@@ -1110,6 +1135,9 @@ class FluidSimulation {
       }
     }
     this.fillPoppedHoles(packed, count, dye, N);
+    if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
+    this.coverPacked.set(packed.subarray(0, count * 4));
+    this.coverCount = count;
     /*
       Next frame's list to diff against: this frame's bubbles, *plus* the
       ones still filling.
