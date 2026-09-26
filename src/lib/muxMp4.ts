@@ -51,6 +51,14 @@ export interface Mp4AudioConfig {
   description?: Uint8Array | null;
   /** Average bitrate, for the esds (0 when not known). */
   bitrate?: number;
+  /**
+   * The song's stretch of the track (see `trimAudio` in lib/muxShared.ts):
+   * `skip` samples of the encoder's priming from the start of the first
+   * packet, then `length` samples of song. Written as the track's edit list,
+   * and what the track's and the movie's durations say. Absent, the track
+   * plays as it is, from its first sample to its last.
+   */
+  edit?: { skip: number; length: number } | null;
 }
 
 interface TrackState {
@@ -214,7 +222,8 @@ export class Mp4Muxer {
     this.out(s.data);
   }
 
-  private trak(index: 0 | 1, movieScale: number): Uint8Array {
+  /** Track `index`'s trak box, and how long the track plays in the movie's timescale (what its tkhd says). */
+  private trak(index: 0 | 1, movieScale: number): [Uint8Array, number] {
     const t = this.tracks[index];
     const isVideo = index === 0;
     const n = t.sizes.length;
@@ -231,7 +240,10 @@ export class Mp4Muxer {
     const dts = reordered ? sorted : t.pts;
     const durations = dts.map((d, i) => (i + 1 < n ? dts[i + 1] - d : t.durations[i]));
     const mediaDuration = n ? dts[n - 1] + durations[n - 1] - dts[0] : 0;
-    const movieDuration = Math.round((mediaDuration * movieScale) / t.timescale);
+    const edit = isVideo ? null : this.audio?.edit ?? null;
+    // What the track lasts as it is played: the edit's length where there is
+    // one, the media's own otherwise.
+    const movieDuration = this.presentation(index, movieScale, mediaDuration);
 
     const stts = new Bytes();
     const sttsRuns = runs(durations);
@@ -281,10 +293,44 @@ export class Mp4Muxer {
     const hdlr = new Bytes().u32(0).ascii(isVideo ? 'vide' : 'soun').zeros(12).ascii(isVideo ? 'VideoHandler' : 'SoundHandler').u8(0);
     const mediaHeader = isVideo ? full('vmhd', 0, 1, new Bytes().zeros(8).done()) : full('smhd', 0, 0, new Bytes().zeros(4).done());
     const dinf = box('dinf', full('dref', 0, 0, new Bytes().u32(1).done(), full('url ', 0, 1)));
-    return box('trak',
+    /*
+      The edit list: one edit, which plays the media from `skip` (the
+      encoder's priming, in the audio's own samples) for the song's length
+      (in the movie's milliseconds) at normal rate. This is how MP4 says
+      "the first 2112 samples are the encoder warming up, and the track ends
+      here": QuickTime, FFmpeg and the browsers all read it, and it is what
+      Apple's own writers put in an AAC track. The media itself keeps every
+      packet (a decoder needs the priming packets to produce the song's first
+      samples), and `mdhd` goes on saying how long the media is, which is its
+      job in the standard (14496-12, 8.4.2) and what the strict reader checks
+      against the samples; `tkhd` and `mvhd` say how long it plays.
+      Version 0 while the numbers fit 32 bits, which is any song.
+    */
+    const edts: Uint8Array[] = [];
+    if (edit) {
+      const wide = movieDuration > 0xffffffff || edit.skip > 0x7fffffff;
+      const e = new Bytes().u32(1);
+      if (wide) e.u64(movieDuration).u32(Math.floor(edit.skip / 4294967296)).u32(edit.skip % 4294967296);
+      else e.u32(movieDuration).i32(edit.skip);
+      e.u16(1).u16(0);
+      edts.push(box('edts', full('elst', wide ? 1 : 0, 0, e.done())));
+    }
+    return [box('trak',
       full('tkhd', 0, 3, tkhd.done()),
+      ...edts,
       box('mdia', full('mdhd', 0, 0, mdhd.done()), full('hdlr', 0, 0, hdlr.done()),
-        box('minf', mediaHeader, dinf, box('stbl', ...tables))));
+        box('minf', mediaHeader, dinf, box('stbl', ...tables)))), movieDuration];
+  }
+
+  /**
+   * How long track `index` plays, in the movie's timescale: its edit's length
+   * where it has one, else its media's length (`mediaDuration`, in its own
+   * timescale).
+   */
+  private presentation(index: number, movieScale: number, mediaDuration: number): number {
+    const t = this.tracks[index];
+    const edit = index === 0 ? null : this.audio?.edit ?? null;
+    return Math.round(((edit ? edit.length : mediaDuration) * movieScale) / t.timescale);
   }
 
   /** Write what is waiting and the moov, and patch the mdat's size. */
@@ -295,7 +341,8 @@ export class Mp4Muxer {
     if (this.video.codec.startsWith('avc1') && !this.videoDescription) throw new Error('no avcC: the H.264 encoder gave no decoder description');
     const mdatSize = this.pos - this.mdatAt;
     const movieScale = 1000;
-    const traks = this.tracks.map((_, i) => this.trak(i as 0 | 1, movieScale));
+    const built = this.tracks.map((_, i) => this.trak(i as 0 | 1, movieScale));
+    const traks = built.map(([b]) => b);
     const ms = (t: TrackState) => {
       const n = t.pts.length;
       if (!n) return 0;
@@ -309,8 +356,14 @@ export class Mp4Muxer {
       }
       return ((last - first) * 1000) / t.timescale;
     };
-    const durationMs = Math.max(...this.tracks.map(ms));
-    const mvhd = new Bytes().u32(0).u32(0).u32(movieScale).u32(Math.round(durationMs))
+    // The audio's edit, where there is one, is how long it plays; the movie
+    // lasts as long as its longest track plays.
+    const edit = this.audio?.edit ?? null;
+    const durationMs = Math.max(...this.tracks.map((t, i) => (i === 1 && edit ? (edit.length * 1000) / t.timescale : ms(t))));
+    // mvhd's duration is the longest tkhd's (14496-12, 8.2.2: "the duration of
+    // the longest track"), taken from the very numbers the tkhds carry so the
+    // two cannot disagree by a rounding.
+    const mvhd = new Bytes().u32(0).u32(0).u32(movieScale).u32(Math.max(...built.map(([, d]) => d)))
       .u32(0x00010000).u16(0x0100).zeros(10);
     for (const m of MATRIX) mvhd.u32(m);
     mvhd.zeros(24).u32(this.tracks.length + 1);

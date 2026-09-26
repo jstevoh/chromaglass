@@ -13,7 +13,9 @@
  * browser's `<video>` is the other, independent judge (`npm run render-lab`).
  *
  * Both return the same shape: per track, each sample's presentation time in
- * microseconds (rounded to the container's own resolution), its duration,
+ * microseconds (rounded to the container's own resolution; an MP4 track's
+ * edit list honoured, so an audio encoder's priming comes out before zero),
+ * its duration,
  * whether it is a keyframe, and its bytes, so a check can compare a file with
  * what was fed to the writer, sample for sample.
  */
@@ -206,7 +208,9 @@ export function readMp4(b) {
 
   const tracks = moov.children.filter((x) => x.type === 'trak').map((trak) => {
     const tkhd = child(trak, 'tkhd');
+    if (b[tkhd.body] !== 0) fail(tkhd.at, 'tkhd version is not 0');
     const id = dv.getUint32(tkhd.body + 12);
+    const trackDuration = dv.getUint32(tkhd.body + 20);
     const mdia = child(trak, 'mdia');
     const mdhd = child(mdia, 'mdhd');
     const scale = dv.getUint32(mdhd.body + 12), mediaDuration = dv.getUint32(mdhd.body + 16);
@@ -238,6 +242,44 @@ export function readMp4(b) {
     { const s = child(stbl, 'stsc'); const { n, at } = u32s(s, 4);
       for (let i = 0; i < n; i++) stscRows.push([dv.getUint32(at + 12 * i), dv.getUint32(at + 12 * i + 4)]); }
 
+    /*
+      The edit list, where there is one (14496-12, 8.6.6): which stretch of
+      the media plays, and for how long. The writer puts one edit on an
+      audio track, to skip the encoder's priming and end at the song's end
+      (lib/muxShared.ts, `trimAudio`), and this reads exactly that shape and
+      refuses the rest: one edit, at normal rate, starting inside the media
+      and not running past it. Its media_time is where presentation time 0
+      is, so the samples' times below are shifted by it: the priming's
+      packets come out before zero, as a player sees them.
+    */
+    let edit = null;
+    { const edts = maybe(trak, 'edts');
+      if (edts) {
+        const elst = child(edts, 'elst');
+        const v = b[elst.body];
+        if (v > 1) fail(elst.at, `elst version ${v}`);
+        const n = dv.getUint32(elst.body + 4);
+        if (n !== 1) fail(elst.at, `an edit list of ${n} edits; the writer makes one`);
+        const at = elst.body + 8;
+        const segment = v ? dv.getUint32(at) * 4294967296 + dv.getUint32(at + 4) : dv.getUint32(at);
+        const mediaTime = v ? dv.getInt32(at + 8) * 4294967296 + dv.getUint32(at + 12) : dv.getInt32(at + 4);
+        const rateAt = at + (v ? 16 : 8);
+        if (dv.getInt16(rateAt) !== 1 || dv.getInt16(rateAt + 2) !== 0) fail(elst.at, 'an edit not at normal rate');
+        if (elst.end !== rateAt + 4) fail(elst.at, 'elst is not exactly its one entry');
+        if (mediaTime < 0) fail(elst.at, 'an empty edit (media_time -1): the writer makes none');
+        if (mediaTime >= mediaDuration) fail(elst.at, `the edit starts at ${mediaTime}, past the media's ${mediaDuration} ticks`);
+        // In the media's ticks, the edit may overshoot the media by less
+        // than one of the movie's ticks: the movie's milliseconds are
+        // coarser than the audio's samples, and the writer rounds.
+        const segmentInMedia = (segment * scale) / movieScale;
+        if (mediaTime + segmentInMedia > mediaDuration + scale / movieScale) fail(elst.at, `the edit runs ${(mediaTime + segmentInMedia - mediaDuration).toFixed(0)} ticks past the media`);
+        edit = { mediaTime, segment, mediaTimeUs: (mediaTime * 1e6) / scale, segmentMs: (segment * 1000) / movieScale };
+      }
+    }
+    const plays = edit ? edit.segment : Math.round((mediaDuration * movieScale) / scale);
+    if (trackDuration !== plays) fail(tkhd.at, `tkhd says ${trackDuration} ticks, the track ${edit ? 'edit' : 'media'} plays ${plays}`);
+    const shift = edit ? edit.mediaTime : 0;
+
     // Every sample's place in the file, from the chunk table.
     const samples = [];
     let s = 0, dts = 0;
@@ -248,7 +290,7 @@ export function readMp4(b) {
       for (let k = 0; k < row[1]; k++, s++) {
         if (s >= sizes.length) fail(stbl.at, 'the chunk table holds more samples than stsz');
         if (off < mdat.body || off + sizes[s] > mdat.end) fail(off, `sample ${s} of track ${id} lies outside the mdat`);
-        const pts = dts + (offsets[s] ?? 0);
+        const pts = dts + (offsets[s] ?? 0) - shift;
         samples.push({ timeUs: (pts * 1e6) / scale, durationUs: (deltas[s] * 1e6) / scale, key: keys ? keys.has(s + 1) : true, data: b.subarray(off, off + sizes[s]) });
         off += sizes[s];
         dts += deltas[s];
@@ -256,8 +298,11 @@ export function readMp4(b) {
     }
     if (s !== sizes.length) fail(stbl.at, `the chunk table holds ${s} samples, stsz ${sizes.length}`);
     if (dts !== mediaDuration) fail(mdhd.at, `mdhd says ${mediaDuration} ticks, the samples add to ${dts}`);
-    return { id, handler, codec: entry.type, scale, samples, mediaDurationMs: (mediaDuration * 1000) / scale, entry };
+    return { id, handler, codec: entry.type, scale, samples, mediaDurationMs: (mediaDuration * 1000) / scale, entry, edit, presentationMs: (trackDuration * 1000) / movieScale, trackDuration };
   });
   if (nextTrack !== tracks.length + 1) fail(mvhd.at, `next_track_ID ${nextTrack} with ${tracks.length} tracks`);
+  // The movie lasts as long as its longest track plays (8.2.2).
+  const longest = Math.max(0, ...tracks.map((t) => t.trackDuration));
+  if (movieDuration !== longest) fail(mvhd.at, `mvhd says ${movieDuration} ticks, the longest track plays ${longest}`);
   return { kind: 'mp4', durationMs: (movieDuration * 1000) / movieScale, tracks, boxes: types };
 }

@@ -23,7 +23,9 @@
  * asks, every gate a comparison within the run:
  *
  *   1. the file is what was asked for: the strict reader
- *      (scripts/media-read.mjs) finds every frame at i/fps and a song;
+ *      (scripts/media-read.mjs) finds every frame at i/fps and a song, the
+ *      file lasts the song to a frame, and an MP4's audio has an edit list
+ *      that skips exactly the priming the render measured;
  *   2. the same seed twice draws the same frames, hash for hash; the bytes
  *      are compared and printed too, but not gated, because whether the
  *      Mac's H.264 encoder is byte-deterministic is the encoder's business
@@ -169,7 +171,7 @@ try {
   }, { o, b64: o.silent ? silence : song });
 
   const runs = {};
-  const say = (name, r) => console.log(`   ${name}: ${r.phase}; ${r.format}; ${r.summary ? `${r.summary.videoFrames} frames, ${r.summary.audioPackets} audio packets, ${r.summary.durationMs.toFixed(1)} ms, ${r.summary.bytes} bytes` : r.message}; ${(r.ms / 1000).toFixed(1)} s`);
+  const say = (name, r) => console.log(`   ${name}: ${r.phase}; ${r.format}; ${r.summary ? `${r.summary.videoFrames} frames, ${r.summary.audioPackets} audio packets, ${r.summary.durationMs.toFixed(1)} ms, ${r.summary.bytes} bytes${r.summary.priming ? `, audio priming ${r.summary.priming.samples} samples (${r.summary.priming.source}), ${r.summary.priming.dropped} packets past the song dropped` : ''}` : r.message}; ${(r.ms / 1000).toFixed(1)} s`);
   for (const [name, o] of [
     ['A: seed 7', { seed: SEED, w: W, h: H, fps: FPS }],
     ['B: seed 7 again', { seed: SEED, w: W, h: H, fps: FPS }],
@@ -207,6 +209,21 @@ try {
     check(`${frames} frames, each at i/${FPS} s`, v.samples.length === frames && off.every((d) => d <= res / 2 + 1e-6), `${v.samples.length} frames, worst ${Math.max(0, ...off).toFixed(1)} µs off`);
     check('an audio track with the song in it', !!au && au.samples.length > 0, au ? `${au.samples.length} packets` : 'none');
     check('the file lasts the song', Math.abs(parsed.durationMs - SONG_S * 1000) <= 1000 / FPS, `${parsed.durationMs.toFixed(1)} ms of ${SONG_S * 1000}`);
+    /*
+      Where the song starts in the audio. An MP4's audio carries the
+      encoder's priming in its first packets, and the edit list is what
+      tells a player to skip it: without one the sound plays some 44 ms late
+      against the picture (2112 samples of Apple's AAC), and the track runs
+      past the song. So: an edit, skipping exactly what the render says the
+      encoder primed with (more than nothing: every AAC encoder primes), for
+      the song's length. WebM says the same with its Opus CodecDelay, which
+      `npm run render` checks against the OpusHead.
+    */
+    if (parsed.kind === 'mp4') {
+      const p = A.summary?.priming;
+      check('the audio skips the encoder\'s priming (an MP4 edit list)', !!au?.edit && !!p && p.samples > 0 && au.edit.mediaTime === p.samples && Math.abs(au.presentationMs - SONG_S * 1000) <= 1,
+        au?.edit ? `edit from ${au.edit.mediaTime} samples for ${au.presentationMs.toFixed(1)} ms; render says ${p ? `${p.samples} (${p.source})` : 'nothing'}` : 'no edit list');
+    }
   }
 
   // 2 to 5. Frames against frames.

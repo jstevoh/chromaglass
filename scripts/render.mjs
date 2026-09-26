@@ -56,7 +56,7 @@ import { AutoRange, RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SoundLevels, bytesFromDb, smoothLevels, waveBytes } from '../src/lib/soundLevels.ts';
 import { BeatClock } from '../src/lib/beatClock.ts';
 import { makeRng } from '../src/lib/rng.ts';
-import { MemorySink } from '../src/lib/muxShared.ts';
+import { MemorySink, trimAudio } from '../src/lib/muxShared.ts';
 import { WebmMuxer } from '../src/lib/muxWebm.ts';
 import { Mp4Muxer } from '../src/lib/muxMp4.ts';
 import { readWebm, readMp4 } from './media-read.mjs';
@@ -413,13 +413,13 @@ function media(fps, seconds, { audioFrame = 960, audioRate = 48000, reorder = fa
   return { video, audio, frames };
 }
 
-function mux(kind, m, fps, audioCodec) {
+function mux(kind, m, fps, audioCodec, edit = null) {
   const sink = new MemorySink();
   const w = 320, h = 180;
   const mx = kind === 'webm'
     ? new WebmMuxer(sink, { codec: 'vp09.00.10.08', width: w, height: h, fps }, { codec: 'opus', sampleRate: 48000, channels: 2 })
     : new Mp4Muxer(sink, { codec: audioCodec === 'aac' ? 'avc1.64001f' : 'vp09.00.10.08', width: w, height: h, fps },
-      { codec: audioCodec, sampleRate: 48000, channels: 2, bitrate: 128000 });
+      { codec: audioCodec, sampleRate: 48000, channels: 2, bitrate: 128000, edit });
   // Arrival as it happens in a render: all the audio first (it is encoded
   // before the first frame is drawn), then the frames one by one. The
   // interleaver has to put them back in time order regardless.
@@ -482,6 +482,87 @@ for (const [kind, fps, audioCodec, opts] of [
 }
 
 /*
+  The song's stretch of the audio: an encoder's priming, and the packets past
+  the song's end.
+
+  `npm run render-app` on the Mac: an 8-second song came back as an 8072 ms
+  file. Part of that was the render flushing its AAC encoder mid-song (see
+  `encodeAudio` in lib/render.ts); the rest is what every AAC encoder does
+  with a song however it is fed. It puts 2112 samples of priming before the
+  first sample it was given (Apple's number, TN2258; Chrome on the Mac uses
+  Apple's encoder), pads the last packet out to 1024 samples, and adds one
+  more packet to close the overlap: ceil((2112 + N) / 1024) + 1 packets for N
+  samples. Written as they come, the track starts 44 ms late against the
+  picture and ends 73 ms after the song (for the 7.5 s here: 355 packets,
+  7573 ms). The writer now keeps the packets that hold any of the song
+  (`trimAudio` drops the one that does not) and says in an MP4 edit list
+  where the song starts in them and how long it lasts; tkhd and mvhd say how
+  long the track plays, mdhd how long its media is.
+
+  Two ways an encoder can hand its priming over, both here: stamped from 0
+  with the priming hidden in the first packets (Chrome's AAC and Opus; the
+  lab's Opus measured it: 101 packets for 2 s, stamped from 0), and stamped
+  from before 0 (-44000 µs: 2112 samples), which is believed over what the
+  caller assumed (1024 is passed as the assumption to prove it). And Opus in
+  MP4, the lab's path, with its 312 samples of pre-skip.
+
+  The files go to ffprobe below with the rest: the length it reports has to
+  be the song's, which it is only if FFmpeg honours the edit (the media
+  alone is 7552 ms).
+*/
+{
+  const rate = 48000, fps = 30, seconds = 7.5, N = seconds * rate;
+  const encoded = (frame, priming, extra, firstUs) => {
+    const count = Math.ceil((priming + N) / frame) + extra;
+    const rng = makeRng(12, `render.priming.${frame}.${firstUs}`);
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const data = new Uint8Array(100 + rng.int(300));
+      for (let k = 0; k < data.length; k++) data[k] = rng.int(256);
+      new DataView(data.buffer).setUint32(0, 0x80000000 + i);
+      const ts = firstUs + Math.round((i * frame * 1e6) / rate);
+      out.push({ data, timestampUs: ts, durationUs: firstUs + Math.round(((i + 1) * frame * 1e6) / rate) - ts, key: true });
+    }
+    return out;
+  };
+  console.log('\nThe song\'s stretch of the audio');
+  for (const c of [
+    { label: 'AAC, priming hidden (stamped from 0)', codec: 'aac', frame: 1024, priming: 2112, extra: 1, firstUs: 0, assumed: 2112, want: { skip: 2112, dropped: 1, priming: 'hidden' } },
+    { label: 'AAC, priming stamped before 0', codec: 'aac', frame: 1024, priming: 2112, extra: 1, firstUs: -44000, assumed: 1024, want: { skip: 2112, dropped: 1, priming: 'timestamps' } },
+    { label: 'Opus in MP4, pre-skip hidden', codec: 'opus', frame: 960, priming: 312, extra: 0, firstUs: 0, assumed: 312, want: { skip: 312, dropped: 0, priming: 'hidden' } },
+  ]) {
+    const packets = encoded(c.frame, c.priming, c.extra, c.firstUs);
+    const t = trimAudio(packets, rate, N, c.assumed);
+    const keep = Math.ceil((c.priming + N) / c.frame);
+    check(`${c.label}: the song starts ${c.want.skip} samples in, and the ${c.want.dropped} packet(s) past it are dropped`,
+      t.skip === c.want.skip && t.dropped === c.want.dropped && t.packets.length === keep && t.priming === c.want.priming && t.length === N && t.packets[0].timestampUs === 0,
+      `skip ${t.skip} (${t.priming}), ${t.packets.length} of ${packets.length} packets kept, first at ${t.packets[0].timestampUs} µs`);
+    const m = media(fps, seconds);
+    const file = { ...m, audio: t.packets };
+    const edit = { skip: t.skip, length: t.length };
+    const one = mux('mp4', file, fps, c.codec, edit);
+    const two = mux('mp4', file, fps, c.codec, edit);
+    let parsed = null, error = null;
+    try { parsed = readMp4(one.bytes); } catch (e) { error = e.message; }
+    check(`${c.label}: a strict reader accepts it, edit list and all`, !!parsed, error ?? `${one.bytes.length} bytes; ${parsed.boxes}`);
+    if (!parsed) continue;
+    const [vt, at] = parsed.tracks;
+    check(`${c.label}: the audio's edit skips the priming and plays the song's length`,
+      !!at.edit && at.edit.mediaTime === c.want.skip && at.presentationMs === seconds * 1000 && !vt.edit,
+      at.edit ? `media from ${at.edit.mediaTime} samples for ${at.presentationMs} ms; media ${at.mediaDurationMs.toFixed(1)} ms` : 'no edit');
+    check(`${c.label}: the file lasts the song, not the media`, Math.abs(parsed.durationMs - seconds * 1000) <= 1 && Math.abs(one.summary.durationMs - seconds * 1000) <= 1,
+      `${parsed.durationMs} ms read, ${one.summary.durationMs} ms said by the writer, media ${at.mediaDurationMs.toFixed(1)} ms`);
+    // Read through the edit, the packets are where a player puts them: the
+    // priming's before zero, the song's first sample at zero.
+    const want = t.packets.map((p) => ({ ...p, timestampUs: p.timestampUs - Math.round((c.want.skip * 1e6) / rate) }));
+    const aBad = sameSamples(at.samples, want, 1e6 / rate);
+    check(`${c.label}: every packet comes back, shifted by the edit`, !aBad, aBad ?? `${at.samples.length} packets, the first at ${at.samples[0].timeUs.toFixed(0)} µs`);
+    check(`${c.label}: the same samples twice are the same bytes`, sha(one.bytes) === sha(two.bytes), sha(one.bytes));
+    probed.push({ label: `MP4 ${fps} fps, ${c.label}`, kind: 'mp4', fps, audioCodec: c.codec, bytes: one.bytes, frames: m.frames, packets: t.packets.length, seconds, edit: true });
+  }
+}
+
+/*
   A second, independent reader: FFmpeg's.
 
   The strict reader above was written from the same specifications as the
@@ -511,7 +592,7 @@ for (const [kind, fps, audioCodec, opts] of [
         const file = join(dir, `probe.${p.kind}`);
         writeFileSync(file, p.bytes);
         const r = spawnSync('ffprobe', ['-v', 'error', '-count_packets', '-show_entries',
-          'stream=codec_type,codec_name,nb_read_packets:format=format_name,duration', '-of', 'json', file], { encoding: 'utf8' });
+          'stream=codec_type,codec_name,nb_read_packets,duration:format=format_name,duration', '-of', 'json', file], { encoding: 'utf8' });
         let info = null;
         try { info = JSON.parse(r.stdout); } catch { /* reported below */ }
         const v = info?.streams?.find((s) => s.codec_type === 'video');
@@ -529,6 +610,10 @@ for (const [kind, fps, audioCodec, opts] of [
           a ? `${a.codec_name}, ${a.nb_read_packets} packets of ${p.packets}` : 'no audio stream');
         check(`${p.label}: ffprobe says it lasts what was written`, Math.abs(dur - p.seconds) <= 1 / p.fps,
           `${dur} s, written ${p.seconds} s`);
+        // FFmpeg honours the edit: the audio stream itself lasts the song
+        // (without the edit it would be the media's, 52 ms longer for AAC).
+        if (p.edit) check(`${p.label}: ffprobe's audio stream lasts the song, through the edit`, Math.abs(Number(a?.duration) - p.seconds) <= 0.001,
+          `${a?.duration} s, the song ${p.seconds} s`);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });

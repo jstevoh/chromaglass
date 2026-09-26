@@ -7,7 +7,7 @@ import { setShowSeed, showSeed } from '../lib/rng';
 import { decodeSong, SongEar, type DecodedSong } from '../lib/songTrack';
 import type { LevelParams } from '../lib/soundLevels';
 import {
-  RenderCancelled, RenderEncoder, openRenderSink, pickRenderFormat, renderSupport, type RenderFormat, type RenderSink,
+  RenderCancelled, RenderEncoder, openRenderSink, pickRenderFormat, renderSupport, type AudioPriming, type RenderFormat, type RenderSink,
 } from '../lib/render';
 
 /**
@@ -66,7 +66,7 @@ export interface SongRenderState {
   elapsedS: number;
   remainingS: number | null;
   /** The film's own summary, when done. */
-  summary: { videoFrames: number; audioPackets: number; durationMs: number; bytes: number } | null;
+  summary: { videoFrames: number; audioPackets: number; durationMs: number; bytes: number; priming: AudioPriming | null } | null;
   /** FNV hashes of every frame that went in, when asked for (the checks). */
   frameHashes: string[] | null;
   /**

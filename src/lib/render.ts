@@ -38,8 +38,8 @@
  * song and says so for a long one.
  */
 import { Mp4Muxer, type Mp4AudioConfig } from './muxMp4.ts';
-import { WebmMuxer } from './muxWebm.ts';
-import { MemorySink, type ByteSink, type MuxSample } from './muxShared.ts';
+import { WebmMuxer, opusPreSkip } from './muxWebm.ts';
+import { MemorySink, trimAudio, type ByteSink, type MuxSample } from './muxShared.ts';
 
 export type Container = 'mp4' | 'webm';
 
@@ -332,9 +332,14 @@ export class RenderEncoder {
     const { format, width, height, fps, sink, audio } = this.opts;
     const channels = audio ? Math.min(2, audio.channels.length) : 0;
     const audioCfg = audio ? { sampleRate: audio.sampleRate, channels, description: this.audioDescription } : null;
+    // WebM needs no edit: its Opus track's CodecDelay (from the same
+    // pre-skip) is what skips the priming, and the tail past the song is at
+    // most one 20 ms packet of the encoder's padding, which `trimAudio`
+    // cannot cut finer than a packet and WebM could only cut with a
+    // BlockGroup's DiscardPadding.
     this.mux = format.container === 'mp4'
       ? new Mp4Muxer(sink, { codec: format.videoCodec, width, height, fps },
-        audioCfg ? { codec: format.audioCodec, ...audioCfg, bitrate: format.audioBitrate } as Mp4AudioConfig : null)
+        audioCfg ? { codec: format.audioCodec, ...audioCfg, bitrate: format.audioBitrate, edit: this.audioEdit } as Mp4AudioConfig : null)
       : new WebmMuxer(sink, { codec: format.videoCodec, width, height, fps }, audioCfg ? { codec: 'opus', ...audioCfg } : null);
     return this.mux;
   }
@@ -364,12 +369,13 @@ export class RenderEncoder {
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
         const desc = meta?.decoderConfig?.description;
-        if (desc && !description) description = new Uint8Array(desc instanceof ArrayBuffer ? desc.slice(0) : (desc as ArrayBufferView).buffer.slice((desc as ArrayBufferView).byteOffset, (desc as ArrayBufferView).byteOffset + (desc as ArrayBufferView).byteLength));
+        if (desc && !description) description = copyDescription(desc);
         packets.push({ data, timestampUs: chunk.timestamp, durationUs: chunk.duration ?? 0, key: true });
       },
       error: (e) => { err ??= e; },
     });
-    enc.configure({ codec: format.audioCodecString, sampleRate: audio.sampleRate, numberOfChannels: channels.length, bitrate: format.audioBitrate });
+    const config = { codec: format.audioCodecString, sampleRate: audio.sampleRate, numberOfChannels: channels.length, bitrate: format.audioBitrate };
+    enc.configure(config);
     const n = channels[0].length;
     // A second at a time: large enough that the per-call cost vanishes,
     // small enough that the encoder's queue never holds much.
@@ -385,25 +391,79 @@ export class RenderEncoder {
       });
       enc.encode(data);
       data.close();
-      if (enc.encodeQueueSize > 4) await enc.flush();
+      /*
+        Back-pressure by waiting for the queue to drain, never by flushing.
+        This used to be `await enc.flush()` whenever more than four blocks
+        were queued, and on the Mac CI runner that made an 8-second song an
+        8072 ms file: a flush is the end of a stream to an AAC encoder, so it
+        emptied its lapped transform, closed the stream with one extra packet,
+        and started the next second of song as a new stream, with 2112 fresh
+        samples of priming and timestamps starting over. The counts fit
+        exactly: 238 packets for the first five seconds (ceil((2112 +
+        240000) / 1024) + 1) and 144 for the last three, the second run
+        stamped from 5000 ms, so the track ended at 5000 + 144 x 21.33 =
+        8072 ms, with a burst of silence and a click at five seconds in the
+        sound. The encoder's queue is waited on instead, the way `addFrame`
+        waits on the video's; a browser whose encoder never fires `dequeue`
+        is polled rather than hung. The one flush is at the end.
+      */
+      while (enc.encodeQueueSize > 4) {
+        await new Promise<void>((r) => {
+          const t = setTimeout(r, 50);
+          enc.addEventListener('dequeue', () => { clearTimeout(t); r(); }, { once: true });
+        });
+        if (this.cancelled) { enc.close(); throw new RenderCancelled(); }
+      }
       onProgress?.(Math.min(1, (at + len) / n));
     }
     await enc.flush();
     enc.close();
     if (err) throw err;
+    /*
+      The song's stretch of the track: where in it the song starts (past the
+      encoder's priming) and which packets hold nothing of it (see
+      `trimAudio` in lib/muxShared.ts). Chrome's encoders stamp their first
+      packet at the first sample they were given and hide the priming in it,
+      so how much there is has to come from somewhere else:
+        - Opus says, in the OpusHead it hands over (the pre-skip);
+        - AAC does not, so it is measured (`measurePriming`: a short burst
+          through a second encoder and back through a decoder, and where it
+          comes out), and where that cannot be done, Apple's 2112 (TN2258),
+          which is the encoder Chrome uses on the Mac, and which the CI's
+          packet counts above agree with.
+      An encoder that stamps its priming before zero is believed over all of
+      these (`trimAudio` looks first).
+    */
+    let hidden: number;
+    let source: AudioPriming['source'];
+    if (format.audioCodec === 'opus') {
+      hidden = description ? opusPreSkip(description) : 312;
+      source = 'opus-head';
+    } else {
+      const measured = await measurePriming(config, description, true).catch(() => null);
+      hidden = measured ?? AAC_PRIMING;
+      source = measured === null ? 'assumed' : 'measured';
+    }
+    const trim = trimAudio(packets, audio.sampleRate, n, hidden);
+    this.priming = { samples: trim.skip, source: trim.priming === 'timestamps' ? 'timestamps' : source, dropped: trim.dropped };
     // The container's audio description is the encoder's own where it gave
     // one (the OpusHead, the AAC config); the muxers write a standard one
     // otherwise.
     this.audioDescription = description;
+    this.audioEdit = { skip: trim.skip, length: trim.length };
     const mux = this.muxer();
-    for (const p of packets) mux.addAudio(p);
+    for (const p of trim.packets) mux.addAudio(p);
     mux.endAudio();
-    this.audioPackets = packets.length;
+    this.audioPackets = trim.packets.length;
     // The samples are in the file now (the muxer holds the packets until the
     // frames beside them are written): let go of the song, which for four
     // minutes of stereo is some 90 MB the render no longer needs.
     this.opts.audio = null;
   }
+  /** Where the song starts in the audio track and how that was known, once `encodeAudio` is done (for the checks). */
+  priming: AudioPriming | null = null;
+  /** The song's stretch of the audio track, for the MP4's edit list. */
+  private audioEdit: { skip: number; length: number } | null = null;
   audioDescription: Uint8Array | null = null;
   audioPackets = 0;
 
@@ -438,12 +498,12 @@ export class RenderEncoder {
   get framesAdded(): number { return this.frames; }
 
   /** Flush the encoder, write the file's tail and close it. */
-  async finish(): Promise<{ videoFrames: number; audioPackets: number; durationMs: number; bytes: number }> {
+  async finish(): Promise<{ videoFrames: number; audioPackets: number; durationMs: number; bytes: number; priming: AudioPriming | null }> {
     this.check();
     await this.video.flush();
     this.video.close();
     this.check();
-    const summary = this.muxer().finish();
+    const summary = { ...this.muxer().finish(), priming: this.priming };
     await this.opts.sink.close();
     return summary;
   }
@@ -455,6 +515,109 @@ export class RenderEncoder {
     try { if (this.video.state !== 'closed') this.video.close(); } catch { /* already closed */ }
     await this.opts.sink.abort();
   }
+}
+
+/** Where the song starts in a render's audio track, and how that was known. */
+export interface AudioPriming {
+  /** Samples of the encoder's priming before the song's first sample (the MP4 edit's media time). */
+  samples: number;
+  /**
+   * 'timestamps': the encoder stamped its first packet before zero;
+   * 'opus-head': the OpusHead's pre-skip; 'measured': `measurePriming`;
+   * 'assumed': Apple's 2112, for an AAC encoder that could not be measured.
+   */
+  source: 'timestamps' | 'opus-head' | 'measured' | 'assumed';
+  /** Packets past the song's end that were left out of the file. */
+  dropped: number;
+}
+
+/** Apple's AAC encoder's priming, in samples (Technical Note TN2258). */
+export const AAC_PRIMING = 2112;
+
+function copyDescription(desc: AllowSharedBufferSource): Uint8Array {
+  if (desc instanceof ArrayBuffer) return new Uint8Array(desc.slice(0));
+  const v = desc as ArrayBufferView;
+  return new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
+}
+
+/**
+ * How many samples of priming an audio encoder puts before the first sample
+ * it is given, measured: a third of a second of noise through a fresh
+ * encoder with `config`, the packets back through a decoder, and the lag at
+ * which what comes out best matches what went in. Null when it cannot be
+ * told (no decoder for it, or no clear match).
+ *
+ * Why measure rather than take 2112 on trust: 2112 is Apple's number, for
+ * Apple's encoder, and Chrome uses another platform's encoder elsewhere
+ * (Media Foundation on Windows), whose priming nothing here has seen. An
+ * edit list that skips the wrong amount puts the sound early or late against
+ * the picture by the difference, and no duration check would notice.
+ *
+ * The noise is the same every time (a fixed linear congruential sequence,
+ * not Math.random), so the measurement is too. A decoder that already drops
+ * the priming itself (it would have to know it, which an AAC decoder given
+ * only an AudioSpecificConfig does not) would give 0, and 0 is returned as
+ * null, "cannot tell", so the caller falls back rather than skipping
+ * nothing. `describe` false decodes without the encoder's description,
+ * which is how the lab measures Opus (whose decoder would otherwise honour
+ * the pre-skip and hide it) to prove the measurement against a priming the
+ * OpusHead states.
+ */
+export async function measurePriming(config: AudioEncoderConfig, description: Uint8Array | null, describe: boolean): Promise<number | null> {
+  if (typeof AudioDecoder !== 'function') return null;
+  const rate = config.sampleRate, ch = config.numberOfChannels;
+  const n = 16384, window = 8192, maxLag = 4096;
+  const probe = new Float32Array(n);
+  let x = 0x2545f491;
+  for (let i = 0; i < n; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; probe[i] = (x / 4294967296 - 0.5) * 0.5; }
+  const chunks: EncodedAudioChunk[] = [];
+  let desc: Uint8Array | null = null;
+  let failed = false;
+  const enc = new AudioEncoder({
+    output: (c, meta) => { chunks.push(c); if (meta?.decoderConfig?.description && !desc) desc = copyDescription(meta.decoderConfig.description); },
+    error: () => { failed = true; },
+  });
+  enc.configure(config);
+  const planar = new Float32Array(n * ch);
+  for (let c = 0; c < ch; c++) planar.set(probe, c * n);
+  const data = new AudioData({ format: 'f32-planar', sampleRate: rate, numberOfFrames: n, numberOfChannels: ch, timestamp: 0, data: planar });
+  enc.encode(data);
+  data.close();
+  await enc.flush();
+  enc.close();
+  if (failed || !chunks.length) return null;
+  const out: Float32Array[] = [];
+  const dec = new AudioDecoder({
+    output: (a) => {
+      const f = new Float32Array(a.numberOfFrames);
+      a.copyTo(f, { planeIndex: 0, format: 'f32-planar' });
+      out.push(f);
+      a.close();
+    },
+    error: () => { failed = true; },
+  });
+  const d = describe ? (desc ?? description) : null;
+  dec.configure({ codec: config.codec, sampleRate: rate, numberOfChannels: ch, ...(d ? { description: d } : {}) });
+  for (const c of chunks) dec.decode(c);
+  await dec.flush();
+  dec.close();
+  if (failed) return null;
+  const got = new Float32Array(out.reduce((k, f) => k + f.length, 0));
+  let at = 0;
+  for (const f of out) { got.set(f, at); at += f.length; }
+  if (got.length < maxLag + window) return null;
+  let pp = 0;
+  for (let i = 0; i < window; i++) pp += probe[i] * probe[i];
+  let best = -1, bestLag = -1;
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let pg = 0, gg = 0;
+    for (let i = 0; i < window; i++) { const g = got[lag + i]; pg += probe[i] * g; gg += g * g; }
+    const r = gg > 0 ? pg / Math.sqrt(pp * gg) : 0;
+    if (r > best) { best = r; bestLag = lag; }
+  }
+  // A lossy codec at a render's bitrate keeps noise well above 0.5 against
+  // itself at the right lag, and nowhere near it at any other.
+  return best > 0.5 && bestLag > 0 ? bestLag : null;
 }
 
 /** Thrown out of a render that was cancelled, so the loop unwinds without calling it a failure. */

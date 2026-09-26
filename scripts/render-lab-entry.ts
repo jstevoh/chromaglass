@@ -4,8 +4,9 @@
 // read back its own frames (software WebGPU, a cloud session).
 import './lab-entry.ts';
 import {
-  RenderEncoder, memorySink, pickRenderFormat, renderSupport, avcCodec, vp9Codec, videoBitrate, hashVideoFrame, type RenderFormat,
+  RenderEncoder, memorySink, pickRenderFormat, renderSupport, avcCodec, vp9Codec, videoBitrate, hashVideoFrame, measurePriming, type RenderFormat,
 } from '../src/lib/render.ts';
+import { opusPreSkip } from '../src/lib/muxWebm.ts';
 import { makeRng } from '../src/lib/rng.ts';
 import { readWebm, readMp4 } from './media-read.mjs';
 
@@ -57,6 +58,34 @@ function base64(bytes: Uint8Array): string {
 
 const api = {
   support: () => renderSupport(),
+  /**
+   * `measurePriming` against a priming that is known: Opus's, which its
+   * encoder states in the OpusHead. Decoded without that header (so the
+   * decoder cannot skip the pre-skip for us), the measurement has to find
+   * the same number. And AAC's, where this browser can encode it, printed.
+   */
+  async priming() {
+    const opus = { codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 };
+    let head: Uint8Array | null = null;
+    const enc = new AudioEncoder({
+      output: (_c, meta) => { const d = meta?.decoderConfig?.description; if (d && !head) head = new Uint8Array(d instanceof ArrayBuffer ? d.slice(0) : (d as ArrayBufferView).buffer.slice(0)); },
+      error: () => {},
+    });
+    enc.configure(opus);
+    const n = 4800;
+    const data = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: 2, timestamp: 0, data: new Float32Array(2 * n) });
+    enc.encode(data);
+    data.close();
+    await enc.flush();
+    enc.close();
+    const stated = head ? opusPreSkip(head) : null;
+    const measured = await measurePriming(opus, null, false);
+    const withHead = await measurePriming(opus, head, true);
+    let aac: number | null | 'unsupported' = 'unsupported';
+    const aacCfg = { codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2, bitrate: 192_000 };
+    if ((await AudioEncoder.isConfigSupported(aacCfg).catch(() => ({ supported: false }))).supported) aac = await measurePriming(aacCfg, null, true);
+    return { stated, measured, withHead, aac };
+  },
   /** What this browser would render a film of this size as, and what it cannot. */
   async formats(w: number, h: number, fps: number) {
     const picked = await pickRenderFormat(w, h, fps, 48000, 2);

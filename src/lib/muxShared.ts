@@ -32,6 +32,67 @@ export interface ByteSink {
   patch(position: number, bytes: Uint8Array): void;
 }
 
+/**
+ * The song's own stretch of an encoded audio track: where in it the song
+ * starts, how long the song is, and the packets worth keeping.
+ *
+ * An audio encoder does not hand back the samples it was given, one for one.
+ * It adds a run of *priming* at the front, before the first sample it was
+ * given (a lapped transform has to be started on something: 2112 samples for
+ * Apple's AAC encoder, Technical Note TN2258; Opus calls its 312 the
+ * pre-skip), and pads the last packet out to a whole frame, plus, for AAC,
+ * one more packet to finish the overlap of the last one. Decoded as it is,
+ * the sound starts a few tens of milliseconds late and the track runs a
+ * packet or two past the song. `npm run render-app` measured it on the Mac:
+ * an 8-second song came back as an 8072 ms file.
+ *
+ * An encoder can say where its priming is in one of two ways, and both are
+ * handled:
+ *
+ *   - in its timestamps: the first packet is stamped before the first
+ *     sample it was given (a negative time, for a song that starts at 0),
+ *     and the priming is how far before;
+ *   - not at all: the packets are stamped from the first sample given, as if
+ *     there were no priming, and the priming is hidden in the first packets.
+ *     Chrome's encoders do this (the lab's Opus measured it: 101 packets
+ *     for two seconds, stamped from 0), and then the caller has to know it
+ *     (`hiddenPriming`: Opus's pre-skip from its header, AAC's measured by
+ *     decoding, see lib/render.ts).
+ *
+ * `skip` is where the song's first sample is, in samples from the start of
+ * the first packet; `length` is the song's own length in samples. A packet
+ * whose decoded sound starts at or after `skip + length` holds nothing of
+ * the song (it is padding, or the frame that closes the overlap), and is
+ * dropped: it would only make the track longer than the song for any player
+ * that does not honour an edit list. Everything before that is kept, the
+ * priming packets included, because a decoder needs them to produce the
+ * first samples of the song at all; the container is what says to skip
+ * them (an MP4 edit list; WebM's CodecDelay for Opus).
+ *
+ * The packets come back stamped from their first (0), the priming still in
+ * them and `skip` saying how much of it there is.
+ *
+ * Pure, so `npm run render` measures it in node.
+ */
+export function trimAudio(packets: MuxSample[], sampleRate: number, songSamples: number, hiddenPriming: number):
+  { packets: MuxSample[]; skip: number; length: number; dropped: number; priming: 'timestamps' | 'hidden' } {
+  if (!packets.length) return { packets, skip: 0, length: songSamples, dropped: 0, priming: 'hidden' };
+  let first = Infinity;
+  for (const p of packets) if (p.timestampUs < first) first = p.timestampUs;
+  const samples = (us: number) => Math.round((us * sampleRate) / 1e6);
+  // Stamped before the song's zero: the timestamps say where the song
+  // starts, and they are believed over anything the caller assumed.
+  const signalled = first < 0;
+  const skip = Math.max(0, signalled ? -samples(first) : hiddenPriming - samples(first));
+  const end = skip + songSamples;
+  // Kept packets are restamped from the first one, which is how both
+  // containers store an audio track (the media starts at its first packet;
+  // where the song starts in it is the edit's, or CodecDelay's, to say), and
+  // what keeps a negative time out of a muxer that cannot write one.
+  const kept = packets.filter((p) => samples(p.timestampUs - first) < end).map((p) => (first ? { ...p, timestampUs: p.timestampUs - first } : p));
+  return { packets: kept, skip, length: songSamples, dropped: packets.length - kept.length, priming: signalled ? 'timestamps' : 'hidden' };
+}
+
 /** A growable big-endian byte builder. */
 export class Bytes {
   private buf = new Uint8Array(256);

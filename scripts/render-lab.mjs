@@ -64,6 +64,19 @@ try {
     browser can encode them (Chrome on a Mac can; the open-source Chromium
     in a cloud session cannot, and says so above). Asked, never assumed.
   */
+  /*
+    An audio encoder's priming, measured. Chrome's encoders hide it (the
+    first packet is stamped 0, the priming inside it), and for AAC nothing
+    states it, so a render measures it (`measurePriming` in lib/render.ts)
+    to know where the song starts, and the MP4's edit list skips that much.
+    The measurement is proved here on the one priming that is stated: Opus's
+    pre-skip, in its OpusHead. Decoded without the head, the burst has to
+    come out exactly that late.
+  */
+  const pr = await page.evaluate(() => window.renderLab.priming());
+  console.log(`\nPriming: the OpusHead says ${pr.stated}; measured ${pr.measured} decoded without it, ${pr.withHead ?? 'nothing (the decoder skipped it)'} with it; AAC ${pr.aac === 'unsupported' ? 'not encodable here' : `measured ${pr.aac}`}`);
+  check('the measured priming is the one Opus states', pr.stated > 0 && pr.measured === pr.stated, `${pr.measured} measured, ${pr.stated} stated`);
+
   const small = await page.evaluate(([w, h, fps]) => window.renderLab.formats(w, h, fps), [SIZE, SIZE, FPS]);
   const avcHere = Object.entries(small.each).some(([k, v]) => k.startsWith('avc1') && v) && Object.entries(small.each).some(([k, v]) => k.startsWith('mp4a') && v);
   const kinds = [['webm', readWebm, 'video/webm'], ['mp4-vp9', readMp4, 'video/mp4'], ...(avcHere ? [['mp4-avc', readMp4, 'video/mp4']] : [])];
