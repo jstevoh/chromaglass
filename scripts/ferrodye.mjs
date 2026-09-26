@@ -21,10 +21,12 @@
  *   2. the colour it pushed out sits along its edge: the water beside the
  *      black holds more dye than the water far from it, by more than it does
  *      with the setting off
- *   3. dye poured under a pool comes out over time
- *   4. the pass makes and loses no dye: twenty passes on their own
- *   5. at 0 nothing changes, to the bit: every look that does not ask for it
- *      runs the plate it always did
+ *   3. dye poured under a pool comes out of its middle, which the push
+ *      alone cannot reach (asked of the pass directly, on one settled pool)
+ *   4. the pass makes and loses no dye: twenty passes on their own, judged
+ *      against how much they moved
+ *   5. at 0 nothing changes, to the bit, and 0.01 does: every look that does
+ *      not ask for it runs the plate it always did
  *
  * The plate: even dye everywhere, eighteen drops of ferrofluid (the drops of
  * `npm run maze`), the Labyrinth at 0.9 and a magnet walking a circle, 360
@@ -39,7 +41,9 @@
  *   dye left in the 680 cells the black grew    71%     8%
  *   water beside the black / far water          0.84    1.49
  *   dye under the black / its share of area     0.80    0.13
- *   twenty passes alone                         35221.3 → 35221.5
+ *   a pool's middle after 600 passes            100%    57%   (inside exchange off / on)
+ *   twenty passes alone: 1316 units moved, the total 36001.5 → 36005.0
+ *   60 steps at 0, absent and 0.01: equal, equal, different
  *
  * The same 680 cells in both arms: the push moves the dye and never the
  * ferrofluid, so the black grows the same way on or off and the two arms
@@ -142,38 +146,77 @@ try {
   check('and packs along its edge',
     on.rim > off.rim * 1.1,
     `water beside the black holds ${on.rim.toFixed(2)} of the far water's dye, ${off.rim.toFixed(2)} with it off`);
-  check('dye poured under a pool comes out',
-    on.under < 0.5 && off.under > 0.7,
-    `dye under the black ${on.under.toFixed(2)} of its share of the area after ${STEPS} steps, ${off.under.toFixed(2)} with it off`);
+  /*
+    3. The inside exchange, on its own terms. The arms above cannot show it:
+    with it switched off the push alone drains the maze's thin fingers and
+    they read almost as low (the check-skeptic measured 0.36 against 0.13),
+    so a pool's middle is asked directly. One pool, a fifth of the plate
+    across, poured on even dye and left to settle with no magnet and no
+    maze; then the pass alone, 600 times (300 steps' worth), once with the
+    inside exchange at its real strength and once with it at 0. The dye
+    left in the middle half of the pool must fall well below what the push
+    alone leaves there, which is all of it, since the middle has no slope.
+    Measured: 57% against 100%. It is slow on purpose (a diffusion, and the
+    middle is drawn black), so the bound is 75%, which the push alone
+    cannot reach and a working inside exchange passes with room.
+  */
+  const middle = async (inside) => {
+    await page.evaluate(async () => {
+      await lab.create(256);
+      lab.dye(0.5, 0.5, 3, [0.3, 0.5, 0.7], 1);
+      lab.flush();
+      lab.addPhase(0.5, 0.5, 0.1, 0.95);
+      await lab.step(30);
+    });
+    const before = await read();
+    await page.evaluate(async (inside) => { await lab.displacePasses(600, lab.displace.push, inside ? lab.displace.inside : 0); }, inside);
+    const after = await read();
+    const { L } = after;
+    let b = 0, a = 0;
+    for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
+      if (Math.hypot((x + 0.5) / L - 0.5, (y + 0.5) / L - 0.5) > 0.05) continue;
+      b += before.dye[x + y * L]; a += after.dye[x + y * L];
+    }
+    return a / b;
+  };
+  const withInside = await middle(true), pushOnly = await middle(false);
+  check('dye poured under a pool comes out of its middle',
+    withInside < 0.75 && pushOnly > 0.9,
+    `the middle of a pool keeps ${(withInside * 100).toFixed(0)}% of its dye after 600 passes, ${(pushOnly * 100).toFixed(0)}% with the inside exchange off`);
 
-  // 4. The pass alone, on the plate the "on" arm left: twenty passes at full,
-  // nothing else run, the dye summed before and after.
-  const drift = await page.evaluate(async () => {
-    const s = lab.solver();
-    const sum = async () => { const d = await lab.field('dye'); let m = 0; for (let i = 3; i < d.length; i += 4) m += d[i]; return m; };
-    const before = await sum();
-    const enc = s.device.createCommandEncoder();
-    const pass = enc.beginComputePass();
-    const args = s.arg('ferrodye check', [0.18, 0.06, 0, 0]);
-    for (let k = 0; k < 20; k++) { s.run(pass, 'phaseDisplace', s.dye.write, [s.dye.read, s.phase.read], args); s.dye.swap(); }
-    pass.end(); s.device.queue.submit([enc.finish()]);
-    await s.device.queue.onSubmittedWorkDone();
-    return { before, after: await sum() };
-  });
+  /*
+    4. The pass makes and loses no dye. Judged against what it moves, not
+    against the whole plate: twenty passes on a plate like the arms' shift
+    about a thousand units of dye between cells out of some 36000, so a
+    tolerance on the total could hide a pass that destroyed a tenth of what
+    it moved (the check-skeptic's finding). A freshly laid plate, settled,
+    then twenty passes at the engine's own strengths.
+  */
+  await lay(256);
+  await play(40, { phaseDisplace: 0 });
+  const b4 = await read();
+  await page.evaluate(async () => { await lab.displacePasses(20, lab.displace.push, lab.displace.inside); });
+  const a4 = await read();
+  let moved = 0, before4 = 0, after4 = 0;
+  for (let i = 0; i < a4.dye.length; i++) { moved += Math.abs(a4.dye[i] - b4.dye[i]); before4 += b4.dye[i]; after4 += a4.dye[i]; }
   check('and makes and loses no dye',
-    Math.abs(drift.after / drift.before - 1) < 0.001,
-    `twenty passes alone: ${drift.before.toFixed(1)} → ${drift.after.toFixed(1)}`);
+    moved > 200 && Math.abs(after4 - before4) / moved < 0.01,
+    `twenty passes alone move ${moved.toFixed(0)} units of dye between cells; the total goes ${before4.toFixed(1)} → ${after4.toFixed(1)}, ${(Math.abs(after4 - before4) / moved * 100).toFixed(2)}% of what moved`);
 
-  // 5. At 0 the stage is not run: the same plate, sixty steps, with the
-  // setting at 0 and with it absent, must agree to the last bit.
+  /*
+    5. At 0 the stage is not run. The solver reads a missing setting as 0
+    (`p.phaseDisplace ?? 0`), so "0 against absent" alone proves only that
+    the run is deterministic. The third arm, 0.01, is what shows the measure
+    can see the pass at all: it must differ.
+  */
   const sumAfter = async (over) => {
     await lay(256);
     await play(60, over);
     return page.evaluate(async () => { const d = await lab.field('dye'); let m = 0; for (let i = 0; i < d.length; i++) m += d[i] * ((i % 97) + 1); return m; });
   };
-  const zero = await sumAfter({ phaseDisplace: 0 }), absent = await sumAfter({});
-  check('at 0 the plate is the plate it was', zero === absent,
-    `60 steps: dye field sums ${zero.toFixed(3)} at 0 and ${absent.toFixed(3)} without it`);
+  const zero = await sumAfter({ phaseDisplace: 0 }), absent = await sumAfter({}), faint = await sumAfter({ phaseDisplace: 0.01 });
+  check('at 0 the plate is the plate it was', zero === absent && faint !== zero,
+    `60 steps: dye field sums ${zero.toFixed(3)} at 0, ${absent.toFixed(3)} without it, ${faint.toFixed(3)} at 0.01`);
 } finally {
   await close();
 }

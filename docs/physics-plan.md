@@ -167,8 +167,10 @@ have. `npm run ferrodye` (256², even dye, eighteen drops, a walking magnet,
 360 steps): the black's new ground keeps 8% of its dye against 71% with it
 off, the water beside the black holds 1.49 of the far water's dye against
 0.84, the dye under the black falls to 0.13 of its share of the area
-against 0.80, twenty passes alone move the total from 35221.3 to 35221.5,
-and at 0 the plate is the same to the bit.
+against 0.80, the middle of a settled pool keeps 57% of its dye after 600
+passes against 100% with the inside exchange off, twenty passes alone move
+1316 units of dye and change the total by 0.26% of that, and at 0 the plate
+is the same to the bit while 0.01 is not.
 
 The same work fixed the magnet on its own. The sharpening pass that stood in
 for Cahn–Hilliard without a maze clamped to its neighbourhood, and lost an

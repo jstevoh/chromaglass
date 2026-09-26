@@ -198,8 +198,8 @@ const MAGNET_CELLS = 2.4;
   along the edge. The inside only has to walk dye poured under a pool out to
   the edge eventually, since the middle is drawn black.
 */
-const DISPLACE_PUSH = 0.18;
-const DISPLACE_INSIDE = 0.06;
+export const DISPLACE_PUSH = 0.18;
+export const DISPLACE_INSIDE = 0.06;
 const DISPLACE_ITERS = 2;
 const PHASE_SUBSTEPS = 6;
 const GRAIN_PERIOD = 6;
