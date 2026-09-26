@@ -44,7 +44,7 @@ import { launchChromium } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, WatchError } from './watch.mjs';
-import { AUTOPLAY, withBand, recordTake } from './recorder.mjs';
+import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
 
 const PORT = Number(process.env.FILM_PORT ?? 4352);
 const OUT = path.resolve(process.env.FILM_OUT ?? 'film');
@@ -172,9 +172,19 @@ try {
       page.on('pageerror', e => row.problems.push(`page error: ${e.message.slice(0, 120)}`));
       await withBand(page);
       await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look.id}${engineQuery()}`, { waitUntil: 'load' });
+      // The opening freeze of a fresh runner is waited out, not filmed
+      // (`untilRunning` in recorder.mjs says why), and how long it took is
+      // printed with the look. Nine seconds first, as `npm run depth` does:
+      // the freeze starts about four and a half seconds after load, so two
+      // steady seconds looked for any sooner can be the two before it.
       await page.waitForTimeout(9000);
-      const got = await recordTake(page, SECONDS, take);
-      if (!got.ok) row.problems.push(got.reason);
+      const running = await untilRunning(page);
+      row.opening = 9 + running.waited;
+      if (!running.ok) row.problems.push(`the show never ran steadily in ${row.opening.toFixed(0)} s after load`);
+      else {
+        const got = await recordTake(page, SECONDS, take);
+        if (!got.ok) row.problems.push(got.reason);
+      }
     } catch (e) {
       row.problems.push(`recording failed: ${e.message.split('\n')[0]}`);
     } finally {
@@ -193,7 +203,7 @@ try {
     }
     row.seconds = (Date.now() - started) / 1000;
     const s = row.shape;
-    console.log(` ${row.problems.length ? 'FAIL' : 'ok  '} ${look.id} (${row.seconds.toFixed(0)} s)${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${row.problems.length ? ` — ${row.problems.join('; ')}` : ''}`);
+    console.log(` ${row.problems.length ? 'FAIL' : 'ok  '} ${look.id} (${row.seconds.toFixed(0)} s, running ${row.opening?.toFixed(1) ?? '?'} s after load)${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${row.problems.length ? ` — ${row.problems.join('; ')}` : ''}`);
     // After every look, so a run that hits the job's time limit still leaves
     // the table for the looks it did.
     writeTable();

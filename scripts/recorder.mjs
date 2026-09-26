@@ -29,6 +29,38 @@ export const AUTOPLAY = '--autoplay-policy=no-user-gesture-required';
 /** Before `goto`: the synthesised band plays instead of asking for a microphone. */
 export const withBand = page => page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
 
+/**
+ * Resolves once the show's loop has beaten in every quarter second for two
+ * seconds running (up to `limit` ms), to `{ ok, waited }` in seconds.
+ *
+ * Why not a fixed wait. Every fresh Mac runner opens with a freeze of about
+ * nine seconds a few seconds after load: no animation frames, no loop
+ * heartbeat, while the page's timers keep firing (the depth check found it;
+ * the likeliest reading, inferred, is Metal compiling the solver's pipelines
+ * cold). A take started inside it is short by however much of it was left,
+ * since a canvas that draws nothing gives MediaRecorder nothing: the first
+ * film run lost 8.7 s of Classic's 120 that way and failed on its length,
+ * which says nothing about Classic. So the take starts on a running show, and
+ * how long that took is said on every run rather than hidden. A freeze that
+ * comes after this is still in the take, and still fails it.
+ *
+ * Counted by `crash.beats()`, the loop's own heartbeat, as `npm run crash`
+ * does, not by the stage's frames, which a grab can draw by itself.
+ */
+export async function untilRunning(page, limit = 45000) {
+  return page.evaluate(async (limit) => {
+    const t0 = performance.now();
+    const beats = () => window.chromaglassDebug?.()?.crash?.beats?.() ?? null;
+    const seen = [];
+    const steady = () => seen.length >= 9 && seen.slice(-9).every((b, i, r) => i === 0 || (b !== null && r[i - 1] !== null && b > r[i - 1]));
+    while (!steady() && performance.now() - t0 < limit) {
+      seen.push(beats());
+      if (!steady()) await new Promise((r) => setTimeout(r, 250));
+    }
+    return { ok: steady(), waited: (performance.now() - t0) / 1000 };
+  }, limit);
+}
+
 /** Run a command from the palette. Resolves once it has been chosen. */
 export async function viaPalette(page, query) {
   await page.keyboard.press('Control+k');
