@@ -242,3 +242,28 @@
   height: 22px; width: 22px; border: 0; border-radius: 9999px;
   background: #FAFAFA; box-shadow: 0 1px 3px rgba(0,0,0,.6);
 }
+
+/* ── Settings sliders ───────────────────────────────────────────────
+   A 4px track filled to the value in the accent, and a white knob with a
+   soft ring: the desks' rides at a settings scale. --fill is set inline. */
+.set-range { -webkit-appearance: none; appearance: none; background: transparent; height: 18px; width: 100%; cursor: pointer; }
+.set-range:disabled { cursor: not-allowed; }
+.set-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right,
+    var(--color-accent) 0, var(--color-accent) var(--fill, 0%),
+    rgba(255,255,255,.10) var(--fill, 0%), rgba(255,255,255,.10) 100%);
+}
+.set-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  height: 14px; width: 14px; margin-top: -5px; border-radius: 50%;
+  background: #FAFAFA; box-shadow: 0 0 0 3px rgba(139,92,246,.28), 0 1px 3px rgba(0,0,0,.5);
+  transition: box-shadow 120ms, transform 120ms;
+}
+.set-range:hover::-webkit-slider-thumb { box-shadow: 0 0 0 5px rgba(139,92,246,.30), 0 1px 3px rgba(0,0,0,.5); }
+.set-range:active::-webkit-slider-thumb { transform: scale(1.12); }
+.set-range:focus-visible { outline: none; }
+.set-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent); }
+.set-range::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,.10); }
+.set-range::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--color-accent); }
+.set-range::-moz-range-thumb { height: 14px; width: 14px; border: 0; border-radius: 50%; background: #FAFAFA; box-shadow: 0 0 0 3px rgba(139,92,246,.28); }

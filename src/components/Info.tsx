@@ -16,23 +16,23 @@ import { Info as InfoIcon } from 'lucide-react';
 export function Info({ children, label = 'What this does' }: { children: ReactNode; label?: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={label ? 'mb-3' : ''}>
+    <div className={label ? '-mt-1 mb-2' : ''}>
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 rounded-lg px-1.5 py-1 min-h-[28px] min-w-[28px] justify-center text-[11px] transition-colors ${label ? '-ml-1.5' : ''} ${
-          open ? 'text-white/70' : 'text-white/35 hover:text-white/70'
+        className={`flex min-h-[22px] min-w-[22px] items-center justify-center gap-1 rounded-md px-1 text-[11px] transition-colors ${label ? '-ml-1' : ''} ${
+          open ? 'text-accent-text' : 'text-white/30 hover:text-white/70'
         }`}
         aria-expanded={open}
         aria-label={label || 'What this does'}
         data-info="toggle"
       >
-        <InfoIcon size={13} />
+        <InfoIcon size={12} />
         {/* No label where the ⓘ sits beside something that already names
             itself — a menu row, say. The glyph alone is the affordance. */}
-        {label && <span className="uppercase tracking-wider font-semibold">{label}</span>}
+        {label && <span>{label}</span>}
       </button>
       {open && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-white/55" data-info="body">
+        <p className="mt-1 max-w-[62ch] rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] leading-relaxed text-white/60" data-info="body">
           {children}
         </p>
       )}
