@@ -27,6 +27,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { installFrameReader, isGpuEngine, lastFrameRead } from './frame.mjs';
+import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -323,47 +324,8 @@ const appears = async (testId, poke) => {
  */
 const firstVisible = (testId) => page.getByTestId(testId).first();
 
-/*
-  Raw coordinates for every click in the suite.
-
-  `locator.click()` stalls in this environment: its call log stops at "locator resolved to
-  <button …>" and never reports an actionability verdict, while a mouse click
-  at the same point works and the control visibly takes the selection. The
-  element is stable (traced over twenty animation frames: one bounding box)
-  and hit-testable (elementFromPoint returns the button itself), so that is
-  Playwright's machinery queueing behind the render loop, not the app.
-
-  It was first seen on the desk, then on the overlay's Settings button, then
-  inside the MIDI sheet, where it ended a run at 25 of 27 with a 60-second
-  timeout. Three sightings is a property of the environment, not of three
-  controls, so every click here goes through this.
-
-  Both branches scroll first, which the locator branch did not at first. That
-  is the one thing `locator.click()` was doing for free, and dropping it cost
-  two checks: a control below the fold in a scrolling sheet had its
-  coordinates taken where it actually sat, well outside the visible box, and
-  the click landed on whatever was at that point instead.
-*/
-const clickOn = async (target) => {
-  const box = typeof target === 'string'
-    ? await page.evaluate((id) => {
-        const el = document.querySelector(`[data-testid="${id}"]`);
-        if (!el) return null;
-        // Into view first: a cue list is thirty-two rows in a column that
-        // holds fourteen, so a row's coordinates can be well outside the
-        // visible box and a click there lands on whatever is actually at
-        // that point. "Go names the look it will send" failed on exactly
-        // that, and read as an app bug.
-        el.scrollIntoView({ block: 'center', behavior: 'instant' });
-        const r = el.getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      }, target)
-    : await target.scrollIntoViewIfNeeded()
-        .then(() => target.boundingBox())
-        .then(b => (b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : null));
-  if (!box) throw new Error(`nothing to click: ${typeof target === 'string' ? target : 'locator'}`);
-  await page.mouse.click(box.x, box.y);
-};
+// Every click is a raw mouse click at the control's middle (layoutProbe.mjs says why).
+const clickOn = (target) => clickAt(page, target);
 
 /** ⌘K, type, Enter — the only way to reach most of the app under a desk. */
 const viaPalette = async (query) => {
@@ -1264,10 +1226,7 @@ try {
     // 137px. The one control whose whole job is to be in the same place every
     // time was the one that moved when you pressed it.
     {
-      const at = () => page.evaluate(() => {
-        const r = document.querySelector('[data-testid="mode-segmented"]')?.getBoundingClientRect();
-        return r ? Math.round(r.x) : null;
-      });
+      const at = () => modeSwitchX(page);
       const inPerform = await at();
       await clickOn('mode-segmented-design');
       await settle(1200);
@@ -2177,21 +2136,7 @@ try {
   {
     await page.setViewportSize({ width: 1600, height: 900 });
     await settle(1000);
-    const measure = () => page.evaluate(() => {
-      const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(','); return p[3] === undefined ? 1 : parseFloat(p[3]); };
-      const tiny = [], faint = [], small = [];
-      for (const el of document.querySelectorAll('button, input, select, [role="menuitem"], a')) {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0 || el.offsetParent === null) continue;
-        const cs = getComputedStyle(el);
-        const text = (el.textContent || '').trim();
-        const name = (text || el.getAttribute('aria-label') || el.getAttribute('title') || el.tagName).slice(0, 26);
-        if (text && parseFloat(cs.fontSize) < 11) tiny.push(`${name} ${cs.fontSize}`);
-        if (text && alpha(cs.color) < 0.6) faint.push(`${name} α${alpha(cs.color)}`);
-        if (Math.min(r.width, r.height) < 24) small.push(`${name} ${Math.round(r.width)}×${Math.round(r.height)}`);
-      }
-      return { tiny, faint, small };
-    });
+    const measure = () => legibility(page);
     const legible = await measure();
     check('nothing you can click has text under 11px', legible.tiny.length === 0, legible.tiny.slice(0, 6).join(', '));
     check('and none of it is under 60% opacity', legible.faint.length === 0, legible.faint.slice(0, 6).join(', '));
@@ -2246,31 +2191,7 @@ try {
     const coveredAt = async (w, h) => {
       await page.setViewportSize({ width: w, height: h });
       await settle(1200);
-      return page.evaluate(() => {
-        const inView = (el) => {
-          const r = el.getBoundingClientRect();
-          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-          for (let p = el.parentElement; p; p = p.parentElement) {
-            const cs = getComputedStyle(p);
-            if (/auto|scroll|hidden/.test(cs.overflowY + cs.overflowX)) {
-              const pr = p.getBoundingClientRect();
-              if (cy < pr.top - 1 || cy > pr.bottom + 1 || cx < pr.left - 1 || cx > pr.right + 1) return false;
-            }
-          }
-          return cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight;
-        };
-        const out = [];
-        for (const el of document.querySelectorAll('button, input, select, [role="tab"]')) {
-          const r = el.getBoundingClientRect();
-          if (!r.width || !r.height || !inView(el)) continue;
-          const top = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
-          if (!top || el === top || el.contains(top) || top.contains(el)) continue;
-          const me = el.dataset.testid || el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 20) || el.tagName;
-          const by = top.dataset?.testid || (top.textContent || '').trim().slice(0, 20) || top.tagName;
-          out.push(`${me} under ${by}`);
-        }
-        return out;
-      });
+      return coveredControls(page);
     };
     /*
       Including the widths below 1024, where the app shows its own older
@@ -2280,7 +2201,7 @@ try {
       and an eight-wide swatch grid made the left one 270px of a 390px window
       and the right column was painted over the end of it.
     */
-    for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860], [430, 932], [390, 844]]) {
+    for (const [w, h] of COVER_WIDTHS) {
       const hit = await coveredAt(w, h);
       check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
       // And every status dot on the desk says what it is. The words used to
@@ -2288,10 +2209,7 @@ try {
       // reported as "these dots need to be labeled. I don't know what goes
       // to what." They move under their dots instead now.
       if (w >= 1024) {
-        const bare = await page.evaluate(() => [...document.querySelectorAll('header [data-testid^="dot-"]')]
-          .filter((el) => el.getBoundingClientRect().width > 0 && !(el.innerText || '').trim())
-          .map((el) => el.dataset.testid));
-        const all = await page.locator('header [data-testid^="dot-"]').count();
+        const { all, bare } = await statusDots(page);
         check(`every status dot is labelled at ${w}px`, all > 0 && bare.length === 0,
           bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word`);
       }

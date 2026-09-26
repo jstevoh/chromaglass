@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Drops** (`beadDrops`, Settings → Show under Oil Beads, MIDI-learnable and
   pinnable; 0 by default, so every look is unchanged): the oil beads become
-  drops of colour from the look's palette, lit across their domes with one
-  highlight toward the lamp, pressed flat where they crowd, and a drop that
+  drops of colour from the look's palette, shaded as lenses (below), pressed
+  flat where they crowd, and a drop that
   swallows a smaller one keeps it visible for fifteen to thirty-five seconds.
   `npm run drops` measures the field and its mask (PLAN.md batch 3).
 
@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every edge texel full red and the fade-in into nothing; its rims also took
   nine tenths of the dome under them. It is drawn on black now, rims added
   into green alone, as the drops' mask always was.
+
+### Added — the layout checked without a GPU
+
+- `npm run layout` asks the show night's layout questions (type size, hit
+  targets, controls painted over at six widths, the mode switch staying put,
+  labelled status dots) in about twenty seconds with no GPU, and runs on the
+  ubuntu job. It shares its measurements with `qa.mjs` (`scripts/layoutProbe.mjs`).
+- `npm run check` runs every check that needs no GPU in about a minute, before
+  a push.
 
 ### Added — the liquids' own physics and chemistry
 

@@ -483,6 +483,12 @@ check('most of the app takes advantage of them', withPhysics >= PRESETS.length -
       if (args.some((v) => !Number.isFinite(v))) throw new TypeError('arc: non-finite');
     },
     clearRect() {}, beginPath() {}, fill() {}, stroke() {},
+    // The rings' mask is laid on opaque black before the beads (fillRect)
+    // and takes its rims additively (globalCompositeOperation): lib/beads.ts.
+    fillRect: (...args) => {
+      if (args.some((v) => !Number.isFinite(v))) throw new TypeError('fillRect: non-finite');
+    },
+    globalCompositeOperation: 'source-over',
     // Stored as well as checked. Written as setters alone they read back
     // `undefined`, and `rr - undefined * 0.5` is NaN — the stub would then
     // fail the very code it is testing, which it did.

@@ -36,12 +36,15 @@ const check = (name, ok, detail = '') => {
 };
 
 const out = 'node_modules/.cache/drops-beads.mjs';
-await build({ entryPoints: ['src/lib/beads.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { BeadField, rasterDrops, paletteSlot, innerLife } = await import(`../${out}`);
+await build({
+  stdin: { contents: "export * from './src/lib/beads.ts'; export { setShowSeed } from './src/lib/rng.ts';", resolveDir: '.', loader: 'ts' },
+  bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
+});
+const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed } = await import(`../${out}`);
 
-// The field draws from Math.random (the seeded generator may take it over;
-// the claims below do not care which, only that a run can be repeated).
-const seed = (s) => { Math.random = () => (s = (s * 16807) % 2147483647) / 2147483647; };
+// The field draws from the show's seeded `plate.beads` stream (lib/rng.ts),
+// so a run is repeated by running the show on the same seed, as the app would.
+const seed = (s) => setShowSeed(s);
 
 // The app's own grid (GRID_SIZE in LiquidVisualizer.tsx) and mask size, so
 // the pixel thresholds below are the ones the plate is drawn at.
@@ -84,12 +87,17 @@ function crowd(drops, { palette = FILLMORE, frames = 1200, s = 4242 } = {}) {
   Pinned, not compared with itself. The two runs below both use this code,
   so they could agree while both had drifted from the rings; the fingerprint
   is of the same crowded run on the rings' own `beads.ts` from before drops
-  existed (main at 6c03494), every bead's x, y and r as float64 through
-  FNV-1a. If a change to the beads is *meant* to move the rings (seeding
-  their random draws, say), this is the number that change re-pins, and says
-  why in the same commit.
+  existed, every bead's x, y and r as float64 through FNV-1a. If a change to
+  the beads is *meant* to move the rings (seeding their random draws, say),
+  this is the number that change re-pins, and says why in the same commit.
+
+  Re-pinned once, for exactly that: #153 moved every draw the beads make
+  from Math.random to the show's seeded `plate.beads` stream, so the same
+  run lays a different carpet. 822d175a:337 was main at 6c03494 with
+  Math.random seeded here; c927327f:336 is main at 38fd0a8 (after #153, still
+  without drops) on show seed 4242, computed from that file, not this one.
 */
-const RINGS_FINGERPRINT = '822d175a:337';
+const RINGS_FINGERPRINT = 'c927327f:336';
 const fingerprint = (bs) => {
   const f = new Float64Array(bs.length * 3);
   bs.forEach((b, i) => { f[3 * i] = b.x; f[3 * i + 1] = b.y; f[3 * i + 2] = b.r; });
@@ -199,6 +207,30 @@ const clusterStats = (fld, withColour) => {
   check('one cluster of drops still spans a 6:1 range of sizes', dropsC.range >= 6,
     `${dropsC.range.toFixed(1)}:1 across ${dropsC.size} touching drops (rings, the control: ${ringsC.range.toFixed(1)}:1 across ${ringsC.size})`);
   check('and is more than one colour, read from the mask', dropsC.colours >= 3, `${dropsC.colours} of the palette's ${FILLMORE.length}`);
+}
+
+// ── No holes in the crowd ────────────────────────────────────────────
+/*
+  Every pixel well inside some drop's circle (half a pixel in from its
+  round edge, clear of the antialiasing) belongs to a drop. The walls are
+  clamped off each centre, and with the clamp on, three or four drops
+  pressed together leave a triangle past every wall that nobody claims:
+  the plate showed through the middle of a crowd, and a passenger drawn in
+  one was how this was found.
+*/
+{
+  let holes = 0, inside = 0;
+  for (const b of beads) {
+    const R = Math.max(1, b.r * K), x0 = b.x * K, y0 = b.y * K;
+    for (let y = Math.max(0, Math.floor(y0 - R)); y <= Math.min(S - 1, Math.ceil(y0 + R)); y++) {
+      for (let x = Math.max(0, Math.floor(x0 - R)); x <= Math.min(S - 1, Math.ceil(x0 + R)); x++) {
+        if (Math.hypot(x + 0.5 - x0, y + 0.5 - y0) > R - 0.5) continue;
+        inside++;
+        if (owner(x, y) < 0) holes++;
+      }
+    }
+  }
+  check('no pixel inside a drop is left to nobody', inside > 10000 && holes === 0, `${holes} of ${inside}`);
 }
 
 // ── Droplets round the big drops ─────────────────────────────────────

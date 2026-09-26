@@ -10,6 +10,8 @@
  * they are drawn as a mask texture (hundreds of them, too many for
  * uniforms) that the shader reads for the rim and the interior.
  */
+import { makeRng, showSeed, stream, type Rng } from './rng';
+
 export interface Bead {
   x: number;   // logical grid cells
   y: number;
@@ -111,8 +113,18 @@ export class BeadField {
   private dropOwn: Float32Array | null = null;
   private dropIds: Int32Array | null = null;
 
-  /** A per-population offset for the patch field, so every plate clusters differently. */
-  private patchSeed = Math.random() * 1000;
+  /**
+   * A per-population offset for the patch field, so every plate clusters differently.
+   *
+   * The first one is drawn from a generator of its own, keyed on the show's
+   * seed, and not from `rng`. The visualizer builds this object as
+   * `useRef(new BeadField(…))`, which constructs one on every React render
+   * and throws all but the first away; a draw here from the shared stream
+   * would move the beads' sequence once per render, and how often React
+   * renders is nothing a replay can reproduce. `npm run seed` builds one and
+   * checks the stream did not move.
+   */
+  private patchSeed = makeRng(showSeed(), 'plate.beads', 'opening').float() * 1000;
 
   /*
     The crowding step's scratch, kept from one step to the next (S13,
@@ -126,9 +138,14 @@ export class BeadField {
   private readonly spareLists: Bead[][] = [];
   private readonly gone = new Set<Bead>();
 
-  constructor(private readonly grid: number) {}
+  /**
+   * `rng` is where every bead's size, place, wander and merge comes from:
+   * the show's `plate.beads` stream unless a check hands in its own, so the
+   * same seed lays the same carpet (lib/rng.ts, `npm run seed`).
+   */
+  constructor(private readonly grid: number, private readonly rng: Rng = stream('plate.beads')) {}
 
-  clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = Math.random() * 1000; }
+  clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = this.rng.float() * 1000; }
 
   /**
    * The look's colours. Held, not applied: each drop eases toward its slot in
@@ -196,13 +213,13 @@ export class BeadField {
       // before so the carpet is not one size.
       // Small beads span four to one in diameter within a patch, as in the
       // reference; the big lenses are a tail on top.
-      const u = Math.random();
-      const r = (Math.random() < 0.8 ? 0.45 + Math.random() * Math.random() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
-      let x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
+      const u = this.rng.float();
+      const r = (this.rng.float() < 0.8 ? 0.45 + this.rng.float() * this.rng.float() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
+      let x = 4 + this.rng.float() * (N - 8), y = 4 + this.rng.float() * (N - 8);
       if (density) {
         let best = density(x, y);
         for (let t = 0; t < 3; t++) {
-          const px = 4 + Math.random() * (N - 8), py = 4 + Math.random() * (N - 8);
+          const px = 4 + this.rng.float() * (N - 8), py = 4 + this.rng.float() * (N - 8);
           const d = density(px, py);
           if (d > best) { best = d; x = px; y = py; }
         }
@@ -210,12 +227,12 @@ export class BeadField {
       // Patches: none where the field is zero, dense where it is high, and
       // packed tighter there (the crowding step keeps them from overlapping).
       const p = this.patchField(x, y);
-      if (p <= 0 || Math.random() > p) continue;
+      if (p <= 0 || this.rng.float() > p) continue;
       const gap = 1.3 - 0.3 * p;
       let ok = true;
       for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * gap) { ok = false; break; } }
       if (ok) {
-        const seed = Math.random();
+        const seed = this.rng.float();
         const c = this.drops > 0 ? this.slotColour(seed) : undefined;
         this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]] } : { x, y, r, age: 0, seed });
         this.dirty = true;
@@ -258,11 +275,11 @@ export class BeadField {
     const rMax = hosts.reduce((m, b) => Math.max(m, b.r), 0);
     let tries = 0;
     while (have < target && tries++ < target * 8) {
-      const host = hosts[Math.floor(Math.random() * hosts.length)];
-      if (Math.random() > (host.r / rMax) ** 2) continue;
-      const u = Math.random();
+      const host = hosts[Math.floor(this.rng.float() * hosts.length)];
+      if (this.rng.float() > (host.r / rMax) ** 3) continue;
+      const u = this.rng.float();
       const r = (0.35 + u * u * 0.55) * sizeScale * (N / 192);
-      const a = Math.random() * Math.PI * 2;
+      const a = this.rng.float() * Math.PI * 2;
       const d = host.r + r + 0.05;
       const x = host.x + Math.cos(a) * d, y = host.y + Math.sin(a) * d;
       if (x < 2 || y < 2 || x > N - 2 || y > N - 2) continue;
@@ -273,7 +290,7 @@ export class BeadField {
         if (dx * dx + dy * dy < (b.r + r) * (b.r + r)) { ok = false; break; }
       }
       if (!ok) continue;
-      const seed = Math.random();
+      const seed = this.rng.float();
       const c = this.slotColour(seed);
       this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]], tiny: true } : { x, y, r, age: 0, seed, tiny: true });
       have++; this.dirty = true;
@@ -300,8 +317,8 @@ export class BeadField {
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
       // Heavier than the dye: they lag the flow and drift little on their own.
-      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + (Math.random() - 0.5) * 0.15;
-      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + (Math.random() - 0.5) * 0.15;
+      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + this.rng.centred() * 0.15;
+      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + this.rng.centred() * 0.15;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
     }
@@ -427,7 +444,7 @@ export class BeadField {
           // own middle to a neighbour.
           const smaller = b.r < o.r ? b : o, larger = smaller === b ? o : b;
           const takes = !smaller.tiny || larger.tiny;
-          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && Math.random() < 0.02) || (larger.tiny && d < touch * 0.6))) {
+          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < 0.02) || (larger.tiny && d < touch * 0.6))) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
@@ -471,6 +488,30 @@ export class BeadField {
     for (const list of buckets.values()) { list.length = 0; spare.push(list); }
     buckets.clear();
     gone.clear();
+    /*
+      Last, a droplet the crowd has pushed inside a drop's rim is put back
+      on it. Left there, the wall the mask draws between the two is a
+      straight line through the big drop rather than round the droplet, and
+      everything past it the droplet does not cover belongs to nobody: a
+      hole in the drop (npm run drops found passengers in two). Done after
+      the pushing, since a push from a third drop could put it back inside
+      within the same step. Nothing to do without droplets, so the rings
+      never come here.
+    */
+    if (bs.some((b) => b.tiny)) {
+      for (const t of bs) {
+        if (!t.tiny) continue;
+        for (const o of bs) {
+          if (o.tiny || o === t) continue;
+          const dx = t.x - o.x, dy = t.y - o.y;
+          if (Math.abs(dx) > o.r || Math.abs(dy) > o.r) continue;
+          const d = Math.hypot(dx, dy);
+          if (d >= o.r) continue;
+          const k = (o.r + t.r * 0.6) / Math.max(d, 1e-3);
+          t.x = o.x + (d > 1e-3 ? dx : t.r) * k; t.y = o.y + (d > 1e-3 ? dy : 0) * k;
+        }
+      }
+    }
     for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
     this.dirty = true;
   }
@@ -608,6 +649,9 @@ export class BeadField {
  * drop owns the pixel, which is as far as a bilinear read reaches: the
  * plate's read at a rim never mixes a drop with the black around it.
  */
+/** Pixels inside a drop's circle but past one of its walls (see the holes in `rasterDrops`), and their list, kept between calls. */
+let holes = new Uint8Array(0);
+let holeList = new Int32Array(0);
 export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out: Uint8ClampedArray, own: Float32Array, ids: Int32Array, amount = 1): void {
   const W = S * 2;
   // Opaque black everywhere: alpha stays 255 so the upload never divides a
@@ -615,6 +659,9 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
   new Uint32Array(out.buffer, out.byteOffset, W * S).fill(0xff000000);
   own.fill(0);
   ids.fill(0);
+  if (holes.length !== S * S) { holes = new Uint8Array(S * S); holeList = new Int32Array(S * S); }
+  holes.fill(0);
+  let nHoles = 0;
   const k = S / grid;
   const n = beads.length;
   const cx = new Float32Array(n), cy = new Float32Array(n), cr = new Float32Array(n);
@@ -706,6 +753,8 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
         const p = py * S + px;
         const o = (py * W + px) * 4, oc = o + S * 4;
         if (cov <= 0) {
+          // Inside this drop's circle but past one of its walls: see below.
+          if (wall <= 0 && d < R && !holes[p]) { holes[p] = 1; holeList[nHoles++] = p; }
           // The colour's halo, where nothing owns the pixel.
           if (own[p] === 0 && edge > -1) { out[oc] = c0; out[oc + 1] = c1; out[oc + 2] = c2; }
           continue;
@@ -720,7 +769,37 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
         out[oc] = c0; out[oc + 1] = c1; out[oc + 2] = c2;
       }
     }
-    // The drop it holds: its own dome and rim, standing inside this one.
+  }
+  /*
+    Holes. Each pair of drops meets along one wall, clamped to stay a third
+    of a radius from either centre, and with the clamp on, the walls of three
+    or four drops pressed together no longer meet in one point: a small drop
+    squeezed between four big ones left a triangle past every wall that no
+    drop claimed, the plate showing through the middle of the crowd, and
+    `npm run drops` found a passenger drawn in one. A pixel inside some drop's
+    circle that nobody owns takes its neighbour's, twice over, which closes
+    the triangles (a pixel or two across) without moving any wall.
+  */
+  for (let pass = 0; pass < 2; pass++) {
+    for (let h = 0; h < nHoles; h++) {
+      const p = holeList[h];
+      if (ids[p] !== 0) continue;
+      const x = p % S, y = (p - x) / S;
+      const q = x + 1 < S && ids[p + 1] ? p + 1 : x > 0 && ids[p - 1] ? p - 1
+        : y + 1 < S && ids[p + S] ? p + S : y > 0 && ids[p - S] ? p - S : -1;
+      if (q < 0) continue;
+      const o = (y * W + x) * 4, oq = ((q - (q % S)) / S * W + (q % S)) * 4;
+      for (let c = 0; c < 3; c++) { out[o + c] = out[oq + c]; out[o + S * 4 + c] = out[oq + S * 4 + c]; }
+      own[p] = own[q]; ids[p] = ids[q];
+    }
+  }
+  // The drops they hold, each its own dome and rim standing inside its host,
+  // drawn once every pixel has its owner.
+  for (let i = 0; i < n; i++) {
+    const b = beads[i];
+    if (!Number.isFinite(cx[i]) || !Number.isFinite(cy[i]) || !Number.isFinite(cr[i])) continue;
+    const x0 = cx[i], y0 = cy[i];
+    const ringA = Math.min(1, b.age / 0.6) * (0.8 + 0.2 * b.seed);
     const inn = b.inner;
     if (inn && Number.isFinite(inn.dx) && Number.isFinite(inn.dy)) {
       // Dissolving: the passenger narrows to nothing over its life. Never

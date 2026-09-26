@@ -497,6 +497,8 @@ export function parseMidiMap(text: string): MidiMap {
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
     (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
+    // The fallback id below is unseeded on purpose (`npm run seed` allows it):
+    // a name for a loaded binding, never on the plate.
     .map(b => ({
       ...b,
       target: onTodaysTravel(b.target),
