@@ -214,6 +214,17 @@ try {
   await settle(700);
   await snap('finger1');
   const fa = await measure('finger0', f0p), fs = await measure('stroked', f0p), fb = await measure('finger1', f0p);
+  /*
+    And the plate left alone again after the stroke. What the plate does on
+    its own after a pool is laid swings from +29 to +139 between runs, and
+    one window before the stroke is a single reading of that: a stroke that
+    moved 576 -> 766 against +49 failed by one unit (main's #146 deploy) on
+    runs where the same code passed. Bracketed, the slack is the larger of
+    what the plate did alone before and after; a Finger that makes dye still
+    has to beat both.
+  */
+  const fIdleAfter = await idleChange(A, 3800);
+  const fDrift = Math.abs(fIdle) >= Math.abs(fIdleAfter) ? fIdle : fIdleAfter;
   const moved = Math.hypot(fs.cx - fa.cx, fs.cy - fa.cy);
   const drift = Math.hypot(fb.cx - fs.cx, fb.cy - fs.cy);
   // Toward B on the plate: B's grid point less A's.
@@ -224,8 +235,8 @@ try {
   // The plate's own change over the same time is part of the slack, as for
   // the Press below: it is measured once, and it moved by +68 on a run where
   // the stroke landed 82 under it against an allowance of 80.
-  check('and adds none', Math.abs((fb.total - fa.total) - fIdle) < 0.15 * fa.total + 5 + Math.abs(fIdle),
-    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} with the plate left alone as long`);
+  check('and adds none', Math.abs((fb.total - fa.total) - fDrift) < 0.15 * fa.total + 5 + Math.abs(fDrift),
+    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after with the plate left alone as long`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
 
