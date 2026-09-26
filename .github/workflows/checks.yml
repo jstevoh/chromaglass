@@ -90,6 +90,9 @@ jobs:
       # one says why, and "how it meets the others" agrees with the shelf.
       - name: The liquids file
         run: npm run liquidfile
+      # A popped bubble closes back into the liquid, round, not into blocks.
+      - name: The popped bubbles
+        run: npm run pops
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.

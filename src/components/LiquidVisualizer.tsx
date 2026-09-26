@@ -25,6 +25,7 @@ import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
+import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -1105,34 +1106,10 @@ class FluidSimulation {
         }
       }
       if (!(mass > 1e-4)) continue;
-      // The annulus the mass lands in: just outside the rim, a third of a
-      // radius wide, which is about what the references show as the bright
-      // ring around a bubble sitting in dye.
-      const rIn = R * 1.02, rOut = R * 1.38;
-      const cells: number[] = [];
-      const yl = Math.max(0, Math.floor(b.y - rOut)), yh = Math.min(N - 1, Math.ceil(b.y + rOut));
-      const cxl = Math.max(0, Math.floor(b.x - rOut)), cxh = Math.min(N - 1, Math.ceil(b.x + rOut));
-      for (let y = yl; y <= yh; y++) {
-        for (let x = cxl; x <= cxh; x++) {
-          const dd = Math.hypot(x - b.x, y - b.y);
-          if (dd < rIn || dd > rOut) continue;
-          cells.push(x + y * N);
-        }
-      }
-      if (!cells.length) continue;
-      /*
-        Deposited in the mirror's own log-space rather than through
-        `addDensity`, which takes a colour and takes its log. Going out to a
-        colour and back in would lose the mix: the absorptions here are
-        already the geometric-mean form the plate stores, so the ring keeps
-        the colour of the dye it came from, whatever was mixed into it.
-      */
-      const w = 1 / cells.length;
-      this.dirty = true;
-      for (const i of cells) {
-        this.density[i] += mass * w;
-        this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
-      }
+      // Into the ring just outside the rim (bubbleDye.ts), in the mirror's
+      // own log-space rather than through `addDensity`, which takes a colour
+      // and takes its log: going out to a colour and back would lose the mix.
+      if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.dirty = true;
     }
     this.fillPoppedHoles(packed, count, dye, N);
     if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
@@ -1182,6 +1159,10 @@ class FluidSimulation {
    * That conserves by construction, stops itself at the right moment, and
    * needs nothing remembered but where the bubbles were last frame.
    */
+  private dyeTarget(): DyeTarget {
+    return { density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB, mul: this.mul };
+  }
+
   private fillPoppedHoles(packed: Float32Array, count: number, dye: Float32Array, N: number): void {
     if (this.prevCount <= 0) return;
     for (let k = 0; k < this.prevCount; k++) {
@@ -1201,58 +1182,9 @@ class FluidSimulation {
       }
       if (alive) continue;
 
-      // The hole, and the liquid around it the fill draws from.
-      const disc: number[] = [], ring: number[] = [];
-      /*
-        Tight, on the ring the displacement was laid into.
-
-        Reaching wider was tried and is worse — 24-29% of the surroundings
-        against 48-53% — because it averages the enriched ring together with
-        ordinary liquid, so the level the fill equalises toward drops and
-        less moves. The dye is in the ring; that is where to get it.
-      */
-      const rOut = R * 1.45;
-      const yl = Math.max(0, Math.floor(y - rOut)), yh = Math.min(N - 1, Math.ceil(y + rOut));
-      const xl = Math.max(0, Math.floor(x - rOut)), xh = Math.min(N - 1, Math.ceil(x + rOut));
-      for (let j = yl; j <= yh; j++) {
-        for (let i = xl; i <= xh; i++) {
-          const d = Math.hypot(i - x, j - y);
-          if (d <= R) disc.push(i + j * N);
-          else if (d <= rOut) ring.push(i + j * N);
-        }
-      }
-      if (disc.length === 0 || ring.length === 0) continue;
-
-      let discMass = 0, ringMass = 0, aR = 0, aG = 0, aB = 0;
-      for (const i of disc) discMass += dye[i * 4 + 3];
-      for (const i of ring) {
-        const i4 = i * 4;
-        ringMass += dye[i4 + 3];
-        aR += dye[i4]; aG += dye[i4 + 1]; aB += dye[i4 + 2];
-      }
-      const discMean = discMass / disc.length, ringMean = ringMass / ring.length;
-      if (!(ringMean > discMean + 1e-4) || !(ringMass > 1e-4)) continue;
-
-      /*
-        A rate, not a jump. The ring collapses over a moment rather than
-        snapping shut, and a fraction each refresh also means a mis-matched
-        bubble — one that moved further in a frame than half its radius —
-        costs a nudge rather than a hole filled under a live bubble.
-      */
-      const per = (ringMean - discMean) * 0.35;
-      const moved = Math.min(per * disc.length, ringMass * 0.5);
-      if (!(moved > 1e-5)) continue;
-      const add = moved / disc.length;
-      const colR = aR / ringMass, colG = aG / ringMass, colB = aB / ringMass;
+      // One pass of the ring falling back in (bubbleDye.ts).
+      if (!(fillHole(this.dyeTarget(), dye, N, x, y, R) > 0)) continue;
       this.dirty = true;
-      for (const i of disc) {
-        this.density[i] += add;
-        this.densityR[i] += colR * add; this.densityG[i] += colG * add; this.densityB[i] += colB * add;
-      }
-      // And taken out of the ring, through the multiplicative channel that
-      // exists for exactly this: dye removed rather than dye added.
-      const keepRing = Math.max(0, 1 - moved / ringMass);
-      for (const i of ring) this.mul[i] *= keepRing;
       /*
         And keep this hole on the books while it is still worth filling. The
         deficit shrinks every pass, so this drops out on its own — the count
