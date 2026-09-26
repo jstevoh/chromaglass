@@ -61,7 +61,7 @@ export function AddToSetSheet({ looks, saved, sequences, count, onAdd, onImport,
 
   return (
     <Sheet title="Add to the set" onClose={onClose} width={560} height={560} testId="add-to-set">
-      <div className="flex h-full flex-col gap-3 p-5">
+      <div className="flex h-full min-w-0 flex-1 flex-col gap-3 p-5">
         <Segmented
           value={tab}
           options={[['look', 'Looks'], ['saved', 'Saved'], ['sequence', 'Sequences'], ['file', 'File']] as const}
