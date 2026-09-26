@@ -634,12 +634,23 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
+  /*
+    A move not yet handed to the GPU. The reading to wait for was counted
+    from the move, two copies on, on the grounds that the deltas go across at
+    the next step. But a frame can run no step at all (the loop steps at its
+    own rate), and the copies go on being issued once a frame while the move
+    waits on the CPU, so two on could still be a reading from before it: the
+    Finger read dye it had already carried, put it down again, and the plate
+    gained (CI: 327 -> 569 against +75 left alone, on a commit that did not
+    touch it). So the count starts when the deltas actually go: the first
+    copy issued after that flush is submitted after it, and holds the move.
+  */
+  private dyeMovePending = false;
   private dyeMirrorCurrent(): boolean {
-    return !!this.gpu && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
+    return !!this.gpu && !this.dyeMovePending && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
   }
   private dyeMoved(): void {
-    // The next copy issued may be taken before this step's deltas are flushed, so the one after it.
-    if (this.gpu) this.dyeMoveAfter = this.gpu.rbDyeIssued + 2;
+    if (this.gpu) this.dyeMovePending = true;
   }
   private rimSeq = -1;
   /*
@@ -776,6 +787,8 @@ class FluidSimulation {
     }
     this.gpu = gpu;
     gpu.clear();
+    // Its readings count from nothing again, and whatever was pending went with the last solver.
+    this.dyeMoveAfter = 0; this.dyeMovePending = false;
     this.keepSeed();
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
@@ -860,6 +873,7 @@ class FluidSimulation {
     this.pressure.fill(0);
     this.mul.fill(1);
     this.dirty = false;
+    this.dyeMovePending = false;
   }
 
   /** Once per rendered frame: refresh the readback the CPU-side readers use. */
@@ -917,6 +931,7 @@ class FluidSimulation {
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
     gpu.applyDeltas(da, va, this.mul, dt);
+    if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
@@ -1339,6 +1354,7 @@ class FluidSimulation {
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
+    this.dyeMovePending = false;
     this.gpu?.clear();
   }
 
