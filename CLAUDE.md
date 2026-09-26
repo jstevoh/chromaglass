@@ -25,7 +25,7 @@ owner's eyes on a real GPU.
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `particles`, `derive`) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `particles`, `derive`) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving` fail or pass vacuously here |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
@@ -45,7 +45,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`) | `shelf`, `music` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
-| `scripts/watch.mjs` | `npm run watch -- --selftest` |
+| `scripts/watch.mjs` | `npm run watch -- --selftest`; `moving` and `gig` import it (Mac only) |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |

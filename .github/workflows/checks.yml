@@ -264,6 +264,15 @@ jobs:
       - name: The wall
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run wall
+      # ffmpeg is not on the macOS image; imageio-ffmpeg is a static build that
+      # scripts/watch.mjs finds by itself. Homebrew's Python refuses a plain
+      # pip install (PEP 668), hence the second try.
+      - name: ffmpeg, to watch a take
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+      - name: The show keeps moving
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/moving.mjs
 
   # The one name the rest of the repository knows this stage by: green only
   # when every shard is.

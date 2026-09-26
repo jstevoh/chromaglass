@@ -67,21 +67,28 @@ import zlib from 'node:zlib';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const argv = process.argv.slice(2);
-const opt = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false };
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i], v = () => argv[++i];
-  if (a === '--out') opt.out = v();
-  else if (a === '--frames') opt.frames = Math.max(1, Math.min(60, Number(v()) || 24));
-  else if (a === '--per-sheet') opt.perSheet = Math.max(1, Math.min(30, Number(v()) || 12));
-  else if (a === '--rate') opt.rate = Number(v()) || 0;
-  else if (a === '--from') opt.from = Number(v()) || 0;
-  else if (a === '--to') opt.to = Number(v()) || 0;
-  else if (a === '--at') opt.at = v().split(',').map(Number).filter(Number.isFinite);
-  else if (a === '--selftest') opt.selftest = true;
-  else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
-  else if (!opt.input) opt.input = a;
-  else { console.error(`watch: unexpected argument ${a}`); process.exit(2); }
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null };
+const opt = { ...DEFAULTS };
+
+/** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
+class WatchError extends Error { constructor(message, code = 1) { super(message); this.code = code; } }
+const fail = (message, code) => { throw new WatchError(message, code); };
+
+function parseArgs(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i], v = () => argv[++i];
+    if (a === '--out') opt.out = v();
+    else if (a === '--frames') opt.frames = Math.max(1, Math.min(60, Number(v()) || 24));
+    else if (a === '--per-sheet') opt.perSheet = Math.max(1, Math.min(30, Number(v()) || 12));
+    else if (a === '--rate') opt.rate = Number(v()) || 0;
+    else if (a === '--from') opt.from = Number(v()) || 0;
+    else if (a === '--to') opt.to = Number(v()) || 0;
+    else if (a === '--at') opt.at = v().split(',').map(Number).filter(Number.isFinite);
+    else if (a === '--selftest') opt.selftest = true;
+    else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
+    else if (!opt.input) opt.input = a;
+    else fail(`unexpected argument ${a}`, 2);
+  }
 }
 
 function printHelp() {
@@ -107,8 +114,8 @@ function findYtDlp() {
 
 const INSTALL = 'Install: `brew install ffmpeg yt-dlp` on a Mac; in a cloud session `python3 -m pip install yt-dlp imageio-ffmpeg`.';
 
-const FF = findFfmpeg();
-if (!FF) { console.error(`watch: no ffmpeg found. ${INSTALL}`); process.exit(2); }
+let FF_ = null;
+const ff = () => (FF_ ??= findFfmpeg() ?? fail(`no ffmpeg found. ${INSTALL}`, 2));
 
 // ─── fetching a URL ──────────────────────────────────────────────────────────
 
@@ -119,14 +126,14 @@ if (!FF) { console.error(`watch: no ffmpeg found. ${INSTALL}`); process.exit(2);
  */
 function download(url, dir) {
   const y = findYtDlp();
-  if (!y) { console.error(`watch: a URL needs yt-dlp. ${INSTALL}`); process.exit(2); }
+  if (!y) fail(`a URL needs yt-dlp. ${INSTALL}`, 2);
   const help = spawnSync(y[0], [...y.slice(1), '--help'], { encoding: 'utf8' }).stdout ?? '';
   const args = [
     ...y.slice(1), '--no-playlist', '--write-info-json', '--no-progress',
     // Up to 1080 on the short side: `res` sorts by the smaller dimension, so a
     // vertical Short gets 1080×1920 and not the 608×1080 a height cap picks.
     '-f', 'bv*+ba/b', '-S', 'res:1080', '--merge-output-format', 'mkv',
-    '--ffmpeg-location', FF, '-o', path.join(dir, 'source.%(ext)s'),
+    '--ffmpeg-location', ff(), '-o', path.join(dir, 'source.%(ext)s'),
   ];
   // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
   if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
@@ -136,10 +143,17 @@ function download(url, dir) {
   const files = fs.readdirSync(dir).filter(f => f.startsWith('source.') && !/\.(json|part|ytdl)$/.test(f));
   if (r.status !== 0 || !files.length) {
     const err = (r.stderr || '').trim().split('\n').filter(l => /ERROR/.test(l)).join('\n') || (r.stderr || '').slice(-600);
-    console.error(err);
     if (/not a bot|Sign in to confirm|HTTP Error 403/.test(err)) {
-      console.error([
+      const thumbs = youtubeThumbs(url, dir);
+      fail([
+        err,
         '',
+        ...(thumbs.length ? [
+          `The four stills YouTube serves to anyone came through instead (not the video: a cover`,
+          `frame and three frames from about a quarter, half and three quarters in):`,
+          ...thumbs.map(f => `  ${f}`),
+          '',
+        ] : []),
         'watch: YouTube refused the video to this machine. It does that to cloud',
         'addresses; it is not the environment\'s network setting. Ways round it:',
         '  1. run this on the owner\'s Mac (Remote Control), where it works as is;',
@@ -147,10 +161,32 @@ function download(url, dir) {
         '  3. look for a mirror (archive.org keeps many YouTube uploads).',
       ].join('\n'));
     }
-    process.exit(1);
+    fail(err);
   }
   const file = path.join(dir, files[0]);
   return { file, info: readInfo(file) };
+}
+
+/**
+ * YouTube's thumbnails for a video id: `maxresdefault` (the cover, 1280×720
+ * when there is one) and `hq1`–`hq3`, frames YouTube picked from about 25%,
+ * 50% and 75% of the way in. They come from i.ytimg.com, which does not ask
+ * a cloud address to prove it is not a bot, so they arrive when the video
+ * itself is refused. Four frames are not a watch, but they are the look.
+ * Through curl, not fetch: curl honours the HTTPS_PROXY a cloud session's
+ * traffic goes through, and Node's fetch does not.
+ */
+function youtubeThumbs(url, dir) {
+  const id = /(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/.exec(url)?.[1];
+  if (!id) return [];
+  const got = [];
+  for (const name of ['maxresdefault', 'hq1', 'hq2', 'hq3']) {
+    const f = path.join(dir, `youtube-${id}-${name}.jpg`);
+    const r = spawnSync('curl', ['-sSfL', '-o', f, `https://i.ytimg.com/vi/${id}/${name}.jpg`], { timeout: 30_000 });
+    if (r.status === 0 && fs.existsSync(f) && fs.statSync(f).size > 2000) got.push(f);
+    else fs.rmSync(f, { force: true });
+  }
+  return got;
 }
 
 /** A file fetched earlier keeps its page's description beside it. */
@@ -165,12 +201,12 @@ function readInfo(file) {
 // ─── probing and decoding ────────────────────────────────────────────────────
 
 function probe(file) {
-  const r = spawnSync(FF, ['-hide_banner', '-i', file], { encoding: 'utf8' });
+  const r = spawnSync(ff(), ['-hide_banner', '-i', file], { encoding: 'utf8' });
   const s = r.stderr ?? '';
   const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s);
   const fps = /Video:.*?(\d+(?:\.\d+)?) fps/.exec(s) ?? /Video:.*?(\d+(?:\.\d+)?) tbr/.exec(s);
   const size = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(s);
-  if (!size) { console.error(`watch: no video stream in ${file}\n${s.slice(-400)}`); process.exit(1); }
+  if (!size) fail(`no video stream in ${file}\n${s.slice(-400)}`);
   return {
     duration: d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : null,
     fps: fps ? +fps[1] : null,
@@ -195,7 +231,7 @@ function seekArgs() {
  */
 function decode(vf, onFrame) {
   return new Promise((resolve, reject) => {
-    const p = spawn(FF, ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', vf,
+    const p = spawn(ff(), ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', vf,
       '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1']);
     let err = '', w = 0, h = 0, pending = [], buf = Buffer.alloc(0), n = 0;
     const feed = chunk => {
@@ -218,7 +254,7 @@ function decode(vf, onFrame) {
 /** Mono 8 kHz samples, for loudness. */
 function decodeAudio() {
   return new Promise((resolve, reject) => {
-    const p = spawn(FF, ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1']);
+    const p = spawn(ff(), ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1']);
     const chunks = []; let err = '';
     p.stdout.on('data', d => chunks.push(d));
     p.stderr.on('data', d => (err += d));
@@ -290,7 +326,7 @@ async function watch() {
   if (/^https?:\/\//.test(opt.input)) ({ file: opt.file, info } = download(opt.input, out));
   else {
     opt.file = path.resolve(opt.input);
-    if (!fs.existsSync(opt.file)) { console.error(`watch: no such file ${opt.file}`); process.exit(2); }
+    if (!fs.existsSync(opt.file)) fail(`no such file ${opt.file}`, 2);
     info = readInfo(opt.file);
   }
   const pr = probe(opt.file);
@@ -304,7 +340,12 @@ async function watch() {
   // Pass 1: every sample, small, for the numbers and the slit scan.
   const rows = [], slit = [];
   let prev = null;
-  const { n, w, h } = await decode(`fps=${rate},scale=${aw}:-2:flags=area`, (px, k, W, H) => {
+  // `crop` ({ x, y, w, h } as fractions of the picture) keeps only part of it:
+  // a harness filming the whole page wants the plate, not the desk's meters,
+  // which move with the music whether the plate does or not.
+  const c = opt.crop;
+  const pre = c ? `crop=trunc(iw*${c.w}/2)*2:trunc(ih*${c.h}/2)*2:trunc(iw*${c.x}):trunc(ih*${c.y}),` : '';
+  const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px, k, W, H) => {
     let lum = 0, sat = 0, dark = 0, bright = 0, diff = 0, coloured = 0;
     const hue = new Float64Array(8), hist = new Float32Array(64);
     for (let i = 0, p = 0; i < px.length; i += 3, p++) {
@@ -333,7 +374,7 @@ async function watch() {
     for (let y = 0; y < H; y++) px.copy(col, y * 3, (y * W + (W >> 1)) * 3, (y * W + (W >> 1)) * 3 + 3);
     slit.push(col);
   });
-  if (!n) { console.error('watch: decoded no frames'); process.exit(1); }
+  if (!n) fail('decoded no frames');
   const span = n / rate;
 
   // Loudness over the same window each motion value covers: the motion at
@@ -400,7 +441,7 @@ async function watch() {
   const tw = best.tw - (best.tw % 2), th = Math.round(tw / aspect / 2) * 2;
   const tiles = [];
   const sel = picks.map(k => `eq(n,${k})`).join('+');
-  await decode(`fps=${rate},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
+  await decode(`${pre}fps=${rate},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
   const sheets = [];
   for (let s = 0; s * per < tiles.length; s++) {
     const group = tiles.slice(s * per, (s + 1) * per);
@@ -459,7 +500,7 @@ async function watch() {
   const stills = [];
   for (const t of opt.at) {
     const f = path.join(out, `still-${t.toFixed(2)}s.png`);
-    const r = spawnSync(FF, ['-hide_banner', '-loglevel', 'error', '-ss', String(t), '-i', opt.file, '-frames:v', '1', '-y', f]);
+    const r = spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-ss', String(t), '-i', opt.file, '-frames:v', '1', '-y', f]);
     if (r.status === 0 && fs.existsSync(f)) stills.push(f);
   }
 
@@ -550,7 +591,7 @@ async function makeClip(dir, name, { sec, frame, sound, delay = 0 }) {
   for (let i = 0; i < sec * 8000; i++) { const t = i / 8000 - delay; wav.writeInt16LE(t < 0 ? 0 : Math.round(sound(t)), 44 + i * 2); }
   const wavPath = path.join(dir, `${name}.wav`), clip = path.join(dir, `${name}.webm`);
   fs.writeFileSync(wavPath, wav);
-  const p = spawn(FF, ['-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${SW_}x${SH_}`, '-r', String(SFPS), '-i', 'pipe:0',
+  const p = spawn(ff(), ['-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${SW_}x${SH_}`, '-r', String(SFPS), '-i', 'pipe:0',
     '-i', wavPath, '-c:v', 'libvpx', '-b:v', '2M', '-c:a', 'libvorbis', '-shortest', '-f', 'webm', 'pipe:1'], { stdio: ['pipe', 'pipe', 'inherit'] });
   const file = fs.createWriteStream(clip);
   p.stdout.pipe(file);
@@ -668,12 +709,86 @@ async function selftest() {
   check('C: a cut into fast motion at 2.0 s, none inside it, and the dissolve at 4.0 s once',
     C.cuts.length === 2 && C.cuts[0] === 20 && (C.cuts[1] === 40 || C.cuts[1] === 41), `cuts at ${ts(C)}`);
 
+  // C stands still twice: the grey square until the cut at 2.0 s (2.0 s
+  // still), and the blue from 4.1 s to the end at 6.0 (1.9 s). At the default
+  // two seconds the first is a freeze and the second is not; at 1.5 both are.
+  // A never stands still for a second and a half.
+  const fz2 = freezes(C), fz = freezes(C, { minSeconds: 1.5 }), fzA = freezes(A, { minSeconds: 1.5 });
+  const near = (x, v) => Math.abs(x - v) < 1e-6;
+  const show = a => a.map(f => `${f.from.toFixed(1)}–${f.to.toFixed(1)} s`).join(', ') || 'none';
+  check('C at the default 2 s: one freeze, 0.0–2.0 s', fz2.length === 1 && near(fz2[0].from, 0) && near(fz2[0].to, 2), show(fz2));
+  check('C at 1.5 s: that and 4.1–6.0 s; A: none', fz.length === 2 && near(fz[1].from, 4.1) && near(fz[1].to, 6) && !fzA.length,
+    `C: ${show(fz)}; A: ${show(fzA)}`);
+
   const bad = checks.filter(v => !v).length;
   console.log(bad ? `\n${bad} FAIL` : '\nall ok');
   fs.rmSync(dir, { recursive: true, force: true });
   process.exit(bad ? 1 : 0);
 }
 
-if (opt.selftest) await selftest();
-else if (!opt.input) { printHelp(); process.exit(2); }
-else await watch();
+/**
+ * For a harness: watch a clip and get the numbers back.
+ *
+ *   import { watchVideo } from './watch.mjs';
+ *   const r = await watchVideo('/tmp/take.webm', { out: '/tmp/take', quiet: true });
+ *   r.rows (one per sample: t, lum, dark, sat, motion, loud, cut), r.cuts, r.sync
+ *
+ * Throws a WatchError with the reason when the clip cannot be read.
+ */
+export async function watchVideo(input, options = {}) {
+  Object.assign(opt, DEFAULTS, options, { input });
+  return watch();
+}
+
+/**
+ * Stretches where the picture stands still: at least `minSeconds` of samples
+ * whose motion is under `below` (mean % change between samples). A light
+ * show that stops is the fault an audience sees first, and the one
+ * `npm run depth` caught as a six-second freeze of the plate; a film of a run
+ * can name it by time.
+ *
+ * Why 0.005 and not "small". A frozen canvas gives the recorder no new frames,
+ * the decoder repeats the last one, and the change is exactly zero; a still
+ * picture through a lossy codec measured 0.000 to 0.002 in the self-test. The
+ * slowest moving plate is orders above that. A bar near the slow plate would
+ * call a calm look a freeze.
+ */
+export function freezes(r, { below = 0.005, minSeconds = 2 } = {}) {
+  const out = [];
+  let start = -1;
+  const rows = r.rows;
+  for (let k = 1; k <= rows.length; k++) {
+    const quiet = k < rows.length && rows[k].motion < below;
+    if (quiet && start < 0) start = k;
+    if (!quiet && start >= 0) {
+      // From the last sample before the stillness to the first that moved
+      // again (or the end of the clip): a picture still from 0.0 until it
+      // changes at 2.0 is two seconds still, not the 1.9 between the first
+      // and last identical samples.
+      const from = rows[start - 1].t, to = k < rows.length ? rows[k].t : rows[k - 1].t + 1 / r.rate;
+      if (to - from >= minSeconds - 1e-9) out.push({ from, to, seconds: to - from });
+      start = -1;
+    }
+  }
+  return out;
+}
+
+export { WatchError };
+
+// Run as a command only when this file is the one node was given: a harness
+// that imports it, or bundles it (gig.mjs goes through esbuild, where
+// import.meta.url is the bundle's own path), must not start a watch.
+const main = !!process.argv[1] && path.basename(process.argv[1]) === 'watch.mjs'
+  && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
+if (main) {
+  try {
+    parseArgs(process.argv.slice(2));
+    if (opt.selftest) await selftest();
+    else if (!opt.input) { printHelp(); process.exit(2); }
+    else await watch();
+  } catch (e) {
+    if (!(e instanceof WatchError)) throw e;
+    console.error(`watch: ${e.message}`);
+    process.exit(e.code);
+  }
+}

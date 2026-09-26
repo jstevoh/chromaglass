@@ -27,11 +27,22 @@ import { installFrameReader, frameOf } from './frame.mjs';
 import { PIN_RANGE, PINNABLE } from '../src/lib/deskPins.ts';
 import { PALETTE } from '../src/constants.ts';
 import { PRESETS } from '../src/presets.ts';
+import { watchVideo, freezes, WatchError } from './watch.mjs';
 
 const PORT0 = Number(process.env.GIG_PORT ?? 4540);
 const LOOK = process.env.GIG_LOOK ?? 'soap-film';
 const MINUTES = Number(process.env.GIG_MINUTES ?? 10);
 const SEED = Number(process.env.GIG_SEED ?? 20260924);
+/*
+  The gig is filmed (GIG_FILM=0 to not), and the film watched afterwards with
+  scripts/watch.mjs. The photographs below are one every two to four seconds,
+  which says what the plate looked like and nothing about what it did between
+  them: a plate that froze for three seconds, or a look change that landed as
+  a jump cut, happens between two photographs. The film has every frame, and
+  its timeline shows ten minutes in one picture.
+*/
+const FILM = process.env.GIG_FILM !== '0';
+const FILM_DIR = process.env.GIG_OUT ?? '/tmp/chromaglass-gig';
 
 let bits = SEED >>> 0;
 const rnd = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
@@ -142,18 +153,28 @@ const bag = actions.flatMap(a => Array(a.weight).fill(a));
 
 const browser = await launchChromium(chromium);
 let died = false;
+let filmed = null, filmT0 = 0, gigT0 = 0, filmCrop = null;
+const done = [];
 try {
-  const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+  const page = await browser.newPage({ viewport: { width: 1060, height: 700 },
+    ...(FILM ? { recordVideo: { dir: FILM_DIR, size: { width: 1060, height: 700 } } } : {}) });
+  filmed = page.video();
+  filmT0 = Date.now();
   await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
   await installFrameReader(page);
   await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
+  // The film is of the whole page; the watch keeps the plate. The desk's
+  // meters move with the band whether the plate does or not.
+  const box = await page.locator('canvas').first().boundingBox().catch(() => null);
+  if (box) filmCrop = { x: box.x / 1060, y: box.y / 700, w: Math.min(1, box.width / 1060), h: Math.min(1, box.height / 700) };
   console.log(`  ${LOOK}, worked for ${MINUTES} minutes (seed ${SEED})\n`);
 
   const log = [];
   const baseline = [];
   let over = 0;
   const until = Date.now() + MINUTES * 60000;
+  gigT0 = Date.now();
   while (Date.now() < until) {
     const a = pick(bag);
     let detail = '';
@@ -179,6 +200,7 @@ try {
     });
     const t = Math.round((MINUTES * 60000 - (until - Date.now())) / 1000);
     log.push({ t, what: `${a.name}: ${detail}`, flat: j.flat, luma: j.luma, rgb: j.rgb, dye: dyeNow.mean, target: dyeNow.target });
+    done.push({ t, what: `${a.name}: ${detail}` });
     if (log.length > 40) log.shift();
 
     if (baseline.length < 14) baseline.push(j.flat);
@@ -251,5 +273,29 @@ try {
     break;
   }
 } finally { await browser.close(); stop(); }
+
+if (filmed) {
+  // Film time is gig time plus the load and the settle before the first action.
+  const lead = (gigT0 - filmT0) / 1000;
+  const before = (tf) => [...done].reverse().find(e => e.t + lead <= tf + 0.5)?.what ?? 'before the first action';
+  try {
+    const file = await filmed.path();
+    const r = await watchVideo(file, { out: FILM_DIR, frames: 24, quiet: true, crop: filmCrop });
+    // Only frames that did not change at all. A plate whose solver stops but
+    // is still drawn changes a little every frame (its grain moves with the
+    // clock), and telling that from a slow plate needs a frozen control to
+    // calibrate against: `npm run moving` has one; a gig does not.
+    const still = freezes(r).filter(f => f.to > lead);
+    console.log(`\n  the film: ${file}\n  timeline: ${r.timeline} (and sheets beside it)`);
+    console.log(`  frames stopped: ${still.length ? '' : 'never for two seconds'}`);
+    for (const f of still) console.log(`    ${(f.from - lead).toFixed(1)}–${(f.to - lead).toFixed(1)} s, after ${before(f.from)}`);
+    const cuts = r.cuts.map(k => r.rows[k].t).filter(t => t > lead);
+    console.log(`  jump cuts: ${cuts.length ? '' : 'none'}`);
+    for (const t of cuts) console.log(`    ${(t - lead).toFixed(1)} s, after ${before(t)}`);
+  } catch (e) {
+    if (!(e instanceof WatchError)) throw e;
+    console.log(`\n  the film was not watched: ${e.message.split('\n')[0]}`);
+  }
+}
 console.log(died ? '\nreproduced' : `\n${MINUTES} minutes of being worked, and it held`);
 process.exit(died ? 1 : 0);

@@ -41,7 +41,10 @@ on its own). On a Mac: `brew install ffmpeg yt-dlp`.
 The page and the list of formats come through, but YouTube refuses the video
 itself to a cloud address ("Sign in to confirm you're not a bot", or a 403).
 That is YouTube, not the environment's network setting, and changing the
-setting does not fix it. In order of preference:
+setting does not fix it. When that happens the tool still saves the four
+stills YouTube serves to anyone (the cover at 1280×720, and three 480×360
+frames from about 25%, 50% and 75% in) and prints their paths: enough for the
+look, nothing about motion. For the video itself, in order of preference:
 
 1. **The owner's Mac.** The same command works there as is; run it through
    Remote Control, or ask the owner to run it and drop the output folder in
@@ -70,6 +73,18 @@ owner's login.
 4. **Big clips.** The `video-watcher` agent reads the sheets in its own context
    and returns prose and numbers; use it when there are several videos, or a
    long one, so the main thread does not fill with images.
+
+## In the QA checks
+
+- **`npm run moving`** (macOS CI, `tools` shard): records the show with the app's
+  own Record button and a band in a box playing, watches the take, and fails
+  if the plate stands still for two seconds or the take is black, silent or
+  short. It prints motion vs loudness without judging it; a threshold waits on
+  runs from the owner's machine. Output in `/tmp/chromaglass-moving`.
+- **`npm run gig`** films the whole worked show (`GIG_FILM=0` to not) and lists
+  every freeze and jump cut with the action done just before it; the timeline
+  is in `/tmp/chromaglass-gig`.
+- From a harness: `import { watchVideo, freezes } from './watch.mjs'`.
 
 ## The app's own output
 
