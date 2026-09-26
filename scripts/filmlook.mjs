@@ -92,7 +92,16 @@ async function scene(labels) {
   const T = 1;
   const r = {};
   const want = (k) => labels.includes(k);
-  const shot = async (k, over, cam) => { if (want(k)) r[k] = Array.from(await lab.render(S, over, cam)); };
+  /*
+    Each render comes back as base64, not as an array of numbers. Thirty-two
+    renders of 400 by 400 are twenty million bytes; handed back as a plain
+    array, Playwright's serialiser builds each number as its own string, and
+    the Mac runner's node (a 2 GB heap) ran out of memory before the first
+    check printed. As base64 it is 27 MB of text, and the node side reads it
+    back as bytes.
+  */
+  const b64 = (a) => { let t = ''; for (let i = 0; i < a.length; i += 0x8000) t += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(t); };
+  const shot = async (k, over, cam) => { if (want(k)) r[k] = b64(Uint8Array.from(await lab.render(S, over, cam))); };
   await shot('bare0', { thinFilm: 0, filmPhysics: 0 }, { ...plate, time: T });
   await shot('bare1', { thinFilm: 0, filmPhysics: 1 }, { ...plate, time: T });
   await shot('film0', { thinFilm: 1, filmPhysics: 0 }, { ...plate, time: T });
@@ -130,14 +139,16 @@ const ALL = ['bare0', 'bare1', 'film0', 'filmHalf', 'film1', 'bare0Later', 'film
   ...CLOCKS.flatMap((k) => ['None', 'Flat', '0', '1'].flatMap((s) => [`plate${s}${k}`, `closeup${s}${k}`]))];
 const AT_ZERO = ['bare0', 'film0', 'plate00', 'closeup00'];
 
+// The scene's renders, from base64 back to bytes (see `shot` in `scene`).
+const bytes = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Buffer.from(v, 'base64')]));
 let m, ref;
 {
   const { page, close } = await openLab();
-  try { m = await page.evaluate(scene, ALL); } finally { await close(); }
+  try { m = bytes(await page.evaluate(scene, ALL)); } finally { await close(); }
 }
 {
   const { page, close } = await openLab({ plugins: [RAINBOW_ONLY], tag: 'rainbow-only' });
-  try { ref = await page.evaluate(scene, [...AT_ZERO, 'film1']); } finally { await close(); }
+  try { ref = bytes(await page.evaluate(scene, [...AT_ZERO, 'film1'])); } finally { await close(); }
 }
 
 const px = (a, i) => [a[i], a[i + 1], a[i + 2]];
