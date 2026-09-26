@@ -24,7 +24,7 @@ seconds, with the band playing, and puts them all on one contact sheet.
   | Chemistry | Neon Coral Reef, Sensual Laboratory |
   | Dye particles | Stardust Collapse |
   | Bubbles | Boiling Point |
-  | Ferrofluid and magnet | Magnet Garden |
+  | Ferrofluid and magnet | Magnet Garden, Ferro Maze, Ferro Paint |
   | Film stock | Home Movie |
   | Curved glasses and depth drag | Clock Glass |
   | Gel wheel | Acid Trip, Oil Wheel |
