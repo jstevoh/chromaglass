@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the layout checked without a GPU
+
+- `npm run layout` asks the show night's layout questions (type size, hit
+  targets, controls painted over at six widths, the mode switch staying put,
+  labelled status dots) in about twenty seconds with no GPU, and runs on the
+  ubuntu job. It shares its measurements with `qa.mjs` (`scripts/layoutProbe.mjs`).
+- `npm run check` runs every check that needs no GPU in about a minute, before
+  a push.
+
 ### Added — the liquids' own physics and chemistry
 
 Each is a setting, off by default (docs/physics-plan.md has the models and
