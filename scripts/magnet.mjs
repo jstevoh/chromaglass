@@ -16,6 +16,9 @@
  *   2. dragging it across the plate carries the ferrofluid with it, measured
  *      as the centre of mass moving toward the hand, against the same plate
  *      left alone for the same time (the flow moves the phase too)
+ *   3. let go of, it stays where the hand left it, rather than going back
+ *      to the middle and taking the ferrofluid with it
+ *   4. and Magnet Across still moves it once the hand has set it down
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
@@ -282,6 +285,83 @@ try {
   check('and dragging it neither makes nor loses more liquid than the plate does alone',
     Math.abs(keptDrag - keptIdle) < 0.08,
     `kept ${(keptDrag * 100).toFixed(0)}% dragged, ${(keptIdle * 100).toFixed(0)}% left alone`);
+
+  /*
+    3. Let go, and the magnet stays where the hand left it.
+
+    Reported by the owner: "I don't like how the magnet draws the ferrofluid
+    back to the center automatically. I want to just control it with the
+    mouse." A quarter of a second after the last touch the solver's magnet
+    went back to the look's own place, the middle of the plate on every
+    look, and the ferrofluid the drag had carried off flowed back after it.
+
+    The look's magnet is put first in the far corner from where the hand
+    will be, so a magnet gone home cannot pass by landing near the hand:
+    the drag above ends wherever the pointer mapping puts 0.85 across, which
+    read 0.43,0.58 in a cloud session, 0.1 from the middle. And the check
+    first asks that the solver really has the magnet in that corner, so a
+    settings write that never reached it cannot pass either. Then the hand
+    presses the magnet down there, holds it, lets go, and two seconds on the
+    check asks what the solver was given: the lead plate's last step, not
+    the hand (which the fix does not change and always said the right
+    place), and not magnetNow, which is bookkeeping written beside the step
+    and could say the right place while the step said another.
+
+    Once let go it is the look's magnet, left where the hand put it: the
+    look's own strength and height, not the hand's firm, low pull, which is
+    the hand pressing it up to the glass.
+  */
+  const clamp = (v) => Math.max(0.05, Math.min(0.95, v));
+  /** What the lead plate's solver was last given, and what the look alone would give it. */
+  const readStep = () => page.evaluate(() => {
+    const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep, s = d.settings, m = d.magnetNow?.();
+    if (!st) return null;
+    return {
+      x: st.magnetX, y: st.magnetY, strength: st.magnetStrength, height: st.magnetHeight, held: !!m?.held,
+      lookStrength: Math.max(0, s.magnetStrength ?? 0),
+      lookHeight: Math.max(0.02, (s.magnetHeight ?? 0.25) * (0.5 + (s.phaseScale ?? 0.4))),
+    };
+  });
+  const fmt = (m) => m ? `${m.x.toFixed(2)},${m.y.toFixed(2)} strength ${m.strength.toFixed(2)} height ${m.height.toFixed(3)}${m.held ? ' (held)' : ''}` : 'unknown';
+  const asLook = (m) => !!m && !m.held && Math.abs(m.strength - m.lookStrength) < 1e-3 && Math.abs(m.height - m.lookHeight) < 1e-3;
+  await page.mouse.move(...at(0.85));
+  const probe = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  const corner = { x: (probe?.x ?? 0.5) > 0.5 ? 0.1 : 0.9, y: (probe?.y ?? 0.5) > 0.5 ? 0.1 : 0.9 };
+  await page.evaluate((c) => Object.assign(window.chromaglassDebug().settings, { magnetX: c.x, magnetY: c.y }), corner);
+  await page.waitForTimeout(1000);
+  const home = await readStep();
+  check('the look\'s own magnet is where the check put it, in the far corner',
+    asLook(home) && Math.hypot(home.x - corner.x, home.y - corner.y) < 0.02,
+    `asked for ${corner.x},${corner.y}; the solver was given ${fmt(home)}`);
+  await page.mouse.down();
+  await page.waitForTimeout(1000);
+  const left = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  await page.mouse.up();
+  await page.waitForTimeout(2000);
+  const letGo = await readStep();
+  const away = left && home ? Math.hypot(clamp(left.x) - home.x, clamp(left.y) - home.y) : 0;
+  const off = left && letGo ? Math.hypot(letGo.x - clamp(left.x), letGo.y - clamp(left.y)) : Infinity;
+  check('let go of, the magnet stays where the hand left it',
+    away > 0.3 && asLook(letGo) && off < 0.02,
+    `the hand left it at ${left ? `${left.x.toFixed(2)},${left.y.toFixed(2)}` : 'nowhere'}, ${away.toFixed(2)} from the look's; ` +
+    `two seconds after letting go the solver was given ${fmt(letGo)} (the look alone: strength ${letGo?.lookStrength.toFixed(2)} height ${letGo?.lookHeight.toFixed(3)})`);
+
+  /*
+    4. And the look can still place it. Magnet Across moved (the slider, a
+    fader, a patch) takes the magnet from where the hand left it, so the
+    sliders are not dead once the tool has been used. This passed before the
+    fix too, by design; it is here so the fix cannot make the sliders dead.
+    The y term is what lets it fail: across can land near where the hand
+    left the magnet, but the corner's y is on the other side of the middle
+    from the hand's, so a magnet still at the hand is 0.4 off in y at least.
+  */
+  const across = corner.x > 0.5 ? 0.3 : 0.7;
+  await page.evaluate((x) => { window.chromaglassDebug().settings.magnetX = x; }, across);
+  await page.waitForTimeout(1000);
+  const placed = await readStep();
+  check('moving Magnet Across takes it from where the hand left it',
+    asLook(placed) && Math.abs(placed.x - across) < 0.02 && Math.abs(placed.y - corner.y) < 0.02,
+    `Magnet Across ${corner.x} → ${across}; the solver was given ${fmt(placed)}`);
 } finally {
   await browser.close();
 }
