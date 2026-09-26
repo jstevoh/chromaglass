@@ -42,6 +42,10 @@
  * analyser's tuning becomes.
  */
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   RENDER_ORIGIN_MS, beginFixedClock, clearShowInterval, clockIsFixed, endFixedClock, showEpochS, showInterval,
   showIntervalCount, showNow, tickFixedClock,
@@ -427,6 +431,8 @@ const sameSamples = (got, want, resolutionUs) => {
   return null;
 };
 
+/** Every file the loop below writes, for ffprobe after it. */
+const probed = [];
 for (const [kind, fps, audioCodec, opts] of [
   ['webm', 60, 'opus', {}],
   ['webm', 30, 'opus', {}],
@@ -439,6 +445,7 @@ for (const [kind, fps, audioCodec, opts] of [
   const label = `${kind.toUpperCase()} ${fps} fps, ${kind === 'webm' ? 'VP9' : audioCodec === 'aac' ? 'H.264' : 'VP9'} + ${audioCodec === 'aac' ? 'AAC' : 'Opus'}${opts.reorder ? ', frames reordered as by B-frames' : ''}`;
   const one = mux(kind, m, fps, audioCodec);
   const two = mux(kind, m, fps, audioCodec);
+  probed.push({ label, kind, fps, audioCodec, bytes: one.bytes, frames: m.frames, packets: m.audio.length, seconds });
   let parsed = null, error = null;
   try { parsed = kind === 'webm' ? readWebm(one.bytes) : readMp4(one.bytes); } catch (e) { error = e.message; }
   check(`${label}: a strict reader accepts it`, !!parsed, error ?? `${one.bytes.length} bytes in ${one.chunks} writes${parsed.boxes ? `; ${parsed.boxes}` : `; ${parsed.clusters} clusters, ${parsed.cuePoints} cues`}`);
@@ -460,6 +467,87 @@ for (const [kind, fps, audioCodec, opts] of [
     check(`${label}: frame durations are 1/${fps} s to the millisecond`, d.every((x) => Math.abs(x - 1e6 / fps) <= 1000), `${Math.min(...d)}–${Math.max(...d)} µs`);
   }
   check(`${label}: the same samples twice are the same bytes`, sha(one.bytes) === sha(two.bytes), sha(one.bytes));
+}
+
+/*
+  A second, independent reader: FFmpeg's.
+
+  The strict reader above was written from the same specifications as the
+  writers, by the same hand, so a misreading of the standard shared by both
+  would pass it. ffprobe is the demuxer most players and editors are built
+  on, and it owes these files nothing. It is asked to open each one and
+  count its packets without decoding them (the payloads are seeded noise,
+  not pictures), and the gate is what the file must say to anyone: a video
+  stream of the right codec with every frame in it, an audio stream of the
+  right codec with every packet, and the length that was written.
+
+  The Measure job installs ffmpeg in the step before this one (for the
+  shelf, in `npm run bands`). On CI a missing ffprobe is a failure, as there;
+  on a laptop without it this prints SKIP and says what was not measured.
+*/
+{
+  console.log('\nThe files, opened by ffprobe');
+  const has = spawnSync('ffprobe', ['-version'], { encoding: 'utf8' });
+  if (has.error || has.status !== 0) {
+    const where = process.env.CI ? 'FAIL' : 'SKIP';
+    console.log(`  ${where}  no ffprobe on the path: the files were NOT opened by an independent demuxer on this machine`);
+    if (process.env.CI) failed++;
+  } else {
+    const dir = mkdtempSync(join(tmpdir(), 'cg-render-'));
+    try {
+      for (const p of probed) {
+        const file = join(dir, `probe.${p.kind}`);
+        writeFileSync(file, p.bytes);
+        const r = spawnSync('ffprobe', ['-v', 'error', '-count_packets', '-show_entries',
+          'stream=codec_type,codec_name,nb_read_packets:format=format_name,duration', '-of', 'json', file], { encoding: 'utf8' });
+        let info = null;
+        try { info = JSON.parse(r.stdout); } catch { /* reported below */ }
+        const v = info?.streams?.find((s) => s.codec_type === 'video');
+        const a = info?.streams?.find((s) => s.codec_type === 'audio');
+        const wantV = p.kind === 'webm' || p.audioCodec === 'opus' ? 'vp9' : 'h264';
+        const wantA = p.audioCodec === 'aac' ? 'aac' : 'opus';
+        const wantFormat = p.kind === 'webm' ? 'webm' : 'mp4';
+        const dur = Number(info?.format?.duration);
+        const errors = (r.stderr ?? '').trim().split('\n').filter(Boolean);
+        check(`${p.label}: ffprobe opens it as ${wantFormat}`, r.status === 0 && !!info && (info.format?.format_name ?? '').includes(wantFormat),
+          r.status !== 0 ? `exit ${r.status}: ${errors.slice(0, 2).join(' / ')}` : `${info.format.format_name}${errors.length ? `; ${errors.length} complaints, first: ${errors[0].slice(0, 120)}` : ', no complaints'}`);
+        check(`${p.label}: ffprobe finds a ${wantV} stream with every frame`, v?.codec_name === wantV && Number(v?.nb_read_packets) === p.frames,
+          v ? `${v.codec_name}, ${v.nb_read_packets} packets of ${p.frames}` : 'no video stream');
+        check(`${p.label}: ffprobe finds a ${wantA} stream with every packet`, a?.codec_name === wantA && Number(a?.nb_read_packets) === p.packets,
+          a ? `${a.codec_name}, ${a.nb_read_packets} packets of ${p.packets}` : 'no audio stream');
+        check(`${p.label}: ffprobe says it lasts what was written`, Math.abs(dur - p.seconds) <= 1 / p.fps,
+          `${dur} s, written ${p.seconds} s`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+}
+
+/*
+  A long song's MP4: past about 125,000 samples in a track, a spread into
+  Math.min throws RangeError (the engine's argument limit), which is where
+  the movie's length used to be worked out. Four hours of Opus is 720,000
+  packets; this is 150,000 (fifty minutes), with a second of frames, and
+  the file has to finish and say how long it is.
+*/
+{
+  const sink = new MemorySink();
+  const mx = new Mp4Muxer(sink, { codec: 'vp09.00.10.08', width: 64, height: 64, fps: 30 }, { codec: 'opus', sampleRate: 48000, channels: 2, bitrate: 128000 });
+  const n = 150_000, pkt = new Uint8Array(8);
+  for (let i = 0; i < n; i++) {
+    const ts = Math.round((i * 960 * 1e6) / 48000);
+    mx.addAudio({ data: pkt, timestampUs: ts, durationUs: Math.round(((i + 1) * 960 * 1e6) / 48000) - ts, key: true });
+  }
+  mx.endAudio();
+  for (let i = 0; i < 30; i++) {
+    const ts = Math.round((i * 1e6) / 30);
+    mx.addVideo({ data: new Uint8Array(16), timestampUs: ts, durationUs: Math.round(((i + 1) * 1e6) / 30) - ts, key: i === 0 });
+  }
+  let summary = null, error = null;
+  try { summary = mx.finish(); } catch (e) { error = `${e.name}: ${e.message}`; }
+  check('an MP4 with 150,000 audio packets finishes, and says how long it is', !!summary && Math.abs(summary.durationMs - n * 20) <= 1,
+    error ?? `${summary.durationMs} ms, ${n * 20} ms written`);
 }
 
 // MemorySink's patch across a chunk boundary: the header fields a writer

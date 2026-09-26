@@ -81,7 +81,7 @@ jobs:
       # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
       # the ubuntu runner does not have until it is installed here; with no
       # decoder the script fails on CI rather than skipping the real music.
-      - name: ffmpeg, for the shelf
+      - name: ffmpeg, for the shelf and the render's files
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         run: npm run bands
@@ -91,7 +91,9 @@ jobs:
       # track is the same bytes twice and hears the kicks at the same moments
       # at 30 and 60 fps; the ear the render uses is the live hook's to the
       # last bit; and both file writers give back every sample, at its time,
-      # through a strict reader, the same bytes twice.
+      # through a strict reader, the same bytes twice; and ffprobe, installed
+      # above for the shelf, opens each file with the right streams, every
+      # packet and the right length (with no ffprobe this fails on CI).
       - name: The render's clock, ear and file
         run: npm run render
 

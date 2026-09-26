@@ -299,9 +299,14 @@ export class Mp4Muxer {
     const ms = (t: TrackState) => {
       const n = t.pts.length;
       if (!n) return 0;
-      const first = Math.min(...t.pts);
-      let last = 0;
-      for (let i = 0; i < n; i++) last = Math.max(last, t.pts[i] + t.durations[i]);
+      // A loop, not Math.min(...t.pts): a spread passes every sample as an
+      // argument, and past about 125,000 of them (forty minutes of Opus) the
+      // engine throws RangeError and the film is lost at its last step.
+      let first = Infinity, last = 0;
+      for (let i = 0; i < n; i++) {
+        if (t.pts[i] < first) first = t.pts[i];
+        last = Math.max(last, t.pts[i] + t.durations[i]);
+      }
       return ((last - first) * 1000) / t.timescale;
     };
     const durationMs = Math.max(...this.tracks.map(ms));
