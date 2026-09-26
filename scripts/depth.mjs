@@ -33,6 +33,9 @@ const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok
 const PORT = 4343;
 const CURVE = Number(process.env.DEPTH_CURVE ?? 1);
 const DRAG = Number(process.env.DEPTH_DRAG ?? 3);
+// What the solver is handed: `deriveStep` clamps the curve to [-1, 1], so a
+// wait for `lastStep.plateCurve === 2` would wait for ever.
+const STEPPED_CURVE = Math.max(-1, Math.min(1, CURVE));
 
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -68,13 +71,102 @@ try {
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.
   const set = (o) => page.evaluate((s) => Object.assign(window.chromaglassDebug().settings, s), o);
+
+  /*
+    Wait for the plate to have *stepped* with a shape, not for a clock.
+
+    What was reported: on #151, #153 and #154 — three unrelated PRs off one
+    main, one of them touching no app code — this read exactly 0.0300 at the
+    centre and at the rim, six seconds after the curve was set, and every
+    later line of the same run saw the dome working (the drag took the rim
+    down 93%, and the press was carried up by the reshape). 0.0300 everywhere
+    is the gap at a curve of zero, untouched: not a dome that failed to form,
+    a plate the curve had not reached yet. On the same code #152 and main's
+    deploy read 0.0581 and 0.0144.
+
+    Eight runs of this check on the Mac, same code or near it, split with
+    nothing in between: every pass read exactly 0.0581 and 0.0144 (the dome
+    at rest), every failure exactly 0.0300 and 0.0300, and the failures took
+    26.6 to 28.6 s from the step starting to this read where the passes took
+    21.8 to 24.8. `depth` is the first thing its shard runs, on a cold
+    machine. The solver applies a new shape on its next step
+    (`gapReshape`, or `gapRest` on a solver the ladder has just rebuilt,
+    src/gpu/fluid.ts), so the only way to read the old shape six seconds
+    later is for the lead plate not to have taken that step on the solver
+    being read: a stall, or a rung change that cleared the gap just before
+    the read. Neither is what this check is about.
+
+    So the read waits until the lead solver has been stepped with this curve,
+    twice, on the same solver it is about to read — and fails, saying so, if
+    that never happens. Six seconds stays the floor, so a fast machine reads
+    the plate exactly when it always did.
+  */
+  const settled = (curve) => page.evaluate(async ({ curve, limit }) => {
+    const d = () => window.chromaglassDebug();
+    const t0 = performance.now();
+    // Where the lead plate was when the setting went in (see `mark`), so the
+    // six seconds before this can be told apart: no steps at all is a stall,
+    // steps on another solver is a rebuild.
+    const m = window.__depthMark ?? {};
+    const f0 = d().fluids?.[0];
+    const before = { steps: (f0?.stepIndex ?? 0) - (m.step ?? 0), sameSolver: !!f0?.gpu && f0.gpu === m.gpu };
+    let solver = null, from = -1, rebuilt = 0, seen = 0;
+    while (performance.now() - t0 < limit) {
+      const f = d().fluids?.[0];
+      const g = f?.gpu ?? null;
+      if (g !== solver) { if (solver) rebuilt++; solver = g; from = -1; }
+      if (g && f.lastStep?.plateCurve === curve) {
+        if (from < 0) from = f.stepIndex;
+        seen = f.stepIndex - from;
+        if (seen >= 2) window.__depthSolver = g;
+        if (seen >= 2) return { ok: true, waited: (performance.now() - t0) / 1000, steps: seen, rebuilt, N: g.N, before };
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return { ok: false, waited: limit / 1000, steps: seen, rebuilt, N: solver?.N ?? null, before };
+  }, { curve, limit: 30000 });
+  const mark = () => page.evaluate(() => {
+    const f = window.chromaglassDebug().fluids?.[0];
+    window.__depthMark = { step: f?.stepIndex ?? 0, gpu: f?.gpu ?? null };
+  });
+  // Said every time, stepped or not: the first run on a slow runner is the
+  // one that shows whether it was a stall or a rebuild.
+  const said = (s) => `${s.before.steps} step(s) in the wait${s.before.sameSolver ? '' : ', on a solver built during it'};`
+    + ` ${s.ok ? '' : 'NOT '}stepped with it ${s.waited.toFixed(1)} s later,`
+    + ` ${s.steps} step(s) seen, ${s.rebuilt} rebuild(s), now ${s.N}²`;
+
+  await mark();
   await set({ automateRate: 0, plateCurve: CURVE, depthDrag: 0 });
   await page.waitForTimeout(6000);
+  const shaped = await settled(STEPPED_CURVE);
+  /*
+    Waiting must not turn a frozen plate green. The same solver taking no
+    step at all for six seconds is a freeze an audience would see, and before
+    this wait it was (misnamed) the dome line going red. So it keeps a red
+    line of its own. A rebuild during the six seconds is allowed: the ladder
+    does that on a slow machine, and the new solver lays the dome on its
+    first step.
+  */
+  check('the plate keeps stepping while its shape changes',
+    shaped.before.steps > 0 || !shaped.before.sameSolver, said(shaped));
+  check('the lead plate is stepped with the shape it was given', shaped.ok, said(shaped));
 
   // 1. The gap takes the dome's shape.
-  const gap = await page.evaluate(async () => {
+  /*
+    On the solver the wait counted, and no other. A solver attached between
+    the wait and this read has not stepped yet, and one that has not stepped
+    reads exactly 0.0300 everywhere: both clears (its constructor's, and
+    `attachGpu`'s) lay the gap with `gapRest` before `writeSim` has ever
+    put a curve in the uniform, so the curve they lay is zero. That is the
+    failure's own signature, so a read that lands on one is retried on the
+    new solver rather than measured.
+  */
+  const readDome = () => page.evaluate(async () => {
     const d = window.chromaglassDebug();
+    const mine = () => d.fluids?.[0]?.gpu === window.__depthSolver;
+    if (!mine()) return { moved: true };
     const sq = await d.readSqueeze?.();
+    if (!mine()) return { moved: true };
     if (!sq) return null;
     const { n, gap } = sq;
     let inner = 0, ki = 0, outer = 0, ko = 0;
@@ -85,6 +177,13 @@ try {
     }
     return { inner: inner / ki, outer: outer / ko };
   });
+  let gap = await readDome();
+  for (let tries = 0; gap?.moved && tries < 3; tries++) {
+    console.log('     (the solver was rebuilt between the wait and the read; waiting on the new one)');
+    await settled(STEPPED_CURVE);
+    gap = await readDome();
+  }
+  if (gap?.moved) gap = null;
   check('the gap can be read back at all', gap !== null, gap ? '' : 'no readSqueeze');
   if (!gap) throw new Error('nothing to measure');
   /*
@@ -194,15 +293,28 @@ try {
     await page.waitForTimeout(60);
   }
   const pressed = await gapAt();
+  await mark();
   await set({ plateCurve: 1 });
   await page.waitForTimeout(250);
+  /*
+    And the same wait here, for the opposite reason: a plate that has not
+    stepped since the change still holds the dent exactly as it was pressed,
+    which read as "carried". The wait makes sure a step ran; the lower bound
+    on the lift below makes sure the shift did.
+  */
+  const reshaped = await settled(1);
+  const same = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.gpu === window.__depthSolver);
   const after = await gapAt();
   // Curve 1 lifts the centre's rest from 0.03 to 0.06, so a reset would read
-  // 0.06 exactly and a shift reads the dent carried up with it.
+  // 0.06 exactly and a shift reads the dent carried up with it. Both bounds:
+  // under 0.06 says it was not reset, and lifted by most of the 0.03 the rest
+  // moved says the shift ran at all. With only the first, a plate that never
+  // reshaped read the dent where it was pressed and passed.
   const dent = flat - pressed;
   check('a press survives the glasses changing shape',
-    dent > 0.0005 && after < 0.06 - dent * 0.5,
-    `dented ${dent.toFixed(4)} below rest, and after the change ${after.toFixed(4)} against a rest of 0.0600`);
+    reshaped.ok && same && dent > 0.0005 && after < 0.06 - dent * 0.5 && after - pressed > 0.02,
+    `dented ${dent.toFixed(4)} below rest, and after the change ${after.toFixed(4)} against a rest of 0.0600,`
+    + ` lifted ${(after - pressed).toFixed(4)} by it; ${said(reshaped)}${same ? '' : '; the solver was rebuilt under the press'}`);
 
   await set({ plateCurve: CURVE });
   check('and switching it off puts the plate back',
