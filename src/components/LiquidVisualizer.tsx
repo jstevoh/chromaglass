@@ -37,6 +37,7 @@ import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, type Rng } from '../lib/rng';
+import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -1997,7 +1998,7 @@ class FluidSimulation {
     // press is one press while it keeps coming, even as a finger drifts
     // across grid cells; a pause of a moment starts a new one (a beat
     // squeeze on every kick).
-    const nowMs = performance.now();
+    const nowMs = showNow();
     if (nowMs - this.squishLastAt > 150) { this.squishSteps = 0; this.squishLastStep = -1; }
     this.squishLastAt = nowMs;
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
@@ -3876,7 +3877,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    */
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
-  const lastTimeRef = useRef(Date.now() * 0.001);
+  const lastTimeRef = useRef(showEpochS());
   const lastBass01Ref = useRef(0); // for beat edge detection
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
@@ -3972,7 +3973,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // gate, since holding it over an emptying plate is harmless.
     switch (g.tool) {
       case 'magnet':
-        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: performance.now() };
+        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: showNow() };
         return;
     }
     const layer = g.layer ?? activeLayerRef.current;
@@ -4229,7 +4230,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       for (let i = 0; i < n; i++) {
         // A ring inside the dish, turning slowly, so the voices are lit by
         // different weather rather than by one spot that may never get wet.
-        const a = (i / n) * Math.PI * 2 + performance.now() * 0.00002;
+        const a = (i / n) * Math.PI * 2 + showNow() * 0.00002;
         const rr = 0.28 * GRID_SIZE;
         const x = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr);
         const y = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
@@ -4387,7 +4388,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     handoff: (seconds: number) => {
       if (!(seconds > 0)) { handoffRef.current = null; return; }
-      const now = performance.now();
+      const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
@@ -4417,7 +4418,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const t = externalTiltRef.current;
       t.x = Math.max(-1, Math.min(1, x));
       t.y = Math.max(-1, Math.min(1, y));
-      t.at = performance.now() * 0.001;
+      t.at = showNow() * 0.001;
     },
     setStage: (size) => {
       stageRef.current = size && size.width > 0 && size.height > 0 ? { width: Math.round(size.width), height: Math.round(size.height) } : null;
@@ -4801,15 +4802,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // is sixty allocations a second for a show that runs for hours.
       const patch = patchRef.current!;
       patch.fold(settingsRef.current, {
-        room: sceneRef?.current ?? null,
-        film: filmSenseRef?.current ?? null,
+        room: clockIsFixed() ? null : sceneRef?.current ?? null,
+        film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
         shape: modRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
-      }, settingsRef.current.layerCount ?? 1, performance.now());
+      }, settingsRef.current.layerCount ?? 1, showNow());
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -4828,7 +4829,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         its settings untouched.
       */
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
-        const now = performance.now();
+        const now = showNow();
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
         const strength = look.magnetStrength ?? 0;
@@ -4889,7 +4890,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       };
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
-        const now = Date.now() * 0.001;
+        const now = showEpochS();
         const realDt = now - lastTimeRef.current;
         lastTimeRef.current = now;
         frameS = realDt;
@@ -4898,13 +4899,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // onset as heard. Every reaction below reads this instead of its own
         // threshold crossing, so they all land together.
         {
-          const nowMs = performance.now();
+          const nowMs = showNow();
           const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
           // A clock from the desk, a tapped tempo or a typed one, if there is
           // one. Handed over every frame — the reading carries its own
           // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
+          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -5170,7 +5171,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const g = leadGpu;
           const s = settingsRef.current;
-          const nowMs = performance.now();
+          const nowMs = showNow();
           const live = g?.chemistryLive;
           if (g?.addRxn && (s.bzReaction ?? 0) > 0.001 && (!live?.rxn || nowMs - bzSeedAtRef.current > 30000)) {
             bzSeedAtRef.current = nowMs;
@@ -5277,7 +5278,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const roomFresh = (() => {
           if ((roomDrive <= 0 && roomHands <= 0) || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = sceneRef?.current ?? null;
-          if (!r || !r.ready) return null;
+          if (!r || !r.ready || clockIsFixed()) return null;
           return performance.now() - r.at < ROOM_STALE_MS ? r : null;
         })();
         const roomReading = roomDrive > 0 ? roomFresh : null;
@@ -5299,7 +5300,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const filmReading = (() => {
           if (filmDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = filmSenseRef?.current ?? null;
-          if (!r || !r.ready) return null;
+          if (!r || !r.ready || clockIsFixed()) return null;
           return performance.now() - r.at < ROOM_STALE_MS ? r : null;
         })();
 
@@ -5404,7 +5405,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               if (tool === 'magnet') {
                 // Nothing is laid: the magnet goes where the hand is.
-                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: performance.now() };
+                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
               } else if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
@@ -5773,7 +5774,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const journeyMin = currentSettings.hueJourney ?? 0;
             if (journeyMin > 0) {
               const j = journeyRef.current;
-              const nowS = performance.now() * 0.001;
+              const nowS = showNow() * 0.001;
               if (j.lastAt < 0 || j.lastAt > nowS) j.lastAt = nowS;
               if (nowS - j.lastAt >= journeyMin * 60) {
                 j.lastAt = nowS;
@@ -5788,7 +5789,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           {
             const h = handoffRef.current;
             if (h && isActiveRef.current && drainFrameRef.current === 0) {
-              const nowMs = performance.now();
+              const nowMs = showNow();
               const p = Math.min(1, (nowMs - h.start) / h.dur);
               const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
               h.last = nowMs;
@@ -6092,7 +6093,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // A phone held by the projectionist: its tilt is the plate's, fading
             // out a couple of seconds after the last reading if the link drops.
             const ext = externalTiltRef.current;
-            const extAge = performance.now() * 0.001 - ext.at;
+            const extAge = showNow() * 0.001 - ext.at;
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
             const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
             const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
@@ -6704,7 +6705,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
-        if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
+        if (lum !== null) flashGainRef.current = flashRef.current.sample(showNow(), lum);
         else if (flashGainRef.current !== 1) { flashRef.current.reset(); flashGainRef.current = 1; }
       }
 

@@ -77,6 +77,7 @@ import { CrashReportButton, QuickReportDot, openCrashReport } from './components
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { stream } from './lib/rng';
+import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -1522,7 +1523,7 @@ export default function App() {
       hand takes in the meantime is dropped from the glide (updateSettings),
       and the hand wins.
     */
-    const id = setInterval(() => {
+    const id = showInterval(() => {
       const rate = settingsRef.current.automateRate ?? 0.12;
       const patch = driftLook(settingsRef.current, driftAnchor.current, rate) as Record<string, number>;
       for (const [k, to] of Object.entries(patch)) {
@@ -1545,8 +1546,8 @@ export default function App() {
         driftGlide.current.set('macroAimX', { from: ax, to: wander(ax), at: 0 });
         driftGlide.current.set('macroAimY', { from: ay, to: wander(ay), at: 0 });
       }
-    }, 6000);
-    const glide = setInterval(() => {
+    }, 6000, 'drift');
+    const glide = showInterval(() => {
       if (driftGlide.current.size === 0) return;
       const step: Record<string, number> = {};
       for (const [k, g] of driftGlide.current) {
@@ -1558,8 +1559,8 @@ export default function App() {
       // Not through updateSettings: that is a hand, and re-anchors.
       setSettings(prev => ({ ...prev, ...step }));
       setDocDirty(true);
-    }, 4000 / DRIFT_GLIDE_STEPS);
-    return () => { clearInterval(id); clearInterval(glide); driftGlide.current.clear(); };
+    }, 4000 / DRIFT_GLIDE_STEPS, 'drift-glide');
+    return () => { clearShowInterval(id); clearShowInterval(glide); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
 
@@ -1675,7 +1676,7 @@ export default function App() {
   // crossfade and stay there. (rAF also runs at the compositor's rate, which
   // on a machine with no GPU worth the name is under a frame a second —
   // the fade would arrive in three steps.)
-  const lookFadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lookFadeRef = useRef<ShowIntervalHandle | null>(null);
   /** The look before the last Go, so one step back is always available. */
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
@@ -1865,15 +1866,15 @@ export default function App() {
    * change rather than React.
    */
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
-    if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
+    if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     const from = settingsRef.current;
     if (seconds <= 0) { setSettings(to); setFading(0); return; }
-    const started = performance.now();
+    const started = showNow();
     const ms = seconds * 1000;
-    lookFadeRef.current = setInterval(() => {
-      const t = Math.min(1, (performance.now() - started) / ms);
+    lookFadeRef.current = showInterval(() => {
+      const t = Math.min(1, (showNow() - started) / ms);
       if (t >= 1) {
-        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
+        if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
         lookFadeRef.current = null;
         setSettings(to);
         setFading(0);
@@ -1881,7 +1882,7 @@ export default function App() {
       }
       setSettings(blendLooks(from, to, t));
       setFading(t);
-    }, 33);
+    }, 33, 'look-fade');
   }, []);
 
   const sendLook = useCallback((next: ArmedLook, seconds: number) => {
@@ -1929,7 +1930,7 @@ export default function App() {
     fadeSettingsTo(prev.settings, fadeSeconds);
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
-  useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
+  useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
 
   /*
     MIDI timecode, and the position the sequence follows.
@@ -2386,20 +2387,20 @@ export default function App() {
   const blackoutRef = useRef(blackout);
   blackoutRef.current = blackout;
   const dimmerBeforeRef = useRef(1);
-  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fadeRef = useRef<ShowIntervalHandle | null>(null);
   // On a timer, not requestAnimationFrame: the laptop's window is often
   // behind the projector's, and a hidden tab stops animating while the
   // fader on the desk expects the wall to go dark anyway.
   const fadeDimmer = useCallback((to: number, ms = 1100) => {
-    if (fadeRef.current) clearInterval(fadeRef.current);
+    if (fadeRef.current) clearShowInterval(fadeRef.current);
     const from = settingsRef.current.dimmer ?? 1;
-    const began = performance.now();
-    fadeRef.current = setInterval(() => {
-      const k = Math.min(1, (performance.now() - began) / ms);
+    const began = showNow();
+    fadeRef.current = showInterval(() => {
+      const k = Math.min(1, (showNow() - began) / ms);
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
-      if (k >= 1 && fadeRef.current) { clearInterval(fadeRef.current); fadeRef.current = null; }
-    }, 16);
+      if (k >= 1 && fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
+    }, 16, 'dimmer-fade');
   }, []);
   const toggleBlackout = useCallback(() => {
     setBlackout(prev => {
@@ -2705,23 +2706,23 @@ export default function App() {
 
   // ── Songs: the runtime ──────────────────────────────────────────
   /** A setting walked to a value over some seconds, the way a hand turns a knob. One walk per setting. */
-  const glidesRef = useRef(new Map<string, ReturnType<typeof setInterval>>());
+  const glidesRef = useRef(new Map<string, ShowIntervalHandle>());
   const glideSetting = useCallback((key: keyof VisualizerSettings, to: number, seconds: number, atEnd?: Partial<VisualizerSettings>) => {
     const timers = glidesRef.current;
     const running = timers.get(String(key));
-    if (running) clearInterval(running);
+    if (running) clearShowInterval(running);
     const from = Number((settingsRef.current as unknown as Record<string, unknown>)[key] ?? 0);
     if (!(seconds > 0)) { setSettings(p => ({ ...p, [key]: to, ...(atEnd ?? {}) })); return; }
-    const started = performance.now();
-    const timer = setInterval(() => {
-      const k = Math.min(1, (performance.now() - started) / (seconds * 1000));
+    const started = showNow();
+    const timer: ShowIntervalHandle = showInterval(() => {
+      const k = Math.min(1, (showNow() - started) / (seconds * 1000));
       const e = k * k * (3 - 2 * k);
       setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
-      if (k >= 1) { clearInterval(timer); timers.delete(String(key)); }
-    }, 33);
+      if (k >= 1) { clearShowInterval(timer); timers.delete(String(key)); }
+    }, 33, `glide:${String(key)}`);
     timers.set(String(key), timer);
   }, []);
-  useEffect(() => () => { for (const t of glidesRef.current.values()) clearInterval(t); }, []);
+  useEffect(() => () => { for (const t of glidesRef.current.values()) clearShowInterval(t); }, []);
 
   /** Do one of a song's actions, through the same moves a pad or a key makes. */
   const performSongAction = useCallback((action: SongAction, show: SongShow) => {

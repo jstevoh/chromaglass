@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualizerSettings } from '../types';
 import { PRESETS, type Preset } from '../presets';
 import { lookOf } from '../lib/lookFade';
+import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
   ShowSequence, ShowStage, SequencerStatus,
   builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
@@ -60,7 +61,7 @@ export interface UseShowSequencerArgs {
 interface Run {
   sequenceId: string;
   stageIndex: number;
-  enteredAt: number;          // performance.now() seconds
+  enteredAt: number;          // showNow() seconds (lib/showClock.ts)
   pausedAt: number | null;
   from: Partial<VisualizerSettings>;
   target: Partial<VisualizerSettings>;
@@ -69,7 +70,7 @@ interface Run {
   glideDone: boolean;
 }
 
-const now = () => performance.now() * 0.001;
+const now = () => showNow() * 0.001;
 const TICK_MS = 250;
 /** A section change can only advance a stage after this long in it. */
 const MIN_SECTION_SECONDS = 8;
@@ -223,7 +224,7 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
 
   // The clock.
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timer = showInterval(() => {
       const run = runRef.current;
       if (!run) return;
       const seq = findSequence(run.sequenceId);
@@ -297,8 +298,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
         enterStage(seq, last ? 0 : run.stageIndex + 1);
       }
       publish();
-    }, TICK_MS);
-    return () => clearInterval(timer);
+    }, TICK_MS, 'sequencer');
+    return () => clearShowInterval(timer);
   }, [enterStage, findSequence, publish]);
 
   const upsertSequence = useCallback((seq: ShowSequence) => {

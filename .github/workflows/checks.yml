@@ -86,6 +86,15 @@ jobs:
       - name: The bands
         run: npm run bands
 
+      # A song render's arithmetic (PLAN.md §6): the show clock is the frame
+      # number while rendering and the browser's own clock live; the song's
+      # track is the same bytes twice and hears the kicks at the same moments
+      # at 30 and 60 fps; the ear the render uses is the live hook's to the
+      # last bit; and both file writers give back every sample, at its time,
+      # through a strict reader, the same bytes twice.
+      - name: The render's clock, ear and file
+        run: npm run render
+
       # The shape of the quality ladder: that every rung is a rung, that a
       # step down gives something up, and that a rung asking for fewer device
       # pixels actually gets fewer. That last one was inert for a long while
