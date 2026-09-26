@@ -42,8 +42,10 @@ export interface PlateView {
   /** How far into the macro closeup: 0 at the plate, 1 once it is in. */
   macroAmount: number;
   isDarkBlend: boolean;
-  /** The frame's flow in fluid-UV a second, for advecting procedural detail. */
+  /** Plate-uv per unit of `cellClock` per unit of velocity, for advecting procedural detail. */
   flowRate: number;
+  /** The lead plate's dye travel, wrapped (lib/detailFlow.ts): what the drawn cells ride. */
+  cellClock: number;
   /** Where each plate has turned to. */
   rotations: number[];
   /** The working harmony, as indices into `PALETTE_RGB`. */
@@ -327,6 +329,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('macroEdge', s.macroEdgeDetail ?? 0.6);
   pack.set('macroRelief', s.macroRelief ?? 0.7);
   pack.set('flowRate', view.flowRate);
+  pack.set('cellClock', view.cellClock);
   pack.set('filmLevel', view.filmLevel);
   pack.set('filmGain', clamp(view.filmGain, 0.5, 12));
 

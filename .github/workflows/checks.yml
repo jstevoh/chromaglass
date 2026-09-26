@@ -149,6 +149,14 @@ jobs:
       - name: The timecode
         run: npm run timecode
 
+      # The closeup's drawn cells ride the paint and hold still between
+      # frames (lib/detailFlow.ts): frame by frame they move as far as the
+      # dye did, through frame-time noise, dropped frames, 20 to 144 Hz, the
+      # tempo and the lean changing and Speed pulled to nothing; their clock
+      # wraps cleanly; and packing the flow adds no rounding of its own.
+      - name: The closeup's cells
+        run: npm run cellride
+
       - name: The lights
         run: npm run lights
 

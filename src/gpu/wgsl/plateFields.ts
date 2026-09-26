@@ -58,7 +58,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'filmMix', type: 'f32' },
   { name: 'filmOn', type: 'i32' },
   { name: 'finishInMain', type: 'i32' },
-  { name: 'flowRate', type: 'f32', note: 'fluid-UV per second, for advecting procedural detail' },
+  { name: 'flowRate', type: 'f32', note: 'plate-uv per unit of cellClock per unit of velocity, for advecting procedural detail' },
   { name: 'gelAngle', type: 'f32' },
   { name: 'gelWheel', type: 'f32', note: 'rotating four-segment gel over the lamp' },
   { name: 'glossiness', type: 'f32', note: 'specular intensity, 0 = flat backlit dye' },
@@ -113,6 +113,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'colourBody', type: 'f32', note: 'how solid thin dye reads: opacity and body saturation, 0-1' },
   { name: 'thinFilm', type: 'f32', note: 'interference colour where the dye runs thinnest' },
   { name: 'time', type: 'f32' },
+  { name: 'cellClock', type: 'f32', note: "the lead plate's dye travel, wrapped: what the drawn cells slide and breathe on (lib/detailFlow.ts)" },
   { name: 'transmission', type: 'f32' },
   /** How much of the second phase to draw (H7): 0 keeps it off the picture. */
   { name: 'phaseAmount', type: 'f32' },

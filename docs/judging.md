@@ -147,6 +147,28 @@ about 530 with droplets and curved walls (11 to 12 with straight ones), against 
 rings' canvas at 3.9, in the sandbox's Chromium. If
 `frameMs` climbs with it on, that is the number to report.
 
+## 8. The closeup's cells, riding the paint
+
+At about 6x the closeup's drawn cells and lacing used to shake: they slid by
+the flow times the frame's own measured time, and a browser's frames are never
+quite equal. They now slide on a clock the solver's steps advance by exactly as
+far as they move the dye, so on steady paint they should sit still at any
+zoom. They also now go at the paint's speed: before, at the default Speed they
+lagged at about a quarter of it on a 60 Hz screen and half on 120 Hz, and on
+fast looks raced ahead of it several times over. A faster pour now cycles its
+cells faster; at the default Advection they breathe at the pace they did.
+The plate's own cells at 1x are untouched, and now slide in over the first
+notches of the zoom instead of jumping when it leaves 1x.
+
+Push in to 6x and past on a filled plate, with and without music. What to
+report: any shimmer still there; whether cells now stretch or smear more in a
+swirl, since keeping up with the paint means about four times the slide they
+had at the default Speed on a 60 Hz screen; and on fast, changing paint
+whether the cells hop. The solver keeps its velocity in half float, and on the fastest paint a
+changing flow crossing one of its steps can still hop the cells by about a
+frame's travel (`npm run cellride` prints it); if that shows, the fixes are a
+full-float velocity or shorter-lived cells when zoomed in.
+
 ---
 
 ## Reading the frame time while you do it
