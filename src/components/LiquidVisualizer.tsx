@@ -14,6 +14,8 @@ import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
+import { prepareShow, type Prepared } from '../gpu/prepare';
+import { PipelineCache } from '../gpu/kit';
 import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
@@ -265,6 +267,16 @@ const MAX_PINNED_GRID = 1024;
  */
 const STAGE_TIMINGS = (() => {
   try { return new URLSearchParams(window.location.search).has('stages'); } catch { return false; }
+})();
+
+/**
+ * `?prepare=0`: open the show without building its pipelines ahead
+ * (`gpu/prepare.ts`), as it opened before, each one built on the frame that
+ * first asks. `npm run startup` opens the show once this way as its control.
+ * Diagnostic only, from the query string alone, like `?stages`.
+ */
+const PREPARE_OFF = (() => {
+  try { return new URLSearchParams(window.location.search).get('prepare') === '0'; } catch { return false; }
 })();
 
 /**
@@ -7091,7 +7103,53 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let healthyTimer: ReturnType<typeof setTimeout> | null = null;
-    void WebGPUStage.start(canvas).then((s) => {
+    /** What `prepareShow` built before this stage's show opened (`chromaglassDebug().pipelines`). */
+    let prepared: Prepared | null = null;
+    /*
+      The device while its pipelines are building, before the stage has it.
+      A teardown in that gap (React's development double-run, a heal or a
+      resolution change bumping the epoch) destroys it at once, which settles
+      every build still pending; waiting for the builds to finish instead held
+      a device nobody wanted for as long as they took, compiling alongside the
+      next effect's.
+    */
+    let preparing: GPUDevice | null = null;
+    /*
+      The device first, then the pipelines, then the show. The solver's first
+      step used to ask for forty-four pipelines on the frame, and on a Mac
+      with a cold shader cache the GPU process compiled them before it would
+      present another frame: nine seconds of a stopped plate a few seconds
+      into every CI run (`gpu/prepare.ts`). Built ahead, they compile while
+      the starting frame is up, and the first step finds them waiting.
+    */
+    void WebGPUStage.start(canvas).then(async (s) => {
+      if (cancelled || isGpuFailure(s)) return s;
+      // `?prepare=0` opens the show the old way, every pipeline built on the
+      // frame that first needs it: `npm run startup`'s control, so a run
+      // measures the freeze it guards against as well as its absence.
+      if (PREPARE_OFF) return s;
+      /*
+        Never the reason the show does not open. The builds themselves cannot
+        fail (a pipeline that will not build ahead is left to the frame), but
+        the lists are written by hand, and a kernel renamed under one throws
+        while it is being read. Before this that name threw inside a frame,
+        where the loop catches it; out here nothing would have, and the page
+        would have sat on its starting frame with a live device and no stage.
+      */
+      preparing = s.device;
+      try {
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable });
+        prepared = got;
+        if (got.timedOut || got.ready < got.asked) {
+          console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
+        }
+      } catch (err) {
+        console.warn('ChromaGlass: the pipelines could not be built ahead; the frame builds them.', err);
+      } finally {
+        preparing = null;
+      }
+      return s;
+    }).then((s) => {
       // Too late: this effect has already been torn down. Destroy the device
       // and nothing else — `dispose` would also unconfigure the canvas, and in
       // React's development double-run the canvas is the one the second run
@@ -7663,6 +7721,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
           /**
+           * How the show's pipelines were built: what `prepareShow` built
+           * ahead for this stage, and every one built on a frame on any
+           * device this page has had (`npm run startup` reads it).
+           */
+          pipelines: () => ({ prepared, ledger: PipelineCache.ledger() }),
+          /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim
            * that halving the projection costs nothing is a textbook one
@@ -7956,6 +8020,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       unprovide();
       if (retryTimer) clearTimeout(retryTimer);
       if (healthyTimer) clearTimeout(healthyTimer);
+      preparing?.destroy();
 
       camera?.dispose();
       camera = null;

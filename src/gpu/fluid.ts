@@ -321,6 +321,96 @@ export class WebGPUFluid {
   private squeezeGain = 0;
   private lastDt = 1 / 60;
 
+  /**
+   * The kernels a step runs, on any look a show can open on, built before
+   * the show opens (`gpu/prepare.ts`) in the formats this device's solver
+   * will ask for.
+   *
+   * A list, and so a thing that can fall behind the step. It was taken from
+   * what the show actually built: every `computePipeline` call a show at
+   * `?gpu=mid&look=classic` made in its first twenty seconds (thirty-seven
+   * here, forty-four with the plate, the probe and the air), and then the
+   * ones each of the other thirty-seven looks added in its first steps:
+   * vorticity for galaxy, the dye's own diffusion for eleven of them, the
+   * mix for soap-film, the reaction for chemical-clock, the second phase and
+   * the gel for others. The show opens on a
+   * look picked at random (`OPENING_LOOK`), so a list for one look left the
+   * freeze in place for the nights that opened on another. `npm run startup`
+   * holds it to all of them: it fails when an opening, or a change to any
+   * look, builds a pipeline on a frame.
+   *
+   * What no look runs in its first steps is not here, and is built the
+   * first time something asks for it.
+   *
+   * `dye` is the dye's own format, which is a half float on a GPU that cannot
+   * filter a full one; the scratch textures the advection writes are the
+   * dye's format too, and so is one pass of the velocity's advection.
+   */
+  static prepare(device: GPUDevice, opts: { float32Filterable: boolean }): Promise<void>[] {
+    const cache = PipelineCache.for(device, 'fluid');
+    const dye: GPUTextureFormat = opts.float32Filterable ? RGBA32 : VEL;
+    const byFormat: [string, GPUTextureFormat[]][] = [
+      ['fill', [dye, RGBA32, VEL, R32]],
+      ['gapRest', [RG32]],
+      ['deltaDye', [dye]],
+      ['deltaVel', [VEL]],
+      ['squeezeUpdate', [RG32]],
+      ['scaleDye', [dye]],
+      ['jacobi', [VEL, dye]],
+      ['divergence', [R32]],
+      ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye]],
+      ['macCormack', [dye, VEL]],
+      ['forcesB', [VEL]],
+      ['currentForces', [VEL]],
+      ['curDivergence', [R32]],
+      ['curPressure', [R32]],
+      ['curGradient', [VEL]],
+      ['addCurrent', [VEL]],
+      ['decayDye', [dye]],
+      ['decayVel', [VEL]],
+      ['packView', ['rgba32uint']],
+      ['downsample', [RGBA32]],
+      ...(opts.float32Filterable ? [['seedGrain', [RGBA32]] as [string, GPUTextureFormat[]]] : []),
+      // Vorticity (galaxy): the curl into a single-channel scratch.
+      ['curl', [R32]],
+      ['confine', [VEL]],
+      // The mix (soap-film), always full float, and its surface tension on
+      // the dye as well as on itself.
+      ['marangoniFlux', [dye, RGBA32]],
+      ['mixSplat', [RGBA32]],
+      ['mixAdvect', [RGBA32]],
+      ['mixRelax', [RGBA32]],
+      ['mixMu', [RGBA32]],
+      ['mixUpdate', [RGBA32]],
+      // The reaction (chemical-clock) and the gel, each on its own
+      // full-float grid.
+      ['rxnStep', [RGBA32]],
+      ['liesStep', [RGBA32]],
+      ['gridSplat', [RGBA32]],
+      // The second phase, single-channel, and what it does to the flow.
+      ['phaseSplat', [R32]],
+      ['phaseAdvect', [R32]],
+      ['phaseSeparate', [R32]],
+      ['phaseRelax', [R32]],
+      ['screenJacobi', [R32]],
+      ['phaseMu', [R32]],
+      ['phaseCH', [R32]],
+      ['phaseForce', [VEL]],
+      ['mazeForce', [VEL]],
+    ];
+    // The ones asked for by name alone, each with the one format it writes.
+    const byName: [string, GPUTextureFormat][] = [
+      ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
+      ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
+    ];
+    const keyed = new Map<string, string>();
+    for (const [name, formats] of byFormat) for (const f of formats) keyed.set(`${name}:${f}`, kernel(name, f));
+    for (const [name, f] of byName) keyed.set(name, kernel(name, f));
+    for (const f of [RGBA32, R32] as GPUTextureFormat[]) keyed.set(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f));
+    return [...keyed].map(([key, code]) => cache.prepareCompute(key, code));
+  }
+
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
     this.L = logicalSize;

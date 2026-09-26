@@ -244,6 +244,15 @@ jobs:
       - name: The post chain
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fx
+      # The show opens without stopping (scripts/startup.mjs): the pipelines
+      # the first step draws with are built ahead, none is built on a frame,
+      # and no two frames are more than two seconds apart. First on the
+      # shard, because a Mac keeps compiled shaders across browsers and only
+      # the first check to open the show sees them cold; that was depth,
+      # which is how the nine-second freeze was found.
+      - name: The show opens without stopping
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: npm run startup
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a

@@ -17,7 +17,7 @@
 
 import { PARTICLE_LAYOUT, SEED_WGSL, ADVECT_WGSL, SPLAT_WGSL } from './wgsl/particles';
 import { UniformPack } from './uniforms';
-import { Disposer, PipelineCache, bindGroup, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
 
 /** Bytes per particle: `pos`, `born`, `tint` — see the struct in the WGSL. */
 const STRIDE = 32;
@@ -65,6 +65,36 @@ export interface ParticleParams {
   seed: number;
 }
 
+/** The splat's pipeline, for the frame and `WebGPUParticles.prepare` alike (see the plate's recipes). */
+function splatRecipe(device: GPUDevice): RenderRecipe {
+  return (module) => ({
+    label: 'particle splat',
+    layout: device.createPipelineLayout({
+      label: 'particle splat',
+      bindGroupLayouts: [layoutFromWgsl(device, SPLAT_WGSL, 'particle splat', GPUShaderStage.VERTEX)],
+    }),
+    vertex: { module: module(SPLAT_WGSL), entryPoint: 'vs' },
+    fragment: {
+      module: module(SPLAT_WGSL),
+      entryPoint: 'fs',
+      targets: [{
+        format: 'rgba16float' as GPUTextureFormat,
+        // Additive, and on both channels: the colour sums and so does the
+        // weight in alpha, which is what the compositor divides by to get
+        // a colour back out of a pile of overlapping splats.
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+        },
+      }],
+    },
+    // Four vertices an instance, as a strip: the disc's corners. It was a
+    // point list first, one texel a particle, and the speckle that produced
+    // is written up in `wgsl/particles.ts`.
+    primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
+  });
+}
+
 export class WebGPUParticles {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -81,6 +111,16 @@ export class WebGPUParticles {
   private live = 0;
   private frame = 0;
   private disposed = false;
+
+  /** The seed, the advection and the splat, built before the show opens (`gpu/prepare.ts`): some looks open with particles. */
+  static prepare(device: GPUDevice): Promise<void>[] {
+    const cache = PipelineCache.for(device, 'particles');
+    return [
+      cache.prepareCompute('particle seed', SEED_WGSL),
+      cache.prepareCompute('particle advect', ADVECT_WGSL),
+      cache.prepareRender('particle splat', splatRecipe(device)),
+    ];
+  }
 
   constructor(private readonly device: GPUDevice, readonly grid: number) {
     this.pipelines = PipelineCache.for(device, 'particles');
@@ -167,32 +207,7 @@ export class WebGPUParticles {
    */
   splat(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
     if (this.live === 0) return;
-    const pipeline = this.pipelines.renderPipeline('particle splat', (module) => ({
-      label: 'particle splat',
-      layout: this.device.createPipelineLayout({
-        label: 'particle splat',
-        bindGroupLayouts: [layoutFromWgsl(this.device, SPLAT_WGSL, 'particle splat', GPUShaderStage.VERTEX)],
-      }),
-      vertex: { module: module(SPLAT_WGSL), entryPoint: 'vs' },
-      fragment: {
-        module: module(SPLAT_WGSL),
-        entryPoint: 'fs',
-        targets: [{
-          format: 'rgba16float' as GPUTextureFormat,
-          // Additive, and on both channels: the colour sums and so does the
-          // weight in alpha, which is what the compositor divides by to get
-          // a colour back out of a pile of overlapping splats.
-          blend: {
-            color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-            alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-          },
-        }],
-      },
-      // Four vertices an instance, as a strip: the disc's corners. It was a
-      // point list first, one texel a particle, and the speckle that produced
-      // is written up in `wgsl/particles.ts`.
-      primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
-    }));
+    const pipeline = this.pipelines.renderPipeline('particle splat', splatRecipe(this.device));
 
     const pass = enc.beginRenderPass({
       label: 'particle splat',

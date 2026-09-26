@@ -31,6 +31,12 @@ export class WebGPUFrameProbe {
   private lum: number | null = null;
   private pixels = 1;
 
+  /** The reduction every frame runs, built before the show opens (`gpu/prepare.ts`). */
+  static prepare(device: GPUDevice): Promise<void>[] {
+    const cache = PipelineCache.for(device, 'probe');
+    return (['probeTiles', 'probeFold'] as const).map((name) => cache.prepareCompute(name, PROBE_KERNELS[name]));
+  }
+
   constructor(private readonly device: GPUDevice) {
     this.pipelines = PipelineCache.for(device, 'probe');
     this.args = this.disposer.track(device.createBuffer({

@@ -19,10 +19,48 @@
  */
 
 import { AIR_SPLAT_WGSL } from './wgsl/air';
-import { Disposer, PipelineCache, bindGroup, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
 
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
+
+/**
+ * The splat's pipeline, apart from the class so `WebGPUAir.prepare` builds
+ * the very one the frame asks for (see the plate's recipes).
+ */
+function splatRecipe(device: GPUDevice): RenderRecipe {
+  return (module) => ({
+    label: 'air splat',
+    layout: device.createPipelineLayout({
+      label: 'air splat',
+      /*
+        Both stages: `layoutFromWgsl` gives every binding the one
+        visibility it is handed, and the fragment shader reads `A.soft`
+        for the rim.
+
+        (This was my first guess at why the field was empty, and it was
+        wrong — the layout error in the console was a cascade from an
+        invalid pipeline, not its cause. It is still the correct
+        visibility, so it stays; the actual fault was the target format,
+        see the field's texture in the constructor.)
+      */
+      bindGroupLayouts: [layoutFromWgsl(device, AIR_SPLAT_WGSL, 'air splat', GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
+    }),
+    vertex: { module: module(AIR_SPLAT_WGSL), entryPoint: 'vs' },
+    fragment: {
+      module: module(AIR_SPLAT_WGSL),
+      entryPoint: 'fs',
+      targets: [{
+        format: 'rgba16float' as GPUTextureFormat,
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+        },
+      }],
+    },
+    primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
+  });
+}
 
 export class WebGPUAir {
   private readonly disposer = new Disposer();
@@ -47,6 +85,11 @@ export class WebGPUAir {
   /** The list as last handed over, for the coverage the source needs. */
   private packed = new Float32Array(0);
   private disposed = false;
+
+  /** Its one pipeline, built before the show opens (`gpu/prepare.ts`). */
+  static prepare(device: GPUDevice): Promise<void>[] {
+    return [PipelineCache.for(device, 'air').prepareRender('air splat', splatRecipe(device))];
+  }
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {
     this.pipelines = PipelineCache.for(device, 'air');
@@ -144,37 +187,7 @@ export class WebGPUAir {
    * dye would stay missing under a bubble that had popped.
    */
   splat(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
-    const pipeline = this.pipelines.renderPipeline('air splat', (module) => ({
-      label: 'air splat',
-      layout: this.device.createPipelineLayout({
-        label: 'air splat',
-        /*
-          Both stages: `layoutFromWgsl` gives every binding the one
-          visibility it is handed, and the fragment shader reads `A.soft`
-          for the rim.
-
-          (This was my first guess at why the field was empty, and it was
-          wrong — the layout error in the console was a cascade from an
-          invalid pipeline, not its cause. It is still the correct
-          visibility, so it stays; the actual fault was the target format,
-          above.)
-        */
-        bindGroupLayouts: [layoutFromWgsl(this.device, AIR_SPLAT_WGSL, 'air splat', GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
-      }),
-      vertex: { module: module(AIR_SPLAT_WGSL), entryPoint: 'vs' },
-      fragment: {
-        module: module(AIR_SPLAT_WGSL),
-        entryPoint: 'fs',
-        targets: [{
-          format: 'rgba16float' as GPUTextureFormat,
-          blend: {
-            color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
-            alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
-          },
-        }],
-      },
-      primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
-    }));
+    const pipeline = this.pipelines.renderPipeline('air splat', splatRecipe(this.device));
 
     // Into the one that is not current, which then becomes current: what was
     // there is last frame's air, which is what the push differences against.

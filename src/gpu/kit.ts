@@ -50,7 +50,49 @@ type Pipelines = {
  * free (WebGPU has none for them), and a solver disposed mid-show must not
  * take its successor's pipelines with it.
  */
-const shared = new WeakMap<GPUDevice, { modules: Map<string, GPUShaderModule>; scopes: Map<string, Pipelines> }>();
+const shared = new WeakMap<GPUDevice, { modules: Map<string, GPUShaderModule>; scopes: Map<string, Pipelines>; index: number }>();
+
+/**
+ * How the show's pipelines came to be built, on every device this page has
+ * had: ahead of the show, off the frame (`prepareCompute`, `prepareRender`),
+ * or on a frame that needed one it did not have.
+ *
+ * The second kind is what froze the opening of every show on a fresh Mac.
+ * A pipeline asked for with `createComputePipeline` is handed back at once,
+ * but the GPU process compiles it before it does anything else, presenting
+ * frames included; the solver's first step asked for forty-odd of them, and
+ * on a runner whose Metal shader cache was cold the plate stopped for nine
+ * seconds with no animation frame at all (`npm run depth`, run 36243996678,
+ * "from load: longest stretch without a step"). A pipeline built ahead is
+ * compiled by the async path, which is the one WebGPU lets an implementation
+ * do off the thread that presents.
+ *
+ * So every build on a frame is written down, by scope, name and device, and
+ * `npm run startup` fails if a show's opening made any: that is the lists in
+ * `gpu/prepare.ts` falling behind what the show actually draws with.
+ *
+ * One ledger for the page and not one per device. It was per device, and a
+ * harness reading the current device's missed everything the devices before
+ * it had built: in a cloud session, where software WebGPU loses its device
+ * every few seconds, a pipeline dropped from the lists was built on six
+ * devices and the ledger showed one of them, 49 s in.
+ */
+export type PipelineLedger = {
+  /** Devices that have had pipelines, numbered from 1 in the order they asked. */
+  devices: number;
+  /** Built ahead and ready. */
+  ahead: number;
+  /** Built on a frame, in order: `scope/name`, when (ms since the page began) and on which device. */
+  onFrame: { name: string; at: number; device: number }[];
+};
+
+const ledger: PipelineLedger = { devices: 0, ahead: 0, onFrame: [] };
+
+function deviceStore(device: GPUDevice) {
+  let dev = shared.get(device);
+  if (!dev) { dev = { modules: new Map(), scopes: new Map(), index: ++ledger.devices }; shared.set(device, dev); }
+  return dev;
+}
 
 /**
  * Compute and render pipelines, built once per name. Shader modules are
@@ -64,13 +106,25 @@ export class PipelineCache {
   private readonly modules: Map<string, GPUShaderModule>;
   private readonly compute: Pipelines['compute'];
   private readonly render: Pipelines['render'];
+  private readonly ledger: PipelineLedger | null;
+  private readonly scope: string;
+  private readonly deviceIndex: number;
   constructor(
     private readonly device: GPUDevice,
-    store: { modules: Map<string, GPUShaderModule> } & Pipelines = { modules: new Map(), compute: new Map(), render: new Map() },
+    store: { modules: Map<string, GPUShaderModule>; scope?: string; device?: number } & Pipelines = { modules: new Map(), compute: new Map(), render: new Map() },
   ) {
     this.modules = store.modules;
     this.compute = store.compute;
     this.render = store.render;
+    // A private cache (the self-tests') is nobody's show, and stays off the ledger.
+    this.ledger = store.device ? ledger : null;
+    this.scope = store.scope ?? '';
+    this.deviceIndex = store.device ?? 0;
+  }
+
+  /** How the page's shared pipelines were built (see `PipelineLedger`). */
+  static ledger(): PipelineLedger {
+    return ledger;
   }
 
   /**
@@ -91,11 +145,10 @@ export class PipelineCache {
    * source, which cannot collide.
    */
   static for(device: GPUDevice, scope: string): PipelineCache {
-    let dev = shared.get(device);
-    if (!dev) { dev = { modules: new Map(), scopes: new Map() }; shared.set(device, dev); }
+    const dev = deviceStore(device);
     let pipes = dev.scopes.get(scope);
     if (!pipes) { pipes = { compute: new Map(), render: new Map() }; dev.scopes.set(scope, pipes); }
-    return new PipelineCache(device, { modules: dev.modules, ...pipes });
+    return new PipelineCache(device, { modules: dev.modules, scope, device: dev.index, ...pipes });
   }
 
   module(code: string, label?: string): GPUShaderModule {
@@ -119,24 +172,76 @@ export class PipelineCache {
    * with two entry points (the pressure self-test's) gets both.
    */
   computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline {
-    const key = entryPoint === 'main' ? name : `${name}@${entryPoint}`;
-    let bySource = this.compute.get(key);
-    if (!bySource) { bySource = new Map(); this.compute.set(key, bySource); }
+    const bySource = this.computeSlot(name, entryPoint);
     let p = bySource.get(code);
     if (!p) {
-      const layout = this.device.createPipelineLayout({ label: name, bindGroupLayouts: [layoutFromWgsl(this.device, code, name)] });
-      p = this.device.createComputePipeline({ label: name, layout, compute: { module: this.module(code, name), entryPoint } });
+      p = this.device.createComputePipeline(this.computeDescriptor(name, code, entryPoint));
       bySource.set(code, p);
+      this.onFrame(name);
     }
     return p;
   }
 
-  renderPipeline(name: string, make: (module: (code: string) => GPUShaderModule) => GPURenderPipelineDescriptor): GPURenderPipeline {
+  renderPipeline(name: string, make: RenderRecipe): GPURenderPipeline {
     let p = this.render.get(name);
-    if (!p) { p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) }); this.render.set(name, p); }
+    if (!p) {
+      p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) });
+      this.render.set(name, p);
+      this.onFrame(name);
+    }
     return p;
   }
+
+  /**
+   * The same pipeline `computePipeline` would build, built ahead with
+   * `createComputePipelineAsync` and left in the slot it would look in, so
+   * the frame that first asks finds it waiting.
+   *
+   * It never throws. A pipeline that will not build ahead (a validation
+   * error, a device lost mid-way) is left for the frame to build the old way,
+   * which is also where its error is reported the way every other one is.
+   */
+  async prepareCompute(name: string, code: string, entryPoint = 'main'): Promise<void> {
+    const bySource = this.computeSlot(name, entryPoint);
+    if (bySource.has(code)) return;
+    try {
+      const p = await this.device.createComputePipelineAsync(this.computeDescriptor(name, code, entryPoint));
+      if (bySource.has(code)) return;
+      bySource.set(code, p);
+      if (this.ledger) this.ledger.ahead++;
+    } catch { /* built on the frame instead (above) */ }
+  }
+
+  /** `renderPipeline`'s, ahead: see `prepareCompute`. */
+  async prepareRender(name: string, make: RenderRecipe): Promise<void> {
+    if (this.render.has(name)) return;
+    try {
+      const p = await this.device.createRenderPipelineAsync({ label: name, ...make((code) => this.module(code, name)) });
+      if (this.render.has(name)) return;
+      this.render.set(name, p);
+      if (this.ledger) this.ledger.ahead++;
+    } catch { /* built on the frame instead */ }
+  }
+
+  private computeSlot(name: string, entryPoint: string): Map<string, GPUComputePipeline> {
+    const key = entryPoint === 'main' ? name : `${name}@${entryPoint}`;
+    let bySource = this.compute.get(key);
+    if (!bySource) { bySource = new Map(); this.compute.set(key, bySource); }
+    return bySource;
+  }
+
+  private computeDescriptor(name: string, code: string, entryPoint: string): GPUComputePipelineDescriptor {
+    const layout = this.device.createPipelineLayout({ label: name, bindGroupLayouts: [layoutFromWgsl(this.device, code, name)] });
+    return { label: name, layout, compute: { module: this.module(code, name), entryPoint } };
+  }
+
+  private onFrame(name: string): void {
+    this.ledger?.onFrame.push({ name: `${this.scope}/${name}`, at: Math.round(performance.now()), device: this.deviceIndex });
+  }
 }
+
+/** A render pipeline's descriptor, given a way to get a shader module for a source. */
+export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURenderPipelineDescriptor;
 
 /**
  * The bind group layout a WGSL source describes, from its `@group(0)

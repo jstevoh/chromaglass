@@ -19,7 +19,7 @@
  * Both went with the WebGL renderer (P7); `npm run fx` covers this now.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
 import { BLIT_WGSL, FINISH_PASS_WGSL, STOCK_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
@@ -55,13 +55,32 @@ export interface StockSettings {
 /** As the GLSL's ring keeps: about half a second at sixty frames a second. */
 const RING_FRAMES = 32;
 /** The picture's own format. Storage and filterable on every WebGPU device. */
-const PICTURE_FORMAT: GPUTextureFormat = 'rgba16float';
+export const PICTURE_FORMAT: GPUTextureFormat = 'rgba16float';
 
 /** What the finish is told, from the show's own frame. */
 export interface FinishView {
   dimmer: number;
   markOn: number;
   markRect: readonly [number, number, number, number];
+}
+
+/*
+  A pass's pipeline as a recipe, apart from the class, so the frame and
+  `WebGPUPostChain.prepare` cannot describe two pipelines under one name.
+*/
+function passName(name: string, format: GPUTextureFormat, toTexture: boolean): string {
+  return `${name} ${format}${toTexture ? ' flipped' : ''}`;
+}
+
+function passRecipe(device: GPUDevice, name: string, code: string, format: GPUTextureFormat, toTexture: boolean, stages = GPUShaderStage.FRAGMENT): RenderRecipe {
+  return (module) => ({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [layoutFromWgsl(device, code, name, stages)],
+    }),
+    vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
+    fragment: { module: module(code), entryPoint: 'fs', targets: [{ format }] },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
 }
 
 export class WebGPUPostChain {
@@ -84,6 +103,24 @@ export class WebGPUPostChain {
   /** The mark, when the show has one; the finish composites it over the frame. */
   private markTexture: GPUTexture | null = null;
   private readonly blankMark: GPUTexture;
+
+  /**
+   * What a look with film stock draws with, built before the show opens
+   * (`gpu/prepare.ts`): the stock over the picture, the ring's copy, and the
+   * finish onto the canvas or into the projector's picture. Not the test
+   * effect, which is the harness's and in no look.
+   */
+  static prepare(device: GPUDevice, format: GPUTextureFormat): Promise<void>[] {
+    const cache = PipelineCache.for(device, 'post');
+    const pass = (name: string, code: string, f: GPUTextureFormat, toTexture: boolean) =>
+      cache.prepareRender(passName(name, f, toTexture), passRecipe(device, name, code, f, toTexture));
+    return [
+      pass('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true),
+      pass('ring blit', BLIT_WGSL, PICTURE_FORMAT, true),
+      pass('finish', FINISH_PASS_WGSL, format, false),
+      pass('finish', FINISH_PASS_WGSL, format, true),
+    ];
+  }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'post');
@@ -181,14 +218,7 @@ export class WebGPUPostChain {
   }
 
   private pipeline(name: string, code: string, format: GPUTextureFormat, toTexture: boolean, stages = GPUShaderStage.FRAGMENT): GPURenderPipeline {
-    return this.pipelines.renderPipeline(`${name} ${format}${toTexture ? ' flipped' : ''}`, (module) => ({
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [layoutFromWgsl(this.device, code, name, stages)],
-      }),
-      vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
-      fragment: { module: module(code), entryPoint: 'fs', targets: [{ format }] },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    }));
+    return this.pipelines.renderPipeline(passName(name, format, toTexture), passRecipe(this.device, name, code, format, toTexture, stages));
   }
 
   /**

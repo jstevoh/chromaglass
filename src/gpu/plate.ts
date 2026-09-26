@@ -15,7 +15,7 @@
  * into being told different things.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
@@ -53,6 +53,55 @@ export function pictureSize(image: CanvasImageSource): [number, number] {
   return [w, h];
 }
 
+/*
+  The derive and display pipelines as recipes, apart from the class, so the
+  frame that draws with them and `WebGPUPlate.prepare`, which builds them
+  before the show opens, cannot describe two different pipelines under one
+  name (the cache would hand the frame whichever was built first).
+*/
+function deriveRecipe(device: GPUDevice): RenderRecipe {
+  return (module) => ({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [layoutFromWgsl(device, DERIVE_WGSL, 'derive', GPUShaderStage.FRAGMENT)],
+    }),
+    /*
+      Flipped, as every pass into a texture another pass samples is (the
+      FLIP_Y note in wgsl/plate.ts). It was not, so the display, reading
+      this the way it reads the dye, lit each layer's relief from the
+      mirror of the plate across its middle: a drop or a press on the lead
+      plate was lit again on the other side, top to bottom, or left to
+      right on a plate turned a quarter. npm run derive measured the slopes
+      at 0.72,0.76 for dye at 0.72,0.24.
+    */
+    vertex: { module: module(DERIVE_WGSL), entryPoint: 'vs', constants: { FLIP_Y: -1 } },
+    fragment: { module: module(DERIVE_WGSL), entryPoint: 'fs', targets: [{ format: 'rgba16float' as GPUTextureFormat }] },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
+}
+
+function displayName(format: GPUTextureFormat, toTexture: boolean): string {
+  return `display ${format}${toTexture ? ' flipped' : ''}`;
+}
+
+function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+  return (module) => {
+    const code = plateWgsl(DISPLAY_MAIN);
+    return {
+      layout: device.createPipelineLayout({
+        bindGroupLayouts: [layoutFromWgsl(device, code, 'display', GPUShaderStage.FRAGMENT)],
+      }),
+      vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
+      fragment: {
+        // The fragment stage needs to know too: an override is set per stage,
+        // and without it the fragment read FLIP_Y as 1 on both paths.
+        module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
+        targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
+      },
+      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+    };
+  };
+}
+
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -69,6 +118,23 @@ export class WebGPUPlate {
   private readonly blank: GPUTexture;
   /** The same, for the packed view (unsigned integers). */
   private readonly blankU: GPUTexture;
+
+  /**
+   * Everything a frame of the plate draws with, built before the show opens
+   * (`gpu/prepare.ts`): the two packs, the derive, and the display into the
+   * canvas and flipped into the picture the next pass takes, which is the
+   * canvas's format for the camera and the projector and the post chain's
+   * half floats for film stock (`picture`).
+   */
+  static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat): Promise<void>[] {
+    const cache = PipelineCache.for(device, 'plate');
+    return [
+      ...(['packDye', 'packVel'] as const).map((name) => cache.prepareCompute(name, PACK_KERNELS[name])),
+      cache.prepareRender('derive', deriveRecipe(device)),
+      cache.prepareRender(displayName(format, false), displayRecipe(device, format, false)),
+      ...[...new Set([format, picture])].map((f) => cache.prepareRender(displayName(f, true), displayRecipe(device, f, true))),
+    ];
+  }
 
   constructor(private readonly device: GPUDevice, readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'plate');
@@ -218,23 +284,7 @@ export class WebGPUPlate {
     packPass.end();
 
     // ── Derive ──────────────────────────────────────────────────────
-    const derive = this.pipelines.renderPipeline('derive', (module) => ({
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [layoutFromWgsl(this.device, DERIVE_WGSL, 'derive', GPUShaderStage.FRAGMENT)],
-      }),
-      /*
-        Flipped, as every pass into a texture another pass samples is (the
-        FLIP_Y note in wgsl/plate.ts). It was not, so the display, reading
-        this the way it reads the dye, lit each layer's relief from the
-        mirror of the plate across its middle: a drop or a press on the lead
-        plate was lit again on the other side, top to bottom, or left to
-        right on a plate turned a quarter. npm run derive measured the slopes
-        at 0.72,0.76 for dye at 0.72,0.24.
-      */
-      vertex: { module: module(DERIVE_WGSL), entryPoint: 'vs', constants: { FLIP_Y: -1 } },
-      fragment: { module: module(DERIVE_WGSL), entryPoint: 'fs', targets: [{ format: 'rgba16float' as GPUTextureFormat }] },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    }));
+    const derive = this.pipelines.renderPipeline('derive', deriveRecipe(this.device));
     for (let i = 0; i < fields.length; i++) {
       const pass = encoder.beginRenderPass({
         label: `derive ${i}`,
@@ -254,20 +304,7 @@ export class WebGPUPlate {
     }
 
     // ── Display ─────────────────────────────────────────────────────
-    const code = plateWgsl(DISPLAY_MAIN);
-    const display = this.pipelines.renderPipeline(`display ${format}${toTexture ? ' flipped' : ''}`, (module) => ({
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [layoutFromWgsl(this.device, code, 'display', GPUShaderStage.FRAGMENT)],
-      }),
-      vertex: { module: module(code), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
-      fragment: {
-        // The fragment stage needs to know too: an override is set per stage,
-        // and without it the fragment read FLIP_Y as 1 on both paths.
-        module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
-        targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
-      },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    }));
+    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
 
     // The second target is what the camera pass reads: the normal, the dye's
     // height and the bubble mask. It is written whether or not that pass is
