@@ -1241,8 +1241,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     So each cell's dye is scaled by the flow's expansion there: exp(-div·dt),
     the continuity equation's own factor, thinned where the liquid spreads
-    and thickened where it gathers. The divergence is of the velocity the dye
-    was just carried by, in the same units: A.a.x is the displacement per
+    and thickened where it gathers. The divergence is of the projected
+    velocity (fluid.ts says why not the forced one the dye rides), in the
+    advection's units: A.a.x is the displacement per
     unit velocity (uv), and the central difference over two cells is
     (v+ − v−)·N/2 per uv. Clamped so a single step never scales by more than
     e^±0.7, which a runaway velocity could otherwise ask for.

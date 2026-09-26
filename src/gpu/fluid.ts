@@ -982,9 +982,21 @@ export class WebGPUFluid {
     const a = p.dt * p.diff * n2;
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
-    // And its continuity term: thinned where that flow spreads, thickened where it gathers (see `dilute`).
+    /*
+      And its continuity term (see `dilute`), from the projected velocity,
+      not the forced one the dye rides.
+
+      The projected velocity's divergence is the plate's intended sources
+      and nothing else: the squeeze film under a press and the air a bubble
+      displaces. The forced one also carries the depth's drag, which slows
+      the flow unevenly and so has a divergence of its own, and the lasting
+      current, which is projected on its own coarser grid. Taken from that,
+      the term moved dye wherever the drag varied; the dye feeds the forces
+      that make the flow, and on a flat plate with the drag on the centre's
+      speed ran from 0.64 to 3.55 (npm run depth, CI).
+    */
     stage('dye continuity', (pass) => {
-      this.run(pass, 'dilute', this.dye.write, [this.dye.read, this.velForced], this.arg('dilute', [disp, 0, 0, 0]));
+      this.run(pass, 'dilute', this.dye.write, [this.dye.read, this.vel.read], this.arg('dilute', [disp, 0, 0, 0]));
       this.dye.swap();
     });
     /*
