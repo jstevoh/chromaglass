@@ -86,6 +86,15 @@ jobs:
       - name: The bands
         run: npm run bands
 
+      # Sound learn: controls bound to the music. A synthesised song through
+      # the analyser, the beat clock and the trigger engine frame by frame: a
+      # kick trigger fires once per kick and never on a hat, ahead of the heard
+      # onset once the clock is locked; a mapping moves its setting by its depth
+      # and two add and clamp; the map file round-trips; and with the music
+      # stopped nothing fires.
+      - name: Sound learn
+        run: npm run learn
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments

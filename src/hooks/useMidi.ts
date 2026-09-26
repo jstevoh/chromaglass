@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { unhandled } from '../lib/unhandled';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
-  parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover,
+  parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover, sameSoundBinding, withLoadedMap,
   MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, settingLed, curveOf, valueAt, travelOf,
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
+  type SoundBinding,
 } from '../lib/midi';
 import { SurfaceWatcher, buildAutoMap } from '../lib/autoMap';
 import { PIN_RANGE, onStep } from '../lib/deskPins';
@@ -78,8 +79,10 @@ const hasWebMidi = () => typeof navigator !== 'undefined' && typeof (navigator a
 
 // Unseeded on purpose (`npm run seed` allows it): a binding's name in saved
 // MIDI maps, never on the plate, and it must not repeat across sessions that
-// share a `?seed=` or two bindings would collide.
-const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
+// share a `?seed=` or two bindings would collide. One helper for controller
+// bindings (`b-`) and music bindings (`s-`) alike, so the seed gate's count of
+// unseeded draws in this file stays the one it allows and names.
+const newId = (prefix: 'b' | 's' = 'b') => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * The tempo, if the desk is sending it.
@@ -582,16 +585,23 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   /** Move a binding onto a shift layer, or (undefined) back to always-live. */
   const setBindingBank = useCallback((id: string, bankIndex: number | undefined) =>
     setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, bank: bankIndex } : b) })), [setMap]);
-  const clearMap = useCallback(() => setMap(prev => ({ ...prev, bindings: [] })), [setMap]);
+  // Clear is "remove every binding", and says so on its button: the music's too.
+  const clearMap = useCallback(() => setMap(prev => ({ ...prev, bindings: [], sound: [] })), [setMap]);
   const rename = useCallback((name: string) => setMap(prev => ({ ...prev, name })), [setMap]);
+  /*
+    A factory map, an auto-map and a loaded file each replace the controller's
+    bindings, and none of them may take the music's with them: a factory map
+    knows the hardware and nothing about the kick, and the rig's sound
+    bindings are not the controller's to throw away (`withLoadedMap`).
+  */
   const loadFactory = useCallback((which: FactoryMapId) => {
-    setMap(
+    const next =
       which === 'apc-mini-mk2' ? apcMiniMk2Map(presetIds)
       : which === 'apc40-mk2' ? apc40Mk2Map(presetIds)
       : which === 'launchpad' ? launchpadMap(presetIds)
       : which === 'launch-control-xl' ? launchControlXlMap()
-      : nanoKontrol2Map(),
-    );
+      : nanoKontrol2Map();
+    setMap(prev => withLoadedMap(prev, next));
     takeover.reset();
   }, [presetIds, setMap, takeover]);
   /*
@@ -623,7 +633,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const controls = watch.controls();
     if (controls.length === 0) return null;
     const { map, summary } = buildAutoMap(controls, presetIds, PALETTE.length, deviceName ?? null);
-    setMap(map);
+    setMap(prev => withLoadedMap(prev, map));
     takeover.reset();
     return summary;
   }, [presetIds, setMap, takeover]);
@@ -635,9 +645,23 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   }, []);
   const importFile = useCallback(async (file: File) => {
     const m = parseMidiMap(await file.text());
-    setMap(m);
+    setMap(prev => withLoadedMap(prev, m));
     takeover.reset();
   }, [setMap, takeover]);
+  /**
+   * Bind a control to the music (sound learn, PLAN §5).
+   *
+   * No "touch it" step, unlike a fader: there is nothing to wait for, the
+   * source is picked from a list. The same source onto the same target again
+   * replaces the first (a new depth), so a mapping cannot be doubled by
+   * learning it twice. Always live, on every bank: a shift layer is for hands
+   * that run out of faders, and the music has no faders to run out of.
+   */
+  const learnSound = useCallback((b: Omit<SoundBinding, 'id'>) => setMap(prev => ({
+    ...prev,
+    sound: [...(prev.sound ?? []).filter(x => !sameSoundBinding(x, b)), { ...b, id: newId('s') }],
+  })), [setMap]);
+  const removeSound = useCallback((id: string) => setMap(prev => ({ ...prev, sound: (prev.sound ?? []).filter(b => b.id !== id) })), [setMap]);
   /** A binding written by hand (the panel's "add" without touching the controller). */
   const addBinding = useCallback((b: Omit<MidiBinding, 'id'>) => setMap(prev => ({ ...prev, bindings: [...prev.bindings.filter(x => sourceKey(x.source) !== sourceKey(b.source)), { ...b, id: newId() }] })), [setMap]);
 
@@ -652,6 +676,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
     learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding,
+    learnSound, removeSound,
     softTakeover, setSoftTakeover: setSoftTakeoverOn,
     lastEvent,
     clocked,

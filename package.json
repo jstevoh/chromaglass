@@ -34,6 +34,7 @@
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
     "bands": "node --experimental-strip-types scripts/bands.mjs",
+    "learn": "esbuild scripts/learn.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/learn.mjs && node node_modules/.cache/learn.mjs",
     "render": "node --experimental-strip-types scripts/render.mjs",
     "render-lab": "node scripts/render-lab.mjs",
     "render-app": "npm run build && node scripts/render-app.mjs",
