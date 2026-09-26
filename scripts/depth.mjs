@@ -67,7 +67,22 @@ try {
 
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.
-  const set = (o) => page.evaluate((s) => Object.assign(window.chromaglassDebug().settings, s), o);
+  /*
+    Through the app's own setter, as every other harness does, not by
+    writing into the object the debug hook hands back.
+
+    That object is a snapshot of React's state. Writing into it reached the
+    solver as long as nothing else set the settings, and the next thing that
+    did (the automation's tick among them: automateRate went off in the same
+    write) built its new settings from React's state, where none of this
+    was, and threw it away. The dome check then read the plate at its
+    nominal gap everywhere, as if never curved: centre 0.0300, rim 0.0300,
+    where the runs either side read 0.0581 and 0.0144.
+  */
+  const set = (o) => page.evaluate((s) => {
+    const via = window.chromaglassSettings;
+    if (via) via(s); else Object.assign(window.chromaglassDebug().settings, s);
+  }, o);
   await set({ automateRate: 0, plateCurve: CURVE, depthDrag: 0 });
   await page.waitForTimeout(6000);
 
