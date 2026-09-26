@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SongMap, SongSection, TrackIdentity } from '../lib/musicTypes';
 import { songRefFromTrack, songLabel } from '../lib/songRef';
+import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import { dueActions, describeWhat, describeWhen, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
 
 /**
@@ -75,7 +76,7 @@ export function useSongShows(a: Args): SongShowRuntime {
   const runRef = useRef<{
     show: SongShow;
     manual: boolean;
-    startedAt: number;         // performance.now() at t = 0, for a manual clock
+    startedAt: number;         // showNow() at t = 0, for a manual clock (lib/showClock.ts)
     kicksAtStart: number;
     fired: FiredState;
     trackIsrc: string | null;
@@ -86,7 +87,7 @@ export function useSongShows(a: Args): SongShowRuntime {
     const x = argsRef.current;
     runRef.current = {
       show, manual,
-      startedAt: performance.now() - fromSec * 1000,
+      startedAt: showNow() - fromSec * 1000,
       kicksAtStart: x.kicks(),
       fired: new Map(),
       trackIsrc: x.track?.isrc ?? null,
@@ -129,7 +130,7 @@ export function useSongShows(a: Args): SongShowRuntime {
 
   // The clock: ten times a second is finer than any action needs.
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timer = showInterval(() => {
       const run = runRef.current;
       const x = argsRef.current;
       if (!run || !x.isActive) return;
@@ -138,7 +139,7 @@ export function useSongShows(a: Args): SongShowRuntime {
       if (!found) { stop(); return; }
       const current = skipRef.current.size ? { ...found, actions: found.actions.filter((act) => !skipRef.current.has(act.what.do)) } : found;
       run.show = current;
-      const t = run.manual ? (performance.now() - run.startedAt) / 1000 : Math.max(0, x.positionSec);
+      const t = run.manual ? (showNow() - run.startedAt) / 1000 : Math.max(0, x.positionSec);
       const duration = durationRef.current ?? x.track?.durationSec ?? current.song.durationSec ?? null;
       const clock: SongClock = {
         t, duration,
@@ -153,8 +154,8 @@ export function useSongShows(a: Args): SongShowRuntime {
       if (run.manual && duration !== null && t > duration + 2) { stop(); return; }
       setStatus((s) => (s.showId === current.id && Math.floor(s.t) === Math.floor(t) && s.last === run.last ? s
         : { showId: current.id, song: songLabel(current.song), t, manual: run.manual, last: run.last }));
-    }, 100);
-    return () => clearInterval(timer);
+    }, 100, 'song-show');
+    return () => clearShowInterval(timer);
   }, [stop]);
 
   return { status, start, stop };
