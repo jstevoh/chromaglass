@@ -41,7 +41,20 @@ and by what would otherwise force a rebase later.
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-**This is first because it is red now.** `npm run tools` fails on `main` about two
+**Done in the sandbox; the Mac has the last word.** The dye's advection now thins
+where the flow spreads and thickens where it gathers (the Jacobian of the
+backtrace, in `macCormack`), with a gathering cell held to the most its upstream
+cells held. The Finger's own velocity was never the source — in the lab it moves
+the plate's total by 0.0% — the fingering push added after the projection was:
+it runs along the dye's gradient, the Finger's carry makes that gradient steep,
+and the backtrace copied the dye outward (lab, the Finger's path under the
+push: 636 → 756 against 687 left alone; now 622 → 588 against 612). Holding
+the gathering side matters: carried conservatively, a push up the gradient is
+diffusion run backwards and grew a speck from 1.0 to the 6.0 ceiling in under
+five seconds. `npm run tools`, `plates` and `detail` read frames and did not run here;
+they are what says whether it is green and what it did to the sharpness.
+
+**This was first because it was red.** `npm run tools` fails on `main` about two
 runs in three, and the deploy is gated on it, so every merge queues behind a coin
 toss. Four deploys failed in a row on 2026-09-26 before one got through.
 

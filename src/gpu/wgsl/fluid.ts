@@ -1229,7 +1229,48 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let mn = min(min(a, b), min(c, d));
   let mx = max(max(a, b), max(c, d));
   let r = textureSampleLevel(phi1, lin, uv, 0.0) + 0.5 * (textureSampleLevel(phi0, lin, uv, 0.0) - textureSampleLevel(phi0b, lin, uv, 0.0));
-  let o = clamp(r, mn, mx);
+  var o = clamp(r, mn, mx);
+  /*
+    A.a.y is 1 for the dye: what is carried is an amount on the plate, and
+    where the flow spreads it has to thin.
+
+    A backtrace copies the value at the foot of the path, which is right for
+    a flow that neither spreads nor gathers and wrong for one that does:
+    the cell's dye came from a patch of plate smaller than the cell where
+    the flow diverges (larger where it converges), and a copy spreads it
+    over more plate than it came from. The flow the dye rides diverges in
+    several places on purpose — a press and the beat squeeze are sources
+    in the projection, a bubble's air is another, and the forces added
+    after the projection (fingering, tension, the drip) are not projected
+    at all — so the plate made dye wherever they spread it, and destroyed
+    it wherever they gathered it. The Finger showed it worst: its carry
+    makes steep edges, the fingering push runs along the dye's own
+    gradient, and where the push ran outward the plate gained forty to
+    sixty per cent of what it held (npm run tools, 592 -> 899; in the lab,
+    the Finger's own path under the fingering push, 636 -> 756 against 687
+    left alone). The patch's size is the Jacobian of the backtrace,
+    1 - disp * div(v) to first order, taken here as its exponential so it
+    cannot go negative, and held to a factor of about 1.6 either way in a
+    single step so one bad texel of velocity cannot empty or flood a cell.
+
+    And a gathering flow may thicken a cell only up to the most dye the
+    cells it came from held. The fingering push is a push up the gradient
+    where its noise is negative, and carried conservatively that is
+    diffusion run backwards: in the lab a plate whose densest cell was 1.0
+    grew a speck at the ceiling (6.0) inside five seconds. Held to its
+    neighbourhood it cannot make a new peak, and what the hold keeps out is
+    lost, as the ceiling's own cap loses it: 3 per cent in that window,
+    where the backtrace alone lost 5.
+  */
+  if (A.a.y > 0.5) {
+    let vR = textureLoad(vel, clampP(q + vec2i(1, 0), S.n), 0).x;
+    let vL = textureLoad(vel, clampP(q - vec2i(1, 0), S.n), 0).x;
+    let vU = textureLoad(vel, clampP(q + vec2i(0, 1), S.n), 0).y;
+    let vD = textureLoad(vel, clampP(q - vec2i(0, 1), S.n), 0).y;
+    let div = ((vR - vL) + (vU - vD)) * 0.5 * S.n;
+    let j = exp(clamp(-A.a.x * div, -0.5, 0.5));
+    o = select(o * j, min(o * j, max(mx, o)), j > 1.0);
+  }
   textureStore(dst, q, select(vec4f(0.0), o, finite4(o)));
 }`,
 
