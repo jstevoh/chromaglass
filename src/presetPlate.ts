@@ -49,6 +49,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'chemical-clock':     [7, 15],              // a pale dish for the reaction's own red and blue
   'agate':              [12, 13],             // sienna and coffee, an agate's browns
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
+  'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
+  'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
   'clock-glass':        [23, 7, 20],            // the second projector: emerald, purple, cobalt
   'oil-on-water':       [0, 1],
@@ -111,6 +113,8 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'chemical-clock':     ['drop'],
   'agate':              ['drop'],
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
+  'ferro-maze':         ['pour'],
+  'ferro-paint':        ['drop', 'pour'],
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
 };
@@ -206,6 +210,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'chemical-clock':     ['water'],
   'agate':              ['water'],
   'magnet-garden':      ['water', 'oil'],
+  'ferro-maze':         ['water', 'oil'],
+  'ferro-paint':        ['water', 'oil', 'water'],
   'home-movie':         ['water', 'water', 'soap'],
   // Syrup finds the low point of a curved glass, which is the middle.
   'clock-glass':        ['water', 'syrup'],

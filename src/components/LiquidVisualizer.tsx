@@ -22,6 +22,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
+import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -32,7 +33,8 @@ import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
-import { LEARNABLE_SETTINGS } from '../lib/midi';
+import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
+import { SoundLearn } from '../lib/soundLearn';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
@@ -133,6 +135,14 @@ interface LiquidVisualizerProps {
    * so putting it in state would re-render the app around it for nothing.
    */
   tempoRef?: React.MutableRefObject<TempoSource | null>;
+  /**
+   * What the music is bound to (sound learn, PLAN §5; the MIDI map's
+   * `sound`). Mappings are folded with the look's own patches, triggers are
+   * stepped against the beat clock here, where the clock is, and handed back
+   * through `onSoundTrigger` to run as the action, preset or dye they name.
+   */
+  soundBindings?: readonly SoundBinding[];
+  onSoundTrigger?: (binding: SoundBinding) => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -813,12 +823,19 @@ class FluidSimulation {
     this.meanColor = [0, 0, 0];
     this.lastSettings = null;
     this.lastStep = null;
+    this.cellClock = 0;
     this.rbSeq = 0;
     this.rimSeq = -1;
     this.prevCount = 0;
     this.coverCount = 0;
     this.fillingHoles = [];
   }
+  /**
+   * The dye's own travel, counted in plate-seconds at the default Advection
+   * and wrapped (lib/detailFlow.ts): the clock the closeup's drawn cells
+   * slide and breathe on, so they go exactly as far as the paint did.
+   */
+  cellClock = 0;
   /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
   get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
@@ -2085,6 +2102,19 @@ class FluidSimulation {
         break;
       }
 
+      case 'ferro-paint': {
+        // A patchwork of the three dyes over the whole plate, touching, so
+        // the ferrofluid fingers through colour everywhere and amber meets
+        // teal (the references' green) along the seams.
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+          const c = col(i + j * 2);
+          const x = S * (0.14 + i * 0.24) + Math.sin(j * 1.7 + i) * 4 * k;
+          const y = S * (0.14 + j * 0.24) + Math.cos(i * 1.3 + j) * 4 * k;
+          this.splatBlob(x, y, S * 0.15, 2.0, c.r, c.g, c.b);
+        }
+        break;
+      }
+
       case 'clock-glass': {
         // Curved glasses gather the liquid in the middle; seed it there, in
         // rings, so the dome has something to hold from the first frame.
@@ -2099,6 +2129,9 @@ class FluidSimulation {
       // and the light are the subject, not a seed of blobs.
       case 'sensual-laboratory':
       case 'lumia':
+      // Ferro Maze is ink on a white light table: the ferrofluid is the
+      // picture, poured with the look (layPhase), and the glass stays clear.
+      case 'ferro-maze':
         break;
       default: {
         for (let i = 0; i < 5; i++) {
@@ -2651,11 +2684,13 @@ class FluidSimulation {
     */
     const wantDt = dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP);
     // Finite first, then clamped: a clamp cannot catch a NaN, it carries one.
-    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, 0.0000001), 0.05) : 0.0000001;
+    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, DT_FLOOR), 0.05) : DT_FLOOR;
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
     this.lastStep = p;
+    // The closeup's cells ride this: as far as this step moves the dye.
+    this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
     if (this.gpu) {
       const applied = this.dirty;
@@ -3064,6 +3099,7 @@ class FluidSimulation {
       ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
+      mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
@@ -3613,9 +3649,10 @@ interface FrameView {
   macroOn: boolean;
   macroAmount: number;
   isDarkBlend: boolean;
-  /** The frame's own peak speed, and what it works out to in cells a second. */
-  velRange: number;
+  /** Plate-uv per unit of the cell clock per unit of solver velocity (lib/detailFlow.ts). */
   flowRate: number;
+  /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
+  cellClock: number;
 
   // What the show worked out this frame and the renderer only spends.
   /** Where each plate has turned to. */
@@ -3718,7 +3755,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4037,6 +4074,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
+  /*
+    Sound learn, read by the loop through refs like every other live prop: the
+    bindings change when the map does, the trigger handler on every render of
+    the app, and neither is a reason to rebuild the loop.
+  */
+  const soundLearnRef = useRef(new SoundLearn());
+  const soundBindingsRef = useRef(soundBindings);
+  soundBindingsRef.current = soundBindings;
+  const onSoundTriggerRef = useRef(onSoundTrigger);
+  onSoundTriggerRef.current = onSoundTrigger;
   /**
    * The plate's phrasing: what it should be doing this second.
    *
@@ -4983,7 +5030,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
-      }, settingsRef.current.layerCount ?? 1, showNow());
+      }, settingsRef.current.layerCount ?? 1, showNow(),
+      // Sound learn's mappings: the rig's, not the look's, folded the same way.
+      soundLearnRef.current.patchesOf(soundBindingsRef.current));
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -5115,6 +5164,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
+          /*
+            Sound learn's triggers, right after the clock has decided this
+            frame's beat, so a trigger on the kick and the plate's own kick
+            reactions are promised the same beat by the same clock
+            (`soundLearn.ts`). Paused, the show hears nothing: the engine is
+            handed no reading and forgets its patterns, so nothing fires until
+            the music is back and has been heard again.
+          */
+          const learned = soundBindingsRef.current;
+          if (learned && learned.length > 0) {
+            const clock = beatClockRef.current;
+            const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
+            const fired = soundLearnRef.current.step(nowMs, heard, {
+              period: clock.period,
+              nextBeat: clock.nextBeat,
+              locked: clock.isLocked(nowMs, trust),
+              leadMs: Math.max(0, currentSettings.beatLead ?? 0),
+            }, learned);
+            for (const f of fired) onSoundTriggerRef.current?.(f.binding);
+          }
           /*
             Soap Bursts: with Soap Flow up, a drop of soap lands on the beat
             somewhere on the plate and the Marangoni flow blows the dye out
@@ -6815,26 +6884,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // rather than the show's. They are the same numbers in the same
         // order; the draw now only reads them. (docs/webgpu-plan.md, P3.)
 
-        // Velocity range for the macro detail pass, encoded against the
-        // frame's own peak speed so slow and fast passages both resolve;
-        // u_flowRate converts back to fluid-UV per second in the shader.
-        let flowRate = 0;
-        let velRange = 1e-3;
-        if (macroOn) {
-          const probe = fluidsRef.current[0];
-          const pvx = probe.readVx, pvy = probe.readVy;
-          for (let j = 2; j < GRID_SIZE - 2; j += 4) {
-            for (let i = 2; i < GRID_SIZE - 2; i += 4) {
-              const idx = i + j * GRID_SIZE;
-              const ax = Math.abs(pvx[idx]), ay = Math.abs(pvy[idx]);
-              if (ax > velRange) velRange = ax;
-              if (ay > velRange) velRange = ay;
-            }
-          }
-          // cells advected per second = v * (dt * (N-2)) / N / realDt
-          const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
-          flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
-        }
+        // How far the macro detail slides with the paint: plate-uv per unit
+        // of the cell clock per unit of the solver's velocity, which the
+        // shader multiplies the packed flow by. Zero at the plate itself,
+        // where the detail holds still, as it always has.
+        /*
+          A constant, and the clock does the work (lib/detailFlow.ts).
+
+          This was one step's travel over this frame's `realDt`, and the
+          closeup's cells slide by the flow times their whole life so far, so
+          every frame time that was not exactly a sixtieth moved all of them
+          at once: the reported jitter at 6x, where the cells are big enough
+          to see. Now the lead plate counts its dye's travel step by step
+          (`cellClock`) and the cells slide on that, so nothing measured from
+          a frame is in it. It also no longer needs the frame's peak speed,
+          which it read off a sparse pass over the grid every frame: the flow
+          is packed raw, in half float, which needs no range (pack.ts).
+        */
+        const flowRate = macroOn ? CELL_TRAVEL : 0;
+        const cellClock = fluidsRef.current[0]?.cellClock ?? 0;
 
         // The kaleidoscope's phase is integrated here rather than in the
         // shader, so a change of rate does not move where the rig already is.
@@ -6968,6 +7036,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             diceModulators: streamDraws('plate.modulators'),
             dicePhrasing: streamDraws('plate.phrasing'),
             macroClock: macroCamRef.current.time,
+            cellClock: f0?.cellClock ?? null,
             magnetHand: magnetHandRef.current ? `${magnetHandRef.current.x},${magnetHandRef.current.y},${magnetHandRef.current.at}` : 'none',
             magnetLook: magnetLookRef.current ? `${magnetLookRef.current.x},${magnetLookRef.current.y}` : 'none',
             rbCentre: rd?.[cell(0.5, 0.5)] ?? -1,
@@ -6981,7 +7050,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const lum = renderer?.drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
-          velRange, flowRate,
+          flowRate, cellClock,
           rotations: rotationAnglesRef.current,
           harmony: harmonyRef.current,
           lamp: lampRef.current,
@@ -7104,9 +7173,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         in show milliseconds, which in a render start at 2^20 and live are
         the page's age. Kept across the hand-back, a young page's live clock
         read the render's stamps as in the future and held a lock on a beat
-        nobody was playing.
+        nobody was playing. Sound learn's pattern is stamped on the same
+        clock (the beat it last decided on, the recent levels), so it forgets
+        with the clock: kept, the render's first beats would sit before the
+        live show's last decided one and no trigger would fire until the
+        render's clock had caught up with the page's age.
       */
       beatClockRef.current = new BeatClock();
+      soundLearnRef.current.reset();
     };
     const resetPlateClocks = () => {
       resetStamps();
@@ -8035,7 +8109,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               plate.draw(
                 encoder,
                 cam ? cam.sceneView(size.width, size.height) : afterEffects,
-                size, live, Math.max(view.velRange, 1e-6),
+                size, live,
                 stage?.profiler.renderPass('plate'),
                 !!cam || !!post || !!out,
                 plateFormat,

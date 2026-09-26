@@ -104,6 +104,41 @@ the frame from 43 ms to 18. On frozen frames the two paths come out within one
 If a highlight or an interface line looks faceted, softer or shifted with it
 on, that is the thing to report.
 
+## 7. The closeup's cells, riding the paint
+
+At about 6x the closeup's drawn cells and lacing used to shake: they slid by
+the flow times the frame's own measured time, and a browser's frames are never
+quite equal. They now slide on a clock the solver's steps advance by exactly as
+far as they move the dye, so on steady paint they should sit still at any
+zoom. They also now go at the paint's speed: before, at the default Speed they
+lagged at about a quarter of it on a 60 Hz screen and half on 120 Hz, and on
+fast looks raced ahead of it several times over. A faster pour now cycles its
+cells faster; at the default Advection they breathe at the pace they did.
+The plate's own cells at 1x are untouched, and now slide in over the first
+notches of the zoom instead of jumping when it leaves 1x.
+
+Push in to 6x and past on a filled plate, with and without music. What to
+report: any shimmer still there; whether cells now stretch or smear more in a
+swirl, since keeping up with the paint means about four times the slide they
+had at the default Speed on a 60 Hz screen; and on fast, changing paint
+whether the cells hop. The solver keeps its velocity in half float, and on the fastest paint a
+changing flow crossing one of its steps can still hop the cells by about a
+frame's travel (`npm run cellride` prints it); if that shows, the fixes are a
+full-float velocity or shorter-lived cells when zoomed in.
+
+## 8. Maze Detail, and Ferro Maze at 0.5
+
+The Labyrinth's fingers can now be up to three times finer (Maze Detail), and
+Ferro Maze uses 0.5, about half the old finger width. It has only been seen in
+the lab, on software WebGPU at 512². Two things to look at. On the hosted site
+(512²), Ferro Maze and Maze Detail pushed to the top: past about 0.6 the
+slider does nothing there, and right at that point some half-formed fingers
+draw as brown film rather than black. On a local run (768² or 1024²), the
+full range: whether the finest maze stays black and solid, with no grid
+printed through it, since the maze's force per cell is strongest there and
+`npm run maze` only measures 512². What to report: the setting where it
+starts to look like the references, and any shimmer or brown haze.
+
 ---
 
 ## Reading the frame time while you do it
