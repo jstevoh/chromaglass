@@ -82,7 +82,9 @@ export async function viaPalette(page, query) {
  * run at given seconds into the take ({ at, query }); each comes back with
  * `ran`, the second it was actually chosen (the palette takes most of a
  * second, and a check that plants something must know where it landed).
- * Resolves to `{ ok, cues, reason }`; `ok` is false when no file came back.
+ * Resolves to `{ ok, cues, t0, reason }`; `ok` is false when no file came
+ * back, and `t0` is the wall-clock millisecond the take's second 0 is counted
+ * from, so a page's own `Date.now()` samples can be placed on the take.
  */
 export async function recordTake(page, seconds, file, cues = []) {
   await viaPalette(page, 'Record the plate');
@@ -98,7 +100,7 @@ export async function recordTake(page, seconds, file, cues = []) {
   const download = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
   await viaPalette(page, 'Stop recording');
   const got = await download;
-  if (!got) return { ok: false, cues: ran, reason: 'no download within 20 s of Stop: an empty recording, or the recorder failed to start' };
+  if (!got) return { ok: false, cues: ran, t0, reason: 'no download within 20 s of Stop: an empty recording, or the recorder failed to start' };
   await got.saveAs(file);
-  return { ok: true, cues: ran };
+  return { ok: true, cues: ran, t0 };
 }
