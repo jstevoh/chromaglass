@@ -92,6 +92,45 @@ export function mergeStretch(Rb: number, Rs: number, Rnew: number): number {
   return Math.min(0.5, Math.max(0, Rnew / Math.max(Rb, Rs, 1e-6) - 1));
 }
 
+/*
+  The size a new drop is born at, in cells at 192 before the size slider.
+  An emulsion made by shaking or stirring, which is what a plate of oil
+  pushed round by a hand or a current is, breaks drop into drop over and
+  over, and a size made by many breaks in a row is the product of many
+  random fractions: its logarithm is a sum, so it comes out log-normal
+  (the research on bubbles and drops, item 9; L'Estime et al. 2024). The
+  rings drew from two made-up pools instead, eight in ten small and a big
+  tail. That mix's commonest size is its smallest, 0.45 cells, thinning
+  slowly from there with a bump at 1.8 where the big pool starts. A
+  photograph of a shaken emulsion shows a typical drop first: a log-normal
+  has one, its commonest size per doubling at the median, about 1.2
+  cells, thinning to both ends. So there are about half as many of the
+  smallest drops (0.45 to 0.64 cells: 21 per cent before, 12 after) and
+  more in the middle.
+
+  The spread is the wide end of the 0.4 to 0.7 the research gives for
+  shaken emulsions, since the show wants its range of sizes (0.45 to 5.2,
+  and 17:1 in a cluster once the droplets are counted). The median, 1.18
+  cells, is not from a photograph: it is what keeps the rings' mean r
+  squared (3.14 against their 3.16, and 3.12 against 3.15 as `populate`
+  places them), so the plate holds as much oil as it did and the crowding
+  checks see the same crowd. Sizes outside the rings'
+  0.45 to 5.2 cells are drawn again rather than clamped, since a clamp
+  piles one drop in sixty at exactly the biggest size, a set of identical
+  big drops no emulsion has (and one in twelve at the smallest). The draws
+  are Box and Muller's, on 1 - u so the logarithm never meets zero.
+  `npm run drops` measures the population against this.
+*/
+export const DROP_MEDIAN = 1.18, DROP_SIGMA = 0.7, DROP_MIN = 0.45, DROP_MAX = 5.2;
+export function dropRadius(float: () => number): number {
+  for (let t = 0; t < 16; t++) {
+    const z = Math.sqrt(-2 * Math.log(1 - float())) * Math.cos(2 * Math.PI * float());
+    const r = DROP_MEDIAN * Math.exp(DROP_SIGMA * z);
+    if (r >= DROP_MIN && r <= DROP_MAX) return r;
+  }
+  return DROP_MEDIAN;
+}
+
 /**
  * How long a drop holds the one it swallowed before the skin between them
  * gives and the two are one colour: fifteen to thirty-five seconds, by the
@@ -267,8 +306,13 @@ export class BeadField {
       // before so the carpet is not one size.
       // Small beads span four to one in diameter within a patch, as in the
       // reference; the big lenses are a tail on top.
+      // With drops on, a drop is born at a log-normal size (`dropRadius`).
+      // The rings keep their two pools and their draws, so at drops 0 the
+      // seeded stream, and every bead after this one, is as it always was.
       const u = this.rng.float();
-      const r = (this.rng.float() < 0.8 ? 0.45 + this.rng.float() * this.rng.float() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
+      const r = (this.drops > 0
+        ? dropRadius(() => this.rng.float())
+        : this.rng.float() < 0.8 ? 0.45 + this.rng.float() * this.rng.float() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
       let x = 4 + this.rng.float() * (N - 8), y = 4 + this.rng.float() * (N - 8);
       if (density) {
         let best = density(x, y);

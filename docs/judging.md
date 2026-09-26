@@ -158,6 +158,15 @@ was written for round drops; in the lab's picture of a freshly merged oval
 out as two bright lobes side by side until it rounds, so say if a drawn-out
 drop's lens reads wrong.
 
+New drops are now born at log-normal sizes, the law for a shaken emulsion
+(`dropRadius` in `beads.ts`). The plate holds the same amount of oil and the
+same biggest and smallest drops as before; what changes is that most drops
+are near one size, about a cell and a quarter, where before the smallest
+size was the commonest: there are about half as many of the smallest drops. It is a small change and may not
+show at a glance. Look for whether a crowded plate reads as one emulsion
+with a typical drop, or as too even, too much the same size; the spread
+(`DROP_SIGMA`, 0.7) is already at the wide end of what the research gives.
+
 ## 8. The closeup's cells, riding the paint
 
 At about 6x the closeup's drawn cells and lacing used to shake: they slid by

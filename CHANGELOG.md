@@ -55,6 +55,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   between two plates does: a merged drop of four cells stays an oval for
   about half a second, one of two cells is round within a few frames.
   `npm run drops` measures it.
+- **Drops are born at a shaken emulsion's sizes.** With Drops on, a new
+  drop's size is drawn from a log-normal, the law for oil broken up by
+  shaking and stirring: most drops are about a cell and a quarter across
+  their radius, thinning toward the smallest and the biggest, where the
+  rings drew the smallest size most often and thinned slowly from there. So
+  there are about half as many of the smallest drops and more of the middle.
+  The median is fitted so the plate holds as much oil as it did, and the
+  range is the rings' own. With Drops at 0 nothing changes. `npm run drops`
+  measures what the field places against the distribution.
 - **Walls between drops are curved.** A small drop pushes harder than a big
   one, so the wall between them bows into the big one, an arc through the same
   two points the straight wall joined (`npm run drops`: the wall lands within a

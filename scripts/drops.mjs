@@ -155,6 +155,86 @@ const slotOf = (rgb) => {
   return best;
 };
 
+// ── Drops are born log-normal ────────────────────────────────────────
+/*
+  A shaken emulsion's sizes are log-normal (the research on bubbles and
+  drops, item 9), and with drops on `populate` draws them so: median 1.18
+  cells and 0.7 in the logarithm, redrawn outside the rings' 0.45 to 5.2.
+  Asked of what `populate` actually places, not of `dropRadius` on its own,
+  so a spawn that stopped calling it, or a place that filtered sizes, is
+  caught; at the size slider the crowd uses (1.12), divided back out, so a
+  drop that ignored the slider is caught too; and at drops 0.3 as well as
+  1, since the slider runs from 0 to 1 and a spawn that only drew drops at
+  full would pass at 1 alone.
+
+  Fields of ten, sixty thousand drops a side. Ten because a bead refused
+  for landing on another leans the sizes toward the small, and at forty a
+  field that lean was a third of the whole allowance below (a distance of
+  0.011 on sixty thousand, where the distribution itself gives 0.003);
+  sixty thousand because at three thousand the mean r squared wanders by
+  3 per cent from one block of seeds to the next, which is the whole
+  allowance the oil check has. Both found by the check-skeptic, the second
+  as eleven false reds in twenty blocks.
+
+  The shape by a Kolmogorov-Smirnov distance to the truncated log-normal,
+  with its numbers written here rather than imported, so a change to the
+  constants in beads.ts has to be made here too. Its 1 per cent line is
+  1.63 / sqrt(n), 0.0067 at sixty thousand. The rings' pools, sampled the
+  same way, are the control: about a tenth from it, far past the line.
+  Then the oil: the mean r squared against the value the constants give
+  (worked out below by summing the density, 3.14) and against the rings'
+  own (3.15), so a drop that is born too small, or too big, shows. Then
+  the ends: that no size is piled up at either, as a clamp in place of the
+  redraw would do (one drop in sixty at the biggest size, one in twelve at
+  the smallest), that the tail reaches the top of the range, and that the
+  share of drops of three and a half cells or more is the law's, which a
+  tail cut short (redrawn above 4.5, say) moves by a sixth.
+*/
+{
+  const erf = (x) => {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x));
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return x >= 0 ? y : -y;
+  };
+  const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+  const MED = 1.18, SIG = 0.7, LO = 0.45, HI = 5.2, SLIDER = 1.12, WANT = 60000;
+  const pLo = Phi(Math.log(LO / MED) / SIG), pHi = Phi(Math.log(HI / MED) / SIG);
+  const cdf = (r) => (Phi(Math.log(r / MED) / SIG) - pLo) / (pHi - pLo);
+  // The law's own mean r squared, by summing its density over the range.
+  let lawR2 = 0;
+  for (let k = 0, K = 20000; k < K; k++) {
+    const r0 = LO * (HI / LO) ** (k / K), r1 = LO * (HI / LO) ** ((k + 1) / K), rm = Math.sqrt(r0 * r1);
+    lawR2 += rm * rm * (cdf(r1) - cdf(r0));
+  }
+  const lawBig = 1 - cdf(3.5);
+  const sizes = (drops) => {
+    const rs = [];
+    for (let s = 1; rs.length < WANT && s < 20000; s++) {
+      seed(s);
+      const g = new BeadField(N);
+      g.drops = drops;
+      g.populate(10, SLIDER);
+      for (const b of g.beads) if (!b.tiny) rs.push(b.r / (SLIDER * N / 192));
+    }
+    return rs.sort((a, b) => a - b);
+  };
+  const ks = (rs) => rs.reduce((m, r, i) => Math.max(m, Math.abs(cdf(r) - i / rs.length), Math.abs(cdf(r) - (i + 1) / rs.length)), 0);
+  const d = sizes(1), part = sizes(0.3), r = sizes(0);
+  const line = 1.63 / Math.sqrt(WANT);
+  const kd = ks(d), kp = ks(part), kr = ks(r);
+  const full = d.length >= WANT && part.length >= WANT && r.length >= WANT;
+  check('with drops on, a drop is born at a log-normal size', full && kd < line && kp < line && kr > 5 * line,
+    `KS ${kd.toFixed(4)} at drops 1, ${kp.toFixed(4)} at 0.3, from median ${MED}, spread ${SIG} (the 1% line ${line.toFixed(4)}; the rings' pools ${kr.toFixed(4)}), ${d.length} drops a side`);
+  const r2 = (rs) => rs.reduce((a, x) => a + x * x, 0) / rs.length;
+  check('and the plate holds as much oil as the rings', full && Math.abs(r2(d) / lawR2 - 1) < 0.02 && Math.abs(r2(d) / r2(r) - 1) < 0.03,
+    `mean r² ${r2(d).toFixed(3)}, against the law's ${lawR2.toFixed(3)} and the rings' ${r2(r).toFixed(3)}`);
+  const piled = d.filter((x) => x >= HI * 0.995 || x <= LO * 1.005).length / d.length;
+  const big = d.filter((x) => x >= 3.5).length / d.length;
+  check('with none piled up at the ends, and the tail the law\'s',
+    full && d[0] >= LO - 1e-9 && d[d.length - 1] <= HI + 1e-9 && d[d.length - 1] >= 0.98 * HI && piled < 0.01 && Math.abs(big / lawBig - 1) < 0.1,
+    `${(100 * piled).toFixed(2)}% within half a per cent of ${LO} or ${HI}; biggest ${d[d.length - 1].toFixed(3)}; ${(100 * big).toFixed(2)}% at 3.5 cells or more against the law's ${(100 * lawBig).toFixed(2)}%`);
+}
+
 // ── Merging does not snowball ────────────────────────────────────────
 /*
   Drops merge more readily than rings (a small one pushed inside a bigger one
@@ -179,9 +259,9 @@ for (let i = 0; i < beads.length; i++) for (let j = i + 1; j < beads.length; j++
 check('the crowded field has contacts to judge', pairs.length >= 60, `${pairs.length} touching pairs among ${beads.length} drops`);
 
 /*
-  The size range is the population's (populate's long tail, which this did
-  not change): crowded rings make a cluster as wide, and the control line
-  says so. What it asks of drops is that crowding them into walls and
+  The size range is the population's (the rings' two pools, and with
+  drops on the log-normal measured above, over the same range): crowded
+  rings make a cluster as wide, and the control line says so. What it asks of drops is that crowding them into walls and
   swallowing did not flatten it away. The colours are read back from the
   mask, at each member's own middle, not worked out from the seeds.
 */
@@ -261,6 +341,24 @@ const clusterStats = (fld, withColour) => {
   how many have three or more drops under a sixth their radius touching
   them. The rings, the same run at 0, are the control: they have almost
   none, and no droplets at all.
+
+  Over nine crowded plates, fixed before looking at any of them (the one
+  every other check here uses, and seeds 1 to 8), not one. On one plate
+  the share swings by about four points from seed to seed, and the plate
+  every other check uses was the luckiest of twenty-one: 35 per cent, where
+  the old code averaged 25.3 over all twenty-one. The bar was a quarter,
+  set on that plate, so it sat at the feature's own average and passed or
+  failed on the seed. The check-skeptic surveyed it; drawing sizes
+  log-normal moved the average to 24.4 (not a difference twenty-one plates
+  can tell from nothing, about one standard error).
+
+  So the bar is set from the feature and its failures, not from one plate:
+  a fifth. What the feature does is about a quarter (24.4 per cent over
+  twenty-one plates). Droplets placed round any drop, not the big ones
+  most, give 17.9; none at all, 0; the rings have 4 in 96. A fifth passes
+  the first and fails the others. That is a lower number than the quarter
+  it replaces, and the reply that shipped it said so to the owner, with
+  what raising the feature to a quarter would take.
 */
 {
   const ringed = (bs) => {
@@ -272,9 +370,13 @@ const clusterStats = (fld, withColour) => {
     }
     return { n, of: big.length };
   };
-  const d = ringed(beads), r = ringed(crowd(0, { palette: null }).beads);
-  check('big drops are ringed by droplets', d.of >= 30 && d.n >= 0.25 * d.of && r.n <= 0.05 * r.of,
-    `${d.n} of ${d.of} big drops have three or more a sixth their size touching them (rings: ${r.n} of ${r.of})`);
+  const plates = [beads, ...[1, 2, 3, 4, 5, 6, 7, 8].map((s) => crowd(1, { s }).beads)].map(ringed);
+  const d = plates.reduce((a, x) => ({ n: a.n + x.n, of: a.of + x.of }), { n: 0, of: 0 });
+  const rp = [4242, 1, 2].map((s) => ringed(crowd(0, { palette: null, s }).beads));
+  const r = rp.reduce((a, x) => ({ n: a.n + x.n, of: a.of + x.of }), { n: 0, of: 0 });
+  check('big drops are ringed by droplets',
+    plates.every((p) => p.of >= 60) && d.n >= 0.2 * d.of && rp.every((p) => p.of >= 30) && r.n <= 0.05 * r.of,
+    `${d.n} of ${d.of} big drops on nine plates have three or more a sixth their size touching them, ${(100 * d.n / d.of).toFixed(1)}% (per plate ${plates.map((p) => Math.round(100 * p.n / p.of)).join(' ')}); rings ${r.n} of ${r.of}`);
 }
 
 // ── A drop is its own colour ─────────────────────────────────────────
