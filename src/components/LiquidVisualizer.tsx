@@ -5,6 +5,7 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
+import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
@@ -36,6 +37,8 @@ import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
+import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
+import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -325,8 +328,12 @@ const HANDOFF_POURS = 4;
 const EVOLVE_FLOODS = false;
 /** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
 const ERROR_STORM = 45;
-const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
-  const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
+/**
+ * `auto` is the grid 'auto' stands for: the governor's rung of the moment
+ * live, its opening rung for a song render (see `QualityGovernor.openingRung`).
+ */
+const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number, auto = governor.rung.grid): number => {
+  const want = setting === undefined || setting === 'auto' ? auto : setting;
   // A pin is held to what this GPU can actually allocate, so an old saved
   // look or a hand-typed query cannot ask for a texture the device refuses.
   //
@@ -381,6 +388,45 @@ const SIM_MAX_CATCHUP = (() => {
   return Number.isFinite(warp) && warp >= 1 ? Math.min(240, Math.round(warp)) : 4;
 })();
 
+/*
+  The show's dice, one stream per purpose (lib/rng.ts).
+
+  Every `Math.random` in this file that could change what reaches the plate
+  now draws from one of these, or from the plate's own `rng` (FluidSimulation,
+  one stream a layer), so the same seed plays the same show. They are split by
+  what they decide rather than pooled, so that adding a draw to one — a new
+  tool, a new automation event — cannot move the numbers another one draws:
+
+    lay      what laying a look adds besides its dye: the plates' starting
+             angles, the liquids poured with it, the handoff's pours, the Seed
+             button's drops.
+    hands    what a hand does beyond where it points: the spray's mist, the
+             splatter's flung drops, a theme button's placement, a blow's
+             bubble.
+    evolve   the automation: when a drop lands and where, a thinned patch, a
+             finger stroke, a palette re-pick.
+    music    what the music pours: a style for each band's drop, a dose on the
+             beat's ring, treble sparks, the squeeze, a bubble on the kick, a
+             soap burst.
+    liquids  which bottle a dose comes from (`doseLiquid`).
+    palette  which three of a look's dyes are the working set (`harmonyWithin`;
+             `harmonyColor` and `pickHarmony` draw from the same stream).
+    chem     where a reaction is seeded: the BZ waves and Boyle's chemistry.
+
+  All of them are `plate.` streams, so laying a look restarts them from
+  (seed, name, look) — see "Restarting, rather than continuing" in rng.ts.
+  Module constants are safe to hold: a reseed re-keys a stream in place.
+*/
+const DICE = {
+  lay: stream('plate.lay'),
+  hands: stream('plate.hands'),
+  evolve: stream('plate.evolve'),
+  music: stream('plate.music'),
+  liquids: stream('plate.liquids'),
+  palette: stream('plate.palette'),
+  chem: stream('plate.chemistry'),
+};
+
 // Density histogram used to expose the macro closeup (see "Macro film exposure").
 const FILM_BINS = 64;
 const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
@@ -400,7 +446,7 @@ const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
  */
 function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number, strength = 1): void {
   if (ids.length === 0) return;
-  const liq = LIQUIDS_BY_ID.get(ids[Math.floor(Math.random() * ids.length)]);
+  const liq = LIQUIDS_BY_ID.get(DICE.liquids.pick(ids));
   if (!liq?.behaviour) return;            // water, oil, ink, syrup: colour and nothing else
   const room = fluid.liquid.headroom(liq.behaviour);
   if (room <= 0.02) return;
@@ -408,7 +454,66 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
   fluid.liquid.deposit(x, y, r, liq.behaviour, AUTO_DOSE * strength * room);
 }
 
+/**
+ * What a rendered frame was drawn from, apart from its pixels: for
+ * `npm run render-app`, which can only be run on a real GPU, and so has to
+ * say *why* two renders of the same seed differ, not only that they do.
+ *
+ * When the owner's Mac reports "240 of 240 frames differ", a hash of each
+ * frame says the films are different and nothing else. So each frame, when
+ * a check asks (`begin({ digest: true })`, which the render asks for only
+ * when it is hashing frames), the numbers the frame is drawn from are kept
+ * beside its hash, taken at the moment the plate is handed to the renderer:
+ * the clocks, the canvas and the grid, the steps taken, the phrase and the
+ * modulators, the rock and the lamp, the dye regulator's reading, the flash
+ * guard's gain, the dice drawn so far on each stream, a few cells of the
+ * readback, a hash of the settings. The check prints the first of these
+ * that differs between two renders, which names the part of the plate that
+ * carried something in from before the render, or that reads a clock it
+ * should not. Plain numbers and strings, compared exactly: a value that is
+ * the same to the last bit prints as the same. Null is "not there" (a
+ * stream nothing has asked for yet).
+ */
+export type FrameDigest = Record<string, number | string | boolean | null>;
+
+/**
+ * A song render's hold on the plate (lib/render.ts, PLAN.md §6).
+ *
+ * The show normally draws a frame when the browser asks and steps the solver
+ * as many times as the wall clock says it owes. A render inverts both: the
+ * caller asks for frame i, the plate takes exactly the solver steps that
+ * frame is owed at the render's step rate (worked out from i, not from a
+ * clock), draws it at the film's size, and hands the drawn canvas back as a
+ * VideoFrame in the same task, which is the only moment a WebGPU canvas is
+ * guaranteed to still hold what was drawn.
+ *
+ * The caller owns the show clock (`beginFixedClock` before `begin`,
+ * `endFixedClock` before `end`) and the seed (`setShowSeed` before
+ * `begin`, which lays the look).
+ */
+export interface VisualizerRender {
+  /**
+   * Take the plate: the live loop stops, the canvas becomes width x height,
+   * the solvers are rebuilt fresh at `grid` (the current grid when not
+   * given), the plate's clocks and counters start from zero, and the look is
+   * laid from the seed. Resolves once the laid plate's first readbacks have
+   * landed, so the first frame reads the render's own plate, not the live
+   * one's.
+   */
+  begin: (o: { fps: number; width: number; height: number; stepRate?: number; grid?: number | null; lookId?: string | null; digest?: boolean }) => Promise<{ grid: number; lookId: string; stepRate: number }>;
+  /** Draw the next frame with this frame's sound, and return it as a VideoFrame with these times. */
+  step: (audio: AudioData | null, timestampUs: number, durationUs: number) => VideoFrame;
+  /** The state the last frame was drawn from, when `begin` was asked for digests (the checks); else null. */
+  digest: () => FrameDigest | null;
+  /** Resolves once the GPU has finished the frame and every readback it asked for has landed. */
+  settle: () => Promise<void>;
+  /** Give the plate back to the live loop, at its own size. */
+  end: () => void;
+}
+
 export interface LiquidVisualizerHandle {
+  /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
+  render: () => VisualizerRender | null;
   injectImage: (imageData: ImageData) => void;
   /**
    * Pour words into the lead plate: each row drawn at the biggest size its
@@ -530,7 +635,7 @@ const harmonyWithin = (contract: number[]): number[] => {
   if (contract.length <= 3) return contract;
   const pool = [...contract];
   const out: number[] = [];
-  while (out.length < 3) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  while (out.length < 3) out.push(pool.splice(DICE.palette.int(pool.length), 1)[0]);
   return out;
 };
 
@@ -625,6 +730,26 @@ class FluidSimulation {
   private cdv = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
   /** Which plate this is: 0 is the live plate, the rest run behind it as a background loop. */
   layerIndex = 0;
+  /**
+   * This plate's dice, carried on the fluid (PLAN.md §6): every splat a look
+   * is laid with, every spray, splatter and streak the automation pours, and
+   * every satellite drop of a press draws from `plate.fluid.<layer>`.
+   *
+   * One stream per layer rather than one for the solver, because the layers
+   * run side by side: the second plate's Fillmore wash would otherwise take
+   * its numbers out of the middle of the first plate's sequence, and turning
+   * on a second layer would move every drop on the first. Looked up by the
+   * layer rather than fixed at construction because `layerIndex` is assigned
+   * after the constructor runs. Replacing `Math.random()` here was a straight
+   * substitution — each helper draws exactly once, in the same order — so
+   * the only thing that changed about a laid look is which numbers it drew.
+   */
+  private dice: Rng | null = null;
+  private diceLayer = -1;
+  get rng(): Rng {
+    if (this.diceLayer !== this.layerIndex) { this.dice = stream(`plate.fluid.${this.layerIndex}`); this.diceLayer = this.layerIndex; }
+    return this.dice!;
+  }
 
   // ── GPU solver attachment ──
   // When `gpu` is set, the arrays above hold *deltas* — what the CPU-side
@@ -638,6 +763,64 @@ class FluidSimulation {
   private squishSteps = 0;
   private squishLastAt = 0;
   private squishLastStep = -1;
+  /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; }
+  /**
+   * Forget everything this plate carries from one frame to the next that is
+   * not the liquid itself: a song render starts here (VisualizerRender.begin),
+   * after the solver is rebuilt and the look laid.
+   *
+   * The render made twice with the same seed on CI's Mac differed on every
+   * frame from the first (`npm run render-app`: "240 of 240 frames differ"),
+   * and these are the plate's share of why. Each of them was written by the
+   * live show in the frames before the render and read by the render's first
+   * step, so the first frame of a film depended on what the evening had been
+   * doing a moment before it:
+   *
+   *   - `clockLean`, the phrase's slow lean on the timestep (slewed over 2.5
+   *     s, so it is never quite where the render's reset phrase would put
+   *     it): every step's `dt` is multiplied by it;
+   *   - `plateAngle` and `plateSpin`, which the frame sets from the flywheel
+   *     only after the solver has stepped, so the render's first steps read
+   *     the live plate's angle (gravity's direction) and spin (the twist)
+   *     rather than the ones the look was just laid with;
+   *   - the bubbles' bookkeeping (`prevPacked`, `coverPacked`, the holes
+   *     still filling, the mirror's sequence the rim deposit keys on): the
+   *     bubbles are cleared with the look, and a list of last frame's bubbles
+   *     that is not cleared with them reads as every one of them popping at
+   *     once, whose holes are then filled from the render's own plate at the
+   *     live bubbles' positions;
+   *   - the mean density the dye regulator reads before the render's first
+   *     readback lands, the step counter a press counts by, and the last
+   *     step's parameters.
+   *
+   * `angle` is the angle the look was laid at (`rotationAnglesRef`), and
+   * `viewHalfW`/`viewHalfH` the film's own framing: see the frame's rotation
+   * block for why a render frames by its canvas, not by the window.
+   */
+  forgetHistory(angle: number, viewHalfW: number, viewHalfH: number): void {
+    this.forgetPress();
+    this.clockLean = 1;
+    this.plateSpin = 0;
+    this.plateAngle = angle;
+    this.viewHalfW = viewHalfW;
+    this.viewHalfH = viewHalfH;
+    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0;
+    this.phrase = { drive: 1, gust: 0, drift: 0.5 };
+    this.tempoMul = 1;
+    this.stepIndex = 0;
+    this.meanDensity = 0;
+    this.meanColor = [0, 0, 0];
+    this.lastSettings = null;
+    this.lastStep = null;
+    this.rbSeq = 0;
+    this.rimSeq = -1;
+    this.prevCount = 0;
+    this.coverCount = 0;
+    this.fillingHoles = [];
+  }
+  /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
+  get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
@@ -1128,6 +1311,25 @@ class FluidSimulation {
         full, and the same dye went to the rim once per deposit: the Blow's
         bubble turned 36 of dye into 358 in the tools check. Each cell's dye
         now goes to the rim once, the first time the bubble covers it.
+
+        And what a bubble covers by growing goes to the rim not at all: its
+        own flow has already taken it there. The air arriving is a source in
+        the projection (the divergence pass, wgsl/fluid.ts), so a growing
+        bubble pushes the liquid and its dye out ahead of its edge, and the
+        multiply finds next to nothing left to remove. Measured in the lab
+        with the straw's own growth (bubbles.ts, blow: to 0.047 of the plate
+        in 1.5 s, fingers and all) on a pool of 834 and no deposit at all,
+        the plate kept its dye: 834 -> 827. The same growth with this deposit
+        emulated as the app runs it made 50 to 74 more (+7 to +10%), all of
+        it laid round the bubble, and more the staler the mirror: the Blow's
+        "pushes it out to the rim rather than making more" read 494 -> 920
+        on CI's Mac. A bubble that appears where it was not, or moves onto
+        dye, is not the same: the multiply takes what is under it before
+        any flow has moved it (the lab: -12.6% for a bubble put down whole,
+        -10.4% for one drifting across a pool, with no deposit), and that is
+        what the ring is for. So a bubble that was here at the last deposit
+        counts only the cells it has moved onto at the size it was then; the
+        ring it has grown into is the flow's.
       */
       let was: { x: number; y: number; r: number } | null = null;
       for (let j = 0; j < this.coverCount; j++) {
@@ -1135,13 +1337,14 @@ class FluidSimulation {
         const px = this.coverPacked[q] * N, py = this.coverPacked[q + 1] * N, pr = this.coverPacked[q + 2] * N;
         if (Math.hypot(px - b.x, py - b.y) < Math.max(2, R * 0.5) && (!was || pr > was.r)) was = { x: px, y: py, r: pr };
       }
+      const reach = was ? Math.min(R, was.r) : R;
       let mass = 0, aR = 0, aG = 0, aB = 0;
       const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
       const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
       for (let y = lo; y <= hi; y++) {
         for (let x = xl; x <= xh; x++) {
           const dx = x - b.x, dy = y - b.y;
-          if (dx * dx + dy * dy > R * R) continue;
+          if (dx * dx + dy * dy > reach * reach) continue;
           if (was && (x - was.x) * (x - was.x) + (y - was.y) * (y - was.y) <= was.r * was.r) continue;
           const i4 = (x + y * N) * 4;
           const d = dye[i4 + 3];
@@ -1487,10 +1690,10 @@ class FluidSimulation {
         }
         // Scattered stars
         for (let i = 0; i < 100; i++) {
-          const a = Math.random() * Math.PI * 2, d = (3 + Math.random() * 48) * k;
-          const c = Math.random() < 0.35 ? { r: 1, g: 1, b: 1 } : col(Math.floor(Math.random() * 4));
+          const a = this.rng.angle(), d = (3 + this.rng.float() * 48) * k;
+          const c = this.rng.float() < 0.35 ? { r: 1, g: 1, b: 1 } : col(this.rng.int(4));
           this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
-            0.6 + Math.random(), 0.4 + Math.random() * 1.2, c.r, c.g, c.b);
+            0.6 + this.rng.float(), 0.4 + this.rng.float() * 1.2, c.r, c.g, c.b);
         }
         // Angular velocity for swirl
         for (let j = 2; j < S - 2; j += 2) {
@@ -1582,7 +1785,7 @@ class FluidSimulation {
       case 'cyberpunk': {
         for (let s = 0; s < 5; s++) {
           const c = col(s);
-          const sx = Math.random() * S * 0.3, sy = Math.random() * S;
+          const sx = this.rng.float() * S * 0.3, sy = this.rng.float() * S;
           const a = Math.PI * 0.2 + s * 0.15;
           for (let t = 0; t < S * 1.2; t += 1.5) {
             const x = sx + Math.cos(a) * t, y = sy + Math.sin(a) * t;
@@ -1609,7 +1812,7 @@ class FluidSimulation {
       case 'bass-drop': {
         for (let i = 0; i < 4; i++) {
           const c = col(i);
-          const off = (Math.random() - 0.5) * 12;
+          const off = this.rng.centred() * 12;
           this.splatBlob(cx + off, cy + off, 20 - i * 3, 4.0 - i * 0.5, c.r, c.g, c.b);
         }
         break;
@@ -1627,10 +1830,10 @@ class FluidSimulation {
 
       case 'boiling-point': {
         for (let i = 0; i < 40; i++) {
-          const x = 8 + Math.random() * (S - 16), y = 8 + Math.random() * (S - 16);
+          const x = 8 + this.rng.float() * (S - 16), y = 8 + this.rng.float() * (S - 16);
           const c = col(i);
-          this.splatBlob(x, y, 3 + Math.random() * 5, 2.0, c.r, c.g, c.b);
-          this.addTemp(Math.floor(x), Math.floor(y), 3.0 + Math.random() * 4);
+          this.splatBlob(x, y, 3 + this.rng.float() * 5, 2.0, c.r, c.g, c.b);
+          this.addTemp(Math.floor(x), Math.floor(y), 3.0 + this.rng.float() * 4);
         }
         break;
       }
@@ -1639,7 +1842,7 @@ class FluidSimulation {
         for (let j = 0; j < 12; j++)
           for (let i = 0; i < 12; i++) {
             const c = col(i + j);
-            this.splatBlob((10 + i * 9 + (Math.random() - 0.5) * 4) * k, (10 + j * 9 + (Math.random() - 0.5) * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
+            this.splatBlob((10 + i * 9 + this.rng.centred() * 4) * k, (10 + j * 9 + this.rng.centred() * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
           }
         break;
       }
@@ -1663,9 +1866,9 @@ class FluidSimulation {
         this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
         this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
         for (let f = 0; f < 8; f++) {
-          const a = f * Math.PI * 2 / 8 + (Math.random() - 0.5) * 0.4;
+          const a = f * Math.PI * 2 / 8 + this.rng.centred() * 0.4;
           const c = col(f);
-          const len = (20 + Math.random() * 25) * k;
+          const len = (20 + this.rng.float() * 25) * k;
           for (let t = 5 * k; t < len; t += 1.5) {
             const wb = Math.sin(t * 0.3 + f) * 2 * k;
             const x = cx + Math.cos(a) * t + Math.cos(a + Math.PI / 2) * wb;
@@ -1682,10 +1885,10 @@ class FluidSimulation {
 
       case 'jellyfish-bloom': {
         for (let jf = 0; jf < 4; jf++) {
-          const jx = S * (0.2 + jf * 0.2 + (Math.random() - 0.5) * 0.1);
-          const jy = S * (0.3 + (Math.random() - 0.5) * 0.3);
+          const jx = S * (0.2 + jf * 0.2 + this.rng.centred() * 0.1);
+          const jy = S * (0.3 + this.rng.centred() * 0.3);
           const c = col(jf);
-          const bellR = (8 + Math.random() * 6) * k;
+          const bellR = (8 + this.rng.float() * 6) * k;
           for (let a = -Math.PI; a < 0; a += 0.06)
             for (let r = 0; r < bellR; r += 1.5) {
               const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.7;
@@ -1694,7 +1897,7 @@ class FluidSimulation {
             }
           for (let t = 0; t < 3; t++) {
             let tx = jx + (t - 1) * bellR * 0.4;
-            for (let dy = 0; dy < (18 + Math.random() * 10) * k; dy++) {
+            for (let dy = 0; dy < (18 + this.rng.float() * 10) * k; dy++) {
               const wb = Math.sin(dy * 0.2 + t) * 2 * k;
               this.splatBlob(tx + wb, jy + dy, 1.0, 0.8 / (1 + dy * 0.05), c.r, c.g, c.b);
             }
@@ -1732,16 +1935,16 @@ class FluidSimulation {
           let bx = S * (0.15 + branch * 0.14), by = S * 0.85;
           const c = col(branch);
           for (let seg = 0; seg < 50; seg++) {
-            by -= 1.0 + Math.random() * 0.8;
-            bx += (Math.random() - 0.5) * 3;
+            by -= 1.0 + this.rng.float() * 0.8;
+            bx += this.rng.centred() * 3;
             if (bx < 2 || bx >= S - 2 || by < 2) break;
-            this.splatBlob(bx, by, 2 + Math.random() * 2, 2.0, c.r, c.g, c.b);
-            if (Math.random() < 0.15) {
+            this.splatBlob(bx, by, 2 + this.rng.float() * 2, 2.0, c.r, c.g, c.b);
+            if (this.rng.float() < 0.15) {
               let fx = bx, fy = by;
-              const dir = Math.random() < 0.5 ? -1 : 1;
+              const dir = this.rng.float() < 0.5 ? -1 : 1;
               for (let s2 = 0; s2 < 15; s2++) {
-                fy -= 0.8 + Math.random() * 0.5;
-                fx += dir * (0.8 + Math.random() * 0.5);
+                fy -= 0.8 + this.rng.float() * 0.5;
+                fx += dir * (0.8 + this.rng.float() * 0.5);
                 if (fx < 2 || fx >= S - 2 || fy < 2) break;
                 this.splatBlob(fx, fy, 1.5, 1.2, c.r, c.g, c.b);
               }
@@ -1756,17 +1959,17 @@ class FluidSimulation {
         const ringR = 30 * k;
         for (let i = 0; i < 60; i++) {
           const a = (i / 60) * Math.PI * 2;
-          const r = ringR + (Math.random() - 0.5) * 8 * k;
+          const r = ringR + this.rng.centred() * 8 * k;
           const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
           if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
           const c = col(i);
-          this.splatBlob(x, y, 1.5 + Math.random() * 1.5, 1.5 + Math.random(), c.r, c.g, c.b);
+          this.splatBlob(x, y, 1.5 + this.rng.float() * 1.5, 1.5 + this.rng.float(), c.r, c.g, c.b);
           const dx = cx - x, dy = cy - y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
           this.addVelocity(Math.floor(x), Math.floor(y), dx / dist * 0.08, dy / dist * 0.08);
         }
         for (let i = 0; i < 40; i++) {
-          const a = Math.random() * Math.PI * 2, d = (5 + Math.random() * 45) * k;
-          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + Math.random() * 0.8, 0.3 + Math.random() * 0.5, 1, 1, 1);
+          const a = this.rng.angle(), d = (5 + this.rng.float() * 45) * k;
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + this.rng.float() * 0.8, 0.3 + this.rng.float() * 0.5, 1, 1, 1);
         }
         for (let j = 2; j < S - 2; j += 3)
           for (let i = 2; i < S - 2; i += 3) {
@@ -1783,13 +1986,13 @@ class FluidSimulation {
       // pick from, not one continuous wash covering the plate.
       case 'macro-bead': {
         for (let i = 0; i < 26; i++) {
-          const x = 14 + Math.random() * (S - 28), y = 14 + Math.random() * (S - 28);
+          const x = 14 + this.rng.float() * (S - 28), y = 14 + this.rng.float() * (S - 28);
           const c = col(i);
-          const r = (2 + Math.random() * 5) * k;
-          this.splatBlob(x, y, r, 2.2 + Math.random() * 2.0, c.r, c.g, c.b);
+          const r = (2 + this.rng.float() * 5) * k;
+          this.splatBlob(x, y, r, 2.2 + this.rng.float() * 2.0, c.r, c.g, c.b);
           // A dark shoulder on one side — cells and lacing key off this contrast
           this.splatBlob(x + r * 0.9, y + r * 0.7, r * 0.5, 0.9, 0.06, 0.05, 0.05);
-          const a = Math.random() * Math.PI * 2;
+          const a = this.rng.angle();
           this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.05, Math.sin(a) * 0.05);
         }
         break;
@@ -1803,10 +2006,10 @@ class FluidSimulation {
           this.splatBlob(bx, by, 15 * k, 3.2, c.r, c.g, c.b);
           // Nuclei clustered inside each pool — the densest cell patches
           for (let n = 0; n < 18; n++) {
-            const a = Math.random() * Math.PI * 2, d = Math.random() * 13 * k;
+            const a = this.rng.angle(), d = this.rng.float() * 13 * k;
             const cc = col(ci + 1 + (n % 2));
             this.splatBlob(bx + Math.cos(a) * d, by + Math.sin(a) * d,
-              (1.5 + Math.random() * 2.5) * k, 1.8, cc.r, cc.g, cc.b);
+              (1.5 + this.rng.float() * 2.5) * k, 1.8, cc.r, cc.g, cc.b);
           }
         });
         break;
@@ -1823,9 +2026,9 @@ class FluidSimulation {
           this.addVelocity(Math.floor(x), Math.floor(y), 0.07, 0.0);
         }
         for (let i = 0; i < 34; i++) {
-          const x = S * 0.18 + Math.random() * S * 0.7;
-          const y = S * 0.5 + (Math.random() - 0.5) * S * 0.35;
-          this.splatBlob(x, y, (1 + Math.random() * 3) * k, 1.6, trail.r, trail.g, trail.b);
+          const x = S * 0.18 + this.rng.float() * S * 0.7;
+          const y = S * 0.5 + this.rng.centred() * S * 0.35;
+          this.splatBlob(x, y, (1 + this.rng.float() * 3) * k, 1.6, trail.r, trail.g, trail.b);
         }
         break;
       }
@@ -1849,7 +2052,7 @@ class FluidSimulation {
         // holes in that sheet, so the seed is the sheet and nothing else.
         for (let i = 0; i < 3; i++) {
           const c = col(i);
-          this.splatBlob(cx + (Math.random() - 0.5) * S * 0.28, cy + (Math.random() - 0.5) * S * 0.28,
+          this.splatBlob(cx + this.rng.centred() * S * 0.28, cy + this.rng.centred() * S * 0.28,
             S * 0.4, 1.1, c.r, c.g, c.b);
         }
         break;
@@ -1916,7 +2119,7 @@ class FluidSimulation {
       default: {
         for (let i = 0; i < 5; i++) {
           const c = col(i);
-          this.splatBlob(10 + Math.random() * (S - 20), 10 + Math.random() * (S - 20), 15, 2.0, c.r, c.g, c.b);
+          this.splatBlob(10 + this.rng.float() * (S - 20), 10 + this.rng.float() * (S - 20), 15, 2.0, c.r, c.g, c.b);
         }
         break;
       }
@@ -1953,7 +2156,7 @@ class FluidSimulation {
     // press is one press while it keeps coming, even as a finger drifts
     // across grid cells; a pause of a moment starts a new one (a beat
     // squeeze on every kick).
-    const nowMs = performance.now();
+    const nowMs = showNow();
     if (nowMs - this.squishLastAt > 150) { this.squishSteps = 0; this.squishLastStep = -1; }
     this.squishLastAt = nowMs;
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
@@ -2232,7 +2435,7 @@ class FluidSimulation {
         const sprayR = (8 + energy * 5) * k;
         const count = 8 + Math.floor(energy * 8);
         for (let p = 0; p < count; p++) {
-          const a = Math.random() * Math.PI * 2, d = Math.random() * sprayR;
+          const a = this.rng.angle(), d = this.rng.float() * sprayR;
           const px = Math.floor(x + Math.cos(a) * d), py = Math.floor(y + Math.sin(a) * d);
           if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
           this.addDensity(px, py, amount * (1 - d / sprayR) * 0.25, r, g, b);
@@ -2242,11 +2445,11 @@ class FluidSimulation {
       case 'splatter': {
         const count = 3 + Math.floor(energy * 4);
         for (let p = 0; p < count; p++) {
-          const a = Math.random() * Math.PI * 2;
-          const fling = (2 + Math.random() * (10 + energy * 8)) * k;
+          const a = this.rng.angle();
+          const fling = (2 + this.rng.float() * (10 + energy * 8)) * k;
           const px = Math.floor(x + Math.cos(a) * fling), py = Math.floor(y + Math.sin(a) * fling);
           if (px < 2 || px >= S - 2 || py < 2 || py >= S - 2) continue;
-          const dropR = Math.round((1 + Math.floor(Math.random() * 2)) * k);
+          const dropR = Math.round((1 + this.rng.int(2)) * k);
           for (let ddy = -dropR; ddy <= dropR; ddy++)
             for (let ddx = -dropR; ddx <= dropR; ddx++) {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -2272,7 +2475,7 @@ class FluidSimulation {
         break;
       }
       case 'streak': {
-        const a = Math.random() * Math.PI * 2;
+        const a = this.rng.angle();
         const len = (5 + Math.floor(energy * 10)) * k;
         const dx = Math.cos(a), dy = Math.sin(a);
         for (let t = -len; t <= len; t += 0.8) {
@@ -2345,13 +2548,13 @@ class FluidSimulation {
       }
     }
 
-    const n = Math.round(e * 7 * (0.6 + Math.random() * 0.8));
+    const n = Math.round(e * 7 * (0.6 + this.rng.float() * 0.8));
     for (let q = 0; q < n; q++) {
-      const a = Math.random() * Math.PI * 2;
-      const dist = dropR * (1.4 + (1 + 5 * h) * Math.random());
+      const a = this.rng.angle();
+      const dist = dropR * (1.4 + (1 + 5 * h) * this.rng.float());
       const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
       if (!inside(px, py)) continue;
-      const sr = Math.max(1, Math.round((0.8 + Math.random() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
+      const sr = Math.max(1, Math.round((0.8 + this.rng.float() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
       for (let dy = -sr; dy <= sr; dy++) {
         for (let dx = -sr; dx <= sr; dx++) {
           const dd = Math.sqrt(dx * dx + dy * dy);
@@ -3535,7 +3738,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
-  const noise2D = useMemo(() => createNoise2D(), []);
+  /*
+    The noise a look is laid with and the CPU turbulence stirs by.
+
+    `createNoise2D()` with no argument builds its permutation table from
+    `Math.random`, so the "timbre-shifter" wash and every noise-driven stir
+    was a different field on every page load, and no seed could reach it.
+    Now the table is made from the show's seed — a generator of its own
+    (`makeRng`), not a stream, because the field is a function of the seed
+    alone and laying a look should not rebuild it — and made again when the
+    seed changes (`setShowSeed`), behind the same function, so everything
+    that was handed `noise2D` keeps the one it was handed.
+  */
+  const noise2D = useMemo(() => {
+    let keyedOn = -1;
+    let field: (x: number, y: number) => number = () => 0;
+    return (x: number, y: number): number => {
+      if (keyedOn !== showSeed()) { keyedOn = showSeed(); field = createNoise2D(makeRng(keyedOn, 'plate.noise').float); }
+      return field(x, y);
+    };
+  }, []);
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
   const lastDrainTrigger = useRef(drainTrigger);
@@ -3586,7 +3808,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * jump the pattern. In turns per second, which is why the 2π.
    */
   const kaleidoPhaseRef = useRef(0);
-  const harmonyRef = useRef(pickHarmony());
+  // The opening palette from a generator of its own, keyed on the seed: this
+  // line runs on every render, and a draw from the palette stream here would
+  // move every colour after it by however many times React rendered.
+  const harmonyRef = useRef(pickHarmony(makeRng(showSeed(), 'plate.palette', 'opening')));
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
@@ -3782,6 +4007,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
+  /** The sound the app is handing over, for a render to give back to when it ends. */
+  const audioDataPropRef = useRef(audioData);
+  audioDataPropRef.current = audioData;
   const settingsRef = useRef(settings);
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
@@ -3810,7 +4038,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    */
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   const simulationTimeRef = useRef(0);
-  const lastTimeRef = useRef(Date.now() * 0.001);
+  const lastTimeRef = useRef(showEpochS());
   const lastBass01Ref = useRef(0); // for beat edge detection
   /** The beat clock: kicks from the tempo, ahead of the microphone, once it has locked. */
   const beatClockRef = useRef(new BeatClock());
@@ -3869,6 +4097,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simMsRef = useRef(0);
   /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
   const stepsPerSecRef = useRef(60);
+  /**
+   * Frames the loop has been through, live or rendered: how `npm run render-app`
+   * tells that the live loop is drawing again once a render hands the plate back.
+   */
+  const framesDrawnRef = useRef(0);
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
@@ -3886,6 +4119,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   frameRef.current = frame;
   const resizeRef = useRef<() => void>(() => {});
   const [staged, setStaged] = useState(false);
+  /**
+   * A song render in progress: its rate, the steps a second it holds the
+   * solver to, the frame it is on, the film's size and grid. Null live, and
+   * every branch that reads it leaves the live show exactly as it was.
+   */
+  const renderingRef = useRef<{
+    fps: number; stepRate: number; frame: number; width: number; height: number; grid: number;
+    /** Whether the checks asked for a digest of every frame (see `FrameDigest`), and the last frame's. */
+    digestOn: boolean; digest: FrameDigest | null;
+  } | null>(null);
+  const renderApiRef = useRef<VisualizerRender | null>(null);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -3906,7 +4150,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // gate, since holding it over an emptying plate is harmless.
     switch (g.tool) {
       case 'magnet':
-        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: performance.now() };
+        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: showNow() };
         return;
     }
     const layer = g.layer ?? activeLayerRef.current;
@@ -3929,7 +4173,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'blow':
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
         else af.blowAir(x, y, 4, 0.06 * amt);
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15 * amt) {
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
         break;
@@ -4022,9 +4266,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /**
    * The magnet, when a hand has it: where on the plate (0–1) and when it was
    * last there. The Magnet tool, the phone pad and a replay all set it; the
-   * solver steps read it, and let go of it a moment after the hand does.
+   * solver steps read it, and keep the magnet there after the hand lets go.
    */
   const magnetHandRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  /** Where the lead plate's look put its magnet last frame, to see it moved (see magnetFor). */
+  const magnetLookRef = useRef<{ x: number; y: number } | null>(null);
   /** The magnet's own slow walk when nobody is holding it: where along its path. */
   const magnetWalkRef = useRef(0);
   const magnetWalkAtRef = useRef(0);
@@ -4045,11 +4291,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
 
   const layPlate = (presetId: string) => {
+    /*
+      The plate's dice start again, from (seed, stream, this look), before
+      anything below draws, so the numbers this look is laid with do not
+      depend on how many were drawn before it. That is the dice, not the
+      whole glass: the bead carpet survives a look change (only the beads
+      dial at 0 clears it) and the phrasing, modulators and closeup camera
+      keep their state, as they did before seeding. What it does buy: a
+      render from a cue in the middle of a set, or the gallery shooting
+      presets in any order, draws the same numbers for the same look. Why
+      this and not one sequence running all night: lib/rng.ts, "Restarting,
+      rather than continuing". Only `plate.` streams: Lucky and
+      the wander are a person's and the set's, not the look's.
+    */
+    restartStreams(`look:${presetId}`, 'plate.');
     laidPresetRef.current = presetId;
     for (const fluid of fluidsRef.current) fluid.clearAll();
     bubblesRef.current.clear();
     chemRef.current.reset();
-    rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    rotationAnglesRef.current = rotationAnglesRef.current.map(() => DICE.lay.angle());
     spinVelRef.current = spinVelRef.current.map(() => 0);
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
@@ -4097,7 +4357,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
     if (fluid) for (let i = 0; i < 15; i++) {
       doseLiquid(fluid, plateLiquidsRef.current,
-        10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+        10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
     }
     drainFrameRef.current = 0;
     macroCamRef.current.reset();
@@ -4128,6 +4388,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   layPlateRef.current = layPlate;
 
   useImperativeHandle(ref, () => ({
+    render: () => renderApiRef.current,
     drawnRect: () => drawnRectRef.current?.() ?? null,
     /*
       Numbers, not a photograph.
@@ -4149,7 +4410,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       for (let i = 0; i < n; i++) {
         // A ring inside the dish, turning slowly, so the voices are lit by
         // different weather rather than by one spot that may never get wet.
-        const a = (i / n) * Math.PI * 2 + performance.now() * 0.00002;
+        const a = (i / n) * Math.PI * 2 + showNow() * 0.00002;
         const rr = 0.28 * GRID_SIZE;
         const x = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr);
         const y = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
@@ -4307,7 +4568,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     handoff: (seconds: number) => {
       if (!(seconds > 0)) { handoffRef.current = null; return; }
-      const now = performance.now();
+      const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
@@ -4334,10 +4595,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     setExternalTilt: (x: number, y: number) => {
+      // A phone's tilt is the room's hand, not the song's: a render hears
+      // only its song (see `VisualizerRender`), so it is not taken while the
+      // show clock is the film's.
+      if (clockIsFixed()) return;
       const t = externalTiltRef.current;
       t.x = Math.max(-1, Math.min(1, x));
       t.y = Math.max(-1, Math.min(1, y));
-      t.at = performance.now() * 0.001;
+      t.at = showNow() * 0.001;
     },
     setStage: (size) => {
       stageRef.current = size && size.width > 0 && size.height > 0 ? { width: Math.round(size.width), height: Math.round(size.height) } : null;
@@ -4482,8 +4747,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const af = fluidsRef.current[activeLayerRef.current];
       if (!af || drainFrameRef.current > 0) return;
       const S = GRID_SIZE;
-      const rx = () => Math.floor(S * 0.2 + Math.random() * S * 0.6);
-      const pick = (idxs: number[]) => PALETTE_RGB[idxs[Math.floor(Math.random() * idxs.length)]];
+      const rx = () => Math.floor(S * 0.2 + DICE.hands.float() * S * 0.6);
+      const pick = (idxs: number[]) => PALETTE_RGB[DICE.hands.pick(idxs)];
       const amt = 4 + energy * 8;
 
       switch (theme) {
@@ -4600,12 +4865,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           presetContractRef.current = PRESET_CONTRACTS['classic'];
           for (let d = 0; d < 15; d++) {
             doseLiquid(fluid, plateLiquidsRef.current,
-              10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+              10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
           }
         }
         if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
-        rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
+        rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
 
       }
@@ -4666,6 +4931,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
     const render = () => {
+      // A song render is drawing the frames (`renderApiRef` below): the
+      // browser's frame is not one of them.
+      if (renderingRef.current) return;
       try {
         renderFrame();
         frameErrors = 0;
@@ -4685,6 +4953,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
     const renderFrame = () => {
+      framesDrawnRef.current++;
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
@@ -4708,7 +4977,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         the beads, the bubbles, the rocks, the room and film stirs, the liquid
         chemistry — agrees with the solver about how long a step is.
       */
-      const stepRate = PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
+      const rendering = renderingRef.current;
+      const stepRate = rendering?.stepRate ?? PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
       const simStepS = 1 / stepRate;
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
@@ -4721,15 +4991,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // is sixty allocations a second for a show that runs for hours.
       const patch = patchRef.current!;
       patch.fold(settingsRef.current, {
-        room: sceneRef?.current ?? null,
-        film: filmSenseRef?.current ?? null,
+        room: clockIsFixed() ? null : sceneRef?.current ?? null,
+        film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
         shape: modRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
-      }, settingsRef.current.layerCount ?? 1, performance.now());
+      }, settingsRef.current.layerCount ?? 1, showNow());
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -4739,25 +5009,54 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         Where the magnet is this frame.
 
         A hand on it wins: the Magnet tool (or the phone pad, or a replay)
-        puts it where the pointer is, at no less than a firm pull, and it
-        stays there a quarter of a second after the last touch. With nobody
-        holding it and the automation on, a look with ferrofluid on it gets a
-        magnet that walks: a slow figure around where the look put it, faster
-        when the music is. A magnet that sits still under a still plate is a
-        photograph of ferrofluid, not ferrofluid. Every other look is handed
-        its settings untouched.
+        puts it where the pointer is, at no less than a firm pull, for as long
+        as the hand keeps touching it (a quarter of a second of grace).
+
+        And where the hand lets go of it, it stays. It used to go back to the
+        look's own place a quarter of a second after the last touch, which on
+        almost every look is the middle of the plate (magnetX and magnetY are
+        0.5 unless a look says otherwise, and none does), so the ferrofluid
+        the hand had just dragged to a corner flowed back to the centre on its
+        own. Reported by the owner: "I don't like how the magnet draws the
+        ferrofluid back to the center automatically. I want to just control
+        it with the mouse." A magnet set down under a dish stays where it was
+        put, so this one does too: at the look's own strength and height once
+        released (the firm, low pull is the hand pressing it up to the glass),
+        and not walking, since a walk is the magnet moving on its own.
+
+        What takes it back from the hand is the look placing its magnet
+        somewhere: Magnet Across or Up moved (the slider, a MIDI fader, a
+        patch), seen as the lead plate's magnetX or magnetY changing from one
+        frame to the next. Evolve no longer drifts those two (lib/drift.ts),
+        so the automation cannot do it behind the performer's back. A new look
+        that keeps the magnet where the last one had it leaves the hand's
+        placement alone.
+
+        With no hand ever on it and the automation on, a look with ferrofluid
+        on it gets a magnet that walks: a slow figure around where the look
+        put it, faster when the music is. A magnet that sits still under a
+        still plate is a photograph of ferrofluid, not ferrofluid. Every other
+        look is handed its settings untouched.
       */
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
-        const now = performance.now();
+        const now = showNow();
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
+        const lookX = look.magnetX ?? 0.5, lookY = look.magnetY ?? 0.5;
+        const seen = magnetLookRef.current;
+        magnetLookRef.current = { x: lookX, y: lookY };
+        if (!held && hand && seen && (Math.abs(lookX - seen.x) > 1e-4 || Math.abs(lookY - seen.y) > 1e-4)) {
+          magnetHandRef.current = null;
+        }
+        // Let go of, and left where the hand put it.
+        const placed = !held && magnetHandRef.current !== null;
         const strength = look.magnetStrength ?? 0;
         // The walk is a look setting, so a look (or a test) that places its
         // magnet keeps it there. Random Evolve walks it on any ferrofluid
         // look: at once, gently, and from then on its drift wanders the
         // setting itself (lib/drift.ts), which is what the slider shows.
         const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.35 : 0);
-        const walks = !held && walk > 0 && isActiveRef.current
+        const walks = !held && !placed && walk > 0 && isActiveRef.current
           && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
         /*
           The maze field plays the music: its strength breathes with how
@@ -4777,10 +5076,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
         }
-        if (!held && !walks) {
+        if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
           // as still held once the hand has gone stale.
-          lastMagnetRef.current = { x: look.magnetX ?? 0.5, y: look.magnetY ?? 0.5, strength, height: look.magnetHeight ?? 0.25, held: false, field };
+          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
@@ -4789,6 +5088,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // strong, so it grabs what is near it and drags it along, where a
           // look's own magnet is held further off and gathers broadly.
           mx = hand.x; my = hand.y; ms = Math.max(strength, 0.9) * toolAmountRef.current; mh = Math.min(mh, 0.15);
+        } else if (placed) {
+          mx = hand?.x ?? lookX; my = hand?.y ?? lookY;
         } else {
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           const last = magnetWalkAtRef.current || now;
@@ -4809,8 +5110,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       };
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
-        const now = Date.now() * 0.001;
-        const realDt = now - lastTimeRef.current;
+        const now = showEpochS();
+        // A render's frame is exactly 1/fps: the clock's own difference of two
+        // large doubles is that to within a last bit, which would still be a
+        // different last bit in every uniform downstream.
+        const realDt = rendering ? 1 / rendering.fps : now - lastTimeRef.current;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat
@@ -4818,13 +5122,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // onset as heard. Every reaction below reads this instead of its own
         // threshold crossing, so they all land together.
         {
-          const nowMs = performance.now();
+          const nowMs = showNow();
           const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
           // A clock from the desk, a tapped tempo or a typed one, if there is
           // one. Handed over every frame — the reading carries its own
           // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
+          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -4838,11 +5142,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const soapDial = currentSettings.surfactantFlow ?? 0;
           const leadSolver = fluidsRef.current[0]?.gpu;
           if (soapDial > 0.001 && leadSolver?.addMix && isActiveRef.current) {
-            const beat = kickRef.current.kick && Math.random() < 0.25 + 0.7 * soapDial;
+            const beat = kickRef.current.kick && DICE.music.float() < 0.25 + 0.7 * soapDial;
             const idle = nowMs - soapAtRef.current > (2600 - 1800 * soapDial);
             if (beat || idle) {
               soapAtRef.current = nowMs;
-              leadSolver.addMix(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 0.03 + 0.04 * Math.random(), { soap: 1 });
+              leadSolver.addMix(0.15 + DICE.music.float() * 0.7, 0.15 + DICE.music.float() * 0.7, 0.03 + 0.04 * DICE.music.float(), { soap: 1 });
             }
           }
         }
@@ -4866,7 +5170,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const clock = beatClockRef.current;
           const heard = clock.period > 0 && clock.confidence >= 0.5 ? 60000 / clock.period : 0;
-          const bpm = tempoRef?.current?.bpm || heard;
+          // The desk's tempo (a clock, a tap, a typed number) is a live input
+          // and a render does not follow it: its pace is the song's own, heard.
+          const bpm = (clockIsFixed() ? 0 : tempoRef?.current?.bpm) || heard;
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / 8));
           const playing = isActiveRef.current && !!currentAudioData && loudnessRef.current > 0.01;
@@ -4887,7 +5193,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           is instead of running on in the dark and coming back somewhere else.
         */
         // The LFOs, on the bar rather than on the second: see `modulators.ts`.
-        if (isActiveRef.current) modRef.current.step(realDt, tempoRef?.current?.bpm ?? 0);
+        if (isActiveRef.current) modRef.current.step(realDt, clockIsFixed() ? 0 : tempoRef?.current?.bpm ?? 0);
 
         if (isActiveRef.current) {
           phraseRef.current = phrasingRef.current.step(
@@ -4925,8 +5231,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
-        const simSteps = Math.floor(simAccumRef.current / simStepS);
+        let simSteps = Math.floor(simAccumRef.current / simStepS);
         simAccumRef.current -= simSteps * simStepS;
+        if (rendering) {
+          /*
+            A render's steps are counted, not measured: frame i is owed the
+            steps between floor(i·rate/fps) and floor((i+1)·rate/fps), in
+            integers. The accumulator above works in floating seconds, where
+            1/60 + 1/60 can floor to one step and then three, a judder a film
+            would keep; and its catch-up cap is set from how busy the machine
+            is, which a render must never depend on.
+          */
+          const i = rendering.frame;
+          simSteps = Math.floor(((i + 1) * rendering.stepRate) / rendering.fps) - Math.floor((i * rendering.stepRate) / rendering.fps);
+          simAccumRef.current = 0;
+        }
         stepsThisFrame = simSteps;
         /*
           The same elapsed time, counted in sixtieths of a second (H2b).
@@ -5055,7 +5374,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           dprRef.current = wantDpr;
           renderer?.resize();
         }
-        const wantRes = renderer ? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture) : 0;
+        const wantRes = renderer ? (rendering?.grid ?? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture)) : 0;
         for (const fluid of fluidsRef.current) {
           if (renderer && !renderer.attachSolver(fluid, gpuSupportedRef.current === false ? 0 : wantRes)) {
             gpuSupportedRef.current = false;
@@ -5090,12 +5409,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const g = leadGpu;
           const s = settingsRef.current;
-          const nowMs = performance.now();
+          const nowMs = showNow();
           const live = g?.chemistryLive;
           if (g?.addRxn && (s.bzReaction ?? 0) > 0.001 && (!live?.rxn || nowMs - bzSeedAtRef.current > 30000)) {
             bzSeedAtRef.current = nowMs;
             for (let k = 0; k < (live?.rxn ? 1 : 3); k++) {
-              const x = 0.2 + Math.random() * 0.6, y = 0.2 + Math.random() * 0.6, a = Math.random() * Math.PI * 2;
+              const x = 0.2 + DICE.chem.float() * 0.6, y = 0.2 + DICE.chem.float() * 0.6, a = DICE.chem.angle();
               g.addRxn(x, y, 0.035, { bz: 0.9 });
               g.addRxn(x + Math.cos(a) * 0.03, y + Math.sin(a) * 0.03, 0.035, { bzWake: 0.9 });
             }
@@ -5165,8 +5484,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004) {
-              chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
+            if ((bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+              chem.seed(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 2 + DICE.chem.float() * 3);
             }
             // The dividing regime grows at a pace a show can watch; coral is slower than a set.
             chem.step(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), 0.042, 0.062);
@@ -5197,7 +5516,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const roomFresh = (() => {
           if ((roomDrive <= 0 && roomHands <= 0) || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = sceneRef?.current ?? null;
-          if (!r || !r.ready) return null;
+          if (!r || !r.ready || clockIsFixed()) return null;
           return performance.now() - r.at < ROOM_STALE_MS ? r : null;
         })();
         const roomReading = roomDrive > 0 ? roomFresh : null;
@@ -5219,7 +5538,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const filmReading = (() => {
           if (filmDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = filmSenseRef?.current ?? null;
-          if (!r || !r.ready) return null;
+          if (!r || !r.ready || clockIsFixed()) return null;
           return performance.now() - r.at < ROOM_STALE_MS ? r : null;
         })();
 
@@ -5324,7 +5643,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               if (tool === 'magnet') {
                 // Nothing is laid: the magnet goes where the hand is.
-                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: performance.now() };
+                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
               } else if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
@@ -5369,8 +5688,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Wide cone of fine mist — many small random particles in a radius
                 const sprayR = 10 * GRID_SCALE * kSoft;
                 for (let p = 0; p < 12; p++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const dist = Math.random() * sprayR;
+                  const angle = DICE.hands.angle();
+                  const dist = DICE.hands.float() * sprayR;
                   const px = Math.floor(x + Math.cos(angle) * dist);
                   const py = Math.floor(y + Math.sin(angle) * dist);
                   if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
@@ -5384,13 +5703,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // More droplets, not bigger ones, for a heavier hand.
                 const flings = Math.max(1, Math.round(5 * k));
                 for (let p = 0; p < flings; p++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
+                  const angle = DICE.hands.angle();
+                  const flingDist = (3 + DICE.hands.float() * 15) * GRID_SCALE;
                   const px = Math.floor(x + Math.cos(angle) * flingDist);
                   const py = Math.floor(y + Math.sin(angle) * flingDist);
                   if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
-                  const dropR = Math.round((1 + Math.floor(Math.random() * 3)) * GRID_SCALE);
-                  const amt = 1.0 + Math.random() * 1.5;
+                  const dropR = Math.round((1 + DICE.hands.int(3)) * GRID_SCALE);
+                  const amt = 1.0 + DICE.hands.float() * 1.5;
                   for (let ddy = -dropR; ddy <= dropR; ddy++) {
                     for (let ddx = -dropR; ddx <= dropR; ddx++) {
                       const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -5542,14 +5861,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               projector does — slowly, in small places. `EVOLVE_FLOODS` brings
               it back.
             */
-            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && DICE.evolve.float() < 0.06) {
               lastFloodRef.current = now;
               autoEventsRef.current.poured++;
               const af = fluidsRef.current[0];
               if (af) {
                 const color = harmonyColor(harmonyRef.current);
-                const cx = GRID_SIZE * (0.25 + Math.random() * 0.5);
-                const cy = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                const cx = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
+                const cy = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
                 // A third of the plate across, falling off to nothing, so it
                 // is a pour arriving rather than a rectangle being filled.
                 const R = GRID_SIZE * (0.18 + 0.16 * ph.gust);
@@ -5573,25 +5892,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // About one small event every seven seconds at the default rate,
             // about one a second at full — against two or three a
             // second before, each of them large.
-            if (Math.random() < rate * (0.012 + energy * 0.03) * ph.drive) {
-              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive) {
+              const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
-                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
+                const rx = DICE.evolve.int(GRID_SIZE - 20) + 10;
+                const ry = DICE.evolve.int(GRID_SIZE - 20) + 10;
+                const isBlow = DICE.evolve.float() > 0.75 - (spectralCentroid / 128) * 0.4;
                 if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
-                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
+                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && DICE.evolve.float() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
-                    bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
+                    bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + DICE.evolve.int(3), 4 * GRID_SCALE);
                   }
                 } else {
                   const color = harmonyColor(harmonyRef.current);
                   const styles = injectStyleRef.current;
-                  const style = styles[Math.floor(Math.random() * styles.length)];
+                  const style = DICE.evolve.pick(styles);
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
@@ -5608,7 +5927,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // random every ~3 min (it was ~45 s). Only the dye still to come
             // takes the new colours, so with small drops this is a drift, not
             // a change of scene. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0001) {
+            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && DICE.evolve.float() < 0.0001) {
               harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
             }
 
@@ -5625,16 +5944,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               Rarer than a pour and gentler: a fifth off the middle of a patch
               at most, softened to nothing at its rim.
             */
-            if (now - lastThinRef.current > 9 && Math.random() < rate * 0.004) {
+            if (now - lastThinRef.current > 9 && DICE.evolve.float() < rate * 0.004) {
               lastThinRef.current = now;
               autoEventsRef.current.thinned++;
-              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+              const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
                 af.thinPatch(
-                  GRID_SIZE * (0.2 + Math.random() * 0.6),
-                  GRID_SIZE * (0.2 + Math.random() * 0.6),
-                  GRID_SIZE * (0.10 + Math.random() * 0.12),
-                  0.80 + Math.random() * 0.12,
+                  GRID_SIZE * (0.2 + DICE.evolve.float() * 0.6),
+                  GRID_SIZE * (0.2 + DICE.evolve.float() * 0.6),
+                  GRID_SIZE * (0.10 + DICE.evolve.float() * 0.12),
+                  0.80 + DICE.evolve.float() * 0.12,
                 );
               }
             }
@@ -5650,14 +5969,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               person reaches for when a plate has gone static, which is exactly
               when this should be reaching for it.
             */
-            if (!autoStrokeRef.current && Math.random() < rate * 0.003) {
+            if (!autoStrokeRef.current && DICE.evolve.float() < rate * 0.003) {
               autoEventsRef.current.stroked++;
-              const a = Math.random() * Math.PI * 2;
+              const a = DICE.evolve.angle();
               autoStrokeRef.current = {
-                x: GRID_SIZE * (0.3 + Math.random() * 0.4),
-                y: GRID_SIZE * (0.3 + Math.random() * 0.4),
+                x: GRID_SIZE * (0.3 + DICE.evolve.float() * 0.4),
+                y: GRID_SIZE * (0.3 + DICE.evolve.float() * 0.4),
                 dx: Math.cos(a), dy: Math.sin(a),
-                left: 18 + Math.floor(Math.random() * 14),
+                left: 18 + DICE.evolve.int(14),
               };
             }
             const stroke = autoStrokeRef.current;
@@ -5693,7 +6012,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const journeyMin = currentSettings.hueJourney ?? 0;
             if (journeyMin > 0) {
               const j = journeyRef.current;
-              const nowS = performance.now() * 0.001;
+              const nowS = showNow() * 0.001;
               if (j.lastAt < 0 || j.lastAt > nowS) j.lastAt = nowS;
               if (nowS - j.lastAt >= journeyMin * 60) {
                 j.lastAt = nowS;
@@ -5708,7 +6027,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           {
             const h = handoffRef.current;
             if (h && isActiveRef.current && drainFrameRef.current === 0) {
-              const nowMs = performance.now();
+              const nowMs = showNow();
               const p = Math.min(1, (nowMs - h.start) / h.dur);
               const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
               h.last = nowMs;
@@ -5757,7 +6076,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 else lead?.gpu?.clearPhase?.();
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
-                    doseLiquid(lead, plateLiquidsRef.current, 10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+                    doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
                   }
                 }
               }
@@ -5767,11 +6086,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 h.poured++;
                 const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
                 if (!fluid) break;
-                const rx = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
-                const ry = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                 const color = harmonyColor(harmonyRef.current);
                 const styles = injectStyleRef.current;
-                fluid.autoInject(styles[Math.floor(Math.random() * styles.length)] ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 1.2);
                 doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
               }
@@ -5787,10 +6106,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const styles = injectStyleRef.current;
             for (const fluid of fluidsRef.current) {
               for (let i = 0; i < 8; i++) {
-                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                const rx = DICE.lay.int(GRID_SIZE - 20) + 10;
+                const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const color = harmonyColor(harmonyRef.current);
-                const style = styles[Math.floor(Math.random() * styles.length)];
+                const style = DICE.lay.pick(styles);
                 fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
@@ -5867,7 +6186,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
                   const aStyles = injectStyleRef.current;
-                  const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
+                  const aStyle = () => DICE.music.pick(aStyles);
 
                   // Center pulse — scales with density mapping
                   if (densityMod > 0.005) {
@@ -5913,7 +6232,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // build one permanent patch of soap in the middle and
                     // leave the rest of the plate clean.
                     {
-                      const da = Math.random() * Math.PI * 2;
+                      const da = DICE.music.angle();
                       doseLiquid(activeFluid, plateLiquidsRef.current,
                         centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
                     }
@@ -5940,8 +6259,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // into fog, a handful of real drops stays drops.
                     const sparks = Math.floor(treble01 * 2 * impactMul);
                     for (let s = 0; s < sparks; s++) {
-                      const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                      const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                      const sx = DICE.music.int(GRID_SIZE - 20) + 10;
+                      const sy = DICE.music.int(GRID_SIZE - 20) + 10;
                       activeFluid.addTemp(sx, sy, treble01 * 0.6 * autoAmp);
                       for (let ddy = -1; ddy <= 1; ddy++) {
                         for (let ddx = -1; ddx <= 1; ddx++) {
@@ -5989,8 +6308,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (squeezeAmt > 0 && kickStep && isActiveRef.current && drainFrameRef.current === 0) {
               const leadPlate = fluidsRef.current[0];
               if (leadPlate) {
-                const cx = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
-                const cy = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
+                const cx = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
+                const cy = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
@@ -6012,7 +6331,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // A phone held by the projectionist: its tilt is the plate's, fading
             // out a couple of seconds after the last reading if the link drops.
             const ext = externalTiltRef.current;
-            const extAge = performance.now() * 0.001 - ext.at;
+            const extAge = showNow() * 0.001 - ext.at;
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
             const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
             const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
@@ -6088,16 +6407,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the oil is the thing the references actually show.
               const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
-              if (currentAudioData && room && ((onset && Math.random() < 0.45 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.003 * bubbleAmt))) {
+              if (currentAudioData && room && ((onset && DICE.music.float() < 0.45 * bubbleAmt) || (bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt))) {
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
                 for (let t = 0; t < 6; t++) {
-                  const a = Math.random() * Math.PI * 2, rr = (6 + Math.random() * 40) * GRID_SCALE;
+                  const a = DICE.music.angle(), rr = (6 + DICE.music.float() * 40) * GRID_SCALE;
                   const px = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr), py = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
                   const d = dens ? dens[Math.max(0, Math.min(GRID_SIZE - 1, px)) + Math.max(0, Math.min(GRID_SIZE - 1, py)) * GRID_SIZE] : 0;
                   if (d > best) { best = d; bx = px; by = py; }
                 }
-                bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 3 * GRID_SCALE);
+                bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + DICE.music.int(3), 3 * GRID_SCALE);
               }
               const lead = fluidsRef.current[0];
               const vx = lead?.readVx, vy = lead?.readVy;
@@ -6351,9 +6670,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
-              const drawn = Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
-              fl.viewHalfW = 0.5 * canvas.clientWidth / drawn;
-              fl.viewHalfH = 0.5 * canvas.clientHeight / drawn;
+              /*
+                A render frames by its film, not by the window. The element's
+                CSS box is the window's (a render letterboxes the canvas in it,
+                `objectFit: contain`), so a 16:9 film rendered from a 16:10
+                window got gravity's reach worked out for a frame it does not
+                have, and the same seed rendered from two window sizes was two
+                films. The canvas's pixels are the film's while rendering;
+                live it reads the box, exactly as it always did.
+              */
+              const [vw, vh] = rendering ? [canvas.width, canvas.height] : [canvas.clientWidth, canvas.clientHeight];
+              const drawn = Math.max(1, 1.5 * Math.max(vw, vh));
+              fl.viewHalfW = 0.5 * vw / drawn;
+              fl.viewHalfH = 0.5 * vh / drawn;
             }
           }
         }
@@ -6583,6 +6912,88 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The renderer reads the show's state through `view` and nothing
         // else, which is what lets a second one take the same call
         // (docs/webgpu-plan.md, P3).
+        /*
+          The checks' digest of this frame (see `FrameDigest`), taken here,
+          after everything the frame decides and before it is drawn. Only
+          while a render that asked for it is running: live, and in a render
+          nobody is comparing, this is one property read.
+        */
+        if (rendering?.digestOn) {
+          const f0 = fluidsRef.current[0];
+          const rd = f0?.readDensity, rvx = f0?.readVx;
+          const cell = (fx: number, fy: number) => Math.floor(fx * GRID_SIZE) + Math.floor(fy * GRID_SIZE) * GRID_SIZE;
+          let settingsHash = 0x811c9dc5;
+          const js = JSON.stringify(currentSettings);
+          for (let i = 0; i < js.length; i++) { settingsHash ^= js.charCodeAt(i); settingsHash = Math.imul(settingsHash, 0x01000193); }
+          rendering.digest = {
+            frame: rendering.frame,
+            showNow: showNow(),
+            realDt,
+            simTime: time,
+            steps: simSteps,
+            canvas: `${canvas.width}x${canvas.height}`,
+            grid: f0?.gpu?.N ?? 0,
+            layers: fluidsRef.current.length,
+            settings: (settingsHash >>> 0).toString(16),
+            active: isActiveRef.current,
+            evolve: isAutomatedRef.current,
+            audioEnergy: currentAudioData?.energy ?? -1,
+            audioBass: currentAudioData?.bass ?? -1,
+            kick: kickRef.current.kick,
+            kicks: kickCountRef.current,
+            loudness: loudnessRef.current,
+            tempoMul: tempoMulRef.current,
+            phraseDrive: phraseRef.current.drive,
+            phraseGust: phraseRef.current.gust,
+            phraseDrift: phraseRef.current.drift,
+            lfo1: modRef.current.value('lfo1'),
+            lfo4: modRef.current.value('lfo4'),
+            clockLean: f0?.clockLeanNow ?? 0,
+            dt: f0?.dt ?? 0,
+            solverSteps: f0?.stepCount ?? 0,
+            meanDensity: f0?.meanDensity ?? 0,
+            angle: rotationAnglesRef.current[0] ?? 0,
+            spin: spinVelRef.current[0] ?? 0,
+            rockX: rockRef.current.x,
+            rockY: rockRef.current.y,
+            lampX: lampRef.current.x,
+            lampY: lampRef.current.y,
+            gel: gelAngleRef.current,
+            kaleido: kaleidoPhaseRef.current,
+            filmLevel: filmLevelRef.current,
+            filmGain: filmGainRef.current,
+            flashGain: flashGainRef.current,
+            shot: `${shot.cx},${shot.cy},${shot.zoom}`,
+            harmony: harmonyRef.current.join(','),
+            beads: beadsRef.current.beads.length,
+            bubbles: bubblesRef.current.bubbles.length,
+            diceLay: DICE.lay.draws,
+            diceMusic: DICE.music.draws,
+            diceEvolve: DICE.evolve.draws,
+            dicePalette: DICE.palette.draws,
+            diceFluid: f0?.rng.draws ?? 0,
+            // The plate's other streams, by name (null: not asked for yet),
+            // so a stream that drew once more in one render than the other
+            // names itself in render-app's log.
+            diceHands: streamDraws('plate.hands'),
+            diceLiquids: streamDraws('plate.liquids'),
+            diceChemistry: streamDraws('plate.chemistry'),
+            diceBeads: streamDraws('plate.beads'),
+            diceBubbles: streamDraws('plate.bubbles'),
+            diceMacro: streamDraws('plate.macro'),
+            diceModulators: streamDraws('plate.modulators'),
+            dicePhrasing: streamDraws('plate.phrasing'),
+            macroClock: macroCamRef.current.time,
+            magnetHand: magnetHandRef.current ? `${magnetHandRef.current.x},${magnetHandRef.current.y},${magnetHandRef.current.at}` : 'none',
+            magnetLook: magnetLookRef.current ? `${magnetLookRef.current.x},${magnetLookRef.current.y}` : 'none',
+            rbCentre: rd?.[cell(0.5, 0.5)] ?? -1,
+            rbA: rd?.[cell(0.3, 0.3)] ?? -1,
+            rbB: rd?.[cell(0.7, 0.35)] ?? -1,
+            rbC: rd?.[cell(0.4, 0.72)] ?? -1,
+            rbVx: rvx?.[cell(0.5, 0.5)] ?? -1,
+            fxFrame: fxFrameRef.current,
+          };
+        }
         const lum = renderer?.drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
@@ -6601,7 +7012,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mark: markRef.current,
           film: filmRef.current,
           beadMask,
-          outputCfg: outputCfgRef.current,
+          outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,
           postForce: postForceRef.current,
           postTest: postTestRef.current,
           fxFrame: fxFrameRef.current,
@@ -6624,14 +7035,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
-        if (lum !== null) flashGainRef.current = flashRef.current.sample(performance.now(), lum);
+        if (lum !== null) flashGainRef.current = flashRef.current.sample(showNow(), lum);
         else if (flashGainRef.current !== 1) { flashRef.current.reset(); flashGainRef.current = 1; }
       }
 
       // Governor: judge this frame. A rung change takes effect through the
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
-      if (frameS > 0 && governorRef.current) {
+      if (frameS > 0 && governorRef.current && !rendering) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
         // What this frame cost the GPU, where the engine can say. Without it
@@ -6642,6 +7053,276 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
 
       animationFrameId = requestAnimationFrame(render);
+    };
+
+    /*
+      A song render's hold on the plate (see `VisualizerRender` for the
+      contract, lib/render.ts for the other half).
+
+      Everything the plate keeps from one frame to the next that is not the
+      glass itself starts from zero here, because a render has to be a
+      function of (seed, look, settings, song) and not of the evening before
+      it: the time stamps the timers compare against (they held the browser's
+      clock, and the show clock has just been handed to the render), the
+      phrase, the modulators, the beat clock, the frame counters the beads,
+      the drops and the effects count by, the flash guard's memory. The
+      solvers are rebuilt rather than cleared, because a solver keeps state
+      no clear reaches (its particles' frame count, its grain), and the
+      readback rings are told to forget the live plate (gpu/kit.ts).
+
+      Not reset, and so still able to differ between two renders in one
+      page: anything a person set (the settings, a locked palette, the layer
+      count), and the bead carpet's own dice (cleared, but drawn from its
+      stream before the look restarts it, which is the same draw every time).
+
+      That list was longer than it said. The same seed rendered twice in one
+      page on CI's Mac came out different on every frame, the first included
+      (`npm run render-app`, "the same seed twice draws the same frames: 240
+      of 240 frames differ"), and reading every value the frame reads found
+      these still carrying the evening into the film, each now reset below
+      with the reason where it is done: the plate's rock (a spring, kicked
+      live, that tilts the liquid and moves the lamp from the first step),
+      the gel wheel's and the kaleidoscope's phases, the film exposure's slew,
+      the closeup's last shot, Evolve's stamps and its finger stroke in
+      flight, the magnet's memory of where the look put it, each plate's own
+      history (FluidSimulation.forgetHistory), the flash probe's last reading
+      and the post chain's ring of past frames (rebuilt in `begin`), and the
+      grid, which followed the governor's rung of the moment.
+    */
+    const resetStamps = () => {
+      lastTimeRef.current = showEpochS();
+      /*
+        Evolve's own stamps, on the show clock like the rest of these: a thin
+        and a flood are each held back for a few seconds after the last
+        (`now - lastThinRef > 9`). Carried into a render, a live stamp (the
+        epoch, some 1.8e9 s) held every thin back for the whole film, and
+        carried out of one, a film stamp (2^20 ms in, about 1049 s) is simply
+        long ago; so an Evolve render's thins depended on whether the live
+        show had thinned before it, and the second of two Evolve renders was
+        held back by the first one's last thin.
+      */
+      lastThinRef.current = -1e9;
+      lastFloodRef.current = -1e9;
+      soapAtRef.current = 0;
+      bzSeedAtRef.current = 0;
+      liesSeedAtRef.current = 0;
+      mazeKickRef.current = { env: 0, at: 0 };
+      magnetWalkAtRef.current = 0;
+      magnetHandRef.current = null;
+      handoffRef.current = null;
+      externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
+      journeyRef.current.lastAt = -1;
+      flashRef.current.reset();
+      flashGainRef.current = 1;
+      for (const f of fluidsRef.current) f.forgetPress();
+      /*
+        The beat clock too, both ways: its onsets and its lock are stamped
+        in show milliseconds, which in a render start at 2^20 and live are
+        the page's age. Kept across the hand-back, a young page's live clock
+        read the render's stamps as in the future and held a lock on a beat
+        nobody was playing.
+      */
+      beatClockRef.current = new BeatClock();
+    };
+    const resetPlateClocks = () => {
+      resetStamps();
+      simulationTimeRef.current = 0;
+      simAccumRef.current = 0;
+      wanderClockRef.current = 0;
+      loudnessRef.current = 0;
+      tempoMulRef.current = 1;
+      kickRef.current = { kick: false, predicted: false };
+      kickCountRef.current = 0;
+      magnetWalkRef.current = 0;
+      phrasingRef.current.reset();
+      phraseRef.current = { drive: 1, gust: 0, drift: 0.5 };
+      modRef.current.reset();
+      beadsRef.current.clear();
+      fxFrameRef.current = 0;
+      dropClockRef.current = 0;
+      beadFrameRef.current = 0;
+      gestureFrameRef.current = 0;
+      /*
+        The rest of what the frame integrates from one frame to the next, at
+        the values they are made with. The rock is a damped spring the beat
+        kicks (Plate Rock is on by default, 0.45), and its displacement
+        tilts every plate and moves the lamp from the render's first step, so
+        a render began mid-sway wherever the live show's last kick had left
+        it; its phase decides which way the next kick throws it. The gel
+        wheel and the kaleidoscope turn by accumulating, the film exposure
+        and the closeup slew toward what they read, and a finger stroke
+        Evolve had begun would have carried on into the film.
+      */
+      rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
+      gelAngleRef.current = 0;
+      kaleidoPhaseRef.current = 0;
+      filmLevelRef.current = 0.3;
+      filmGainRef.current = 4.5;
+      macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
+      // The camera behind the shot, clock and all (see MacroCamera.forget):
+      // `reset` alone keeps its clock, which the tremor and breathing are
+      // drawn from.
+      macroCamRef.current.forget();
+      lastMacroOnRef.current = false;
+      camBassRef.current = 0;
+      lastBass01Ref.current = 0;
+      autoStrokeRef.current = null;
+      magnetLookRef.current = null;
+      lastMagnetRef.current = null;
+      // As if the look had just been laid with the amount it has, which it
+      // is about to be: the "turned up on a bare plate" pour below reads it.
+      phaseAmountRef.current = settingsRef.current.phaseAmount ?? 0;
+    };
+    renderApiRef.current = {
+      begin: async (o) => {
+        if (cancelled) throw new Error('the plate was rebuilt (the GPU was lost): start the render again');
+        if (!renderer || !stage || glLostRef.current) throw new Error('the plate is not up yet');
+        const governor = governorRef.current;
+        /*
+          The grid: what the settings pin, or for 'auto' the rung this
+          machine opens on, never the governor's rung of the moment. That one
+          climbs and falls with the live show's frame times, so two renders
+          of the same seed a few seconds apart could be laid on two grids,
+          which are two films (and the render reports its grid, so the check
+          can see which it got).
+        */
+        /*
+          And never above the out-of-memory cap (`gridCapRef`, every shortage
+          this session): the opening rung within it for 'auto', and a pinned
+          grid larger than it brought down to that rung too, since a render
+          is exactly the moment the plate is rebuilt from scratch at its
+          grid, and a grid the GPU has refused once it refuses again.
+          (`o.grid` is the caller's own, for the checks, and left alone.)
+        */
+        const cap = gridCapRef.current;
+        const within = governor?.openingRungWithin(cap).grid;
+        const asked = governor && within !== undefined ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture, within) : 256;
+        const grid = o.grid ?? (asked > cap && within !== undefined ? within : asked);
+        const stepRate = o.stepRate ?? 60;
+        cancelAnimationFrame(animationFrameId);
+        renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid, digestOn: !!o.digest, digest: null };
+        trackReadbacks(true);
+        renderer.resize();
+        resize();
+        setStaged(true);
+        for (const f of fluidsRef.current) {
+          if (f.gpu) f.detachGpu();
+          renderer.attachSolver(f, grid);
+        }
+        /*
+          The passes that remember a frame, rebuilt. The flash probe keeps
+          its last reading outside its ring (`luminance` answers from it until
+          a new one lands), so the render's first frame folded the live show's
+          brightness into the flash guard; and the post chain keeps a ring of
+          past frames that a delay effect reads. Both are built again on the
+          first frame that wants them, knowing nothing of the evening.
+        */
+        probe?.dispose();
+        probe = null;
+        chain?.dispose();
+        chain = null;
+        resetPlateClocks();
+        forgetReadbacks();
+        const lookId = o.lookId ?? livePresetRef.current;
+        layPlateRef.current(lookId);
+        {
+          // Each plate's own history, after the look has laid its angles.
+          const drawn = Math.max(1, 1.5 * Math.max(o.width, o.height));
+          fluidsRef.current.forEach((f, l) => f.forgetHistory(rotationAnglesRef.current[l] ?? 0, 0.5 * o.width / drawn, 0.5 * o.height / drawn));
+        }
+        // The laid plate, read back twice, so the first frame's readers (the
+        // dye regulator, the beads) see this plate and not nothing.
+        for (let k = 0; k < 2; k++) {
+          for (const f of fluidsRef.current) f.syncFromGpu();
+          await stage.device.queue.onSubmittedWorkDone();
+          await readbacksLanded();
+        }
+        return { grid, lookId, stepRate };
+      },
+      step: (audio, timestampUs, durationUs) => {
+        /*
+          The loss first, then whether a render is running.
+
+          The other way round, a GPU lost mid-render was reported as "step
+          with no render running", which is true and says nothing: the loss
+          rebuilds the stage through this effect's cleanup, the cleanup ends
+          the render from outside (it clears `renderingRef`, so the new loop
+          can draw), and by the time the render loop asks this hold for its
+          next frame the ref it checked first was already empty. What
+          happened was the GPU going away, and that is what the render has
+          to say (`npm run render-app`, render L, measured it on the Mac:
+          "The render failed: step with no render running."). So everything
+          that means "this hold's stage is gone" is asked before anything
+          else: the cleanup has run (`cancelled`), the loss handler has run
+          and the rebuild has not (`glLostRef`), or there is no stage.
+        */
+        if (cancelled || glLostRef.current || !stage) throw new Error('the GPU was lost during the render');
+        const r = renderingRef.current;
+        if (!r) throw new Error('step with no render running');
+        audioDataRef.current = audio;
+        cancelAnimationFrame(animationFrameId);
+        renderFrame();
+        r.frame++;
+        return new VideoFrame(canvas, { timestamp: timestampUs, duration: durationUs });
+      },
+      digest: () => renderingRef.current?.digest ?? null,
+      settle: async () => {
+        /*
+          The same order as `step`, on both sides of the wait. Before it: a
+          hold whose stage has gone has no queue to wait on, and it used to
+          skip the wait and report the frame settled, so the loss surfaced one
+          frame later as whatever `step` said. After it: the loss can land
+          while this waits (a lost device settles its pending work), and the
+          frame just waited for was drawn on a device that no longer exists.
+          Either way the render stops here and says why.
+        */
+        const lost = () => cancelled || glLostRef.current || !stage;
+        const gone = () => new Error('the GPU was lost during the render');
+        if (lost()) throw gone();
+        try {
+          await stage!.device.queue.onSubmittedWorkDone();
+          await readbacksLanded();
+        } catch (e) {
+          // A wait that failed because the device went is the loss, not
+          // whatever the promise was rejected with.
+          throw lost() ? gone() : e;
+        }
+        if (lost()) throw gone();
+      },
+      end: () => {
+        // The loss first here too: a hold whose stage has gone was already
+        // ended by the cleanup that retired it, and has nothing to hand back.
+        if (cancelled || !renderingRef.current) return;
+        renderingRef.current = null;
+        /*
+          The solvers' view half-extent back to the window's framing. During
+          the render it was the film's (see the frame's rotation block), and
+          live it is recomputed each frame, but only while the show is
+          active: handed back to a paused show, the plate kept the film's
+          framing, so gravity's reach was worked out for a 16:9 film on a
+          16:10 window until someone pressed play. Worked out here the way
+          the live frame does it, from the element's box.
+        */
+        {
+          const vw = canvas.clientWidth, vh = canvas.clientHeight;
+          const drawn = Math.max(1, 1.5 * Math.max(vw, vh));
+          for (const f of fluidsRef.current) { f.viewHalfW = 0.5 * vw / drawn; f.viewHalfH = 0.5 * vh / drawn; }
+        }
+        trackReadbacks(false);
+        resetStamps();
+        // The flash probe's last reading is the film's last frame, not the
+        // room's: built again, as at the start (see `begin`).
+        probe?.dispose();
+        probe = null;
+        audioDataRef.current = audioDataPropRef.current;
+        setStaged(stageRef.current !== null);
+        // The loop first, so that a resize which throws on a half-dead
+        // device still leaves the show drawing (its guard handles the rest).
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+        try { renderer?.resize(); resize(); } catch (e) { console.error('ChromaGlass: resizing after a render', e); }
+      },
     };
 
     /*
@@ -6662,6 +7343,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       display interval is not drawn again.
     */
     (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+      if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
       if (now - lastExternalFrame < 6) return;     // this interval already has a frame
       lastExternalFrame = now;
@@ -6679,6 +7361,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** Frames through the loop since the page loaded, live or rendered. */
+        frames: framesDrawnRef.current,
+        /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
+        beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -6691,6 +7377,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /*
+          The seed the show is running on (lib/rng.ts), which a crash report
+          then carries too, so a night that went wrong can be played again on
+          the same dice. `reseed` runs the show on another from here, as
+          `?seed=` would from a fresh load; `window.__cgSeed` reads the same
+          number without `?debug`.
+        */
+        seed: showSeed(),
+        reseed: (n: number) => { setShowSeed(n); },
         /*
           What is on each plate, from the last readback: how full it is, its
           mean colour, how many cells are not a number, and the fastest cell.
@@ -6939,7 +7634,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const size = () => {
       scopeSoon = 2;   // the canvas's own targets are about to be reallocated
       const dpr = dprRef.current;
-      const px = canvasPixelsFor(
+      const px = renderingRef.current ?? canvasPixelsFor(
         dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
         devicePixels(), { width: window.innerWidth, height: window.innerHeight },
       );
@@ -7587,7 +8282,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       window that changed size kept the pixels it started with.
     */
     const resize = () => {
-      const px = canvasPixelsFor(
+      const px = renderingRef.current ?? canvasPixelsFor(
         dprRef.current, stageRef.current, renderer?.maxTexture ?? 8192,
         devicePixels(), { width: window.innerWidth, height: window.innerHeight },
       );
@@ -7800,6 +8495,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      */
     return () => {
       cancelled = true;
+      /*
+        A render in progress does not survive its stage. A GPU lost halfway
+        rebuilds everything through this cleanup, and the new loop's first
+        frame returns at once while `renderingRef` is set: with it left set,
+        the render's own hold (this closure's) was the only thing that could
+        clear it, and the live show came back with no frame loop at all. So
+        the render is ended here, from outside: the new loop draws, the next
+        `step` on the old hold throws (`cancelled`), and the render's
+        cleanup asks for whatever hold exists now, which has nothing to end.
+      */
+      if (renderingRef.current) {
+        renderingRef.current = null;
+        trackReadbacks(false);
+        audioDataRef.current = audioDataPropRef.current;
+        setStaged(stageRef.current !== null);
+      }
+      renderApiRef.current = null;
       stopFilm();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);

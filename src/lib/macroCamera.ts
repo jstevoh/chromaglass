@@ -16,6 +16,7 @@
  * Everything here works in grid cells; `update()` returns fluid-UV (0..1) so
  * the shader can use it directly as its sampling center.
  */
+import { stream, type Rng } from './rng';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -120,6 +121,15 @@ export class MacroCamera {
   private lastAimX = NaN;
   private lastAimY = NaN;
 
+  /**
+   * The jitter on which drop wins a cut and how long the shot holds. Seeded
+   * (the show's `plate.macro` stream) so "repeat runs don't look scripted"
+   * stays true from one night to the next, and a render of one night is the
+   * same film twice: the cut is where the closeup camera goes, which is most
+   * of what a macro look shows.
+   */
+  constructor(private readonly rng: Rng = stream('plate.macro')) {}
+
   /** Force a cut to a new bead on the next update (preset change, drain, seed). */
   reset() {
     this.sinceCut = 0;
@@ -131,6 +141,30 @@ export class MacroCamera {
     this.whipLeft = 0;
     this.lastAimX = NaN;
     this.lastAimY = NaN;
+  }
+
+  /**
+   * `reset`, and the camera's own clock back to 0: a camera as if just made.
+   *
+   * `reset` is a cut, and a cut keeps the clock running on purpose: the
+   * handheld tremor and the breathing zoom are sines of it, and restarting
+   * them on every preset change would jolt the frame. A song render is the
+   * other case (VisualizerRender.begin, through `resetPlateClocks`): it
+   * has to draw the same film every time, and with the clock left where the
+   * live show had run it to, a macro look's tremor and breathing started at
+   * whatever phase the room had reached, so the same seed shook the closeup
+   * differently in each render. The review that found it read it off this
+   * class; the frame digest carries `macroClock` so a render check sees it.
+   */
+  forget(): void {
+    this.reset();
+    this.clock = 0;
+    this.smoothZoom = 0;
+  }
+
+  /** The clock the tremor and breathing are drawn from, in seconds (for a render's frame digest). */
+  get time(): number {
+    return this.clock;
   }
 
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
@@ -456,7 +490,7 @@ export class MacroCamera {
           const dist = Math.hypot(i - avoid.x, j - avoid.y);
           if (dist < size * 0.12) score *= 0.15;   // don't cut back to the same drop
         }
-        score *= 0.75 + Math.random() * 0.5;       // keeps repeat runs from looking scripted
+        score *= 0.75 + this.rng.float() * 0.5;       // keeps repeat runs from looking scripted
 
         if (score > bestScore) {
           bestScore = score;
@@ -470,7 +504,7 @@ export class MacroCamera {
     this.beadY = bestY;
     this.beadMass = this.recenter(field).mass;
     // Jittered hold — cuts should never land on a metronome.
-    this.holdLeft = Math.max(0.6, hold * (0.7 + Math.random() * 0.6));
+    this.holdLeft = Math.max(0.6, hold * (0.7 + this.rng.float() * 0.6));
   }
 
   private gridIndex(x: number, y: number, size: number): number {

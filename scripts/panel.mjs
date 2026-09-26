@@ -981,8 +981,18 @@ check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app
 // not be true of an empty plate somebody had since painted.
 check('and only one thing decides that', !/const lookEdited =/.test(app));
 
+/*
+  The opening look is drawn from the show's seeded stream now (lib/rng.ts,
+  `npm run seed`), not from Math.random, so a render opens on the look it
+  opened on before. What this held — that a visitor does not arrive on the
+  same look every time — is held the same way, with one more link: the pick
+  is from the pool, and the seed it is keyed on is drawn fresh each load
+  (crypto) unless ?seed= fixes it.
+*/
+const rngSource = readFileSync(join(root, 'src/lib/rng.ts'), 'utf8');
 check('the opening look is not always the same one',
-  /export const OPENING_LOOK/.test(app) && /Math\.random\(\) \* pool\.length/.test(app));
+  /export const OPENING_LOOK/.test(app) && /stream\('show\.opening'\)\.pick\(pool\)/.test(app)
+    && /current = asked \?\? drawStartupSeed\(\)/.test(rngSource) && /getRandomValues\(new Uint32Array\(1\)\)/.test(rngSource));
 check('and can be pinned so a harness is not random', /get\('look'\)/.test(app));
 
 // ── The mirror rig ──────────────────────────────────────────────────
@@ -1401,6 +1411,30 @@ check('and neither starts over the limit',
   check('evolve walks the magnet on a ferrofluid look that set no walk',
     walked > 20 && lo >= 0.29 && hi <= 0.71,
     `walked ${walked} times, between ${lo.toFixed(2)} and ${hi.toFixed(2)}`);
+}
+/*
+  But it never moves where the magnet sits. The Magnet tool sets the magnet
+  down and it stays until the look places its own somewhere (magnetFor in
+  LiquidVisualizer), and a drift of Magnet Across or Up is the look placing
+  it: before magnetX and magnetY were held out of the drift, 165 of these
+  4000 rolls moved one of them, and under Evolve the magnet the owner left in
+  a corner went back to the middle at the first. Measured on the same
+  ferrofluid look as the walk above, where they would otherwise be live.
+*/
+{
+  const anchor = { ...DEFAULT_SETTINGS, phaseAmount: 0.8, magnetStrength: 0.8, magnetWalk: 0.5 };
+  let bits = 20260926;
+  const roll = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
+  let current = { ...anchor }, placed = 0, walked = 0;
+  for (let i = 0; i < 4000; i++) {
+    const patch = driftLook(current, anchor, 1, roll);
+    if ('magnetX' in patch || 'magnetY' in patch) placed++;
+    if ('magnetWalk' in patch) walked++;
+    current = { ...current, ...patch };
+  }
+  check('evolve never moves where the magnet sits, only how it walks',
+    placed === 0 && walked > 20,
+    `Magnet Across or Up moved ${placed} times in 4000 drifts, the walk ${walked}`);
 }
 
 // ── The plate's speed follows the music (lib/tempoPace.ts) ─────────

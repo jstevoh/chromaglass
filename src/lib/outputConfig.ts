@@ -225,6 +225,8 @@ export function normalizeSurfaces(raw: unknown): Surface[] {
     const src = Array.isArray(s.src) && s.src.length === 4 && s.src.every(n => typeof n === 'number' && Number.isFinite(n))
       ? ([clamp(s.src[0], 0, 1), clamp(s.src[1], 0, 1), clamp(s.src[2], 0.01, 1), clamp(s.src[3], 0.01, 1)] as Surface['src'])
       : ([0, 0, 1, 1] as Surface['src']);
+    // The id below is unseeded on purpose (`npm run seed` allows it): it names
+    // a surface in a saved projector setup and is never drawn.
     out.push({
       id: typeof s.id === 'string' && s.id ? s.id : `s${out.length}-${Math.random().toString(36).slice(2, 8)}`,
       shape,
