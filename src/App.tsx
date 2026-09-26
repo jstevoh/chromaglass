@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
+import { flushSync } from 'react-dom';
+import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
+import { useSongRender } from './hooks/useSongRender';
+import { RenderPanel } from './components/RenderPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -22,7 +25,7 @@ import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
@@ -76,7 +79,8 @@ import { LOCKUP_URL } from './brand';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
-import { stream } from './lib/rng';
+import { parseSeed, showSeed, stream } from './lib/rng';
+import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -1137,11 +1141,27 @@ export default function App() {
     smooth: settings.sceneSmooth ?? 0.35,
   });
 
-  const audioData = useAudioAnalyzer(
+  const liveAudio = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
     settings.autoCalibrate !== false, calibrateNonce,
   );
+  /*
+    What the show hears: the room, or a song being rendered.
+
+    A render (hooks/useSongRender.ts) hears its song in advance, one reading
+    per frame, and hands each frame's here before the frame is drawn, so every
+    consumer of the live ear (the plate, the meters, the cast, the phone)
+    gets the song's reading in its place and nothing needs to know which it
+    is. `renderHold` is the span of the whole render, set before the first
+    frame and cleared after the last: the music element is paused for a
+    render, and the silence that leaves on the live ear must not read as a
+    gap between songs (`useSongChange` below) and roll a new look mid-film.
+  */
+  const [renderAudio, setRenderAudio] = useState<AudioData | null>(null);
+  const [renderHold, setRenderHold] = useState(false);
+  const renderHoldRef = useRef(false);
+  const audioData = renderAudio ?? liveAudio;
 
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
@@ -1200,7 +1220,7 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, audioData, musicSettings, settings);
+  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
@@ -1278,7 +1298,8 @@ export default function App() {
 
   // Fire lyric word-triggers into the fluid
   useEffect(() => {
-    if (musicIntel.trigger) {
+    // Not into a render: the lyric clock is the room's, not the film's.
+    if (musicIntel.trigger && !renderHoldRef.current) {
       const energy = audioData ? Math.min(1, audioData.energy) : 0.6;
       visualizerRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
     }
@@ -1293,7 +1314,7 @@ export default function App() {
 
   // Re-fire replayed performance gestures into the fluid
   useEffect(() => {
-    if (musicIntel.gestureFire) {
+    if (musicIntel.gestureFire && !renderHoldRef.current) {
       for (const g of musicIntel.gestureFire.gestures) {
         visualizerRef.current?.applyGesture(g);
       }
@@ -1522,7 +1543,7 @@ export default function App() {
       hand takes in the meantime is dropped from the glide (updateSettings),
       and the hand wins.
     */
-    const id = setInterval(() => {
+    const id = showInterval(() => {
       const rate = settingsRef.current.automateRate ?? 0.12;
       const patch = driftLook(settingsRef.current, driftAnchor.current, rate) as Record<string, number>;
       for (const [k, to] of Object.entries(patch)) {
@@ -1545,8 +1566,8 @@ export default function App() {
         driftGlide.current.set('macroAimX', { from: ax, to: wander(ax), at: 0 });
         driftGlide.current.set('macroAimY', { from: ay, to: wander(ay), at: 0 });
       }
-    }, 6000);
-    const glide = setInterval(() => {
+    }, 6000, 'drift');
+    const glide = showInterval(() => {
       if (driftGlide.current.size === 0) return;
       const step: Record<string, number> = {};
       for (const [k, g] of driftGlide.current) {
@@ -1558,8 +1579,8 @@ export default function App() {
       // Not through updateSettings: that is a hand, and re-anchors.
       setSettings(prev => ({ ...prev, ...step }));
       setDocDirty(true);
-    }, 4000 / DRIFT_GLIDE_STEPS);
-    return () => { clearInterval(id); clearInterval(glide); driftGlide.current.clear(); };
+    }, 4000 / DRIFT_GLIDE_STEPS, 'drift-glide');
+    return () => { clearShowInterval(id); clearShowInterval(glide); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
 
@@ -1675,7 +1696,7 @@ export default function App() {
   // crossfade and stay there. (rAF also runs at the compositor's rate, which
   // on a machine with no GPU worth the name is under a frame a second —
   // the fade would arrive in three steps.)
-  const lookFadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lookFadeRef = useRef<ShowIntervalHandle | null>(null);
   /** The look before the last Go, so one step back is always available. */
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
@@ -1865,15 +1886,15 @@ export default function App() {
    * change rather than React.
    */
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
-    if (lookFadeRef.current) { clearInterval(lookFadeRef.current); lookFadeRef.current = null; }
+    if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     const from = settingsRef.current;
     if (seconds <= 0) { setSettings(to); setFading(0); return; }
-    const started = performance.now();
+    const started = showNow();
     const ms = seconds * 1000;
-    lookFadeRef.current = setInterval(() => {
-      const t = Math.min(1, (performance.now() - started) / ms);
+    lookFadeRef.current = showInterval(() => {
+      const t = Math.min(1, (showNow() - started) / ms);
       if (t >= 1) {
-        if (lookFadeRef.current) clearInterval(lookFadeRef.current);
+        if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
         lookFadeRef.current = null;
         setSettings(to);
         setFading(0);
@@ -1881,7 +1902,7 @@ export default function App() {
       }
       setSettings(blendLooks(from, to, t));
       setFading(t);
-    }, 33);
+    }, 33, 'look-fade');
   }, []);
 
   const sendLook = useCallback((next: ArmedLook, seconds: number) => {
@@ -1929,7 +1950,7 @@ export default function App() {
     fadeSettingsTo(prev.settings, fadeSeconds);
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
-  useEffect(() => () => { if (lookFadeRef.current) clearInterval(lookFadeRef.current); }, []);
+  useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
 
   /*
     MIDI timecode, and the position the sequence follows.
@@ -2135,7 +2156,7 @@ export default function App() {
   // ── A new song, a new look ──────────────────────────────────────
   // Heard as a gap between tracks, or named by track identification. The
   // sequencer owns the evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive);
+  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
   const lastSongChangeSeq = useRef(0);
   useEffect(() => {
     if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
@@ -2386,20 +2407,20 @@ export default function App() {
   const blackoutRef = useRef(blackout);
   blackoutRef.current = blackout;
   const dimmerBeforeRef = useRef(1);
-  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fadeRef = useRef<ShowIntervalHandle | null>(null);
   // On a timer, not requestAnimationFrame: the laptop's window is often
   // behind the projector's, and a hidden tab stops animating while the
   // fader on the desk expects the wall to go dark anyway.
   const fadeDimmer = useCallback((to: number, ms = 1100) => {
-    if (fadeRef.current) clearInterval(fadeRef.current);
+    if (fadeRef.current) clearShowInterval(fadeRef.current);
     const from = settingsRef.current.dimmer ?? 1;
-    const began = performance.now();
-    fadeRef.current = setInterval(() => {
-      const k = Math.min(1, (performance.now() - began) / ms);
+    const began = showNow();
+    fadeRef.current = showInterval(() => {
+      const k = Math.min(1, (showNow() - began) / ms);
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
-      if (k >= 1 && fadeRef.current) { clearInterval(fadeRef.current); fadeRef.current = null; }
-    }, 16);
+      if (k >= 1 && fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
+    }, 16, 'dimmer-fade');
   }, []);
   const toggleBlackout = useCallback(() => {
     setBlackout(prev => {
@@ -2705,23 +2726,23 @@ export default function App() {
 
   // ── Songs: the runtime ──────────────────────────────────────────
   /** A setting walked to a value over some seconds, the way a hand turns a knob. One walk per setting. */
-  const glidesRef = useRef(new Map<string, ReturnType<typeof setInterval>>());
+  const glidesRef = useRef(new Map<string, ShowIntervalHandle>());
   const glideSetting = useCallback((key: keyof VisualizerSettings, to: number, seconds: number, atEnd?: Partial<VisualizerSettings>) => {
     const timers = glidesRef.current;
     const running = timers.get(String(key));
-    if (running) clearInterval(running);
+    if (running) clearShowInterval(running);
     const from = Number((settingsRef.current as unknown as Record<string, unknown>)[key] ?? 0);
     if (!(seconds > 0)) { setSettings(p => ({ ...p, [key]: to, ...(atEnd ?? {}) })); return; }
-    const started = performance.now();
-    const timer = setInterval(() => {
-      const k = Math.min(1, (performance.now() - started) / (seconds * 1000));
+    const started = showNow();
+    const timer: ShowIntervalHandle = showInterval(() => {
+      const k = Math.min(1, (showNow() - started) / (seconds * 1000));
       const e = k * k * (3 - 2 * k);
       setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
-      if (k >= 1) { clearInterval(timer); timers.delete(String(key)); }
-    }, 33);
+      if (k >= 1) { clearShowInterval(timer); timers.delete(String(key)); }
+    }, 33, `glide:${String(key)}`);
     timers.set(String(key), timer);
   }, []);
-  useEffect(() => () => { for (const t of glidesRef.current.values()) clearInterval(t); }, []);
+  useEffect(() => () => { for (const t of glidesRef.current.values()) clearShowInterval(t); }, []);
 
   /** Do one of a song's actions, through the same moves a pad or a key makes. */
   const performSongAction = useCallback((action: SongAction, show: SongShow) => {
@@ -2755,7 +2776,8 @@ export default function App() {
   const songRuntime = useSongShows({
     shows: songShows,
     // Not while a look is being built: Design is where settings are chosen by hand.
-    follow: followSongs && !designing,
+    // Nor while a song is being rendered: the render plays the look on the plate (hooks/useSongRender.ts).
+    follow: followSongs && !designing && !renderHold,
     track: musicIntel.state.track,
     positionSec: musicIntel.state.positionSec,
     songMap: musicIntel.state.songMap,
@@ -2766,6 +2788,122 @@ export default function App() {
   });
   const songRuntimeRef = useRef(songRuntime);
   songRuntimeRef.current = songRuntime;
+
+  // ── Render this song (PLAN.md §6) ───────────────────────────────
+  const showSequencerRef = useRef(sequencer);
+  showSequencerRef.current = sequencer;
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  /*
+    The app's side of a render: what it steps aside from, and what it puts
+    back. The loop itself is hooks/useSongRender.ts; the plate's side is
+    `VisualizerRender` in components/LiquidVisualizer.tsx.
+
+    Stepping aside, and why each:
+      - the music element pauses: the render hears the song from its file;
+        the room does not need to hear it again at the same time. It plays
+        on afterwards if it was playing, from where it was;
+      - a sequence or a song's show stops (first cut: they do not play in a
+        render yet, and the panel says so before anything is pressed);
+      - fades and glides in flight are dropped, because their clocks were
+        started on the wall clock and would land at a moment the film does
+        not have; Evolve's own intervals are kept and re-phased onto the
+        film's clock (lib/showClock.ts), and its glide and aim start empty;
+      - a frozen plate is thawed, since a render of a still is not a film;
+      - the settings and Evolve's anchor are kept, because Evolve wanders
+        them during the render and the show after it should be the show
+        before it. The same snapshot is what makes a second render of the
+        same seed start where the first one did, which `npm run render-app`
+        measures.
+    The seed is put back too (in useSongRender), so tonight's seed is still
+    tonight's after a render on another one. And the fades and glides are
+    dropped again on the way out, for the reason given where it is done.
+  */
+  const renderHost = useMemo(() => ({
+    render: () => visualizerRef.current?.render() ?? null,
+    setAudio: (a: AudioData | null) => setRenderAudio(a),
+    prepare: () => {
+      const el = musicElRef.current;
+      if (showSequencerRef.current.status.sequenceId !== null) showSequencerRef.current.stop();
+      songRuntimeRef.current.stop();
+      if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
+      if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
+      for (const t of glidesRef.current.values()) clearShowInterval(t);
+      glidesRef.current.clear();
+      driftGlide.current.clear();
+      aimTick.current = 0;
+      const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current, playing: !!el && !el.paused };
+      if (el && !el.paused) el.pause();
+      renderHoldRef.current = true;
+      flushSync(() => { setRenderHold(true); setIsActive(true); });
+      return () => {
+        /*
+          The same drops as on the way in, again on the way out. A fade or a
+          glide started during the render (a song show's, a look fade Evolve
+          asked for) was stamped on the film's clock, whose milliseconds start
+          at 2^20; carried into the live show, on a page younger than that it
+          reads as not begun and extrapolates, and writes over the settings
+          and the dimmer this very function is about to put back.
+        */
+        if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
+        if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
+        for (const t of glidesRef.current.values()) clearShowInterval(t);
+        glidesRef.current.clear();
+        renderHoldRef.current = false;
+        flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); });
+        driftAnchor.current = kept.anchor;
+        driftGlide.current.clear();
+        // The song plays on if it was playing: a render interrupts listening, it does not end it.
+        if (kept.playing && musicElRef.current) void musicElRef.current.play().catch(() => { /* needs a gesture: the play button is there */ });
+      };
+    },
+  }), []);
+  const songRender = useSongRender(renderHost);
+  const [renderOpen, setRenderOpen] = useState(false);
+  const startRender = useCallback((choice: { width: number; height: number; fps: number; seed: string }) => {
+    if (!musicFile) return;
+    const s = settingsRef.current;
+    void songRender.start({
+      song: musicFile.url, name: musicFile.name,
+      width: choice.width, height: choice.height, fps: choice.fps,
+      seed: parseSeed(choice.seed) ?? showSeed(),
+      levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
+    });
+  }, [musicFile, songRender.start]);
+  /*
+    For `npm run render-app` only (`?debug`): render the loaded song, or a
+    song handed over as bytes, small and kept in memory, and hand back the
+    file and a hash of every frame, so the check can render twice and compare.
+  */
+  const musicFileRef = useRef(musicFile);
+  musicFileRef.current = musicFile;
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    // What a render could leave running in the live show: a fade or a glide
+    // stamped on the film's clock (see the restore in `renderHost`).
+    (window as unknown as { chromaglassRenderPending?: unknown }).chromaglassRenderPending = () => ({
+      lookFade: lookFadeRef.current !== null, dimmerFade: fadeRef.current !== null, glides: glidesRef.current.size,
+    });
+    (window as unknown as { chromaglassRender?: unknown }).chromaglassRender = async (o: {
+      song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
+    }) => {
+      const s = settingsRef.current;
+      const song = o.song ? new Blob([o.song]) : musicFileRef.current?.url;
+      if (!song) throw new Error('no song: load one or pass its bytes');
+      const r = await songRender.start({
+        song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed,
+        levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
+        test: { keepInMemory: true, hashFrames: true, maxFrames: o.maxFrames },
+      });
+      let b64: string | null = null;
+      if (r.bytes) {
+        let bin = '';
+        for (let i = 0; i < r.bytes.length; i += 0x8000) bin += String.fromCharCode(...r.bytes.subarray(i, i + 0x8000));
+        b64 = btoa(bin);
+      }
+      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64 };
+    };
+  }, [songRender.start]);
   const lookChoices = useMemo<LookChoice[]>(() => [
     ...PRESETS.map(p => ({ kind: 'preset' as const, id: p.id, name: p.name })),
     ...userPresets.presets.map(p => ({ kind: 'saved' as const, id: p.id, name: p.name })),
@@ -3218,8 +3356,32 @@ export default function App() {
           >
             {musicFile?.track ? 'rolls on' : 'repeats'}
           </button>
-          <button onClick={closeMusicFile} className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
+          <button
+            onClick={() => { setRenderOpen(v => !v); setLibraryOpen(false); }}
+            // 24 px and 70% white: the floor for a control a person has to find in a dark room.
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70'}`}
+            aria-label="Render this song to a video file" title="Render this song to a video file, every frame, none dropped"
+            data-testid="render-song"
+          >
+            <Film size={13} />
+          </button>
+          <button onClick={closeMusicFile} disabled={songRender.running} className="p-1 rounded-full hover:bg-white/10 text-white/50 disabled:opacity-30" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
         </div>
+      )}
+      {musicFile && ((renderOpen && !libraryOpen) || songRender.running) && (
+        <RenderPanel
+          songName={musicFile.name}
+          songSeconds={musicTime.d}
+          currentSeed={showSeed()}
+          state={songRender.state}
+          running={songRender.running}
+          showRunning={sequencer.status.sequenceId !== null || songRuntime.status.showId !== null}
+          webcodecs={songRender.support.webcodecs}
+          streamsToDisk={songRender.support.streamsToDisk}
+          onRender={startRender}
+          onCancel={songRender.cancel}
+          onClose={() => { setRenderOpen(false); songRender.reset(); }}
+        />
       )}
       {projector.projector && !isCasting && overlaysVisible && projector.mode !== 'off' && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">

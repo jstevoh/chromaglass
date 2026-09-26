@@ -81,10 +81,21 @@ jobs:
       # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
       # the ubuntu runner does not have until it is installed here; with no
       # decoder the script fails on CI rather than skipping the real music.
-      - name: ffmpeg, for the shelf
+      - name: ffmpeg, for the shelf and the render's files
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         run: npm run bands
+
+      # A song render's arithmetic (PLAN.md §6): the show clock is the frame
+      # number while rendering and the browser's own clock live; the song's
+      # track is the same bytes twice and hears the kicks at the same moments
+      # at 30 and 60 fps; the ear the render uses is the live hook's to the
+      # last bit; and both file writers give back every sample, at its time,
+      # through a strict reader, the same bytes twice; and ffprobe, installed
+      # above for the shelf, opens each file with the right streams, every
+      # packet and the right length (with no ffprobe this fails on CI).
+      - name: The render's clock, ear and file
+        run: npm run render
 
       # The shape of the quality ladder: that every rung is a rung, that a
       # step down gives something up, and that a rung asking for fewer device
@@ -238,6 +249,18 @@ jobs:
       - name: A show night
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: QA_DPR=1 QA_GPU=mid npm run qa
+      # Render this song in the app itself (PLAN.md §6): a synthetic song
+      # rendered ten ways through the visualizer's own frame loop, frame by
+      # frame on the film's clock. The same seed draws the same frames hash
+      # for hash; another seed, a silent song and Evolve each draw others;
+      # a GPU taken away mid-render fails that render and says why; and after
+      # every run the app is given back as it was. It runs here and not on
+      # ubuntu because it needs the app's frames read back, which software
+      # WebGPU does not do. The build above is the one it serves, so this
+      # calls the script and not `npm run render-app` (which builds first).
+      - name: A song rendered in the app
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        run: node scripts/render-app.mjs
       # The post chain in the app: the chain with nothing in it draws the
       # plate's own picture, the ring keeps what it was given, and the
       # effects' randomness is the same twice.

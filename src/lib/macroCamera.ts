@@ -143,6 +143,30 @@ export class MacroCamera {
     this.lastAimY = NaN;
   }
 
+  /**
+   * `reset`, and the camera's own clock back to 0: a camera as if just made.
+   *
+   * `reset` is a cut, and a cut keeps the clock running on purpose: the
+   * handheld tremor and the breathing zoom are sines of it, and restarting
+   * them on every preset change would jolt the frame. A song render is the
+   * other case (VisualizerRender.begin, through `resetPlateClocks`): it
+   * has to draw the same film every time, and with the clock left where the
+   * live show had run it to, a macro look's tremor and breathing started at
+   * whatever phase the room had reached, so the same seed shook the closeup
+   * differently in each render. The review that found it read it off this
+   * class; the frame digest carries `macroClock` so a render check sees it.
+   */
+  forget(): void {
+    this.reset();
+    this.clock = 0;
+    this.smoothZoom = 0;
+  }
+
+  /** The clock the tremor and breathing are drawn from, in seconds (for a render's frame digest). */
+  get time(): number {
+    return this.clock;
+  }
+
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
     const { size } = field;
     const step = clamp(Number.isFinite(dt) ? dt : 0, 0, 0.25);
