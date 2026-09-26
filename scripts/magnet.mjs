@@ -127,7 +127,14 @@ try {
       globalSpeed: 0.025,
     });
   });
-  await page.waitForTimeout(3000);
+  /*
+    And let the pour settle before the control. Three seconds after it, the
+    fresh ferrofluid was still gathering on its own: the plate left alone
+    went 121 -> 189 at the hand's spot in six seconds (CI, on a commit that
+    does not touch the magnet), more than the drag then added over its
+    window, and the check failed on the control rather than on the magnet.
+  */
+  await page.waitForTimeout(9000);
 
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
