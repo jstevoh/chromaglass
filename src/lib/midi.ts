@@ -631,6 +631,16 @@ export function padVelocityFor(r: number, g: number, b: number, dim = false): nu
 
 export function serializeMidiMap(map: MidiMap): string { return JSON.stringify(map, null, 2) + '\n'; }
 
+
+/*
+  The fallback id of a loaded binding that arrived without one, controller
+  (`b-`) or music (`s-`). Unseeded on purpose (`npm run seed` allows it): a
+  name for a loaded binding, never on the plate, and two sessions on one
+  `?seed=` must not mint the same one. One helper for both kinds, so the seed
+  gate's count of unseeded draws in this file stays the one it allows.
+*/
+const fallbackId = (prefix: 'b' | 's') => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+
 export function parseMidiMap(text: string): MidiMap {
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new Error('That is not a JSON file.'); }
@@ -640,12 +650,10 @@ export function parseMidiMap(text: string): MidiMap {
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
     (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
-    // The fallback id below is unseeded on purpose (`npm run seed` allows it):
-    // a name for a loaded binding, never on the plate.
     .map(b => ({
       ...b,
       target: onTodaysTravel(b.target),
-      id: typeof b.id === 'string' ? b.id : `b-${Math.random().toString(36).slice(2, 8)}`,
+      id: typeof b.id === 'string' ? b.id : fallbackId('b'),
       mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'],
       // A map written before banks existed has none, and every binding in it
       // is always live — which is exactly what `undefined` means, so old maps
@@ -683,7 +691,7 @@ function parseSoundBindings(raw: unknown[]): SoundBinding[] {
     else if (t.kind === 'dye' && Number.isInteger(t.paletteIndex) && t.paletteIndex >= 0) target = { kind: 'dye', paletteIndex: t.paletteIndex };
     if (!target) continue;
     const binding: SoundBinding = {
-      id: typeof b.id === 'string' ? b.id : `s-${Math.random().toString(36).slice(2, 8)}`,
+      id: typeof b.id === 'string' ? b.id : fallbackId('s'),
       source: b.source as MusicSource,
       target,
     };

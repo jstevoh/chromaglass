@@ -79,8 +79,10 @@ const hasWebMidi = () => typeof navigator !== 'undefined' && typeof (navigator a
 
 // Unseeded on purpose (`npm run seed` allows it): a binding's name in saved
 // MIDI maps, never on the plate, and it must not repeat across sessions that
-// share a `?seed=` or two bindings would collide.
-const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
+// share a `?seed=` or two bindings would collide. One helper for controller
+// bindings (`b-`) and music bindings (`s-`) alike, so the seed gate's count of
+// unseeded draws in this file stays the one it allows and names.
+const newId = (prefix: 'b' | 's' = 'b') => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * The tempo, if the desk is sending it.
@@ -657,7 +659,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
    */
   const learnSound = useCallback((b: Omit<SoundBinding, 'id'>) => setMap(prev => ({
     ...prev,
-    sound: [...(prev.sound ?? []).filter(x => !sameSoundBinding(x, b)), { ...b, id: `s-${Math.random().toString(36).slice(2, 8)}` }],
+    sound: [...(prev.sound ?? []).filter(x => !sameSoundBinding(x, b)), { ...b, id: newId('s') }],
   })), [setMap]);
   const removeSound = useCallback((id: string) => setMap(prev => ({ ...prev, sound: (prev.sound ?? []).filter(b => b.id !== id) })), [setMap]);
   /** A binding written by hand (the panel's "add" without touching the controller). */
