@@ -104,6 +104,29 @@ the frame from 43 ms to 18. On frozen frames the two paths come out within one
 If a highlight or an interface line looks faceted, softer or shifted with it
 on, that is the thing to report.
 
+## 7. Drops, not rings
+
+`beadDrops` (Settings, Show, under Oil Beads; MIDI-learnable) turns the beads from
+dark-rimmed lenses into drops of colour: each takes a dye from the look's palette,
+is lit across its dome with one highlight toward the lamp, presses flat against
+its neighbours, and keeps a smaller drop it swallowed visible inside it for
+fifteen to thirty-five seconds. It ships at zero everywhere, so nothing changes
+until you ask. `npm run drops` measures the field and the mask; the lab
+photographed the shading on software WebGPU, which cannot say whether it looks
+like oil or like sweets.
+
+```
+?set=beads=0.8;beadDrops=1       Fillmore's field, all drops
+?set=beads=0.8;beadDrops=0.5     half way: rings taking on colour
+```
+
+Three things to look at. Whether a crowd reads as liquid or as candy: the
+colours are the palette's own, at 85% over the plate. Whether the highlight
+sits where the lamp is as the lamp wanders. And the frame time: the drops' mask
+is drawn a pixel at a time on the main thread, 6.7 ms against the rings'
+canvas at 3.9 in the sandbox's Chromium for the same crowd of about 330. If
+`frameMs` climbs with it on, that is the number to report.
+
 ---
 
 ## Reading the frame time while you do it

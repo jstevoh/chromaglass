@@ -36,6 +36,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'layerDrift1', type: 'vec2f' },
   { name: 'resolution', type: 'vec2f' },
   { name: 'beads', type: 'f32', note: 'how much of them' },
+  { name: 'beadDrops', type: 'f32', note: 'rings (0) to coloured, domed, packed drops (1)' },
   { name: 'blendMode', type: 'i32' },
   { name: 'boundaryContrast', type: 'f32', note: 'bright interface line between dye colors' },
   { name: 'bubbleCount', type: 'i32' },

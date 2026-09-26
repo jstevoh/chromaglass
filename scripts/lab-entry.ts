@@ -3,6 +3,7 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms } from '../src/gpu/plateUniforms';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
@@ -77,6 +78,8 @@ const api = {
   solver() { return lab!.solver; },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /** The oil beads and drops, to lay a field on the lab's plate (\`cam.beadMask\` below). */
+  BeadField, rasterDrops,
   /**
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
@@ -84,11 +87,14 @@ const api = {
    * (the app ramps it from 1x to 2x).
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; beadMask?: CanvasImageSource } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
     const zoom = cam.zoom ?? 1;
+    // The beads' mask, as the app uploads it: a BeadField's render(), square
+    // for rings and twice as wide for drops.
+    if (cam.beadMask) plate.setSource('beads', cam.beadMask);
     fillPlateUniforms(plate.pack, {
       view: {
         settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: l.time,

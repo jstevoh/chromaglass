@@ -1042,15 +1042,40 @@ fn viewAt(uv: vec2f) -> View {
   rim, so the view joins the plate outside without a seam.
 
   Returns the offset to add (plate uv) and r, or r = -1 outside every drop.
+
+  The mask comes in two shapes. The rings' is square. Once drops are asked for
+  (beadDrops, PLAN.md batch 3) it is twice as wide, with each drop's colour
+  in the right half, because this pass already binds sixteen sampled textures
+  and that is WebGPU's default ceiling for one stage. The shape is read from
+  the texture itself rather than from the setting, so a mask and the frame
+  that reads it can never disagree about the layout: the setting moves on the
+  frame it is changed, the mask only on the next frame the beads are drawn.
 */
 const DROP_MAGNIFY: f32 = 1.7;
+fn beadWide() -> bool {
+  let d = textureDimensions(beadTex);
+  return d.x > d.y;
+}
+/** Plate uv to the mask's own. Wide, the read is kept off the seam, where a
+    bilinear tap would pick up the colour half's first column as a drop. */
+fn beadAt(uv: vec2f) -> vec4f {
+  if (!beadWide()) { return tex2(beadTex, uv); }
+  let w = f32(textureDimensions(beadTex).x);
+  return tex2(beadTex, vec2f(clamp(uv.x * 0.5, 0.5 / w, 0.5 - 1.0 / w), uv.y));
+}
+/** The drop's colour at uv, as seen lit; only a wide mask has one. */
+fn beadColour(uv: vec2f) -> vec3f {
+  let w = f32(textureDimensions(beadTex).x);
+  return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
+}
 fn dropLens(uv: vec2f) -> vec3f {
-  let px = 1.0 / f32(textureDimensions(beadTex).x);
-  let m = tex2(beadTex, uv);
+  // One texel of the plate either way; the height is the plate's in both shapes.
+  let px = 1.0 / f32(textureDimensions(beadTex).y);
+  let m = beadAt(uv);
   if (m.r < 0.02) { return vec3f(0.0, 0.0, -1.0); }
   let h = clamp(m.b / m.r, 0.0, 1.0);
-  let hx = tex2(beadTex, uv + vec2f(px, 0.0)); let hx2 = tex2(beadTex, uv - vec2f(px, 0.0));
-  let hy = tex2(beadTex, uv + vec2f(0.0, px)); let hy2 = tex2(beadTex, uv - vec2f(0.0, px));
+  let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
+  let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
   let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
   let g2 = dot(g, g);
   let r = clamp(1.0 - h, 0.0, 1.0);
@@ -1733,7 +1758,7 @@ struct FsOut {
     In the closeup too, where a drop fills the frame.
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
-    let bm = tex2(beadTex, fuvSurf);
+    let bm = beadAt(fuvSurf);
     let inner = bm.r;
     let ring = bm.g;
     let r = drop.z;
@@ -1758,8 +1783,52 @@ struct FsOut {
     let fres = 0.04 + 0.96 * pow(1.0 - n.z, 5.0);
     dropC += vec3f(0.8, 0.82, 0.86) * fres * 0.25;
     dropC += vec3f(1.0, 0.98, 0.94) * spec * 1.1;
-    outColor = mix(outColor, dropC, k);
-    auxB = max(auxB, inner * 0.4 * k);
+
+    /*
+      Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
+      each drop is a bead of coloured oil rather than a clear lens with a dark
+      rim. What changes from the ring above, and why each:
+
+      - **Its own colour.** A drop is dyed, so it is its colour lit through,
+        not the plate's. Mostly opaque, not wholly: a thin drop still shows a
+        little of the magnified pattern under it, which is what keeps a field
+        of them reading as liquid on liquid instead of stickers.
+      - **A body, not only a rim.** Lit by the lamp across its dome: the side
+        facing the lamp brighter, the far side and the steep band at the edge
+        darker, and the middle a little brighter again where the dome gathers
+        the light as a lens would. That falloff is what makes a disc of
+        colour read as round.
+      - **One highlight, placed and sized by the lamp.** The dome's normal
+        faces the half-vector at one point, which is toward the lamp, so a
+        lamp off to the side puts the highlight off centre on that side. A
+        low lamp sees a steeper, smaller mirror of itself than one overhead,
+        so the highlight tightens as the lamp drops: the exponent runs from
+        50 with the lamp straight above to 200 at grazing.
+      - **Seen on bare glass too.** The ring above fades to a third off the
+        dye, because a clear lens over nothing is nothing; a coloured drop is
+        visible wherever it sits.
+
+      The flattened walls and the compound drops are in the mask itself
+      (rasterDrops in lib/beads.ts): the dome falls to zero along a wall, so
+      the shading here follows the wall without knowing it is one.
+    */
+    var kDrop = k;
+    if (U.beadDrops > 0.001 && beadWide()) {
+      let dc = beadColour(fuvSurf);
+      let diffuse = max(0.0, dot(n, Lb));
+      let gather = (1.0 - r) * (1.0 - r);
+      var body = dc * (0.42 + 0.7 * diffuse) * (1.0 - 0.45 * band) + dc * 0.22 * gather;
+      // A thin drop still shows a little of what is under it.
+      body = mix(outColor * dc * 1.4, body, 0.85);
+      body += vec3f(0.85, 0.87, 0.9) * ring * 0.45;
+      body += vec3f(0.8, 0.82, 0.86) * fres * 0.3;
+      let shine = mix(50.0, 200.0, clamp(1.0 - Lb.z, 0.0, 1.0));
+      body += vec3f(1.0, 0.98, 0.94) * pow(max(0.0, dot(n, H)), shine) * 1.3;
+      dropC = mix(dropC, body, U.beadDrops);
+      kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
+    }
+    outColor = mix(outColor, dropC, kDrop);
+    auxB = max(auxB, inner * 0.4 * kDrop);
   }
 
   // ── The projectors' rims ─────────────────────────────────────────

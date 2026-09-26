@@ -172,6 +172,27 @@ the Fillmore look is unchanged at 0.
 **Gate:** on a 2× crop, a 6:1 size range within one cluster, visible highlights, and
 flattened contacts between touching drops.
 
+**Built, and waiting on the Mac.** `beadDrops` is in, at zero in every look.
+`npm run drops` holds three of the gate's four on a plate a current has crowded:
+a 12:1 size range across one cluster of 82 touching drops, every pair pressed a
+pixel and a half or more into each other meeting along one straight wall with
+the dome at nothing there, and every compound drop showing its passenger. The
+fourth, the highlight, is the shader's; the lab shows one per drop toward the
+lamp, and whether it reads as oil is for the Mac. On the lab's plate, same
+field, rings against drops: structure at 8 px 3.0 % → 4.7 %, and on a 2× crop
+0.9 % → 1.7 %, with 4 px 0.5 % → 0.8 %. That lab plate is not the Fillmore
+plate batch 2 was measured on, so the 4 and 8 px gate carried here from batch 2
+is still to be read on the Mac with `npm run detail`.
+
+Three things the first version got wrong and the check caught. Pressing a pair
+in by a share of their combined size pushed small drops past a big one's rim,
+and the wall between them landed beyond the small one's middle, so small drops
+vanished into big ones; the press is now set by the smaller drop. A current
+into one point let a drop swallow everything it was brought, one reaching
+thirty-nine cells in twenty seconds; only a drop no bigger than the
+population's own big lenses swallows now. And a passenger held forever meant
+two drops in five were compound after twenty crowded seconds; they dissolve.
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`
