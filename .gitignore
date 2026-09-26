@@ -20,8 +20,10 @@ coverage/
 # TypeScript cache
 *.tsbuildinfo
 
-# Local tooling
-.claude/
+# Local tooling. The rest of .claude/ is shared and committed: CLAUDE.md's
+# skills and agents live there (.claude/skills, .claude/agents).
+.claude/worktrees/
+.claude/settings.local.json
 .firebase/
 
 # Unminified build used for profiling
