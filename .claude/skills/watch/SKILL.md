@@ -95,8 +95,11 @@ owner's login.
   recorded for two minutes with the band, three times on seeds 1, 2, 3, and
   its shape in one table under the real shows' (the median, with the range).
   One take is not enough: the same look on two seeds read a half-life of 8.3 s
-  and 0.3 s. The before and after for any change to how the plate moves, on
-  the same seeds. Output in `film/`.
+  and 0.3 s. A fixed seed does not make a take repeat either (the same code
+  on seed 3 read 1.0 s and 11.3 s on two runs), so read the range, not the
+  median: a change to how the plate moves shows when its range leaves the
+  one before it. Near-black and hues hold from run to run; swells, calm and
+  half-life do not. Output in `film/`.
 - **`npm run gig`** films the whole worked show (`GIG_FILM=0` to not) and lists
   every freeze and jump cut with the action done just before it; the timeline
   is in `/tmp/chromaglass-gig`.

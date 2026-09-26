@@ -79,8 +79,21 @@ const YARDSTICK = [
 // load draws its own seed (#153), so a single two-minute take is one plate
 // among many, and a later change measured on one take could not be told from
 // a luckier seed. So each column is the median over the takes, with their
-// range beside it, and the seeds are fixed so a later run is the same plates
-// with the change, not new ones.
+// range beside it.
+//
+// The seeds are fixed so every run starts from the same plates, but a seed
+// does not make a take repeat. Two Metal runs of this same code on seeds 1-3
+// (36253076514 and 36254210762) disagreed take by take: Classic on seed 3
+// read a half-life of 1.0 s and then 11.3 s, Fillmore on seed 3 was calm 0%
+// and then 46%, and Classic's median swells went from 0.0 to 2.5 a minute.
+// The seed fixes where the plate starts; the frames after it are timed by the
+// runner's clock and the band's audio, and the fluid does not forgive a
+// different step, so the plates part within the take. What did hold from run
+// to run: near-black (within 5 points at the 5th percentile), hues (within
+// one), and soap-film's calm (5-6%). So the range is the result, not the
+// median alone: a change to how the plate moves is shown when its range
+// leaves the one before it, on swells, calm and half-life especially, and a
+// median that moved while the ranges overlap is the plate, not the change.
 const TAKES = Number(process.env.FILM_TAKES || 3);
 if (!(Number.isInteger(TAKES) && TAKES >= 1 && TAKES <= 9)) { console.error(`FILM_TAKES must be a whole number from 1 to 9 (got "${process.env.FILM_TAKES}")`); process.exit(2); }
 const SEEDS = Array.from({ length: TAKES }, (_, i) => i + 1);
