@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ToolAmount } from '../ToolAmount';
+import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
@@ -135,6 +135,9 @@ interface PerformDeskProps {
   onLayer: (n: number) => void;
   tool: string;
   onTool: (t: string) => void;
+  /** How much each tool does, and a way to set any of them (ToolOptions, from a right-click on a tool). */
+  amountOf?: (tool: string) => number;
+  onAmountFor?: (tool: string, v: number) => void;
   /** How much the tool in hand does (ToolAmount). */
   toolAmount?: number;
   onToolAmount?: (v: number) => void;
@@ -187,6 +190,8 @@ const dyeKey = (hex: string): string | null => {
 
 export function PerformDesk(p: PerformDeskProps) {
   const [picking, setPicking] = useState(false);
+  /** A tool's own options, open by a right-click on it or the Amount chip. */
+  const [toolMenu, setToolMenu] = useState<{ tool: string; at: { x: number; y: number } } | null>(null);
   /** The row whose menu is open, and the set's own menu. */
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [setMenu, setSetMenu] = useState(false);
@@ -413,6 +418,16 @@ export function PerformDesk(p: PerformDeskProps) {
         {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
         <div className="mt-3 flex h-9 shrink-0 items-center justify-between gap-3">
+          {/* Right-click a tool for its own options (ToolOptions). */}
+          <div
+            className="contents"
+            onContextMenu={(e) => {
+              const t = toolUnder(e, 'tool-segmented');
+              if (!t || !p.amountOf) return;
+              e.preventDefault();
+              setToolMenu({ tool: t, at: { x: e.clientX, y: e.clientY } });
+            }}
+          >
           <Segmented
             value={p.tool}
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
@@ -420,7 +435,17 @@ export function PerformDesk(p: PerformDeskProps) {
             testId="tool-segmented"
             compact
           />
-          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="hidden w-0 max-w-44 flex-1 overflow-hidden text-muted xl:flex" />}
+          </div>
+          {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
+          {toolMenu && p.amountOf && p.onAmountFor && (
+            <ToolOptions
+              tool={toolMenu.tool}
+              value={p.amountOf(toolMenu.tool)}
+              onChange={(v) => p.onAmountFor!(toolMenu.tool, v)}
+              at={toolMenu.at}
+              onClose={() => setToolMenu(null)}
+            />
+          )}
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
               <Swatch

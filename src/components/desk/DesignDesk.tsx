@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ToolAmount } from '../ToolAmount';
+import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
@@ -48,6 +48,9 @@ export interface DesignDeskProps {
 
   tool: string;
   onTool: (t: string) => void;
+  /** How much each tool does, and a way to set any of them (ToolOptions, from a right-click on a tool). */
+  amountOf?: (tool: string) => number;
+  onAmountFor?: (tool: string, v: number) => void;
   /** How much the tool in hand does (ToolAmount). */
   toolAmount?: number;
   onToolAmount?: (v: number) => void;
@@ -116,6 +119,8 @@ export function DesignDesk(p: DesignDeskProps) {
     if (r) setDocMenu({ top: r.bottom + 4, left: r.left });
   };
   const [picking, setPicking] = useState(false);
+  /** A tool's own options, open by a right-click on it or the Amount chip. */
+  const [toolMenu, setToolMenu] = useState<{ tool: string; at: { x: number; y: number } } | null>(null);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
@@ -341,13 +346,33 @@ export function DesignDesk(p: DesignDeskProps) {
           than its widest item, so it cannot push the preview narrower.
         */}
         <div className="mt-3 flex min-h-9 shrink-0 flex-wrap items-center gap-y-2">
+          {/* Right-click a tool for its own options (ToolOptions). */}
+          <div
+            className="contents"
+            onContextMenu={(e) => {
+              const t = toolUnder(e, 'tool-segmented');
+              if (!t || !p.amountOf) return;
+              e.preventDefault();
+              setToolMenu({ tool: t, at: { x: e.clientX, y: e.clientY } });
+            }}
+          >
           <Segmented
             value={p.tool}
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
             onChange={p.onTool}
             testId="tool-segmented"
           />
-          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="ml-3 min-w-48 max-w-64 flex-1 text-muted" />}
+          </div>
+          {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
+          {toolMenu && p.amountOf && p.onAmountFor && (
+            <ToolOptions
+              tool={toolMenu.tool}
+              value={p.amountOf(toolMenu.tool)}
+              onChange={(v) => p.onAmountFor!(toolMenu.tool, v)}
+              at={toolMenu.at}
+              onClose={() => setToolMenu(null)}
+            />
+          )}
         </div>
       </section>
 

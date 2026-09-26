@@ -4258,6 +4258,8 @@ export default function App() {
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
           onToolAmount={(v) => setToolAmount(activeTool, v)}
+          amountOf={(t: string) => toolAmounts[t] ?? 1}
+          onAmountFor={setToolAmount}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -4331,6 +4333,8 @@ export default function App() {
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
           onToolAmount={(v) => setToolAmount(activeTool, v)}
+          amountOf={(t: string) => toolAmounts[t] ?? 1}
+          onAmountFor={setToolAmount}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}
