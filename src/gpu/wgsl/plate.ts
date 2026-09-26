@@ -303,9 +303,13 @@ fn uvToFluid(uv: vec2f, c: f32, s: f32) -> vec2f {
   return p / (scale * 128.0 * U.camZoom) + U.camCenter;
 }
 
-/** Local dye velocity in fluid-UV per second — macro detail rides the paint. */
+/**
+ * Local dye velocity in plate-uv per unit of the cell clock — macro detail
+ * rides the paint (lib/detailFlow.ts). The flow is packed signed, in the
+ * solver's own units and half float (PACKED_VEL_FORMAT in pack.ts).
+ */
 fn fluidFlow(vtex: texture_2d<f32>, fuv: vec2f) -> vec2f {
-  return (tex2(vtex, fuv).rg * 2.0 - 1.0) * U.flowRate;
+  return tex2(vtex, fuv).rg * U.flowRate;
 }
 `;
 
@@ -427,8 +431,13 @@ fn cellHeight(d: f32, rimWidth: f32) -> f32 {
 // fields into mush, so instead each generation is its own pattern under a
 // sin^2 envelope; two generations half a cycle apart sum to exactly 1, giving
 // continuous cover with no ghosting and no reset pop.
-fn cellField(p0: vec2f, flow: vec2f, seed: f32, period: f32, phase: f32, rimWidth: f32) -> Cell {
-  let a = fract(U.time / period + phase);
+fn cellField(p0: vec2f, flow: vec2f, seed: f32, period: f32, phase: f32, rimWidth: f32, clock: f32) -> Cell {
+  // The clock the generations are timed on. The closeup's cells pass the
+  // paint's own travel (the cell clock, lib/detailFlow.ts), so the slide
+  // below is exactly as far as the dye went, however the frames and the
+  // steps fell; the plate's cells, which only slide once the closeup is on,
+  // keep the plate's clock and so breathe at 1x as they always have.
+  let a = fract(clock / period + phase);
   var env = sin(3.14159265 * a);
   env *= env;
 
@@ -773,8 +782,8 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     k = U.macroCells * focus * clumping * seeCoarse;
 
     // Coarse cells: two generations, half a cycle apart
-    let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13);
-    let g1 = cellField(p, f, 17.0, 3.2, 0.5, 0.13);
+    let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13, U.cellClock);
+    let g1 = cellField(p, f, 17.0, 3.2, 0.5, 0.13, U.cellClock);
     // Union, not sum: adding two generations' masks welds their circles into
     // compound blobs, while taking the stronger of the two keeps every cell
     // round as it fades in over the one it replaces.
@@ -784,8 +793,8 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
 
     // Fine cells crowd into the gaps between the big ones, as they do in a
     // real pour, and read as the grain of the film rather than as bubbles.
-    let h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
-    let h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
+    let h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16, U.cellClock);
+    let h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16, U.cellClock);
     // The fine cells crowd the gaps the coarse ones leave, once those are there.
     let gap = clamp(1.0 - core * 1.6 * seeCoarse, 0.0, 1.0);
     // Everything below scales by k, which is whole by the time these begin
@@ -1326,9 +1335,12 @@ struct FsOut {
   // ── Plate cells ───────────────────────────────────────────────
   if (plateOn && U.cells > 0.005 && fluid0.a > 0.03) {
     let cfreq = U.logicalGrid / 3.2;
-    let cflow = fluidFlow(vel0, fuv0) * cfreq;
-    let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13);
-    let cg1 = cellField(fuv0 * cfreq, cflow, 17.0, 3.2, 0.5, 0.13);
+    // Slid in over the travel into the closeup rather than switched on with
+    // it: the flow comes on at the first notch of the zoom, and the plate's
+    // cells are as old as the plate's clock makes them.
+    let cflow = fluidFlow(vel0, fuv0) * cfreq * macroAmt;
+    let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13, U.time);
+    let cg1 = cellField(fuv0 * cfreq, cflow, 17.0, 3.2, 0.5, 0.13, U.time);
     let ccore = max(cg0.core, cg1.core);
     var crim = cg1.rim;
     if (abs(cg0.rim) > abs(cg1.rim)) { crim = cg0.rim; }

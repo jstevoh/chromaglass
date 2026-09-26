@@ -6,6 +6,7 @@ import { WebGPUPlate } from '../src/gpu/plate';
 import { fillPlateUniforms } from '../src/gpu/plateUniforms';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
+import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -18,7 +19,7 @@ export const BASE: GpuStepParams = {
 } as GpuStepParams;
 
 type Lab = {
-  solver: WebGPUFluid; L: number; N: number; time: number;
+  solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
 };
 let lab: Lab | null = null;
@@ -32,7 +33,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };
+    lab = { solver, L, N, time: 0, cellClock: 0, dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };
     return { N, L };
   },
   /** A soft disc of dye (absorbances r, g, b; density d) at (x, y) in plate units, radius r. */
@@ -66,7 +67,9 @@ const api = {
     const l = lab!;
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
-      l.solver.step({ ...BASE, ...over, time: l.time } as GpuStepParams, false);
+      const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
+      l.solver.step(p, false);
+      l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
@@ -94,7 +97,9 @@ const api = {
       view: {
         settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: l.time,
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
-        macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false, flowRate: 0.05,
+        macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
+        // As the app has them: the cells slide on the lab plate's own travel.
+        flowRate: CELL_TRAVEL, cellClock: l.cellClock,
         rotations: [cam.rotation ?? 0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
@@ -105,7 +110,7 @@ const api = {
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: l.solver.fields.view }], 1);
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: l.solver.fields.view }]);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
