@@ -42,8 +42,12 @@ const { BeadField, rasterDrops, paletteSlot, innerLife } = await import(`../${ou
 // the claims below do not care which, only that a run can be repeated).
 const seed = (s) => { Math.random = () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
-const N = 256, S = 512, K = S / N;
-const FILLMORE = [[1, 0.48, 0], [1, 0.92, 0], [1, 0, 0], [0.65, 0.95, 0.95], [0.31, 0.78, 0.47], [0.54, 0.17, 0.89]];
+// The app's own grid (GRID_SIZE in LiquidVisualizer.tsx) and mask size, so
+// the pixel thresholds below are the ones the plate is drawn at.
+const N = 192, S = 512, K = S / N;
+// Four of Fillmore's dyes: the app hands the field its harmony, three to five
+// colours, not the whole contract.
+const FILLMORE = [[1, 0.48, 0], [1, 0.92, 0], [0.65, 0.95, 0.95], [0.31, 0.78, 0.47]];
 const pal = (cs) => cs.map(([r, g, b]) => ({ r, g, b }));
 
 /*
@@ -75,8 +79,27 @@ function crowd(drops, { palette = FILLMORE, frames = 1200, s = 4242 } = {}) {
 }
 
 // ── At 0, the field is the rings' field ──────────────────────────────
+/*
+  Pinned, not compared with itself. The two runs below both use this code,
+  so they could agree while both had drifted from the rings; the fingerprint
+  is of the same crowded run on the rings' own `beads.ts` from before drops
+  existed (main at 6c03494), every bead's x, y and r as float64 through
+  FNV-1a. If a change to the beads is *meant* to move the rings (seeding
+  their random draws, say), this is the number that change re-pins, and says
+  why in the same commit.
+*/
+const RINGS_FINGERPRINT = '822d175a:337';
+const fingerprint = (bs) => {
+  const f = new Float64Array(bs.length * 3);
+  bs.forEach((b, i) => { f[3 * i] = b.x; f[3 * i + 1] = b.y; f[3 * i + 2] = b.r; });
+  let h = 0x811c9dc5;
+  for (const byte of new Uint8Array(f.buffer)) { h ^= byte; h = Math.imul(h, 0x01000193) >>> 0; }
+  return `${h.toString(16).padStart(8, '0')}:${bs.length}`;
+};
 {
   const bare = crowd(0, { palette: null });
+  check('at 0, the beads go exactly where the rings went before drops existed', fingerprint(bare.beads) === RINGS_FINGERPRINT,
+    `${fingerprint(bare.beads)} against ${RINGS_FINGERPRINT}`);
   const told = crowd(0);
   const same = bare.beads.length === told.beads.length
     && bare.beads.every((b, i) => b.x === told.beads[i].x && b.y === told.beads[i].y && b.r === told.beads[i].r);
@@ -99,6 +122,23 @@ const owner = (x, y) => ids[y * S + x] - 1;
 const at = (x, y) => { const o = (y * S * 2 + x) * 4; return [px[o], px[o + 1], px[o + 2]]; };
 const colourAt = (x, y) => { const o = (y * S * 2 + x + S) * 4; return [px[o], px[o + 1], px[o + 2]]; };
 
+/**
+  Where the wall between two drops is, as `rasterDrops` puts it: the power
+  line, held a third of a radius (and a pixel) off either centre. In mask
+  pixels from a's centre; Ra, Rb and D in mask pixels too.
+*/
+const wallAt = (Ra, Rb, D) => {
+  const lo = Math.max(1, 0.35 * Ra), hi = D - Math.max(1, 0.35 * Rb);
+  const t = (D * D + Ra * Ra - Rb * Rb) / (2 * D);
+  return lo <= hi ? Math.min(hi, Math.max(lo, t)) : (lo + hi) / 2;
+};
+/** A colour read back from the mask, as its nearest palette slot (or -1). */
+const slotOf = (rgb) => {
+  let best = -1, bd = 6;
+  FILLMORE.forEach((c, k) => { const e = Math.max(...c.map((v, q) => Math.abs(v * 255 - rgb[q]))); if (e < bd) { bd = e; best = k; } });
+  return best;
+};
+
 // ── Merging does not snowball ────────────────────────────────────────
 /*
   Drops merge more readily than rings (a small one pushed inside a bigger one
@@ -109,7 +149,8 @@ const colourAt = (x, y) => { const o = (y * S * 2 + x + S) * 4; return [px[o], p
 {
   const rings = crowd(0, { palette: null });
   const biggest = (fld) => Math.max(...fld.beads.map((b) => b.r));
-  check('no drop grows much past the rings\' biggest', biggest(f) <= 1.25 * biggest(rings),
+  const ok = Number.isFinite(biggest(f)) && biggest(rings) > 0;
+  check('no drop grows much past the rings\' biggest', ok && biggest(f) <= 1.25 * biggest(rings),
     `${biggest(f).toFixed(2)} cells against ${biggest(rings).toFixed(2)}`);
 }
 
@@ -121,24 +162,43 @@ for (let i = 0; i < beads.length; i++) for (let j = i + 1; j < beads.length; j++
 }
 check('the crowded field has contacts to judge', pairs.length >= 60, `${pairs.length} touching pairs among ${beads.length} drops`);
 
-const parent = beads.map((_, i) => i);
-const root = (i) => (parent[i] === i ? i : (parent[i] = root(parent[i])));
-for (const [i, j] of pairs) parent[root(i)] = root(j);
-const clusters = new Map();
-beads.forEach((_, i) => { const r = root(i); if (!clusters.has(r)) clusters.set(r, []); clusters.get(r).push(i); });
-let bestRange = 0, bestSize = 0, bestColours = 0;
-for (const members of clusters.values()) {
-  if (members.length < 3) continue;
-  const rs = members.map((i) => beads[i].r);
-  const range = Math.max(...rs) / Math.min(...rs);
-  if (range > bestRange) {
-    bestRange = range; bestSize = members.length;
-    bestColours = new Set(members.map((i) => paletteSlot(beads[i].seed, FILLMORE.length))).size;
+/*
+  The size range is the population's (populate's long tail, which this did
+  not change): crowded rings make a cluster as wide, and the control line
+  says so. What it asks of drops is that crowding them into walls and
+  swallowing did not flatten it away. The colours are read back from the
+  mask, at each member's own middle, not worked out from the seeds.
+*/
+const clusterStats = (fld, withColour) => {
+  const bs = fld.beads, prs = [];
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+    const d = Math.hypot(bs[i].x - bs[j].x, bs[i].y - bs[j].y);
+    if (d < (bs[i].r + bs[j].r) * 1.02) prs.push([i, j]);
   }
+  const par = bs.map((_, i) => i);
+  const rt = (i) => (par[i] === i ? i : (par[i] = rt(par[i])));
+  for (const [i, j] of prs) par[rt(i)] = rt(j);
+  const cl = new Map();
+  bs.forEach((_, i) => { const r = rt(i); if (!cl.has(r)) cl.set(r, []); cl.get(r).push(i); });
+  let best = { range: 0, size: 0, colours: 0 };
+  for (const m of cl.values()) {
+    if (m.length < 3) continue;
+    const rs = m.map((i) => bs[i].r), range = Math.max(...rs) / Math.min(...rs);
+    if (range <= best.range) continue;
+    const colours = withColour
+      ? new Set(m.filter((i) => owner(Math.floor(bs[i].x * K), Math.floor(bs[i].y * K)) === i)
+          .map((i) => slotOf(colourAt(Math.floor(bs[i].x * K), Math.floor(bs[i].y * K)))).filter((k) => k >= 0)).size
+      : 0;
+    best = { range, size: m.length, colours };
+  }
+  return best;
+};
+{
+  const dropsC = clusterStats(f, true), ringsC = clusterStats(crowd(0, { palette: null }), false);
+  check('one cluster of drops still spans a 6:1 range of sizes', dropsC.range >= 6,
+    `${dropsC.range.toFixed(1)}:1 across ${dropsC.size} touching drops (rings, the control: ${ringsC.range.toFixed(1)}:1 across ${ringsC.size})`);
+  check('and is more than one colour, read from the mask', dropsC.colours >= 3, `${dropsC.colours} of the palette's ${FILLMORE.length}`);
 }
-check('one cluster spans a 6:1 range of sizes', bestRange >= 6,
-  `${bestRange.toFixed(1)}:1 across ${bestSize} touching drops`);
-check('and is more than one colour', bestColours >= 3, `${bestColours} of the palette's ${FILLMORE.length}`);
 
 // ── A drop is its own colour ─────────────────────────────────────────
 {
@@ -167,27 +227,45 @@ check('and is more than one colour', bestColours >= 3, `${bestColours} of the pa
   dome standing high across the other.
 */
 {
+  /*
+    Each pair is read at three places along its wall: on the line of
+    centres, and half way out to each end of the chord. At each, a pixel
+    and a bit either side of the wall must belong to the drop on that side:
+    one straight wall, not a split that bends. A pixel nobody owns is a
+    failure (a gap down a contact is the fault the antialiasing comment in
+    rasterDrops describes), and only a third drop over the line excuses a
+    place. The dome at the wall is read as a height in pixels, h times the
+    drop's radius, and must be under three quarters of one, where a dome
+    that ignored its walls stands more than a pixel high; a wall pixel with
+    nothing drawn on it fails rather than reading as zero.
+  */
   let judged = 0, straight = 0, lowWall = 0, deepest = 0;
   for (const [i, j, d] of pairs) {
     const a = beads[i], b = beads[j];
     const Ra = Math.max(1, a.r * K), Rb = Math.max(1, b.r * K), D = d * K;
     const overlap = Ra + Rb - D;
     if (overlap < 1.5 || a.inner || b.inner) continue;
-    deepest = Math.max(deepest, overlap / (Ra + Rb));
+    const ex = (b.x - a.x) / d, ey = (b.y - a.y) / d, nx = -ey, ny = ex;
+    const t = wallAt(Ra, Rb, D);
+    const half = Math.sqrt(Math.max(0, Math.min(Ra * Ra - t * t, Rb * Rb - (D - t) * (D - t))));
+    const px = (off, perp) => ({ x: Math.floor(a.x * K + ex * (t + off) + nx * perp), y: Math.floor(a.y * K + ey * (t + off) + ny * perp) });
+    const places = half >= 4 ? [0, 0.5 * half, -0.5 * half] : [0];
+    let third = false, good = true, low = true;
+    for (const perp of places) {
+      const oA = owner(px(-1.2, perp).x, px(-1.2, perp).y), oB = owner(px(1.2, perp).x, px(1.2, perp).y);
+      const w = px(0, perp), oW = owner(w.x, w.y);
+      if ([oA, oB, oW].some((o) => o >= 0 && o !== i && o !== j)) { third = true; break; }
+      if (oA !== i || oB !== j) good = false;
+      if (perp !== 0) continue;
+      const [r, , bl] = at(w.x, w.y);
+      if (oW < 0 || r === 0) { low = false; continue; }
+      if ((bl / r) * (oW === i ? Ra : Rb) > 0.75) low = false;
+    }
+    if (third) continue;
     judged++;
-    const ex = (b.x - a.x) / d, ey = (b.y - a.y) / d;
-    const t = (D * D + Ra * Ra - Rb * Rb) / (2 * D);
-    // Sample either side of the wall along the line of centres, one pixel off it.
-    const sample = (off) => { const x = Math.floor(a.x * K + ex * (t + off)), y = Math.floor(a.y * K + ey * (t + off)); return { x, y }; };
-    const nearA = sample(-1.2), nearB = sample(1.2), onWall = sample(0);
-    // A third drop can sit over the line of centres; a pair is judged only
-    // where the two of them are all there is on it.
-    const oA = owner(nearA.x, nearA.y), oB = owner(nearB.x, nearB.y);
-    if (![i, j].includes(oA) || ![i, j].includes(oB)) { judged--; continue; }
-    if (oA === i && oB === j) straight++;
-    const [r, , bl] = at(onWall.x, onWall.y);
-    const h = r > 0 ? bl / r : 0;
-    if (h <= 2.5 / Math.min(Ra, Rb)) lowWall++;
+    deepest = Math.max(deepest, overlap / (Ra + Rb));
+    if (good) straight++;
+    if (low) lowWall++;
   }
   check('touching drops press into each other', judged >= 30 && deepest >= 0.08,
     `${judged} pairs a pixel and a half or more into each other, the deepest ${(deepest * 100).toFixed(0)}% of their reach`);
@@ -218,7 +296,9 @@ check('and is more than one colour', bestColours >= 3, `${bestColours} of the pa
   for (const b of held) {
     const ix = Math.floor((b.x + b.inner.dx) * K), iy = Math.floor((b.y + b.inner.dy) * K);
     const bi = beads.indexOf(b);
-    const want = b.inner.color.map((v) => v * 255);
+    // Its colour from the palette, by its own seed, not from what the field
+    // says it stored; and only asked where it differs from its host's.
+    const slot = paletteSlot(b.inner.seed, FILLMORE.length), hostSlot = paletteSlot(b.seed, FILLMORE.length);
     const got = colourAt(ix, iy);
     // Its own colour at its middle, and its own rim a radius out.
     // Its rim: the brightest of the few pixels just inside its edge, which
@@ -230,8 +310,11 @@ check('and is more than one colour', bestColours >= 3, `${bestColours} of the pa
     for (let e = iR - 2; e <= iR; e += 0.5) { const x = Math.floor(cxp + e); if (owner(x, iy) === bi) rim = Math.max(rim, at(x, iy)[1]); }
     // Where a neighbour's wall has cut across the passenger, it is behind the
     // wall, and that is right; it is judged where its own drop holds it.
-    if (owner(ix, iy) !== bi || owner(rimX, iy) !== bi) { skipped++; continue; }
-    if (want.every((v, k) => Math.abs(v - got[k]) <= 2) && rim > 60) seen++;
+    // Nobody owning it is not excused: that is a passenger not drawn.
+    const oc = owner(ix, iy), orim = owner(rimX, iy);
+    if ((oc >= 0 && oc !== bi) || (orim >= 0 && orim !== bi)) { skipped++; continue; }
+    const colourOk = slot === hostSlot || slotOf(got) === slot;
+    if (oc === bi && colourOk && rim > 60) seen++;
   }
   check('a drop that swallowed a smaller one still shows it', held.length >= 3 && seen === held.length - skipped && seen >= 0.8 * held.length,
     `${held.length} compound drops of ${beads.length}, ${seen} with the passenger's colour and rim${skipped ? `, ${skipped} with it behind a neighbour's wall` : ''}`);
@@ -244,20 +327,54 @@ check('and is more than one colour', bestColours >= 3, `${bestColours} of the pa
   check('and in time lets it go', before > 0 && after === 0, `${before} held, ${after} after forty seconds`);
 }
 
+// ── The first notch is a notch ──────────────────────────────────────
+/*
+  The slider blends; it is not a switch at 0.01. At a twentieth the shading
+  is nearly all rings, so the field should be too. Two things are asked.
+  The mask's passengers are drawn in by the amount: the field drawn at a
+  twentieth, and the same field with every passenger taken out, differ by no
+  more than a tenth anywhere, so there is no second ring inside the lenses.
+  (The field at 0 is pinned by the fingerprint above.)
+*/
+{
+  const light = crowd(0.05);
+  const draw = (bs) => {
+    const p = new Uint8ClampedArray(S * 2 * S * 4);
+    rasterDrops(bs, N, S, p, new Float32Array(S * S), new Int32Array(S * S), 0.05);
+    return p;
+  };
+  const withP = draw(light.beads), without = draw(light.beads.map(({ inner, ...b }) => b));
+  let most = 0;
+  for (let q = 0; q < withP.length; q++) if ((q & 3) !== 3) most = Math.max(most, Math.abs(withP[q] - without[q]));
+  const held = light.beads.filter((b) => b.inner).length;
+  check('at a twentieth, a swallowed drop is drawn a twentieth in', held > 10 && most <= 0.1 * 255,
+    `${held} held, the most any pixel moves for them ${most} of 255`);
+}
+
 // ── A look change recolours, it does not cut ───────────────────────
 {
+  /*
+    Timed to half way, on every drop that is still there at the end: a look
+    change that cuts gets there in one frame, one that forgot to ease never
+    moves, and the half-way time says which side of a look fade's second or
+    two it lands without resting on one drop that might be merged away.
+  */
   const g = crowd(1, { frames: 120 });
-  const one = g.beads.find((b) => b.color);
   const NEXT = [[0, 0.66, 0.62], [0.29, 0.18, 1], [0.88, 0.07, 0.62]];
+  const watched = g.beads.filter((b) => b.color).map((b) => ({ b, from: [...b.color], to: NEXT[paletteSlot(b.seed, NEXT.length)], half: -1 }));
   g.setPalette(pal(NEXT));
-  const from = [...one.color], to = NEXT[paletteSlot(one.seed, NEXT.length)];
-  const moved = () => Math.hypot(...one.color.map((v, k) => v - from[k])) / Math.hypot(...to.map((v, k) => v - from[k]));
-  g.step(1 / 60, () => [0, 0], 0, 0);
-  const afterOne = moved();
-  for (let i = 0; i < 180; i++) g.step(1 / 60, () => [0, 0], 0, 0);
-  const afterThree = moved();
-  check('a new look\'s colours arrive over a second and more, not in a frame', afterOne < 0.05 && afterThree > 0.85,
-    `${(afterOne * 100).toFixed(1)}% of the way after one frame, ${(afterThree * 100).toFixed(0)}% after three seconds`);
+  const part = (w) => Math.hypot(...w.b.color.map((v, k) => v - w.from[k])) / Math.hypot(...w.to.map((v, k) => v - w.from[k]));
+  let firstFrame = 0;
+  for (let i = 1; i <= 360; i++) {
+    g.step(1 / 60, () => [0, 0], 0, 0);
+    for (const w of watched) { const p = part(w); if (i === 1) firstFrame = Math.max(firstFrame, p); if (w.half < 0 && p >= 0.5) w.half = i / 60; }
+  }
+  const kept = watched.filter((w) => g.beads.includes(w.b));
+  const halves = kept.map((w) => w.half).sort((x, y) => x - y);
+  const mid = halves.length ? halves[halves.length >> 1] : -1;
+  check('a new look\'s colours arrive over a second or so, not in a frame',
+    kept.length >= 100 && firstFrame < 0.05 && halves.every((h) => h >= 0.5 && h <= 3),
+    `${kept.length} drops, at most ${(firstFrame * 100).toFixed(1)}% of the way after one frame, half way at ${mid.toFixed(2)} s (all within ${halves[0]?.toFixed(2)}–${halves.at(-1)?.toFixed(2)} s)`);
 }
 
 console.log(`     the mask for ${beads.length} drops took ${ms.toFixed(1)} ms to draw (the rings' canvas is not timed here)`);

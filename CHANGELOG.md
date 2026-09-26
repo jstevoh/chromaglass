@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — drops, not rings
+
+- **Drops** (`beadDrops`, Settings → Show under Oil Beads, MIDI-learnable and
+  pinnable; 0 by default, so every look is unchanged): the oil beads become
+  drops of colour from the look's palette, lit across their domes with one
+  highlight toward the lamp, pressed flat where they crowd, and a drop that
+  swallows a smaller one keeps it visible for fifteen to thirty-five seconds.
+  `npm run drops` measures the field and its mask (PLAN.md batch 3).
+
 ### Added — the liquids' own physics and chemistry
 
 Each is a setting, off by default (docs/physics-plan.md has the models and

@@ -244,7 +244,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   { key: 'fingering',       label: 'Fingering',        min: 0, max: 1 },
   { key: 'beads',           label: 'Oil Beads',        min: 0, max: 1 },
-  { key: 'beadDrops',       label: 'Drops',            min: 0, max: 1 },
+  { key: 'beadDrops',       label: 'Bead Drops',       min: 0, max: 1 },
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },

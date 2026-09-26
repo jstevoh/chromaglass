@@ -173,10 +173,14 @@ the Fillmore look is unchanged at 0.
 flattened contacts between touching drops.
 
 **Built, and waiting on the Mac.** `beadDrops` is in, at zero in every look.
-`npm run drops` holds three of the gate's four on a plate a current has crowded:
-a 12:1 size range across one cluster of 82 touching drops, every pair pressed a
-pixel and a half or more into each other meeting along one straight wall with
-the dome at nothing there, and every compound drop showing its passenger. The
+`npm run drops` holds three of the gate's four on a plate a current has crowded,
+at the app's 192² grid: a 10:1 size range across one cluster of 84 touching
+drops (crowded rings make 11:1, so this is the population's range kept, not
+made), every pair pressed a pixel and a half or more into each other meeting
+along one straight wall with the dome under a pixel high there, and every
+compound drop showing its passenger. Each of those claims was run against the
+fault it names (a dome that ignores its walls, a gap down every contact, a
+passenger drawn white, the rings' arithmetic touched at 0) and goes red. The
 fourth, the highlight, is the shader's; the lab shows one per drop toward the
 lamp, and whether it reads as oil is for the Mac. On the lab's plate, same
 field, rings against drops: structure at 8 px 3.0 % → 4.7 %, and on a 2× crop

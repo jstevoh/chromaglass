@@ -78,7 +78,7 @@ const api = {
   solver() { return lab!.solver; },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
-  /** The oil beads and drops, to lay a field on the lab's plate (\`cam.beadMask\` below). */
+  /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**
    * The finished picture of the lab's plate, as the app would draw it with

@@ -81,7 +81,21 @@ export class BeadField {
    * made before drops existed is the same picture; the drop path is a
    * separate branch rather than a blend inside the old one for that reason.
    */
-  drops = 0;
+  get drops(): number { return this.dropAmt; }
+  /**
+   * Crossing zero changes which mask is drawn (square rings, wide drops), so
+   * it asks for a redraw: the mask is otherwise only redrawn when the beads
+   * move, and a paused or draining plate does not step, which left the
+   * slider doing nothing until the plate moved again. Anything not a number
+   * is 0, since a NaN here would reach the crowding arithmetic and stop the
+   * rings pushing apart at all.
+   */
+  set drops(v: number) {
+    const next = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+    if ((next > 0) !== (this.dropAmt > 0)) this.dirty = true;
+    this.dropAmt = next;
+  }
+  private dropAmt = 0;
   /** The colours drops are dyed from: the look's palette, as seen (0..1). */
   private palette: [number, number, number][] = [];
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */
@@ -329,7 +343,9 @@ export class BeadField {
             the plate, where the rings' biggest was under eight.
           */
           const big = Math.max(b.r, o.r);
-          const inside = this.drops > 0 && d < big && Math.min(b.r, o.r) < 0.5 * big && big < 6 * (this.grid / 192);
+          // How deep counts as inside scales with the slider, so the first
+          // notch swallows almost nothing and the rule grows in with the rest.
+          const inside = this.drops > 0 && d < big * this.drops && Math.min(b.r, o.r) < 0.5 * big && big < 6 * (this.grid / 192);
           if (inside || (d < touch * 0.7 - press && touch < 7 && Math.random() < 0.02)) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
@@ -444,7 +460,7 @@ export class BeadField {
       this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     }
     if (!this.dropPixels) { this.dropPixels = new Uint8ClampedArray(S * 2 * S * 4); this.dropOwn = new Float32Array(S * S); this.dropIds = new Int32Array(S * S); }
-    rasterDrops(this.beads, this.grid, S, this.dropPixels, this.dropOwn!, this.dropIds!);
+    rasterDrops(this.beads, this.grid, S, this.dropPixels, this.dropOwn!, this.dropIds!, this.drops);
     // A fresh ImageData over the kept buffer: putImageData copies, so the
     // buffer is free to be drawn into again next frame.
     this.ctx!.putImageData(new ImageData(this.dropPixels as Uint8ClampedArray<ArrayBuffer>, S * 2, S), 0, 0);
@@ -459,7 +475,9 @@ export class BeadField {
  * and which drop has it (its index plus one, 0 for none), which is what keeps
  * a compound drop's passenger inside its own drop and not its neighbour's.
  * Pure: no canvas and no DOM, so `npm run drops` measures exactly what the
- * app uploads.
+ * app uploads. `amount` is `beadDrops`: a passenger is drawn in by it, so the
+ * slider's first notch does not put a second ring inside a third of the
+ * lenses while the shading is still almost all rings.
  *
  * Left half, per pixel of a drop: red is the interior times the drop's
  * fade-in, green the rim, blue the dome times red, which is what the rings'
@@ -481,7 +499,7 @@ export class BeadField {
  * drop owns the pixel, which is as far as a bilinear read reaches: the
  * plate's read at a rim never mixes a drop with the black around it.
  */
-export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out: Uint8ClampedArray, own: Float32Array, ids: Int32Array): void {
+export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out: Uint8ClampedArray, own: Float32Array, ids: Int32Array, amount = 1): void {
   const W = S * 2;
   // Opaque black everywhere: alpha stays 255 so the upload never divides a
   // premultiplied edge back out.
@@ -613,11 +631,12 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
         // Only where the outer drop is: the inner never pokes through a wall.
         if (ids[p] !== i + 1 || out[o] === 0) continue;
         const h = Math.min(1, edge / iR);
-        const ring = Math.max(0, Math.min(1, ilw - edge + 0.5)) * cov * ringA;
+        const w = cov * amount;
+        const ring = Math.max(0, Math.min(1, ilw - edge + 0.5)) * w * ringA;
         out[o + 1] = Math.max(out[o + 1], ring * 255);
         const under = out[o + 2] / out[o];
-        out[o + 2] = out[o] * (under + (h - under) * cov);
-        out[oc] = out[oc] + (i0 - out[oc]) * cov; out[oc + 1] = out[oc + 1] + (i1 - out[oc + 1]) * cov; out[oc + 2] = out[oc + 2] + (i2 - out[oc + 2]) * cov;
+        out[o + 2] = out[o] * (under + (h - under) * w);
+        out[oc] = out[oc] + (i0 - out[oc]) * w; out[oc + 1] = out[oc + 1] + (i1 - out[oc + 1]) * w; out[oc + 2] = out[oc + 2] + (i2 - out[oc + 2]) * w;
       }
     }
   }

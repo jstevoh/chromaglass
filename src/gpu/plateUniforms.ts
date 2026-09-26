@@ -289,7 +289,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('gel2', c2.r, c2.g, c2.b);
     pack.set('gel3', d.r, d.g, d.b);
     pack.set('beads', clamp01(s.beads ?? 0));
-    pack.set('beadDrops', clamp01(s.beadDrops ?? 0));
+    // Not clamp01 alone: it passes NaN, and ?set=beadDrops=x is how the owner is asked to try it.
+    pack.set('beadDrops', Number.isFinite(s.beadDrops) ? clamp01(s.beadDrops) : 0);
     // Gathered back to the one plate as the closeup comes in (see `plateAmt` in wgsl/plate.ts).
     pack.set('dishSpread', clamp01(s.dishSpread ?? 0) * (1 - clamp01(view.macroAmount)));
     pack.set('cells', clamp01(s.cells ?? 0));
