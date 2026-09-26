@@ -388,6 +388,8 @@ export interface VisualizerSettings {
   ferroLabyrinth: number;
   /** How fine the Labyrinth's stripes are: 0 is the maze as it always was, 1 a third its width, as fine as the grid holds. */
   mazeDetail: number;
+  /** The ferrofluid pushes the dye aside where it goes: the colour leaves where the black grows and packs along its edge. 0 leaves the dye where it was, under the black. */
+  phaseDisplace: number;
   /** The dye changes colour with acidity, like red cabbage: pink in acid, purple neutral, green in base. Pour Acid or Base. */
   phIndicator: number;
   /** The Belousov–Zhabotinsky reaction in a gel: excitable waves that curl into spirals, in ferroin red and blue. */
@@ -684,6 +686,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
   mazeDetail: 0,            // the maze as it always was (MAZE_PERIOD)
+  phaseDisplace: 0,         // the dye stays where it was, under the black, as it always did
   phIndicator: 0,
   bzReaction: 0,
   liesegang: 0,

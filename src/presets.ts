@@ -2013,6 +2013,9 @@ export const PRESETS: Preset[] = [
       magnetStrength: 0.5,
       magnetHeight: 0.3,
       magnetWalk: 0.5,
+      // The black pushes the colour aside and packs it along its edges, as in
+      // Colored I and II (npm run ferrodye): full, because it is the look.
+      phaseDisplace: 1,
       beatSqueeze: 0.4,
       lampHotspot: 0.3,
       secondLamp: 0.2,

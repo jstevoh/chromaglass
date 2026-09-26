@@ -74,6 +74,8 @@ export interface GpuStepParams {
   ferroLabyrinth?: number;
   /** How fine the maze is: 0 keeps MAZE_PERIOD, 1 is a third of it (the grid still sets a floor of twelve cells). */
   mazeDetail?: number;
+  /** How hard the ferrofluid pushes the dye aside where it moves (0 leaves the dye where it was, under the black). */
+  phaseDisplace?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */

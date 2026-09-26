@@ -444,6 +444,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The grid sets how far it goes: on the hosted 512² nothing changes past
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
+  // How hard the ferrofluid shoves the colour aside. A fader because riding
+  // it is a gesture: down, the black slides over still colour; up, it cuts
+  // channels through it and the colour piles along its edges.
+  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));

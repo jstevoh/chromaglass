@@ -139,6 +139,20 @@ printed through it, since the maze's force per cell is strongest there and
 `npm run maze` only measures 512². What to report: the setting where it
 starts to look like the references, and any shimmer or brown haze.
 
+## 9. Ferro Paint's colour pushed by the black
+
+Pushes Dye (Squish Plate, under the ferrofluid) is on full in Ferro Paint:
+where the black grows the colour leaves, and it packs as a bright line along
+the black's edges instead of sitting still under it. Seen only in the lab,
+on software WebGPU at 256². Two things to look at: whether the packed edge
+reads as the references' colour pushed into cells, or as a coloured outline
+drawn round the black; and, on a look with a lot of ferrofluid poured on
+dye, whether colour visibly seeps out of a pool for the first seconds.
+
+```
+?set=phaseDisplace=0    the black over still colour, as before
+```
+
 ---
 
 ## Reading the frame time while you do it
