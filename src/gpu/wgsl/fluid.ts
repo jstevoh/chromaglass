@@ -819,6 +819,79 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(here * keep, vec4f(0.0)));
 }`,
 
+  /*
+    Where the ferrofluid is, dye is not: it is pushed aside (Ferro Pushes Dye).
+
+    Steve's reference for Ferro Paint is Chemical Bouillon's "Colored I" and
+    "II": black ferrofluid worked through coloured water, and the black
+    carries the colour. It pushes it into cells between its channels and
+    packs it bright along its edges. On the plate as it was, the ferrofluid
+    and the dye were two fields that never met. Measured in the lab (a plate
+    of even dye, eighteen drops, a magnet walking a circle, 360 steps): dye
+    under the black sat at 0.81–1.01 of its share of the area, and the water
+    within two cells of the black held 0.84–1.01 of the dye of the water far
+    from it. The black was a picture laid over still colour.
+
+    Most of the ferrofluid's motion is not flow, which is why the shared
+    velocity did not carry the dye with it. The maze's fingers grow and the
+    drops round by Cahn–Hilliard, an exchange of phase between neighbouring
+    cells down a chemical potential, and no liquid moves to do it. So the dye
+    has to be told directly where the ferrofluid went.
+
+    Two conserving exchanges between neighbours, per channel, so no dye is
+    made or lost here:
+
+    - Down the slope of open water (A.a.x). Each cell gives each neighbour
+      with more water than it has k·(its dye)·(the difference), and takes
+      the same from each neighbour with less. Where a finger grows into
+      coloured water, the water there falls below the water ahead of it and
+      the dye goes ahead and aside. Where the black retreats, the cell it
+      leaves has more water than its neighbours and the dye comes back in.
+      Across open water there is no slope and nothing moves, so the colour
+      piles up in the first cells past the edge: the packed bright rim.
+      The sum of what one cell gives is at most 4k, so k stays at or under
+      a quarter.
+
+    - Along the inside of the black (A.a.y). The exchange above cannot empty
+      the middle of a pool, because a pool is uniformly full and there is no
+      slope inside it: this is the lesson airExclude records, where a
+      conserving exchange left the middle of a bubble at 0.99 of its dye.
+      The bubbles gave up on conserving and multiply. Here the middle is
+      drawn black all through, so it does not have to empty at once, only
+      eventually: a plain diffusion of the dye, weighted by the smaller of
+      the two cells' phase so it runs only inside the ferrofluid, walks the
+      dye out to the edge, where the first exchange puts it in the water.
+      Dye poured under a pool comes out over some seconds; the dye a growing
+      finger meets never gets in, because the finger's tip is all slope.
+  */
+  phaseDisplace: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn fe(q: vec2i) -> f32 { return smoothstep(0.3, 0.6, textureLoad(phase, clampP(q, S.n), 0).r); }
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let here = textureLoad(dye, p, 0);
+  let fh = fe(p);
+  let k = A.a.x;
+  let d = A.a.y;
+  var keep = 1.0;
+  var got = vec4f(0.0);
+  let offs = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
+  for (var i = 0; i < 4; i++) {
+    let q = clampP(p + offs[i], S.n);
+    let fq = fe(q);
+    let there = textureLoad(dye, q, 0);
+    // Open water is 1 - phase, so more water there is less phase there.
+    keep -= k * max(fh - fq, 0.0) + d * min(fh, fq);
+    got += there * (k * max(fq - fh, 0.0) + d * min(fh, fq));
+  }
+  textureStore(dst, p, max(here * keep + got, vec4f(0.0)));
+}`,
+
   // x = (x0 + a Σ neighbours) / (1 + 4a), per channel. A.a is a, A.b is 1/(1+4a).
   jacobi: `${HEAD}
 @group(0) @binding(2) var x: texture_2d<f32>;

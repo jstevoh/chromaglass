@@ -189,6 +189,19 @@ const MAGNET_CAP = 3;
   plate lost an eighth of its ferrofluid in a few seconds (CI: 86% kept).
 */
 const MAGNET_CELLS = 2.4;
+
+/*
+  Ferro Pushes Dye's two exchanges at full (phaseDisplace in wgsl/fluid.ts),
+  per pass, and passes a step. A cell gives away at most 4·(push + inside) of
+  its dye in one pass, so the two together stay at or under a quarter or the
+  exchange would overshoot and ring. The push is most of it because it is
+  what the eye sees: the colour moved ahead of a growing finger and packed
+  along the edge. The inside only has to walk dye poured under a pool out to
+  the edge eventually, since the middle is drawn black.
+*/
+export const DISPLACE_PUSH = 0.18;
+export const DISPLACE_INSIDE = 0.06;
+const DISPLACE_ITERS = 2;
 const PHASE_SUBSTEPS = 6;
 const GRAIN_PERIOD = 6;
 
@@ -1242,6 +1255,25 @@ export class WebGPUFluid {
         this.mazeReady = true;
       }
     }, this.phaseLive);
+
+    /*
+      The dye gets out of the ferrofluid's way (Ferro Pushes Dye).
+
+      After the phase has moved for this step, so the dye is pushed from
+      where the ferrofluid now is. The why, and the two exchanges, are at
+      phaseDisplace in wgsl/fluid.ts. Twice a step: a finger's tip advances
+      under a cell a step, and one exchange moves at most 4·DISPLACE_PUSH of
+      a cell's dye, so a single pass let the tip overrun its own colour.
+      Off (and not run) at 0, which is every look but the ones that ask.
+    */
+    const displace = Math.max(0, Math.min(1, p.phaseDisplace ?? 0));
+    stage('phase displace', (pass) => {
+      const args = this.arg('phase displace', [DISPLACE_PUSH * displace, DISPLACE_INSIDE * displace, 0, 0]);
+      for (let k = 0; k < DISPLACE_ITERS; k++) {
+        this.run(pass, 'phaseDisplace', this.dye.write, [this.dye.read, this.phase.read], args);
+        this.dye.swap();
+      }
+    }, this.phaseLive && displace > 0.001);
 
     /*
       The mix: oil and water, soap, acidity (docs/physics-plan.md).

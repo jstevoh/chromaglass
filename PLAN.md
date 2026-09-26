@@ -1,6 +1,6 @@
-# Plan: a plate with real detail, and a show you can render
+# Plan: a plate with real detail, a show you can render, and a show that plays like one
 
-Two threads of work, merged into one running order.
+Three threads of work, merged into one running order.
 
 **The look.** Filmed liquid (acrylic pour, oil and milk macro) carries structure at
 every scale. Ours does not: measured on a 512 px centre crop, the reference frames
@@ -14,6 +14,13 @@ below the grid.
 **The instrument.** The show can be played from the music more directly than
 sound-drive-and-hope, and a finished song deserves a rendered film rather than a
 screen capture.
+
+**The show.** Twenty-odd filmed liquid light shows, from the Joshua Light Show's 1969
+*Liquid Loops* to a band's show in 2023, were measured with the watch tool
+(`npm run watch`) on 2026-09-26. Real shows move in swells and scenes, spend a third
+or more of the time near black, hold two or three hues a frame, and do not follow the
+kick. Ours is equally busy all the time, which `src/lib/phrasing.ts` measured and
+stopped short of fixing. Batch 10 is that thread; its yardstick is the table there.
 
 | Measure (512 px centre crop) | Pour | Drops | Marbling | Ours now |
 |---|---|---|---|---|
@@ -37,11 +44,36 @@ Each batch is one PR: build, test in the sandbox, merge, deploy, then a GPU look
 the Mac before the next one starts. Order is by what lifts everything else first,
 and by what would otherwise force a rebase later.
 
+Where each batch stands, as of 2026-09-26:
+
+| | Batch | State |
+|---|---|---|
+| 0 | The dye a tool makes | **Shipped** (#152) |
+| 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
+| 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
+| 3 | Drops, not rings | **In progress** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
+| 4 | Liquids that behave differently | **Shipped**; milk's opacity still owed |
+| 5 | Playing it | Sound learn **shipped** (#155, on #154's bands); shutter and look link **not started** |
+| 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
+| 7 | The room in the plate | **Shipped** |
+| 8 | The desk | **Shipped** |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **in progress** |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; steps 1–7 not started |
+
+Also landed or in flight around these batches: the macro closeup's cells ride the paint
+and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
+it opens, so a cold Mac no longer freezes for 6–19 s at the start (#164, in progress,
+`npm run startup`); the magnet stays where the hand leaves it (#159).
+
 ### 0. The dye a tool makes, and the deploys it is blocking
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-**Done in the sandbox; the Mac has the last word.** The dye's advection now thins
+**Shipped in #152.** The Finger's "adds none" passes on Metal (208 → 199 against
+−16 and −7 left alone), as do the Blow and the Press, and plates hold less dye at the
+same point than before. What follows is how it was found.
+
+The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream
 cells held. The Finger's own velocity was never the source — in the lab it moves
@@ -51,8 +83,7 @@ and the backtrace copied the dye outward (lab, the Finger's path under the
 push: 636 → 756 against 687 left alone; now 622 → 588 against 612). Holding
 the gathering side matters: carried conservatively, a push up the gradient is
 diffusion run backwards and grew a speck from 1.0 to the 6.0 ceiling in under
-five seconds. `npm run tools`, `plates` and `detail` read frames and did not run here;
-they are what says whether it is green and what it did to the sharpness.
+five seconds.
 
 **This was first because it was red.** `npm run tools` fails on `main` about two
 runs in three, and the deploy is gated on it, so every merge queues behind a coin
@@ -185,6 +216,35 @@ the Fillmore look is unchanged at 0.
 **Gate:** on a 2× crop, a 6:1 size range within one cluster, visible highlights, and
 flattened contacts between touching drops.
 
+**In progress in #163, and the spec above has moved.** A physics search on 2026-09-26
+(`/mnt/project-files/drops/research/bubbles-and-drops.md`, with ray-trace scripts
+beside it and reference photographs in `drops/references/`) found that a projector
+and a camera see a drop differently, and the bullets above were written from camera
+photographs:
+
+- **A projector shows no highlight.** It focuses on the dish, and a drop bends light
+  out of the lens's small aperture where its surface is steep. So each drop reads as a
+  dark ring round a bright, upright centre: the bright core is
+  u\* ≈ NA/(2·n_out·|1 − n_out/n_in|) of the radius, which leaves 60–80 % of a small oil
+  drop and about 90 % of an air bubble dark. Nothing is flipped. The flipped,
+  shrunk picture inside a drop in the macro photographs is the camera looking
+  through it, and belongs to the macro closeup only.
+- **The thin gap between the glasses sets the shape.** A drop is a sphere until its
+  radius reaches half the gap, then a pancake with a half-cylinder edge. The gap also
+  sets how fast drops move (a pancake lags at 2U/(1+λ), a bubble runs ahead) and how
+  long a merged drop stays stretched.
+- **Walls between unequal drops are arcs** that bulge into the larger drop, and
+  junctions fillet like Plateau borders; that replaces "polygonal flattening".
+- **Air bubbles are air pockets** (a thick black ring, a clear middle), and soap-film
+  colour is faint in transmitted light.
+
+Steve chose "Both": the projector look on the plate and the flipped, many-coloured
+lens in the macro closeup. He then asked for the report's other findings to go into
+the app in its ranked order, on the same PR. The gate becomes: the size range and
+flattened contacts as written, the dark-ring fraction matching the rule above for oil
+and for air, and no highlight in a projected look. Batch 2's deferred structure gate
+(4 px ≥ 0.9 %, 8 px ≥ 1.2 %) is measured once this lands.
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`
@@ -298,6 +358,18 @@ Needs per-band energies and per-band onsets added to `useAudioAnalyzer` (it expo
 bass, mid, treble, energy and the raw `frequencyData` today, but no named bands and no
 onsets).
 
+**The bands shipped in #154, and sound learn in #155.**
+`src/lib/audioFeatures.ts` is the one analyser the live show and an offline song both
+use: level, kick, bass, snare, hats, eight bands and an onset per source (`npm run
+bands`, 71/71). On it, #155 puts a music button beside every Learn button: a slider
+follows a source at a depth through the patch bay (`sceneMap.ts`), and an action fires
+on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
+heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
+What it leaves open: "press the big dish" and "drop the lead dye" have no matching
+`MidiAction` yet; the bar is every fourth beat from lock, with no real downbeat; and
+learned mappings do not reach a Cast or network display (triggers do). The downbeat is also what batch 10's accent
+selection (step 3) needs.
+
 **Shutter** (`shutter`, camera pass). Their trail buffer is a generic VJ smear laid
 over everything. Here it belongs in the camera, where it is physically motivated: the
 photographs that the Photograph style is built from are long exposures, and their light
@@ -348,6 +420,22 @@ Nobody else in this space ships that.
 
 **Gate:** the same song rendered twice is byte-identical, and a 3-minute 1080p render
 completes without dropping a frame.
+
+**Shipped, the first half of the gate met.** Seeded randomness in #153
+(`src/lib/rng.ts`, one seed a load, `?seed=` fixes it, 199 `Math.random` references on
+the plate down to 5 allowlisted; `npm run seed`). Offline bands and onsets in #154. The
+render in #156: a film button in the music player steps the plate on a fixed clock
+(`src/lib/showClock.ts`) and muxes MP4 or WebM with the song, in-house
+(`npm run render` 105/105, ffprobe agreeing). On Metal, `npm run render-app` reads
+24/24: the same seed twice draws the same 240 frames and an 8 s film lasts 8000.0 ms.
+**Not yet measured:** a 3-minute 1080p render end to end, and a full sequence with its
+cue sheet played out over a song. Both need the Mac.
+
+One caution from batch 10's step 0: a fixed seed makes a *render* repeat, but not a
+live take. Two Metal runs of the same code on the same seeds read Classic's motion
+half-life as 1.0 s and then 11.3 s, because a live take's frames depend on the frame
+clock. Judge a live-motion change by its range leaving the old range, not by a median
+moving.
 
 ### 7. The room in the plate: the camera as a sensor
 
@@ -518,6 +606,107 @@ muscle memory is most of what playing an instrument is. Design mode exists so no
 is *taken away*, and the desk is judged on whether a show can be played from it, not on
 whether it is tidier.
 
+### 9. Ferrofluid after the references
+
+`src/gpu/wgsl/plate.ts`, `src/presets.ts`, `src/presetPlate.ts`, `scripts/ferrolook.mjs`
+
+The reference is Chemical Bouillon's ferrofluid films (frames in
+`/mnt/project-files/ferrofluid-look/references/`): razor-sharp edges at any zoom, a fine
+scale (fingers or cells about 1/60 of the frame, hundreds of them), thin black walls of
+ferrofluid between packed cells of coloured dye, and wet gloss. Ferrofluid is the one
+liquid here that *should* shine: a projected look has no speculars, because the light
+comes through the liquid, but these films are lit from the front.
+
+**9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,
+antialiased line at any zoom (edge width at 1x 17.9 → 1.5 px; at 3x 4.46 → 0.40
+cells), with an amber sliver inside, a bright meniscus outside and a glint that stays
+with the key light. A pool is black all through. Two looks: **Ferro Maze** and
+**Ferro Paint**. `npm run ferrolook`, 10/10.
+
+What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
+(`/mnt/project-files/ferrofluid-look/watch/`), in the order to fix them:
+
+- **9b. Maze detail**, shipped in #167. The maze's finger width is fixed by `MAZE_PERIOD` (0.045 of the
+  plate) and comes out two to three times wider than the reference, and it coarsens
+  over time. Maze Detail (0 to 1) divides the period by up to three; 0 is the maze as it
+  was, bit for bit, and Ferro Maze uses 0.5. `npm run maze`: finger width 0.0296 at 0.5
+  against 0.0431 at 0 (ratio 0.69). Whether it now matches the reference is for the
+  Mac.
+- **9c. The dye rides the ferrofluid** (in progress, picked 2026-09-26). In Ferro Paint the dye is not carried by the
+  ferrofluid, so the patchwork does not deform with the fingers the way the reference's
+  does.
+- **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
+  white table clips (32 % of the frame blown); no visible pulse on the kick.
+
+### 10. Playing like a show
+
+`src/lib/phrasing.ts`, `src/lib/beatClock.ts`, `src/lib/audioFeatures.ts`,
+`scripts/watch.mjs`, `scripts/film.mjs`
+
+From the footage study of 2026-09-26: the plan page is
+<https://claude.ai/artifact/UB2VSoFbA3S84yEoFPuPQX>, the notes are
+`/mnt/project-files/research/light-show/footage.md` (every clip, its link and its
+numbers) and `craft-and-field.md` (performers, VJ practice, the digital field).
+
+The yardstick, measured on the footage at four samples a second:
+
+| Quality | Real shows |
+|---|---|
+| Swells of motion | 1.5–3.5 a minute, peaking about 2.5x the median, rising and falling over 2–9 s |
+| Composition change | every 7–10 s, without a cut |
+| Scene change | every 15–30 s |
+| Share of time calm | 20–40 % |
+| Near-black | 30–60 % on average, ranging from 3 % to 90 % over a set |
+| Hues in a frame | 2–3, one family leading, the family changing by scene |
+| Motion against loudness | r ≈ 0 at the beat; about 0.4 over 20 s windows |
+| Edges | two regimes: soft washes under 1 %, sharp drop and cell fields about 15 % |
+| Hard cuts | none |
+
+The last-but-one row matters for this plan's own gate: the detail table at the top was
+built on macro films, which are all drop and cell field. A real show's big shapes are
+soft, so `npm run detail` should judge the two regimes separately rather than ask every
+region to be sharp.
+
+The steps, most visible first. Each is one PR with its own check, and every step after
+0 reports its change in the film table's units.
+
+0. **Film every look and measure it**, shipped in #162. `npm run film` records each
+   look three times for two minutes with the band in a box and writes the table above
+   with our looks under the real shows' rows; `film.yml` runs it by hand across six Mac
+   runners. **The first full baseline has not been run yet**: that is one by-hand run of
+   `film.yml`, and every step below is measured against it.
+1. **Rest, big events and darkness.** `phrasing.ts` already has the shape and measured
+   why it changes nothing: small gusts on a plate that is never still are invisible. Let
+   it fire the whole-frame events the app already has (a flood pour, a partial drain, a
+   dye swap, a press), let the plate settle and the dimmer fall between them, and let a
+   scene end in near-black. A Pacing setting whose zero keeps today's look.
+   *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
+   10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
+   from a seeded run, and the film table.
+2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
+   accumulating intensity from #154's bands, and from them live build, drop and
+   breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
+   reported within one bar, none in a steady section, and motion against loudness near
+   0 at the beat and positive over 20 s. *Check:* synthesised songs with known builds.
+3. **Choose the accents.** Beat squeeze and plate rock fire on every kick. Let the
+   performer pick downbeats, every other bar or fills only, vary the depth a little as a
+   hand does, and pull a hand-played press onto the predicted beat. Needs a real
+   downbeat, which #155 does not have yet.
+4. **Press smooth, lift into fingers** (roadmap G). A squeeze gives a smooth ring and a
+   lift breaks into fingers; today both finger. *Check:* finger count round the ring,
+   low on press and high on lift, in the lab.
+5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
+   with the ferrofluid phase as the precedent. The biggest difference in every frame,
+   and the largest piece of work here; prototype in the lab first.
+6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
+   having a strength.
+7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
+   and a streak layer, each at its own speed, added as light.
+
+Small things that ride along with the steps: drops with a coloured rim lined up in
+chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
+event, and one big organiser over a field of small drops at about a 10:1 size range.
+
 ## Not doing
 
 - **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.
@@ -525,19 +714,25 @@ whether it is tidier.
 - **A built-in drum machine.** Reacting to a synthesized beat is fine for rehearsal,
   but you perform with a band, and the music file player already covers practice.
 
-## If you want to reorder
+## What comes next
 
-Two things decide the order above, and both can be moved.
+Batches 5 and 6 were the ones that mattered most, and the seeded generator was the
+hinge between them. The generator, the render and sound learn are in; batch 5's shutter
+and look link are not. The order from here, as of 2026-09-26:
 
-- **Batches 5 and 6 are the ones that matter most**, and they sit last only because of
-  a dependency, not because they are worth less: 6 changes what the app is, 5 changes
-  how it feels to play. 5 touches no fluid code and can be pulled forward at any time.
-- **The seeded generator is the hinge.** It is a mechanical sweep over 104 call sites
-  in files that batches 1–4 also edit. Doing it last means one sweep over code that has
-  just changed; doing it first means every later batch is written against the seeded
-  generator from the start, which is cleaner but delays the first visible improvement
-  and will shift existing bead layouts and finger spokes slightly. It is worth pulling
-  forward as its own small PR the moment rendering a song is the next thing wanted.
+1. **Batch 10, step 0 then step 1.** Run `film.yml` by hand for the
+   first full baseline, then build rest, big events and darkness. It is the change an
+   audience would notice first, it needs no new physics (the events exist and
+   `phrasing.ts` has the shape), and the film table can measure it.
+2. **The rest of batch 5**: the look link and the shutter are independent of
+   everything else and can be built while the Mac is judging a look.
+3. **Batch 9c, the dye rides the ferrofluid**, being built now in the ferrofluid
+   thread: the other visible gap between Ferro Paint and its reference.
+
+Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
+freeze (#164) finish in their own threads first.
+Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
+pick them up from `docs/roadmap.md` when step 1 is in.
 
 ## Operating rules
 

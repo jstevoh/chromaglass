@@ -148,6 +148,30 @@ through it, and that on a grid too coarse for it (256²) Detail changes
 nothing. The maze is still coarsening towards its period at eight seconds,
 so where it ends up is not asserted.
 
+**Pushes Dye** (`phaseDisplace`) lets the ferrofluid move the dye. The two
+fields never met: the dye under the black measured as thick as the dye in
+open water, so the black moved through Ferro Paint's colours as a picture
+laid over them. Most of the ferrofluid's motion is Cahn–Hilliard, an
+exchange of phase between cells with no liquid moving, so the shared
+velocity could not carry the dye with it. The dye is told directly instead,
+after the phase moves each step: two conserving exchanges between
+neighbours, one down the slope of open water across the half-full line
+(the colour leaves where the black grows, returns where it retreats, and
+piles in the first cells past the edge), and one plain diffusion inside
+the black, which walks dye poured under a pool out to its edge, where the
+first puts it in the water. The first alone cannot empty a pool's middle,
+for the reason airExclude records for bubbles: a uniform pool has no slope.
+Pushing across the whole phase profile rather than the half-full line left
+a pale halo of clear water round every body, which the references do not
+have. `npm run ferrodye` (256², even dye, eighteen drops, a walking magnet,
+360 steps): the black's new ground keeps 8% of its dye against 71% with it
+off, the water beside the black holds 1.49 of the far water's dye against
+0.84, the dye under the black falls to 0.13 of its share of the area
+against 0.80, the middle of a settled pool keeps 57% of its dye after 600
+passes against 100% with the inside exchange off, twenty passes alone move
+1316 units of dye and change the total by 0.26% of that, and at 0 the plate
+is the same to the bit while 0.01 is not.
+
 The same work fixed the magnet on its own. The sharpening pass that stood in
 for Cahn–Hilliard without a maze clamped to its neighbourhood, and lost an
 eighth of the ferrofluid at ten frames a second; its pairwise replacement
