@@ -227,6 +227,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('time', view.time);
   pack.set('glossiness', s.glossiness ?? 0);
   pack.set('saturation', s.saturationBoost ?? 1.35);
+  pack.set('colourBody', Math.max(0, Math.min(1, s.colourBody ?? 0)));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));

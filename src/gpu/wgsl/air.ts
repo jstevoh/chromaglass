@@ -39,11 +39,17 @@ struct AirU {
 @group(0) @binding(0) var<uniform> A: AirU;
 /** x, y, radius — all as a fraction of the grid — and how opaque the bubble is. */
 @group(0) @binding(1) var<storage, read> discs: array<vec4f>;
+/** Each disc's rim: how far it has broken into fingers (0 round), how many, and their phase. */
+@group(0) @binding(2) var<storage, read> fingers: array<vec4f>;
+
+/** The longest a finger reaches past the round rim, as a fraction of the radius, at fingering 1. */
+const FINGER_REACH: f32 = 0.9;
 
 struct VOut {
   @builtin(position) pos: vec4f,
   @location(0) local: vec2f,
   @location(1) amt: f32,
+  @location(2) @interpolate(flat) rim: vec4f,
 };
 
 @vertex
@@ -54,17 +60,41 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
   // The field is read y-down and written here in clip space, which is y-up.
   // Flipping the centre rather than the corner keeps the disc round.
   let centre = vec2f(d.x * 2.0 - 1.0, 1.0 - d.y * 2.0);
+  let f = fingers[i];
+  // The quad reaches as far as the longest finger can.
+  let reach = 1.0 + clamp(f.x, 0.0, 1.0) * FINGER_REACH;
   var o: VOut;
-  o.pos = vec4f(centre + corner * (d.z * 2.0), 0.0, 1.0);
-  o.local = corner;
+  o.pos = vec4f(centre + corner * (d.z * 2.0 * reach), 0.0, 1.0);
+  o.local = corner * reach;
   o.amt = d.w;
+  o.rim = f;
   return o;
+}
+
+/*
+  How far the rim reaches at an angle, as a fraction of the round radius.
+
+  Fingers, not a flower: each a narrow lobe (a raised cosine taken to a high
+  power), spaced unevenly (the angle warped by a slower wave), and each its
+  own length (a second, incommensurate wave), so the front reads as the air
+  pushing into the liquid where it gave first, as a blown bubble's does.
+*/
+fn rimAt(theta: f32, rim: vec4f) -> f32 {
+  let f = clamp(rim.x, 0.0, 1.0);
+  if (f <= 0.001) { return 1.0; }
+  let k = max(rim.y, 3.0);
+  let ph = rim.z;
+  let warped = theta + 0.45 * sin(2.0 * theta + ph * 1.7) / k * 6.2831853;
+  let lobe = pow(0.5 + 0.5 * cos(k * warped + ph), 6.0);
+  let len = 0.55 + 0.45 * (0.5 + 0.5 * sin(3.0 * theta + ph * 2.3 + 1.1 * sin(5.0 * theta + ph)));
+  return 1.0 + f * FINGER_REACH * lobe * len;
 }
 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4f {
   let r = length(in.local);
-  if (r > 1.0) { discard; }
+  let edge = rimAt(atan2(in.local.y, in.local.x), in.rim);
+  if (r > edge) { discard; }
   /*
     Soft only at the very rim: a bubble has a sharp edge, and the softness is
     there to keep the disc from aliasing rather than to blur it.
@@ -76,7 +106,7 @@ fn fs(in: VOut) -> @location(0) vec4f {
     a peak of 0.01: present, plausible, and useless. A check that only asked
     whether there was air would have passed.
   */
-  let a = in.amt * (1.0 - smoothstep(1.0 - max(A.soft, 0.01), 1.0, r));
+  let a = in.amt * (1.0 - smoothstep(edge * (1.0 - max(A.soft, 0.01)), edge, r));
   return vec4f(a, 0.0, 0.0, 1.0);
 }
 `;

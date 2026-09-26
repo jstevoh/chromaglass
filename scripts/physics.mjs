@@ -116,6 +116,39 @@ try {
   check('and carries it rather than making or losing any', Math.abs(burst.tot / still.tot - 1) < 0.01,
     `${still.tot.toFixed(0)} → ${burst.tot.toFixed(0)}`);
 
+  /*
+    And at a frame's time step, the dial where a performer puts it: reported
+    as a halftone lattice of dots over the dye with Soap Bursts at 80%. The
+    soap's own spread was an explicit diffusion run near eight times past its
+    limit, so the soap flipped between neighbouring cells every step and
+    carried the dye into a checkerboard. Measured on 2x2 blocks (a - b - c + d,
+    zero on anything smoother than the grid): 50 times the plate without soap
+    before, about 5 after (what is left is the fronts themselves).
+  */
+  const lattice = async (soap) => {
+    await page.evaluate(() => lab.create(256, 256));
+    await page.evaluate(() => {
+      let s = 3; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      for (let k = 0; k < 30; k++) lab.dye(r(), r(), 0.08 + 0.1 * r(), [r(), r(), r()], 0.6);
+      lab.flush();
+    });
+    for (let b = 0; b < 8; b++) {
+      await page.evaluate((b) => lab.solver().addMix(0.2 + 0.6 * ((b * 0.618) % 1), 0.2 + 0.6 * ((b * 0.382 + 0.3) % 1), 0.05, { soap: 1 }), b);
+      await page.evaluate((s) => lab.step(20, { surfactantFlow: s, dt: 0.016 }), soap);
+    }
+    return page.evaluate(async () => {
+      const d = await lab.field('dye'); const L = 256; let cb = 0, tot = 0;
+      const a = (i, j) => d[(i + j * L) * 4 + 3];
+      for (let j = 0; j < L - 1; j++) for (let i = 0; i < L - 1; i++) {
+        cb += Math.abs(a(i, j) - a(i + 1, j) - a(i, j + 1) + a(i + 1, j + 1)); tot += a(i, j);
+      }
+      return cb / tot;
+    });
+  };
+  const calmGrid = await lattice(0), soapGrid = await lattice(0.8);
+  check('Soap Bursts at 80% leave no lattice of dots in the dye', soapGrid < 12 * calmGrid + 0.004,
+    `checkerboard ${soapGrid.toFixed(4)} against ${calmGrid.toFixed(4)} with no soap`);
+
   // ── 6: buoyancy ──
   const sink = async (b) => {
     await page.evaluate(() => lab.create(128));

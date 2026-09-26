@@ -1037,6 +1037,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ saturationBoost: v })}
           settingKey="saturationBoost"
         />
+        {/* How solid the colour reads: a tint the light shows through, or a body of colour. */}
+        <Slider
+          label="Colour Body"
+          value={settings.colourBody ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ colourBody: v })}
+          settingKey="colourBody"
+        />
         <Slider
           label="Glossiness"
           value={settings.glossiness}

@@ -90,6 +90,9 @@ jobs:
       # one says why, and "how it meets the others" agrees with the shelf.
       - name: The liquids file
         run: npm run liquidfile
+      # A popped bubble closes back into the liquid, round, not into blocks.
+      - name: The popped bubbles
+        run: npm run pops
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
@@ -154,6 +157,12 @@ jobs:
       # The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.
       - name: The relief
         run: npm run derive
+      # Held still, the Blow grows a bubble with a fingered rim and a ring of satellites.
+      - name: The straw bubble
+        run: npm run straw
+      # The closeup pushes in like a microscope: the cells come through as they resolve.
+      - name: The microscope
+        run: npm run microscope
       - run: npm run webgpu
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's

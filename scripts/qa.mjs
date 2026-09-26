@@ -737,13 +737,19 @@ try {
     // seconds, and measured inside that the drift read 18.7 (against 4.0 on
     // a settled plate) once Classic opened lit rather than dark, and a zoom
     // that moved the picture 73.7 failed the 4x margin.
-    await settle(4500);
+    await settle(7000);
     const plate = await frame();
 
     // The plate goes on moving under all of this, so measure how far it
     // wanders on its own first: nothing below counts unless it clears this.
+    // The calmer of two windows: the zoom moved the picture 86.9, 87.0 and
+    // 86.9 on three runs, and the one window's drift read 13.6, 3.6 and 24.8,
+    // the last on a plate still spreading from its seed, which failed a
+    // camera that did exactly what it did on the others.
     await settle(1800);
-    const drift = apart(plate, await frame());
+    const mid = await frame();
+    await settle(1800);
+    const drift = Math.min(apart(plate, mid), apart(mid, await frame()));
 
     // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
     const far = apart(plate, await at(9));

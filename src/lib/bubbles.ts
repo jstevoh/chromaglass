@@ -29,6 +29,21 @@ export interface Bubble {
   /** A transient kick of velocity (cells/s) from a split or a pop nearby. */
   kx: number;
   ky: number;
+  /**
+   * Fingering: how far the rim has broken into fingers (0 round, 1 the
+   * fingers as long as the radius), how many there are, and where they sit.
+   * Air pushed into liquid faster than the liquid can get out of its way
+   * does not push a round front: the front breaks into fingers (Saffman and
+   * Taylor), the thing a bubble blown through a straw between two plates
+   * shows. Surface tension rounds it off again once the blowing stops.
+   */
+  fing: number;
+  lobes: number;
+  fph: number;
+  /** Blown by hand through the straw (kept when the look has no bubbles of its own). */
+  straw?: boolean;
+  /** On the end of the straw this step: held there and growing. */
+  held?: boolean;
 }
 
 export const MAX_BUBBLES = 40;
@@ -49,6 +64,10 @@ export class BubbleField {
   readonly packed = new Float32Array(MAX_BUBBLES * 4);
   /** sx, sy, wobble amplitude, wobble phase — the shader's shape block. */
   readonly packedShape = new Float32Array(MAX_BUBBLES * 4);
+  /** fingering, finger count, finger phase, 0 — the air splat's shape block. */
+  readonly packedFinger = new Float32Array(MAX_BUBBLES * 4);
+  /** The bubble on the end of the straw, while there is one. */
+  private strawBubble: Bubble | null = null;
   /** Things that happened this step, for the show to react to (a pop disturbs the dye). */
   readonly events: BubbleEvent[] = [];
 
@@ -57,7 +76,19 @@ export class BubbleField {
   clear(): void {
     this.bubbles.length = 0;
     this.events.length = 0;
+    this.strawBubble = null;
   }
+
+  /**
+   * Let the look's own bubbles go and keep the ones blown by hand: a look
+   * with no bubbles of its own still keeps what the straw put there.
+   */
+  clearLooks(): void {
+    for (let i = this.bubbles.length - 1; i >= 0; i--) if (!this.bubbles[i].straw) this.bubbles.splice(i, 1);
+  }
+
+  /** Whether any bubble on the plate was blown by hand. */
+  get anyBlown(): boolean { return this.bubbles.some((b) => b.straw); }
 
   private make(x: number, y: number, r: number, life: number, wob = 0.12): Bubble {
     return {
@@ -65,6 +96,7 @@ export class BubbleField {
       sx: 0, sy: 0,
       wob, wph: Math.random() * Math.PI * 2, wvel: 1.2 + Math.random() * 1.2,
       kx: 0, ky: 0,
+      fing: 0, lobes: 8 + Math.floor(Math.random() * 7), fph: Math.random() * Math.PI * 2,
     };
   }
 
@@ -84,6 +116,57 @@ export class BubbleField {
       const a = Math.random() * Math.PI * 2;
       const d = Math.random() * spread;
       this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.65 + Math.random() * 0.7), 9 + Math.random() * 14, 0.1 + Math.random() * 0.08));
+    }
+  }
+
+  /**
+   * Air blown through a straw held still at (x, y): one bubble on the end of
+   * it, growing while the blowing goes on.
+   *
+   * Its area grows at a steady rate, as a steady breath delivers a steady
+   * volume, so it swells fast at first and slows as it gets big, up to about
+   * a seventh of the plate across. The faster it is growing, the more its rim
+   * breaks into fingers; small bubbles are shed off the rim as it goes, the
+   * ring of satellites round a blown bubble. Let go, it stays where it is and
+   * rounds off, and a long time later pops; blow again beside it and the
+   * plate fills with them.
+   *
+   * `strength` is the tool's Amount (1 is a steady breath).
+   */
+  blow(x: number, y: number, dt: number, strength = 1): void {
+    const N = this.grid;
+    const rMax = N * 0.07;
+    let b = this.strawBubble;
+    if (b && (!this.bubbles.includes(b) || Math.hypot(b.x - x, b.y - y) > b.r + 3)) {
+      // Popped, or the straw has moved off it: the next breath is a new bubble.
+      b = this.strawBubble = null;
+    }
+    if (!b) {
+      b = this.make(x, y, Math.max(1, N * 0.008), 1e9, 0.08);
+      b.straw = true;
+      this.push(b);
+      this.strawBubble = b;
+    }
+    const rate = Math.max(0.05, strength) * Math.PI * rMax * rMax / 3.5;   // cells² a second
+    const r0 = b.r;
+    b.r = Math.min(rMax, Math.sqrt(b.r * b.r + rate * dt / Math.PI));
+    const speed = (b.r - r0) / Math.max(dt, 1e-4);                       // cells a second
+    // Fingers as long as the growth is fast, relaxing toward that.
+    const want = Math.min(1, speed / (N * 0.03)) * 0.55;
+    b.fing += (want - b.fing) * (1 - Math.exp(-dt / 0.25));
+    // Held at the straw.
+    const k = Math.min(1, dt * 8);
+    b.x += (x - b.x) * k; b.y += (y - b.y) * k;
+    b.kx = 0; b.ky = 0;
+    b.held = true;
+    b.life = b.age + 60;
+    // Satellites off the rim while it grows.
+    if (speed > 0.2 && this.bubbles.length < MAX_BUBBLES - 1 && Math.random() < dt * 5 * Math.min(1, strength)) {
+      const a = Math.random() * Math.PI * 2;
+      const d = b.r * (1 + b.fing * 0.6) + 1.5 + Math.random() * 3;
+      const sat = this.make(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, Math.max(0.8, N * (0.003 + Math.random() * 0.004)), 8 + Math.random() * 10, 0.1);
+      sat.kx = Math.cos(a) * 8; sat.ky = Math.sin(a) * 8;
+      this.push(sat);
     }
   }
 
@@ -139,7 +222,13 @@ export class BubbleField {
     const bs = this.bubbles;
     this.events.length = 0;
 
+    // The bubbles on the end of the straw this step: held where it is, so
+    // nothing below moves them (a satellite pressed against one, a merge).
+    const heldNow = new Set(bs.filter((b) => b.held));
     for (const b of bs) {
+      // A bubble on the end of the straw is held there; one let go rounds off.
+      if (!b.held) b.fing *= Math.exp(-dt / 1.2);
+      if (b.held) { b.held = false; b.age += dt; b.wph += b.wvel * dt; continue; }
       const [vx, vy] = velocity(b.x, b.y);
       // Ride the dye, climb the tilt, carry any kick, and wander a little.
       const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + (Math.random() - 0.5) * (0.5 + agitation * 1.5);
@@ -175,15 +264,18 @@ export class BubbleField {
         const ddx = c.x - a.x, ddy = c.y - a.y;
         const dist = Math.hypot(ddx, ddy) || 1e-3;
         const touch = a.r + c.r;
+        // A held bubble does not give: the other takes the whole of the move.
+        const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
+        const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
         if (dist < touch * 3 && dist > touch * 0.95) {
           const pull = 2.5 * dt * (1 - dist / (touch * 3));
-          a.x += (ddx / dist) * pull; a.y += (ddy / dist) * pull;
-          c.x -= (ddx / dist) * pull; c.y -= (ddy / dist) * pull;
+          a.x += (ddx / dist) * pull * ka; a.y += (ddy / dist) * pull * ka;
+          c.x -= (ddx / dist) * pull * kc; c.y -= (ddy / dist) * pull * kc;
         } else if (dist < touch * 0.95) {
           // Overlapping: push apart to rest edge to edge.
           const push = (touch * 0.95 - dist) * 0.5;
-          a.x -= (ddx / dist) * push; a.y -= (ddy / dist) * push;
-          c.x += (ddx / dist) * push; c.y += (ddy / dist) * push;
+          a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
+          c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
         }
       }
     }
@@ -196,9 +288,12 @@ export class BubbleField {
         const dist2 = ddx * ddx + ddy * ddy;
         if (a.age > 2 && c.age > 2 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.92 && Math.random() < dt * 0.12) {
           const wa = a.r * a.r, wc = c.r * c.r;
-          a.x = (a.x * wa + c.x * wc) / (wa + wc);
-          a.y = (a.y * wa + c.y * wc) / (wa + wc);
-          a.r = Math.min(N * 0.05, Math.sqrt(wa + wc));
+          // Merged into the one on the straw, it stays on the straw.
+          const pin = heldNow.has(a) ? a : heldNow.has(c) ? c : null;
+          a.x = pin ? pin.x : (a.x * wa + c.x * wc) / (wa + wc);
+          a.y = pin ? pin.y : (a.y * wa + c.y * wc) / (wa + wc);
+          a.r = Math.min(a.straw || c.straw ? N * 0.07 : N * 0.05, Math.sqrt(wa + wc));
+          if (c.straw) { a.straw = true; a.held = c.held; if (this.strawBubble === c) this.strawBubble = a; }
           a.age = Math.min(a.age, c.age);
           const dist = Math.sqrt(dist2) || 1;
           a.sx = (ddx / dist) * 0.18;
@@ -267,6 +362,10 @@ export class BubbleField {
       this.packedShape[o + 1] = b.sy;
       this.packedShape[o + 2] = b.wob;
       this.packedShape[o + 3] = b.wph;
+      this.packedFinger[o] = b.fing;
+      this.packedFinger[o + 1] = b.lobes;
+      this.packedFinger[o + 2] = b.fph;
+      this.packedFinger[o + 3] = 0;
       n++;
     }
     return n;

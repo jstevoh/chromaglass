@@ -25,6 +25,7 @@ import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
+import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -635,12 +636,23 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
+  /*
+    A move not yet handed to the GPU. The reading to wait for was counted
+    from the move, two copies on, on the grounds that the deltas go across at
+    the next step. But a frame can run no step at all (the loop steps at its
+    own rate), and the copies go on being issued once a frame while the move
+    waits on the CPU, so two on could still be a reading from before it: the
+    Finger read dye it had already carried, put it down again, and the plate
+    gained (CI: 327 -> 569 against +75 left alone, on a commit that did not
+    touch it). So the count starts when the deltas actually go: the first
+    copy issued after that flush is submitted after it, and holds the move.
+  */
+  private dyeMovePending = false;
   private dyeMirrorCurrent(): boolean {
-    return !!this.gpu && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
+    return !!this.gpu && !this.dyeMovePending && this.gpu.rbDyeLanded >= this.dyeMoveAfter;
   }
   private dyeMoved(): void {
-    // The next copy issued may be taken before this step's deltas are flushed, so the one after it.
-    if (this.gpu) this.dyeMoveAfter = this.gpu.rbDyeIssued + 2;
+    if (this.gpu) this.dyeMovePending = true;
   }
   private rimSeq = -1;
   /*
@@ -661,6 +673,13 @@ class FluidSimulation {
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
+  /**
+   * The bubbles as they stood at the last rim deposit, live ones only: a
+   * cell a bubble already covered then has had its dye moved to the rim
+   * once, and is not counted again.
+   */
+  private coverPacked = new Float32Array(0);
+  private coverCount = 0;
   /** Holes still closing: carried so the fill converges instead of running once. */
   private fillingHoles: { at: Float32Array; left: number }[] = [];
   private rbDensity: Float32Array;  // downsampled readback
@@ -770,6 +789,8 @@ class FluidSimulation {
     }
     this.gpu = gpu;
     gpu.clear();
+    // Its readings count from nothing again, and whatever was pending went with the last solver.
+    this.dyeMoveAfter = 0; this.dyeMovePending = false;
     this.keepSeed();
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
@@ -854,6 +875,7 @@ class FluidSimulation {
     this.pressure.fill(0);
     this.mul.fill(1);
     this.dirty = false;
+    this.dyeMovePending = false;
   }
 
   /** Once per rendered frame: refresh the readback the CPU-side readers use. */
@@ -911,6 +933,7 @@ class FluidSimulation {
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
     gpu.applyDeltas(da, va, this.mul, dt);
+    if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
@@ -1067,6 +1090,23 @@ class FluidSimulation {
       if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
       const clear = Math.max(0, Math.min(1, b.opacity));
       if (clear < 0.02) continue;
+      /*
+        Only cells it did not already cover at the last deposit.
+
+        The mirror is a few frames behind the GPU, which has already taken the
+        dye out from under the bubble as it stood then. A bubble sitting still
+        or drifting shows that as nothing under it; a bubble growing fast (the
+        straw's) covers, deposit after deposit, cells the mirror still shows
+        full, and the same dye went to the rim once per deposit: the Blow's
+        bubble turned 36 of dye into 358 in the tools check. Each cell's dye
+        now goes to the rim once, the first time the bubble covers it.
+      */
+      let was: { x: number; y: number; r: number } | null = null;
+      for (let j = 0; j < this.coverCount; j++) {
+        const q = j * 4;
+        const px = this.coverPacked[q] * N, py = this.coverPacked[q + 1] * N, pr = this.coverPacked[q + 2] * N;
+        if (Math.hypot(px - b.x, py - b.y) < Math.max(2, R * 0.5) && (!was || pr > was.r)) was = { x: px, y: py, r: pr };
+      }
       let mass = 0, aR = 0, aG = 0, aB = 0;
       const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
       const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
@@ -1074,6 +1114,7 @@ class FluidSimulation {
         for (let x = xl; x <= xh; x++) {
           const dx = x - b.x, dy = y - b.y;
           if (dx * dx + dy * dy > R * R) continue;
+          if (was && (x - was.x) * (x - was.x) + (y - was.y) * (y - was.y) <= was.r * was.r) continue;
           const i4 = (x + y * N) * 4;
           const d = dye[i4 + 3];
           if (!(d > 1e-5)) continue;
@@ -1082,36 +1123,15 @@ class FluidSimulation {
         }
       }
       if (!(mass > 1e-4)) continue;
-      // The annulus the mass lands in: just outside the rim, a third of a
-      // radius wide, which is about what the references show as the bright
-      // ring around a bubble sitting in dye.
-      const rIn = R * 1.02, rOut = R * 1.38;
-      const cells: number[] = [];
-      const yl = Math.max(0, Math.floor(b.y - rOut)), yh = Math.min(N - 1, Math.ceil(b.y + rOut));
-      const cxl = Math.max(0, Math.floor(b.x - rOut)), cxh = Math.min(N - 1, Math.ceil(b.x + rOut));
-      for (let y = yl; y <= yh; y++) {
-        for (let x = cxl; x <= cxh; x++) {
-          const dd = Math.hypot(x - b.x, y - b.y);
-          if (dd < rIn || dd > rOut) continue;
-          cells.push(x + y * N);
-        }
-      }
-      if (!cells.length) continue;
-      /*
-        Deposited in the mirror's own log-space rather than through
-        `addDensity`, which takes a colour and takes its log. Going out to a
-        colour and back in would lose the mix: the absorptions here are
-        already the geometric-mean form the plate stores, so the ring keeps
-        the colour of the dye it came from, whatever was mixed into it.
-      */
-      const w = 1 / cells.length;
-      this.dirty = true;
-      for (const i of cells) {
-        this.density[i] += mass * w;
-        this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
-      }
+      // Into the ring just outside the rim (bubbleDye.ts), in the mirror's
+      // own log-space rather than through `addDensity`, which takes a colour
+      // and takes its log: going out to a colour and back would lose the mix.
+      if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.dirty = true;
     }
     this.fillPoppedHoles(packed, count, dye, N);
+    if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
+    this.coverPacked.set(packed.subarray(0, count * 4));
+    this.coverCount = count;
     /*
       Next frame's list to diff against: this frame's bubbles, *plus* the
       ones still filling.
@@ -1156,6 +1176,10 @@ class FluidSimulation {
    * That conserves by construction, stops itself at the right moment, and
    * needs nothing remembered but where the bubbles were last frame.
    */
+  private dyeTarget(): DyeTarget {
+    return { density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB, mul: this.mul };
+  }
+
   private fillPoppedHoles(packed: Float32Array, count: number, dye: Float32Array, N: number): void {
     if (this.prevCount <= 0) return;
     for (let k = 0; k < this.prevCount; k++) {
@@ -1175,58 +1199,9 @@ class FluidSimulation {
       }
       if (alive) continue;
 
-      // The hole, and the liquid around it the fill draws from.
-      const disc: number[] = [], ring: number[] = [];
-      /*
-        Tight, on the ring the displacement was laid into.
-
-        Reaching wider was tried and is worse — 24-29% of the surroundings
-        against 48-53% — because it averages the enriched ring together with
-        ordinary liquid, so the level the fill equalises toward drops and
-        less moves. The dye is in the ring; that is where to get it.
-      */
-      const rOut = R * 1.45;
-      const yl = Math.max(0, Math.floor(y - rOut)), yh = Math.min(N - 1, Math.ceil(y + rOut));
-      const xl = Math.max(0, Math.floor(x - rOut)), xh = Math.min(N - 1, Math.ceil(x + rOut));
-      for (let j = yl; j <= yh; j++) {
-        for (let i = xl; i <= xh; i++) {
-          const d = Math.hypot(i - x, j - y);
-          if (d <= R) disc.push(i + j * N);
-          else if (d <= rOut) ring.push(i + j * N);
-        }
-      }
-      if (disc.length === 0 || ring.length === 0) continue;
-
-      let discMass = 0, ringMass = 0, aR = 0, aG = 0, aB = 0;
-      for (const i of disc) discMass += dye[i * 4 + 3];
-      for (const i of ring) {
-        const i4 = i * 4;
-        ringMass += dye[i4 + 3];
-        aR += dye[i4]; aG += dye[i4 + 1]; aB += dye[i4 + 2];
-      }
-      const discMean = discMass / disc.length, ringMean = ringMass / ring.length;
-      if (!(ringMean > discMean + 1e-4) || !(ringMass > 1e-4)) continue;
-
-      /*
-        A rate, not a jump. The ring collapses over a moment rather than
-        snapping shut, and a fraction each refresh also means a mis-matched
-        bubble — one that moved further in a frame than half its radius —
-        costs a nudge rather than a hole filled under a live bubble.
-      */
-      const per = (ringMean - discMean) * 0.35;
-      const moved = Math.min(per * disc.length, ringMass * 0.5);
-      if (!(moved > 1e-5)) continue;
-      const add = moved / disc.length;
-      const colR = aR / ringMass, colG = aG / ringMass, colB = aB / ringMass;
+      // One pass of the ring falling back in (bubbleDye.ts).
+      if (!(fillHole(this.dyeTarget(), dye, N, x, y, R) > 0)) continue;
       this.dirty = true;
-      for (const i of disc) {
-        this.density[i] += add;
-        this.densityR[i] += colR * add; this.densityG[i] += colG * add; this.densityB[i] += colB * add;
-      }
-      // And taken out of the ring, through the multiplicative channel that
-      // exists for exactly this: dye removed rather than dye added.
-      const keepRing = Math.max(0, 1 - moved / ringMass);
-      for (const i of ring) this.mul[i] *= keepRing;
       /*
         And keep this hole on the books while it is still worth filling. The
         deficit shrinks every pass, so this drops out on its own — the count
@@ -1381,6 +1356,7 @@ class FluidSimulation {
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
+    this.dyeMovePending = false;
     this.gpu?.clear();
   }
 
@@ -5234,9 +5210,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
-                af.blowAir(x, y, 4, 0.06 * k);
-                if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                  bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                /*
+                  Held still on the lead plate, the Blow is a straw: one
+                  bubble on the end of it, growing while the breath goes on,
+                  its rim breaking into fingers and shedding a ring of small
+                  ones (bubbles.ts, blow). Moving, it is the wind it was.
+                */
+                const still = Math.hypot(strokeDx, strokeDy) < 0.75;
+                if (activeLayerRef.current === 0 && still) {
+                  bubblesRef.current.blow(x, y, simStepS, k);
+                } else {
+                  af.blowAir(x, y, 4, 0.06 * k);
+                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
+                    bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                  }
                 }
 
               } else if (tool === 'finger') {
@@ -5912,9 +5899,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // ── Bubbles ─────────────────────────────────────────
             const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
             const bubbles = bubblesRef.current;
+            // A look with no bubbles of its own keeps the ones blown by hand.
             if (bubbleAmt <= 0) {
-              if (bubbles.bubbles.length) bubbles.clear();
-            } else if (isActiveRef.current && drainFrameRef.current === 0) {
+              if (bubbles.anyBlown) bubbles.clearLooks();
+              else if (bubbles.bubbles.length) bubbles.clear();
+            }
+            if ((bubbleAmt > 0 || bubbles.anyBlown) && isActiveRef.current && drainFrameRef.current === 0) {
               // A few bubbles at a time, not a foam: one on a kick (usually),
               // the odd extra under sustained bass, and none once the plate
               // already carries as many as the setting allows.
@@ -6302,7 +6292,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // invisible — the harness caught it as "0 pixels changed".
         {
           const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
-          const count = bubbleAmt > 0 ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          // And the ones blown by hand on a look with none of its own.
+          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
           bubbleDebugRef.current = {
             count: Math.min(MAX_BUBBLES, count),
             strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
@@ -7153,7 +7144,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
-              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25);
+              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
               /*
                 And the dye those bubbles displace, put back as a ring
                 (H6 · A). Before the hand-off in reading order but after it in

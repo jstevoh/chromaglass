@@ -465,6 +465,8 @@ export interface VisualizerSettings {
   blobSurfaceTension: number; // lower = more elongation/shear, higher = more circular
   boundaryContrast: number;   // bright edge-line strength where two dye colors meet
   saturationBoost: number;    // final color grade saturation multiplier
+  /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
+  colourBody?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -712,6 +714,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
+  colourBody: 0,            // the dye's own tint; up, a solid body of colour
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,
