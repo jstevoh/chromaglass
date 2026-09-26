@@ -380,44 +380,72 @@ export class RenderEncoder {
     // A second at a time: large enough that the per-call cost vanishes,
     // small enough that the encoder's queue never holds much.
     const block = audio.sampleRate;
-    for (let at = 0; at < n; at += block) {
-      if (this.cancelled) { enc.close(); throw new RenderCancelled(); }
-      const len = Math.min(block, n - at);
-      const planar = new Float32Array(len * channels.length);
-      channels.forEach((ch, c) => planar.set(ch.subarray(at, at + len), c * len));
-      const data = new AudioData({
-        format: 'f32-planar', sampleRate: audio.sampleRate, numberOfFrames: len, numberOfChannels: channels.length,
-        timestamp: Math.round((at * 1e6) / audio.sampleRate), data: planar,
-      });
-      enc.encode(data);
-      data.close();
-      /*
-        Back-pressure by waiting for the queue to drain, never by flushing.
-        This used to be `await enc.flush()` whenever more than four blocks
-        were queued, and on the Mac CI runner that made an 8-second song an
-        8072 ms file: a flush is the end of a stream to an AAC encoder, so it
-        emptied its lapped transform, closed the stream with one extra packet,
-        and started the next second of song as a new stream, with 2112 fresh
-        samples of priming and timestamps starting over. The counts fit
-        exactly: 238 packets for the first five seconds (ceil((2112 +
-        240000) / 1024) + 1) and 144 for the last three, the second run
-        stamped from 5000 ms, so the track ended at 5000 + 144 x 21.33 =
-        8072 ms, with a burst of silence and a click at five seconds in the
-        sound. The encoder's queue is waited on instead, the way `addFrame`
-        waits on the video's; a browser whose encoder never fires `dequeue`
-        is polled rather than hung. The one flush is at the end.
-      */
-      while (enc.encodeQueueSize > 4) {
-        await new Promise<void>((r) => {
-          const t = setTimeout(r, 50);
-          enc.addEventListener('dequeue', () => { clearTimeout(t); r(); }, { once: true });
+    /*
+      The encoder can fail on its own (its `error` callback), and once it has
+      it is closed: the next `encode` throws "closed codec", which is what
+      the render used to report, and the AudioData it was handed was never
+      closed. So before each block and after each wait the encoder is asked
+      whether it is still there, and a failure is reported in the encoder's
+      own words (or "the audio encoder closed", when it closed without
+      saying why). Whatever leaves this loop, the encoder is closed behind
+      it, and a block's AudioData is closed whether or not `encode` took it.
+    */
+    const broken = (): Error | null => {
+      if (err) return err instanceof Error ? err : new Error(String(err));
+      return enc.state === 'closed' ? new Error('the audio encoder closed') : null;
+    };
+    try {
+      for (let at = 0; at < n; at += block) {
+        if (this.cancelled) throw new RenderCancelled();
+        const b = broken();
+        if (b) throw b;
+        const len = Math.min(block, n - at);
+        const planar = new Float32Array(len * channels.length);
+        channels.forEach((ch, c) => planar.set(ch.subarray(at, at + len), c * len));
+        const data = new AudioData({
+          format: 'f32-planar', sampleRate: audio.sampleRate, numberOfFrames: len, numberOfChannels: channels.length,
+          timestamp: Math.round((at * 1e6) / audio.sampleRate), data: planar,
         });
-        if (this.cancelled) { enc.close(); throw new RenderCancelled(); }
+        try { enc.encode(data); } finally { data.close(); }
+        /*
+          Back-pressure by waiting for the queue to drain, never by flushing.
+          This used to be `await enc.flush()` whenever more than four blocks
+          were queued, and on the Mac CI runner that made an 8-second song an
+          8072 ms file: a flush is the end of a stream to an AAC encoder, so it
+          emptied its lapped transform, closed the stream with one extra packet,
+          and started the next second of song as a new stream, with 2112 fresh
+          samples of priming and timestamps starting over. The counts fit
+          exactly: 238 packets for the first five seconds (ceil((2112 +
+          240000) / 1024) + 1) and 144 for the last three, the second run
+          stamped from 5000 ms, so the track ended at 5000 + 144 x 21.33 =
+          8072 ms, with a burst of silence and a click at five seconds in the
+          sound. The encoder's queue is waited on instead, the way `addFrame`
+          waits on the video's; a browser whose encoder never fires `dequeue`
+          is polled rather than hung. The one flush is at the end.
+        */
+        // The listener goes whichever wakes the wait first: left behind on
+        // every 50 ms poll, a long song would pile hundreds of them onto the
+        // encoder, each resolving a promise nobody waits on any more.
+        while (enc.encodeQueueSize > 4) {
+          await new Promise<void>((r) => {
+            const wake = () => { clearTimeout(t); enc.removeEventListener('dequeue', wake); r(); };
+            const t = setTimeout(wake, 50);
+            enc.addEventListener('dequeue', wake);
+          });
+          if (this.cancelled) throw new RenderCancelled();
+          const w = broken();
+          if (w) throw w;
+        }
+        onProgress?.(Math.min(1, (at + len) / n));
       }
-      onProgress?.(Math.min(1, (at + len) / n));
+      await enc.flush();
+    } catch (e) {
+      // A flush or encode rejected because the encoder had failed: the
+      // failure, not the rejection.
+      throw e instanceof RenderCancelled ? e : broken() ?? e;
+    } finally {
+      if (enc.state !== 'closed') enc.close();
     }
-    await enc.flush();
-    enc.close();
     if (err) throw err;
     /*
       The song's stretch of the track: where in it the song starts (past the
@@ -436,16 +464,31 @@ export class RenderEncoder {
     */
     let hidden: number;
     let source: AudioPriming['source'];
+    let measured: number | null = null;
     if (format.audioCodec === 'opus') {
+      // An encoder that gave no OpusHead has said nothing about its
+      // pre-skip, and 312 is then an assumption (libopus's usual value at
+      // 48 kHz), reported as one.
       hidden = description ? opusPreSkip(description) : 312;
-      source = 'opus-head';
+      source = description ? 'opus-head' : 'assumed';
     } else {
-      const measured = await measurePriming(config, description, true).catch(() => null);
-      hidden = measured ?? AAC_PRIMING;
-      source = measured === null ? 'assumed' : 'measured';
+      /*
+        A measurement is believed only when it lands on a priming an AAC
+        encoder actually uses: 2112 (Apple's, TN2258, and what the Mac runner
+        measures), 1024 (one frame, what some encoders use) or 2048 (two).
+        Anything else is a correlation that found the wrong peak (a decoder
+        that dropped part of the priming, a burst mangled by a low bitrate),
+        and an edit list built on it would put the sound off the picture by
+        the error; so it is set aside, the render falls back to 2112, and the
+        summary says 'rejected' with what was measured, so the log shows it.
+      */
+      measured = await measurePriming(config, description, true);
+      const plausible = measured !== null && AAC_PRIMINGS.includes(measured);
+      hidden = plausible ? measured! : AAC_PRIMING;
+      source = plausible ? 'measured' : measured === null ? 'assumed' : 'rejected';
     }
     const trim = trimAudio(packets, audio.sampleRate, n, hidden);
-    this.priming = { samples: trim.skip, source: trim.priming === 'timestamps' ? 'timestamps' : source, dropped: trim.dropped };
+    this.priming = { samples: trim.skip, source: trim.priming === 'timestamps' ? 'timestamps' : source, dropped: trim.dropped, measured };
     // The container's audio description is the encoder's own where it gave
     // one (the OpusHead, the AAC config); the muxers write a standard one
     // otherwise.
@@ -523,18 +566,26 @@ export interface AudioPriming {
   samples: number;
   /**
    * 'timestamps': the encoder stamped its first packet before zero;
-   * 'opus-head': the OpusHead's pre-skip; 'measured': `measurePriming`;
-   * 'assumed': Apple's 2112, for an AAC encoder that could not be measured.
+   * 'opus-head': the OpusHead's pre-skip; 'measured': `measurePriming`,
+   * landing on a priming AAC encoders use; 'rejected': measured, but on a
+   * value no AAC encoder uses, so 2112 was used instead; 'assumed': nothing
+   * to go on (an AAC encoder that could not be measured, or an Opus
+   * encoder that gave no OpusHead), so the codec's usual value.
    */
-  source: 'timestamps' | 'opus-head' | 'measured' | 'assumed';
+  source: 'timestamps' | 'opus-head' | 'measured' | 'rejected' | 'assumed';
   /** Packets past the song's end that were left out of the file. */
   dropped: number;
+  /** What `measurePriming` found, whether or not it was used (null: not measured, or no answer). */
+  measured: number | null;
 }
 
 /** Apple's AAC encoder's priming, in samples (Technical Note TN2258). */
 export const AAC_PRIMING = 2112;
+/** The primings AAC encoders use: Apple's, and one or two whole frames. A measurement off these is not believed. */
+export const AAC_PRIMINGS: readonly number[] = [1024, 2048, AAC_PRIMING];
 
-function copyDescription(desc: AllowSharedBufferSource): Uint8Array {
+/** A codec description (an OpusHead, an AudioSpecificConfig) copied out of whatever view it came in: just its own bytes. */
+export function copyDescription(desc: AllowSharedBufferSource): Uint8Array {
   if (desc instanceof ArrayBuffer) return new Uint8Array(desc.slice(0));
   const v = desc as ArrayBufferView;
   return new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
@@ -563,61 +614,85 @@ function copyDescription(desc: AllowSharedBufferSource): Uint8Array {
  * the pre-skip and hide it) to prove the measurement against a priming the
  * OpusHead states.
  */
-export async function measurePriming(config: AudioEncoderConfig, description: Uint8Array | null, describe: boolean): Promise<number | null> {
-  if (typeof AudioDecoder !== 'function') return null;
-  const rate = config.sampleRate, ch = config.numberOfChannels;
-  const n = 16384, window = 8192, maxLag = 4096;
-  const probe = new Float32Array(n);
-  let x = 0x2545f491;
-  for (let i = 0; i < n; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; probe[i] = (x / 4294967296 - 0.5) * 0.5; }
-  const chunks: EncodedAudioChunk[] = [];
-  let desc: Uint8Array | null = null;
-  let failed = false;
-  const enc = new AudioEncoder({
-    output: (c, meta) => { chunks.push(c); if (meta?.decoderConfig?.description && !desc) desc = copyDescription(meta.decoderConfig.description); },
-    error: () => { failed = true; },
-  });
-  enc.configure(config);
-  const planar = new Float32Array(n * ch);
-  for (let c = 0; c < ch; c++) planar.set(probe, c * n);
-  const data = new AudioData({ format: 'f32-planar', sampleRate: rate, numberOfFrames: n, numberOfChannels: ch, timestamp: 0, data: planar });
-  enc.encode(data);
-  data.close();
-  await enc.flush();
-  enc.close();
-  if (failed || !chunks.length) return null;
-  const out: Float32Array[] = [];
-  const dec = new AudioDecoder({
-    output: (a) => {
-      const f = new Float32Array(a.numberOfFrames);
-      a.copyTo(f, { planeIndex: 0, format: 'f32-planar' });
-      out.push(f);
-      a.close();
-    },
-    error: () => { failed = true; },
-  });
-  const d = describe ? (desc ?? description) : null;
-  dec.configure({ codec: config.codec, sampleRate: rate, numberOfChannels: ch, ...(d ? { description: d } : {}) });
-  for (const c of chunks) dec.decode(c);
-  await dec.flush();
-  dec.close();
-  if (failed) return null;
-  const got = new Float32Array(out.reduce((k, f) => k + f.length, 0));
-  let at = 0;
-  for (const f of out) { got.set(f, at); at += f.length; }
-  if (got.length < maxLag + window) return null;
-  let pp = 0;
-  for (let i = 0; i < window; i++) pp += probe[i] * probe[i];
-  let best = -1, bestLag = -1;
-  for (let lag = 0; lag <= maxLag; lag++) {
-    let pg = 0, gg = 0;
-    for (let i = 0; i < window; i++) { const g = got[lag + i]; pg += probe[i] * g; gg += g * g; }
-    const r = gg > 0 ? pg / Math.sqrt(pp * gg) : 0;
-    if (r > best) { best = r; bestLag = lag; }
+export async function measurePriming(config: AudioEncoderConfig, description: Uint8Array | null, describe: boolean, timeoutMs = 5000): Promise<number | null> {
+  if (typeof AudioDecoder !== 'function' || typeof AudioEncoder !== 'function') return null;
+  /*
+    Bounded, and tidy. The render waits on this before its first frame, so
+    an encoder or decoder that never answers its flush (a platform codec
+    wedged by something else on the machine) would hang the render at 0%
+    with nothing said. So it races a timeout (five seconds, against the
+    tenth of a second it takes on the Mac), and losing the race is "cannot
+    tell", which the caller already falls back on. Either way both codecs
+    are closed when it returns: a platform encoder is a real resource (a
+    hardware session on the Mac), and one left open per render would be one
+    leaked per render.
+  */
+  let enc: AudioEncoder | null = null;
+  let dec: AudioDecoder | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((r) => { timer = setTimeout(() => r(null), timeoutMs); });
+  const work = (async (): Promise<number | null> => {
+    const rate = config.sampleRate, ch = config.numberOfChannels;
+    const n = 16384, window = 8192, maxLag = 4096;
+    const probe = new Float32Array(n);
+    let x = 0x2545f491;
+    for (let i = 0; i < n; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; probe[i] = (x / 4294967296 - 0.5) * 0.5; }
+    const chunks: EncodedAudioChunk[] = [];
+    let desc: Uint8Array | null = null;
+    let failed = false;
+    const e = enc = new AudioEncoder({
+      output: (c, meta) => { chunks.push(c); if (meta?.decoderConfig?.description && !desc) desc = copyDescription(meta.decoderConfig.description); },
+      error: () => { failed = true; },
+    });
+    e.configure(config);
+    const planar = new Float32Array(n * ch);
+    for (let c = 0; c < ch; c++) planar.set(probe, c * n);
+    const data = new AudioData({ format: 'f32-planar', sampleRate: rate, numberOfFrames: n, numberOfChannels: ch, timestamp: 0, data: planar });
+    try { e.encode(data); } finally { data.close(); }
+    await e.flush();
+    e.close();
+    if (failed || !chunks.length) return null;
+    const out: Float32Array[] = [];
+    const d = dec = new AudioDecoder({
+      output: (a) => {
+        const f = new Float32Array(a.numberOfFrames);
+        a.copyTo(f, { planeIndex: 0, format: 'f32-planar' });
+        out.push(f);
+        a.close();
+      },
+      error: () => { failed = true; },
+    });
+    const head = describe ? (desc ?? description) : null;
+    d.configure({ codec: config.codec, sampleRate: rate, numberOfChannels: ch, ...(head ? { description: head } : {}) });
+    for (const c of chunks) d.decode(c);
+    await d.flush();
+    d.close();
+    if (failed) return null;
+    const got = new Float32Array(out.reduce((k, f) => k + f.length, 0));
+    let at = 0;
+    for (const f of out) { got.set(f, at); at += f.length; }
+    if (got.length < maxLag + window) return null;
+    let pp = 0;
+    for (let i = 0; i < window; i++) pp += probe[i] * probe[i];
+    let best = -1, bestLag = -1;
+    for (let lag = 0; lag <= maxLag; lag++) {
+      let pg = 0, gg = 0;
+      for (let i = 0; i < window; i++) { const g = got[lag + i]; pg += probe[i] * g; gg += g * g; }
+      const r = gg > 0 ? pg / Math.sqrt(pp * gg) : 0;
+      if (r > best) { best = r; bestLag = lag; }
+    }
+    // A lossy codec at a render's bitrate keeps noise well above 0.5 against
+    // itself at the right lag, and nowhere near it at any other.
+    return best > 0.5 && bestLag > 0 ? bestLag : null;
+  })().catch(() => null);
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+    for (const c of [enc as AudioEncoder | null, dec as AudioDecoder | null]) {
+      try { if (c && c.state !== 'closed') c.close(); } catch { /* closed already */ }
+    }
   }
-  // A lossy codec at a render's bitrate keeps noise well above 0.5 against
-  // itself at the right lag, and nowhere near it at any other.
-  return best > 0.5 && bestLag > 0 ? bestLag : null;
 }
 
 /** Thrown out of a render that was cancelled, so the loop unwinds without calling it a failure. */

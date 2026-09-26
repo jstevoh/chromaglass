@@ -171,7 +171,7 @@ try {
   }, { o, b64: o.silent ? silence : song });
 
   const runs = {};
-  const say = (name, r) => console.log(`   ${name}: ${r.phase}; ${r.format}; ${r.summary ? `${r.summary.videoFrames} frames, ${r.summary.audioPackets} audio packets, ${r.summary.durationMs.toFixed(1)} ms, ${r.summary.bytes} bytes${r.summary.priming ? `, audio priming ${r.summary.priming.samples} samples (${r.summary.priming.source}), ${r.summary.priming.dropped} packets past the song dropped` : ''}` : r.message}; ${(r.ms / 1000).toFixed(1)} s`);
+  const say = (name, r) => console.log(`   ${name}: ${r.phase}; ${r.format}; ${r.summary ? `${r.summary.videoFrames} frames, ${r.summary.audioPackets} audio packets, ${r.summary.durationMs.toFixed(1)} ms, ${r.summary.bytes} bytes${r.summary.priming ? `, audio priming ${r.summary.priming.samples} samples (${r.summary.priming.source}${r.summary.priming.measured !== null && r.summary.priming.measured !== undefined ? `, measured ${r.summary.priming.measured}` : ''}), ${r.summary.priming.dropped} packets past the song dropped` : ''}` : r.message}; ${(r.ms / 1000).toFixed(1)} s`);
   for (const [name, o] of [
     ['A: seed 7', { seed: SEED, w: W, h: H, fps: FPS }],
     ['B: seed 7 again', { seed: SEED, w: W, h: H, fps: FPS }],
@@ -217,12 +217,26 @@ try {
       past the song. So: an edit, skipping exactly what the render says the
       encoder primed with (more than nothing: every AAC encoder primes), for
       the song's length. WebM says the same with its Opus CodecDelay, which
-      `npm run render` checks against the OpusHead.
+      the WebM writer takes from the OpusHead's pre-skip (lib/muxWebm.ts).
     */
     if (parsed.kind === 'mp4') {
       const p = A.summary?.priming;
       check('the audio skips the encoder\'s priming (an MP4 edit list)', !!au?.edit && !!p && p.samples > 0 && au.edit.mediaTime === p.samples && Math.abs(au.presentationMs - SONG_S * 1000) <= 1,
         au?.edit ? `edit from ${au.edit.mediaTime} samples for ${au.presentationMs.toFixed(1)} ms; render says ${p ? `${p.samples} (${p.source})` : 'nothing'}` : 'no edit list');
+      /*
+        And the measurement itself, where the film is AAC: the render
+        measures its encoder's priming (`measurePriming` in lib/render.ts)
+        rather than assume it, and on the Mac, whose encoder is Apple's, it
+        has to find Apple's 2112 (TN2258), by measuring: 'assumed' would mean
+        the measurement no longer answers there, and 'rejected' that it
+        answered wrong, and either would leave the edit list resting on an
+        assumption this check exists to stop resting on. (The Mac run that
+        added it printed "audio priming 2112 samples (measured)".)
+      */
+      if (/AAC/.test(A.format ?? '')) {
+        check('the AAC encoder\'s priming is measured, and is Apple\'s 2112', !!p && p.source === 'measured' && p.samples === 2112,
+          p ? `${p.samples} samples (${p.source}), measured ${p.measured}` : 'no priming reported');
+      }
     }
   }
 

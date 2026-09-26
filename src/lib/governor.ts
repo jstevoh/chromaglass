@@ -140,8 +140,26 @@ export class QualityGovernor {
    * it is, and what it has already run out of memory at.
    */
   get openingRung(): QualityRung {
+    return this.openingRungWithin(Number.POSITIVE_INFINITY);
+  }
+
+  /**
+   * `openingRung`, and no larger than `cap` (the visualizer's out-of-memory
+   * cap on the grid, `gridCapRef`): the largest rung at or below the
+   * opening rung whose grid fits, rounded down to a rung so a render is
+   * laid on a grid the ladder has, and the smallest rung when none fits.
+   *
+   * Why both: `failed` only remembers the rungs this governor failed at,
+   * and the cap is the visualizer's memory of every shortage this session.
+   * They part when the governor had already fallen below its opening rung
+   * (a slow evening) and ran out of memory down there: the rung it failed
+   * at is marked, but the opening rung above it, never tried since, is
+   * not, and a render asked for it would allocate a grid larger than one
+   * this GPU has just refused.
+   */
+  openingRungWithin(cap: number): QualityRung {
     let i = this.start;
-    while (i < this.rungs.length - 1 && this.failed.get(i) === Number.POSITIVE_INFINITY) i++;
+    while (i < this.rungs.length - 1 && (this.failed.get(i) === Number.POSITIVE_INFINITY || this.rungs[i].grid > cap)) i++;
     return this.rungs[i];
   }
 

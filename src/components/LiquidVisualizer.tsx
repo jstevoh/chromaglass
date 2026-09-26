@@ -37,7 +37,7 @@ import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
-import { makeRng, restartStreams, setShowSeed, showSeed, stream, type Rng } from '../lib/rng';
+import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
@@ -455,21 +455,6 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
 }
 
 /**
- * A song render's hold on the plate (lib/render.ts, PLAN.md §6).
- *
- * The show normally draws a frame when the browser asks and steps the solver
- * as many times as the wall clock says it owes. A render inverts both: the
- * caller asks for frame i, the plate takes exactly the solver steps that
- * frame is owed at the render's step rate (worked out from i, not from a
- * clock), draws it at the film's size, and hands the drawn canvas back as a
- * VideoFrame in the same task, which is the only moment a WebGPU canvas is
- * guaranteed to still hold what was drawn.
- *
- * The caller owns the show clock (`beginFixedClock` before `begin`,
- * `endFixedClock` before `end`) and the seed (`setShowSeed` before
- * `begin`, which lays the look).
- */
-/**
  * What a rendered frame was drawn from, apart from its pixels: for
  * `npm run render-app`, which can only be run on a real GPU, and so has to
  * say *why* two renders of the same seed differ, not only that they do.
@@ -486,10 +471,26 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
  * that differs between two renders, which names the part of the plate that
  * carried something in from before the render, or that reads a clock it
  * should not. Plain numbers and strings, compared exactly: a value that is
- * the same to the last bit prints as the same.
+ * the same to the last bit prints as the same. Null is "not there" (a
+ * stream nothing has asked for yet).
  */
-export type FrameDigest = Record<string, number | string | boolean>;
+export type FrameDigest = Record<string, number | string | boolean | null>;
 
+/**
+ * A song render's hold on the plate (lib/render.ts, PLAN.md §6).
+ *
+ * The show normally draws a frame when the browser asks and steps the solver
+ * as many times as the wall clock says it owes. A render inverts both: the
+ * caller asks for frame i, the plate takes exactly the solver steps that
+ * frame is owed at the render's step rate (worked out from i, not from a
+ * clock), draws it at the film's size, and hands the drawn canvas back as a
+ * VideoFrame in the same task, which is the only moment a WebGPU canvas is
+ * guaranteed to still hold what was drawn.
+ *
+ * The caller owns the show clock (`beginFixedClock` before `begin`,
+ * `endFixedClock` before `end`) and the seed (`setShowSeed` before
+ * `begin`, which lays the look).
+ */
 export interface VisualizerRender {
   /**
    * Take the plate: the live loop stops, the canvas becomes width x height,
@@ -797,8 +798,6 @@ class FluidSimulation {
    * `viewHalfW`/`viewHalfH` the film's own framing: see the frame's rotation
    * block for why a render frames by its canvas, not by the window.
    */
-  /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
-  get stepCount(): number { return this.stepIndex; }
   forgetHistory(angle: number, viewHalfW: number, viewHalfH: number): void {
     this.forgetPress();
     this.clockLean = 1;
@@ -820,6 +819,8 @@ class FluidSimulation {
     this.coverCount = 0;
     this.fillingHoles = [];
   }
+  /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
+  get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
@@ -6955,6 +6956,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             diceEvolve: DICE.evolve.draws,
             dicePalette: DICE.palette.draws,
             diceFluid: f0?.rng.draws ?? 0,
+            // The plate's other streams, by name (null: not asked for yet),
+            // so a stream that drew once more in one render than the other
+            // names itself in render-app's log.
+            diceHands: streamDraws('plate.hands'),
+            diceLiquids: streamDraws('plate.liquids'),
+            diceChemistry: streamDraws('plate.chemistry'),
+            diceBeads: streamDraws('plate.beads'),
+            diceBubbles: streamDraws('plate.bubbles'),
+            diceMacro: streamDraws('plate.macro'),
+            diceModulators: streamDraws('plate.modulators'),
+            dicePhrasing: streamDraws('plate.phrasing'),
+            macroClock: macroCamRef.current.time,
+            magnetHand: magnetHandRef.current ? `${magnetHandRef.current.x},${magnetHandRef.current.y},${magnetHandRef.current.at}` : 'none',
+            magnetLook: magnetLookRef.current ? `${magnetLookRef.current.x},${magnetLookRef.current.y}` : 'none',
             rbCentre: rd?.[cell(0.5, 0.5)] ?? -1,
             rbA: rd?.[cell(0.3, 0.3)] ?? -1,
             rbB: rd?.[cell(0.7, 0.35)] ?? -1,
@@ -7129,6 +7144,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       filmLevelRef.current = 0.3;
       filmGainRef.current = 4.5;
       macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
+      // The camera behind the shot, clock and all (see MacroCamera.forget):
+      // `reset` alone keeps its clock, which the tremor and breathing are
+      // drawn from.
+      macroCamRef.current.forget();
       lastMacroOnRef.current = false;
       camBassRef.current = 0;
       lastBass01Ref.current = 0;
@@ -7152,7 +7171,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           which are two films (and the render reports its grid, so the check
           can see which it got).
         */
-        const grid = o.grid ?? (governor ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture, governor.openingRung.grid) : 256);
+        /*
+          And never above the out-of-memory cap (`gridCapRef`, every shortage
+          this session): the opening rung within it for 'auto', and a pinned
+          grid larger than it brought down to that rung too, since a render
+          is exactly the moment the plate is rebuilt from scratch at its
+          grid, and a grid the GPU has refused once it refuses again.
+          (`o.grid` is the caller's own, for the checks, and left alone.)
+        */
+        const cap = gridCapRef.current;
+        const within = governor?.openingRungWithin(cap).grid;
+        const asked = governor && within !== undefined ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture, within) : 256;
+        const grid = o.grid ?? (asked > cap && within !== undefined ? within : asked);
         const stepRate = o.stepRate ?? 60;
         cancelAnimationFrame(animationFrameId);
         renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid, digestOn: !!o.digest, digest: null };
@@ -7249,6 +7279,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // ended by the cleanup that retired it, and has nothing to hand back.
         if (cancelled || !renderingRef.current) return;
         renderingRef.current = null;
+        /*
+          The solvers' view half-extent back to the window's framing. During
+          the render it was the film's (see the frame's rotation block), and
+          live it is recomputed each frame, but only while the show is
+          active: handed back to a paused show, the plate kept the film's
+          framing, so gravity's reach was worked out for a 16:9 film on a
+          16:10 window until someone pressed play. Worked out here the way
+          the live frame does it, from the element's box.
+        */
+        {
+          const vw = canvas.clientWidth, vh = canvas.clientHeight;
+          const drawn = Math.max(1, 1.5 * Math.max(vw, vh));
+          for (const f of fluidsRef.current) { f.viewHalfW = 0.5 * vw / drawn; f.viewHalfH = 0.5 * vh / drawn; }
+        }
         trackReadbacks(false);
         resetStamps();
         // The flash probe's last reading is the film's last frame, not the

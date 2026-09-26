@@ -4,7 +4,7 @@
 // read back its own frames (software WebGPU, a cloud session).
 import './lab-entry.ts';
 import {
-  RenderEncoder, memorySink, pickRenderFormat, renderSupport, avcCodec, vp9Codec, videoBitrate, hashVideoFrame, measurePriming, type RenderFormat,
+  RenderEncoder, memorySink, pickRenderFormat, renderSupport, avcCodec, vp9Codec, videoBitrate, hashVideoFrame, measurePriming, copyDescription, type RenderFormat,
 } from '../src/lib/render.ts';
 import { opusPreSkip } from '../src/lib/muxWebm.ts';
 import { makeRng } from '../src/lib/rng.ts';
@@ -67,17 +67,24 @@ const api = {
   async priming() {
     const opus = { codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 };
     let head: Uint8Array | null = null;
+    // An encoder that fails here fails the check, in its own words: a
+    // swallowed error left `head` null and the check reading "stated null",
+    // which says nothing about why. And the head is copied as the render
+    // copies it (`copyDescription`): its own bytes, not the whole buffer a
+    // view into it may sit in.
+    let failure: unknown = null;
     const enc = new AudioEncoder({
-      output: (_c, meta) => { const d = meta?.decoderConfig?.description; if (d && !head) head = new Uint8Array(d instanceof ArrayBuffer ? d.slice(0) : (d as ArrayBufferView).buffer.slice(0)); },
-      error: () => {},
+      output: (_c, meta) => { const d = meta?.decoderConfig?.description; if (d && !head) head = copyDescription(d); },
+      error: (e) => { failure ??= e; },
     });
     enc.configure(opus);
     const n = 4800;
     const data = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: 2, timestamp: 0, data: new Float32Array(2 * n) });
     enc.encode(data);
     data.close();
-    await enc.flush();
-    enc.close();
+    await enc.flush().catch((e) => { failure ??= e; });
+    if (enc.state !== 'closed') enc.close();
+    if (failure) throw failure instanceof Error ? failure : new Error(String(failure));
     const stated = head ? opusPreSkip(head) : null;
     const measured = await measurePriming(opus, null, false);
     const withHead = await measurePriming(opus, head, true);
