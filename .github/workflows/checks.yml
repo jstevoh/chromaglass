@@ -263,6 +263,11 @@ jobs:
       - name: The ferrofluid maze's detail
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run maze
+      # Pushes Dye: where the ferrofluid grows the colour leaves and packs
+      # along its edge, conserved, and at 0 nothing changes.
+      - name: The ferrofluid pushes the dye
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run ferrodye
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
