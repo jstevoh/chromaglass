@@ -473,7 +473,7 @@ with.
 | Blow tool | Click/tap to blow air bubbles |
 | Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring, or into radial fingers with **Fingering** up |
 | Macro zoom | With the closeup on: + and − (or = and _), the wheel over the plate, or the − / + chip below the title, from 1× to 16×; + with the closeup off turns it on at 2× |
-| Dish Spread / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
+| Dish Spread / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets, which **Drops** (0 by default) turns into drops of colour that press flat against each other, gather droplets round the big ones and keep a swallowed drop visible for a while; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
 | Mic / System / File | Where the show listens: the microphone (or the input chosen in Settings → Sound), system audio, or a music file played here with its own small player |
 | Dimmer / Blackout | Settings → Master: the house lights for the plate; **B** fades to black and back, as does the Blackout button on the phone or from a controller |
 | Record | The red button by Cast: the show to a `.webm` file, music included |
@@ -497,7 +497,7 @@ with.
 | Pushes Dye | Settings → Squish Plate, under the ferrofluid: the black pushes the colour aside where it grows and packs it along its edges; at 0 it is drawn over still dye (on the phone while there is ferrofluid) |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp & Light | Settings → Lamp & Light: light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth, exposure |
-| Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
+| Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film, film physics (the rainbow to a real soap film's colours, for Thin Film and the bubbles' Iridescence; on the phone while a film is up) |
 | All settings | Every section, on a rail grouped Live, Inputs, Look, Plate and Stage, one section at a time. **All settings…** sits under the rides on Perform and under the recipe on Design, and ⌘K reaches a section by name ("the room", "wall", "patches") or by anything in it ("keystone", "film mix"). The sheet's search box finds a section by what it is *about* — "camera", "people" and "crowd" all reach The Room, and none of those words is in its heading — or by the name on any of its controls, old names included |
 | About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |
 | Eye toggle | Minimize/maximize the UI |

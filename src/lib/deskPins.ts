@@ -85,6 +85,7 @@ const SECTION_OF: Record<string, string> = {
   beatSqueeze: 'show',
   fingering: 'show',
   beads: 'show',
+  beadDrops: 'show',
   dishSpread: 'show',
   cells: 'show',
   bubbles: 'look',
@@ -131,6 +132,7 @@ const SECTION_OF: Record<string, string> = {
   kaleidoSpin: 'kaleidoscope',
   kaleidoZoom: 'kaleidoscope',
   mazeDetail: 'physics',
+  filmPhysics: 'camera',
   phaseDisplace: 'physics',
   pacing: 'automation',};
 

@@ -3,6 +3,7 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms } from '../src/gpu/plateUniforms';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
@@ -100,22 +101,32 @@ const api = {
   solver() { return lab!.solver; },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
+  BeadField, rasterDrops,
   /**
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
    * the closeup's magnification; `macroAmount` how far into the closeup
    * (the app ramps it from 1x to 2x). `rotation` turns the plate, in
-   * radians, as the motor does.
+   * radians, as the motor does. The plate reads the solver's packed view
+   * field (the gap, the mix, the reactions) as the app does; `view: false`
+   * hands it none, and it reads a blank one, a flat gap at rest.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
     const zoom = cam.zoom ?? 1;
+    // The beads' mask, as the app uploads it: a BeadField's render(), square
+    // for rings and twice as wide for drops.
+    if (cam.beadMask) plate.setSource('beads', cam.beadMask);
     fillPlateUniforms(plate.pack, {
       view: {
-        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: l.time,
+        // The plate's clock can be set apart from the solver's, to ask what
+        // the picture does with time alone (in `npm run filmlook`, the film's
+        // thickness must not drift with it).
+        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: cam.time ?? l.time,
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
@@ -130,7 +141,7 @@ const api = {
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: l.solver.fields.view }]);
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view }]);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
