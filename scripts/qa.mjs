@@ -1977,6 +1977,46 @@ try {
     check('cleared, the desk lists every look again', back === allLooks, `${back} of ${allLooks}`);
   }
 
+  // ── A look replaces the one before it ────────────────────────────
+  //
+  // Asked for: "as each preset loads, the visuals should shift (over the
+  // specified time) completely to the new preset and not keep any aspects of
+  // the previous preset." The handover kept 45% of the old paint and laid the
+  // new look over it, so an orange plate faded into a blue one stayed half
+  // orange. Measured as the plate's colour (its mean absorptions, as shares,
+  // so how much dye there is does not count): after a 4 s fade from Solar
+  // Flare into Deep Ocean, and on Deep Ocean cut to cleanly, each read the
+  // same time after its Go. The faded plate has to sit far nearer Deep
+  // Ocean's own colour than Solar Flare's does.
+  {
+    const colour = () => page.evaluate(() => {
+      const c = window.chromaglassDebug().plateStats()[0].colour;
+      const t = c.reduce((a, b) => a + b, 0) || 1;
+      return c.map((v) => v / t);
+    });
+    const dist = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+    const goTo = async (id, fade) => {
+      await page.evaluate((id) => window.chromaglassApplyPreset?.(id), id);
+      await settle(400);
+      await clickOn(`fade-segmented-${fade}`);
+      await clickOn('go-button');
+    };
+    await goTo('solar-flare', 0);
+    await settle(8000);
+    const from = await colour();
+    await goTo('deep-ocean', 4);
+    await settle(8000);
+    const faded = await colour();
+    await goTo('deep-ocean', 0);
+    await settle(8000);
+    const own = await colour();
+    const f = (c) => c.map((v) => v.toFixed(2)).join('/');
+    check('a look fades all the way into the next: none of the last one\'s colour is left',
+      dist(faded, own) < 0.35 * dist(from, own),
+      `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
+      + `${dist(faded, own).toFixed(3)} from its own colour against ${dist(from, own).toFixed(3)} for Solar Flare`);
+  }
+
   // ── Songs: a look for each song, and what happens while it plays ──
   //
   // Folded into the Perform desk: song shows open from the set's menu. A song
