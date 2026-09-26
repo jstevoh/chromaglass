@@ -93,6 +93,7 @@
     "controls": "npm run build && esbuild scripts/controls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/controls.mjs && node node_modules/.cache/controls.mjs",
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
+    "startup": "npm run build && esbuild scripts/startup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/startup.mjs && node node_modules/.cache/startup.mjs",
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
     "replay": "esbuild scripts/replay.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/replay.mjs && node node_modules/.cache/replay.mjs",
     "evolve": "npm run build && esbuild scripts/evolve.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/evolve.mjs && node node_modules/.cache/evolve.mjs",

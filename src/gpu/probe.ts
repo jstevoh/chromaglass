@@ -15,7 +15,7 @@
  * WebGL probe already stood.
  */
 
-import { Disposer, PipelineCache, ReadbackRing, bindGroup } from './kit';
+import { Disposer, PipelineCache, type Prep, ReadbackRing, bindGroup } from './kit';
 import { PROBE_GROUPS, PROBE_KERNELS, SOLID_WGSL } from './wgsl/probe';
 
 /** Enough for the one number, at a size a buffer copy is happy with. */
@@ -30,6 +30,12 @@ export class WebGPUFrameProbe {
   private readonly ring: ReadbackRing;
   private lum: number | null = null;
   private pixels = 1;
+
+  /** The reduction every frame runs, built before the show opens (`gpu/prepare.ts`). */
+  static prepare(device: GPUDevice): Prep[] {
+    const cache = PipelineCache.for(device, 'probe');
+    return (['probeTiles', 'probeFold'] as const).map((name) => cache.computePrep(name, PROBE_KERNELS[name]));
+  }
 
   constructor(private readonly device: GPUDevice) {
     this.pipelines = PipelineCache.for(device, 'probe');

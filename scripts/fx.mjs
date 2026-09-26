@@ -32,7 +32,7 @@ import net from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import { launchChromium } from './chromium.mjs';
-import { installFrameReader } from './frame.mjs';
+import { installFrameReader, waitForShow } from './frame.mjs';
 
 const PORT = Number(process.env.FX_PORT ?? 4326);
 /** As the wall harness: a fraction of the window, so SwiftShader keeps up. FX_DPR=1 for full size. */
@@ -163,6 +163,9 @@ try {
   // under a comparison.
   await installFrameReader(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&dpr=${encodeURIComponent(DPR)}`, { waitUntil: 'load' });
+  // Eight seconds of a running show, not of a page: on a runner whose shader
+  // cache is cold the show opens seconds after the page does (waitForShow).
+  await waitForShow(page);
   await page.waitForTimeout(8000);
 
   const wired = await page.evaluate(() => typeof window.chromaglassDebug?.().post?.force === 'function');

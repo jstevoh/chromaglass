@@ -12,7 +12,7 @@
  * machine that has never seen a projector pays nothing at all.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
@@ -87,6 +87,30 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
   return n;
 }
 
+/** The projector's pipeline as a recipe, for the frame and `WebGPUOutput.prepare` alike (see the plate's). */
+function outputRecipe(device: GPUDevice, format: GPUTextureFormat): RenderRecipe {
+  return (module) => ({
+    layout: device.createPipelineLayout({
+      // The vertex stage reads the uniforms too — the quad's corners are
+      // in the buffer rather than in a vertex attribute — so the layout has
+      // to say both stages, or the entry point does not match it.
+      bindGroupLayouts: [layoutFromWgsl(device, OUTPUT_WGSL, 'output', GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
+    }),
+    vertex: { module: module(OUTPUT_WGSL), entryPoint: 'vs' },
+    fragment: {
+      module: module(OUTPUT_WGSL), entryPoint: 'fs',
+      targets: [{
+        format,
+        blend: {
+          color: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
+          alpha: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
+        },
+      }],
+    },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
+}
+
 export class WebGPUOutput {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -96,6 +120,19 @@ export class WebGPUOutput {
 
   private scene: GPUTexture | null = null;
   private sceneSize = [0, 0];
+
+  /**
+   * The projection, built before the show opens (`gpu/prepare.ts`). A show
+   * on a real projector opens with it on (a corner pin, a flip, a grade);
+   * one without costs a compile on the starting frame, and a projector
+   * plugged in mid-set finds it waiting.
+   */
+  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
+    // Waited for, though a show with nothing set never builds it: a projector's
+    // mask and pins are the room's, not the look's, so nothing says whether
+    // the show opening has them, and a real show opens on a projector.
+    return [PipelineCache.for(device, 'output').renderPrep(`output ${format}`, outputRecipe(device, format))];
+  }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'output');
@@ -144,26 +181,7 @@ export class WebGPUOutput {
     // The format is in the name because the cache is the device's, not this
     // projector's (S4): a second one on another format must not be handed
     // the first one's pipeline.
-    const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, (module) => ({
-      layout: this.device.createPipelineLayout({
-        // The vertex stage reads the uniforms too — the quad's corners are
-        // in the buffer rather than in a vertex attribute — so the layout has
-        // to say both stages, or the entry point does not match it.
-        bindGroupLayouts: [layoutFromWgsl(this.device, OUTPUT_WGSL, 'output', GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
-      }),
-      vertex: { module: module(OUTPUT_WGSL), entryPoint: 'vs' },
-      fragment: {
-        module: module(OUTPUT_WGSL), entryPoint: 'fs',
-        targets: [{
-          format: this.format,
-          blend: {
-            color: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
-            alpha: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
-          },
-        }],
-      },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    }));
+    const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, outputRecipe(this.device, this.format));
     const pass = encoder.beginRenderPass({
       label: 'output',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

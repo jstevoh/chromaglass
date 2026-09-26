@@ -191,3 +191,23 @@ export const lastFrameRead = (page) => page.evaluate(() => window.__cgFrameLast)
 
 /** The plate, scaled, from a harness's side. */
 export const frameOf = (page, w, h) => page.evaluate(([a, b]) => window.__cgFrame(a, b), [w, h]);
+
+/**
+ * Wait until the show has opened: the debug hook is there and the lead plate
+ * has stepped. Seconds waited, or null if it never did within `timeout` ms.
+ *
+ * The show opens once its pipelines are built (`src/gpu/prepare.ts`), which on
+ * a Mac with a cold shader cache is several seconds after load: nine on a CI
+ * runner. A harness that waited a fixed eight seconds from load and then
+ * asked for `chromaglassDebug()` found nothing there on the first run of its
+ * shard (`npm run fx`, "stale bundle", run 36253622675). Before that change
+ * the hook was there early and the plate froze under it instead, for the
+ * same nine seconds. This waits for the show, and the harness's own settle
+ * time then counts from a show that is running.
+ */
+export const waitForShow = (page, timeout = 60_000) => page.evaluate(async (ms) => {
+  const t0 = performance.now();
+  const open = () => (window.chromaglassDebug?.()?.fluids?.[0]?.stepIndex ?? 0) > 0;
+  while (!open() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 100));
+  return open() ? (performance.now() - t0) / 1000 : null;
+}, timeout);
