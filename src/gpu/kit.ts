@@ -63,9 +63,9 @@ const shared = new WeakMap<GPUDevice, { modules: Map<string, GPUShaderModule>; s
  * frames included; the solver's first step asked for forty-odd of them, and
  * on a runner whose Metal shader cache was cold the plate stopped for nine
  * seconds with no animation frame at all (`npm run depth`, run 36243996678,
- * "from load: longest stretch without a step"). Built ahead, one at a time,
- * before the show opens (`gpu/prepare.ts` says why one at a time), the page
- * waits behind one compile at most and never mid-show.
+ * "from load: longest stretch without a step"). Built ahead, one at a time
+ * (`gpu/prepare.ts` says why), what the look opens with before the show
+ * opens and the rest behind it, the page waits behind one compile at most.
  *
  * So every build on a frame is written down, by scope, name and device, and
  * `npm run startup` fails if a show's opening made any: that is the lists in
@@ -84,9 +84,20 @@ export type PipelineLedger = {
   ahead: number;
   /** Built on a frame, in order: `scope/name`, when (ms since the page began) and on which device. */
   onFrame: { name: string; at: number; device: number }[];
+  /**
+   * Every `scope/name` asked for, built or found, while a harness holds a set
+   * here; null otherwise, which is always, in a show. A build on the frame is
+   * only seen when the cache was cold for it, so once everything is built the
+   * ledger above can no longer say what a look draws with. `npm run startup`
+   * holds one across each look's first steps, and asks whether each look
+   * opened on nothing that the show builds after it opens (`gpu/prepare.ts`).
+   * Each with when it was first asked for (ms since the page began), which
+   * says how far into a look a failure came.
+   */
+  asking: Map<string, number> | null;
 };
 
-const ledger: PipelineLedger = { devices: 0, ahead: 0, onFrame: [] };
+const ledger: PipelineLedger = { devices: 0, ahead: 0, onFrame: [], asking: null };
 
 function deviceStore(device: GPUDevice) {
   let dev = shared.get(device);
@@ -125,6 +136,11 @@ export class PipelineCache {
   /** How the page's shared pipelines were built (see `PipelineLedger`). */
   static ledger(): PipelineLedger {
     return ledger;
+  }
+
+  /** The number the ledger gives `device` (from 1, in the order devices first asked). */
+  static deviceIndex(device: GPUDevice): number {
+    return deviceStore(device).index;
   }
 
   /**
@@ -173,6 +189,7 @@ export class PipelineCache {
    */
   computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline {
     const bySource = this.computeSlot(name, entryPoint);
+    this.asked(name);
     let p = bySource.get(code);
     if (!p) {
       p = this.device.createComputePipeline(this.computeDescriptor(name, code, entryPoint));
@@ -183,6 +200,7 @@ export class PipelineCache {
   }
 
   renderPipeline(name: string, make: RenderRecipe): GPURenderPipeline {
+    this.asked(name);
     let p = this.render.get(name);
     if (!p) {
       p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) });
@@ -197,30 +215,43 @@ export class PipelineCache {
    * `createComputePipelineAsync` and left in the slot it would look in, so
    * the frame that first asks finds it waiting.
    *
-   * It never throws. A pipeline that will not build ahead (a validation
-   * error, a device lost mid-way) is left for the frame to build the old way,
-   * which is also where its error is reported the way every other one is.
+   * It never throws, and says whether the pipeline is in the cache now. A
+   * pipeline that will not build ahead (a validation error, a device lost
+   * mid-way) is left for the frame to build the old way, which is also where
+   * its error is reported the way every other one is.
    */
-  async prepareCompute(name: string, code: string, entryPoint = 'main'): Promise<void> {
+  async prepareCompute(name: string, code: string, entryPoint = 'main'): Promise<boolean> {
     const bySource = this.computeSlot(name, entryPoint);
-    if (bySource.has(code)) return;
+    if (bySource.has(code)) return true;
     try {
       const p = await this.device.createComputePipelineAsync(this.computeDescriptor(name, code, entryPoint));
-      if (bySource.has(code)) return;
+      if (bySource.has(code)) return true;
       bySource.set(code, p);
       if (this.ledger) this.ledger.ahead++;
-    } catch { /* built on the frame instead (above) */ }
+      return true;
+    } catch { return false; /* built on the frame instead (above) */ }
   }
 
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
-  async prepareRender(name: string, make: RenderRecipe): Promise<void> {
-    if (this.render.has(name)) return;
+  async prepareRender(name: string, make: RenderRecipe): Promise<boolean> {
+    if (this.render.has(name)) return true;
     try {
       const p = await this.device.createRenderPipelineAsync({ label: name, ...make((code) => this.module(code, name)) });
-      if (this.render.has(name)) return;
+      if (this.render.has(name)) return true;
       this.render.set(name, p);
       if (this.ledger) this.ledger.ahead++;
-    } catch { /* built on the frame instead */ }
+      return true;
+    } catch { return false; /* built on the frame instead */ }
+  }
+
+  /** `prepareCompute`, handed over to be asked for later (see `Prep`). */
+  computePrep(name: string, code: string, later = false): Prep {
+    return { key: `${this.scope}/${name}`, later, build: () => this.prepareCompute(name, code) };
+  }
+
+  /** `prepareRender`, handed over to be asked for later (see `Prep`). */
+  renderPrep(name: string, make: RenderRecipe, later = false): Prep {
+    return { key: `${this.scope}/${name}`, later, build: () => this.prepareRender(name, make) };
   }
 
   private computeSlot(name: string, entryPoint: string): Map<string, GPUComputePipeline> {
@@ -235,6 +266,11 @@ export class PipelineCache {
     return { label: name, layout, compute: { module: this.module(code, name), entryPoint } };
   }
 
+  private asked(name: string): void {
+    const asking = this.ledger?.asking;
+    if (asking && !asking.has(`${this.scope}/${name}`)) asking.set(`${this.scope}/${name}`, Math.round(performance.now()));
+  }
+
   private onFrame(name: string): void {
     this.ledger?.onFrame.push({ name: `${this.scope}/${name}`, at: Math.round(performance.now()), device: this.deviceIndex });
   }
@@ -243,9 +279,19 @@ export class PipelineCache {
 /**
  * One pipeline to build ahead, not yet asked for: `gpu/prepare.ts` asks for
  * them one at a time (see there), so an owner hands over the asking, not a
- * build already under way.
+ * build already under way. With the key the ledger knows it by, so a harness
+ * can hold what a look asked for against what was built before it opened;
+ * and whether the show can open without it (`gpu/prepare.ts` on why the
+ * opening waits only for what some look opens with).
  */
-export type Prep = () => Promise<void>;
+export interface Prep {
+  /** `scope/name`, as the ledger writes it. */
+  key: string;
+  /** Built behind the show once it has opened, not before. */
+  later: boolean;
+  /** Whether it is in the cache once this settles. */
+  build(): Promise<boolean>;
+}
 
 /** A render pipeline's descriptor, given a way to get a shader module for a source. */
 export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURenderPipelineDescriptor;

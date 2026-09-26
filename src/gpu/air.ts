@@ -88,7 +88,7 @@ export class WebGPUAir {
 
   /** Its one pipeline, built before the show opens (`gpu/prepare.ts`). */
   static prepare(device: GPUDevice): Prep[] {
-    return [() => PipelineCache.for(device, 'air').prepareRender('air splat', splatRecipe(device))];
+    return [PipelineCache.for(device, 'air').renderPrep('air splat', splatRecipe(device))];
   }
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {

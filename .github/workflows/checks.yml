@@ -171,7 +171,10 @@ jobs:
   # smoke 1:34, the black box 1:42, tools 1:36, the drop map 2:27 of which a
   # minute was printed-only cases, now left to MIRROR_ALL=1), and within a
   # shard every check runs whatever failed before it. The repository is
-  # public, so the extra runners cost nothing.
+  # public, so the extra runners cost nothing. A fourth, `open`, is the
+  # startup check alone: it opens the show twice on a cold shader cache and
+  # then every look on its own, about five minutes, which the tools shard
+  # (eight already) had no room for under the timeout.
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     runs-on: macos-15
@@ -179,7 +182,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [show, tools, plate]
+        shard: [show, tools, plate, open]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -244,14 +247,15 @@ jobs:
       - name: The post chain
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fx
-      # The show opens without stopping (scripts/startup.mjs): the pipelines
-      # the first step draws with are built ahead, none is built on a frame,
-      # and no two frames are more than two seconds apart. First on the
-      # shard, because a Mac keeps compiled shaders across browsers and only
-      # the first check to open the show sees them cold; that was depth,
-      # which is how the nine-second freeze was found.
+      # The show opens without stopping (scripts/startup.mjs): what the look
+      # opens with is built before it opens and the rest behind it, none is
+      # built on a frame, no two frames are more than two seconds apart, and
+      # the plate moves for good no later than it did the old way. On a shard
+      # of its own, because it empties the Mac's shader cache, and one after
+      # another check would find it warm; depth, first on the tools shard,
+      # is how the nine-second freeze was found and still sees it cold.
       - name: The show opens without stopping
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run startup
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,

@@ -22,6 +22,7 @@
  */
 
 import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup, type Prep } from './kit';
+import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
@@ -347,84 +348,99 @@ export class WebGPUFluid {
    * filter a full one; the scratch textures the advection writes are the
    * dye's format too, and so is one pass of the velocity's advection.
    */
-  static prepare(device: GPUDevice, opts: { float32Filterable: boolean }): Prep[] {
+  static prepare(device: GPUDevice, opts: { float32Filterable: boolean }, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'fluid');
     const dye: GPUTextureFormat = opts.float32Filterable ? RGBA32 : VEL;
-    const byFormat: [string, GPUTextureFormat[]][] = [
-      ['fill', [dye, RGBA32, VEL, R32]],
-      ['gapRest', [RG32]],
-      // A change to the plate's shape (every look that curves the glass).
-      ['gapReshape', [RG32]],
-      ['deltaDye', [dye]],
-      ['deltaVel', [VEL]],
-      ['squeezeUpdate', [RG32]],
-      ['scaleDye', [dye]],
-      ['jacobi', [VEL, dye]],
-      ['divergence', [R32]],
-      ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye]],
-      ['macCormack', [dye, VEL]],
-      ['forcesB', [VEL]],
-      ['currentForces', [VEL]],
-      ['curDivergence', [R32]],
-      ['curPressure', [R32]],
-      ['curGradient', [VEL]],
-      ['addCurrent', [VEL]],
-      ['decayDye', [dye]],
-      ['decayVel', [VEL]],
-      ['packView', ['rgba32uint']],
-      ['downsample', [RGBA32]],
-      ...(opts.float32Filterable ? [['seedGrain', [RGBA32]] as [string, GPUTextureFormat[]]] : []),
+    /*
+      Each with whether the show waits for it (`gpu/opening.ts`): true for
+      what every look's first steps ask for, the part of the look that uses
+      it, or false for what is built behind the show once it is up. The
+      forty-three every opening asks for were read off all thirty-eight
+      looks' openings; `npm run startup` reads them again on every run.
+    */
+    const byFormat: [string, GPUTextureFormat[], boolean][] = [
+      ['fill', [dye, RGBA32, VEL, R32], true],
+      ['gapRest', [RG32], true],
+      // A change to the plate's shape: a look changed to mid-show, never an opening.
+      ['gapReshape', [RG32], false],
+      ['deltaDye', [dye], true],
+      ['deltaVel', [VEL], true],
+      ['squeezeUpdate', [RG32], true],
+      ['scaleDye', [dye], true],
+      // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
+      ['jacobi', [VEL, dye], true],
+      ['divergence', [R32], true],
+      ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
+      ['macCormack', [dye, VEL], true],
+      ['forcesB', [VEL], true],
+      ['currentForces', [VEL], true],
+      ['curDivergence', [R32], true],
+      ['curPressure', [R32], true],
+      ['curGradient', [VEL], true],
+      ['addCurrent', [VEL], true],
+      ['decayDye', [dye], true],
+      ['decayVel', [VEL], true],
+      ['packView', ['rgba32uint'], true],
+      ['downsample', [RGBA32], true],
+      ...(opts.float32Filterable ? [['seedGrain', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
       // Vorticity (galaxy): the curl into a single-channel scratch.
-      ['curl', [R32]],
-      ['confine', [VEL]],
+      ['curl', [R32], open.vorticity],
+      ['confine', [VEL], open.vorticity],
       // The mix (soap-film), always full float, and its surface tension on
       // the dye as well as on itself.
-      ['marangoniFlux', [dye, RGBA32]],
-      ['mixSplat', [RGBA32]],
-      ['mixAdvect', [RGBA32]],
-      ['mixRelax', [RGBA32]],
-      ['mixMu', [RGBA32]],
-      ['mixUpdate', [RGBA32]],
+      ['marangoniFlux', [dye, RGBA32], open.mix],
+      ['mixSplat', [RGBA32], open.mix],
+      ['mixAdvect', [RGBA32], open.mix],
+      ['mixRelax', [RGBA32], open.mix],
+      ['mixMu', [RGBA32], open.mix],
+      ['mixUpdate', [RGBA32], open.mix],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
-      ['rxnStep', [RGBA32]],
-      ['liesStep', [RGBA32]],
-      ['gridSplat', [RGBA32]],
+      ['rxnStep', [RGBA32], open.reaction],
+      ['liesStep', [RGBA32], open.gel],
+      ['gridSplat', [RGBA32], open.reaction || open.gel],
       // The second phase, single-channel, and what it does to the flow.
-      ['phaseSplat', [R32]],
-      ['phaseAdvect', [R32]],
-      ['phaseSeparate', [R32]],
-      ['phaseRelax', [R32]],
-      ['screenJacobi', [R32]],
-      ['phaseMu', [R32]],
-      ['phaseCH', [R32]],
-      ['phaseForce', [VEL]],
-      ['mazeForce', [VEL]],
+      ['phaseSplat', [R32], open.phase],
+      ['phaseAdvect', [R32], open.phase],
+      ['phaseSeparate', [R32], open.phase],
+      ['phaseRelax', [R32], open.phase],
+      ['screenJacobi', [R32], open.phase],
+      ['phaseMu', [R32], open.phase],
+      ['phaseCH', [R32], open.phase],
+      ['phaseForce', [VEL], open.phase],
+      ['mazeForce', [VEL], open.maze],
       // And the rest of what a step can run: the mix's push on the flow,
       // sharpening, the bubbles clearing dye, the reaction's deposit, the
-      // drain. None was seen in a look's first steps, but each is one
-      // setting away, and a compile on the frame mid-set is the same stop.
-      ['mixForce', [VEL]],
-      ['sharpenDye', [dye]],
-      ['airExclude', [dye]],
-      ['depositChem', [dye]],
-      ['drainVel', [VEL]],
+      // drain. None was seen in a look's first steps, the mix's and the
+      // reaction's own looks included, but each is one setting away, and a
+      // compile on the frame mid-set is the same stop: built behind.
+      ['mixForce', [VEL], false],
+      ['sharpenDye', [dye], false],
+      ['airExclude', [dye], false],
+      ['depositChem', [dye], false],
+      ['drainVel', [VEL], false],
     ];
-    // The ones asked for by name alone, each with the one format it writes.
+    // The ones asked for by name alone, each with the one format it writes:
+    // the pressure solve and the squeeze, which every step runs.
     const byName: [string, GPUTextureFormat][] = [
       ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
       ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
     ];
-    const keyed = new Map<string, string>();
-    for (const [name, formats] of byFormat) for (const f of formats) keyed.set(`${name}:${f}`, kernel(name, f));
-    for (const [name, f] of byName) keyed.set(name, kernel(name, f));
-    for (const f of [RGBA32, R32] as GPUTextureFormat[]) keyed.set(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f));
-    // A drop, a tool, a pour: the splats, always into the full-float deltas.
-    for (const name of ['splatDeltas', 'pourImage']) keyed.set(`${name}:${RGBA32}`, splatKernel(name, RGBA32));
-    // The plate measured (`measure`), keyed by name as `statsRun` asks.
-    for (const name of ['statsTiles', 'statsFold'] as const) keyed.set(name, STATS_KERNELS[name]);
-    return [...keyed].map(([key, code]) => () => cache.prepareCompute(key, code));
+    const keyed = new Map<string, [string, boolean]>();
+    const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
+    for (const [name, formats, now] of byFormat) for (const f of formats) add(`${name}:${f}`, kernel(name, f), now);
+    for (const [name, f] of byName) add(name, kernel(name, f), true);
+    // The splats' deltas brought up to the grid, every step.
+    for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
+    // A tool, a pour: the splats, always into the full-float deltas. And the
+    // plate measured (`measure`), keyed by name as `statsRun` asks. Neither
+    // was asked for in any look's first forty steps, nor in the classic
+    // opening's first twenty seconds on the Mac: built behind, and `npm run
+    // startup` gives each look's opening seconds as well as steps to say so.
+    for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    for (const name of ['statsTiles', 'statsFold'] as const) add(name, STATS_KERNELS[name], false);
+    return [...keyed].map(([key, [code, now]]) => cache.computePrep(key, code, !now));
   }
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {

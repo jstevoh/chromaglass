@@ -20,6 +20,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
 import { BLIT_WGSL, FINISH_PASS_WGSL, STOCK_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
@@ -110,15 +111,17 @@ export class WebGPUPostChain {
    * finish onto the canvas or into the projector's picture. Not the test
    * effect, which is the harness's and in no look.
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
+  static prepare(device: GPUDevice, format: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'post');
-    const pass = (name: string, code: string, f: GPUTextureFormat, toTexture: boolean) =>
-      () => cache.prepareRender(passName(name, f, toTexture), passRecipe(device, name, code, f, toTexture));
+    const pass = (name: string, code: string, f: GPUTextureFormat, toTexture: boolean, now: boolean) =>
+      cache.renderPrep(passName(name, f, toTexture), passRecipe(device, name, code, f, toTexture), !now);
+    // A film look opens on the stock and the finish to the canvas; the ring
+    // and the finish into a texture (a camera behind the film) come later.
     return [
-      pass('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true),
-      pass('ring blit', BLIT_WGSL, PICTURE_FORMAT, true),
-      pass('finish', FINISH_PASS_WGSL, format, false),
-      pass('finish', FINISH_PASS_WGSL, format, true),
+      pass('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true, open.stock),
+      pass('ring blit', BLIT_WGSL, PICTURE_FORMAT, true, false),
+      pass('finish', FINISH_PASS_WGSL, format, false, open.stock),
+      pass('finish', FINISH_PASS_WGSL, format, true, false),
     ];
   }
 

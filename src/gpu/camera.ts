@@ -14,6 +14,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { CAMERA_LAYOUT } from './wgsl/cameraFields';
 import { CAMERA_WGSL } from './wgsl/camera';
@@ -92,9 +93,10 @@ export class WebGPUCamera {
    * both the camera and film stock, and `npm run startup` would say if one
    * did.
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
+  static prepare(device: GPUDevice, format: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'camera');
-    return [false, true].map((toTexture) => () => cache.prepareRender(cameraName(format, toTexture), cameraRecipe(device, format, toTexture)));
+    // Into a texture only when there is film behind it too, which no look opens on.
+    return [false, true].map((toTexture) => cache.renderPrep(cameraName(format, toTexture), cameraRecipe(device, format, toTexture), toTexture || !open.camera));
   }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {

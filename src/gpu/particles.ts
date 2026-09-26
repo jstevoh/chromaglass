@@ -18,6 +18,7 @@
 import { PARTICLE_LAYOUT, SEED_WGSL, ADVECT_WGSL, SPLAT_WGSL } from './wgsl/particles';
 import { UniformPack } from './uniforms';
 import { Disposer, PipelineCache, type Prep, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
+import type { Opening } from './opening';
 
 /** Bytes per particle: `pos`, `born`, `tint` — see the struct in the WGSL. */
 const STRIDE = 32;
@@ -113,12 +114,12 @@ export class WebGPUParticles {
   private disposed = false;
 
   /** The seed, the advection and the splat, built before the show opens (`gpu/prepare.ts`): some looks open with particles. */
-  static prepare(device: GPUDevice): Prep[] {
+  static prepare(device: GPUDevice, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'particles');
     return [
-      () => cache.prepareCompute('particle seed', SEED_WGSL),
-      () => cache.prepareCompute('particle advect', ADVECT_WGSL),
-      () => cache.prepareRender('particle splat', splatRecipe(device)),
+      cache.computePrep('particle seed', SEED_WGSL, !open.particles),
+      cache.computePrep('particle advect', ADVECT_WGSL, !open.particles),
+      cache.renderPrep('particle splat', splatRecipe(device), !open.particles),
     ];
   }
 

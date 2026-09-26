@@ -128,7 +128,10 @@ export class WebGPUOutput {
    * plugged in mid-set finds it waiting.
    */
   static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
-    return [() => PipelineCache.for(device, 'output').prepareRender(`output ${format}`, outputRecipe(device, format))];
+    // Waited for, though a show with nothing set never builds it: a projector's
+    // mask and pins are the room's, not the look's, so nothing says whether
+    // the show opening has them, and a real show opens on a projector.
+    return [PipelineCache.for(device, 'output').renderPrep(`output ${format}`, outputRecipe(device, format))];
   }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {

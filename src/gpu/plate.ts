@@ -16,6 +16,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
@@ -126,13 +127,16 @@ export class WebGPUPlate {
    * canvas's format for the camera and the projector and the post chain's
    * half floats for film stock (`picture`).
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat): Prep[] {
+  static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'plate');
     return [
-      ...(['packDye', 'packVel'] as const).map((name) => () => cache.prepareCompute(name, PACK_KERNELS[name])),
-      () => cache.prepareRender('derive', deriveRecipe(device)),
-      () => cache.prepareRender(displayName(format, false), displayRecipe(device, format, false)),
-      ...[...new Set([format, picture])].map((f) => () => cache.prepareRender(displayName(f, true), displayRecipe(device, f, true))),
+      ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      cache.renderPrep('derive', deriveRecipe(device)),
+      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
+      // Into a texture rather than the canvas: the camera's, in the canvas's
+      // format, and the film stock's picture.
+      ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
+        !((f === format && open.camera) || (f === picture && open.stock)))),
     ];
   }
 

@@ -15,6 +15,7 @@ import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
 import { prepareLog, prepareShow } from '../gpu/prepare';
+import { openingOf } from '../gpu/opening';
 import { PipelineCache } from '../gpu/kit';
 import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
@@ -278,6 +279,17 @@ const STAGE_TIMINGS = (() => {
 const PREPARE_OFF = (() => {
   try { return new URLSearchParams(window.location.search).get('prepare') === '0'; } catch { return false; }
 })();
+
+/**
+ * `?asked`: write down every pipeline the show asks for from the moment it
+ * loads (`PipelineLedger.asking`), so `npm run startup` can hold each look's
+ * first steps against what was built before the look opened. From the start
+ * of the page, because a harness setting it once the page is up is already
+ * behind a look whose first step came first. Diagnostic only, like `?stages`.
+ */
+try {
+  if (new URLSearchParams(window.location.search).has('asked')) PipelineCache.ledger().asking = new Map();
+} catch { /* no window: nothing to write down */ }
 
 /**
  * `?rung=N` — hold the governor on one rung of its ladder and measure it.
@@ -7117,8 +7129,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       step used to ask for forty-four pipelines on the frame, and on a Mac
       with a cold shader cache the GPU process compiled them before it would
       present another frame: nine seconds of a stopped plate a few seconds
-      into every CI run (`gpu/prepare.ts`). Built ahead, they compile while
-      the starting frame is up, and the first step finds them waiting.
+      into every CI run (`gpu/prepare.ts`). Built ahead, what the look opens
+      with compiles while the starting frame is up and the first step finds
+      it waiting; the rest compiles behind the show.
     */
     void WebGPUStage.start(canvas).then(async (s) => {
       if (cancelled || isGpuFailure(s)) return s;
@@ -7136,7 +7149,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       preparing = s.device;
       try {
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable });
+        // What the look now up turns on: the opening's, or the one on when a
+        // lost device is replaced mid-show (`gpu/opening.ts`).
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable }, openingOf(settingsRef.current));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }
