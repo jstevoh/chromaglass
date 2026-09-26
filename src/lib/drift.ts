@@ -57,6 +57,9 @@ const CALIBRATION = new Set([
   'sceneSmooth', 'camera',
   // How the show follows the music, not what the look is (lib/tempoPace.ts).
   'tempoSync',
+  // The set's shape, not the look's (lib/scenePacing.ts): a nudge across its
+  // half would switch a sequence's dark endings on or off mid-set.
+  'pacing',
 ]);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',

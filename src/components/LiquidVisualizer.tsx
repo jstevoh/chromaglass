@@ -3690,7 +3690,7 @@ interface FrameView {
   bubbles: { count: number; strength: number; amount: number };
   /** Their geometry, packed for the shader. */
   bubblePack: { packed: Float32Array; shape: Float32Array };
-  /** The flash guard's gain, from the luminance the last frame read back. */
+  /** The flash guard's gain, from the luminance the last frame read back, times a paced scene's light (lib/scenePacing.ts). */
   dimmerGain: number;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
@@ -4126,10 +4126,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * or twice a scene, with the light coming up on it, rather than whenever a
    * gust peaked.
    */
-  const floodPour = (gust: number, energy: number, dice: Rng) => {
+  const floodPour = (gust: number, energy: number, bubbles: number, dice: Rng, colourDice?: Rng) => {
     const af = fluidsRef.current[0];
     if (!af) return;
-    const color = harmonyColor(harmonyRef.current);
+    // Evolve's flood leaves the colour to the palette's stream, as it always
+    // did; a paced pour hands its own, so it cannot move the draws the
+    // automation's palette picks read.
+    const color = harmonyColor(harmonyRef.current, colourDice);
     const cx = GRID_SIZE * (0.25 + dice.float() * 0.5);
     const cy = GRID_SIZE * (0.25 + dice.float() * 0.5);
     // A third of the plate across, falling off to nothing, so it
@@ -4146,17 +4149,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }
     // And it lands: a pour pushes the plate out of the way.
     af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
-    if ((settingsRef.current.bubbles ?? 0) > 0) {
+    if (bubbles > 0) {
       bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
     }
   };
+  /** The frame's Bubbles, patches and modulators folded in, for a pour that lands between frames. */
+  const frameBubblesRef = useRef(0);
   /*
     The scene a running sequence is playing (`lib/scenePacing.ts`): where the
     sequencer says it should be, and where the plate has got to on its way
     there, stepped a frame at a time by `approachPace`. The activity scales the
-    phrase's drive, which is both the plate's clock (through its 2.5 s lean)
-    and how often the automation acts; the dim scales the light, on top of the
-    dimmer and the flash guard. Both 1 unless a sequence is pacing.
+    plate's clock (after the phrase's 2.5 s lean, not through it: see
+    `paceMul`) and how often the automation acts; the dim scales the light, on
+    top of the dimmer and the flash guard. Both 1 unless a sequence is pacing.
   */
   const paceTargetRef = useRef<PaceSample>({ ...PACE_NEUTRAL });
   const paceNowRef = useRef<PaceSample>({ ...PACE_NEUTRAL });
@@ -4604,7 +4609,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
     pour: (gust = 0.8) => {
       const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
-      floodPour(Math.max(0, Math.min(1, gust)), energy, DICE.pour);
+      floodPour(Math.max(0, Math.min(1, gust)), energy, frameBubblesRef.current, DICE.pour, DICE.pour);
     },
     stepDyes: () => {
       const w = paletteWindowRef.current;
@@ -5322,6 +5327,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Followed while paused too, so a sequence stopped in the dark still
         // brings the light back up on a paused plate.
         paceNowRef.current = approachPace(paceNowRef.current, paceTargetRef.current, realDt);
+        frameBubblesRef.current = currentSettings.bubbles ?? 0;
         if (isActiveRef.current) {
           const phrased = phrasingRef.current.step(
             realDt,
@@ -5993,7 +5999,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && DICE.evolve.float() < 0.06) {
               lastFloodRef.current = now;
               autoEventsRef.current.poured++;
-              floodPour(ph.gust, energy, DICE.evolve);
+              floodPour(ph.gust, energy, currentSettings.bubbles ?? 0, DICE.evolve);
             }
 
             // About one small event every seven seconds at the default rate,

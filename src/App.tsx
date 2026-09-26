@@ -2019,7 +2019,7 @@ export default function App() {
     // A paced stage's scene (lib/scenePacing.ts): the plate's pace and light,
     // and the moments that open its swells, which are the same moves a song
     // show's actions make.
-    pace: (sample) => visualizerRef.current?.pace(sample),
+    pace: (sample) => { const v = visualizerRef.current; if (!v) return false; v.pace(sample); return true; },
     moment: (kind) => {
       const v = visualizerRef.current;
       switch (kind) {

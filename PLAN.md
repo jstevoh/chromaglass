@@ -686,13 +686,15 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Built* (in review) on the stage sequencer rather than the phrase generator, because a
    stage is already a scene: `src/lib/scenePacing.ts` plans each stage of a running
    sequence (a pour, press or dye change opening each swell, rests where the plate's clock
-   drops as low as a fifth, and from Pacing ½ a fade to near-black at the stage's end), and the
-   plate follows it on its clock, its automation and its light. A **Pacing** setting (0
-   keeps today's show, a stage may set it), an ending choice per stage (as Pacing says,
-   into the dark, into the dark and drained, stay lit), and a built-in **Light Show
-   Night** of 22–30 s scenes. `npm run pacing` measures what the sequence asks for with
-   the footage's `shape()`: 2.4 swells a minute, calm 28 %, dark endings at 0.04 with no
-   step. Whether the plate delivers it is the film's to say: film Light Show Night.
+   drops as low as a fifth, and from Pacing ½ a slow fade to near-black at the stage's
+   end, the next coming up out of it), and the plate follows it on its clock, its
+   automation and its light. A **Pacing** setting (0 keeps today's show; sheet, MIDI,
+   desks, phone; a stage may set it and it is put back when the sequence stops), an
+   ending choice per stage, and a built-in **Light Show Night** of 22–30 s scenes.
+   `npm run pacing` measures what the sequence asks for with the footage's `shape()`,
+   counting a fade as the change in every pixel it is: 2.35 swells a minute, calm 25–28 %,
+   swells 2.4× the median, the light under a quarter 19 % of the set, every drain in the
+   dark. Whether the plate delivers it is the film's to say: film Light Show Night.
 2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
    accumulating intensity from #154's bands, and from them live build, drop and
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop

@@ -250,7 +250,9 @@ export function builtInSequences(): ShowSequence[] {
 
       Transitions are short because each change happens in the dark: the
       light is down when a stage starts, so the settings can arrive before
-      anyone sees them.
+      anyone sees them. A scene this long has one swell, opened as the light
+      comes up by the first moment its stage lists, so the stages list
+      different ones: a pour, the dyes turning, a press.
     */
     {
       id: 'light-show-night',
@@ -260,11 +262,11 @@ export function builtInSequences(): ShowSequence[] {
       builtIn: true,
       stages: [
         s('Out of the dark', 28, { presetId: 'fillmore-1969', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
-        s('Oil wheel', 24, { presetId: 'oil-wheel', transition: 3, settings: { pacing: 0.7 } }),
-        s('Poster', 22, { presetId: 'poster-1969', transition: 3, settings: { pacing: 0.75 } }),
+        s('Oil wheel', 24, { presetId: 'oil-wheel', transition: 3, pace: { moments: ['dyes', 'pour', 'burst'] }, settings: { pacing: 0.7 } }),
+        s('Poster', 22, { presetId: 'poster-1969', transition: 3, pace: { moments: ['burst', 'dyes'] }, settings: { pacing: 0.75 } }),
         s('Chemistry', 26, { presetId: 'sensual-laboratory', transition: 3, settings: { pacing: 0.7 } }),
         s('The dish, pressed', 24, { presetId: 'fillmore-1969', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
-        s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { moments: ['pour', 'dyes', 'drain'] }, settings: { pacing: 0.6 } }),
+        s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { endDark: true, moments: ['dyes', 'pour', 'drain'] }, settings: { pacing: 0.6 } }),
       ],
     },
   ];

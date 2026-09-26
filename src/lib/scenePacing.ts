@@ -108,25 +108,37 @@ export const PACE_NEUTRAL: Readonly<PaceSample> = Object.freeze({ activity: 1, d
   to be deep to read as one ("a rest is a real rest") and started from a
   third. Measured with the footage's own yardstick (`npm run pacing`, calm is
   the share of the time under a third of the 90th percentile of motion), a
-  third over a peak of 1.5 left the rests sitting exactly on that line, and
-  "Light Show Night" read 17 % calm against the footage's 20–40 %. A fifth
-  under 1.8 reads 28 %, with the swells' tops about 3 times the median against
-  the footage's 2.5. The swell's top goes above today's pace, so a set at
-  full Pacing has peaks rather than only valleys.
+  third under a top of 1.5 left the rests sitting on that line: "Light Show
+  Night" read 18 % calm against the footage's 20–40 %, and 14 % of its lit
+  time. A fifth under 1.8 reads 25–28 %, with the swells' tops 2.4 times the
+  median against the footage's 2.5. The swell's top goes above today's pace,
+  so a set at full Pacing has peaks rather than only valleys.
 
   Darkness: near-black is 30–60 % of real shows on average, with a range down
   to a fade between scenes. Most of that is the looks' own black surround; the
   dimmer adds the fades between scenes and a slight settling in the rests.
   BLACK is not zero because a fade that goes to exact black reads as the
   projector switching off, where a real show's fade leaves a glow.
+
+  The fades are slow: down over a third of the scene (8 to 14 s), up over a
+  quarter (6 to 9 s). They began at a sixth and a tenth (3 to 8 s, 2.5 to 5),
+  and measured by the footage's yardstick with the fade counted as what it is
+  on a frame (the dimmer scales every pixel, so a fade is a change in all of
+  them), each fade read as a swell of its own: 4.3 swells a minute, decaying
+  in 1.5 s, and the rests calm 47 % of the time because the fades set the top
+  of the scale. At these lengths a fade changes the frame about as much as
+  the plate moving does, and a scene measures 2.35 swells a minute, calm 27 %,
+  its swells 2.4 times the median (the footage's 2.5), rising over 2.5 s and
+  falling over 3.3 (`npm run pacing`). A scene of 25 s is lit for about 10;
+  most of the footage's darkness is like that, a slow going and coming.
 */
 const RATE_MIN = 1.5, RATE_MAX = 3.5;          // swells a minute, at Pacing 0+ and 1
 const REST_AT_FULL = 0.2;                      // the clock at rest, at full Pacing
 const PEAK_OVER = 0.8;                         // how far over today's pace a swell's top goes, at full
 const REST_DIM_AT_FULL = 0.72;                 // the light at rest, at full Pacing
 const BLACK = 0.04;                            // the bottom of a fade between scenes
-const FADE_OUT = [3, 8] as const;              // seconds, a sixth of the stage within these
-const FADE_IN = [2.5, 5] as const;             // seconds, a tenth of the stage within these
+const FADE_OUT = [8, 14] as const;             // seconds, a third of the stage within these
+const FADE_IN = [6, 9] as const;               // seconds, a quarter of the stage within these
 const MARGIN = 2;                              // no swell opens this close to the fade or the end
 
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -149,11 +161,22 @@ export function planScene(
   if (p <= 0.001) return { seconds: T, swells: [], fadeIn: 0, fadeOut: 0, drainAt: null };
 
   const endDark = opts.pace?.endDark ?? p >= 0.5;
-  const fadeOut = endDark ? clamp(T / 6, FADE_OUT[0], Math.min(FADE_OUT[1], T / 3)) : 0;
-  const fadeIn = opts.fromDark ? clamp(T / 10, FADE_IN[0], Math.min(FADE_IN[1], T / 4)) : 0;
-  const allowed = (opts.pace?.moments ?? ['pour', 'burst', 'dyes']).filter(m => m !== 'drain');
+  const fadeOut = endDark ? clamp(T / 3, FADE_OUT[0], Math.min(FADE_OUT[1], T / 2)) : 0;
+  const fadeIn = opts.fromDark ? clamp(T / 4, FADE_IN[0], Math.min(FADE_IN[1], T / 4)) : 0;
+  // A stage's moments come from a file someone may have written by hand, so
+  // only the four known ones are taken, whatever else the list holds.
+  const listed = Array.isArray(opts.pace?.moments) ? opts.pace.moments.filter(m => PACE_MOMENTS.includes(m)) : null;
+  const allowed = (listed ?? ['pour', 'burst', 'dyes']).filter(m => m !== 'drain');
   const kinds: PaceMoment[] = allowed.length ? allowed : ['pour'];
-  const drainAt = endDark && (opts.pace?.moments ?? []).includes('drain') ? T - fadeOut : null;
+  /*
+    The drain fires once the light is down, not as it starts to go: the
+    drain takes most of a second, and fired at the top of the fade (the
+    first version) it ran with the light at 0.93, so the room watched the
+    dye swirl away and then watched an empty plate fade. An eighth of the fade
+    from the end is where the smoothstep has the light near black, and
+    `npm run pacing` holds it there.
+  */
+  const drainAt = endDark && (listed ?? []).includes('drain') ? T - fadeOut * 0.12 : null;
 
   /*
     Where the swells go.
@@ -165,9 +188,10 @@ export function planScene(
     17–40 s) do not show that. Between 0.6 and 1.4 of the mean keeps them
     irregular without clumping.
 
-    The first opens the scene: at once out of darkness (the pour arrives as
-    the light comes up), otherwise somewhere in the first gap, so a stage
-    change is not always the instant something lands.
+    The first opens the scene: at once out of darkness (the stage's first
+    moment arrives as the light comes up, a pour unless the stage says
+    otherwise), otherwise somewhere in the first gap, so a stage change is not
+    always the instant something lands.
 
     The rate is kept over the whole stage, not only its lit part. A scene owes
     T / gap swells; the first is always there, and the rest are spread over
@@ -186,9 +210,15 @@ export function planScene(
   const spacing = owed > 1 ? Math.max(gap * 0.6, (last - t) / (owed - 1)) : Infinity;
   let prev: PaceMoment | null = null;
   while (t <= last) {
-    // Out of darkness the first is a pour; after that no moment twice running.
+    /*
+      Out of darkness the first is the stage's own opening move: the first it
+      lists, a pour by default. It was always a pour, and since a scene of 20
+      to 30 seconds has one swell, a set of them was all pours: "The dish,
+      pressed" never pressed (the review's count: 47 pours, no press, no dye
+      change in a night). After that, no moment twice running.
+    */
     let kind: PaceMoment;
-    if (swells.length === 0 && opts.fromDark && kinds.includes('pour')) kind = 'pour';
+    if (swells.length === 0 && opts.fromDark) kind = kinds[0];
     else {
       const pool: PaceMoment[] = kinds.length > 1 && prev ? kinds.filter(k => k !== prev) : kinds;
       kind = pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))];
@@ -318,4 +348,95 @@ export function stepScene(plan: ScenePlan, cur: SceneCursor, elapsed: number, pa
   }
   cur.lastElapsed = elapsed;
   return { sample: sampleScene(plan, elapsed, pacing), moments };
+}
+
+/*
+  One stage's scene, played: the plan, where it has got to, and the plans
+  after it when the stage outlasts one.
+
+  The sequencer hook keeps one of these per stage and calls `tick` every
+  quarter second; `npm run pacing` drives the same class through whole sets.
+  It was first written inline in the hook with a copy in the check, and the
+  review found the check testing its copy: three changes to the hook (section
+  stages allowed to end dark, never coming up from the dark, the plate never
+  following) left every line green.
+*/
+
+/**
+ * How long a scene is planned for when the stage has no end of its own clock:
+ * a section stage or a hold. No dark ending, because the plan cannot know when
+ * the section will change and a fade that lands at the stage's minimum would
+ * leave the plate black until it did. A stage that outlasts it (a hold left
+ * up, a section that never changes) is given the next plan on from there
+ * rather than sitting at rest for the rest of the night.
+ */
+export const OPEN_SCENE_SECONDS = 600;
+
+/** A stage comes up out of the dark when the light last sent was under this. */
+export const FROM_DARK_BELOW = 0.5;
+
+/** What the player needs of a stage (a `ShowStage` has all of it). */
+export interface PacedStage {
+  seconds: number;
+  advance: 'time' | 'section' | 'hold';
+  pace?: StagePace;
+}
+
+const freshCursor = (): SceneCursor => ({ nextSwell: 0, drained: false, lastElapsed: 0 });
+
+export class ScenePlayer {
+  plan: ScenePlan | null = null;
+  cursor: SceneCursor = freshCursor();
+  /** Seconds into the stage the plan in force starts at: past 0 only once an open stage has outrun a plan. */
+  planFrom = 0;
+
+  /**
+   * `rand` is the show's dice (the hook passes the `show.pacing` stream: seeded
+   * with the night, and not a `plate.` stream, because a scene belongs to the
+   * set and should not start over when a look is laid in the middle of it).
+   */
+  constructor(private readonly stage: PacedStage, private readonly rand: () => number) {}
+
+  private make(pacing: number, fromDark: boolean): ScenePlan | null {
+    if (pacing <= 0.001) return null;
+    const timed = this.stage.advance === 'time';
+    return planScene(
+      timed ? this.stage.seconds : Math.max(this.stage.seconds, OPEN_SCENE_SECONDS),
+      pacing,
+      this.rand,
+      { fromDark, pace: timed ? this.stage.pace : { ...this.stage.pace, endDark: false } },
+    );
+  }
+
+  /** Entering the stage, at the Pacing it is going to; `fromDark` when the light is down as it enters. */
+  enter(pacing: number, fromDark: boolean): this {
+    this.plan = this.make(pacing, fromDark);
+    this.cursor = freshCursor();
+    this.planFrom = 0;
+    return this;
+  }
+
+  /** One tick, `elapsed` seconds into the stage, at the Pacing in force now. */
+  tick(elapsed: number, pacing: number): { sample: PaceSample; moments: PaceMoment[] } {
+    if (!this.plan && pacing > 0.001) {
+      // Pacing came up mid-stage: plan from here, with nothing owed from before.
+      this.plan = this.make(pacing, false);
+      this.planFrom = 0;
+      if (this.plan) this.cursor = cursorAt(this.plan, elapsed + 0.001);
+    }
+    if (this.plan && this.planFrom > 0 && elapsed < this.planFrom) {
+      // Located back before the plan in force: start this stage's plans over.
+      this.plan = this.make(pacing, false);
+      this.planFrom = 0;
+      if (this.plan) this.cursor = cursorAt(this.plan, elapsed);
+    }
+    if (this.plan && this.stage.advance !== 'time' && elapsed - this.planFrom >= this.plan.seconds) {
+      // An open stage past its plan: the next one, on from here.
+      this.planFrom += this.plan.seconds;
+      this.plan = this.make(pacing, false);
+      this.cursor = freshCursor();
+    }
+    if (!this.plan) return { sample: { ...PACE_NEUTRAL }, moments: [] };
+    return stepScene(this.plan, this.cursor, elapsed - this.planFrom, pacing);
+  }
 }
