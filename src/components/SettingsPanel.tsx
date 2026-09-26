@@ -2629,6 +2629,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ phaseSharp: v })}
           settingKey="phaseSharp"
         />
+        {/* The ferrofluid moving the colour it moves through: at 0 the black
+            is drawn over still dye, as Ferro Paint's references never are. */}
+        <Slider
+          label="Pushes Dye"
+          value={settings.phaseDisplace ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ phaseDisplace: v })}
+          settingKey="phaseDisplace"
+        />
         <Slider
           label="Magnet Strength"
           value={settings.magnetStrength ?? 0}

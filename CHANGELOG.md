@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Maze Detail**: the Labyrinth's fingers up to three times finer, as fine
   as the grid holds. At 0 it is the maze as it was; Ferro Maze uses 0.5.
   `npm run maze` measures it.
+- **Pushes Dye**: the ferrofluid moves the colour it moves through. Where
+  the black grows the colour leaves, and it packs along the black's edges
+  instead of sitting under it. At 0 the dye stays where it was; Ferro
+  Paint uses 1. `npm run ferrodye` measures it.
 
 ### Added — drops, not rings
 
@@ -41,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   orange, magenta, and paler orders washing out to grey). In the closeup,
   as a camera sees it, a bubble's film turns gold where the rainbow turned
   it blue; on the plate, as a projector throws it, a film is only the faint
-  complementary tint of the light through it. `npm run film` holds the
+  complementary tint of the light through it. `npm run filmtable` holds the
   colours to the research's own script; `npm run filmlook` photographs them.
 
 ### Changed — beads shaded from photographs

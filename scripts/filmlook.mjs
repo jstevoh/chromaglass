@@ -5,7 +5,7 @@
  *
  *   npm run filmlook      (any adapter that computes: scripts/lab.mjs)
  *
- * `npm run film` holds the table to the research's film.py and reads the
+ * `npm run filmtable` holds the table to the research's film.py and reads the
  * shader's source for it. This asks the pixels, on the lab's plate (the real
  * solver and the real plate shader), and against a control: the same lab
  * built with Film Physics taken out of the shader (below), since the lab

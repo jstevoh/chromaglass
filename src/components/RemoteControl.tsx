@@ -564,6 +564,13 @@ export default function RemoteControl() {
           {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
             <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/*
+            And, by the same rule, Pushes Dye only while there is ferrofluid
+            on the plate to do the pushing.
+          */}
+          {(settings?.phaseAmount ?? 0) > 0.001 && (
+            <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+          )}
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">

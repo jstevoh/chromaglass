@@ -13,7 +13,8 @@
  * (docs/webgpu-plan.md, P7); what covers this pass now is `npm run webgpu`.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { CAMERA_LAYOUT } from './wgsl/cameraFields';
 import { CAMERA_WGSL } from './wgsl/camera';
@@ -54,6 +55,26 @@ export function fillCameraUniforms(pack: UniformPack, view: CameraView, width: n
   pack.set('dither', view.dither);
 }
 
+/*
+  The camera's pipeline as a recipe, apart from the class, so the frame and
+  `WebGPUCamera.prepare` (which builds it before the show opens) cannot
+  describe two pipelines under one name.
+*/
+function cameraName(format: GPUTextureFormat, toTexture: boolean): string {
+  return `camera ${format}${toTexture ? ' flipped' : ''}`;
+}
+
+function cameraRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+  return (module) => ({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [layoutFromWgsl(device, CAMERA_WGSL, 'camera', GPUShaderStage.FRAGMENT)],
+    }),
+    vertex: { module: module(CAMERA_WGSL), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
+    fragment: { module: module(CAMERA_WGSL), entryPoint: 'fs', targets: [{ format }] },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
+}
+
 export class WebGPUCamera {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -64,6 +85,19 @@ export class WebGPUCamera {
   /** What the plate draws into while this pass is on. */
   private scene: GPUTexture | null = null;
   private sceneSize = [0, 0];
+
+  /**
+   * The camera onto the canvas, and into the projector's picture when one is
+   * on, built before the show opens (`gpu/prepare.ts`): two of the looks open
+   * with the camera on. Not into the post chain's half floats: no look has
+   * both the camera and film stock, and `npm run startup` would say if one
+   * did.
+   */
+  static prepare(device: GPUDevice, format: GPUTextureFormat, open: Opening): Prep[] {
+    const cache = PipelineCache.for(device, 'camera');
+    // Into a texture only when there is film behind it too, which no look opens on.
+    return [false, true].map((toTexture) => cache.renderPrep(cameraName(format, toTexture), cameraRecipe(device, format, toTexture), toTexture || !open.camera));
+  }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'camera');
@@ -107,14 +141,7 @@ export class WebGPUCamera {
   ): void {
     if (!this.scene) return;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
-    const pipeline = this.pipelines.renderPipeline(`camera ${format}${toTexture ? ' flipped' : ''}`, (module) => ({
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [layoutFromWgsl(this.device, CAMERA_WGSL, 'camera', GPUShaderStage.FRAGMENT)],
-      }),
-      vertex: { module: module(CAMERA_WGSL), entryPoint: 'vs', constants: toTexture ? { FLIP_Y: -1 } : undefined },
-      fragment: { module: module(CAMERA_WGSL), entryPoint: 'fs', targets: [{ format }] },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    }));
+    const pipeline = this.pipelines.renderPipeline(cameraName(format, toTexture), cameraRecipe(this.device, format, toTexture));
     const pass = encoder.beginRenderPass({
       label: 'camera',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

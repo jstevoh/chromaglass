@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms } from '../src/gpu/plateUniforms';
@@ -75,6 +75,26 @@ const api = {
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /** Ferro Pushes Dye's exchanges at full, as the engine runs them. */
+  displace: { push: DISPLACE_PUSH, inside: DISPLACE_INSIDE },
+  /**
+   * The phaseDisplace pass alone, n times, with these two strengths and
+   * nothing else stepped: so a check can hold one exchange to account without
+   * the rest of the solver moving the dye as well.
+   */
+  async displacePasses(n: number, push: number, inside: number) {
+    const s = lab!.solver as unknown as {
+      device: GPUDevice; dye: { read: GPUTexture; write: GPUTexture; swap(): void }; phase: { read: GPUTexture };
+      arg(name: string, v: number[]): GPUBuffer; run(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void;
+    };
+    const enc = s.device.createCommandEncoder({ label: 'displace passes' });
+    const pass = enc.beginComputePass();
+    const args = s.arg('lab displace', [push, inside, 0, 0]);
+    for (let k = 0; k < n; k++) { s.run(pass, 'phaseDisplace', s.dye.write, [s.dye.read, s.phase.read], args); s.dye.swap(); }
+    pass.end();
+    s.device.queue.submit([enc.finish()]);
+    await s.device.queue.onSubmittedWorkDone();
+  },
   async field(which: 'dye' | 'vel') { return Array.from(await lab!.solver.readField(which)); },
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
