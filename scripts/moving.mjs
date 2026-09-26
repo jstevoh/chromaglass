@@ -53,6 +53,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { watchVideo, freezes, WatchError } from './watch.mjs';
+import { AUTOPLAY, withBand, recordTake } from './recorder.mjs';
 
 const PORT = Number(process.env.MOVING_PORT ?? 4351);
 const LOOK = process.env.MOVING_LOOK ?? 'soap-film';
@@ -77,55 +78,25 @@ fs.mkdirSync(OUT, { recursive: true });
 const take = path.join(OUT, 'take.webm');
 fs.rmSync(take, { force: true });
 
-// Without this the band in a box never starts (no one has clicked the page,
-// so its AudioContext stays suspended), its audio track gives the recorder
-// no data, and MediaRecorder hands back an empty file that the app then
-// quietly does not save: no download, no error. An owner has always clicked.
-const browser = await launchChromium(chromium, { args: ['--autoplay-policy=no-user-gesture-required'] });
+// The autoplay flag, the band, and the palette: scripts/recorder.mjs says
+// why each is there (every one was a silent empty take without it).
+const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 let froze = 0, thawed = 0;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
-  await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
+  await withBand(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${LOOK}${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
-
-  // Through the command palette, as qa.mjs reaches things under a desk: the
-  // round Record button is hidden while a desk is up, and a desk is up at
-  // this size, as on the owner's laptop. Resolves when the command has run.
-  const viaPalette = async (query) => {
-    await page.keyboard.press('Control+k');
-    await page.waitForTimeout(400);
-    await page.evaluate((q) => {
-      const input = document.querySelector('[data-testid="palette-input"]');
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, q);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.focus();
-    }, query);
-    await page.waitForTimeout(400);
-    const row = await page.evaluate(() => document.querySelector('[data-row="0"]')?.textContent ?? '');
-    // A row carries its key after the name ("Freeze the liquidF").
-    if (!row.startsWith(query)) throw new Error(`the palette offered "${row}" for "${query}"`);
-    await page.keyboard.press('Enter');
-  };
-  await viaPalette('Record the plate');
-  const t0 = Date.now();
-  const at = s => page.waitForTimeout(Math.max(0, t0 + s * 1000 - Date.now()));
-  await at(FREEZE_AT);
-  await viaPalette('Freeze the liquid');
-  froze = (Date.now() - t0) / 1000;
-  await at(FREEZE_AT + FREEZE_FOR);
-  await viaPalette('Thaw the liquid');
-  thawed = (Date.now() - t0) / 1000;
-  await at(SECONDS);
-  const download = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
-  await viaPalette('Stop recording');
-  const file = await download;
-  if (!file) {
-    check('the recorder hands back a file', false, 'no download within 20 s of Stop: an empty recording, or the recorder failed to start');
+  const got = await recordTake(page, SECONDS, take, [
+    { at: FREEZE_AT, query: 'Freeze the liquid' },
+    { at: FREEZE_AT + FREEZE_FOR, query: 'Thaw the liquid' },
+  ]);
+  if (!got.ok) {
+    check('the recorder hands back a file', false, got.reason);
     process.exit(1);
   }
-  await file.saveAs(take);
+  [froze, thawed] = got.cues.map(c => c.ran);
 } finally {
   await browser.close();
 }

@@ -1,0 +1,63 @@
+name: Film the looks
+
+# Every look recorded with the band playing and measured in the units the
+# footage study measured real liquid light shows in: swells a minute, calm,
+# near black, hues, composition changes, motion against loudness by section
+# (scripts/film.mjs; the plan "Playing the plate like the real thing", step 0).
+# It is the before for any change to how the plate moves, and it runs only by
+# hand from the Actions tab: two minutes a look is over an hour for all of
+# them. A pull request that changes the filming or the watching films three
+# looks, so the tool is proven on Metal before it is trusted with all of them
+# (a cloud session cannot film the app: its WebGPU device is lost and the
+# recorder hands back nothing). The table and every look's timeline come back
+# as the `film` artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated look ids (blank for all)'
+        required: false
+        default: ''
+      seconds:
+        description: 'Seconds to film each look (120 gives section-scale sync five windows)'
+        required: false
+        default: '120'
+  pull_request:
+    paths:
+      - 'scripts/film.mjs'
+      - 'scripts/recorder.mjs'
+      - 'scripts/watch.mjs'
+      - '.github/workflows/film.yml'
+
+concurrency:
+  group: film-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  film:
+    name: Film (macOS)
+    runs-on: macos-15
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: ffmpeg, to watch a take
+        run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+      - name: Film every look
+        run: npm run film
+        env:
+          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,fillmore-1969,soap-film' || inputs.only }}
+          FILM_SECONDS: ${{ inputs.seconds || '120' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: film
+          path: film/
+          retention-days: 30
