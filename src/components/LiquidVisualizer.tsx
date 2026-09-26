@@ -5,7 +5,7 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
-import { forgetReadbacks, readbacksLanded } from '../gpu/kit';
+import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
@@ -4469,6 +4469,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     setExternalTilt: (x: number, y: number) => {
+      // A phone's tilt is the room's hand, not the song's: a render hears
+      // only its song (see `VisualizerRender`), so it is not taken while the
+      // show clock is the film's.
+      if (clockIsFixed()) return;
       const t = externalTiltRef.current;
       t.x = Math.max(-1, Math.min(1, x));
       t.y = Math.max(-1, Math.min(1, y));
@@ -5009,7 +5013,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const clock = beatClockRef.current;
           const heard = clock.period > 0 && clock.confidence >= 0.5 ? 60000 / clock.period : 0;
-          const bpm = tempoRef?.current?.bpm || heard;
+          // The desk's tempo (a clock, a tap, a typed number) is a live input
+          // and a render does not follow it: its pace is the song's own, heard.
+          const bpm = (clockIsFixed() ? 0 : tempoRef?.current?.bpm) || heard;
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / 8));
           const playing = isActiveRef.current && !!currentAudioData && loudnessRef.current > 0.01;
@@ -5030,7 +5036,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           is instead of running on in the dark and coming back somewhere else.
         */
         // The LFOs, on the bar rather than on the second: see `modulators.ts`.
-        if (isActiveRef.current) modRef.current.step(realDt, tempoRef?.current?.bpm ?? 0);
+        if (isActiveRef.current) modRef.current.step(realDt, clockIsFixed() ? 0 : tempoRef?.current?.bpm ?? 0);
 
         if (isActiveRef.current) {
           phraseRef.current = phrasingRef.current.step(
@@ -6835,6 +6841,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       flashRef.current.reset();
       flashGainRef.current = 1;
       for (const f of fluidsRef.current) f.forgetPress();
+      /*
+        The beat clock too, both ways: its onsets and its lock are stamped
+        in show milliseconds, which in a render start at 2^20 and live are
+        the page's age. Kept across the hand-back, a young page's live clock
+        read the render's stamps as in the future and held a lock on a beat
+        nobody was playing.
+      */
+      beatClockRef.current = new BeatClock();
     };
     const resetPlateClocks = () => {
       resetStamps();
@@ -6846,7 +6860,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       kickRef.current = { kick: false, predicted: false };
       kickCountRef.current = 0;
       magnetWalkRef.current = 0;
-      beatClockRef.current = new BeatClock();
       phrasingRef.current.reset();
       phraseRef.current = { drive: 1, gust: 0, drift: 0.5 };
       modRef.current.reset();
@@ -6858,12 +6871,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
     renderApiRef.current = {
       begin: async (o) => {
-        if (!renderer || !stage) throw new Error('the plate is not up yet');
+        if (cancelled) throw new Error('the plate was rebuilt (the GPU was lost): start the render again');
+        if (!renderer || !stage || glLostRef.current) throw new Error('the plate is not up yet');
         const governor = governorRef.current;
         const grid = o.grid ?? (governor ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture) : 256);
         const stepRate = o.stepRate ?? 60;
         cancelAnimationFrame(animationFrameId);
         renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid };
+        trackReadbacks(true);
         renderer.resize();
         resize();
         setStaged(true);
@@ -6887,6 +6902,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       step: (audio, timestampUs, durationUs) => {
         const r = renderingRef.current;
         if (!r) throw new Error('step with no render running');
+        // The GPU went away under the render: the frame would be the last
+        // good one again, or nothing. Stop, and let the render say why.
+        if (cancelled || glLostRef.current || !stage) throw new Error('the GPU was lost during the render');
         audioDataRef.current = audio;
         cancelAnimationFrame(animationFrameId);
         renderFrame();
@@ -6898,15 +6916,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         await readbacksLanded();
       },
       end: () => {
-        if (!renderingRef.current) return;
+        if (!renderingRef.current || cancelled) return;
         renderingRef.current = null;
+        trackReadbacks(false);
         resetStamps();
         audioDataRef.current = audioDataPropRef.current;
         setStaged(stageRef.current !== null);
-        renderer?.resize();
-        resize();
+        // The loop first, so that a resize which throws on a half-dead
+        // device still leaves the show drawing (its guard handles the rest).
         cancelAnimationFrame(animationFrameId);
         animationFrameId = requestAnimationFrame(render);
+        try { renderer?.resize(); resize(); } catch (e) { console.error('ChromaGlass: resizing after a render', e); }
       },
     };
 
@@ -6948,6 +6968,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
+        beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -8078,6 +8100,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
      */
     return () => {
       cancelled = true;
+      /*
+        A render in progress does not survive its stage. A GPU lost halfway
+        rebuilds everything through this cleanup, and the new loop's first
+        frame returns at once while `renderingRef` is set: with it left set,
+        the render's own hold (this closure's) was the only thing that could
+        clear it, and the live show came back with no frame loop at all. So
+        the render is ended here, from outside: the new loop draws, the next
+        `step` on the old hold throws (`cancelled`), and the render's
+        cleanup asks for whatever hold exists now, which has nothing to end.
+      */
+      if (renderingRef.current) {
+        renderingRef.current = null;
+        trackReadbacks(false);
+        audioDataRef.current = audioDataPropRef.current;
+        setStaged(stageRef.current !== null);
+      }
+      renderApiRef.current = null;
       stopFilm();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);

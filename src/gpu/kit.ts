@@ -264,11 +264,19 @@ export class PingPong {
   every ring report nothing until a copy asked for after it lands, so the
   render's first frames read either nothing (the same nothing every time) or
   the render's own plate. Live, neither is ever called, and a ring behaves
-  exactly as it did: the in-flight set is bookkeeping, and the epoch never
-  moves.
+  exactly as it did: nothing is tracked (`trackReadbacks` is on only between
+  a render's begin and end, so the show pays no set and no promise per
+  readback), and the epoch never moves.
 */
 const inFlight = new Set<Promise<void>>();
 let epoch = 0;
+let tracking = false;
+
+/** Keep count of readbacks in flight (a render, from its begin to its end), or stop. */
+export function trackReadbacks(on: boolean): void {
+  tracking = on;
+  if (!on) inFlight.clear();
+}
 
 /** Every ring reports nothing until a copy asked for from now on lands. */
 export function forgetReadbacks(): void { epoch++; }
@@ -339,10 +347,12 @@ export class ReadbackRing {
         slot.busy = false;
       }
     }, () => { slot.busy = false; });
-    inFlight.add(landing);
-    // Not caught here: a landing that throws still surfaces as an unhandled
-    // rejection with the same reason, once, as it did before it was tracked.
-    void landing.finally(() => inFlight.delete(landing));
+    if (tracking) {
+      // Not caught here: a landing that throws still surfaces as an unhandled
+      // rejection with the same reason, once, as it does untracked.
+      inFlight.add(landing);
+      void landing.finally(() => inFlight.delete(landing));
+    }
   }
 
   /**

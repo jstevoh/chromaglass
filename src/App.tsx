@@ -2800,8 +2800,9 @@ export default function App() {
     `VisualizerRender` in components/LiquidVisualizer.tsx.
 
     Stepping aside, and why each:
-      - the music element pauses: the render hears the song from its file, in
-        advance; the room does not need to hear it again at the same time;
+      - the music element pauses: the render hears the song from its file;
+        the room does not need to hear it again at the same time. It plays
+        on afterwards if it was playing, from where it was;
       - a sequence or a song's show stops (first cut: they do not play in a
         render yet, and the panel says so before anything is pressed);
       - fades and glides in flight are dropped, because their clocks were
@@ -2815,14 +2816,14 @@ export default function App() {
         same seed start where the first one did, which `npm run render-app`
         measures.
     The seed is put back too (in useSongRender), so tonight's seed is still
-    tonight's after a render on another one.
+    tonight's after a render on another one. And the fades and glides are
+    dropped again on the way out, for the reason given where it is done.
   */
   const renderHost = useMemo(() => ({
     render: () => visualizerRef.current?.render() ?? null,
     setAudio: (a: AudioData | null) => setRenderAudio(a),
     prepare: () => {
       const el = musicElRef.current;
-      if (el && !el.paused) el.pause();
       if (showSequencerRef.current.status.sequenceId !== null) showSequencerRef.current.stop();
       songRuntimeRef.current.stop();
       if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
@@ -2831,14 +2832,29 @@ export default function App() {
       glidesRef.current.clear();
       driftGlide.current.clear();
       aimTick.current = 0;
-      const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current };
+      const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current, playing: !!el && !el.paused };
+      if (el && !el.paused) el.pause();
       renderHoldRef.current = true;
       flushSync(() => { setRenderHold(true); setIsActive(true); });
       return () => {
+        /*
+          The same drops as on the way in, again on the way out. A fade or a
+          glide started during the render (a song show's, a look fade Evolve
+          asked for) was stamped on the film's clock, whose milliseconds start
+          at 2^20; carried into the live show, on a page younger than that it
+          reads as not begun and extrapolates, and writes over the settings
+          and the dimmer this very function is about to put back.
+        */
+        if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
+        if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
+        for (const t of glidesRef.current.values()) clearShowInterval(t);
+        glidesRef.current.clear();
         renderHoldRef.current = false;
         flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); });
         driftAnchor.current = kept.anchor;
         driftGlide.current.clear();
+        // The song plays on if it was playing: a render interrupts listening, it does not end it.
+        if (kept.playing && musicElRef.current) void musicElRef.current.play().catch(() => { /* needs a gesture: the play button is there */ });
       };
     },
   }), []);
@@ -2863,6 +2879,11 @@ export default function App() {
   musicFileRef.current = musicFile;
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has('debug')) return;
+    // What a render could leave running in the live show: a fade or a glide
+    // stamped on the film's clock (see the restore in `renderHost`).
+    (window as unknown as { chromaglassRenderPending?: unknown }).chromaglassRenderPending = () => ({
+      lookFade: lookFadeRef.current !== null, dimmerFade: fadeRef.current !== null, glides: glidesRef.current.size,
+    });
     (window as unknown as { chromaglassRender?: unknown }).chromaglassRender = async (o: {
       song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
     }) => {
@@ -3337,11 +3358,12 @@ export default function App() {
           </button>
           <button
             onClick={() => { setRenderOpen(v => !v); setLibraryOpen(false); }}
-            className={`p-1 rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/50'}`}
+            // 24 px and 70% white: the floor for a control a person has to find in a dark room.
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70'}`}
             aria-label="Render this song to a video file" title="Render this song to a video file, every frame, none dropped"
             data-testid="render-song"
           >
-            <Film size={12} />
+            <Film size={13} />
           </button>
           <button onClick={closeMusicFile} disabled={songRender.running} className="p-1 rounded-full hover:bg-white/10 text-white/50 disabled:opacity-30" aria-label="Close music file" data-testid="music-close"><X size={12} /></button>
         </div>
