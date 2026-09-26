@@ -93,7 +93,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'bzReaction', 'liesegang',
   /*
     The second phase and its magnet (H7). Each layer is a separate dish with
     its own phase field, so each can have its own domains and its own magnet —

@@ -129,7 +129,8 @@ const SECTION_OF: Record<string, string> = {
   sceneHands: 'room',
   kaleidoscope: 'kaleidoscope',
   kaleidoSpin: 'kaleidoscope',
-  kaleidoZoom: 'kaleidoscope',};
+  kaleidoZoom: 'kaleidoscope',
+  mazeDetail: 'physics',};
 
 const FROM_MIDI: DeskSpec[] = LEARNABLE_SETTINGS.map(s => ({ ...s, section: SECTION_OF[String(s.key)] ?? 'look' }));
 

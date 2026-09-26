@@ -2730,6 +2730,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="ferroLabyrinth"
         />
         <Slider
+          label="Maze Detail"
+          disabled={(settings.ferroLabyrinth ?? 0) <= 0.001 && 'needs Labyrinth above 0'}
+          value={settings.mazeDetail ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ mazeDetail: v })}
+          settingKey="mazeDetail"
+        />
+        <Slider
           label="pH Indicator"
           value={settings.phIndicator ?? 0}
           min={0}

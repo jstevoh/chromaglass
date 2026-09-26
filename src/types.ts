@@ -375,6 +375,8 @@ export interface VisualizerSettings {
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
   ferroLabyrinth: number;
+  /** How fine the Labyrinth's stripes are: 0 is the maze as it always was, 1 a third its width, as fine as the grid holds. */
+  mazeDetail: number;
   /** The dye changes colour with acidity, like red cabbage: pink in acid, purple neutral, green in base. Pour Acid or Base. */
   phIndicator: number;
   /** The Belousov–Zhabotinsky reaction in a gel: excitable waves that curl into spirals, in ferroin red and blue. */
@@ -670,6 +672,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tiltDirection: 180,
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
+  mazeDetail: 0,            // the maze as it always was (MAZE_PERIOD)
   phIndicator: 0,
   bzReaction: 0,
   liesegang: 0,

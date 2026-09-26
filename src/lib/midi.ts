@@ -294,6 +294,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'sceneDrive',      label: 'Room Drive',       min: 0, max: 1 },
   { key: 'sceneHands',      label: 'Room Hands',       min: 0, max: 1 },
   { key: 'sceneImpact',     label: 'Room Impact',      min: 0, max: 1 },
+  // How fine the ferrofluid's maze is. A fader because the reference films
+  // ride it: the fingers split finer as the field comes up and fatten as it
+  // falls, and that is a gesture across a song, not a setting for a night.
+  // The grid sets how far it goes: on the hosted 512² nothing changes past
+  // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
+  { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));

@@ -249,6 +249,11 @@ jobs:
       - name: The ferrofluid's edge
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrolook
+      # Maze Detail grows finer ferrofluid fingers than the default maze gets
+      # in twice the time, keeps all of it, and the grid floor holds.
+      - name: The ferrofluid maze's detail
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run maze
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
