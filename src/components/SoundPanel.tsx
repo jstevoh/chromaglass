@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Sparkles, Slash, Play, Pause, Repeat } from 'lucide-react';
+import { Mic, Monitor, FileAudio, Music, Sparkles, Slash, Play, Pause, Repeat, Waves } from 'lucide-react';
 import { Sheet } from './ui';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
+import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
 
 /**
  * Sound: where the show's music comes from, in one place you can find.
@@ -17,7 +18,7 @@ import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musi
  * is — one of the things you set up before a room fills.
  */
 
-export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated';
+export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 const SOURCES: ReadonlyArray<{
   id: AudioSource; label: string; icon: typeof Mic; blurb: string;
@@ -30,6 +31,8 @@ const SOURCES: ReadonlyArray<{
     blurb: 'Share a tab that is playing music and the show listens to it in stereo. The sound stays in that tab, so a video call sharing *this* tab will not carry it.' },
   { id: 'file', label: 'Your file', icon: FileAudio,
     blurb: 'Play a track from this machine. It plays out of this tab, so a shared tab carries the music too.' },
+  { id: 'drone', label: 'The plate', icon: Waves,
+    blurb: 'The glass plays itself: four voices tuned to a scale, lit by where the dye is and keyed by the colour on it. It sounds out of this tab, so a shared tab carries it.' },
   { id: 'simulated', label: 'A band in a box', icon: Sparkles,
     blurb: 'A synthesised band — kick, snare, hats, bass and a pad, in verses and choruses. No device, no permission, nothing to be asked for.' },
 ];
@@ -37,7 +40,7 @@ const SOURCES: ReadonlyArray<{
 export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
-  nowPlaying, onPickFile, onPickTrack, onClose,
+  nowPlaying, onPickFile, onPickTrack, drone, onDrone, onClose,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
@@ -53,6 +56,8 @@ export function SoundPanel({
   nowPlaying: { name: string; track?: Track } | null;
   onPickFile: (f: File) => void;
   onPickTrack: (t: Track) => void;
+  drone: DroneParams;
+  onDrone: (p: Partial<DroneParams>) => void;
   onClose: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -87,6 +92,78 @@ export function SoundPanel({
           })}
         </div>
         <p className="mt-2 min-h-[32px] text-[12px] leading-relaxed text-muted">{chosen.blurb}</p>
+
+        {source === 'drone' && (
+          <div className="mt-3 rounded-xl border border-border p-3" data-testid="drone-controls">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-center gap-2 text-[12px] text-muted">
+                <span className="w-20 shrink-0">Key</span>
+                <select
+                  value={drone.root}
+                  onChange={e => onDrone({ root: Number(e.target.value) })}
+                  className="flex-1 rounded-lg border border-border bg-black/30 px-2 py-1.5 text-text"
+                  data-testid="drone-root"
+                >
+                  {NOTES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-muted">
+                <span className="w-20 shrink-0">Scale</span>
+                <select
+                  value={drone.scale}
+                  onChange={e => onDrone({ scale: e.target.value as ScaleName })}
+                  className="flex-1 rounded-lg border border-border bg-black/30 px-2 py-1.5 text-text"
+                  data-testid="drone-scale"
+                >
+                  {Object.keys(SCALES).map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-muted">
+                <span className="w-20 shrink-0">Shape</span>
+                <select
+                  value={drone.wave}
+                  onChange={e => onDrone({ wave: e.target.value as Wave })}
+                  className="flex-1 rounded-lg border border-border bg-black/30 px-2 py-1.5 text-text"
+                  data-testid="drone-wave"
+                >
+                  {(['sine', 'triangle', 'sawtooth', 'square'] as const).map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              </label>
+              {([
+                ['voices', 'Voices', 1, 4, 1, (v: number) => String(v)],
+                ['octave', 'Octave', 0, 4, 1, (v: number) => String(v)],
+                ['cutoff', 'Tone', 120, 6000, 20, (v: number) => `${Math.round(v)} Hz`],
+                ['resonance', 'Edge', 0.5, 14, 0.1, (v: number) => v.toFixed(1)],
+                ['sub', 'Weight', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
+                ['drift', 'Drift', 0, 60, 1, (v: number) => `${Math.round(v)}¢`],
+                ['reverb', 'Room', 0, 6, 0.1, (v: number) => (v < 0.05 ? 'dry' : `${v.toFixed(1)}s`)],
+                ['level', 'Level', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
+              ] as const).map(([key, label, min, max, step, fmt]) => (
+                <label key={key} className="flex items-center gap-2 text-[12px] text-muted">
+                  <span className="w-20 shrink-0">{label}</span>
+                  <input
+                    type="range" min={min} max={max} step={step}
+                    value={drone[key] as number}
+                    onChange={e => onDrone({ [key]: Number(e.target.value) } as Partial<DroneParams>)}
+                    className="h-6 flex-1 accent-white"
+                    data-testid={`drone-${key}`}
+                  />
+                  <span className="w-14 text-right font-mono text-[10px] text-faint">{fmt(drone[key] as number)}</span>
+                </label>
+              ))}
+            </div>
+            {/*
+              Said out loud, because it is the one surprising thing about this
+              source: it listens to the plate it is driving.
+            */}
+            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+              The plate voices this and this drives the plate, which is a loop — so it reads slowly
+              and glides rather than steps, and follows the plate's weather over seconds instead of
+              chasing every frame.
+            </p>
+          </div>
+        )}
 
         {source === 'microphone' && inputs.length > 0 && (
           <div className="mt-3">

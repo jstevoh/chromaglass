@@ -112,8 +112,8 @@ interface SettingsPanelProps {
     on the desk now opens this section, and a dot that reports the input has
     to land somewhere that can change it.
   */
-  audioSource?: 'none' | 'microphone' | 'system' | 'file' | 'simulated';
-  onAudioSource?: (s: 'none' | 'microphone' | 'system' | 'simulated') => void;
+  audioSource?: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
+  onAudioSource?: (s: 'none' | 'microphone' | 'system' | 'simulated' | 'drone') => void;
   /** The file picker, which cannot be opened from a value change. */
   onAudioFile?: () => void;
   audioInputs?: { id: string; label: string }[];

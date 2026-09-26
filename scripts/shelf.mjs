@@ -154,6 +154,48 @@ try {
     !!credited && credited.includes(owed.artist), credited ?? 'no credit shown');
   const inLine = credits();
   check('and the shelf credit line names them too', inLine.includes(owed.artist), inLine);
+
+  /*
+    The plate playing itself, measured the same way as the shelf.
+
+    A synth that runs and cannot be heard is the same failure as a track that
+    plays to a deaf analyser, so it is asked the same question: does the
+    energy the show is driven by actually move? Four voices tuned from the
+    plate should read well clear of silence within a few seconds.
+  */
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
+    b?.click();
+  });
+  await page.waitForTimeout(600);
+  const droneOn = await page.evaluate(() => {
+    const b = document.querySelector('[data-testid="sound-source-drone"]');
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  check('the plate is offered as an instrument', droneOn, 'a source beside the microphone and the shelf');
+  await page.waitForTimeout(1200);
+  const knobs = await page.evaluate(() =>
+    !!document.querySelector('[data-testid="drone-controls"]') &&
+    ['root', 'scale', 'wave', 'voices', 'octave', 'cutoff', 'resonance', 'sub', 'drift', 'reverb', 'level']
+      .filter(k => document.querySelector(`[data-testid="drone-${k}"]`)).length);
+  check('and it has its controls', knobs === 11, `${knobs} of 11 on screen`);
+
+  let droneLoud = 0, droneReads = 0;
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(200);
+    const e = await page.evaluate(() => {
+      const a = window.chromaglassCastState().audio;
+      return a ? a.energy : null;
+    });
+    if (e === null) continue;
+    droneReads++;
+    if (e > droneLoud) droneLoud = e;
+  }
+  if (!droneReads) throw new Error('the show reported no audio at all while the drone ran — not quiet, absent');
+  check('and the show can hear the plate playing itself', droneLoud > 0.01,
+    `loudest energy ${droneLoud.toFixed(4)} over ${droneReads} reads`);
   check('the shelf carries no non-commercial or no-derivatives licence',
     LIBRARY.every(t => !/\b(nc|nd)\b/i.test(t.licenceUrl) && !/-nc|-nd/.test(t.licenceUrl)),
     LIBRARY.map(t => t.licence).join(', '));

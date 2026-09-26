@@ -434,6 +434,8 @@ export interface LiquidVisualizerHandle {
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
   drawnRect: () => DOMRect | null;
+  /** What the dye is doing, cheaply, for an instrument that plays the plate. */
+  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[] } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
@@ -4049,6 +4051,40 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useImperativeHandle(ref, () => ({
     drawnRect: () => drawnRectRef.current?.() ?? null,
+    /*
+      Numbers, not a photograph.
+
+      `npm run shelf`'s sibling instrument reads this several times a second,
+      and a readback of the plate at that rate would cost more than the show
+      it is supposed to accompany. The solver already keeps a mean and a mean
+      colour; the only new work is sampling the density it has already read
+      back at a few fixed places, so four voices can be lit by four different
+      parts of the glass instead of all by the same average.
+    */
+    plateReading: (voices: number) => {
+      const fluid = fluidsRef.current[0];
+      if (!fluid) return null;
+      const d = fluid.readDensity;
+      if (!d || !d.length) return null;
+      const cells: number[] = [];
+      const n = Math.max(1, voices);
+      for (let i = 0; i < n; i++) {
+        // A ring inside the dish, turning slowly, so the voices are lit by
+        // different weather rather than by one spot that may never get wet.
+        const a = (i / n) * Math.PI * 2 + performance.now() * 0.00002;
+        const rr = 0.28 * GRID_SIZE;
+        const x = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr);
+        const y = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
+        const idx = Math.max(0, Math.min(d.length - 1, x + y * GRID_SIZE));
+        cells.push(Number.isFinite(d[idx]) ? d[idx] : 0);
+      }
+      const c = fluid.meanColor;
+      return {
+        wetness: Number.isFinite(fluid.meanDensity) ? fluid.meanDensity : 0,
+        colour: [c?.[0] ?? 0, c?.[1] ?? 0, c?.[2] ?? 0] as [number, number, number],
+        cells,
+      };
+    },
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
