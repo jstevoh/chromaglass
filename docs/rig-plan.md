@@ -109,13 +109,52 @@ built on. It saves, recalls and cues: "all four up", "kill two and three",
 "cross-fade one into four". The cue list and sequencer already exist and point
 at looks; they want to point at rigs.
 
+### R7 · The mixer: one surface for the stack
+
+Asked for directly, and most of it is R1–R3 wearing an operator's clothes: *"a
+video mixer control available from the top level but also in the settings, that
+can move the order of layers — LED spinning, video, picture, any other image
+input — and control brightness, contrast and the other photo and video
+standards on each."*
+
+R2 already says the grade belongs per projector and not per output: *the
+output's `gain` and `gamma` are the right controls at the wrong scope*. R1
+already says a surface has its own source. So the mixer is not a new capability,
+it is **the place where R1–R3 are worked from** — a list of the live sources, in
+order, each a row with its opacity, its grade and its source.
+
+Two things it needs that are not in R1–R3 as written:
+
+- **An order.** R3 makes the default combination additive, and additive light
+  does not care what is on top — which is why nothing above specifies a z-order.
+  A mixer does: the moment a source is multiplied, keyed or laid over rather than
+  added, which of two beams is in front is a real question. So the stack needs an
+  index per source, and the compositing pass has to walk it rather than run a
+  fixed sequence. **This is the only part of the mixer the renderer cannot do
+  today at all.**
+- **The sources that are not projectors.** The LED ring, the logo and the room
+  camera are not in R1's list of sources, and the mixer is where an operator
+  would expect to find them next to the rest. Either they become sources under
+  R1, or the mixer shows two kinds of row. The first is cleaner and is probably
+  R1's list being one short.
+
+The rest is a panel: what exists today is `filmMix`, `markMix`, `layerCount` and
+a blend mode, each in its own corner of Settings, with the grade global. What is
+missing under the panel is a per-source grade-and-composite pass in WGSL — which
+is R2's work, and doing the panel without it would be a surface over controls
+that are still at the wrong scope.
+
+**It comes after R1 and R3 and carries R2**, because a mixer over one source is
+a settings page with extra steps.
+
 ## Order, and why
 
 R1 first, because every other item is meaningless while all the projectors show
 the same picture. R3 next, because additive combination is what makes two
 projectors better than one and it is nearly free. R2 then — it is a pile of
-independent controls, each small. R4 is ergonomics and can come any time after
-R1. R5 is authoring and comes last.
+independent controls, each small, and R7 is where they are reached from, so the
+two land together. R4 is ergonomics and can come any time after R1. R5 is
+authoring and comes last.
 
 ## What this costs
 

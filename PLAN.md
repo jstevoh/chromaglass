@@ -37,6 +37,51 @@ Each batch is one PR: build, test in the sandbox, merge, deploy, then a GPU look
 the Mac before the next one starts. Order is by what lifts everything else first,
 and by what would otherwise force a rebase later.
 
+### 0. The dye a tool makes, and the deploys it is blocking
+
+`src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
+
+**This is first because it is red now.** `npm run tools` fails on `main` about two
+runs in three, and the deploy is gated on it, so every merge queues behind a coin
+toss. Four deploys failed in a row on 2026-09-26 before one got through.
+
+The claim it breaks is the Finger's: *carries dye along the stroke, adds none*. It
+adds a great deal.
+
+| commit | dye on the plate | the Finger added |
+|---|---|---|
+| #142 | 635 | **+301** |
+| #142 | 656 | **+246** |
+| `main` | 592 | **+307** |
+| `main` | 655 | **+394** |
+| #143 | 180 | +36 |
+
+Forty to sixty per cent of whatever is already there, against a tolerance of
+`0.15 * fa.total`. It is not a regression and it is not the gate being flaky — both
+were checked, and both were wrong answers on the way here. The behaviour is the same
+at #142, #143 and `main`; what varies is how much dye the plate happens to be holding
+when the harness runs, because the tolerance scales with the pool and the amount added
+scales with it too. It passes only on a thin plate. #143's two green runs started at
+180 rather than 650.
+
+The cause is already written down in `tools.mjs`, for the Press rather than the
+Finger: *"the solver carries the dye's concentration through that spreading flow
+without thinning it, so a press can add up to about as much again as it had"*. The
+same note says it is tracked on its own, and this is that item. A flow that spreads
+has to thin what it carries; ours multiplies it.
+
+Two things to settle, in this order:
+
+- **A conserving advection where the flow diverges.** This is the fix and it touches
+  the beat squeeze, bubbles and currents as well, so it wants `npm run tools`,
+  `npm run liquids` and `npm run plates` green together before and after, and a
+  before/after on `npm run detail` — thinning dye correctly will change how sharp the
+  plate reads, and that is the number this whole plan is judged on.
+- **What the check should mean.** "Adds none" is a claim about the tool; what fails is
+  the advection under it. Once the advection conserves, the check is honest as written.
+  Loosening it first would silence the one instrument that found this, so it stays as
+  it is until the physics is right.
+
 ### 1. Sharp liquid, and pigment in it
 
 `src/gpu/fluid.ts`, `src/gpu/wgsl/fluid.ts`, `src/components/LiquidVisualizer.tsx`,
