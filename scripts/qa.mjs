@@ -738,14 +738,28 @@ try {
     // a settled plate) once Classic opened lit rather than dark, and a zoom
     // that moved the picture 73.7 failed the 4x margin.
     await settle(7000);
+    /*
+      And held still while the camera is measured. The claim is that the zoom
+      alone moves the picture, and the plate moving on its own is the noise
+      against it: the zoom moved the picture 82-87 on every run, while the
+      plate's own drift read 3.6, 13.6, 20.0, 22.6 and 24.8 across runs (the
+      calmer of two windows, after seven seconds' settling) and failed a
+      camera that did the same thing each time. The plate's clock, its
+      turbulence, its sound drive and its automation are stopped for these
+      few seconds and put back after; the camera runs on its own clock.
+    */
+    const STILL = { globalSpeed: 0, tempoSync: 0, turbulenceScale: 0, audioImpact: 0, automateRate: 0 };
+    const wasMoving = await page.evaluate((keys) => {
+      const s = window.chromaglassSettings?.() ?? {};
+      return Object.fromEntries(keys.map((k) => [k, s[k]]));
+    }, Object.keys(STILL));
+    await page.evaluate((s) => window.chromaglassSettings?.(s), STILL);
+    await settle(1500);
     const plate = await frame();
 
     // The plate goes on moving under all of this, so measure how far it
     // wanders on its own first: nothing below counts unless it clears this.
-    // The calmer of two windows: the zoom moved the picture 86.9, 87.0 and
-    // 86.9 on three runs, and the one window's drift read 13.6, 3.6 and 24.8,
-    // the last on a plate still spreading from its seed, which failed a
-    // camera that did exactly what it did on the others.
+    // The calmer of two windows, as a guard on the stillness above.
     await settle(1800);
     const mid = await frame();
     await settle(1800);
@@ -775,6 +789,7 @@ try {
     const homeZoom = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
     check('and it comes back to the plate again',
       homeZoom !== null && homeZoom < 1.05, `camera at ${homeZoom === null ? '?' : homeZoom.toFixed(2)}×`);
+    await page.evaluate((s) => window.chromaglassSettings?.(s), wasMoving);
 
     // The readout follows the zoom, not the old flag.
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));
