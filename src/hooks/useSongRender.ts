@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { AudioData } from './useAudioAnalyzer';
-import type { VisualizerRender } from '../components/LiquidVisualizer';
+import type { FrameDigest, VisualizerRender } from '../components/LiquidVisualizer';
 import { beginFixedClock, endFixedClock, tickFixedClock } from '../lib/showClock';
 import { setShowSeed, showSeed } from '../lib/rng';
 import { decodeSong, SongEar, type DecodedSong } from '../lib/songTrack';
@@ -69,6 +69,11 @@ export interface SongRenderState {
   summary: { videoFrames: number; audioPackets: number; durationMs: number; bytes: number } | null;
   /** FNV hashes of every frame that went in, when asked for (the checks). */
   frameHashes: string[] | null;
+  /**
+   * With the hashes, what each frame was drawn from (see `FrameDigest`): so a
+   * check that finds two renders differ can say where they began to.
+   */
+  frameDigests: FrameDigest[] | null;
   /** The whole file, when it was kept in memory and asked for (the checks). */
   bytes: Uint8Array | null;
 }
@@ -96,7 +101,7 @@ export interface SongRenderHost {
 }
 
 const IDLE: SongRenderState = {
-  phase: 'idle', frame: 0, frames: 0, message: '', format: null, elapsedS: 0, remainingS: null, summary: null, frameHashes: null, bytes: null,
+  phase: 'idle', frame: 0, frames: 0, message: '', format: null, elapsedS: 0, remainingS: null, summary: null, frameHashes: null, frameDigests: null, bytes: null,
 };
 
 const stamp = () => {
@@ -173,7 +178,7 @@ export function useSongRender(host: SongRenderHost) {
       clockTaken = true;
       set({ frames, message: 'Laying the look…' });
       plateTaken = true;
-      const laid = await plate.begin({ fps: req.fps, width: req.width, height: req.height });
+      const laid = await plate.begin({ fps: req.fps, width: req.width, height: req.height, digest: !!req.test?.hashFrames });
 
       const seconds = frames / req.fps;
       encoder = new RenderEncoder({
@@ -188,6 +193,7 @@ export function useSongRender(host: SongRenderHost) {
       set({ phase: 'frames', message: `Rendering ${laid.lookId} on a ${laid.grid}² grid, ${laid.stepRate} steps a second` });
 
       const enc = encoder;
+      const digests: FrameDigest[] | null = req.test?.hashFrames ? [] : null;
       let shown = performance.now();
       for (let i = 0; i < frames; i++) {
         if (cancelled) throw new RenderCancelled();
@@ -197,6 +203,7 @@ export function useSongRender(host: SongRenderHost) {
           hostRef.current.setAudio(audio);
         });
         await enc.addFrame((ts, dur) => plate.step(audio, ts, dur));
+        if (digests) digests.push(plate.digest() ?? {});
         await plate.settle();
         const now = performance.now();
         if (now - shown > 250 || i === frames - 1) {
@@ -210,6 +217,7 @@ export function useSongRender(host: SongRenderHost) {
       return set({
         phase: 'done', summary, frame: frames, remainingS: 0,
         frameHashes: req.test?.hashFrames ? enc.frameHashes.slice() : null,
+        frameDigests: digests,
         bytes: req.test?.keepInMemory ? sink.bytes?.() ?? null : null,
         message: `Rendered ${frames} frames (${(summary.durationMs / 1000).toFixed(1)} s) in ${Math.round(elapsed())} s: ${(summary.bytes / 1e6).toFixed(1)} MB of ${format.label}.`,
       });

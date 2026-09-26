@@ -328,8 +328,12 @@ const HANDOFF_POURS = 4;
 const EVOLVE_FLOODS = false;
 /** GPU errors within three seconds that mean the stage's objects have gone invalid, not a one-off. */
 const ERROR_STORM = 45;
-const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number): number => {
-  const want = setting === undefined || setting === 'auto' ? governor.rung.grid : setting;
+/**
+ * `auto` is the grid 'auto' stands for: the governor's rung of the moment
+ * live, its opening rung for a song render (see `QualityGovernor.openingRung`).
+ */
+const resolveSimResolution = (setting: SimResolution | undefined, governor: QualityGovernor, maxTexture: number, auto = governor.rung.grid): number => {
+  const want = setting === undefined || setting === 'auto' ? auto : setting;
   // A pin is held to what this GPU can actually allocate, so an old saved
   // look or a hand-typed query cannot ask for a texture the device refuses.
   //
@@ -465,6 +469,27 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
  * `endFixedClock` before `end`) and the seed (`setShowSeed` before
  * `begin`, which lays the look).
  */
+/**
+ * What a rendered frame was drawn from, apart from its pixels: for
+ * `npm run render-app`, which can only be run on a real GPU, and so has to
+ * say *why* two renders of the same seed differ, not only that they do.
+ *
+ * When the owner's Mac reports "240 of 240 frames differ", a hash of each
+ * frame says the films are different and nothing else. So each frame, when
+ * a check asks (`begin({ digest: true })`, which the render asks for only
+ * when it is hashing frames), the numbers the frame is drawn from are kept
+ * beside its hash, taken at the moment the plate is handed to the renderer:
+ * the clocks, the canvas and the grid, the steps taken, the phrase and the
+ * modulators, the rock and the lamp, the dye regulator's reading, the flash
+ * guard's gain, the dice drawn so far on each stream, a few cells of the
+ * readback, a hash of the settings. The check prints the first of these
+ * that differs between two renders, which names the part of the plate that
+ * carried something in from before the render, or that reads a clock it
+ * should not. Plain numbers and strings, compared exactly: a value that is
+ * the same to the last bit prints as the same.
+ */
+export type FrameDigest = Record<string, number | string | boolean>;
+
 export interface VisualizerRender {
   /**
    * Take the plate: the live loop stops, the canvas becomes width x height,
@@ -474,9 +499,11 @@ export interface VisualizerRender {
    * landed, so the first frame reads the render's own plate, not the live
    * one's.
    */
-  begin: (o: { fps: number; width: number; height: number; stepRate?: number; grid?: number | null; lookId?: string | null }) => Promise<{ grid: number; lookId: string; stepRate: number }>;
+  begin: (o: { fps: number; width: number; height: number; stepRate?: number; grid?: number | null; lookId?: string | null; digest?: boolean }) => Promise<{ grid: number; lookId: string; stepRate: number }>;
   /** Draw the next frame with this frame's sound, and return it as a VideoFrame with these times. */
   step: (audio: AudioData | null, timestampUs: number, durationUs: number) => VideoFrame;
+  /** The state the last frame was drawn from, when `begin` was asked for digests (the checks); else null. */
+  digest: () => FrameDigest | null;
   /** Resolves once the GPU has finished the frame and every readback it asked for has landed. */
   settle: () => Promise<void>;
   /** Give the plate back to the live loop, at its own size. */
@@ -737,6 +764,62 @@ class FluidSimulation {
   private squishLastStep = -1;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
   forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; }
+  /**
+   * Forget everything this plate carries from one frame to the next that is
+   * not the liquid itself: a song render starts here (VisualizerRender.begin),
+   * after the solver is rebuilt and the look laid.
+   *
+   * The render made twice with the same seed on CI's Mac differed on every
+   * frame from the first (`npm run render-app`: "240 of 240 frames differ"),
+   * and these are the plate's share of why. Each of them was written by the
+   * live show in the frames before the render and read by the render's first
+   * step, so the first frame of a film depended on what the evening had been
+   * doing a moment before it:
+   *
+   *   - `clockLean`, the phrase's slow lean on the timestep (slewed over 2.5
+   *     s, so it is never quite where the render's reset phrase would put
+   *     it): every step's `dt` is multiplied by it;
+   *   - `plateAngle` and `plateSpin`, which the frame sets from the flywheel
+   *     only after the solver has stepped, so the render's first steps read
+   *     the live plate's angle (gravity's direction) and spin (the twist)
+   *     rather than the ones the look was just laid with;
+   *   - the bubbles' bookkeeping (`prevPacked`, `coverPacked`, the holes
+   *     still filling, the mirror's sequence the rim deposit keys on): the
+   *     bubbles are cleared with the look, and a list of last frame's bubbles
+   *     that is not cleared with them reads as every one of them popping at
+   *     once, whose holes are then filled from the render's own plate at the
+   *     live bubbles' positions;
+   *   - the mean density the dye regulator reads before the render's first
+   *     readback lands, the step counter a press counts by, and the last
+   *     step's parameters.
+   *
+   * `angle` is the angle the look was laid at (`rotationAnglesRef`), and
+   * `viewHalfW`/`viewHalfH` the film's own framing: see the frame's rotation
+   * block for why a render frames by its canvas, not by the window.
+   */
+  /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
+  get stepCount(): number { return this.stepIndex; }
+  forgetHistory(angle: number, viewHalfW: number, viewHalfH: number): void {
+    this.forgetPress();
+    this.clockLean = 1;
+    this.plateSpin = 0;
+    this.plateAngle = angle;
+    this.viewHalfW = viewHalfW;
+    this.viewHalfH = viewHalfH;
+    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0;
+    this.phrase = { drive: 1, gust: 0, drift: 0.5 };
+    this.tempoMul = 1;
+    this.stepIndex = 0;
+    this.meanDensity = 0;
+    this.meanColor = [0, 0, 0];
+    this.lastSettings = null;
+    this.lastStep = null;
+    this.rbSeq = 0;
+    this.rimSeq = -1;
+    this.prevCount = 0;
+    this.coverCount = 0;
+    this.fillingHoles = [];
+  }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
@@ -4024,7 +4107,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * solver to, the frame it is on, the film's size and grid. Null live, and
    * every branch that reads it leaves the live show exactly as it was.
    */
-  const renderingRef = useRef<{ fps: number; stepRate: number; frame: number; width: number; height: number; grid: number } | null>(null);
+  const renderingRef = useRef<{
+    fps: number; stepRate: number; frame: number; width: number; height: number; grid: number;
+    /** Whether the checks asked for a digest of every frame (see `FrameDigest`), and the last frame's. */
+    digestOn: boolean; digest: FrameDigest | null;
+  } | null>(null);
   const renderApiRef = useRef<VisualizerRender | null>(null);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
@@ -6566,9 +6653,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
-              const drawn = Math.max(1, 1.5 * Math.max(canvas.clientWidth, canvas.clientHeight));
-              fl.viewHalfW = 0.5 * canvas.clientWidth / drawn;
-              fl.viewHalfH = 0.5 * canvas.clientHeight / drawn;
+              /*
+                A render frames by its film, not by the window. The element's
+                CSS box is the window's (a render letterboxes the canvas in it,
+                `objectFit: contain`), so a 16:9 film rendered from a 16:10
+                window got gravity's reach worked out for a frame it does not
+                have, and the same seed rendered from two window sizes was two
+                films. The canvas's pixels are the film's while rendering;
+                live it reads the box, exactly as it always did.
+              */
+              const [vw, vh] = rendering ? [canvas.width, canvas.height] : [canvas.clientWidth, canvas.clientHeight];
+              const drawn = Math.max(1, 1.5 * Math.max(vw, vh));
+              fl.viewHalfW = 0.5 * vw / drawn;
+              fl.viewHalfH = 0.5 * vh / drawn;
             }
           }
         }
@@ -6798,6 +6895,74 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The renderer reads the show's state through `view` and nothing
         // else, which is what lets a second one take the same call
         // (docs/webgpu-plan.md, P3).
+        /*
+          The checks' digest of this frame (see `FrameDigest`), taken here,
+          after everything the frame decides and before it is drawn. Only
+          while a render that asked for it is running: live, and in a render
+          nobody is comparing, this is one property read.
+        */
+        if (rendering?.digestOn) {
+          const f0 = fluidsRef.current[0];
+          const rd = f0?.readDensity, rvx = f0?.readVx;
+          const cell = (fx: number, fy: number) => Math.floor(fx * GRID_SIZE) + Math.floor(fy * GRID_SIZE) * GRID_SIZE;
+          let settingsHash = 0x811c9dc5;
+          const js = JSON.stringify(currentSettings);
+          for (let i = 0; i < js.length; i++) { settingsHash ^= js.charCodeAt(i); settingsHash = Math.imul(settingsHash, 0x01000193); }
+          rendering.digest = {
+            frame: rendering.frame,
+            showNow: showNow(),
+            realDt,
+            simTime: time,
+            steps: simSteps,
+            canvas: `${canvas.width}x${canvas.height}`,
+            grid: f0?.gpu?.N ?? 0,
+            layers: fluidsRef.current.length,
+            settings: (settingsHash >>> 0).toString(16),
+            active: isActiveRef.current,
+            evolve: isAutomatedRef.current,
+            audioEnergy: currentAudioData?.energy ?? -1,
+            audioBass: currentAudioData?.bass ?? -1,
+            kick: kickRef.current.kick,
+            kicks: kickCountRef.current,
+            loudness: loudnessRef.current,
+            tempoMul: tempoMulRef.current,
+            phraseDrive: phraseRef.current.drive,
+            phraseGust: phraseRef.current.gust,
+            phraseDrift: phraseRef.current.drift,
+            lfo1: modRef.current.value('lfo1'),
+            lfo4: modRef.current.value('lfo4'),
+            clockLean: f0?.clockLeanNow ?? 0,
+            dt: f0?.dt ?? 0,
+            solverSteps: f0?.stepCount ?? 0,
+            meanDensity: f0?.meanDensity ?? 0,
+            angle: rotationAnglesRef.current[0] ?? 0,
+            spin: spinVelRef.current[0] ?? 0,
+            rockX: rockRef.current.x,
+            rockY: rockRef.current.y,
+            lampX: lampRef.current.x,
+            lampY: lampRef.current.y,
+            gel: gelAngleRef.current,
+            kaleido: kaleidoPhaseRef.current,
+            filmLevel: filmLevelRef.current,
+            filmGain: filmGainRef.current,
+            flashGain: flashGainRef.current,
+            shot: `${shot.cx},${shot.cy},${shot.zoom}`,
+            harmony: harmonyRef.current.join(','),
+            beads: beadsRef.current.beads.length,
+            bubbles: bubblesRef.current.bubbles.length,
+            diceLay: DICE.lay.draws,
+            diceMusic: DICE.music.draws,
+            diceEvolve: DICE.evolve.draws,
+            dicePalette: DICE.palette.draws,
+            diceFluid: f0?.rng.draws ?? 0,
+            rbCentre: rd?.[cell(0.5, 0.5)] ?? -1,
+            rbA: rd?.[cell(0.3, 0.3)] ?? -1,
+            rbB: rd?.[cell(0.7, 0.35)] ?? -1,
+            rbC: rd?.[cell(0.4, 0.72)] ?? -1,
+            rbVx: rvx?.[cell(0.5, 0.5)] ?? -1,
+            fxFrame: fxFrameRef.current,
+          };
+        }
         const lum = renderer?.drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
@@ -6876,12 +7041,37 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
       Not reset, and so still able to differ between two renders in one
       page: anything a person set (the settings, a locked palette, the layer
-      count), the bead carpet's own dice (cleared, but drawn from its stream
-      before the look restarts it, which is the same draw every time), and
-      the post chain's ring of past frames, which a delay effect reads.
+      count), and the bead carpet's own dice (cleared, but drawn from its
+      stream before the look restarts it, which is the same draw every time).
+
+      That list was longer than it said. The same seed rendered twice in one
+      page on CI's Mac came out different on every frame, the first included
+      (`npm run render-app`, "the same seed twice draws the same frames: 240
+      of 240 frames differ"), and reading every value the frame reads found
+      these still carrying the evening into the film, each now reset below
+      with the reason where it is done: the plate's rock (a spring, kicked
+      live, that tilts the liquid and moves the lamp from the first step),
+      the gel wheel's and the kaleidoscope's phases, the film exposure's slew,
+      the closeup's last shot, Evolve's stamps and its finger stroke in
+      flight, the magnet's memory of where the look put it, each plate's own
+      history (FluidSimulation.forgetHistory), the flash probe's last reading
+      and the post chain's ring of past frames (rebuilt in `begin`), and the
+      grid, which followed the governor's rung of the moment.
     */
     const resetStamps = () => {
       lastTimeRef.current = showEpochS();
+      /*
+        Evolve's own stamps, on the show clock like the rest of these: a thin
+        and a flood are each held back for a few seconds after the last
+        (`now - lastThinRef > 9`). Carried into a render, a live stamp (the
+        epoch, some 1.8e9 s) held every thin back for the whole film, and
+        carried out of one, a film stamp (2^20 ms in, about 1049 s) is simply
+        long ago; so an Evolve render's thins depended on whether the live
+        show had thinned before it, and the second of two Evolve renders was
+        held back by the first one's last thin.
+      */
+      lastThinRef.current = -1e9;
+      lastFloodRef.current = -1e9;
       soapAtRef.current = 0;
       bzSeedAtRef.current = 0;
       liesSeedAtRef.current = 0;
@@ -6921,16 +7111,51 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       dropClockRef.current = 0;
       beadFrameRef.current = 0;
       gestureFrameRef.current = 0;
+      /*
+        The rest of what the frame integrates from one frame to the next, at
+        the values they are made with. The rock is a damped spring the beat
+        kicks (Plate Rock is on by default, 0.45), and its displacement
+        tilts every plate and moves the lamp from the render's first step, so
+        a render began mid-sway wherever the live show's last kick had left
+        it; its phase decides which way the next kick throws it. The gel
+        wheel and the kaleidoscope turn by accumulating, the film exposure
+        and the closeup slew toward what they read, and a finger stroke
+        Evolve had begun would have carried on into the film.
+      */
+      rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
+      gelAngleRef.current = 0;
+      kaleidoPhaseRef.current = 0;
+      filmLevelRef.current = 0.3;
+      filmGainRef.current = 4.5;
+      macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
+      lastMacroOnRef.current = false;
+      camBassRef.current = 0;
+      lastBass01Ref.current = 0;
+      autoStrokeRef.current = null;
+      magnetLookRef.current = null;
+      lastMagnetRef.current = null;
+      // As if the look had just been laid with the amount it has, which it
+      // is about to be: the "turned up on a bare plate" pour below reads it.
+      phaseAmountRef.current = settingsRef.current.phaseAmount ?? 0;
     };
     renderApiRef.current = {
       begin: async (o) => {
         if (cancelled) throw new Error('the plate was rebuilt (the GPU was lost): start the render again');
         if (!renderer || !stage || glLostRef.current) throw new Error('the plate is not up yet');
         const governor = governorRef.current;
-        const grid = o.grid ?? (governor ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture) : 256);
+        /*
+          The grid: what the settings pin, or for 'auto' the rung this
+          machine opens on, never the governor's rung of the moment. That one
+          climbs and falls with the live show's frame times, so two renders
+          of the same seed a few seconds apart could be laid on two grids,
+          which are two films (and the render reports its grid, so the check
+          can see which it got).
+        */
+        const grid = o.grid ?? (governor ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture, governor.openingRung.grid) : 256);
         const stepRate = o.stepRate ?? 60;
         cancelAnimationFrame(animationFrameId);
-        renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid };
+        renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid, digestOn: !!o.digest, digest: null };
         trackReadbacks(true);
         renderer.resize();
         resize();
@@ -6939,10 +7164,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (f.gpu) f.detachGpu();
           renderer.attachSolver(f, grid);
         }
+        /*
+          The passes that remember a frame, rebuilt. The flash probe keeps
+          its last reading outside its ring (`luminance` answers from it until
+          a new one lands), so the render's first frame folded the live show's
+          brightness into the flash guard; and the post chain keeps a ring of
+          past frames that a delay effect reads. Both are built again on the
+          first frame that wants them, knowing nothing of the evening.
+        */
+        probe?.dispose();
+        probe = null;
+        chain?.dispose();
+        chain = null;
         resetPlateClocks();
         forgetReadbacks();
         const lookId = o.lookId ?? livePresetRef.current;
         layPlateRef.current(lookId);
+        {
+          // Each plate's own history, after the look has laid its angles.
+          const drawn = Math.max(1, 1.5 * Math.max(o.width, o.height));
+          fluidsRef.current.forEach((f, l) => f.forgetHistory(rotationAnglesRef.current[l] ?? 0, 0.5 * o.width / drawn, 0.5 * o.height / drawn));
+        }
         // The laid plate, read back twice, so the first frame's readers (the
         // dye regulator, the beads) see this plate and not nothing.
         for (let k = 0; k < 2; k++) {
@@ -6953,26 +7195,66 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return { grid, lookId, stepRate };
       },
       step: (audio, timestampUs, durationUs) => {
+        /*
+          The loss first, then whether a render is running.
+
+          The other way round, a GPU lost mid-render was reported as "step
+          with no render running", which is true and says nothing: the loss
+          rebuilds the stage through this effect's cleanup, the cleanup ends
+          the render from outside (it clears `renderingRef`, so the new loop
+          can draw), and by the time the render loop asks this hold for its
+          next frame the ref it checked first was already empty. What
+          happened was the GPU going away, and that is what the render has
+          to say (`npm run render-app`, render L, measured it on the Mac:
+          "The render failed: step with no render running."). So everything
+          that means "this hold's stage is gone" is asked before anything
+          else: the cleanup has run (`cancelled`), the loss handler has run
+          and the rebuild has not (`glLostRef`), or there is no stage.
+        */
+        if (cancelled || glLostRef.current || !stage) throw new Error('the GPU was lost during the render');
         const r = renderingRef.current;
         if (!r) throw new Error('step with no render running');
-        // The GPU went away under the render: the frame would be the last
-        // good one again, or nothing. Stop, and let the render say why.
-        if (cancelled || glLostRef.current || !stage) throw new Error('the GPU was lost during the render');
         audioDataRef.current = audio;
         cancelAnimationFrame(animationFrameId);
         renderFrame();
         r.frame++;
         return new VideoFrame(canvas, { timestamp: timestampUs, duration: durationUs });
       },
+      digest: () => renderingRef.current?.digest ?? null,
       settle: async () => {
-        if (stage) await stage.device.queue.onSubmittedWorkDone();
-        await readbacksLanded();
+        /*
+          The same order as `step`, on both sides of the wait. Before it: a
+          hold whose stage has gone has no queue to wait on, and it used to
+          skip the wait and report the frame settled, so the loss surfaced one
+          frame later as whatever `step` said. After it: the loss can land
+          while this waits (a lost device settles its pending work), and the
+          frame just waited for was drawn on a device that no longer exists.
+          Either way the render stops here and says why.
+        */
+        const lost = () => cancelled || glLostRef.current || !stage;
+        const gone = () => new Error('the GPU was lost during the render');
+        if (lost()) throw gone();
+        try {
+          await stage!.device.queue.onSubmittedWorkDone();
+          await readbacksLanded();
+        } catch (e) {
+          // A wait that failed because the device went is the loss, not
+          // whatever the promise was rejected with.
+          throw lost() ? gone() : e;
+        }
+        if (lost()) throw gone();
       },
       end: () => {
-        if (!renderingRef.current || cancelled) return;
+        // The loss first here too: a hold whose stage has gone was already
+        // ended by the cleanup that retired it, and has nothing to hand back.
+        if (cancelled || !renderingRef.current) return;
         renderingRef.current = null;
         trackReadbacks(false);
         resetStamps();
+        // The flash probe's last reading is the film's last frame, not the
+        // room's: built again, as at the start (see `begin`).
+        probe?.dispose();
+        probe = null;
         audioDataRef.current = audioDataPropRef.current;
         setStaged(stageRef.current !== null);
         // The loop first, so that a resize which throws on a half-dead

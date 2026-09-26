@@ -27,7 +27,11 @@
  *   2. the same seed twice draws the same frames, hash for hash; the bytes
  *      are compared and printed too, but not gated, because whether the
  *      Mac's H.264 encoder is byte-deterministic is the encoder's business
- *      (`npm run render-lab` gates the encoder where it can);
+ *      (`npm run render-lab` gates the encoder where it can). Beside it,
+ *      not gated, where two renders part: the first frame whose pixels
+ *      differ and the first whose plate state differs (the visualizer's
+ *      per-frame digest, `digest` in LiquidVisualizer.tsx), with the fields
+ *      that differ, so a red run names its cause in the log;
  *   3. another seed draws another plate;
  *   4. the song is what drives it: the same seed with a silent song of the
  *      same length draws other frames;
@@ -207,6 +211,43 @@ try {
 
   // 2 to 5. Frames against frames.
   const differ = (x, y) => (x.frameHashes ?? []).filter((h, i) => h !== y.frameHashes?.[i]).length;
+  /*
+    Where two renders that should be one film part, printed beside the gates
+    that compare them (not a gate itself: the gates above and below are what
+    pass or fail).
+
+    This can only run on a real GPU, so when it goes red on CI the log is all
+    there is to go on, and "240 of 240 frames differ" says the films are
+    different and nothing about why. So two things are printed: the first
+    frame whose pixels differ, and the first frame on which anything the
+    plate drew it *from* differs (the render's per-frame digest, taken as
+    each frame is handed to the renderer; see `FrameDigest` in
+    LiquidVisualizer.tsx), with every field that differs there. The digest's
+    fields run from the inputs (the clock, the canvas, the grid, the
+    settings, the sound) to the outputs (the readback), so the first named
+    is usually the cause and the rest its consequences. A state that parts
+    before the pixels do is something carried in from before the render; a
+    state that never parts while the pixels do is the GPU's own (or a pass
+    the digest does not see), which is where to look next.
+  */
+  const parting = (x, y) => {
+    const hx = x.frameHashes ?? [], hy = y.frameHashes ?? [];
+    let pixels = -1;
+    for (let i = 0; i < Math.min(hx.length, hy.length); i++) if (hx[i] !== hy[i]) { pixels = i; break; }
+    const dx = x.frameDigests ?? [], dy = y.frameDigests ?? [];
+    let state = null;
+    for (let i = 0; i < Math.min(dx.length, dy.length) && !state; i++) {
+      const fields = [...new Set([...Object.keys(dx[i] ?? {}), ...Object.keys(dy[i] ?? {})])].filter((k) => dx[i]?.[k] !== dy[i]?.[k]);
+      if (fields.length) state = { frame: i, fields: fields.map((k) => `${k} ${JSON.stringify(dx[i]?.[k])} / ${JSON.stringify(dy[i]?.[k])}`) };
+    }
+    const px = pixels < 0 ? `no frame's pixels differ (of ${Math.min(hx.length, hy.length)})` : `the pixels first differ at frame ${pixels}`;
+    const st = !dx.length || !dy.length ? 'no digests came back'
+      : state ? `what the plate drew from first differs at frame ${state.frame}: ${state.fields.slice(0, 10).join('; ')}${state.fields.length > 10 ? `; and ${state.fields.length - 10} more` : ''}`
+        : `what the plate drew from is the same on all ${Math.min(dx.length, dy.length)} frames`;
+    return `${px}; ${st}`;
+  };
+  console.log(`   A against B (seed 7 twice): ${parting(A, B)}`);
+  console.log(`   E1 against E2 (Evolve twice): ${parting(E1, E2)}`);
   check('the plate moves: the frames are not one picture', new Set(A.frameHashes ?? []).size > frames * 0.9, `${new Set(A.frameHashes ?? []).size} distinct of ${frames}`);
   check('the same seed twice draws the same frames', (A.frameHashes?.length ?? 0) === frames && differ(A, B) === 0, `${differ(A, B)} of ${frames} frames differ`);
   const bytesB = B.bytes ? Buffer.from(B.bytes, 'base64') : Buffer.alloc(0);

@@ -126,6 +126,25 @@ export class QualityGovernor {
     return this.rungs[this.index];
   }
 
+  /**
+   * The rung this machine opens a show on, below any this device has failed
+   * at for good (out of memory, or a solver that would not start): a
+   * function of the machine and not of the last few seconds of frame times.
+   *
+   * For a song render (VisualizerRender.begin), which has to draw the same
+   * film from the same seed every time it is asked, and so cannot take its
+   * grid from `rung`: that is wherever the governor happens to have climbed
+   * or fallen to by the moment the render is pressed, and a plate on
+   * another grid is another film. A render has no frame budget to keep, so
+   * the only reasons not to use a rung are the ones this keeps: the machine
+   * it is, and what it has already run out of memory at.
+   */
+  get openingRung(): QualityRung {
+    let i = this.start;
+    while (i < this.rungs.length - 1 && this.failed.get(i) === Number.POSITIVE_INFINITY) i++;
+    return this.rungs[i];
+  }
+
   get frameMs(): number {
     return this.emaFrame;
   }

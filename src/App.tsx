@@ -2901,7 +2901,7 @@ export default function App() {
         for (let i = 0; i < r.bytes.length; i += 0x8000) bin += String.fromCharCode(...r.bytes.subarray(i, i + 0x8000));
         b64 = btoa(bin);
       }
-      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, bytes: b64 };
+      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64 };
     };
   }, [songRender.start]);
   const lookChoices = useMemo<LookChoice[]>(() => [
