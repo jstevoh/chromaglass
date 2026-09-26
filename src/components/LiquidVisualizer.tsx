@@ -37,6 +37,7 @@ import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
+import { makeRng, restartStreams, setShowSeed, showSeed, stream, type Rng } from '../lib/rng';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -390,6 +391,45 @@ const SIM_MAX_CATCHUP = (() => {
   return Number.isFinite(warp) && warp >= 1 ? Math.min(240, Math.round(warp)) : 4;
 })();
 
+/*
+  The show's dice, one stream per purpose (lib/rng.ts).
+
+  Every `Math.random` in this file that could change what reaches the plate
+  now draws from one of these, or from the plate's own `rng` (FluidSimulation,
+  one stream a layer), so the same seed plays the same show. They are split by
+  what they decide rather than pooled, so that adding a draw to one — a new
+  tool, a new automation event — cannot move the numbers another one draws:
+
+    lay      what laying a look adds besides its dye: the plates' starting
+             angles, the liquids poured with it, the handoff's pours, the Seed
+             button's drops.
+    hands    what a hand does beyond where it points: the spray's mist, the
+             splatter's flung drops, a theme button's placement, a blow's
+             bubble.
+    evolve   the automation: when a drop lands and where, a thinned patch, a
+             finger stroke, a palette re-pick.
+    music    what the music pours: a style for each band's drop, a dose on the
+             beat's ring, treble sparks, the squeeze, a bubble on the kick, a
+             soap burst.
+    liquids  which bottle a dose comes from (`doseLiquid`).
+    palette  which three of a look's dyes are the working set (`harmonyWithin`;
+             `harmonyColor` and `pickHarmony` draw from the same stream).
+    chem     where a reaction is seeded: the BZ waves and Boyle's chemistry.
+
+  All of them are `plate.` streams, so laying a look restarts them from
+  (seed, name, look) — see "Restarting, rather than continuing" in rng.ts.
+  Module constants are safe to hold: a reseed re-keys a stream in place.
+*/
+const DICE = {
+  lay: stream('plate.lay'),
+  hands: stream('plate.hands'),
+  evolve: stream('plate.evolve'),
+  music: stream('plate.music'),
+  liquids: stream('plate.liquids'),
+  palette: stream('plate.palette'),
+  chem: stream('plate.chemistry'),
+};
+
 // Density histogram used to expose the macro closeup (see "Macro film exposure").
 const FILM_BINS = 64;
 const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
@@ -409,7 +449,7 @@ const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
  */
 function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number, strength = 1): void {
   if (ids.length === 0) return;
-  const liq = LIQUIDS_BY_ID.get(ids[Math.floor(Math.random() * ids.length)]);
+  const liq = LIQUIDS_BY_ID.get(DICE.liquids.pick(ids));
   if (!liq?.behaviour) return;            // water, oil, ink, syrup: colour and nothing else
   const room = fluid.liquid.headroom(liq.behaviour);
   if (room <= 0.02) return;
@@ -539,7 +579,7 @@ const harmonyWithin = (contract: number[]): number[] => {
   if (contract.length <= 3) return contract;
   const pool = [...contract];
   const out: number[] = [];
-  while (out.length < 3) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  while (out.length < 3) out.push(pool.splice(DICE.palette.int(pool.length), 1)[0]);
   return out;
 };
 
@@ -634,6 +674,26 @@ class FluidSimulation {
   private cdv = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
   /** Which plate this is: 0 is the live plate, the rest run behind it as a background loop. */
   layerIndex = 0;
+  /**
+   * This plate's dice, carried on the fluid (PLAN.md §6): every splat a look
+   * is laid with, every spray, splatter and streak the automation pours, and
+   * every satellite drop of a press draws from `plate.fluid.<layer>`.
+   *
+   * One stream per layer rather than one for the solver, because the layers
+   * run side by side: the second plate's Fillmore wash would otherwise take
+   * its numbers out of the middle of the first plate's sequence, and turning
+   * on a second layer would move every drop on the first. Looked up by the
+   * layer rather than fixed at construction because `layerIndex` is assigned
+   * after the constructor runs. Replacing `Math.random()` here was a straight
+   * substitution — each helper draws exactly once, in the same order — so
+   * the only thing that changed about a laid look is which numbers it drew.
+   */
+  private dice: Rng | null = null;
+  private diceLayer = -1;
+  get rng(): Rng {
+    if (this.diceLayer !== this.layerIndex) { this.dice = stream(`plate.fluid.${this.layerIndex}`); this.diceLayer = this.layerIndex; }
+    return this.dice!;
+  }
 
   // ── GPU solver attachment ──
   // When `gpu` is set, the arrays above hold *deltas* — what the CPU-side
@@ -1516,10 +1576,10 @@ class FluidSimulation {
         }
         // Scattered stars
         for (let i = 0; i < 100; i++) {
-          const a = Math.random() * Math.PI * 2, d = (3 + Math.random() * 48) * k;
-          const c = Math.random() < 0.35 ? { r: 1, g: 1, b: 1 } : col(Math.floor(Math.random() * 4));
+          const a = this.rng.angle(), d = (3 + this.rng.float() * 48) * k;
+          const c = this.rng.float() < 0.35 ? { r: 1, g: 1, b: 1 } : col(this.rng.int(4));
           this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
-            0.6 + Math.random(), 0.4 + Math.random() * 1.2, c.r, c.g, c.b);
+            0.6 + this.rng.float(), 0.4 + this.rng.float() * 1.2, c.r, c.g, c.b);
         }
         // Angular velocity for swirl
         for (let j = 2; j < S - 2; j += 2) {
@@ -1611,7 +1671,7 @@ class FluidSimulation {
       case 'cyberpunk': {
         for (let s = 0; s < 5; s++) {
           const c = col(s);
-          const sx = Math.random() * S * 0.3, sy = Math.random() * S;
+          const sx = this.rng.float() * S * 0.3, sy = this.rng.float() * S;
           const a = Math.PI * 0.2 + s * 0.15;
           for (let t = 0; t < S * 1.2; t += 1.5) {
             const x = sx + Math.cos(a) * t, y = sy + Math.sin(a) * t;
@@ -1638,7 +1698,7 @@ class FluidSimulation {
       case 'bass-drop': {
         for (let i = 0; i < 4; i++) {
           const c = col(i);
-          const off = (Math.random() - 0.5) * 12;
+          const off = this.rng.centred() * 12;
           this.splatBlob(cx + off, cy + off, 20 - i * 3, 4.0 - i * 0.5, c.r, c.g, c.b);
         }
         break;
@@ -1656,10 +1716,10 @@ class FluidSimulation {
 
       case 'boiling-point': {
         for (let i = 0; i < 40; i++) {
-          const x = 8 + Math.random() * (S - 16), y = 8 + Math.random() * (S - 16);
+          const x = 8 + this.rng.float() * (S - 16), y = 8 + this.rng.float() * (S - 16);
           const c = col(i);
-          this.splatBlob(x, y, 3 + Math.random() * 5, 2.0, c.r, c.g, c.b);
-          this.addTemp(Math.floor(x), Math.floor(y), 3.0 + Math.random() * 4);
+          this.splatBlob(x, y, 3 + this.rng.float() * 5, 2.0, c.r, c.g, c.b);
+          this.addTemp(Math.floor(x), Math.floor(y), 3.0 + this.rng.float() * 4);
         }
         break;
       }
@@ -1668,7 +1728,7 @@ class FluidSimulation {
         for (let j = 0; j < 12; j++)
           for (let i = 0; i < 12; i++) {
             const c = col(i + j);
-            this.splatBlob((10 + i * 9 + (Math.random() - 0.5) * 4) * k, (10 + j * 9 + (Math.random() - 0.5) * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
+            this.splatBlob((10 + i * 9 + this.rng.centred() * 4) * k, (10 + j * 9 + this.rng.centred() * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
           }
         break;
       }
@@ -1692,9 +1752,9 @@ class FluidSimulation {
         this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
         this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
         for (let f = 0; f < 8; f++) {
-          const a = f * Math.PI * 2 / 8 + (Math.random() - 0.5) * 0.4;
+          const a = f * Math.PI * 2 / 8 + this.rng.centred() * 0.4;
           const c = col(f);
-          const len = (20 + Math.random() * 25) * k;
+          const len = (20 + this.rng.float() * 25) * k;
           for (let t = 5 * k; t < len; t += 1.5) {
             const wb = Math.sin(t * 0.3 + f) * 2 * k;
             const x = cx + Math.cos(a) * t + Math.cos(a + Math.PI / 2) * wb;
@@ -1711,10 +1771,10 @@ class FluidSimulation {
 
       case 'jellyfish-bloom': {
         for (let jf = 0; jf < 4; jf++) {
-          const jx = S * (0.2 + jf * 0.2 + (Math.random() - 0.5) * 0.1);
-          const jy = S * (0.3 + (Math.random() - 0.5) * 0.3);
+          const jx = S * (0.2 + jf * 0.2 + this.rng.centred() * 0.1);
+          const jy = S * (0.3 + this.rng.centred() * 0.3);
           const c = col(jf);
-          const bellR = (8 + Math.random() * 6) * k;
+          const bellR = (8 + this.rng.float() * 6) * k;
           for (let a = -Math.PI; a < 0; a += 0.06)
             for (let r = 0; r < bellR; r += 1.5) {
               const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.7;
@@ -1723,7 +1783,7 @@ class FluidSimulation {
             }
           for (let t = 0; t < 3; t++) {
             let tx = jx + (t - 1) * bellR * 0.4;
-            for (let dy = 0; dy < (18 + Math.random() * 10) * k; dy++) {
+            for (let dy = 0; dy < (18 + this.rng.float() * 10) * k; dy++) {
               const wb = Math.sin(dy * 0.2 + t) * 2 * k;
               this.splatBlob(tx + wb, jy + dy, 1.0, 0.8 / (1 + dy * 0.05), c.r, c.g, c.b);
             }
@@ -1761,16 +1821,16 @@ class FluidSimulation {
           let bx = S * (0.15 + branch * 0.14), by = S * 0.85;
           const c = col(branch);
           for (let seg = 0; seg < 50; seg++) {
-            by -= 1.0 + Math.random() * 0.8;
-            bx += (Math.random() - 0.5) * 3;
+            by -= 1.0 + this.rng.float() * 0.8;
+            bx += this.rng.centred() * 3;
             if (bx < 2 || bx >= S - 2 || by < 2) break;
-            this.splatBlob(bx, by, 2 + Math.random() * 2, 2.0, c.r, c.g, c.b);
-            if (Math.random() < 0.15) {
+            this.splatBlob(bx, by, 2 + this.rng.float() * 2, 2.0, c.r, c.g, c.b);
+            if (this.rng.float() < 0.15) {
               let fx = bx, fy = by;
-              const dir = Math.random() < 0.5 ? -1 : 1;
+              const dir = this.rng.float() < 0.5 ? -1 : 1;
               for (let s2 = 0; s2 < 15; s2++) {
-                fy -= 0.8 + Math.random() * 0.5;
-                fx += dir * (0.8 + Math.random() * 0.5);
+                fy -= 0.8 + this.rng.float() * 0.5;
+                fx += dir * (0.8 + this.rng.float() * 0.5);
                 if (fx < 2 || fx >= S - 2 || fy < 2) break;
                 this.splatBlob(fx, fy, 1.5, 1.2, c.r, c.g, c.b);
               }
@@ -1785,17 +1845,17 @@ class FluidSimulation {
         const ringR = 30 * k;
         for (let i = 0; i < 60; i++) {
           const a = (i / 60) * Math.PI * 2;
-          const r = ringR + (Math.random() - 0.5) * 8 * k;
+          const r = ringR + this.rng.centred() * 8 * k;
           const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
           if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
           const c = col(i);
-          this.splatBlob(x, y, 1.5 + Math.random() * 1.5, 1.5 + Math.random(), c.r, c.g, c.b);
+          this.splatBlob(x, y, 1.5 + this.rng.float() * 1.5, 1.5 + this.rng.float(), c.r, c.g, c.b);
           const dx = cx - x, dy = cy - y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
           this.addVelocity(Math.floor(x), Math.floor(y), dx / dist * 0.08, dy / dist * 0.08);
         }
         for (let i = 0; i < 40; i++) {
-          const a = Math.random() * Math.PI * 2, d = (5 + Math.random() * 45) * k;
-          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + Math.random() * 0.8, 0.3 + Math.random() * 0.5, 1, 1, 1);
+          const a = this.rng.angle(), d = (5 + this.rng.float() * 45) * k;
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + this.rng.float() * 0.8, 0.3 + this.rng.float() * 0.5, 1, 1, 1);
         }
         for (let j = 2; j < S - 2; j += 3)
           for (let i = 2; i < S - 2; i += 3) {
@@ -1812,13 +1872,13 @@ class FluidSimulation {
       // pick from, not one continuous wash covering the plate.
       case 'macro-bead': {
         for (let i = 0; i < 26; i++) {
-          const x = 14 + Math.random() * (S - 28), y = 14 + Math.random() * (S - 28);
+          const x = 14 + this.rng.float() * (S - 28), y = 14 + this.rng.float() * (S - 28);
           const c = col(i);
-          const r = (2 + Math.random() * 5) * k;
-          this.splatBlob(x, y, r, 2.2 + Math.random() * 2.0, c.r, c.g, c.b);
+          const r = (2 + this.rng.float() * 5) * k;
+          this.splatBlob(x, y, r, 2.2 + this.rng.float() * 2.0, c.r, c.g, c.b);
           // A dark shoulder on one side — cells and lacing key off this contrast
           this.splatBlob(x + r * 0.9, y + r * 0.7, r * 0.5, 0.9, 0.06, 0.05, 0.05);
-          const a = Math.random() * Math.PI * 2;
+          const a = this.rng.angle();
           this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.05, Math.sin(a) * 0.05);
         }
         break;
@@ -1832,10 +1892,10 @@ class FluidSimulation {
           this.splatBlob(bx, by, 15 * k, 3.2, c.r, c.g, c.b);
           // Nuclei clustered inside each pool — the densest cell patches
           for (let n = 0; n < 18; n++) {
-            const a = Math.random() * Math.PI * 2, d = Math.random() * 13 * k;
+            const a = this.rng.angle(), d = this.rng.float() * 13 * k;
             const cc = col(ci + 1 + (n % 2));
             this.splatBlob(bx + Math.cos(a) * d, by + Math.sin(a) * d,
-              (1.5 + Math.random() * 2.5) * k, 1.8, cc.r, cc.g, cc.b);
+              (1.5 + this.rng.float() * 2.5) * k, 1.8, cc.r, cc.g, cc.b);
           }
         });
         break;
@@ -1852,9 +1912,9 @@ class FluidSimulation {
           this.addVelocity(Math.floor(x), Math.floor(y), 0.07, 0.0);
         }
         for (let i = 0; i < 34; i++) {
-          const x = S * 0.18 + Math.random() * S * 0.7;
-          const y = S * 0.5 + (Math.random() - 0.5) * S * 0.35;
-          this.splatBlob(x, y, (1 + Math.random() * 3) * k, 1.6, trail.r, trail.g, trail.b);
+          const x = S * 0.18 + this.rng.float() * S * 0.7;
+          const y = S * 0.5 + this.rng.centred() * S * 0.35;
+          this.splatBlob(x, y, (1 + this.rng.float() * 3) * k, 1.6, trail.r, trail.g, trail.b);
         }
         break;
       }
@@ -1878,7 +1938,7 @@ class FluidSimulation {
         // holes in that sheet, so the seed is the sheet and nothing else.
         for (let i = 0; i < 3; i++) {
           const c = col(i);
-          this.splatBlob(cx + (Math.random() - 0.5) * S * 0.28, cy + (Math.random() - 0.5) * S * 0.28,
+          this.splatBlob(cx + this.rng.centred() * S * 0.28, cy + this.rng.centred() * S * 0.28,
             S * 0.4, 1.1, c.r, c.g, c.b);
         }
         break;
@@ -1929,7 +1989,7 @@ class FluidSimulation {
       default: {
         for (let i = 0; i < 5; i++) {
           const c = col(i);
-          this.splatBlob(10 + Math.random() * (S - 20), 10 + Math.random() * (S - 20), 15, 2.0, c.r, c.g, c.b);
+          this.splatBlob(10 + this.rng.float() * (S - 20), 10 + this.rng.float() * (S - 20), 15, 2.0, c.r, c.g, c.b);
         }
         break;
       }
@@ -2245,7 +2305,7 @@ class FluidSimulation {
         const sprayR = (8 + energy * 5) * k;
         const count = 8 + Math.floor(energy * 8);
         for (let p = 0; p < count; p++) {
-          const a = Math.random() * Math.PI * 2, d = Math.random() * sprayR;
+          const a = this.rng.angle(), d = this.rng.float() * sprayR;
           const px = Math.floor(x + Math.cos(a) * d), py = Math.floor(y + Math.sin(a) * d);
           if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
           this.addDensity(px, py, amount * (1 - d / sprayR) * 0.25, r, g, b);
@@ -2255,11 +2315,11 @@ class FluidSimulation {
       case 'splatter': {
         const count = 3 + Math.floor(energy * 4);
         for (let p = 0; p < count; p++) {
-          const a = Math.random() * Math.PI * 2;
-          const fling = (2 + Math.random() * (10 + energy * 8)) * k;
+          const a = this.rng.angle();
+          const fling = (2 + this.rng.float() * (10 + energy * 8)) * k;
           const px = Math.floor(x + Math.cos(a) * fling), py = Math.floor(y + Math.sin(a) * fling);
           if (px < 2 || px >= S - 2 || py < 2 || py >= S - 2) continue;
-          const dropR = Math.round((1 + Math.floor(Math.random() * 2)) * k);
+          const dropR = Math.round((1 + this.rng.int(2)) * k);
           for (let ddy = -dropR; ddy <= dropR; ddy++)
             for (let ddx = -dropR; ddx <= dropR; ddx++) {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -2285,7 +2345,7 @@ class FluidSimulation {
         break;
       }
       case 'streak': {
-        const a = Math.random() * Math.PI * 2;
+        const a = this.rng.angle();
         const len = (5 + Math.floor(energy * 10)) * k;
         const dx = Math.cos(a), dy = Math.sin(a);
         for (let t = -len; t <= len; t += 0.8) {
@@ -2358,13 +2418,13 @@ class FluidSimulation {
       }
     }
 
-    const n = Math.round(e * 7 * (0.6 + Math.random() * 0.8));
+    const n = Math.round(e * 7 * (0.6 + this.rng.float() * 0.8));
     for (let q = 0; q < n; q++) {
-      const a = Math.random() * Math.PI * 2;
-      const dist = dropR * (1.4 + (1 + 5 * h) * Math.random());
+      const a = this.rng.angle();
+      const dist = dropR * (1.4 + (1 + 5 * h) * this.rng.float());
       const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
       if (!inside(px, py)) continue;
-      const sr = Math.max(1, Math.round((0.8 + Math.random() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
+      const sr = Math.max(1, Math.round((0.8 + this.rng.float() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
       for (let dy = -sr; dy <= sr; dy++) {
         for (let dx = -sr; dx <= sr; dx++) {
           const dd = Math.sqrt(dx * dx + dy * dy);
@@ -3548,7 +3608,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
-  const noise2D = useMemo(() => createNoise2D(), []);
+  /*
+    The noise a look is laid with and the CPU turbulence stirs by.
+
+    `createNoise2D()` with no argument builds its permutation table from
+    `Math.random`, so the "timbre-shifter" wash and every noise-driven stir
+    was a different field on every page load, and no seed could reach it.
+    Now the table is made from the show's seed — a generator of its own
+    (`makeRng`), not a stream, because the field is a function of the seed
+    alone and laying a look should not rebuild it — and made again when the
+    seed changes (`setShowSeed`), behind the same function, so everything
+    that was handed `noise2D` keeps the one it was handed.
+  */
+  const noise2D = useMemo(() => {
+    let keyedOn = -1;
+    let field: (x: number, y: number) => number = () => 0;
+    return (x: number, y: number): number => {
+      if (keyedOn !== showSeed()) { keyedOn = showSeed(); field = createNoise2D(makeRng(keyedOn, 'plate.noise').float); }
+      return field(x, y);
+    };
+  }, []);
   const lastSeedCount = useRef(seedCount);
   const lastClearTrigger = useRef(clearTrigger);
   const lastDrainTrigger = useRef(drainTrigger);
@@ -3599,7 +3678,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * jump the pattern. In turns per second, which is why the 2π.
    */
   const kaleidoPhaseRef = useRef(0);
-  const harmonyRef = useRef(pickHarmony());
+  // The opening palette from a generator of its own, keyed on the seed: this
+  // line runs on every render, and a draw from the palette stream here would
+  // move every colour after it by however many times React rendered.
+  const harmonyRef = useRef(pickHarmony(makeRng(showSeed(), 'plate.palette', 'opening')));
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
@@ -3952,7 +4034,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'blow':
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
         else af.blowAir(x, y, 4, 0.06 * amt);
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && Math.random() < 0.15 * amt) {
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
         break;
@@ -4070,11 +4152,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
 
   const layPlate = (presetId: string) => {
+    /*
+      The plate's dice start again, from (seed, stream, this look), before
+      anything below draws, so the numbers this look is laid with do not
+      depend on how many were drawn before it. That is the dice, not the
+      whole glass: the bead carpet survives a look change (only the beads
+      dial at 0 clears it) and the phrasing, modulators and closeup camera
+      keep their state, as they did before seeding. What it does buy: a
+      render from a cue in the middle of a set, or the gallery shooting
+      presets in any order, draws the same numbers for the same look. Why
+      this and not one sequence running all night: lib/rng.ts, "Restarting,
+      rather than continuing". Only `plate.` streams: Lucky and
+      the wander are a person's and the set's, not the look's.
+    */
+    restartStreams(`look:${presetId}`, 'plate.');
     laidPresetRef.current = presetId;
     for (const fluid of fluidsRef.current) fluid.clearAll();
     bubblesRef.current.clear();
     chemRef.current.reset();
-    rotationAnglesRef.current = rotationAnglesRef.current.map(() => Math.random() * Math.PI * 2);
+    rotationAnglesRef.current = rotationAnglesRef.current.map(() => DICE.lay.angle());
     spinVelRef.current = spinVelRef.current.map(() => 0);
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
@@ -4122,7 +4218,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // about five spots of soap, one of `['soap', 'silicone']` gets fifteen.
     if (fluid) for (let i = 0; i < 15; i++) {
       doseLiquid(fluid, plateLiquidsRef.current,
-        10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+        10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
     }
     drainFrameRef.current = 0;
     macroCamRef.current.reset();
@@ -4507,8 +4603,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const af = fluidsRef.current[activeLayerRef.current];
       if (!af || drainFrameRef.current > 0) return;
       const S = GRID_SIZE;
-      const rx = () => Math.floor(S * 0.2 + Math.random() * S * 0.6);
-      const pick = (idxs: number[]) => PALETTE_RGB[idxs[Math.floor(Math.random() * idxs.length)]];
+      const rx = () => Math.floor(S * 0.2 + DICE.hands.float() * S * 0.6);
+      const pick = (idxs: number[]) => PALETTE_RGB[DICE.hands.pick(idxs)];
       const amt = 4 + energy * 8;
 
       switch (theme) {
@@ -4625,12 +4721,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           presetContractRef.current = PRESET_CONTRACTS['classic'];
           for (let d = 0; d < 15; d++) {
             doseLiquid(fluid, plateLiquidsRef.current,
-              10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+              10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
           }
         }
         if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
-        rotationAnglesRef.current.push(Math.random() * Math.PI * 2);
+        rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
 
       }
@@ -4916,11 +5012,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const soapDial = currentSettings.surfactantFlow ?? 0;
           const leadSolver = fluidsRef.current[0]?.gpu;
           if (soapDial > 0.001 && leadSolver?.addMix && isActiveRef.current) {
-            const beat = kickRef.current.kick && Math.random() < 0.25 + 0.7 * soapDial;
+            const beat = kickRef.current.kick && DICE.music.float() < 0.25 + 0.7 * soapDial;
             const idle = nowMs - soapAtRef.current > (2600 - 1800 * soapDial);
             if (beat || idle) {
               soapAtRef.current = nowMs;
-              leadSolver.addMix(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 0.03 + 0.04 * Math.random(), { soap: 1 });
+              leadSolver.addMix(0.15 + DICE.music.float() * 0.7, 0.15 + DICE.music.float() * 0.7, 0.03 + 0.04 * DICE.music.float(), { soap: 1 });
             }
           }
         }
@@ -5173,7 +5269,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (g?.addRxn && (s.bzReaction ?? 0) > 0.001 && (!live?.rxn || nowMs - bzSeedAtRef.current > 30000)) {
             bzSeedAtRef.current = nowMs;
             for (let k = 0; k < (live?.rxn ? 1 : 3); k++) {
-              const x = 0.2 + Math.random() * 0.6, y = 0.2 + Math.random() * 0.6, a = Math.random() * Math.PI * 2;
+              const x = 0.2 + DICE.chem.float() * 0.6, y = 0.2 + DICE.chem.float() * 0.6, a = DICE.chem.angle();
               g.addRxn(x, y, 0.035, { bz: 0.9 });
               g.addRxn(x + Math.cos(a) * 0.03, y + Math.sin(a) * 0.03, 0.035, { bzWake: 0.9 });
             }
@@ -5243,8 +5339,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && Math.random() < 0.12) || Math.random() < 0.004) {
-              chem.seed(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, 2 + Math.random() * 3);
+            if ((bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+              chem.seed(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 2 + DICE.chem.float() * 3);
             }
             // The dividing regime grows at a pace a show can watch; coral is slower than a set.
             chem.step(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), 0.042, 0.062);
@@ -5447,8 +5543,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Wide cone of fine mist — many small random particles in a radius
                 const sprayR = 10 * GRID_SCALE * kSoft;
                 for (let p = 0; p < 12; p++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const dist = Math.random() * sprayR;
+                  const angle = DICE.hands.angle();
+                  const dist = DICE.hands.float() * sprayR;
                   const px = Math.floor(x + Math.cos(angle) * dist);
                   const py = Math.floor(y + Math.sin(angle) * dist);
                   if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
@@ -5462,13 +5558,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // More droplets, not bigger ones, for a heavier hand.
                 const flings = Math.max(1, Math.round(5 * k));
                 for (let p = 0; p < flings; p++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const flingDist = (3 + Math.random() * 15) * GRID_SCALE;
+                  const angle = DICE.hands.angle();
+                  const flingDist = (3 + DICE.hands.float() * 15) * GRID_SCALE;
                   const px = Math.floor(x + Math.cos(angle) * flingDist);
                   const py = Math.floor(y + Math.sin(angle) * flingDist);
                   if (px < 2 || px >= GRID_SIZE - 2 || py < 2 || py >= GRID_SIZE - 2) continue;
-                  const dropR = Math.round((1 + Math.floor(Math.random() * 3)) * GRID_SCALE);
-                  const amt = 1.0 + Math.random() * 1.5;
+                  const dropR = Math.round((1 + DICE.hands.int(3)) * GRID_SCALE);
+                  const amt = 1.0 + DICE.hands.float() * 1.5;
                   for (let ddy = -dropR; ddy <= dropR; ddy++) {
                     for (let ddx = -dropR; ddx <= dropR; ddx++) {
                       const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -5620,14 +5716,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               projector does — slowly, in small places. `EVOLVE_FLOODS` brings
               it back.
             */
-            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && Math.random() < 0.06) {
+            if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && DICE.evolve.float() < 0.06) {
               lastFloodRef.current = now;
               autoEventsRef.current.poured++;
               const af = fluidsRef.current[0];
               if (af) {
                 const color = harmonyColor(harmonyRef.current);
-                const cx = GRID_SIZE * (0.25 + Math.random() * 0.5);
-                const cy = GRID_SIZE * (0.25 + Math.random() * 0.5);
+                const cx = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
+                const cy = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
                 // A third of the plate across, falling off to nothing, so it
                 // is a pour arriving rather than a rectangle being filled.
                 const R = GRID_SIZE * (0.18 + 0.16 * ph.gust);
@@ -5651,25 +5747,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // About one small event every seven seconds at the default rate,
             // about one a second at full — against two or three a
             // second before, each of them large.
-            if (Math.random() < rate * (0.012 + energy * 0.03) * ph.drive) {
-              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive) {
+              const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
-                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const isBlow = Math.random() > 0.75 - (spectralCentroid / 128) * 0.4;
+                const rx = DICE.evolve.int(GRID_SIZE - 20) + 10;
+                const ry = DICE.evolve.int(GRID_SIZE - 20) + 10;
+                const isBlow = DICE.evolve.float() > 0.75 - (spectralCentroid / 128) * 0.4;
                 if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
-                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && Math.random() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
+                  if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && DICE.evolve.float() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
-                    bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 4 * GRID_SCALE);
+                    bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + DICE.evolve.int(3), 4 * GRID_SCALE);
                   }
                 } else {
                   const color = harmonyColor(harmonyRef.current);
                   const styles = injectStyleRef.current;
-                  const style = styles[Math.floor(Math.random() * styles.length)];
+                  const style = DICE.evolve.pick(styles);
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
@@ -5686,7 +5782,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // random every ~3 min (it was ~45 s). Only the dye still to come
             // takes the new colours, so with small drops this is a drift, not
             // a change of scene. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && Math.random() < 0.0001) {
+            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && DICE.evolve.float() < 0.0001) {
               harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
             }
 
@@ -5703,16 +5799,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               Rarer than a pour and gentler: a fifth off the middle of a patch
               at most, softened to nothing at its rim.
             */
-            if (now - lastThinRef.current > 9 && Math.random() < rate * 0.004) {
+            if (now - lastThinRef.current > 9 && DICE.evolve.float() < rate * 0.004) {
               lastThinRef.current = now;
               autoEventsRef.current.thinned++;
-              const af = fluidsRef.current[Math.floor(Math.random() * fluidsRef.current.length)];
+              const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
                 af.thinPatch(
-                  GRID_SIZE * (0.2 + Math.random() * 0.6),
-                  GRID_SIZE * (0.2 + Math.random() * 0.6),
-                  GRID_SIZE * (0.10 + Math.random() * 0.12),
-                  0.80 + Math.random() * 0.12,
+                  GRID_SIZE * (0.2 + DICE.evolve.float() * 0.6),
+                  GRID_SIZE * (0.2 + DICE.evolve.float() * 0.6),
+                  GRID_SIZE * (0.10 + DICE.evolve.float() * 0.12),
+                  0.80 + DICE.evolve.float() * 0.12,
                 );
               }
             }
@@ -5728,14 +5824,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               person reaches for when a plate has gone static, which is exactly
               when this should be reaching for it.
             */
-            if (!autoStrokeRef.current && Math.random() < rate * 0.003) {
+            if (!autoStrokeRef.current && DICE.evolve.float() < rate * 0.003) {
               autoEventsRef.current.stroked++;
-              const a = Math.random() * Math.PI * 2;
+              const a = DICE.evolve.angle();
               autoStrokeRef.current = {
-                x: GRID_SIZE * (0.3 + Math.random() * 0.4),
-                y: GRID_SIZE * (0.3 + Math.random() * 0.4),
+                x: GRID_SIZE * (0.3 + DICE.evolve.float() * 0.4),
+                y: GRID_SIZE * (0.3 + DICE.evolve.float() * 0.4),
                 dx: Math.cos(a), dy: Math.sin(a),
-                left: 18 + Math.floor(Math.random() * 14),
+                left: 18 + DICE.evolve.int(14),
               };
             }
             const stroke = autoStrokeRef.current;
@@ -5835,7 +5931,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 else lead?.gpu?.clearPhase?.();
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
-                    doseLiquid(lead, plateLiquidsRef.current, 10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
+                    doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
                   }
                 }
               }
@@ -5845,11 +5941,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 h.poured++;
                 const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
                 if (!fluid) break;
-                const rx = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
-                const ry = Math.floor(GRID_SIZE * (0.18 + Math.random() * 0.64));
+                const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                 const color = harmonyColor(harmonyRef.current);
                 const styles = injectStyleRef.current;
-                fluid.autoInject(styles[Math.floor(Math.random() * styles.length)] ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 1.2);
                 doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
               }
@@ -5865,10 +5961,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const styles = injectStyleRef.current;
             for (const fluid of fluidsRef.current) {
               for (let i = 0; i < 8; i++) {
-                const rx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                const ry = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                const rx = DICE.lay.int(GRID_SIZE - 20) + 10;
+                const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const color = harmonyColor(harmonyRef.current);
-                const style = styles[Math.floor(Math.random() * styles.length)];
+                const style = DICE.lay.pick(styles);
                 fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
@@ -5945,7 +6041,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
                   const aStyles = injectStyleRef.current;
-                  const aStyle = () => aStyles[Math.floor(Math.random() * aStyles.length)];
+                  const aStyle = () => DICE.music.pick(aStyles);
 
                   // Center pulse — scales with density mapping
                   if (densityMod > 0.005) {
@@ -5991,7 +6087,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // build one permanent patch of soap in the middle and
                     // leave the rest of the plate clean.
                     {
-                      const da = Math.random() * Math.PI * 2;
+                      const da = DICE.music.angle();
                       doseLiquid(activeFluid, plateLiquidsRef.current,
                         centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
                     }
@@ -6018,8 +6114,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // into fog, a handful of real drops stays drops.
                     const sparks = Math.floor(treble01 * 2 * impactMul);
                     for (let s = 0; s < sparks; s++) {
-                      const sx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-                      const sy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+                      const sx = DICE.music.int(GRID_SIZE - 20) + 10;
+                      const sy = DICE.music.int(GRID_SIZE - 20) + 10;
                       activeFluid.addTemp(sx, sy, treble01 * 0.6 * autoAmp);
                       for (let ddy = -1; ddy <= 1; ddy++) {
                         for (let ddx = -1; ddx <= 1; ddx++) {
@@ -6067,8 +6163,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (squeezeAmt > 0 && kickStep && isActiveRef.current && drainFrameRef.current === 0) {
               const leadPlate = fluidsRef.current[0];
               if (leadPlate) {
-                const cx = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
-                const cy = GRID_SIZE / 2 + (Math.random() - 0.5) * 30 * GRID_SCALE;
+                const cx = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
+                const cy = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
@@ -6166,16 +6262,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the oil is the thing the references actually show.
               const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
-              if (currentAudioData && room && ((onset && Math.random() < 0.45 * bubbleAmt) || (bass01 > 0.5 && Math.random() < 0.003 * bubbleAmt))) {
+              if (currentAudioData && room && ((onset && DICE.music.float() < 0.45 * bubbleAmt) || (bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt))) {
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
                 for (let t = 0; t < 6; t++) {
-                  const a = Math.random() * Math.PI * 2, rr = (6 + Math.random() * 40) * GRID_SCALE;
+                  const a = DICE.music.angle(), rr = (6 + DICE.music.float() * 40) * GRID_SCALE;
                   const px = Math.round(GRID_SIZE / 2 + Math.cos(a) * rr), py = Math.round(GRID_SIZE / 2 + Math.sin(a) * rr);
                   const d = dens ? dens[Math.max(0, Math.min(GRID_SIZE - 1, px)) + Math.max(0, Math.min(GRID_SIZE - 1, py)) * GRID_SIZE] : 0;
                   if (d > best) { best = d; bx = px; by = py; }
                 }
-                bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + Math.floor(Math.random() * 3), 3 * GRID_SCALE);
+                bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + DICE.music.int(3), 3 * GRID_SCALE);
               }
               const lead = fluidsRef.current[0];
               const vx = lead?.readVx, vy = lead?.readVy;
@@ -6769,6 +6865,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /*
+          The seed the show is running on (lib/rng.ts), which a crash report
+          then carries too, so a night that went wrong can be played again on
+          the same dice. `reseed` runs the show on another from here, as
+          `?seed=` would from a fresh load; `window.__cgSeed` reads the same
+          number without `?debug`.
+        */
+        seed: showSeed(),
+        reseed: (n: number) => { setShowSeed(n); },
         /*
           What is on each plate, from the last readback: how full it is, its
           mean colour, how many cells are not a number, and the fastest cell.

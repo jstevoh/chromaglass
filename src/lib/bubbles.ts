@@ -12,6 +12,7 @@
  * (metaball) surface, so two bubbles pulling together blend through a neck
  * instead of two circles overlapping.
  */
+import { stream, type Rng } from './rng';
 
 export interface Bubble {
   x: number;    // logical grid cells
@@ -78,7 +79,13 @@ export class BubbleField {
   /** Things that happened this step, for the show to react to (a pop disturbs the dye). */
   readonly events: BubbleEvent[] = [];
 
-  constructor(private readonly grid: number) {}
+  /**
+   * `rng` decides every size, scatter, wobble, merge and split: the show's
+   * `plate.bubbles` stream unless a check hands in its own. A stream of its
+   * own rather than a share of one, so a bubble that learns to draw one more
+   * number cannot move where the beads land (lib/rng.ts, `npm run seed`).
+   */
+  constructor(private readonly grid: number, private readonly rng: Rng = stream('plate.bubbles')) {}
 
   clear(): void {
     this.bubbles.length = 0;
@@ -101,9 +108,9 @@ export class BubbleField {
     return {
       x, y, r, age: 0, life,
       sx: 0, sy: 0,
-      wob, wph: Math.random() * Math.PI * 2, wvel: 1.2 + Math.random() * 1.2,
+      wob, wph: this.rng.angle(), wvel: 1.2 + this.rng.float() * 1.2,
       kx: 0, ky: 0,
-      fing: 0, lobes: 8 + Math.floor(Math.random() * 7), fph: Math.random() * Math.PI * 2,
+      fing: 0, lobes: 8 + this.rng.int(7), fph: this.rng.angle(),
     };
   }
 
@@ -129,7 +136,7 @@ export class BubbleField {
         a few large. u³ puts two in three under 0.6 of the asked size and one
         in twenty past 1.7.
       */
-      const u = Math.random();
+      const u = this.rng.float();
       // Not under two cells: the air field is a grid, and a bubble smaller
       // than a cell cut a square hole in the dye rather than a round one.
       const size = Math.max(2, r * (0.3 + 2.1 * u * u * u));
@@ -142,9 +149,9 @@ export class BubbleField {
       let under = 0;
       for (const b of this.bubbles) under += b.r * b.r;
       if (Math.PI * (under + size * size) > N * N * 0.16) return;
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * spread;
-      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, size, 9 + Math.random() * 14, 0.1 + Math.random() * 0.08));
+      const a = this.rng.angle();
+      const d = this.rng.float() * spread;
+      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, size, 9 + this.rng.float() * 14, 0.1 + this.rng.float() * 0.08));
     }
   }
 
@@ -190,10 +197,10 @@ export class BubbleField {
     b.held = true;
     b.life = b.age + 60;
     // Satellites off the rim while it grows.
-    if (speed > 0.2 && this.bubbles.length < MAX_BUBBLES - 1 && Math.random() < dt * 5 * Math.min(1, strength)) {
-      const a = Math.random() * Math.PI * 2;
-      const d = b.r * (1 + b.fing * 0.6) + 1.5 + Math.random() * 3;
-      const sat = this.make(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, Math.max(0.8, N * (0.003 + Math.random() * 0.004)), 8 + Math.random() * 10, 0.1);
+    if (speed > 0.2 && this.bubbles.length < MAX_BUBBLES - 1 && this.rng.float() < dt * 5 * Math.min(1, strength)) {
+      const a = this.rng.angle();
+      const d = b.r * (1 + b.fing * 0.6) + 1.5 + this.rng.float() * 3;
+      const sat = this.make(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, Math.max(0.8, N * (0.003 + this.rng.float() * 0.004)), 8 + this.rng.float() * 10, 0.1);
       sat.kx = Math.cos(a) * 8; sat.ky = Math.sin(a) * 8;
       this.push(sat);
     }
@@ -219,10 +226,10 @@ export class BubbleField {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
         if (b.r > 2 && bs.length < MAX_BUBBLES - 2) {
-          const n = 2 + Math.floor(Math.random() * 2);
+          const n = 2 + this.rng.int(2);
           for (let k = 0; k < n; k++) {
-            const a = Math.random() * Math.PI * 2;
-            const nb = this.make(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, b.r * (0.25 + Math.random() * 0.2), 2 + Math.random() * 2.5, 0.12);
+            const a = this.rng.angle();
+            const nb = this.make(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, b.r * (0.25 + this.rng.float() * 0.2), 2 + this.rng.float() * 2.5, 0.12);
             nb.kx = Math.cos(a) * 20; nb.ky = Math.sin(a) * 20;
             bs.push(nb);
           }
@@ -260,8 +267,8 @@ export class BubbleField {
       if (b.held) { b.held = false; b.age += dt; b.wph += b.wvel * dt; continue; }
       const [vx, vy] = velocity(b.x, b.y);
       // Ride the dye, climb the tilt, carry any kick, and wander a little.
-      const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + (Math.random() - 0.5) * (0.5 + agitation * 1.5);
-      const dy = vy * CELLS_PER_UNIT * 1.4 - tiltY * 900 + b.ky + (Math.random() - 0.5) * (0.5 + agitation * 1.5);
+      const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + this.rng.centred() * (0.5 + agitation * 1.5);
+      const dy = vy * CELLS_PER_UNIT * 1.4 - tiltY * 900 + b.ky + this.rng.centred() * (0.5 + agitation * 1.5);
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.5);
@@ -315,7 +322,7 @@ export class BubbleField {
         const a = bs[i], c = bs[j];
         const ddx = a.x - c.x, ddy = a.y - c.y;
         const dist2 = ddx * ddx + ddy * ddy;
-        if (a.age > 2 && c.age > 2 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.92 && Math.random() < dt * 0.12) {
+        if (a.age > 2 && c.age > 2 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.92 && this.rng.float() < dt * 0.12) {
           const wa = a.r * a.r, wc = c.r * c.r;
           // Merged into the one on the straw, it stays on the straw.
           const pin = heldNow.has(a) ? a : heldNow.has(c) ? c : null;
@@ -367,12 +374,12 @@ export class BubbleField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       const s = Math.hypot(b.sx, b.sy);
-      if (b.age > 4 && b.r > 5 && s > 0.36 && bs.length < MAX_BUBBLES && Math.random() < dt * 0.3) {
+      if (b.age > 4 && b.r > 5 && s > 0.36 && bs.length < MAX_BUBBLES && this.rng.float() < dt * 0.3) {
         const ux = b.sx / s, uy = b.sy / s;
         const r2 = b.r / Math.SQRT2;
         const gap = r2 * 1.3;
         const child = (dir: number) => {
-          const nb = this.make(b.x + ux * gap * dir, b.y + uy * gap * dir, r2 * (0.85 + Math.random() * 0.3), b.life, 0.15);
+          const nb = this.make(b.x + ux * gap * dir, b.y + uy * gap * dir, r2 * (0.85 + this.rng.float() * 0.3), b.life, 0.15);
           nb.kx = ux * 14 * dir; nb.ky = uy * 14 * dir;
           return nb;
         };
@@ -386,15 +393,15 @@ export class BubbleField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       const atEdge = b.x < b.r + 1 || b.y < b.r + 1 || b.x > N - b.r - 1 || b.y > N - b.r - 1;
-      const shaken = b.age > 5 && Math.random() < dt * agitation * 0.06;
+      const shaken = b.age > 5 && this.rng.float() < dt * agitation * 0.06;
       if (b.age > b.life * lifeScale || atEdge || shaken) {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
         if (!atEdge && b.r > 2 && bs.length < MAX_BUBBLES - 2) {
-          const n = 2 + Math.floor(Math.random() * 2);
+          const n = 2 + this.rng.int(2);
           for (let k = 0; k < n; k++) {
-            const a = Math.random() * Math.PI * 2;
-            const nb = this.make(b.x + Math.cos(a) * b.r * 0.9, b.y + Math.sin(a) * b.r * 0.9, b.r * (0.25 + Math.random() * 0.2), 2 + Math.random() * 2.5, 0.12);
+            const a = this.rng.angle();
+            const nb = this.make(b.x + Math.cos(a) * b.r * 0.9, b.y + Math.sin(a) * b.r * 0.9, b.r * (0.25 + this.rng.float() * 0.2), 2 + this.rng.float() * 2.5, 0.12);
             nb.kx = Math.cos(a) * 18; nb.ky = Math.sin(a) * 18;
             bs.push(nb);
           }
