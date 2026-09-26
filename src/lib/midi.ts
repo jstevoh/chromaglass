@@ -390,6 +390,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   { key: 'fingering',       label: 'Fingering',        min: 0, max: 1 },
   { key: 'beads',           label: 'Oil Beads',        min: 0, max: 1 },
+  { key: 'beadDrops',       label: 'Bead Drops',       min: 0, max: 1 },
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
@@ -446,6 +447,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The grid sets how far it goes: on the hosted 512² nothing changes past
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
+  // The film's colours, the rainbow to a real soap film's. A fader because
+  // the mix between them is a look of its own, not only the two ends.
+  { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
