@@ -72,6 +72,8 @@ export interface GpuStepParams {
   oilTension?: number;
   /** The ferrofluid's labyrinth under a strong field (Ohta–Kawasaki). */
   ferroLabyrinth?: number;
+  /** How fine the maze is: 0 keeps MAZE_PERIOD, 1 is a third of it (the grid still sets a floor of twelve cells). */
+  mazeDetail?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */

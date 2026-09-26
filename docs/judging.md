@@ -126,6 +126,19 @@ changing flow crossing one of its steps can still hop the cells by about a
 frame's travel (`npm run cellride` prints it); if that shows, the fixes are a
 full-float velocity or shorter-lived cells when zoomed in.
 
+## 8. Maze Detail, and Ferro Maze at 0.5
+
+The Labyrinth's fingers can now be up to three times finer (Maze Detail), and
+Ferro Maze uses 0.5, about half the old finger width. It has only been seen in
+the lab, on software WebGPU at 512². Two things to look at. On the hosted site
+(512²), Ferro Maze and Maze Detail pushed to the top: past about 0.6 the
+slider does nothing there, and right at that point some half-formed fingers
+draw as brown film rather than black. On a local run (768² or 1024²), the
+full range: whether the finest maze stays black and solid, with no grid
+printed through it, since the maze's force per cell is strongest there and
+`npm run maze` only measures 512². What to report: the setting where it
+starts to look like the references, and any shimmer or brown haze.
+
 ---
 
 ## Reading the frame time while you do it

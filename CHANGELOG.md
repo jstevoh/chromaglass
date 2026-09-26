@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   black ferrofluid fingering into a maze on a white light table; Ferro
   Paint works it through amber, teal and coral dye under a wandering
   magnet, wet and glossy.
+- **Maze Detail**: the Labyrinth's fingers up to three times finer, as fine
+  as the grid holds. At 0 it is the maze as it was; Ferro Maze uses 0.5.
+  `npm run maze` measures it.
 
 ### Added — the layout checked without a GPU
 

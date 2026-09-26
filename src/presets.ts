@@ -1919,6 +1919,12 @@ export const PRESETS: Preset[] = [
     description: 'Black ferrofluid on a white light table, over a field coil: it fingers out into a dense maze of worm-shaped channels that sharpens on the beat, as in Magnetic Pattern I.',
     settings: {
       ferroLabyrinth: 1,
+      // Fingers about half as wide as the default maze (the reference's are
+      // about a sixtieth of the frame). 0.5 and not more because it is the
+      // value `npm run maze` measures, and on the hosted 512² it is still
+      // above the twelve-cell floor (MAZE_FINEST in src/gpu/fluid.ts): at
+      // 0.6, right on it, some fingers draw as brown film.
+      mazeDetail: 0.5,
       globalSpeed: 0.0095,
       surge: 0.3,
       layerCount: 1,

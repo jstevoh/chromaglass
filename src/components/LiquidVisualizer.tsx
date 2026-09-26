@@ -3090,6 +3090,7 @@ class FluidSimulation {
       ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
+      mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),

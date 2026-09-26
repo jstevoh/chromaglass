@@ -123,6 +123,31 @@ hits and fattens between them. `npm run physics` checks the field alone
 doubles the edge of eighteen drops (2866 against 1352), conserves them, and
 leaves the black solid.
 
+**Maze Detail** (`mazeDetail`) makes the maze finer, as a thinner gap
+between the plates does. Steve's references (Chemical Bouillon's ferrofluid
+films) run fingers about a sixtieth of the frame wide, and the maze above
+drew them two to three times wider. Detail divides the period by up to three
+(MAZE_FINEST): at 1 it is 0.015 of the plate. The twelve-cell floor still
+holds, so on a 512² grid (the hosted site's largest) Detail stops doing
+anything past about 0.6 (0.023), on 768² past 0.96, and only 1024² reaches
+the full range. At 0 it is the maze as it was.
+Measured in the lab (512², the eighteen drops, finger width as 2·area/edge
+at half full):
+
+| Detail | width at 240 steps | at 480 | plate past half full at 480 |
+|---|---|---|---|
+| 0 | 0.059 | 0.043 | 18.3% |
+| 0.35 | 0.038 | 0.022 | 17.8% |
+| 0.6 | 0.025 | 0.014 | 16.4% |
+
+At 0.6, where the period is right at the floor, some fingers that are
+still pinching apart sit under half full and draw as brown film.
+`npm run maze` checks that Detail 0.5 grows fingers in four seconds finer
+than Detail 0 gets in eight, keeps all the ferrofluid with no grid printed
+through it, and that on a grid too coarse for it (256²) Detail changes
+nothing. The maze is still coarsening towards its period at eight seconds,
+so where it ends up is not asserted.
+
 The same work fixed the magnet on its own. The sharpening pass that stood in
 for Cahn–Hilliard without a maze clamped to its neighbourhood, and lost an
 eighth of the ferrofluid at ten frames a second; its pairwise replacement
