@@ -113,10 +113,15 @@ export function ToolAmountChip({ tool, value, onOpen }: { tool: string; value: n
     <button
       onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpen({ x: r.left, y: r.top }); }}
       title={`How much the ${TOOL_NAMES[tool] ?? tool} does (${means}). Click, or right-click any tool, for its options.`}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[12px] transition-colors hover:bg-hover ${value === 1 ? 'border-border text-muted' : 'border-accent-border text-accent-text'}`}
+      className={`hidden h-8 shrink-0 items-center min-[1400px]:inline-flex gap-1.5 rounded-md border px-2 text-[12px] transition-colors hover:bg-hover ${value === 1 ? 'border-border text-muted' : 'border-accent-border text-accent-text'}`}
       data-testid="tool-amount-chip"
     >
       {/*
+        The chip itself only from 1400px, where the tool row has room for it:
+        at 1280 and 1024 it sat under Freeze (the qa check "nothing covers a
+        control"). Below that the tools' options are a right-click on the tool,
+        as the Amount slider this replaced was hidden below 1280.
+
         The word only where there is room for it. On the macOS runner's fonts
         the chip with its word pushed the tool row past the middle column at
         1440, which widened the whole desk and slid the header's centred mode
