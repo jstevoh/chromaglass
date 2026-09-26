@@ -39,9 +39,13 @@
  *      build that goes around the cache is counted too.
  *   4. no stop in the opening: no two animation frames, no two loop
  *      heartbeats, and no two plate steps more than MAX_GAP_S apart, each
- *      measured from its first to the moment of reading (so a stop still
- *      going then counts), over WATCH_S, ten seconds past the first step or
+ *      measured from its first (frames from when the GPU device was given)
+ *      to the moment of reading (so a stop still going then counts), over WATCH_S, ten seconds past the first step or
  *      a second past the end of the building behind it, whichever is last
+ *   4b. and the page stops for the GPU device itself no longer than the
+ *      control did, give or take DEVICE_SLACK_S: that stop (2.6 s on a cold
+ *      runner) is Chromium making its Metal device, before any of the show's
+ *      GPU code runs, and is the same with or without this fix
  *   5. every look, opened on its own, asks in its first OPENING_STEPS
  *      steps and OPENING_SECONDS seconds for nothing the show did not wait
  *      for (`?asked`, `gpu/opening.ts`); and each part some look waits for
@@ -128,6 +132,13 @@ const OPENINGS_BUDGET_S = Number(process.env.STARTUP_OPENINGS_BUDGET ?? 360);
  * fails it by far.
  */
 const STEADY_SLACK_S = Number(process.env.STARTUP_STEADY_SLACK ?? 3);
+/**
+ * How much longer than the control's the page may go without a frame while
+ * Chromium makes the GPU device (4b). Nothing of the show's runs then, so the
+ * two should match; one second is for a cold cache's variation between two
+ * openings (2.35 s and 2.58 s on run 36258502020).
+ */
+const DEVICE_SLACK_S = Number(process.env.STARTUP_DEVICE_SLACK ?? 1);
 
 const presetIds = [...readFileSync('src/presets.ts', 'utf8').matchAll(/^ {4}id: '([^']+)'/gm)].map((m) => m[1]);
 
@@ -295,8 +306,28 @@ async function open(query, looks) {
       const rows = window.__startupRows.filter((r) => r[0] <= now);
       const changes = (col) => rows.filter((r, i) => i > 0 && rows[i - 1][col] >= 0 && r[col] > rows[i - 1][col]).map((r) => r[0]);
       const d = window.chromaglassDebug?.();
+      /*
+        Frames from when the GPU was given, not from load. On CI's cold Mac
+        the page drew no frame for 2.58 s from 1.05 s, inside
+        \`requestDevice\` (asked 0.53 s, given 3.65 s), before a line of the
+        show's own GPU code had run, and the control stopped the same way
+        (2.35 s from 1.08 s, given 3.42 s; run 36258502020): Chromium making
+        its Metal device on a cold cache, which no order of the show's
+        pipelines can move. That stop is measured on its own below, against
+        the control's, so it is still seen and still cannot grow.
+      */
+      const given = window.__startupGpu.find(([w]) => w === 'device')?.[2] ?? null;
+      const gapUpTo = (end) => {
+        const ts = window.__startupFrames.filter((t) => t <= end);
+        let gap = 0, at = null;
+        for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
+        if (ts.length && end - ts[ts.length - 1] > gap) { gap = end - ts[ts.length - 1]; at = ts[ts.length - 1]; }
+        return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
+      };
       return {
-        frames: longest(window.__startupFrames),
+        // From the moment it was given, so a stop that ran on past it counts from there.
+        frames: longest(given == null ? window.__startupFrames : [given, ...window.__startupFrames.filter((t) => t > given)]),
+        framesAsking: given == null ? null : gapUpTo(given),
         beats: longest(changes(2)),
         steps: longest(changes(3)),
         firstStep: (rows.find((r) => r[3] > 0) ?? [null])[0],
@@ -495,6 +526,10 @@ try {
   check(`no stop in the opening, or while the rest was built behind it (frames, heartbeats and steps each no more than ${MAX_GAP_S} s apart)`,
     o.frames.first != null && o.beats.first != null && o.steps.first != null && worst <= MAX_GAP_S,
     `longest wait for a frame ${say(o.frames)}, for a heartbeat ${say(o.beats)}, for a step ${say(o.steps)}, watched to ${secs(o.watch)}`);
+  const asking = (x) => (x.framesAsking ? say(x.framesAsking) : 'not seen');
+  check(`and the wait for the GPU stops the page no longer than it did the old way (with ${DEVICE_SLACK_S} s to spare)`,
+    !!o.framesAsking && !!c.framesAsking && o.framesAsking.gap <= c.framesAsking.gap + DEVICE_SLACK_S,
+    `longest wait for a frame before the device was given ${asking(o)}, against ${asking(c)} for ?prepare=0`);
   if (worst > MAX_GAP_S || process.env.STARTUP_TIMELINE) timeline(o);
 
   // ── Every look, opened on its own ─────────────────────────────────
