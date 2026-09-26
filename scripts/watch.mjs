@@ -347,7 +347,7 @@ async function watch() {
   const pre = c ? `crop=trunc(iw*${c.w}/2)*2:trunc(ih*${c.h}/2)*2:trunc(iw*${c.x}):trunc(ih*${c.y}),` : '';
   const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px, k, W, H) => {
     let lum = 0, sat = 0, dark = 0, bright = 0, diff = 0, coloured = 0;
-    const hue = new Float64Array(8), hist = new Float32Array(64);
+    const hue = new Float64Array(8), hist = new Float32Array(64), hue12 = new Float32Array(12), hv = new Float32Array(39);
     for (let i = 0, p = 0; i < px.length; i += 3, p++) {
       const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
       const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -357,10 +357,23 @@ async function watch() {
       if (Y > 0.92) bright++;
       if (prev) diff += Math.abs(Y - prev[p]);
       hist[(px[i] >> 6) * 16 + (px[i + 1] >> 6) * 4 + (px[i + 2] >> 6)]++;
-      if (S > 0.25 && mx > 0.15) {
-        coloured++;
-        let H0 = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
+      let H0 = -1;
+      if (S > 0.25) {
+        H0 = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
         H0 = (H0 * 60 + 360) % 360;
+      }
+      // For the show's shape (below): twelve 30° hues, and the same with the
+      // grey pixels in a slot of their own, each in three values. The bins
+      // are centred on the hues (red is 345° to 15°), not started at them.
+      // Started at 0°, pure red sits on the edge between two bins and the
+      // codec's rounding splits it: the self-test's red-and-cyan grating read
+      // as four hues, and a red turning slowly towards magenta read as a
+      // composition change the moment it began, as its pixels crossed 0°.
+      const hb = H0 < 0 ? 12 : Math.floor((H0 + 15) / 30) % 12;
+      hv[hb * 3 + (mx < 0.15 ? 0 : mx < 0.5 ? 1 : 2)]++;
+      if (H0 >= 0 && mx > 0.15) {
+        coloured++;
+        hue12[hb]++;
         hue[H0 < 15 || H0 >= 330 ? 0 : H0 < 40 ? 1 : H0 < 70 ? 2 : H0 < 160 ? 3 : H0 < 200 ? 4 : H0 < 255 ? 5 : H0 < 290 ? 6 : 7]++;
       }
     }
@@ -368,7 +381,7 @@ async function watch() {
     const cur = new Float32Array(N);
     for (let i = 0, p = 0; p < N; i += 3, p++) cur[p] = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
     rows.push({ t: opt.from + k / rate, lum: lum / N, sat: sat / N, dark: dark / N, bright: bright / N,
-      motion: prev ? (diff / N) * 100 : 0, coloured, hue, hist: hist.map(v => v / N) });
+      motion: prev ? (diff / N) * 100 : 0, coloured, colour: coloured / N, hue, hue12, hist: hist.map(v => v / N), hv: hv.map(v => v / N) });
     prev = cur;
     const col = Buffer.alloc(H * 3);
     for (let y = 0; y < H; y++) px.copy(col, y * 3, (y * W + (W >> 1)) * 3, (y * W + (W >> 1)) * 3 + 3);
@@ -539,6 +552,14 @@ async function watch() {
     sync = { r0: pear(a, b), best: bestLag.r, lag: bestLag.lag / rate };
   }
 
+  const sh = shape({ rows, rate, span, cuts });
+  const f1 = x => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(1));
+  const shapeLines = [
+    `- shape: ${sh.swells.perMin.toFixed(1)} swells a minute (median gap ${f1(sh.swells.gap)} s, rise ${f1(sh.swells.rise)} s, decay ${f1(sh.swells.decay)} s, peak ${f1(sh.swells.peakOverMedian)}× the median); calm ${pct(sh.calm)} of the time; motion half-life ${f1(sh.halfLife)} s`,
+    `- near black ${pct(sh.black.p5)} to ${pct(sh.black.p95)} (5th to 95th percentile); ${sh.hues} hues a frame; ${sh.reorgPerMin.toFixed(1)} composition changes and ${sh.cutsPerMin.toFixed(1)} cuts a minute`,
+    ...(sh.sections ? [`- motion vs loudness by window: ${[1, 5, 10, 20].map(w => `${w} s ${sh.sections[w].r == null ? '–' : sh.sections[w].r.toFixed(2)}`).join(', ')}`] : []),
+  ];
+
   const buckets = Math.min(40, n);
   const table = ['| time | luma | dark | sat | motion | loud dB |', '|---|---|---|---|---|---|'];
   for (let b = 0; b < buckets; b++) {
@@ -558,6 +579,7 @@ async function watch() {
     `- colour: ${pct(colTot / (n * w * h))} of pixels are coloured; of those ${hues.map(([nme, v]) => `${nme} ${pct(v)}`).join(', ') || 'none'}`,
     `- motion (mean % change between samples): median ${q(motions, 0.5)?.toFixed(2) ?? 0}, 90th ${q(motions, 0.9)?.toFixed(2) ?? 0}, max ${q(motions, 1)?.toFixed(2) ?? 0}`,
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t)).join(', ') : 'none'}`,
+    ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
     '',
     'Read first: the timeline (how it moves over the whole clip), then the sheets.',
@@ -570,7 +592,169 @@ async function watch() {
   ];
   fs.writeFileSync(path.join(out, 'summary.md'), lines.join('\n') + '\n');
   if (!opt.quiet) console.log(lines.join('\n'));
-  return { out, rows, cuts, sync, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  return { out, rows, cuts, sync, shape: sh, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+}
+
+// ─── the show's shape ────────────────────────────────────────────────────────
+
+/**
+ * The shape of a show over minutes, in the units the footage study measured
+ * real liquid light shows in (/mnt/project-files/research/light-show/
+ * footage.md, "The same clips measured further"), so a take from the app can
+ * be put beside the Joshua Light Show and read in the same numbers.
+ *
+ * Why these and not the summary's. The summary says how busy a clip is on
+ * average; what separated the real shows from our plate was never the
+ * average. Across the live and historic shows, motion comes in swells (1.6
+ * to 3.7 a minute, each peaking at about two and a half times the median and
+ * falling away over 2 to 9 s), the plate is calm a fifth to two fifths of
+ * the time, the composition reorganises every 7 to 10 s without a cut, the
+ * near-black share of the frame swings over tens of percent, a frame holds
+ * two or three hues, and motion follows loudness only over whole sections,
+ * never beat by beat. `phrasing.ts` says our plate is equally busy all the
+ * time; these are the numbers that would show it, and show it change.
+ *
+ * Every window is in seconds, not samples. That makes a take watched at ten
+ * samples a second comparable with a reference watched at four, but not
+ * equal: motion is the change between samples, and more change builds up
+ * over a quarter of a second than a tenth (clip D reads a peak of 7.4 times
+ * the median at ten and 5.3 at four). Compare at the same rate; `film`
+ * watches at four, as the footage study did. Cut samples are left
+ * out of everything that reads motion: a cut is the editor's, not the
+ * plate's.
+ *
+ *   swells       episodes where motion (smoothed over 1.25 s) rises past 1.8
+ *                times its median to a peak that is the highest within 2 s,
+ *                at least 4 s after the last; per minute, the median gap,
+ *                the median rise and decay (to and from half the peak), and
+ *                the median peak over the median. A rise or decay that runs
+ *                off the end of the clip is not counted.
+ *   calm         the share of samples under a third of the 90th percentile.
+ *   halfLife     how long motion stays like itself: the first lag at which
+ *                its autocorrelation drops under 0.5.
+ *   black        the near-black share of the frame: mean, and the 5th and
+ *                95th percentiles over samples, so "performed black" (a
+ *                flood, then a fade) reads as a wide range.
+ *   hues         the median, over samples, of how many 30° hues hold at least
+ *                8% of the coloured pixels (0 when under 5% of the frame is
+ *                coloured at all).
+ *   reorgPerMin  times the colour-and-brightness histogram (twelve hues and
+ *                grey, three values each) moves by more than half its mass
+ *                over 3 s, at least 5 s apart: a composition change, with or
+ *                without a cut. Colour only: the histogram has no
+ *                position, so shapes rearranging in the same colours are
+ *                not counted.
+ *   still        true when the median sample changes under 0.1%;
+ *                swells, calm and half-life are then NaN or null, not
+ *                numbers about nothing.
+ *   sections     motion against loudness over windows of 1, 5, 10 and 20 s
+ *                (means, loudness as amplitude), null with under five
+ *                windows. The real shows score about zero at 1 s; the one
+ *                unedited live show rose to 0.4 at 20 s.
+ */
+const FREEZE_FLOOR = 0.005;   // % change a sample: under it, the frame did not change (see freezes())
+const STILL = 0.1;            // % change a sample at the median: under it, the take is a still (see shape())
+
+export function shape({ rows, rate, span, cuts = [] }) {
+  const n = rows.length;
+  const med = a => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[s.length >> 1] : NaN; };
+  const q = (a, p) => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : NaN; };
+  const sec = x => Math.max(1, Math.round(x * rate));
+  const m = rows.map((r, k) => (k === 0 || r.cut ? NaN : r.motion));
+
+  const hw = Math.round(1.25 * rate) >> 1;   // a window 1.25 s wide: five samples at 4 a second
+  const sm = m.map((_, i) => {
+    let s = 0, c = 0;
+    for (let k = Math.max(0, i - hw); k <= Math.min(n - 1, i + hw); k++) if (Number.isFinite(m[k])) { s += m[k]; c++; }
+    return c ? s / c : NaN;
+  });
+  // A plate that is not moving has no shape to measure: a swell is then any
+  // codec blip over nothing, and "calm" divides by a 90th percentile of
+  // nothing. The review of the first version found a clip frozen for two
+  // thirds of its length read five swells a minute. So below STILL at the
+  // median the motion measures refuse, and say why. Not the freeze floor:
+  // a repeated frame through libvpx reads 0.01% a sample, not zero (clip E
+  // below), and a frozen plate with its grain 0.03–0.08% (`npm run moving`
+  // on Metal), while the stillest real show measured, a bar in 2016, has a
+  // median of 1.1 and the app's soap film 0.7.
+  const still = !(med(m) >= STILL);
+  const smMed = med(sm), near = sec(2), apart = sec(4);
+  const peaks = [];
+  for (let i = 0; i < n; i++) {
+    if (!(sm[i] > 1.8 * smMed)) continue;
+    let top = true;
+    for (let k = Math.max(0, i - near); k <= Math.min(n - 1, i + near) && top; k++) if (sm[k] > sm[i] || (sm[k] === sm[i] && k < i)) top = false;
+    if (top && (!peaks.length || i - peaks.at(-1) >= apart)) peaks.push(i);
+  }
+  const rise = [], decay = [];
+  for (const p of peaks) {
+    let j = p; while (j < n && !(sm[j] <= sm[p] / 2)) j++;
+    if (j < n) decay.push((j - p) / rate);
+    let k = p; while (k >= 0 && !(sm[k] <= sm[p] / 2)) k--;
+    if (k >= 0) rise.push((p - k) / rate);
+  }
+  const minutes = span / 60;
+  const swells = still ? { at: [], perMin: NaN, gap: NaN, rise: NaN, decay: NaN, peakOverMedian: NaN } : {
+    at: peaks.map(p => rows[p].t),
+    perMin: peaks.length / minutes,
+    gap: med(peaks.slice(1).map((p, i) => (p - peaks[i]) / rate)),
+    rise: med(rise), decay: med(decay),
+    peakOverMedian: med(peaks.map(p => sm[p])) / smMed,
+  };
+
+  const p90 = q(m, 0.9), valid = m.filter(Number.isFinite);
+  const calm = !still && valid.length ? valid.filter(x => x < p90 / 3).length / valid.length : NaN;
+
+  let halfLife = null;
+  if (!still && valid.length > 8) {
+    const mu = valid.reduce((a, b) => a + b, 0) / valid.length;
+    const v = valid.reduce((a, b) => a + (b - mu) ** 2, 0) / valid.length;
+    for (let lag = 1; v > 0 && lag < valid.length / 2; lag++) {
+      let c = 0; for (let i = 0; i + lag < valid.length; i++) c += (valid[i] - mu) * (valid[i + lag] - mu);
+      if (c / ((valid.length - lag) * v) < 0.5) { halfLife = lag / rate; break; }
+    }
+  }
+
+  const dark = rows.map(r => r.dark);
+  const black = { mean: dark.reduce((a, b) => a + b, 0) / n, p5: q(dark, 0.05), p95: q(dark, 0.95) };
+
+  const hues = med(rows.map(r => (r.colour < 0.05 ? 0 : [...r.hue12].filter(c => c / r.coloured >= 0.08).length)));
+
+  const lag3 = sec(3), gap5 = sec(5);
+  const reorgAt = [];
+  for (let k = lag3; k < n; k++) {
+    let d = 0; for (let i = 0; i < rows[k].hv.length; i++) d += Math.abs(rows[k].hv[i] - rows[k - lag3].hv[i]);
+    if (d > 0.5 && (!reorgAt.length || k - reorgAt.at(-1) >= gap5)) reorgAt.push(k);
+  }
+
+  let sections = null;
+  if (rows.some(r => r.loud != null)) {
+    const pear = (a, b) => {
+      const c = a.length, ma = a.reduce((s, x) => s + x, 0) / c, mb = b.reduce((s, x) => s + x, 0) / c;
+      let sab = 0, saa = 0, sbb = 0;
+      for (let i = 0; i < c; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+      // Nothing to correlate when either side is flat: a silent track, or a
+      // band at one level throughout. The sums of squares are then rounding
+      // (a silent take read r = 1e-16 and a steady -20 dB read -0.53), so
+      // flat means a spread under a millionth of the mean, and r is null.
+      const flat = (ss, mean) => Math.sqrt(ss / c) <= 1e-6 * Math.abs(mean);
+      if (flat(saa, ma) || flat(sbb, mb)) return null;
+      return sab / Math.sqrt(saa * sbb);
+    };
+    sections = {};
+    for (const win of [1, 5, 10, 20]) {
+      const k = sec(win), M = [], L = [];
+      for (let i = 0; i + k <= n; i += k) {
+        const g = rows.slice(i, i + k).map((r, j) => [m[i + j], 10 ** ((r.loud ?? -80) / 20)]).filter(([x]) => Number.isFinite(x));
+        if (g.length < k / 2) continue;
+        M.push(g.reduce((s, [x]) => s + x, 0) / g.length); L.push(g.reduce((s, [, y]) => s + y, 0) / g.length);
+      }
+      sections[win] = M.length >= 5 ? { r: pear(M, L), windows: M.length } : { r: null, windows: M.length };
+    }
+  }
+
+  return { still, swells, calm, halfLife, black, hues, reorgPerMin: reorgAt.length / minutes, reorgAt: reorgAt.map(k => rows[k].t),
+    cutsPerMin: cuts.length / minutes, sections };
 }
 
 // ─── self-test ───────────────────────────────────────────────────────────────
@@ -627,6 +811,14 @@ const square = (img, x) => { for (let y = 70; y < 110; y++) for (let xx = x; xx 
  * C: calm, a hard cut at 2.0 s into stripes sweeping fast (every sample
  * changes far more than 8%, and none of it is a cut), then a dissolve over
  * two samples at 4.0 s into calm blue, which is one cut, not two.
+ * D, a minute, for the show's shape: a two-colour grating drifting right at
+ * half a pixel a frame, surging to four in three swells at 6, 18 and 30 s
+ * and never after; its colours crossfading from red and cyan to magenta and
+ * green between 24 and 27 s (one composition change, no cut), and the top
+ * 30% of it turning back from 45 s (a partial change, not a composition); a
+ * yellow band along the bottom; a black strip on the left widening from 10%
+ * to 80% of the frame over the minute; and a tone whose loudness follows the
+ * swells. D again, silent and then frozen, for what shape() must refuse.
  */
 async function selftest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'watch-selftest-'));
@@ -662,6 +854,37 @@ async function selftest() {
   const A = await run(await makeClip(dir, 'a', { sec: 6, frame: frameA, sound: beep }));
   const B = await run(await makeClip(dir, 'b', { sec: 6, frame: frameA, sound: beep, delay: 0.5 }));
   const C = await run(await makeClip(dir, 'c', { sec: 6, frame: frameC, sound: () => 0 }));
+
+  const SWELLS = [6, 18, 30];
+  // Each swell rises slowly (σ 2.5 s) and falls fast (σ 1 s), so a rise and
+  // a decay swapped read wrong.
+  const bump = (t, c) => Math.exp(-((t - c) ** 2) / (2 * (t < c ? 2.5 : 1) ** 2));
+  const speed = t => 0.5 + 3.5 * SWELLS.reduce((a, c) => a + bump(t, c), 0);
+  const drift = [0];
+  for (let f = 1; f < SFPS * 60; f++) drift.push(drift[f - 1] + speed(f / SFPS));
+  const mixc = (a, b, u) => a.map((v, i) => v * (1 - u) + b[i] * u);
+  const RED = [255, 0, 0], CYAN = [0, 255, 255], MAGENTA = [255, 0, 255], GREEN = [0, 255, 0];
+  const TOP = Math.round(0.3 * SH_), BAND = SH_ - Math.round(0.15 * SH_);
+  const frameD = f => {
+    const t = f / SFPS, u = Math.max(0, Math.min(1, (t - 24) / 3)), v = Math.max(0, Math.min(1, (t - 45) / 3));
+    const c1 = mixc(RED, MAGENTA, u), c2 = mixc(CYAN, GREEN, u);
+    // The top 30% of rows turn back to red and cyan from 45 s: a real but
+    // partial change of colour, too small to be a new composition.
+    const t1 = mixc(c1, RED, v), t2 = mixc(c2, CYAN, v);
+    const edge = Math.round((0.1 + (0.7 * t) / 60) * SW_);
+    const top = Buffer.alloc(SW_ * 3), mid = Buffer.alloc(SW_ * 3), band = Buffer.alloc(SW_ * 3);
+    for (let xx = edge; xx < SW_; xx++) {
+      const g = 0.5 + 0.5 * Math.sin((2 * Math.PI * (xx - drift[f])) / 64);
+      top.set(mixc(t1, t2, g).map(Math.round), xx * 3);
+      mid.set(mixc(c1, c2, g).map(Math.round), xx * 3);
+      band.set([255, 255, 0], xx * 3);
+    }
+    const img = Buffer.alloc(SW_ * SH_ * 3);
+    for (let y = 0; y < SH_; y++) (y < TOP ? top : y < BAND ? mid : band).copy(img, y * SW_ * 3);
+    return img;
+  };
+  const D = await run(await makeClip(dir, 'd', { sec: 60, frame: frameD, sound: t => 3000 * speed(t) * Math.sin(2 * Math.PI * 440 * t) }));
+  const E = await run(await makeClip(dir, 'e', { sec: 60, frame: f => frameD(Math.min(f, SFPS * 20)), sound: () => 0 }));
 
   const checks = [];
   const check = (name, ok, detail) => { checks.push(!!ok); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name} — ${detail}`); };
@@ -720,6 +943,58 @@ async function selftest() {
   check('C at 1.5 s: that and 4.1–6.0 s; A: none', fz.length === 2 && near(fz[1].from, 4.1) && near(fz[1].to, 6) && !fzA.length,
     `C: ${show(fz)}; A: ${show(fzA)}`);
 
+  // D's answers come from how it was made. Where a number depends on the
+  // motion's exact size (rise, decay, peak, calm, half-life), the answer is
+  // the same measure worked out on D's raw frames before the codec, by a
+  // separate script written from the definitions in shape()'s comment: peaks
+  // at 5.7, 17.7 and 29.7 s, rise 3.3 s, decay 1.8 s, peak 6.65 times the
+  // median, calm 66.3%, half-life 2.7 s. The codec blurs a little, hence the
+  // margins; each is narrower than the error it is there to catch (a rise
+  // and decay swapped, a gap left in samples, a peak divided by 2.5, a calm
+  // bar moved from a third to a half, no smoothing: the check-skeptic review
+  // found the first version of these passed all of those).
+  //
+  // Swells: exactly the three, each within a second of where it was made,
+  // and nothing in the flat half-minute after (a detector that finds a peak
+  // in every bit of noise fails there). Black: the strip's width at the 5th
+  // and 95th percentile of the minute. Hues: red, cyan and the yellow band
+  // (16% of the coloured pixels, so the 8% bar matters), and later magenta
+  // and green with it. One composition change, inside the crossfade at
+  // 24–27 s; the partial one at 45–48 s moves about a tenth of the frame's
+  // colour and must not count. The loudness follows the swells, so it
+  // correlates with motion at 1 s and over 5 s windows; a minute holds only
+  // three 20 s windows, too few to say.
+  const sh = D.shape, f2 = x => (x == null || !Number.isFinite(x) ? String(x) : x.toFixed(2));
+  const within = (x, v, tol) => Number.isFinite(x) && Math.abs(x - v) <= tol;
+  check('D: three swells, at 6, 18 and 30 s, 12 s apart, none after',
+    sh.swells.at.length === 3 && sh.swells.at.every((t, i) => Math.abs(t - SWELLS[i]) <= 1) && within(sh.swells.gap, 12, 0.5),
+    `swells at ${sh.swells.at.map(t => t.toFixed(1)).join(', ') || 'none'} s, gap ${f2(sh.swells.gap)} s`);
+  check('D: each rises in about 3.3 s and decays in about 1.8',
+    within(sh.swells.rise, 3.3, 0.6) && within(sh.swells.decay, 1.8, 0.5) && sh.swells.rise > sh.swells.decay,
+    `rise ${f2(sh.swells.rise)} s, decay ${f2(sh.swells.decay)} s`);
+  check('D: a swell peaks at about 6.65 times the median', within(sh.swells.peakOverMedian, 6.65, 1.3), `${f2(sh.swells.peakOverMedian)}×`);
+  check('D: calm about 66% of the time, and motion stays like itself about 2.7 s',
+    within(sh.calm, 0.663, 0.05) && within(sh.halfLife, 2.7, 0.6), `calm ${f2(sh.calm)}, half-life ${f2(sh.halfLife)} s`);
+  check('D: near black from 13.5% to 76.5% (the strip at the 5th and 95th percentile)',
+    within(sh.black.p5, 0.135, 0.03) && within(sh.black.p95, 0.765, 0.03), `${f2(sh.black.p5)} to ${f2(sh.black.p95)}`);
+  check('D: three hues a frame', sh.hues === 3, `${sh.hues}`);
+  check('D: one composition change, in the crossfade at 24–27 s, not the partial one at 45, and no cut',
+    sh.reorgAt.length === 1 && sh.reorgAt[0] >= 24 && sh.reorgAt[0] <= 28 && !D.cuts.length,
+    `changes at ${sh.reorgAt.map(t => t.toFixed(1)).join(', ') || 'none'} s; cuts at ${ts(D)}`);
+  check('D: loudness follows motion at 1 s and over 5 s windows; 20 s windows are too few to say',
+    sh.sections?.[1]?.r > 0.8 && sh.sections?.[5]?.r > 0.8 && sh.sections?.[20]?.r === null && sh.sections?.[20]?.windows === 3,
+    sh.sections ? `1 s r ${f2(sh.sections[1].r)}, 5 s r ${f2(sh.sections[5].r)}; 20 s r ${f2(sh.sections[20].r)} over ${sh.sections[20].windows}` : 'no audio read');
+
+  const q50 = a => [...a].sort((x, y) => x - y)[a.length >> 1];
+  // E is D stopped at 20 s (every frame after it the same) with no sound: a
+  // stopped renderer, and a silent track. It must not be given a shape.
+  const eh = E.shape, allNull = eh.sections && [1, 5, 10, 20].every(w => eh.sections[w].r === null);
+  check('E, frozen from 20 s: no swells, no calm, no half-life, and it says so',
+    eh.still === true && !sh.still && Number.isNaN(eh.swells.perMin) && !eh.swells.at.length && Number.isNaN(eh.calm) && eh.halfLife === null,
+    `still ${eh.still} (D ${sh.still}), frozen samples ${f2(q50(E.rows.filter(r => r.t > 21).map(r => r.motion)))}% at the median, swells ${f2(eh.swells.perMin)}, calm ${f2(eh.calm)}, half-life ${f2(eh.halfLife)}`);
+  check('E, silent: no correlation with a sound that is not there', allNull,
+    eh.sections ? [1, 5, 10, 20].map(w => `${w} s ${f2(eh.sections[w].r)}`).join(', ') : 'no audio track read');
+
   const bad = checks.filter(v => !v).length;
   console.log(bad ? `\n${bad} FAIL` : '\nall ok');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -753,7 +1028,7 @@ export async function watchVideo(input, options = {}) {
  * slowest moving plate is orders above that. A bar near the slow plate would
  * call a calm look a freeze.
  */
-export function freezes(r, { below = 0.005, minSeconds = 2 } = {}) {
+export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2 } = {}) {
   const out = [];
   let start = -1;
   const rows = r.rows;
@@ -773,7 +1048,7 @@ export function freezes(r, { below = 0.005, minSeconds = 2 } = {}) {
   return out;
 }
 
-export { WatchError };
+export { WatchError, FREEZE_FLOOR, STILL };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

@@ -547,6 +547,15 @@ export default function RemoteControl() {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
+            Only while a maze is on the plate, as the macro dials are only
+            there with the closeup on: the phone is a surface for the show,
+            not a copy of the settings, and Maze Detail does nothing without
+            Labyrinth. With it, how fine the fingers are is worth a thumb.
+          */}
+          {(settings?.ferroLabyrinth ?? 0) > 0.001 && (
+            <Slider label="Maze Detail" field="mazeDetail" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
+          )}
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
