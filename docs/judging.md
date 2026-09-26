@@ -104,7 +104,50 @@ the frame from 43 ms to 18. On frozen frames the two paths come out within one
 If a highlight or an interface line looks faceted, softer or shifted with it
 on, that is the thing to report.
 
-## 7. The closeup's cells, riding the paint
+## 7. Drops, not rings
+
+`beadDrops` (Settings, Show, under Oil Beads; MIDI-learnable) turns the beads from
+dark-rimmed lenses into drops of colour: each takes a dye from the look's palette,
+is a lens over what is under it (see below), presses flat against
+its neighbours, and keeps a smaller drop it swallowed visible inside it for
+fifteen to thirty-five seconds. It ships at zero everywhere, so nothing changes
+until you ask. `npm run drops` measures the field and the mask; the lab
+photographed the shading on software WebGPU, which cannot say whether it looks
+like oil or like sweets.
+
+```
+?set=beads=0.8;beadDrops=1       Fillmore's field, all drops
+?set=beads=0.8;beadDrops=0.5     half way: rings taking on colour
+```
+
+Three things to look at. Whether a crowd reads as liquid or as candy:
+after your "very cartoon like", the beads and drops were matched to
+photographs and then to the optics of a projector, and you chose both. On the
+plate each drop is drawn as a projector throws it: its middle upright and as
+bright as the plate, and dark round its edge where the curve bends the light
+out of the lens, the outer three tenths of a droplet and a hair round a big
+pool. Zoom into the closeup and it is drawn as a camera sees it: a small drop
+shows the plate round it upside down, a big one is flat on top, a thin dark
+line at the contact. No highlight in either. How dark the edge is comes from
+one number, the projector's effective aperture (NA 0.25 in `plate.ts`); the
+bare lens of an overhead projector (0.08) blacks out two thirds of every
+droplet, which is how the physics reads but was a field of black doughnuts in
+the lab, so tell me if the edges want to be heavier or lighter. A narrower
+gap (a press, or the plate's curve) flattens every drop and thins every edge,
+since the gap sets where a ball becomes a pool: Clock Glass, whose glasses bow
+apart in the middle, now has rounder drops there and thin-edged pools near its
+rim. Zooming in, the drops change from the projector's to the camera's near
+1.45x, all at once over a few hundredths of the zoom; say if that reads as a
+jump. The closeup's lens is measured with the closeup's own paint
+detail (cells, lacing, relief) turned off, since that is laid over the whole
+frame; with it on, whether a drop still reads as a lens is for your eye. This changes the rings in every look
+that has beads, not only the drops. And the frame time: the drops' mask
+is drawn a pixel at a time on the main thread: about 15 ms for the crowd of
+about 530 with droplets and curved walls (11 to 12 with straight ones), against 6.7 ms for the 330 without them and the
+rings' canvas at 3.9, in the sandbox's Chromium. If
+`frameMs` climbs with it on, that is the number to report.
+
+## 8. The closeup's cells, riding the paint
 
 At about 6x the closeup's drawn cells and lacing used to shake: they slid by
 the flow times the frame's own measured time, and a browser's frames are never
@@ -125,6 +168,38 @@ whether the cells hop. The solver keeps its velocity in half float, and on the f
 changing flow crossing one of its steps can still hop the cells by about a
 frame's travel (`npm run cellride` prints it); if that shows, the fixes are a
 full-float velocity or shorter-lived cells when zoomed in.
+
+## 9. Bubbles as air pockets
+
+The bubbles were drawn as a camera with a front light sees a soap bubble: a
+bright crescent, a white highlight, film colour round the rim. The research on
+bubbles and drops found that a bubble between a projector's glasses is none of
+that. It is a pocket of air, and its curved edge bends the lamp's light three
+times as hard as an oil drop does, out of the projection lens. So on the plate
+a small bubble is now a dark disc round a pin-point of light, and a big one a
+clear, flat window edged in a dark band about two cells wide, narrower when
+the glasses are pressed. No highlight unless the second lamp is on, and no
+film colour at the default Iridescence; the looks that set it higher (0.6,
+0.9) still get a soap film over the window. Below the default the plate's
+bubbles have none at all, so on the plate Iridescence now does something only
+from a quarter up (the closeup's bubbles still use the whole range). Zoom into the closeup and the
+bubbles are the camera's again, shine and film as before, changing over near
+1.45x as the drops do. `npm run airlens` measures it on one bubble.
+
+```
+?set=bubbles=0.6              any look, bubbles on
+```
+
+Three things to look at. Whether a field of small bubbles reads as air in
+liquid or as pepper: the physics says small ones are nearly black, and that
+is how air reads in footage of real projected shows, but the same effective
+aperture as the drops sets how dark (`AIR_DARK` and `DROP_NA` in `plate.ts`),
+so say if they want to be lighter. Whether the big bubbles' band reads as an
+edge or as a cartoon outline; its inner edge is sharp to a pixel, as a
+focused projector draws it. And on a pressed plate, the band is drawn two or
+three pixels (at 3x) wider than the gap says, since it is then thinner than
+the air field can place (`npm run airlens` prints it). This changes the
+bubbles in every look that has them.
 
 ---
 

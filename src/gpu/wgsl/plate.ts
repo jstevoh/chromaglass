@@ -1037,37 +1037,234 @@ fn viewAt(uv: vec2f) -> View {
 }
 
 /*
-  A drop of oil sitting on the plate is a lens: a spherical cap, thick in the
-  middle and thin at its edge, so what lies under it is seen magnified at the
-  centre and squeezed toward the rim, the way a drop under a microscope shows
-  the pattern beneath it bigger than the pattern round it.
+  A drop of oil sitting on the plate is a lens, and what it shows depends on
+  who is looking through it. The owner chose "both" (the "Drops, not rings"
+  thread): the plate is drawn as a projector throws it, and the macro
+  closeup as a camera sees it, because the two really do differ and the
+  photographs that started this were all taken with a camera.
+
+  **A camera looking through the drop** (the closeup, U.macroOn) sees what
+  the macro photographs show:
+
+  - **A small drop is a ball lens, and it turns the world over.** Its eye is
+    past its focus, so it shows a small, upside-down picture of the plate
+    round it: where a yellow and a blue meet beside the drop, the drop shows
+    the blue on the yellow's side. That is what makes a cluster of droplets
+    read as liquid rather than as dots.
+  - **A big drop is a pancake**, flat on top once it is wider than the
+    meniscus is tall, so its middle is a window onto what is under it, seen
+    as it is. Only the curved band at its edge bends light, and it bends it
+    hard: that band shows a sliver of the far side, flipped, the crescent of
+    the wrong colour along one edge of every large drop in the pictures.
+
+  So the sample under a point at radius r (0 centre, 1 rim) is pushed toward
+  the centre and past it by an amount set by the surface's slope there. On
+  a small drop the slope climbs from the middle, so the push grows with r
+  and the whole drop is one inverted view. On a big one it is zero across
+  the flat and climbs across the band.
+
+  How far past a drop its view reaches is not a number of its own radii.
+  The first version pushed by three radii, which gave every drop a view of
+  the plate within a radius or two of itself, one colour, since the dye
+  changes over a much larger distance than a bead is wide. The owner, on
+  the macro photographs: "some of the bubbles have multiple background
+  colors in them". A drop's view is set by what it looks through to, and
+  that is the same for every drop, so each is a push of DROP_INVERT radii
+  plus a fixed DROP_REACH of the plate: a big drop's crescent reaches a
+  little past its far side, and a droplet a tenth its size shows, turned
+  over, much the same stretch of plate the big one does, which is how a
+  cluster of droplets in the photographs each carry the same small
+  picture of the colours round them.
+
+  **A projector focused on the plate** sees none of that, and the research
+  (bubbles-and-drops.md in the project's shared files, item 1, with ray
+  traces) says why. The projection lens is focused on the dye, not on
+  anything through the drop, so nothing is turned over; and it takes in only
+  the rays within its aperture. A ray crossing the drop's curved surface a
+  fraction u of the way out is bent by about 2u(1 - n_water/n_oil), and once
+  that is more than the aperture the lens never sees it: that part of the
+  screen is black. So a projected drop is a bright middle out to
+  u* = NA / (2 n_water |1 - n_water/n_oil|) of its curved part and black
+  beyond it, with at most the slight upright magnification of a lens the
+  dye sits just under: M = f/(f - d), about 1.2 for dye a radius under a
+  ball of focal length 5.4 radii. Ryu, Zhang and Emeigh (2022) measured the
+  black annulus of drops between plates and the same arithmetic gives their
+  widths within a few per cent. That is the "dark ring round a bright
+  point" of every projected show, thick on a droplet and a hair on a big
+  pool; the thin line the camera view draws is only its outer edge.
+
+  **What sets flat**, in both views, is the gap between the glasses, not a
+  size of its own (item 3). A drop the glasses do not squeeze, one of
+  radius under half the gap, is a sphere; gravity would flatten it only at
+  the oil-water capillary length, several millimetres. A bigger drop is a
+  disc as thick as the gap with a half-round edge of radius gap/2, so its
+  curved band is gap/2 wide whatever its size, and a press (a smaller gap)
+  flattens every drop at once and thins every rim, as it does in a dish.
+  There is no attempt to join the view to the plate outside at the rim:
+  real ones do not either, and the dark line at the contact (the shading,
+  below) is where the jump goes.
 
   The bead mask's blue is a ramp 1 - d/R (d from the bead's centre, R its
   radius), times the bead's fade in red. Its gradient points at the centre
   with length 1/R, so from any point inside, the centre is (1 - h)/|grad h|
-  away along it, which finds the drop's middle without a list of beads. The
-  point at radius r (0 centre, 1 rim) shows what lies at radius rs, with rs =
-  r(a + (1 - a) r^2): a = 1/magnification at the centre, and rs = r at the
-  rim, so the view joins the plate outside without a seam.
+  away along it, which finds the drop's middle and its size without a list
+  of beads.
 
-  Returns the offset to add (plate uv) and r, or r = -1 outside every drop.
+  Returns the offset to add (plate uv), r, and R in plate uv (0 where the
+  gradient is too flat to say, at a drop's very centre); r = -1 outside
+  every drop.
+
+  The mask comes in two shapes. The rings' is square. Once drops are asked for
+  (beadDrops, PLAN.md batch 3) it is twice as wide, with each drop's colour
+  in the right half, because this pass already binds sixteen sampled textures
+  and that is WebGPU's default ceiling for one stage. The shape is read from
+  the texture itself rather than from the setting, so a mask and the frame
+  that reads it can never disagree about the layout: the setting moves on the
+  frame it is changed, the mask only on the next frame the beads are drawn.
 */
-const DROP_MAGNIFY: f32 = 1.7;
-fn dropLens(uv: vec2f) -> vec3f {
-  let px = 1.0 / f32(textureDimensions(beadTex).x);
-  let m = tex2(beadTex, uv);
-  if (m.r < 0.02) { return vec3f(0.0, 0.0, -1.0); }
+const DROP_INVERT: f32 = 3.0;
+const DROP_REACH: f32 = 0.06;
+/** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
+const DROP_BIGGEST: f32 = 0.045;
+/*
+  The projector. A ray crossing a round surface u of the way out meets it at
+  a slope u/sqrt(1 - u^2), and two refractions bend it by about
+  2 (1 - n_water/n_oil) times that slope; the lens loses it once that times
+  n_water is more than its numerical aperture. So the bright core ends where
+  the slope reaches X = NA / (2 n_water (1 - n_water/n_oil)), at
+  u* = X / sqrt(1 + X^2) of the curved part. (The research's table uses the
+  small-angle form, u* = X, which is the same for a narrow core and says
+  nothing near the edge, where a real meniscus always goes steep.)
+
+  Which NA. The lens of an overhead projector alone takes in about 0.05 to
+  0.1, which blacks out two thirds of every droplet: drawn that way the
+  plate was a field of black doughnuts, and neither photograph of a real
+  projected show has that (hairline edges on the pools, small drops as pale
+  dots). The lamp is not a point: the condenser fills the lens from a
+  spread of directions, so a ray bent less than that spread still gets in.
+  The one measurement in the research, Ryu, Zhang and Emeigh's dark annuli
+  of drops between plates, was matched by an effective NA of 0.30 to 0.35;
+  0.25 sits between that and the bare lens. Oil 1.47 in water 1.333 then
+  gives X = 1.0 and a core of 0.71: a droplet ringed in black over its outer
+  three tenths round a bright middle, and a pool edged in a hair three
+  tenths of half the gap wide.
+*/
+const DROP_NA: f32 = 0.25;
+const N_WATER: f32 = 1.333;
+const N_OIL: f32 = 1.47;
+const DROP_X: f32 = DROP_NA / (2.0 * N_WATER * (1.0 - N_WATER / N_OIL));
+const DROP_CORE: f32 = DROP_X / sqrt(1.0 + DROP_X * DROP_X);
+/*
+  An air bubble, by the same arithmetic. Air (1.0) in water bends light the
+  other way from oil, and far harder: 1 - n_water/n_air is a third, where
+  oil's 1 - n_water/n_oil is a tenth. So at the same aperture the slope
+  that loses a ray is 0.28, not 1.0, and the core is 0.27 of the curved
+  part: a small bubble is a dark disc round a pin-point, a big one a clear
+  window edged in a band 0.73 of half the gap wide, two and a half times a
+  drop's hair. (The research's table has 0.78 to 0.94 of the radius dark
+  for the bare lens; 0.73 is the same effective aperture the drops use.)
+*/
+const N_AIR: f32 = 1.0;
+const AIR_X: f32 = DROP_NA / (2.0 * N_WATER * (N_WATER / N_AIR - 1.0));
+const AIR_CORE: f32 = AIR_X / sqrt(1.0 + AIR_X * AIR_X);
+/** How much of the plate's light the band takes: it leaves a tenth, less than a drop's 0.15, the bend being three times as hard. */
+const AIR_DARK: f32 = 0.9;
+/** The upright magnification a projected ball gives the dye just under it, M = f/(f - d) at d = R, f = 5.4R. */
+const DROP_MAG: f32 = 1.23;
+/*
+  Half the gap at rest, as a radius in plate uv: the size at which a drop
+  stops being a ball and starts being a pancake. Before the gap set it, a
+  drop was round up to three cells of the 192 grid, the common bead, and
+  mostly flat by six and a half; three cells at rest keeps the common bead
+  a ball (at 2.3 it came out a fifth flat, and the camera's view through it
+  lost a third of its turn: npm run droplens). The gap (0.03 in the
+  solver's units at rest) scales it: a press to half the gap halves every
+  meniscus.
+*/
+const DROP_HALF_GAP: f32 = 0.016;
+/** Half the gap where the last dropLens call found a drop (it reads it only there). */
+var<private> dropRho: f32 = DROP_HALF_GAP;
+/** Half the gap at uv, in plate uv. */
+fn dropHalfGap(uv: vec2f) -> f32 {
+  let g = viewAt(uv).gap;
+  return DROP_HALF_GAP * select(1.0, clamp(g / 0.03, 0.3, 3.0), g > 0.001);
+}
+fn beadWide() -> bool {
+  let d = textureDimensions(beadTex);
+  return d.x > d.y;
+}
+/** Plate uv to the mask's own. Wide, the read is kept off the seam, where a
+    bilinear tap would pick up the colour half's first column as a drop. */
+fn beadAt(uv: vec2f) -> vec4f {
+  if (!beadWide()) { return tex2(beadTex, uv); }
+  let w = f32(textureDimensions(beadTex).x);
+  return tex2(beadTex, vec2f(clamp(uv.x * 0.5, 0.5 / w, 0.5 - 1.0 / w), uv.y));
+}
+/** The drop's colour at uv, as seen lit; only a wide mask has one. */
+fn beadColour(uv: vec2f) -> vec3f {
+  let w = f32(textureDimensions(beadTex).x);
+  return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
+}
+/** How much of a drop of radius R (plate uv) is flat on top, for half the
+    gap rho: none for a ball (R under rho), and all but its half-round edge,
+    rho wide, for a pancake. */
+fn dropFlat(R: f32, rho: f32) -> f32 {
+  return clamp(1.0 - rho / max(R, 1e-5), 0.0, 0.95);
+}
+/** Where on its meniscus a point is: 0 on the flat top (or the middle of a
+    small drop), 1 at the contact. */
+fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
+  let f = dropFlat(R, rho);
+  return clamp((r - f) / (1.0 - f), 0.0, 1.0);
+}
+fn dropLens(uv: vec2f, cam: f32) -> vec4f {
+  // One texel of the plate either way; the height is the plate's in both shapes.
+  let px = 1.0 / f32(textureDimensions(beadTex).y);
+  let m = beadAt(uv);
+  if (m.r < 0.02) { return vec4f(0.0, 0.0, -1.0, 0.0); }
+  // The gap, read only under a drop: four packed texels, too many for every
+  // pixel of every look with beads.
+  let rho = dropHalfGap(uv);
+  dropRho = rho;
   let h = clamp(m.b / m.r, 0.0, 1.0);
-  let hx = tex2(beadTex, uv + vec2f(px, 0.0)); let hx2 = tex2(beadTex, uv - vec2f(px, 0.0));
-  let hy = tex2(beadTex, uv + vec2f(0.0, px)); let hy2 = tex2(beadTex, uv - vec2f(0.0, px));
+  let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
+  let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
   let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
   let g2 = dot(g, g);
   let r = clamp(1.0 - h, 0.0, 1.0);
-  if (g2 < 1.0) { return vec3f(0.0, 0.0, r); }
-  let toC = g * (1.0 - h) / g2;
-  let a = 1.0 / DROP_MAGNIFY;
-  let rs = r * (a + (1.0 - a) * r * r);
-  return vec3f(toC * (1.0 - rs / max(r, 1e-4)), r);
+  if (g2 < 1.0) { return vec4f(0.0, 0.0, r, 0.0); }
+  /*
+    No drop is bigger than DROP_BIGGEST. Where the taps straddle the wall
+    between two drops of a size, the dome is nearly level across them, the
+    size it implies runs up to the whole plate, and a push of three radii
+    read the plate from up to three plate-widths away: eight in a hundred
+    fragments of a crowd at 3x sampled farther than any drop can see, most
+    within a texel of a wall (a copy of this arithmetic run on the drops
+    check's crowd). Held to the biggest drop, a wall shows a nearby patch.
+  */
+  let R = min(inverseSqrt(g2), DROP_BIGGEST);
+  // toC runs from here to the centre, r radii long.
+  let toC = normalize(g) * r * R;
+  /*
+    The push comes in with the mask's coverage rather than at a threshold.
+    The outermost texels of a drop are its antialiasing, and there both the
+    dome and the coverage are a few steps of eight bits, so the centre they
+    point at can be anywhere; pushed in full, those texels showed a patch of
+    plate from well outside the drop, a staircase of odd pixels round every
+    rim at 3x. Faded in over the edge they show the plate beside them, as
+    the coverage there says most of the texel is.
+  */
+  let band = dropBand(r, R, rho);
+  let cover = smoothstep(0.02, 0.6, m.r);
+  // The camera's push: past the centre, in radii.
+  let turned = (DROP_INVERT + DROP_REACH / max(R, px)) * band;
+  // The projector's: toward the centre by r(1 - 1/M) radii, which puts the
+  // sample at centre + (here - centre)/M, upright; a ball's whole round top,
+  // a pancake's flat none of it (it is a window), fading out across the
+  // flat as the drop flattens.
+  let upright = r * (1.0 - 1.0 / DROP_MAG) * (1.0 - smoothstep(0.0, 0.5, dropFlat(R, rho)));
+  let push = mix(upright, turned, cam) * cover;
+  return vec4f(toC * (push / max(r, 1e-3)), r, R);
 }
 `;
 
@@ -1265,11 +1462,23 @@ struct FsOut {
   if (U.dishSpread > 0.001) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
   // Where the eye meets the plate's surface: the drops sit here, and what is
   // under a drop is read through it (dropLens), before anything is sampled,
-  // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
+  // so the dye, the ferrofluid, the oil and the chemistry are all seen through it.
   let fuvSurf = fuv0;
-  var drop = vec3f(0.0, 0.0, -1.0);
+  var drop = vec4f(0.0, 0.0, -1.0, 0.0);
+  /*
+    Who is looking at the drops (dropLens): a camera in the closeup, the
+    projector everywhere else. Not the zoom's own fade: the lens blends
+    where it reads, and between the projector's slight pull toward the
+    centre and the camera's push past it there is a blend that reads every
+    point of a drop from its centre, a disc of one colour, then one that
+    blows it up eight times. On the zoom's fade that sat at 1.1x to 1.3x, a
+    zoom a performer parks on (the pre-push review). Changed over the middle
+    fifth of the fade instead, the whole of it passes in a few hundredths
+    of the zoom, near 1.45x.
+  */
+  let dropCam = smoothstep(0.4, 0.6, macroAmt);
   if (U.beads > 0.001) {
-    drop = dropLens(fuvSurf);
+    drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
   let fuvBase = fuv0;
@@ -1768,8 +1977,10 @@ struct FsOut {
       let filmT = smoothstep(0.02, 0.28, rimF.a);
       let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
 
-      // Through it: the liquid beyond, magnified by the lens (more toward the middle).
-      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play);
+      // Through it: the liquid beyond, magnified by the lens (more toward the
+      // middle), in the closeup; the projector's view of it (below) is the
+      // liquid right there, a flat slab of air being a window, not a lens.
+      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play) * dropCam;
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
       let lensCol = mix(bgColor, lensF.rgb, lensF.a);
       // And the lamp through the clear gap, carrying the liquid's hue
@@ -1790,6 +2001,67 @@ struct FsOut {
       let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
       let filmC = thinFilmColour(thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0));
       let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+      // A second lamp to the side is the one light that can put a glint on
+      // an air pocket seen from beneath (below, as the projector throws it).
+      var side = vec3f(0.0);
+      if (U.lamp2.w > 0.001) {
+        let L2 = lampDir(fuvBase, U.lamp2);
+        let H2 = normalize(L2 + vec3f(0.0, 0.0, 1.0));
+        let shine2 = mix(60.0, 260.0, clamp(0.02 / max(R, 0.004), 0.0, 1.0)) * mix(0.7, 1.3, k3) * 0.8;
+        side = vec3f(0.75, 0.86, 1.0) * pow(max(dot(n, H2), 0.0), shine2) * 0.5 * U.lamp2.w;
+      }
+
+      /*
+        As the projector throws it. Everything below this block is the
+        camera's bubble, tuned by eye against macro photographs, and those
+        photographs are lit from the front: their bright crescents are a
+        room light reflected, their film colour a soap film facing the lens.
+        A bubble between the glasses of a projector is neither (the research
+        in the project's files, bubbles-and-drops.md, item 2). It is a pocket
+        of air with the liquid pushed out: its walls are the meniscus and
+        the glass, not a film; the 2% a water and air surface reflects goes
+        back toward the lamp, never to the screen; and its curved edge bends
+        the light three times as hard as an oil drop's, far past what the
+        projection lens takes in. So on the plate:
+
+        - **A dark band from the aperture**, past AIR_CORE (0.27) of the
+          curved part: all but a pin-point of a small bubble, which is how
+          air reads in every projected show, a pepper of dark dots; round a
+          big one, which the glasses flatten into a pancake, a band 0.73 of
+          half the gap wide, narrowing as the glasses are pressed together.
+          Shaped by the gap exactly as a drop is (dropFlat, dropBand), the
+          band's inner edge softened over 0.7 of a screen pixel: where in its
+          bubble a point is comes from a linear field (wgsl/air.ts), good to
+          well under a texel of the air, so a texel of the air would blur a
+          small bubble's core away.
+        - **A clear middle**, the lamp through a slab of air with a breath of
+          the liquid's hue from the wetting film on the glass: what the
+          camera's bubble is at its very centre, held flat across the window.
+        - **No film colour unless asked for.** Iridescence at its default,
+          a quarter, is what every look has always had, and the camera's
+          bubble still wears it; the plate takes only what is asked above
+          that, as a performer turning a soap film up (the looks that set
+          0.6 and 0.9 get most of it; a look at 0.3, a trace).
+        - **No highlight but the side lamp's.**
+
+        The zoom crosses from this to the camera where the drops do
+        (dropCam), so a bubble and a drop change view together.
+      */
+      var cp = vec3f(0.0);
+      if (dropCam < 0.999) {
+        let rho = dropHalfGap(fuvBase);
+        let flatB = dropFlat(R, rho);
+        let tB = dropBand(rr, R, rho);
+        // A screen pixel in plate uv (uvToFluid, above).
+        let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+        let curvedB = max((1.0 - flatB) * R, spx);
+        let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
+        let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
+        cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
+        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+        cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
+        cp = cp * (1.0 - AIR_DARK * blackB) + side;
+      }
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
       c *= 1.0 - 0.35 * smoothstep(0.85, 1.0, age) * F;
 
@@ -1808,56 +2080,139 @@ struct FsOut {
       let n2 = normalize(vec3f(-p * 0.6, h + 0.3));
       let spec2 = pow(max(dot(n2, H), 0.0), shine * 0.5) * 0.3;
       c += mix(vec3f(1.0, 0.98, 0.92), tint, 0.4 * filmT) * (spec + spec2) * (0.7 + 0.6 * ground) * (0.6 + 0.8 * k2);
-      if (U.lamp2.w > 0.001) {
-        let L2 = lampDir(fuvBase, U.lamp2);
-        let H2 = normalize(L2 + vec3f(0.0, 0.0, 1.0));
-        c += vec3f(0.75, 0.86, 1.0) * pow(max(dot(n, H2), 0.0), shine * 0.8) * 0.5 * U.lamp2.w;
-      }
+      c += side;
+      c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
-      auxN = mix(auxN, -bestD * 0.8, opac * inside);
+      /*
+        The camera pass (wgsl/camera.ts) bends the screen along this normal,
+        which is the camera's dome: on the plate it would lens the window the
+        projector sees as a flat slab of air, and push its band outward, in
+        every look with the camera on. So it comes in with the camera's view.
+      */
+      auxN = mix(auxN, -bestD * 0.8, opac * inside * dropCam);
       auxB = max(auxB, opac * inside);
     }
   }
 
   // ── Oil drops ────────────────────────────────────────────────────
   /*
-    A drop of oil on the plate, as a microscope sees one: the pattern under
-    it magnified (dropLens, above, moved where everything is read), a dark
-    band just inside the edge where the surface is steep enough that light
-    from below is bent away from the eye, a thin bright line where the drop
-    meets the film round it, and one hard highlight where its dome faces the
-    lamp. Oil takes none of the water's dye, so it is faintly paler and warm.
-    In the closeup too, where a drop fills the frame.
+    A drop of oil on the plate, lit from beneath: a lens, not a painted disc.
+    Reshaded three times on the owner's word that the beads and drops "look
+    very cartoon like": against macro photographs of oil on backlit water,
+    then, once the research showed a camera and a projector see a drop
+    differently, as each of them sees it (dropLens, above, and the owner's
+    "both"). The closeup is the camera (dropCam); the plate is the
+    projector; the zoom between fades one into the other.
+
+    As the projector throws it:
+    - **A black band from the aperture.** Light crossing the drop's curved
+      part further out than DROP_CORE of the way leaves it too steeply for
+      the projection lens, so the screen there is dark: the outer three
+      tenths of a droplet, a hair round a pancake. Not quite black (0.15 of
+      the plate is left, as the lamp's spread and the oil's scatter leave
+      some in the photographs), with a pixel's
+      softening at its inner edge and none of its own at the contact,
+      where the mask's coverage fades it into the plate.
+    - **The middle, upright and as bright as the plate.** Traced in focus,
+      the core is neither brighter nor dimmer than the plate round it; the
+      brightening a ball gives is the defocused picture, not the focused one.
+
+    As the camera sees it:
+    - **What is under it, through the lens** (dropLens): turned over and
+      shrunk in a small drop, as it is in a big drop's flat middle.
+    - **A thin, crisp dark line at the contact**, and nothing else drawn.
+      The meniscus is steep, so light from beneath leaves it sideways, most
+      of it past what a camera's wider lens takes in: the projector's band,
+      narrowed to its outer edge. The first reshade dimmed the outer half
+      of every drop's radius, which read as a shadow painted round it.
+    - **A brighter middle only where the drop is round**: a ball gathers the
+      light behind it toward a camera focused past it; a pancake does not.
+
+    In both, **no highlight.** The white dot every bead carried is a lamp
+    seen in reflection, and a plate lit from beneath shows transmitted light
+    only. Not one of the photographs has it, and it was the loudest thing
+    saying sticker.
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
-    let bm = tex2(beadTex, fuvSurf);
+    let bm = beadAt(fuvSurf);
     let inner = bm.r;
     let ring = bm.g;
     let r = drop.z;
+    let R = drop.w;
     let inDye = smoothstep(0.015, 0.2, auxH);
     let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
-    // The dome: tilted outward toward the edge, steepest at the rim.
-    let off = drop.xy;
-    var outward = vec2f(0.0);
-    if (dot(off, off) > 1e-12) { outward = -normalize(off); }
-    let tilt = 0.85 * r;
-    let n = vec3f(outward * tilt, sqrt(max(0.0, 1.0 - tilt * tilt)));
-    let Lb = lampDir(fuvSurf, U.lamp);
-    let H = normalize(Lb + vec3f(0.0, 0.0, 1.0));
-    let spec = pow(max(0.0, dot(n, H)), 90.0);
-    // Light under the steep edge is refracted out of view: a dark band.
-    let band = smoothstep(0.7, 0.92, r) * (1.0 - smoothstep(0.97, 1.0, r));
-    let oilTint = mix(outColor, vec3f(0.96, 0.93, 0.84) * (0.3 + 0.7 * outColor), 0.18);
-    var dropC = oilTint * (1.0 - 0.72 * band);
-    // The meniscus catches the room: a fine bright line at the contact.
-    dropC += vec3f(0.85, 0.87, 0.9) * ring * 0.35;
-    // Fresnel: the dome's flank reflects a little of the light above.
-    let fres = 0.04 + 0.96 * pow(1.0 - n.z, 5.0);
-    dropC += vec3f(0.8, 0.82, 0.86) * fres * 0.25;
-    dropC += vec3f(1.0, 0.98, 0.94) * spec * 1.1;
-    outColor = mix(outColor, dropC, k);
-    auxB = max(auxB, inner * 0.4 * k);
+    let flat = dropFlat(R, dropRho);
+    let t = dropBand(r, R, dropRho);
+    // How much oil the light crosses: 1 over the flat top (or a small drop's
+    // middle), falling as a quarter circle across the meniscus.
+    let th = sqrt(max(0.0, 1.0 - t * t));
+    let px = 1.0 / f32(textureDimensions(beadTex).y);
+    /*
+      The projector's band: black past DROP_CORE of the curved part. Its
+      inner edge is softened over about a texel of the plate, as a fraction
+      of the curved part's own width (the whole radius for a ball, gap/2 for
+      a pancake). R is 0 where the lens could not tell (a drop's very
+      centre), and there r is 0 too, well inside the core.
+    */
+    let curved = max((1.0 - flat) * R, px);
+    let soft = clamp(0.7 * px / curved, 0.02, 0.3);
+    let black = smoothstep(DROP_CORE - soft, DROP_CORE + soft, t);
+    let projected = 1.0 - 0.85 * black;
+    /*
+      The camera's line, about two and a half texels of the plate wide
+      whatever the drop's size, as a fraction of this one's radius. Up
+      sharply across the line's inner edge and held to the contact: the
+      coverage in kDrop fades the drop, line and all, into the plate over
+      the mask's own antialiasing, so the line never ends in a hard step.
+      That fade takes the outer texel, so the line is a texel and a half
+      inside it, or the fade eats it: at a texel and a half across it came
+      out 62% of the plate at its darkest (npm run droplens).
+    */
+    let w = clamp(2.4 * px / max(R, 1e-4), 0.08, 0.5);
+    let rim = smoothstep(1.0 - w, 1.0 - 0.5 * w, r);
+    let focus = 1.0 + 0.3 * (1.0 - r) * (1.0 - r) * (1.0 - flat);
+    let photographed = focus * (1.0 - 0.85 * rim);
+    let shade = mix(projected, photographed, dropCam);
+    // The rings' drawn rim glows only where light gets through.
+    let glow = ring * 0.15 * mix(1.0 - black, 1.0, dropCam);
+    // Clear oil: nearly colourless, a breath warmer than the water round it.
+    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * shade;
+    dropC += outColor * glow;
+
+    /*
+      Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
+      each drop is oil carrying a dye of its own, which a projected show
+      draws as a flat pool of colour outlined in a thin dark line:
+
+      - **Beer and Lambert.** The dye absorbs in proportion to how much oil
+        the light crosses, so a big drop is its colour right across its flat
+        top and only the meniscus thins toward clear, and a small round one
+        is deepest in its middle. The first version painted the colour at
+        85% right to the edge.
+      - **The dye's own light.** On this plate dye is light (bare water is
+        dark), so a dyed drop over bare water still glows its colour, as
+        thick as the oil is.
+      - **The same lens and line** as the clear drop above. None of it is a
+        colour laid on top.
+
+      The flattened walls and the compound drops are in the mask itself
+      (rasterDrops in lib/beads.ts): the dome falls to zero along a wall, so
+      the line follows the wall without knowing it is one.
+    */
+    var kDrop = k;
+    if (U.beadDrops > 0.001 && beadWide()) {
+      let dc = beadColour(fuvSurf);
+      let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
+      let trans = exp(-absorb * th * 1.0);
+      let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15;
+      var body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
+      body += (outColor * trans + glowC) * glow;
+      dropC = mix(dropC, body, U.beadDrops);
+      kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
+    }
+    outColor = mix(outColor, dropC, kDrop);
+    auxB = max(auxB, inner * 0.4 * kDrop);
   }
 
   // ── The projectors' rims ─────────────────────────────────────────

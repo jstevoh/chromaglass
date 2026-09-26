@@ -473,7 +473,7 @@ with.
 | Blow tool | Click/tap to blow air bubbles |
 | Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring, or into radial fingers with **Fingering** up |
 | Macro zoom | With the closeup on: + and − (or = and _), the wheel over the plate, or the − / + chip below the title, from 1× to 16×; + with the closeup off turns it on at 2× |
-| Dish Spread / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
+| Dish Spread / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets, which **Drops** (0 by default) turns into drops of colour that press flat against each other, gather droplets round the big ones and keep a swallowed drop visible for a while; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |
 | Mic / System / File | Where the show listens: the microphone (or the input chosen in Settings → Sound), system audio, or a music file played here with its own small player |
 | Dimmer / Blackout | Settings → Master: the house lights for the plate; **B** fades to black and back, as does the Blackout button on the phone or from a controller |
 | Record | The red button by Cast: the show to a `.webm` file, music included |

@@ -19,6 +19,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Paint works it through amber, teal and coral dye under a wandering
   magnet, wet and glossy.
 
+### Added — drops, not rings
+
+- **Drops** (`beadDrops`, Settings → Show under Oil Beads, MIDI-learnable and
+  pinnable; 0 by default, so every look is unchanged): the oil beads become
+  drops of colour from the look's palette, shaded as lenses (below), pressed
+  flat where they crowd, and a drop that
+  swallows a smaller one keeps it visible for fifteen to thirty-five seconds.
+  `npm run drops` measures the field and its mask (PLAN.md batch 3).
+
+### Changed — beads shaded from photographs
+
+- **The beads and drops are lenses, not stickers, seen as a projector sees
+  them on the plate and as a camera does in the closeup.** Projected, each
+  drop is a bright, upright middle ringed in dark where its curved edge bends
+  the light out of the lens (the outer three tenths of a droplet, a hair round
+  a big pool), from the optics of a projector's aperture. In the macro
+  closeup, as in the photographs of backlit oil, a small drop shows the plate
+  round it upside down and a big one is flat on top. In both the white dot is
+  gone. `npm run droplens` measures each on one drop.
+- **Bubbles are air pockets on the plate.** Projected, a small bubble is a
+  dark disc round a pin-point and a big one a clear, flat window edged in a
+  dark band from half the gap, as a projector throws a pocket of air: its edge
+  bends the light out of the lens, it reflects nothing toward the screen, and
+  it has no soap film facing the viewer. No highlight unless the second lamp
+  is on; film colour only above the default Iridescence. The closeup keeps
+  the camera's bubble. `npm run airlens` measures it on one bubble.
+- **Walls between drops are curved.** A small drop pushes harder than a big
+  one, so the wall between them bows into the big one, an arc through the same
+  two points the straight wall joined (`npm run drops`: the wall lands within a
+  pixel of the arc the two pressures give, 2.4 px past the straight line).
+- **The gap sets how flat a drop is.** A drop smaller than half the gap
+  between the glasses is a ball, a bigger one a pool with an edge half the gap
+  wide, so a press flattens every drop and thins every dark edge at once.
+- **Several colours in one drop, in the closeup.** Every drop sees the same
+  stretch of plate round it, turned over, however small it is, so a droplet
+  near where two dyes meet carries both, as the droplets in the photographs do.
+- **Droplets.** With Drops on, big drops are ringed by droplets a tenth their
+  size and less, and the sizes in one cluster span 17 to 1 (10 to 1 before).
+  Droplets run into each other but are never swallowed by a drop.
+- **Fixed: dark squares and pale flecks round beads when zoomed.** The rings'
+  mask was drawn on a clear canvas, and the upload's straight alpha turned
+  every edge texel full red and the fade-in into nothing; its rims also took
+  nine tenths of the dome under them. It is drawn on black now, rims added
+  into green alone, as the drops' mask always was.
+
 ### Added — the layout checked without a GPU
 
 - `npm run layout` asks the show night's layout questions (type size, hit

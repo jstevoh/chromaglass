@@ -116,6 +116,11 @@ jobs:
       # A popped bubble closes back into the liquid, round, not into blocks.
       - name: The popped bubbles
         run: npm run pops
+      # Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,
+      # each drop its own colour, pressed flat where it touches, a swallowed
+      # one kept inside and let go, and at 0 the rings' field to the bit.
+      - name: The drops
+        run: npm run drops
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist
@@ -244,6 +249,16 @@ jobs:
       - name: The microscope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run microscope
+      # An oil drop as a projector throws it (upright, dark past its aperture's core) and as the
+      # closeup's camera sees it (small ones turn the plate over, big ones flat); no highlight.
+      - name: The drop lens
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run droplens
+      # An air bubble as a projector throws it: a small one a dark disc round a pin-point, a big
+      # one a clear window edged in a band from half the gap; the closeup keeps the camera's bubble.
+      - name: The air lens
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run airlens
       # The ferrofluid is drawn with an edge: a line at any zoom, black all
       # through, a thin film still visible, the glint fixed as the plate turns.
       - name: The ferrofluid's edge

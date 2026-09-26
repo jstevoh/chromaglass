@@ -87,7 +87,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'look', name: 'Light Show Look', category: 'look',
     terms: 'turbulence blobs glow relief bubbles rock saturation gloss blur look colour color vivid grain size' },
   { id: 'show', name: 'Show', category: 'look',
-    terms: 'hue journey colour color beat squeeze background loop dish vignette spread beads cells' },
+    terms: 'hue journey colour color beat squeeze background loop dish vignette spread beads drops cells' },
   /*
     A section of its own, because it is played rather than set.
 

@@ -1164,6 +1164,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="beads"
         />
         <Slider
+          label="Drops"
+          disabled={(settings.beads ?? 0) <= 0 && 'needs Oil Beads'}
+          value={settings.beadDrops ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ beadDrops: v })}
+          settingKey="beadDrops"
+        />
+        <Info>
+          Drops turns the oil beads from dark-rimmed rings into drops of colour: each takes a dye from the look, is a lens over the liquid under it, presses flat against its neighbours, gathers a ring of droplets, and keeps a smaller drop it swallowed visible inside it.
+        </Info>
+        <Slider
           label="Plate Cells"
           value={settings.cells ?? 0}
           min={0}
