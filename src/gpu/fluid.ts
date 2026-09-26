@@ -451,6 +451,8 @@ export class WebGPUFluid {
       ['phaseCH', [R32], open.phase],
       ['phaseForce', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
+      // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
+      ['phaseDisplace', [dye], open.displace],
       // And the rest of what a step can run: the mix's push on the flow,
       // sharpening, the bubbles clearing dye, the reaction's deposit, the
       // drain. None was seen in a look's first steps, the mix's and the

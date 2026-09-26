@@ -40,6 +40,13 @@ export interface Opening {
   phase: boolean;
   /** The magnet's maze on the second phase (magnet-garden). */
   maze: boolean;
+  /**
+   * The second phase pushing the dye it moves through (Pushes Dye; Ferro
+   * Paint). Added with that setting, after the rest of this list: the
+   * startup check found Ferro Paint asking for it in its first steps with
+   * no list naming it, which is how a new kernel brings the freeze back.
+   */
+  displace: boolean;
   /** The particles (stardust-collapse). */
   particles: boolean;
   /** The plate filmed by a camera (oil-on-water and its kind). */
@@ -57,6 +64,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     gel: on(s.liesegang),
     phase: on(s.phaseAmount),
     maze: on(s.phaseAmount) && on(s.magnetStrength),
+    displace: on(s.phaseAmount) && on(s.phaseDisplace),
     particles: on(s.particles),
     camera: on(s.camera),
     stock: on(s.stock),
