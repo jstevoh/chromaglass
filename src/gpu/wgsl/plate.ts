@@ -1274,8 +1274,10 @@ struct FsOut {
   let view = viewAt(fuvBase);
   // One screen pixel in plate units, for the ferrofluid's edge. Taken here,
   // before any branch a pixel can take on its own, because WGSL reads a
-  // derivative across the whole quad or not at all.
-  let phasePx = max(fwidth(fuvBase.x), fwidth(fuvBase.y)) + 1e-6;
+  // derivative across the whole quad or not at all. The length of a step
+  // across the screen, not fwidth: fwidth adds the two axes, which on a
+  // turning plate is up to √2 pixels and softened the edge as it spun.
+  let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
@@ -1433,7 +1435,10 @@ struct FsOut {
         // says which side: capped at eight cells either way.
         let d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
         let dc = d / cell;
-        let cover = clamp(0.5 + d / phasePx, 0.0, 1.0);
+        // A floor under the pixel, for where the screen's coordinates stop
+        // changing (the kaleidoscope clamps them at its corners) and there is
+        // no pixel to measure.
+        let cover = clamp(0.5 + d / max(phasePx, 0.05 * cell), 0.0, 1.0);
         let outward = select(vec2f(0.0), -grad / slope, slope > 1e-4);
         let amt = clamp(U.phaseAmount, 0.0, 1.0);
 
@@ -1465,11 +1470,16 @@ struct FsOut {
           position (overhead, near vertical) every shoulder facing up matched
           it and each domain wore a grey bevel all the way round. From one
           corner, only the side facing it lights, and every bead's dot sits on
-          the same side, as in the reference.
+          the same side, as in the reference. The corner is the screen's, so
+          it is turned into the plate's frame (c0, s0, as uvToFluid turns the
+          plate): set in the plate's own, it went round with the motor and
+          every dot circled its bead once a turn.
         */
         let tilt = 2.4 * exp(-max(dc, 0.0) / 0.9);
         let Nd = normalize(vec3f(outward * tilt, 1.0));
-        let H = normalize(normalize(vec3f(-0.55, -0.45, 0.7)) + vec3f(0.0, 0.0, 1.0));
+        let key = normalize(vec3f(-0.55, 0.45, 0.7));   // upper left: uv's y is up
+        let keyPlate = vec3f(c0 * key.x - s0 * key.y, s0 * key.x + c0 * key.y, key.z);
+        let H = normalize(keyPlate + vec3f(0.0, 0.0, 1.0));
         let glint = pow(max(dot(Nd, H), 0.0), 220.0);
         pc += vec3f(1.0, 0.97, 0.92) * glint * 0.9 * amt;
 
@@ -1479,9 +1489,25 @@ struct FsOut {
           water's own colour (a domain in magenta liquid has a magenta line),
           and less than a cell wide, so it stays a line rather than the glow
           it used to be when it was sampled a few cells out.
+
+          And a film too thin to reach half full anywhere (a short tap of the
+          bottle adds a quarter a step; a patch dragged thin) has no line at
+          all, and drawn only inside the line it vanished. So outside the
+          line the old measure stands, a brown film as dark as it is full,
+          but not read where the pixel is: within a few cells of a line the
+          phase there is the line's own ramp, not liquid, and drawing it was
+          the smudge. It is read four and a half cells out from the line
+          instead (the ramp's tail is gone by then; at three, the distance
+          estimate, which is only linear, ran out inside the tail and drew
+          it as a dark ring two cells out), so
+          it runs on continuously into whatever film lies beyond. Cutting it
+          off near the line instead left a bright band round every domain
+          wherever the maze left a trace of phase in the water.
         */
         let lens = exp(-pow(max(-dc, 0.0) / 0.55, 2.0)) * (1.0 - cover);
-        let lit = outColor * (1.0 + 0.6 * lens * amt);
+        let phFar = select(ph, viewAt(fuvBase + outward * (4.5 + dc) * cell).phase, slope > 1e-4 && dc > -4.5);
+        let film = 9.0 * pow(clamp(phFar, 0.0, 0.5), 1.5) * (0.4 + 0.6 * amt);
+        let lit = outColor * exp(-film * vec3f(0.45, 0.7, 1.0)) * (1.0 + 0.6 * lens * amt);
         outColor = mix(lit, pc, cover);
       }
     }
