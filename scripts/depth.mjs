@@ -91,6 +91,41 @@ try {
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
+  /*
+    And then until the show is actually running.
+
+    The timeline above found what the freeze was. On run 36243996678 the
+    plate took eight steps at four seconds and then nothing, no animation
+    frame and no loop heartbeat, for 8.6 s, while the page's own timers kept
+    firing: the main thread was free and the frames were not coming. The
+    black box logged it as a stall that "resumed after 9.0s". It happens at
+    the opening of every run on a fresh Mac runner, and the grid does not
+    change across it; the solver's hundred-odd pipelines are built once per
+    device (`PipelineCache.for(device, 'fluid')`), so the likeliest reading
+    is Metal compiling them cold on the first frames that use them. That is
+    inferred, not measured.
+
+    Whether it overlapped the curve being set was the whole difference
+    between a pass and a fail here: a freeze that ends before nine seconds
+    passed, one that ran past it read a flat plate. It is a fact about the
+    show's first seconds on a cold machine, not about the plate's shape, and
+    it is reported on its own line below on every run. So nothing is
+    measured until the plate has stepped in every quarter second for two
+    seconds running. A freeze after that is still a red line.
+  */
+  const running = await page.evaluate(async () => {
+    const t0 = performance.now();
+    const rows = () => window.__depthLoad ?? [];
+    const steady = () => {
+      const r = rows().slice(-9);
+      return r.length === 9 && r.every((row, i) => i === 0 || row[3] > r[i - 1][3]);
+    };
+    while (!steady() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 250));
+    return { ok: steady(), waited: (performance.now() - t0) / 1000 };
+  });
+  check('the show is running before anything is measured', running.ok,
+    `${running.waited.toFixed(1)} s after the first nine to see two steady seconds`);
+
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.
   const set = (o) => page.evaluate((s) => Object.assign(window.chromaglassDebug().settings, s), o);
