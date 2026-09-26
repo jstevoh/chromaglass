@@ -2102,6 +2102,19 @@ class FluidSimulation {
         break;
       }
 
+      case 'ferro-paint': {
+        // A patchwork of the three dyes over the whole plate, touching, so
+        // the ferrofluid fingers through colour everywhere and amber meets
+        // teal (the references' green) along the seams.
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+          const c = col(i + j * 2);
+          const x = S * (0.14 + i * 0.24) + Math.sin(j * 1.7 + i) * 4 * k;
+          const y = S * (0.14 + j * 0.24) + Math.cos(i * 1.3 + j) * 4 * k;
+          this.splatBlob(x, y, S * 0.15, 2.0, c.r, c.g, c.b);
+        }
+        break;
+      }
+
       case 'clock-glass': {
         // Curved glasses gather the liquid in the middle; seed it there, in
         // rings, so the dome has something to hold from the first frame.
@@ -2116,6 +2129,9 @@ class FluidSimulation {
       // and the light are the subject, not a seed of blobs.
       case 'sensual-laboratory':
       case 'lumia':
+      // Ferro Maze is ink on a white light table: the ferrofluid is the
+      // picture, poured with the look (layPhase), and the glass stays clear.
+      case 'ferro-maze':
         break;
       default: {
         for (let i = 0; i < 5; i++) {

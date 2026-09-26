@@ -84,10 +84,11 @@ const api = {
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
    * the closeup's magnification; `macroAmount` how far into the closeup
-   * (the app ramps it from 1x to 2x).
+   * (the app ramps it from 1x to 2x). `rotation` turns the plate, in
+   * radians, as the motor does.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
@@ -99,7 +100,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3, mark: null, film: { kind: 'none', video: null },
@@ -109,7 +110,7 @@ const api = {
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: null }]);
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: l.solver.fields.view }]);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);

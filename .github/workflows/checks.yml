@@ -253,6 +253,11 @@ jobs:
       - name: The microscope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run microscope
+      # The ferrofluid is drawn with an edge: a line at any zoom, black all
+      # through, a thin film still visible, the glint fixed as the plate turns.
+      - name: The ferrofluid's edge
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run ferrolook
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
