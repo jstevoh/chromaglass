@@ -270,6 +270,13 @@ try {
         `${under0.disc.toFixed(0)} → ${under1.disc.toFixed(0)} under it`);
       // Moved to the rim, not made: what was under it and round it, against the plate left alone.
       const was = under0.disc + under0.ring, now = under1.disc + under1.ring;
+      /*
+        And the whole plate, on the record. This judges what is under the
+        bubble and round it, so dye carried in from further out reads as made
+        (CI: 480 -> 1092 against +47 left alone, failing a deploy). The plate's
+        total says which it was: the next failure shows moved or made.
+      */
+      console.log(`     the plate as a whole ${a.total.toFixed(0)} → ${b.total.toFixed(0)} across the blow, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
       check('and pushes it out to the rim rather than making more', now - was - idle < 0.5 * was + 5 + 3 * Math.abs(idle),
         `${was.toFixed(0)} → ${now.toFixed(0)} under it and round it, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
     } else {
@@ -277,14 +284,18 @@ try {
         `${a.disc.toFixed(0)} → ${b.disc.toFixed(0)} under it, ${a.ring.toFixed(0)} → ${b.ring.toFixed(0)} from 0.05 to 0.25`);
       /*
         Loses none, and makes no more than it had. Not 'keeps it exactly', as
-        the Finger does: the press squeezes the film, the gap under the palm
-        closes and the liquid runs out from under it, and the solver carries
-        the dye's concentration through that spreading flow without thinning
-        it, so a press can add up to about as much again as it had (CI:
-        +64, +253 beyond the plate left alone). That is the dye advection,
-        not the tool, and it is tracked on its own (a conserving advection
-        where the flow spreads, which touches the beat squeeze, bubbles and
-        currents too).
+        the Finger does: the squeeze film carries some dye off the grid's
+        edge of the palm and the plate's own drift is in it too.
+
+        This allowed a press to add as much again as it had, on the reading
+        that the dye's advection made it (CI: +64, +253 beyond the plate left
+        alone). It was not the advection: the lab runs the same press through
+        the solver alone and the plate *loses* dye (3363 -> 3101). It was
+        squeezeOut, which took the disc's dye out as a share of what the plate
+        held when the move landed and put a share of the older mirror's into
+        the ring, while the squeeze film emptied the disc in between. It takes
+        the same amounts out as it puts in now; the allowance is left as it
+        was until CI has shown the gain gone on runners slow and fast.
       */
       /*
         The slack is the plate's own: what it did alone over the same time,
