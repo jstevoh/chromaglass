@@ -467,34 +467,89 @@ try {
 
   // ── 2. Masking ─────────────────────────────────────────────────────
   // A hard edge, so the gate is "black" and not "dimmer".
-  await withOutput({ maskBottom: 0.3, maskLeft: 0.2, maskFeather: 0 });
+  const MASK = { maskBottom: 0.3, maskLeft: 0.2, maskFeather: 0 };
   /*
-    Lit inside the mask before anything is judged, as the identity read above
-    waits for a lit plate. One frame used to be taken as it came, and on
-    f5e678f (PR #160, which touched nothing the wall draws) it read 0.001
-    inside the mask a moment after the unmasked plate read 0.171, while the
-    same code on the commit before read 0.179. The plate's own automation
-    empties or dims it for moments (a drain, a look fading; inferred, not
-    caught in the act), and a single grab of such a moment measures the plate,
-    not the mask. The black gates lose nothing: they are read on this same
-    frame, so a mask that let light through would still show it, now on a
-    frame that has light to let through.
+    Each masked frame is judged between two bare ones: the plate with no
+    mask, read just before and just after it, over the same places.
+
+    On f5e678f (PR #160, which touched nothing the wall draws) one frame read
+    0.001 inside the mask a moment after the unmasked plate read 0.171; the
+    same code on the commit before read 0.179. Two things read like that. The
+    plate can be dark for a moment by itself (a drain, a look fading), which
+    says nothing about the mask. Or the output pass, built afresh each time
+    the mask is set (setting nothing drops it, section 8 checks that), can
+    stay black past the few frames `withOutput` waits for, and on stage that
+    is a black screen when the operator sets a mask. The first fix retried
+    until lit, which passed both; the check-skeptic review said it would hide
+    the second for good, and that the blanked edges were never shown to have
+    had any light to blank.
+
+    So a masked read counts only when the bare plate is lit both before and
+    after it, in the kept region and in both blanked bands. Then every gate
+    is judged on that one masked frame against its own brackets: the bands
+    black in absolute terms and against the light they would have had, and
+    the kept region lit. When the brackets are lit but the masked frame is
+    dark, that is the mask's doing only if it happens again on a fresh build:
+    a plate dipping for a moment does not line up with the mask three times
+    over, a pass that comes up black does. Three of those fail, with the
+    numbers. A bracket that is dark is the plate, and the triple is tried
+    again half a second on, up to twenty times.
+
+    What this cannot see is a black of a frame or two when the pass is
+    built: `withOutput` waits four animation frames before any read.
   */
-  let masked = await gridOf();
   const keptOf = g => meanOver(g, (x, y) => x > 0.25 && y < 0.65);
-  for (let tries = 0; keptOf(masked) <= LIT && tries < 20; tries++) {
-    await page.waitForTimeout(500);
-    masked = await gridOf();
+  const bottomOf = g => meanOver(g, (x, y) => y > 0.72);
+  const leftOf = g => meanOver(g, (x, y) => x < 0.18 && y < 0.68);
+  const litAll = g => keptOf(g) > LIT && bottomOf(g) > LIT && leftOf(g) > LIT;
+  let judged = null, dark = 0, tries = 0;
+  const ateReads = [];
+  for (; tries < 20 && !judged && ateReads.length < 3; tries++) {
+    if (tries) await page.waitForTimeout(500);
+    await withOutput({});
+    const before = await gridOf();
+    await withOutput(MASK);
+    const masked = await gridOf();
+    await withOutput({});
+    const after = await gridOf();
+    if (!litAll(before) || !litAll(after)) { dark++; continue; }
+    if (keptOf(masked) <= LIT) { ateReads.push(`${keptOf(masked).toFixed(3)} between ${keptOf(before).toFixed(3)} and ${keptOf(after).toFixed(3)}`); continue; }
+    judged = {
+      kept: keptOf(masked), bottom: bottomOf(masked), left: leftOf(masked),
+      bareBottom: Math.min(bottomOf(before), bottomOf(after)), bareLeft: Math.min(leftOf(before), leftOf(after)),
+    };
   }
-  const maskedBottom = meanOver(masked, (x, y) => y > 0.72);
-  const maskedLeft = meanOver(masked, (x, y) => x < 0.18 && y < 0.68);
-  const maskedKept = keptOf(masked);
-  check('a blanked bottom edge is black', maskedBottom < 0.004, `mean ${maskedBottom.toFixed(4)}`);
-  check('a blanked left edge is black', maskedLeft < 0.004, `mean ${maskedLeft.toFixed(4)}`);
-  check('the picture survives inside the mask', maskedKept > LIT, `mean ${maskedKept.toFixed(3)}`);
+  const ate = ateReads.length >= 3;
+  /*
+    The flash guard reads the delivered frame, mask and all, so the loop's
+    mask on, mask off is a luminance step it sees. At about 0.17 on this
+    plate the mask takes some 0.07 away, under the guard's 0.1 step, and a
+    triple takes over a second, under its three a second: it should never
+    engage here. If it did, it would dim the bare reads that bracket the
+    masked one, so a failure says whether it had.
+  */
+  const guard = await page.evaluate(() => window.chromaglassDebug?.().flash?.() ?? null);
+  const guardNote = guard ? `; flash guard ${guard.engaged ? `engaged, gain ${guard.gain.toFixed(2)}` : 'not engaged'}` : '';
+  const why = (ate ? `the mask ate a lit plate on ${ateReads.length} fresh builds: ${ateReads.join('; ')}`
+    : `no masked read between two lit bare ones in ${tries} tries (${dark} with the bare plate dark, ${ateReads.length} dark masked)`) + guardNote;
+  check('the edges the mask blanks are lit without it', !!judged,
+    judged ? `bottom ${judged.bareBottom.toFixed(3)}, left ${judged.bareLeft.toFixed(3)} bare` : why);
+  // Black outright, and against the light that band had: a band lit at 0.02
+  // and let through at 0.0039 passes a bare "under 0.004" with a fifth of
+  // its light leaking.
+  const blanked = (m, bare) => m < 0.004 && m < 0.1 * bare;
+  check('a blanked bottom edge is black', judged && blanked(judged.bottom, judged.bareBottom),
+    judged ? `mean ${judged.bottom.toFixed(4)} masked, ${judged.bareBottom.toFixed(3)} bare` : 'not judged');
+  check('a blanked left edge is black', judged && blanked(judged.left, judged.bareLeft),
+    judged ? `mean ${judged.left.toFixed(4)} masked, ${judged.bareLeft.toFixed(3)} bare` : 'not judged');
+  check('the picture survives inside the mask', !!judged,
+    judged ? `mean ${judged.kept.toFixed(3)}${tries > 1 ? ` on try ${tries}` : ''}` : why);
+
+  await withOutput(MASK);
 
   const builtNow = await page.evaluate(() => !!window.chromaglassDebug?.().outputPass);
   check('the pass is built as soon as something is set', builtNow === true, builtNow ? 'built' : 'never built');
+
 
   // ── 3. Corner pin ──────────────────────────────────────────────────
   // The picture squeezed into the left half: everything right of it is off.
