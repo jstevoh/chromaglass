@@ -3612,6 +3612,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmEndedRef = useRef<(() => void) | null>(null);
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
+  /** Seconds of wall clock, for gestures that should not slow with the look. */
+  const wanderClockRef = useRef(0);
   const rotationAnglesRef = useRef<number[]>([]);
   /*
     The plate's angular velocity, in radians a second, one per layer.
@@ -4778,6 +4780,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         if (isActiveRef.current) {
           simulationTimeRef.current += realDt * timeMultiplier;
+          wanderClockRef.current += realDt;
         }
         const time = simulationTimeRef.current;
 
@@ -6025,8 +6028,101 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
 
+            /*
+              Which way round, chosen rather than assumed.
+
+              `dirMod` above is the plate's index: even plates one way, odd
+              plates the other, which is where the shear between two dishes
+              comes from and is why it stays the default. It was also the only
+              option — a show could not turn its plates the same way, which is
+              the projectionist's move, one motor under the whole wall.
+            */
+            const dirChoice = currentSettings.spinDirection ?? 0;
+            if (dirChoice > 0.5) dirMod = Math.abs(dirMod);
+            else if (dirChoice < -0.5) dirMod = -Math.abs(dirMod);
+
+            /*
+              A hand on a dish is never a motor.
+
+              Wander moves the *direction* rather than the speed, which is why
+              it can turn the plate back on itself: past about 0.45 the term
+              crosses zero and the dish slows, stops and comes back, the way a
+              plate being nudged by hand does. Under that it is a breath on a
+              held speed. It is noise rather than a random number per frame,
+              because the flywheel below integrates this and white noise would
+              average to nothing at all — measured as no visible change at any
+              setting before it was made coherent.
+            */
+            const wander = Math.max(0, Math.min(1, currentSettings.spinWander ?? 0));
+            if (wander > 0.001) {
+              /*
+                A wall clock, not the simulation's.
+
+                This read `time`, which is `simulationTimeRef` — realDt times
+                the time multiplier, so it runs at the look's own speed and
+                all but stops on a slow one. The drift was then frozen at
+                whatever value it happened to hold: measured at full wander as
+                139 readings backwards out of 140 with *less* variation than a
+                steady motor, which is a stuck number rather than a drift, and
+                raising the multiplier only made the stuck value stronger.
+
+                A hand nudging a dish does not slow down because the look is
+                slow, so this runs on its own clock.
+              */
+              const w = noise2D(wanderClockRef.current * 0.12 + l * 37.1, 11.5);   // -1..1, drifting
+              /*
+                3.4, chosen from what the noise actually does.
+
+                The term flips the plate when `w < -1/(wander*k)`, and the
+                drift was measured over ten minutes rather than assumed: it
+                runs to about ±0.93 and sits below -0.29 for 30% of the time,
+                below -0.59 for 12%. At 3.4 that makes the top of the dial
+                turn back on itself regularly, half the dial an occasional
+                change of mind, and the bottom third a breath on a held speed
+                — which is the progression the label promises. At 2.2 the top
+                of the dial needed -0.455, a fifth of the time, and twenty
+                seconds of watching never caught one.
+              */
+              dirMod *= 1 + w * wander * 3.4;
+            }
+
+            /*
+              The top of this dial used to be one turn every thirteen minutes.
+
+              `rotationSpeed` ran `v * 0.01`, so the whole slider reached
+              0.01 rad/s — measured at 0.011 rad over 1.4 s with the dial at
+              0.8, against 1.885 rad/s for a flick. It was a motor that kept a
+              plate alive and could not be seen doing it, and asking for a
+              plate that visibly turns was asking for travel this dial did not
+              have.
+
+              Every shipped look sits at 0.1 or below (most under 0.012), so
+              the bottom tenth is kept exactly as it was — `v * 0.01`, the same
+              arithmetic, the same numbers — and the ninety per cent above it,
+              which nothing has ever used, is where the speed now lives. The
+              two halves meet at 0.001 rad/s, so there is no step at the join,
+              and the square keeps fine control at the slow end of what is
+              finally a visible range: about a turn every fifteen seconds at
+              half, and a flick's worth at the top.
+            */
+            const asked = Math.max(0, currentSettings.rotationSpeed ?? 0);
+            const motorRate = asked <= 0.1
+              ? asked * 0.01
+              : 0.001 + Math.pow((asked - 0.1) / 0.9, 2) * 2.4;
+
+            /*
+              How hard the music pushes, kept off by default.
+
+              Nine shipped looks route a band to rotation already and the
+              amount they get is part of how they read, so that arithmetic is
+              untouched. This adds to it and starts at zero, which is what
+              those looks have always had, and reaches a flick's worth at the
+              top for anyone who wants the bass actually turning the plate.
+            */
+            const audioDepth = Math.max(0, Math.min(1, currentSettings.spinAudioDepth ?? 0));
+
             // Use realDt only — never timeMultiplier, which spikes with audio energy
-            const rotationSpeed = (currentSettings.rotationSpeed ?? 0) * 0.01 + Math.abs(rotationMod) * 0.3;
+            const rotationSpeed = motorRate + Math.abs(rotationMod) * (0.3 + audioDepth * 26);
             /*
               An angle that accumulates cannot be allowed to go non-finite.
 

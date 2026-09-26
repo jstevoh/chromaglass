@@ -122,6 +122,96 @@ try {
   const a1 = await page.evaluate(() => window.chromaglassDebug().rotation.current[0]);
   check('and the plate it turns is actually turned', Math.abs(a1 - a0) > 0.05,
     `${(a1 - a0).toFixed(3)} rad`);
+  // ── 5: the motor turns the plate, and the direction control decides which way ──
+  /*
+    Measured on the angle over a second, not on the velocity at an instant.
+
+    The flywheel relaxes toward the motor rather than snapping to it, so a
+    reading taken straight after a setting changes is the old speed on its way
+    to the new one. What the room sees is the angle moving, so that is what is
+    asked.
+  */
+  const settle = async (patch) => {
+    await page.evaluate((p) => Object.assign(window.chromaglassDebug().settings, p), patch);
+    await page.evaluate(() => { const d = window.chromaglassDebug(); d.spin.current.fill(0); });
+    await page.waitForTimeout(1600);
+  };
+  const turnedOver = async (ms, layer) => {
+    const a0 = await page.evaluate((l) => window.chromaglassDebug().rotation.current[l], layer);
+    await page.waitForTimeout(ms);
+    const a1 = await page.evaluate((l) => window.chromaglassDebug().rotation.current[l], layer);
+    return a1 - a0;
+  };
+
+  await settle({ rotationSpeed: 0.8, spinWander: 0, spinDirection: 1, layerCount: 2 });
+  const cwFront = await turnedOver(1400, 0), cwBack = await turnedOver(0, 1);
+  const cwBack2 = await (async () => { const a0 = await page.evaluate(() => window.chromaglassDebug().rotation.current[1]); await page.waitForTimeout(1400); return (await page.evaluate(() => window.chromaglassDebug().rotation.current[1])) - a0; })();
+  check('the motor turns the plate', Math.abs(cwFront) > 0.05, `${cwFront.toFixed(3)} rad in 1.4s`);
+  check('and clockwise turns both plates the same way', cwFront * cwBack2 > 0,
+    `front ${cwFront.toFixed(3)}, back ${cwBack2.toFixed(3)} rad`);
+
+  await settle({ spinDirection: -1 });
+  const acwFront = await turnedOver(1400, 0);
+  check('anticlockwise turns it the other way', acwFront * cwFront < 0,
+    `clockwise ${cwFront.toFixed(3)}, anticlockwise ${acwFront.toFixed(3)} rad`);
+
+  await settle({ spinDirection: 0 });
+  const opFront = await turnedOver(1400, 0);
+  const opBack = await (async () => { const a0 = await page.evaluate(() => window.chromaglassDebug().rotation.current[1]); await page.waitForTimeout(1400); return (await page.evaluate(() => window.chromaglassDebug().rotation.current[1])) - a0; })();
+  check('and opposed still turns them against each other', opFront * opBack < 0,
+    `front ${opFront.toFixed(3)}, back ${opBack.toFixed(3)} rad`);
+
+  // ── 6: wander moves the speed, and at the top it reverses ──
+  /*
+    Sampled over many seconds, because the noise is deliberately slow: a
+    reading pair a second apart would catch one part of one drift and call it
+    a constant. Nine windows at a steady motor against nine with wander up.
+  */
+  const windows = async (n, ms) => {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(await turnedOver(ms, 0));
+    return out;
+  };
+  const spread = (a) => {
+    const m = a.reduce((x, y) => x + y, 0) / a.length;
+    return Math.sqrt(a.reduce((s, v) => s + (v - m) * (v - m), 0) / a.length);
+  };
+  await settle({ rotationSpeed: 0.6, spinDirection: 1, spinWander: 0 });
+  const steady = await windows(9, 700);
+  await settle({ spinWander: 0.85 });
+  const wandering = await windows(9, 700);
+  check('wander moves the speed about', spread(wandering) > spread(steady) * 2,
+    `steady sd ${spread(steady).toFixed(4)}, wandering sd ${spread(wandering).toFixed(4)} rad`);
+
+  /*
+    Watched for long enough to see one, and on the velocity rather than the angle.
+
+    The first version of this asked nine 700 ms windows — six seconds — whether
+    the plate had gone backwards, and the drift takes about eight seconds to
+    change its mind at all. It was asking a question the sampling could not
+    answer and reporting the answer as a failure of the feature. The velocity
+    is read directly, every quarter second for twenty, which is long enough for
+    the noise to come round.
+  */
+  await settle({ spinWander: 1 });
+  const signs = [];
+  for (let i = 0; i < 140; i++) {
+    await page.waitForTimeout(250);
+    signs.push(await page.evaluate(() => window.chromaglassDebug().spin.current[0]));
+  }
+  const fwd = signs.filter(v => v > 0.002).length, back = signs.filter(v => v < -0.002).length;
+  check('and at the top of the dial the plate turns back on itself', fwd > 0 && back > 0,
+    `${fwd} readings forward, ${back} back, over ${(signs.length * 0.25).toFixed(0)}s`);
+
+  // ── 7: the audio route exists and is reachable ──
+  await settle({ spinWander: 0, rotationSpeed: 0 });
+  const routed = await page.evaluate(() => {
+    const d = window.chromaglassDebug();
+    d.settings.audioMappings = { ...d.settings.audioMappings, rotation: 'bass' };
+    return d.settings.audioMappings.rotation;
+  });
+  check('the plate can be driven by a band of the music', routed === 'bass',
+    `audioMappings.rotation is ${routed}`);
 } finally { await browser.close(); stop(); }
 console.log(bad ? `\n${bad} failed` : '\nall spin checks passed');
 process.exit(bad ? 1 : 0);
