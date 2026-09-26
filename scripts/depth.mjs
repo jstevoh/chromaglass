@@ -65,6 +65,29 @@ const browser = await launchChromium(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
+  /*
+    The plate from the moment the page starts, a row every quarter second:
+    animation frames, the show loop's heartbeat, lead-plate steps, and the
+    solver's grid. The freeze this check found (see `settled` below) came
+    about nine seconds in and was seen only because a setting happened to
+    change then; this watches the whole opening of the show on every run,
+    passing or not, so each Mac run says whether and where the plate stopped.
+  */
+  await page.addInitScript(() => {
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = () => { raf++; requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    const rows = [];
+    window.__depthLoad = rows;
+    const sample = () => {
+      const d = window.chromaglassDebug?.();
+      const f = d?.fluids?.[0];
+      rows.push([+((performance.now() - t0) / 1000).toFixed(2), raf, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0]);
+      if (rows.length < 400) setTimeout(sample, 250);
+    };
+    setTimeout(sample, 250);
+  });
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
@@ -224,6 +247,34 @@ try {
   }
   if (gap?.moved) gap = null;
   check('the gap can be read back at all', gap !== null, gap ? '' : 'no readSqueeze');
+
+  {
+    // The longest stretch from load to here in which the lead plate took no
+    // step, once the plate had started stepping at all.
+    const { rows, log } = await page.evaluate(() => ({
+      rows: window.__depthLoad ?? [],
+      log: (window.chromaglassDebug().crash?.thisLoad?.() ?? []).map((e) => [e.up, `${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`]),
+    }));
+    let best = null;
+    for (let i = 0, from = -1; i < rows.length; i++) {
+      const steps = rows[i][3];
+      if (steps <= 0) continue;
+      if (from < 0 || steps !== rows[from][3]) { from = i; continue; }
+      const len = rows[i][0] - rows[from][0];
+      if (!best || len > best.len) best = { len, a: from, b: i };
+    }
+    if (!best) console.log('     (from load: the plate never held still for a quarter second)');
+    else {
+      const [a, b] = [rows[best.a], rows[best.b]];
+      console.log(`     (from load: longest stretch without a step ${best.len.toFixed(2)} s, from ${a[0]} s to ${b[0]} s;`
+        + ` ${b[1] - a[1]} animation frames and ${b[2] - a[2]} loop heartbeats in it, grid ${a[4]}² → ${b[4]}²)`);
+      if (best.len >= 2) {
+        console.log('       seconds · animation frames · heartbeats · steps · grid');
+        for (const r of rows.slice(Math.max(0, best.a - 4), best.b + 5)) console.log(`       ${r.join('  ')}`);
+        for (const [up, l] of log.filter(([up]) => up >= a[0] - 3 && up <= b[0] + 3)) console.log(`       ${up.toFixed(1)}s ${l}`);
+      }
+    }
+  }
   if (!gap) throw new Error('nothing to measure');
   /*
     Positive curve is a deep centre and a tight rim — which is what every
