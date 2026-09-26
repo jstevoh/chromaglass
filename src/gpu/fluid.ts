@@ -21,7 +21,7 @@
  *   the plate's own resolution and never cross the bus.
  */
 
-import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup } from './kit';
+import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup, type Prep } from './kit';
 import { kernel } from './wgsl/fluid';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
@@ -339,19 +339,22 @@ export class WebGPUFluid {
    * holds it to all of them: it fails when an opening, or a change to any
    * look, builds a pipeline on a frame.
    *
-   * What no look runs in its first steps is not here, and is built the
-   * first time something asks for it.
+   * Past what the looks were seen to ask for, the rest of what a step can
+   * run is here too (below), so a setting turned up mid-set does not
+   * compile on the frame either.
    *
    * `dye` is the dye's own format, which is a half float on a GPU that cannot
    * filter a full one; the scratch textures the advection writes are the
    * dye's format too, and so is one pass of the velocity's advection.
    */
-  static prepare(device: GPUDevice, opts: { float32Filterable: boolean }): Promise<void>[] {
+  static prepare(device: GPUDevice, opts: { float32Filterable: boolean }): Prep[] {
     const cache = PipelineCache.for(device, 'fluid');
     const dye: GPUTextureFormat = opts.float32Filterable ? RGBA32 : VEL;
     const byFormat: [string, GPUTextureFormat[]][] = [
       ['fill', [dye, RGBA32, VEL, R32]],
       ['gapRest', [RG32]],
+      // A change to the plate's shape (every look that curves the glass).
+      ['gapReshape', [RG32]],
       ['deltaDye', [dye]],
       ['deltaVel', [VEL]],
       ['squeezeUpdate', [RG32]],
@@ -397,6 +400,15 @@ export class WebGPUFluid {
       ['phaseCH', [R32]],
       ['phaseForce', [VEL]],
       ['mazeForce', [VEL]],
+      // And the rest of what a step can run: the mix's push on the flow,
+      // sharpening, the bubbles clearing dye, the reaction's deposit, the
+      // drain. None was seen in a look's first steps, but each is one
+      // setting away, and a compile on the frame mid-set is the same stop.
+      ['mixForce', [VEL]],
+      ['sharpenDye', [dye]],
+      ['airExclude', [dye]],
+      ['depositChem', [dye]],
+      ['drainVel', [VEL]],
     ];
     // The ones asked for by name alone, each with the one format it writes.
     const byName: [string, GPUTextureFormat][] = [
@@ -408,7 +420,11 @@ export class WebGPUFluid {
     for (const [name, formats] of byFormat) for (const f of formats) keyed.set(`${name}:${f}`, kernel(name, f));
     for (const [name, f] of byName) keyed.set(name, kernel(name, f));
     for (const f of [RGBA32, R32] as GPUTextureFormat[]) keyed.set(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f));
-    return [...keyed].map(([key, code]) => cache.prepareCompute(key, code));
+    // A drop, a tool, a pour: the splats, always into the full-float deltas.
+    for (const name of ['splatDeltas', 'pourImage']) keyed.set(`${name}:${RGBA32}`, splatKernel(name, RGBA32));
+    // The plate measured (`measure`), keyed by name as `statsRun` asks.
+    for (const name of ['statsTiles', 'statsFold'] as const) keyed.set(name, STATS_KERNELS[name]);
+    return [...keyed].map(([key, code]) => () => cache.prepareCompute(key, code));
   }
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {

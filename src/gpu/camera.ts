@@ -13,7 +13,7 @@
  * (docs/webgpu-plan.md, P7); what covers this pass now is `npm run webgpu`.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { CAMERA_LAYOUT } from './wgsl/cameraFields';
 import { CAMERA_WGSL } from './wgsl/camera';
@@ -92,9 +92,9 @@ export class WebGPUCamera {
    * both the camera and film stock, and `npm run startup` would say if one
    * did.
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat): Promise<void>[] {
+  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
     const cache = PipelineCache.for(device, 'camera');
-    return [false, true].map((toTexture) => cache.prepareRender(cameraName(format, toTexture), cameraRecipe(device, format, toTexture)));
+    return [false, true].map((toTexture) => () => cache.prepareRender(cameraName(format, toTexture), cameraRecipe(device, format, toTexture)));
   }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {

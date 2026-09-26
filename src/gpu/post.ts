@@ -19,7 +19,7 @@
  * Both went with the WebGL renderer (P7); `npm run fx` covers this now.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
 import { BLIT_WGSL, FINISH_PASS_WGSL, STOCK_PASS_WGSL, TEST_PASS_WGSL } from './wgsl/post';
@@ -110,10 +110,10 @@ export class WebGPUPostChain {
    * finish onto the canvas or into the projector's picture. Not the test
    * effect, which is the harness's and in no look.
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat): Promise<void>[] {
+  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
     const cache = PipelineCache.for(device, 'post');
     const pass = (name: string, code: string, f: GPUTextureFormat, toTexture: boolean) =>
-      cache.prepareRender(passName(name, f, toTexture), passRecipe(device, name, code, f, toTexture));
+      () => cache.prepareRender(passName(name, f, toTexture), passRecipe(device, name, code, f, toTexture));
     return [
       pass('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true),
       pass('ring blit', BLIT_WGSL, PICTURE_FORMAT, true),

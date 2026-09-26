@@ -14,7 +14,7 @@ import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
-import { prepareShow, type Prepared } from '../gpu/prepare';
+import { prepareLog, prepareShow } from '../gpu/prepare';
 import { PipelineCache } from '../gpu/kit';
 import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
@@ -7103,8 +7103,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let healthyTimer: ReturnType<typeof setTimeout> | null = null;
-    /** What `prepareShow` built before this stage's show opened (`chromaglassDebug().pipelines`). */
-    let prepared: Prepared | null = null;
     /*
       The device while its pipelines are building, before the stage has it.
       A teardown in that gap (React's development double-run, a heal or a
@@ -7139,7 +7137,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       preparing = s.device;
       try {
         const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable });
-        prepared = got;
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }
@@ -7722,10 +7719,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
           /**
            * How the show's pipelines were built: what `prepareShow` built
-           * ahead for this stage, and every one built on a frame on any
-           * device this page has had (`npm run startup` reads it).
+           * ahead for the opening (and for every device since), and every
+           * one built on a frame on any device this page has had (`npm run
+           * startup` reads it).
            */
-          pipelines: () => ({ prepared, ledger: PipelineCache.ledger() }),
+          pipelines: () => ({ prepared: prepareLog[0] ?? null, prepares: prepareLog, ledger: PipelineCache.ledger() }),
           /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim

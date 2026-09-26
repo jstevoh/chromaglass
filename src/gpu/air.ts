@@ -19,7 +19,7 @@
  */
 
 import { AIR_SPLAT_WGSL } from './wgsl/air';
-import { Disposer, PipelineCache, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
 
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
@@ -87,8 +87,8 @@ export class WebGPUAir {
   private disposed = false;
 
   /** Its one pipeline, built before the show opens (`gpu/prepare.ts`). */
-  static prepare(device: GPUDevice): Promise<void>[] {
-    return [PipelineCache.for(device, 'air').prepareRender('air splat', splatRecipe(device))];
+  static prepare(device: GPUDevice): Prep[] {
+    return [() => PipelineCache.for(device, 'air').prepareRender('air splat', splatRecipe(device))];
   }
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {

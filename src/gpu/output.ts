@@ -12,7 +12,7 @@
  * machine that has never seen a projector pays nothing at all.
  */
 
-import { Disposer, PipelineCache, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { UniformPack } from './uniforms';
 import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
@@ -127,8 +127,8 @@ export class WebGPUOutput {
    * one without costs a compile on the starting frame, and a projector
    * plugged in mid-set finds it waiting.
    */
-  static prepare(device: GPUDevice, format: GPUTextureFormat): Promise<void>[] {
-    return [PipelineCache.for(device, 'output').prepareRender(`output ${format}`, outputRecipe(device, format))];
+  static prepare(device: GPUDevice, format: GPUTextureFormat): Prep[] {
+    return [() => PipelineCache.for(device, 'output').prepareRender(`output ${format}`, outputRecipe(device, format))];
   }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {

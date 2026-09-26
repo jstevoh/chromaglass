@@ -63,9 +63,9 @@ const shared = new WeakMap<GPUDevice, { modules: Map<string, GPUShaderModule>; s
  * frames included; the solver's first step asked for forty-odd of them, and
  * on a runner whose Metal shader cache was cold the plate stopped for nine
  * seconds with no animation frame at all (`npm run depth`, run 36243996678,
- * "from load: longest stretch without a step"). A pipeline built ahead is
- * compiled by the async path, which is the one WebGPU lets an implementation
- * do off the thread that presents.
+ * "from load: longest stretch without a step"). Built ahead, one at a time,
+ * before the show opens (`gpu/prepare.ts` says why one at a time), the page
+ * waits behind one compile at most and never mid-show.
  *
  * So every build on a frame is written down, by scope, name and device, and
  * `npm run startup` fails if a show's opening made any: that is the lists in
@@ -239,6 +239,13 @@ export class PipelineCache {
     this.ledger?.onFrame.push({ name: `${this.scope}/${name}`, at: Math.round(performance.now()), device: this.deviceIndex });
   }
 }
+
+/**
+ * One pipeline to build ahead, not yet asked for: `gpu/prepare.ts` asks for
+ * them one at a time (see there), so an owner hands over the asking, not a
+ * build already under way.
+ */
+export type Prep = () => Promise<void>;
 
 /** A render pipeline's descriptor, given a way to get a shader module for a source. */
 export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURenderPipelineDescriptor;
