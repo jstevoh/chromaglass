@@ -381,7 +381,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<rg32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -390,11 +390,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
   let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
   let s = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, s.b, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, 0.0, 0.0));
 }`,
 
   gapRest: `${HEAD}
-@group(0) @binding(2) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -661,7 +661,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<rg32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
@@ -672,34 +672,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
   var dhdt = s.g * S.gapMemory;
-  /*
-    How firmly a hand holds the glass here, 1 while it presses and falling
-    to nothing over a sixth of a second once it lets go.
-
-    Without it a held press read as the glass opening. The spring lifted
-    the gap off its floor every step and the press pushed it back down,
-    the floor clamped the press's half of that, and the film was left with
-    a steady positive dh/dt under a palm that was not moving: a sink, and
-    the liquid ran *in* under the hand (measured in the lab: the flow at
-    0.1 either side of a held press pointed at it, at 1.06, with dh/dt
-    +0.127). The dye went with it, piled up under the palm to the density
-    cap and was thrown away. A hand on the glass holds it where it is; the
-    spring takes over when the hand comes off.
-  */
-  var hold = max(0.0, s.b - S.dt / 0.15);
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
       let g2 = max(0.004, gap + dg);
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
-      if (dg < 0.0) { hold = 1.0; }
     }
   }
-  // The spring back toward the dome, and its motion counts; not while held.
-  let g3 = gap + (rest - gap) * S.gapSpring * (1.0 - hold);
+  // The spring back toward the dome, and its motion counts.
+  let g3 = gap + (rest - gap) * S.gapSpring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, hold, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, 0.0, 0.0));
 }`,
 
   /*
@@ -1218,51 +1202,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // Finite only: this carries the velocity too, whose signs must survive.
   let o = textureSampleLevel(src, lin, pos, 0.0);
   textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
-}`,
-
-  /*
-    The dye's continuity term: what the advection leaves out.
-
-    The dye is carried semi-Lagrangian (advect, then macCormack), which moves
-    a value along the flow and has no term for the flow converging or
-    spreading. Where it spreads, a cell backtraces into a denser one and the
-    plate gains dye; where it converges, the MacCormack clamp will not let a
-    cell rise above its neighbours' peak, and the dye arriving from the edges
-    has nowhere to go and is lost. Most of the plate's flow is projected
-    divergence-free and neither happens; the flows that are not are exactly
-    the ones meant to squeeze liquid about. The squeeze film under a press,
-    the air a bubble displaces, the depth's drag.
-
-    Measured in the lab: a press at the app's strength on a pool of 250 left
-    0 of it, the pool eaten from its edge inward (rings 223 27 -> 27 0),
-    the gap back at rest 300 steps later and the dye not with it. In the app
-    the emptied plate is then seeded afresh, which is the dye the Press
-    check read as made.
-
-    So each cell's dye is scaled by the flow's expansion there: exp(-div·dt),
-    the continuity equation's own factor, thinned where the liquid spreads
-    and thickened where it gathers. The divergence is of the projected
-    velocity (fluid.ts says why not the forced one the dye rides), in the
-    advection's units: A.a.x is the displacement per
-    unit velocity (uv), and the central difference over two cells is
-    (v+ − v−)·N/2 per uv. Clamped so a single step never scales by more than
-    e^±0.7, which a runaway velocity could otherwise ask for.
-  */
-  dilute: `${HEAD}
-@group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var vel: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let p = vec2i(id.xy);
-  let vxp = textureLoad(vel, clampP(p + vec2i(1, 0), S.n), 0).x;
-  let vxm = textureLoad(vel, clampP(p - vec2i(1, 0), S.n), 0).x;
-  let vyp = textureLoad(vel, clampP(p + vec2i(0, 1), S.n), 0).y;
-  let vym = textureLoad(vel, clampP(p - vec2i(0, 1), S.n), 0).y;
-  let div = ((vxp - vxm) + (vyp - vym)) * 0.5 * S.n;
-  let k = exp(-clamp(div * A.a.x, -0.7, 0.7));
-  let d = textureLoad(src, p, 0) * select(1.0, k, finite4(vec4f(k)));
-  textureStore(dst, p, capDye(d));
 }`,
 
   // MacCormack: phi1 + ½(phi0 − phi0b), clamped to the four cells the forward step sampled.

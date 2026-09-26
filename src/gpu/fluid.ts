@@ -164,6 +164,7 @@ const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
 const R32 = 'r32float';
+const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
@@ -339,8 +340,7 @@ export class WebGPUFluid {
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.vel = pp(this.N, VEL, 'vel');
-    // Four channels: the gap, its rate, and how firmly a hand holds it (squeezeUpdate).
-    this.squeeze = pp(this.N, 'rgba32float', 'squeeze');
+    this.squeeze = pp(this.N, RG32, 'squeeze');
     /*
       The second phase (H7): one number a cell, how much of the dark liquid is
       there.
@@ -983,23 +983,6 @@ export class WebGPUFluid {
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
     /*
-      And its continuity term (see `dilute`), from the projected velocity,
-      not the forced one the dye rides.
-
-      The projected velocity's divergence is the plate's intended sources
-      and nothing else: the squeeze film under a press and the air a bubble
-      displaces. The forced one also carries the depth's drag, which slows
-      the flow unevenly and so has a divergence of its own, and the lasting
-      current, which is projected on its own coarser grid. Taken from that,
-      the term moved dye wherever the drag varied; the dye feeds the forces
-      that make the flow, and on a flat plate with the drag on the centre's
-      speed ran from 0.64 to 3.55 (npm run depth, CI).
-    */
-    stage('dye continuity', (pass) => {
-      this.run(pass, 'dilute', this.dye.write, [this.dye.read, this.vel.read], this.arg('dilute', [disp, 0, 0, 0]));
-      this.dye.swap();
-    });
-    /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
       reading the same soap the dye was moved by.
@@ -1486,13 +1469,13 @@ export class WebGPUFluid {
   /**
    * The squeeze film, read back whole: the gap and its rate. For checks.
    *
-   * RGBA32, so sixteen bytes a texel and four floats a cell — r is the gap between
+   * RG32, so eight bytes a texel and two floats a cell — r is the gap between
    * the glasses, g is how fast it is changing, which is the thing that moves
    * any liquid at all.
    */
   async readSqueeze(): Promise<{ n: number; gap: Float32Array; rate: Float32Array } | null> {
     const n = this.N;
-    const row = Math.ceil((n * 16) / 256) * 256;
+    const row = Math.ceil((n * 8) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
     enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
@@ -1503,8 +1486,8 @@ export class WebGPUFluid {
     const stride = row / 4;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
-        gap[y * n + x] = all[y * stride + x * 4];
-        rate[y * n + x] = all[y * stride + x * 4 + 1];
+        gap[y * n + x] = all[y * stride + x * 2];
+        rate[y * n + x] = all[y * stride + x * 2 + 1];
       }
     }
     buf.unmap();
