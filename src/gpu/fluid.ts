@@ -108,12 +108,39 @@ const LIES_B0 = 0.2;
 */
 const MAZE_PERIOD = 0.045;
 /*
+  How much finer Maze Detail can make it: at 1 the period is a third of
+  MAZE_PERIOD, 0.015 of the plate.
+
+  Steve's references (Chemical Bouillon's ferrofluid films) run fingers
+  about a sixtieth of the frame wide, and MAZE_PERIOD drew them two to three
+  times wider than that in the lab. It stays the default because every look
+  made so far was made with it. It cannot just be made smaller, though,
+  because of the twelve-cell floor in step(): a period is only as fine as the
+  grid can hold, and turning Detail up on a smaller grid stops at the floor
+  rather than washing the stripes out to grey. Where it stops, by grid
+  (qualityLadder in lib/platform.ts): 256² at 0 (the default is already at
+  the floor there), 384² at 0.33, 512² at 0.59, 768² at 0.96, and only 1024²
+  reaches 0.015. The hosted site tops out at 512², so there the top two
+  fifths of the slider do nothing; the other way, mapping the slider onto
+  what each grid can hold, would give each machine a different maze for the
+  same setting, which is what the constant period was chosen to avoid. The
+  step from default to finest is geometric, so each part of the slider
+  changes the size by the same ratio.
+*/
+const MAZE_FINEST = 3;
+/*
   How hard the maze's own potential moves the liquid, in plate widths a
   second per unit of its gradient (per cell). From the lab at 256²: drops
   turn to starfish in two seconds and to a branched maze in eight; the
   experiments give a second or a few for a viscous Hele-Shaw maze. Scaled
-  by the grid over 256: the maze is the same size in the plate on every
-  grid, so on a finer one its potential changes less per cell.
+  by the grid over 256: at a given Maze Detail the maze is the same size in
+  the plate on every grid, so on a finer one its potential changes less per
+  cell. Maze Detail itself is not scaled for: a finer maze has the sharper
+  force per cell, and it forms faster for it (its growth goes as the
+  wavenumber to the fourth). The step's motion stays capped at MAGNET_CELLS
+  a step, and `npm run maze` finds no grid printed through the black at
+  Detail 0.5 on 512²; a 768² or 1024² plate at full Detail is only judged by
+  eye (docs/judging.md).
 */
 const MAZE_GAIN = 2;
 /** The share of the maze's field that is uniform (a coil under the whole plate); the hand magnet adds the rest where it is. */
@@ -719,8 +746,11 @@ export class WebGPUFluid {
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
     // Never under twelve cells a period: the edge is three or four wide, and
-    // on 192² (8.6 cells) the stripes washed out to grey.
-    const kk = (2 * Math.PI / Math.max(MAZE_PERIOD * N, 12)) ** 2;
+    // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
+    // the period by up to three (MAZE_FINEST), and that floor is why it is
+    // a setting and not a new constant: see MAZE_FINEST.
+    const period = MAZE_PERIOD / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
+    const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
     const mazeK = { m2: 0.16 * kk, alpha: (1.16 * kk) ** 2 };
     if (maze <= 0.001) this.mazeReady = false;
     this.writeSim(p, disp);

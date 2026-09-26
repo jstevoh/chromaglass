@@ -60,7 +60,8 @@ import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction } from './lib/midi';
+import type { MidiAction, SoundBinding } from './lib/midi';
+import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -2567,10 +2568,18 @@ export default function App() {
       default: unhandled('an action', a);
     }
   };
-  /** The selected liquid takes a palette colour; the dropper becomes the tool. */
-  const selectDye = (paletteIndex: number) => {
+  /**
+   * The selected liquid takes a palette colour, and nothing else changes.
+   * What a sound trigger on a dye does (`TriggerHost.dye`): the music may
+   * recolour the dropper, never take a tool out of the performer's hand.
+   */
+  const colourDye = (paletteIndex: number) => {
     const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
     updateLiquidColor(selectedLiquidId, c.hex);
+  };
+  /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
+  const selectDye = (paletteIndex: number) => {
+    colourDye(paletteIndex);
     setActiveTool('dropper');
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
@@ -2979,6 +2988,17 @@ export default function App() {
     }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
+  /*
+    A trigger the music fired (sound learn, PLAN §5): the same action and
+    preset doors a pad goes through, so a kick on Next Preset and a pad on
+    Next Preset cannot come to mean different things. The dye is the one
+    difference, and it is deliberate: the colour changes and the tool does not
+    (`TriggerHost` in soundLearn.ts says why). `runTrigger` also refuses an
+    action a beat must not press, the last door before the show.
+  */
+  const runSoundTrigger = (b: SoundBinding) => {
+    runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
+  };
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
     action: runAction,
@@ -3260,6 +3280,8 @@ export default function App() {
         frame={preview.frame}
         output={output}
         tempoRef={tempoRef}
+        soundBindings={midi.map.sound}
+        onSoundTrigger={runSoundTrigger}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
