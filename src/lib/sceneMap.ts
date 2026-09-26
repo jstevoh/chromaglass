@@ -49,7 +49,15 @@ import { PINNABLE, onStep } from './deskPins';
  * takes it to eighty-one and costs nothing, because that list already had to
  * exist for the desk's pin chips.
  */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount']);
+/*
+  Pacing is left out because nothing would hear the patch. Patches are folded
+  into the settings the plate draws with, inside the visualizer; the sequencer
+  plans each scene from the settings the app holds, so a room, sound or LFO
+  patch on Pacing would show in the bay and change nothing. And if it did, a
+  sixty-hertz wobble across the half that turns on dark endings would move it
+  under a plan made when the stage was entered.
+*/
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing']);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
   !String(s.key).startsWith('scene') && !NOT_A_TARGET.has(String(s.key)));

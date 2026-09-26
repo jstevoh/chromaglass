@@ -57,8 +57,8 @@ Where each batch stands, as of 2026-09-26:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **in progress** |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; steps 1–7 not started |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **built on the sequencer, in review**; steps 2–7 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -632,7 +632,7 @@ What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
   was, bit for bit, and Ferro Maze uses 0.5. `npm run maze`: finger width 0.0296 at 0.5
   against 0.0431 at 0 (ratio 0.69). Whether it now matches the reference is for the
   Mac.
-- **9c. The dye rides the ferrofluid** (in progress, picked 2026-09-26). In Ferro Paint the dye is not carried by the
+- **9c. The dye rides the ferrofluid** (**shipped**, #168). In Ferro Paint the dye is not carried by the
   ferrofluid, so the patchwork does not deform with the fingers the way the reference's
   does.
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
@@ -683,6 +683,18 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
    10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
    from a seeded run, and the film table.
+   *Built* (in review) on the stage sequencer rather than the phrase generator, because a
+   stage is already a scene: `src/lib/scenePacing.ts` plans each stage of a running
+   sequence (a pour, press or dye change opening each swell, rests where the plate's clock
+   drops as low as a fifth, and from Pacing ½ a slow fade to near-black at the stage's
+   end, the next coming up out of it), and the plate follows it on its clock, its
+   automation and its light. A **Pacing** setting (0 keeps today's show; sheet, MIDI,
+   desks, phone; a stage may set it and it is put back when the sequence stops), an
+   ending choice per stage, and a built-in **Light Show Night** of 22–30 s scenes.
+   `npm run pacing` measures what the sequence asks for with the footage's `shape()`,
+   counting a fade as the change in every pixel it is: 2.35 swells a minute, calm 25–28 %,
+   swells 2.4× the median, the light under a quarter 19 % of the set, every drain in the
+   dark. Whether the plate delivers it is the film's to say: film Light Show Night.
 2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
    accumulating intensity from #154's bands, and from them live build, drop and
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
@@ -726,8 +738,7 @@ and look link are not. The order from here, as of 2026-09-26:
    `phrasing.ts` has the shape), and the film table can measure it.
 2. **The rest of batch 5**: the look link and the shutter are independent of
    everything else and can be built while the Mac is judging a look.
-3. **Batch 9c, the dye rides the ferrofluid**, being built now in the ferrofluid
-   thread: the other visible gap between Ferro Paint and its reference.
+3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
 
 Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
 freeze (#164) finish in their own threads first.

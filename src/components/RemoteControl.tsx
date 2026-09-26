@@ -645,6 +645,16 @@ export default function RemoteControl() {
                   <Square size={16} className="mx-auto" />
                 </button>
               </div>
+              {/*
+                Pacing only while a sequence runs, by the Maze Detail rule
+                above: it does nothing without one, and with one how deep the
+                scenes go is the thing a thumb wants from across the room.
+              */}
+              {state.sequencer.running && (
+                <div className="mt-4">
+                  <Slider label="Pacing" field="pacing" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('pacing') as number | undefined} {...sliderProps} connected={connected} />
+                </div>
+              )}
             </div>
           )}
 
