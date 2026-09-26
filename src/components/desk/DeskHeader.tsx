@@ -11,7 +11,7 @@ import { LOCKUP_URL, MARK_URL } from '../../brand';
  * show the same truth in the same place.
  */
 
-export type DeskMode = 'perform' | 'design' | 'sequence';
+export type DeskMode = 'perform' | 'design' | 'sequence' | 'sound';
 
 export interface DeskDots {
   mic: boolean;
@@ -152,7 +152,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         <div ref={switchRef} className="pointer-events-auto">
           <Segmented
             value={mode}
-            options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Songs']] as const}
+            options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Songs'], ['sound', 'Sound']] as const}
             onChange={onMode}
             height={32}
             testId="mode-segmented"

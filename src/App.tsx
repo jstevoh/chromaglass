@@ -15,6 +15,7 @@ import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
+import { SoundPanel } from './components/SoundPanel';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
@@ -395,6 +396,16 @@ export default function App() {
   const playTrackRef = useRef<(t: Track) => void>(() => {});
   const [musicLoop, setMusicLoop] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /*
+    Sound is a tab, because the strip it used to live in could not be found.
+
+    The audio sources were gated on `showControls && !showSettings && !deskUp`:
+    they hid when Settings opened, and hid again whenever either desk was up,
+    which is where the work happens. A shelf of music shipped into that strip
+    and the owner reported not being able to see any of it, which is the right
+    outcome for a control nobody can reach.
+  */
+  const [showSound, setShowSound] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
   const musicElRef = useRef<HTMLAudioElement>(null);
@@ -3693,6 +3704,25 @@ export default function App() {
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
+        {showSound && (
+          <SoundPanel
+            source={audioSource}
+            onSource={(x) => { void handleSourceChange(x); }}
+            inputs={audioInputs}
+            inputId={audioInputId}
+            onInput={chooseAudioInput}
+            playing={musicPlaying}
+            time={musicTime}
+            loop={musicLoop}
+            onLoop={setMusicLoop}
+            onToggle={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }}
+            onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
+            nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
+            onPickFile={playMusicFile}
+            onPickTrack={playTrack}
+            onClose={() => setShowSound(false)}
+          />
+        )}
         {showSongs && (
           <SongsPanel
             shows={songShows}
@@ -4036,8 +4066,10 @@ export default function App() {
           }}
           dots={deskDots}
           onSearch={() => setShowPalette(true)}
-          mode={showSongs || showSequencer ? 'sequence' : 'perform'}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'perform'}
           onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
             if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
             setShowSongs(false);
             setShowSequencer(false);
@@ -4108,8 +4140,10 @@ export default function App() {
           onNew={newLook}
           dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
-          mode={showSongs || showSequencer ? 'sequence' : 'design'}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'design'}
           onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
             if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
             setShowSongs(false);
             setShowSequencer(false);

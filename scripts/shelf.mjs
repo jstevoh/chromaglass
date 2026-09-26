@@ -41,7 +41,8 @@ const check = (name, ok, detail) => {
 
 const browser = await launchChromium(chromium);
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  // Wide enough for the desk: the tabs only exist when there is room for it.
+  const page = await browser.newPage({ viewport: { width: 1500, height: 940 } });
   await page.goto(`http://localhost:${port}/?debug`, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
 
@@ -58,13 +59,43 @@ try {
       `${r.status} ${r.type ?? '?'}`);
   }
 
-  if (await page.evaluate(() => typeof window.chromaglassMusic !== 'function'))
-    throw new Error('chromaglassMusic() is not there — nothing below could put a track on');
+  /*
+    Through the tab a person clicks, not the back door.
 
+    The first version of this drove `chromaglassMusic()` because the shelf
+    could not be found in the DOM — and that was the finding, not an
+    inconvenience to route around. The sources were gated on
+    `showControls && !showSettings && !deskUp`, so they hid when Settings
+    opened and hid again whenever a desk was up. The shelf shipped where
+    nobody could reach it and the harness proved the audio path while saying
+    nothing about whether a hand could get to it. So this clicks the tab.
+  */
   const first = LIBRARY[1];   // a short one, so the test is not waiting on a 31-minute set
-  const put = await page.evaluate((src) => window.chromaglassMusic(src), first.src);
-  check('a track can be put on', put?.src === first.src, `${put?.title} — ${put?.artist}`);
-  await page.waitForTimeout(1200);
+  const tab = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  check('there is a Sound tab on the desk', tab, 'beside Perform, Design and Songs');
+  if (!tab) throw new Error('no Sound tab, so nothing below can be reached by hand');
+  await page.waitForTimeout(700);
+  const panel = await page.evaluate(() => !!document.querySelector('[data-testid="sound-panel"]'));
+  check('and it opens the sound panel', panel, `${LIBRARY.length} tracks, ${Math.round(librarySeconds() / 60)} minutes`);
+
+  const clicked = await page.evaluate((id) => {
+    const b = document.querySelector(`[data-testid="sound-track-${id}"]`);
+    if (!b) return false;
+    b.click();
+    return true;
+  }, first.src.split('/').pop().replace('.mp3', ''));
+  check('a track on the shelf can be clicked', clicked, first.title);
+  await page.waitForTimeout(1400);
+  const put = await page.evaluate(() => {
+    const el = document.querySelector('audio');
+    return el?.currentSrc?.split('/').pop() ?? null;
+  });
+  check('and clicking it loads that track', put === first.src.split('/').pop(), put ?? 'nothing loaded');
   /*
     Only if it needs it. Autoplay may want a gesture, and the play button is
     there for exactly that — but pressing it on a track that is already running
