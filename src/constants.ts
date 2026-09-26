@@ -1,5 +1,6 @@
 import type { AudioData } from './hooks/useAudioAnalyzer';
 import type { AudioFeature } from './types';
+import { stream, type Rng } from './lib/rng';
 
 // Canonical color palette — single source of truth for the entire app.
 // RGB values are 0-1 floats for the fluid simulation.
@@ -72,14 +73,24 @@ export const COLOR_HARMONY_NAMES: string[] = [
   'Contrast Shock', 'Carnival', 'Galaxy', 'Reef', 'Twilight', 'Forest', 'Dusk',
 ];
 
+/*
+  Which colour a drop is and which palette a plate re-picks are both on the
+  plate the moment they are drawn, so both come from the show's seeded
+  `plate.palette` stream (lib/rng.ts) unless a caller hands in another. One
+  stream for the two, because they are one decision — what colour arrives —
+  and nothing but the palette's own choices draw from it (the visualizer's
+  `harmonyWithin` is the third), so no change to the bubbles or the beads
+  can move a colour.
+*/
+
 /** Pick a random color harmony index set */
-export function pickHarmony(): number[] {
-  return COLOR_HARMONIES[Math.floor(Math.random() * COLOR_HARMONIES.length)];
+export function pickHarmony(rng: Rng = stream('plate.palette')): number[] {
+  return rng.pick(COLOR_HARMONIES);
 }
 
 /** Pick a random RGB from a given harmony */
-export function harmonyColor(harmony: number[]): { r: number; g: number; b: number } {
-  return PALETTE_RGB[harmony[Math.floor(Math.random() * harmony.length)]];
+export function harmonyColor(harmony: number[], rng: Rng = stream('plate.palette')): { r: number; g: number; b: number } {
+  return PALETTE_RGB[rng.pick(harmony)];
 }
 
 /** Cycle through a harmony over time (for smooth ambient/audio cycling) */

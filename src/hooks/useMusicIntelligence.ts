@@ -539,6 +539,9 @@ export function useMusicIntelligence(
       setLastStop({ at: Date.now(), kept: false, gestures: 0, title: song?.title });
       return;
     }
+    // Unseeded on purpose (`npm run seed` allows it): a name for a stored take,
+    // never on the plate. Seeded, two sessions on one `?seed=` would mint the
+    // same id and the second take would overwrite the first.
     const id = `perf-${take.startedAtMs.toFixed(0)}-${Math.random().toString(36).slice(2, 8)}`;
     const perf = finishTake(take.gestures, take.startedAtMs, performance.now(), song, id, take.date);
     putPerformance(perf).then(ok => {

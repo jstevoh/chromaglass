@@ -76,6 +76,7 @@ import { LOCKUP_URL } from './brand';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
+import { stream } from './lib/rng';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -182,6 +183,10 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
  * Macro looks are left out — a closeup of one bead is a strange first
  * impression of a light show — and `?look=<id>` pins it, which is how the
  * harnesses stay deterministic without the app having to be boring.
+ *
+ * The pick is the show's `show.opening` stream (lib/rng.ts), so it is still a
+ * different look most nights and the same look on the same `?seed=`: the
+ * look a render opens on is part of the film.
  */
 export const OPENING_LOOK: string = (() => {
   try {
@@ -189,7 +194,7 @@ export const OPENING_LOOK: string = (() => {
     if (asked && PRESETS.some(p => p.id === asked)) return asked;
   } catch { /* no window: the default below */ }
   const pool = PRESETS.filter(p => !p.settings.macroMode);
-  return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : 'classic';
+  return pool.length ? stream('show.opening').pick(pool).id : 'classic';
 })();
 
 
@@ -1534,7 +1539,8 @@ export default function App() {
       const cur = settingsRef.current;
       aimTick.current = (aimTick.current + 1) % 2;
       if (aimTick.current === 0 && (cur.macroZoom ?? 1) > 1.05 && (cur.macroCamera ?? 'hold') !== 'auto') {
-        const wander = (v: number) => Math.min(0.85, Math.max(0.15, v + (Math.random() - 0.5) * 0.24));
+        // The aim's wander is Evolve's, so it draws from Evolve's stream.
+        const wander = (v: number) => Math.min(0.85, Math.max(0.15, v + stream('show.drift').centred() * 0.24));
         const ax = cur.macroAimX ?? 0.5, ay = cur.macroAimY ?? 0.5;
         driftGlide.current.set('macroAimX', { from: ax, to: wander(ax), at: 0 });
         driftGlide.current.set('macroAimY', { from: ay, to: wander(ay), at: 0 });
@@ -2118,10 +2124,10 @@ export default function App() {
     previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
     setSettings(luckyLook(settings, liquidTypes.map(t => t.color)));
     setPinnedPresetId(null);
-    // Randomize inject style for the evolve
+    // Randomize inject style for the evolve: Lucky's own stream, like its roll.
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
-    const s1 = allStyles[Math.floor(Math.random() * allStyles.length)];
-    const s2 = allStyles[Math.floor(Math.random() * allStyles.length)];
+    const s1 = stream('show.lucky').pick(allStyles);
+    const s2 = stream('show.lucky').pick(allStyles);
     visualizerRef.current?.setInjectStyle([s1, s2]);
     setSeedCount(prev => prev + 1);
   };
@@ -2168,11 +2174,16 @@ export default function App() {
     if (mode === 'random') {
       previousLook.current = { id: pinnedPresetId, settings: from };
       setPinnedPresetId(null);
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color))), fadeSeconds);
+      // The song boundary's own stream, not Lucky's default: a Lucky press
+      // between songs must not decide which look the next song brings.
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), fadeSeconds);
       return;
     }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
-    const next = pool[Math.floor(Math.random() * pool.length)];
+    // Which look a song boundary brings is on the plate for the whole song:
+    // seeded (lib/rng.ts), on a stream of its own so Lucky presses between
+    // songs do not decide it.
+    const next = stream('show.newSong').pick(pool);
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);

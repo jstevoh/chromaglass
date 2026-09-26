@@ -26,6 +26,11 @@
  * tap, or anything else that calls `fire`. One is short and one is long, so a
  * single press can do a snap and a swell at once.
  */
+// With the extension: `npm run shapes` loads this file straight into node
+// with --experimental-strip-types, which resolves nothing it is not told the
+// exact name of. The other libraries reach rng through esbuild or vite and
+// can leave it off; this one is read by node itself.
+import { stream } from './rng.ts';
 
 /** What a patch can name on the `shape` source. */
 export type ModulatorFeature = 'lfo1' | 'lfo2' | 'lfo3' | 'lfo4' | 'env1' | 'env2';
@@ -59,7 +64,12 @@ export class Modulators {
   private fired = { env1: -1, env2: -1 };
   private rand: () => number;
 
-  constructor(random: () => number = Math.random) {
+  /**
+   * The stepped LFO's next value: the show's `plate.modulators` stream, so a
+   * patch riding lfo4 steps through the same values on a render of the same
+   * seed (lib/rng.ts). Injectable for a check, as it always was.
+   */
+  constructor(random: () => number = stream('plate.modulators').float) {
     this.rand = random;
   }
 
