@@ -40,7 +40,8 @@ import { STRUCTURE } from './lookFade';
  *   is, how hard a camera drives the plate. Drifting them changes what the
  *   show *responds to*, which is a decision rather than a mood.
  *
- *   **The mark** is a brand, and **the closeup** is a camera move.
+ *   **The mark** is a brand, **the closeup** is a camera move, and **where
+ *   the magnet sits** is the performer's hand.
  *
  *   **Stepped dials** jump rather than drift, so a nudge is a cut.
  */
@@ -62,6 +63,15 @@ const NOT_THE_LOOK = new Set([
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
+  /*
+    Where the magnet sits is the performer's hand, not the mood. A magnet the
+    Magnet tool sets down stays there until the look places its own somewhere
+    (LiquidVisualizer, magnetFor), and a drift of Magnet Across or Up is the
+    look placing it: under Evolve the magnet left in a corner would have
+    jumped back to the middle at the first nudge, which is the very thing the
+    owner asked to be rid of. How far it walks when nobody has it still drifts.
+  */
+  'magnetX', 'magnetY',
 ]);
 
 /** Dials that move in whole steps, where a nudge would be a jump. */
