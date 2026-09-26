@@ -124,6 +124,8 @@ try {
     const at = { fx: 0.75, fy: 0.75 };
     const hx = hole.x + hole.width * at.fx, hy = hole.y + hole.height * at.fy;
     const drift = zero(), change = zero();
+    // Each drop's own maps, for the median below.
+    const driftReps = [], changeReps = [];
     let hand = null;
     for (let rep = 0; rep < REPS; rep++) {
       const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
@@ -135,7 +137,8 @@ try {
       await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
       await page.waitForTimeout(500);
       const c = await shot();
-      add(drift, await grid(a, b)); add(change, await grid(b, c));
+      const d = await grid(a, b), ch = await grid(b, c);
+      add(drift, d); add(change, ch); driftReps.push(d); changeReps.push(ch);
       await page.evaluate(() => { window.__shots = {}; });
     }
     const cellOf = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
@@ -147,12 +150,32 @@ try {
     ]);
     const near = (y, x) => Math.abs(y - cy) <= 1 && Math.abs(x - cx) <= 1;
     const here = Math.max(...[-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => change[cy + dy]?.[cx + dx] ?? 0)));
+    /*
+      Judged on the median of the four drops, not their mean.
+
+      The claim above is that an echo comes back on every drop and the plate's
+      own events do not, and the mean does not ask that: one drip or blob
+      spreading into a cell during one of the four drops carried the average
+      over its allowance. It failed twice in this way, each time beside a
+      region already moving on its own. Once at row 2, column 5, 22.8
+      against 22.8, next to drift of 23.3. Once at row 4, column 3, 25.1
+      against 17.9, next to drift of 28.4. Each time the same cell sat at its
+      drift on the other runs (2.5 against 2.5, 2.1 against 2.2). The median
+      of four is untouched by one such event, and an echo on every drop moves
+      it exactly as much as the mean. The maps above still print the mean.
+    */
+    const median = (reps, y, x) => {
+      const v = reps.map((m) => m[y][x]).sort((a, b) => a - b);
+      return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+    };
     const away = [];
     for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
       if (near(y, x)) continue;
+      const v = median(changeReps, y, x), dm = median(driftReps, y, x);
       // How far past what the plate does alone, in its own terms.
-      const allowed = Math.max(2 * drift[y][x] + 4, 0.3 * here);
-      away.push({ y, x, v: change[y][x], allowed, over: change[y][x] / allowed, tag: tags.get(`${y},${x}`) ?? '' });
+      const allowed = Math.max(2 * dm + 4, 0.3 * here);
+      away.push({ y, x, v, allowed, over: v / allowed, tag: tags.get(`${y},${x}`) ?? '',
+        reps: changeReps.map((m) => m[y][x].toFixed(1)).join(' '), dreps: driftReps.map((m) => m[y][x].toFixed(1)).join(' ') });
     }
     away.sort((a, b) => b.over - a.over);
     const rot = await page.evaluate(() => window.chromaglassDebug?.().rotation?.current ?? null);
@@ -174,7 +197,7 @@ try {
       continue;
     }
     check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
-      worst ? `most away from the hand ${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand` : 'nothing');
+      worst ? `most away from the hand ${worst.v.toFixed(1)} (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}` : 'nothing');
     await page.close();
   }
 } finally {
