@@ -76,10 +76,18 @@ export class WebGPUAir {
       float carry a 0-to-1 coverage with about three decimal places, which is
       finer than the dye it multiplies, and it costs half the memory.
     */
+    /*
+      And four channels of it: the coverage (r) the solver reads, and for the
+      plate which bubble is there and where in it. Every bubble looked alike
+      because the plate had only the coverage
+      to draw from, and coverage is flat inside a bubble. Precisely: g and b
+      are where in its bubble a texel is (weighted by the coverage), a its
+      size, film age and number packed (see wgsl/air.ts).
+    */
     const one = (n: string) => this.disposer.track(device.createTexture({
       label: n,
       size: [grid, grid],
-      format: 'r16float',
+      format: 'rgba16float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
     this.fields = [one('air a'), one('air b')];
@@ -158,7 +166,7 @@ export class WebGPUAir {
         module: module(AIR_SPLAT_WGSL),
         entryPoint: 'fs',
         targets: [{
-          format: 'r16float' as GPUTextureFormat,
+          format: 'rgba16float' as GPUTextureFormat,
           blend: {
             color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
             alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
