@@ -1490,6 +1490,12 @@ struct FsOut {
   }
   // The front plate's own physics, once, where it sits on the plate.
   let view = viewAt(fuvBase);
+  // One screen pixel in plate units, for the ferrofluid's edge. Taken here,
+  // before any branch a pixel can take on its own, because WGSL reads a
+  // derivative across the whole quad or not at all. The length of a step
+  // across the screen, not fwidth: fwidth adds the two axes, which on a
+  // turning plate is up to √2 pixels and softened the edge as it spun.
+  let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
@@ -1615,43 +1621,123 @@ struct FsOut {
     if (U.phaseAmount > 0.002) {
       let ph = clamp(view.phase, 0.0, 1.0);
       if (ph > 0.004) {
-        let e = 1.6 / U.logicalGrid;
-        let gx = viewAt(fuvBase + vec2f(e, 0.0)).phase - viewAt(fuvBase - vec2f(e, 0.0)).phase;
-        let gy = viewAt(fuvBase + vec2f(0.0, e)).phase - viewAt(fuvBase - vec2f(0.0, e)).phase;
-        let edge = clamp(length(vec2f(gx, gy)) * 3.0, 0.0, 1.0);
-        // Brown where it is thin, black where it is thick: a real film, not a
-        // silhouette with a hard edge. Beer–Lambert, the light through it
-        // filtered by its thickness (ph^1.5 over a diffuse edge), and blue
-        // most, as the magnetite does: amber at a finger's edge, then
-        // brown, then ink over the full gap, out of the plate's own light
-        // rather than a painted brown. Optical depth 9: at 5 a finger over a
-        // gold plate stayed reddish brown and the gallery's maze read as thin
-        // lines, with the plate's own texture showing through the ink.
-        let amt = clamp(U.phaseAmount, 0.0, 1.0);
-        let depth = 9.0 * pow(ph, 1.5) * (0.4 + 0.6 * amt);
-        var pc = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-        // The rim: the dye beyond the boundary, bent back through the edge.
-        let outward = select(vec2f(0.0), -normalize(vec2f(gx, gy)), length(vec2f(gx, gy)) > 1e-5);
-        let beyond = decodeFluid(layer0, fuvBase + outward * 0.02, 0.0, false);
-        let rimCol = mix(bgColor, beyond.rgb, beyond.a);
         /*
-          The meniscus is a line where the ferrofluid meets the water, so the
-          rim and the highlight belong to the band round half full, not to
-          every gradient. Weighted by how full it was, they lit every
-          ripple inside a dense pool (the gallery's honeycomb in the ink at
-          8 s), and across a maze finger a few cells wide almost every pixel
-          is within the rim's reach, so the whole finger was washed with the
-          dye's colour and read as brown rather than black.
+          Where the ferrofluid ends, as a line rather than a ramp.
+
+          The solver keeps the phase's boundary a few cells wide (Cahn–Hilliard
+          needs a diffuse interface to stay stable), and this used to draw that
+          width: opacity followed the phase itself, so every domain wore a
+          brown smudge about three cells deep. Three cells is 8 px on a 640 px
+          plate and over 20 px through the closeup, and the references (Chemical
+          Bouillon's labyrinths, Czapiga's macro beads) have a razor edge at
+          every magnification. A liquid either is at a point or is not; the
+          width of the field's ramp is the solver's business, not the picture's.
+
+          So the edge is the half-full line, found where it falls between the
+          texels: the distance to it is (phase − ½) over the phase's slope, and
+          the edge is one screen pixel of antialiasing across that line, however
+          far the camera is in. Measured in the lab on seeded plates with
+          Magnet Garden's settings, as the mean width of the band between 10%
+          and 90% of the way from black to the water: a maze 26 px to 1.3 px,
+          a pool over the magnet 34 px to 1.3 px at 1x and 29 px to 1.3 px at
+          3x, on a 640 px render.
+
+          Distances are in cells (dc) for everything the liquid itself sets
+          (how thick it is, the meniscus), and in pixels only for the
+          antialiasing.
         */
-        let band = pow(clamp(4.0 * ph * (1.0 - ph), 0.0, 1.0), 3.0) * amt;
-        pc += rimCol * edge * 0.55 * band;
-        // A hard specular dot, which every macro frame of this has.
-        // The lamp's direction here, the same way the bubbles take it.
-        let Lp = lampDir(fuvBase, U.lamp);
-        let lampTo = Lp.xy / max(length(Lp.xy), 0.06);
-        let hi = pow(max(0.0, dot(outward, lampTo)), 8.0) * edge;
-        pc += vec3f(1.0, 0.97, 0.92) * hi * 0.35 * band;
-        outColor = pc;
+        let cell = 1.0 / f32(textureDimensions(view0).x);
+        let gx = viewAt(fuvBase + vec2f(cell, 0.0)).phase - viewAt(fuvBase - vec2f(cell, 0.0)).phase;
+        let gy = viewAt(fuvBase + vec2f(0.0, cell)).phase - viewAt(fuvBase - vec2f(0.0, cell)).phase;
+        let grad = vec2f(gx, gy) / (2.0 * cell);
+        let slope = length(grad);
+        // Signed distance to the half-full line in plate units, inside positive.
+        // Where the field is flat there is no line near, and the sign alone
+        // says which side: capped at eight cells either way.
+        let d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
+        let dc = d / cell;
+        // A floor under the pixel, for where the screen's coordinates stop
+        // changing (the kaleidoscope clamps them at its corners) and there is
+        // no pixel to measure.
+        let cover = clamp(0.5 + d / max(phasePx, 0.05 * cell), 0.0, 1.0);
+        let outward = select(vec2f(0.0), -grad / slope, slope > 1e-4);
+        let amt = clamp(U.phaseAmount, 0.0, 1.0);
+
+        /*
+          Opacity from thickness, still: thin at its edge, where the meniscus
+          curves down to the glass, and black over the full gap. But the
+          thickness is now how far inside the line a point is, not how full
+          the solver's cell is. That is what took the smudge off the outside
+          (nothing outside the line is ferrofluid) and the orange worms out of
+          the middle of a pool: ripples in a pool's fill (phase 0.7, 0.8, far
+          from any half-full line) were thin by the old measure, let the gold
+          through and were lit as rims. By this one they are deep inside, and
+          black. The amber is a sliver just inside the edge, about one cell
+          deep, which is where a real ferrofluid lets the lamp through.
+          Optical depth 13 at full thickness: at 9 the Macro Bead texture on
+          the dye beneath printed through a pool as rings.
+        */
+        let t = clamp(dc / 1.1, 0.0, 1.0);
+        let depth = (1.2 + 12.0 * pow(t, 1.3)) * (0.4 + 0.6 * amt);
+        var pc = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
+
+        /*
+          The glint: the liquid's surface as a dome, steep at the meniscus and
+          flat on top, catching one light where it faces it. On a bead that is
+          the hard dot every macro frame has; on a finger it is a line along
+          one side. The light is a fixed key from one corner, as a macro
+          photographer's is, not the projector's lamp: that lamp is under the
+          glass, so it reflects off nothing on top, and taken from the lamp's
+          position (overhead, near vertical) every shoulder facing up matched
+          it and each domain wore a grey bevel all the way round. From one
+          corner, only the side facing it lights, and every bead's dot sits on
+          the same side, as in the reference. The corner is the screen's, so
+          it is turned into the plate's frame (c0, s0, as uvToFluid turns the
+          plate): set in the plate's own, it went round with the motor and
+          every dot circled its bead once a turn.
+        */
+        let tilt = 2.4 * exp(-max(dc, 0.0) / 0.9);
+        let Nd = normalize(vec3f(outward * tilt, 1.0));
+        let key = normalize(vec3f(-0.55, 0.45, 0.7));   // upper left: uv's y is up
+        let keyPlate = vec3f(c0 * key.x - s0 * key.y, s0 * key.x + c0 * key.y, key.z);
+        let H = normalize(keyPlate + vec3f(0.0, 0.0, 1.0));
+        let glint = pow(max(dot(Nd, H), 0.0), 220.0);
+        pc += vec3f(1.0, 0.97, 0.92) * glint * 0.9 * amt;
+
+        /*
+          The meniscus on the water's side: a thin bright line just outside,
+          where the curved edge bends the lamp's light together. Made of the
+          water's own colour (a domain in magenta liquid has a magenta line),
+          and less than a cell wide, so it stays a line rather than the glow
+          it used to be when it was sampled a few cells out.
+
+          And a film too thin to reach half full anywhere (a short tap of the
+          bottle adds a quarter a step; a patch dragged thin) has no line at
+          all, and drawn only inside the line it vanished. So outside the
+          line the old measure stands, a brown film as dark as it is full,
+          but not read where the pixel is: within a few cells of a line the
+          phase there is the line's own ramp, not liquid, and drawing it was
+          the smudge. It is read four and a half cells out from the line
+          instead (the ramp's tail is gone by then; at three, the distance
+          estimate, which is only linear, ran out inside the tail and drew
+          it as a dark ring two cells out), so
+          it runs on continuously into whatever film lies beyond. Cutting it
+          off near the line instead left a bright band round every domain
+          wherever the maze left a trace of phase in the water.
+        */
+        let lens = exp(-pow(max(-dc, 0.0) / 0.55, 2.0)) * (1.0 - cover);
+        let phFar = select(ph, viewAt(fuvBase + outward * (4.5 + dc) * cell).phase, slope > 1e-4 && dc > -4.5);
+        /*
+          Less a trace. A maze leaves a fifth of the plate between a tenth and
+          half full (measured in the lab after eight seconds of Labyrinth:
+          9.5% of cells at 0.1–0.2, 5% at 0.2–0.3), and drawn as film that
+          was a brown haze over the water with a clean band round each domain,
+          where the domain had drawn it in. The references' water is clear.
+          So the first eighth is not drawn; a quarter-full film still is.
+        */
+        let film = 9.0 * pow(clamp((phFar - 0.12) / 0.88, 0.0, 0.43), 1.5) * (0.4 + 0.6 * amt);
+        let lit = outColor * exp(-film * vec3f(0.45, 0.7, 1.0)) * (1.0 + 0.6 * lens * amt);
+        outColor = mix(lit, pc, cover);
       }
     }
 
