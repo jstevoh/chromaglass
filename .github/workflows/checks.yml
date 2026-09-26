@@ -254,6 +254,11 @@ jobs:
       - name: The drop lens
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run droplens
+      # An air bubble as a projector throws it: a small one a dark disc round a pin-point, a big
+      # one a clear window edged in a band from half the gap; the closeup keeps the camera's bubble.
+      - name: The air lens
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run airlens
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

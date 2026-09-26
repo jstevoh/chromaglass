@@ -1154,6 +1154,21 @@ const N_WATER: f32 = 1.333;
 const N_OIL: f32 = 1.47;
 const DROP_X: f32 = DROP_NA / (2.0 * N_WATER * (1.0 - N_WATER / N_OIL));
 const DROP_CORE: f32 = DROP_X / sqrt(1.0 + DROP_X * DROP_X);
+/*
+  An air bubble, by the same arithmetic. Air (1.0) in water bends light the
+  other way from oil, and far harder: 1 - n_water/n_air is a third, where
+  oil's 1 - n_water/n_oil is a tenth. So at the same aperture the slope
+  that loses a ray is 0.28, not 1.0, and the core is 0.27 of the curved
+  part: a small bubble is a dark disc round a pin-point, a big one a clear
+  window edged in a band 0.73 of half the gap wide, two and a half times a
+  drop's hair. (The research's table has 0.78 to 0.94 of the radius dark
+  for the bare lens; 0.73 is the same effective aperture the drops use.)
+*/
+const N_AIR: f32 = 1.0;
+const AIR_X: f32 = DROP_NA / (2.0 * N_WATER * (N_WATER / N_AIR - 1.0));
+const AIR_CORE: f32 = AIR_X / sqrt(1.0 + AIR_X * AIR_X);
+/** How much of the plate's light the band takes: it leaves a tenth, less than a drop's 0.15, the bend being three times as hard. */
+const AIR_DARK: f32 = 0.9;
 /** The upright magnification a projected ball gives the dye just under it, M = f/(f - d) at d = R, f = 5.4R. */
 const DROP_MAG: f32 = 1.23;
 /*
@@ -1876,8 +1891,10 @@ struct FsOut {
       let filmT = smoothstep(0.02, 0.28, rimF.a);
       let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
 
-      // Through it: the liquid beyond, magnified by the lens (more toward the middle).
-      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play);
+      // Through it: the liquid beyond, magnified by the lens (more toward the
+      // middle), in the closeup; the projector's view of it (below) is the
+      // liquid right there, a flat slab of air being a window, not a lens.
+      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play) * dropCam;
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
       let lensCol = mix(bgColor, lensF.rgb, lensF.a);
       // And the lamp through the clear gap, carrying the liquid's hue
@@ -1898,6 +1915,67 @@ struct FsOut {
       let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
       let filmC = thinFilmColour(thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0));
       let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+      // A second lamp to the side is the one light that can put a glint on
+      // an air pocket seen from beneath (below, as the projector throws it).
+      var side = vec3f(0.0);
+      if (U.lamp2.w > 0.001) {
+        let L2 = lampDir(fuvBase, U.lamp2);
+        let H2 = normalize(L2 + vec3f(0.0, 0.0, 1.0));
+        let shine2 = mix(60.0, 260.0, clamp(0.02 / max(R, 0.004), 0.0, 1.0)) * mix(0.7, 1.3, k3) * 0.8;
+        side = vec3f(0.75, 0.86, 1.0) * pow(max(dot(n, H2), 0.0), shine2) * 0.5 * U.lamp2.w;
+      }
+
+      /*
+        As the projector throws it. Everything below this block is the
+        camera's bubble, tuned by eye against macro photographs, and those
+        photographs are lit from the front: their bright crescents are a
+        room light reflected, their film colour a soap film facing the lens.
+        A bubble between the glasses of a projector is neither (the research
+        in the project's files, bubbles-and-drops.md, item 2). It is a pocket
+        of air with the liquid pushed out: its walls are the meniscus and
+        the glass, not a film; the 2% a water and air surface reflects goes
+        back toward the lamp, never to the screen; and its curved edge bends
+        the light three times as hard as an oil drop's, far past what the
+        projection lens takes in. So on the plate:
+
+        - **A dark band from the aperture**, past AIR_CORE (0.27) of the
+          curved part: all but a pin-point of a small bubble, which is how
+          air reads in every projected show, a pepper of dark dots; round a
+          big one, which the glasses flatten into a pancake, a band 0.73 of
+          half the gap wide, narrowing as the glasses are pressed together.
+          Shaped by the gap exactly as a drop is (dropFlat, dropBand), the
+          band's inner edge softened over 0.7 of a screen pixel: where in its
+          bubble a point is comes from a linear field (wgsl/air.ts), good to
+          well under a texel of the air, so a texel of the air would blur a
+          small bubble's core away.
+        - **A clear middle**, the lamp through a slab of air with a breath of
+          the liquid's hue from the wetting film on the glass: what the
+          camera's bubble is at its very centre, held flat across the window.
+        - **No film colour unless asked for.** Iridescence at its default,
+          a quarter, is what every look has always had, and the camera's
+          bubble still wears it; the plate takes only what is asked above
+          that, as a performer turning a soap film up (the looks that set
+          0.6 and 0.9 get most of it; a look at 0.3, a trace).
+        - **No highlight but the side lamp's.**
+
+        The zoom crosses from this to the camera where the drops do
+        (dropCam), so a bubble and a drop change view together.
+      */
+      var cp = vec3f(0.0);
+      if (dropCam < 0.999) {
+        let rho = dropHalfGap(fuvBase);
+        let flatB = dropFlat(R, rho);
+        let tB = dropBand(rr, R, rho);
+        // A screen pixel in plate uv (uvToFluid, above).
+        let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+        let curvedB = max((1.0 - flatB) * R, spx);
+        let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
+        let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
+        cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
+        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+        cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
+        cp = cp * (1.0 - AIR_DARK * blackB) + side;
+      }
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
       c *= 1.0 - 0.35 * smoothstep(0.85, 1.0, age) * F;
 
@@ -1916,14 +1994,17 @@ struct FsOut {
       let n2 = normalize(vec3f(-p * 0.6, h + 0.3));
       let spec2 = pow(max(dot(n2, H), 0.0), shine * 0.5) * 0.3;
       c += mix(vec3f(1.0, 0.98, 0.92), tint, 0.4 * filmT) * (spec + spec2) * (0.7 + 0.6 * ground) * (0.6 + 0.8 * k2);
-      if (U.lamp2.w > 0.001) {
-        let L2 = lampDir(fuvBase, U.lamp2);
-        let H2 = normalize(L2 + vec3f(0.0, 0.0, 1.0));
-        c += vec3f(0.75, 0.86, 1.0) * pow(max(dot(n, H2), 0.0), shine * 0.8) * 0.5 * U.lamp2.w;
-      }
+      c += side;
+      c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
-      auxN = mix(auxN, -bestD * 0.8, opac * inside);
+      /*
+        The camera pass (wgsl/camera.ts) bends the screen along this normal,
+        which is the camera's dome: on the plate it would lens the window the
+        projector sees as a flat slab of air, and push its band outward, in
+        every look with the camera on. So it comes in with the camera's view.
+      */
+      auxN = mix(auxN, -bestD * 0.8, opac * inside * dropCam);
       auxB = max(auxB, opac * inside);
     }
   }

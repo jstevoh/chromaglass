@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closeup, as in the photographs of backlit oil, a small drop shows the plate
   round it upside down and a big one is flat on top. In both the white dot is
   gone. `npm run droplens` measures each on one drop.
+- **Bubbles are air pockets on the plate.** Projected, a small bubble is a
+  dark disc round a pin-point and a big one a clear, flat window edged in a
+  dark band from half the gap, as a projector throws a pocket of air: its edge
+  bends the light out of the lens, it reflects nothing toward the screen, and
+  it has no soap film facing the viewer. No highlight unless the second lamp
+  is on; film colour only above the default Iridescence. The closeup keeps
+  the camera's bubble. `npm run airlens` measures it on one bubble.
 - **Walls between drops are curved.** A small drop pushes harder than a big
   one, so the wall between them bows into the big one, an arc through the same
   two points the straight wall joined (`npm run drops`: the wall lands within a

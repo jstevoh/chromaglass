@@ -169,6 +169,38 @@ changing flow crossing one of its steps can still hop the cells by about a
 frame's travel (`npm run cellride` prints it); if that shows, the fixes are a
 full-float velocity or shorter-lived cells when zoomed in.
 
+## 9. Bubbles as air pockets
+
+The bubbles were drawn as a camera with a front light sees a soap bubble: a
+bright crescent, a white highlight, film colour round the rim. The research on
+bubbles and drops found that a bubble between a projector's glasses is none of
+that. It is a pocket of air, and its curved edge bends the lamp's light three
+times as hard as an oil drop does, out of the projection lens. So on the plate
+a small bubble is now a dark disc round a pin-point of light, and a big one a
+clear, flat window edged in a dark band about two cells wide, narrower when
+the glasses are pressed. No highlight unless the second lamp is on, and no
+film colour at the default Iridescence; the looks that set it higher (0.6,
+0.9) still get a soap film over the window. Below the default the plate's
+bubbles have none at all, so on the plate Iridescence now does something only
+from a quarter up (the closeup's bubbles still use the whole range). Zoom into the closeup and the
+bubbles are the camera's again, shine and film as before, changing over near
+1.45x as the drops do. `npm run airlens` measures it on one bubble.
+
+```
+?set=bubbles=0.6              any look, bubbles on
+```
+
+Three things to look at. Whether a field of small bubbles reads as air in
+liquid or as pepper: the physics says small ones are nearly black, and that
+is how air reads in footage of real projected shows, but the same effective
+aperture as the drops sets how dark (`AIR_DARK` and `DROP_NA` in `plate.ts`),
+so say if they want to be lighter. Whether the big bubbles' band reads as an
+edge or as a cartoon outline; its inner edge is sharp to a pixel, as a
+focused projector draws it. And on a pressed plate, the band is drawn two or
+three pixels (at 3x) wider than the gap says, since it is then thinner than
+the air field can place (`npm run airlens` prints it). This changes the
+bubbles in every look that has them.
+
 ---
 
 ## Reading the frame time while you do it
