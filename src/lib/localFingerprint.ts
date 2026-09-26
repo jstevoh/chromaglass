@@ -9,6 +9,11 @@
 // Reference and query both come from the same capture chain (the user's mic
 // or system audio), which makes matching robust to that channel's coloring.
 
+// With its extension, because `npm run music` runs this file directly under
+// node's strip-types loader, which resolves a path exactly as written and does
+// not try `.ts` on a bare one the way vite and esbuild do.
+import { fft } from './fft.ts';
+
 export const FP_RATE = 11025;   // fingerprint sample rate
 const FP_FRAME = 1024;          // FFT size → bins span 0–5512 Hz
 const FP_HOP = 512;             // ~46 ms per frame
@@ -45,37 +50,6 @@ export interface FingerprintMatch {
   background: number;
   /** Winning votes per hash the snippet offered. */
   perHash: number;
-}
-
-// ── FFT (radix-2, real input) ──────────────────────────────────────────
-function fft(re: Float32Array, im: Float32Array) {
-  const n = re.length;
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) {
-      let t = re[i]; re[i] = re[j]; re[j] = t;
-      t = im[i]; im[i] = im[j]; im[j] = t;
-    }
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const ang = -2 * Math.PI / len;
-    const wRe = Math.cos(ang), wIm = Math.sin(ang);
-    for (let i = 0; i < n; i += len) {
-      let curRe = 1, curIm = 0;
-      for (let k = 0; k < len / 2; k++) {
-        const uRe = re[i + k], uIm = im[i + k];
-        const vRe = re[i + k + len / 2] * curRe - im[i + k + len / 2] * curIm;
-        const vIm = re[i + k + len / 2] * curIm + im[i + k + len / 2] * curRe;
-        re[i + k] = uRe + vRe; im[i + k] = uIm + vIm;
-        re[i + k + len / 2] = uRe - vRe; im[i + k + len / 2] = uIm - vIm;
-        const nRe = curRe * wRe - curIm * wIm;
-        curIm = curRe * wIm + curIm * wRe;
-        curRe = nRe;
-      }
-    }
-  }
 }
 
 const hann = new Float32Array(FP_FRAME);

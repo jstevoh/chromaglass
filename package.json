@@ -32,6 +32,7 @@
     "timecode": "node --experimental-strip-types scripts/timecode.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
+    "bands": "node --experimental-strip-types scripts/bands.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",
     "liquidfile": "node --experimental-strip-types scripts/liquidfile.mjs",
     "setlist": "esbuild scripts/setlist.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/setlist.mjs && node node_modules/.cache/setlist.mjs",

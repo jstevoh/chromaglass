@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AutoRange, RoomTracker, type RoomCalibration } from '../lib/audioCalibration';
+import {
+  AudioFeatures, ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, type AudioReading,
+} from '../lib/audioFeatures';
 
 export interface AudioData {
   frequencyData: Uint8Array;
@@ -14,6 +17,17 @@ export interface AudioData {
   complexity: number;
   /** Room calibration state — null when auto-calibration is off. */
   calibration: RoomCalibration | null;
+  /**
+   * The named sources, bands and their onsets for this frame
+   * (`src/lib/audioFeatures.ts`). Raw, not trimmed by sensitivity or smoothed
+   * like the fields above: each is already 0..1 against its own range, and a
+   * binding that wants smoothing or a trim applies its own. An onset's `hit`
+   * is true for the one analyser frame it landed on, and React may coalesce
+   * that frame with the next; a consumer that must not miss a hit watches
+   * `at` change instead. Optional because other producers of AudioData (the
+   * cast display rebuilds one from the wire) have no spectrum to read it from.
+   */
+  features?: AudioReading | null;
 }
 
 // Per-feature smoothing factors.
@@ -77,9 +91,13 @@ export function useAudioAnalyzer(
       // 1024-point FFT → 512 frequency bins.
       // At 48 kHz that's ~47 Hz per bin — much better bass resolution than the
       // old 256 FFT (which gave ~188 Hz/bin and only 128 bins total).
-      analyzer.fftSize = 1024;
       // Let the AnalyserNode do its own time-constant smoothing (0.6 is gentle).
-      analyzer.smoothingTimeConstant = 0.6;
+      // Both values now live in audioFeatures.ts (the same 1024 and 0.6), because
+      // the offline song analysis emulates this node and has to use exactly
+      // these: a render heard through a different window would react to a
+      // different song from the one the show hears.
+      analyzer.fftSize = ANALYSER_FFT_SIZE;
+      analyzer.smoothingTimeConstant = ANALYSER_SMOOTHING;
       analyzerRef.current = analyzer;
 
       const source = audioContext.createMediaStreamSource(stream);
@@ -107,6 +125,10 @@ export function useAudioAnalyzer(
       };
       let lastFrame = performance.now() / 1000;
       let calibration: RoomCalibration | null = null;
+      // One analyser of named sources per audio context: it learns this
+      // stream's ranges and thresholds, so a restart (a new stream, the
+      // recalibrate button) starts it fresh along with the room tracker.
+      const features = new AudioFeatures();
 
       // Pre-compute frequency-bin boundaries based on actual Hz thresholds.
       // sampleRate is typically 44100 or 48000.
@@ -133,8 +155,19 @@ export function useAudioAnalyzer(
         // ── Fit the analyser's window to the room ─────────────────
         // Do this before reading the byte data so the spectrum this frame is
         // already scaled to the space the app is listening in.
+        // The float spectrum is read every frame now, not only when calibrating:
+        // the named sources are read from it rather than from the byte data
+        // below, because the byte data is scaled into the room tracker's
+        // window, which moves as the room is learned, and a band's level (and
+        // so its flux) would move with it. Decibels are the same whatever the
+        // window. Reading both in one frame smooths once: the node applies its
+        // time constant once per render quantum however many reads there are.
+        analyser.getFloatFrequencyData(floatData);
+        const reading = features.update(
+          { bins: floatData, scale: 'db', sampleRate: audioContext.sampleRate, fftSize: analyser.fftSize },
+          nowSec,
+        );
         if (autoCal) {
-          analyser.getFloatFrequencyData(floatData);
           let peakDb = -Infinity;
           for (let i = 0; i < binCount; i++) if (floatData[i] > peakDb) peakDb = floatData[i];
           calibration = room.update(peakDb, dt);
@@ -254,6 +287,7 @@ export function useAudioAnalyzer(
               frequencyData: new Uint8Array(frequencyData),
               timeDomainData: new Uint8Array(timeDomainData),
               volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity, calibration,
+              features: reading,
             };
           }
 
@@ -269,6 +303,7 @@ export function useAudioAnalyzer(
             timbre:          prev.timbre          + (timbre          - prev.timbre)          * SMOOTHING.timbre,
             complexity:      prev.complexity      + (complexity      - prev.complexity)      * SMOOTHING.complexity,
             calibration,
+            features: reading,
           };
         });
 
