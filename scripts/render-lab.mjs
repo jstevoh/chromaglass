@@ -28,8 +28,10 @@
  * Both containers are rendered: WebM, which is what this Chromium would
  * choose, and MP4 with the same VP9 and Opus in it, which no one would choose
  * but which puts the MP4 writer in front of a real demuxer here, where the
- * H.264 it is for cannot be encoded. What this machine can and cannot encode
- * is printed first.
+ * H.264 it is for cannot be encoded. Where the browser can encode H.264 and
+ * AAC (Chrome on the Mac runner), the MP4 a Mac actually writes is rendered
+ * and judged the same way as a third kind. What this machine can and cannot
+ * encode is printed first.
  *
  * Every gate is a comparison within the run (this file against what was
  * rendered, one render against another); nothing pins a picture.
@@ -57,8 +59,18 @@ try {
   }
   check('this browser can render a song at all', support.webcodecs);
 
-  for (const [kind, reader, mime] of [['webm', readWebm, 'video/webm'], ['mp4-vp9', readMp4, 'video/mp4']]) {
-    console.log(`\n${kind === 'webm' ? 'WebM' : 'MP4'} (VP9 + Opus), ${FRAMES} frames of the lab plate at ${FPS} fps, ${SIZE}x${SIZE}`);
+  /*
+    H.264 and AAC in MP4, the format a Mac will actually write, where this
+    browser can encode them (Chrome on a Mac can; the open-source Chromium
+    in a cloud session cannot, and says so above). Asked, never assumed.
+  */
+  const small = await page.evaluate(([w, h, fps]) => window.renderLab.formats(w, h, fps), [SIZE, SIZE, FPS]);
+  const avcHere = Object.entries(small.each).some(([k, v]) => k.startsWith('avc1') && v) && Object.entries(small.each).some(([k, v]) => k.startsWith('mp4a') && v);
+  const kinds = [['webm', readWebm, 'video/webm'], ['mp4-vp9', readMp4, 'video/mp4'], ...(avcHere ? [['mp4-avc', readMp4, 'video/mp4']] : [])];
+  if (!avcHere) console.log('\nH.264 + AAC in MP4: not rendered here, because this browser cannot encode them (the MP4 writer is still exercised with VP9 + Opus)');
+
+  for (const [kind, reader, mime] of kinds) {
+    console.log(`\n${kind === 'webm' ? 'WebM (VP9 + Opus)' : kind === 'mp4-vp9' ? 'MP4 (VP9 + Opus)' : 'MP4 (H.264 + AAC)'}, ${FRAMES} frames of the lab plate at ${FPS} fps, ${SIZE}x${SIZE}`);
     const run = (seed) => page.evaluate((o) => window.renderLab.run(o), { seed, frames: FRAMES, fps: FPS, size: SIZE, grid: GRID, kind });
     const t0 = Date.now();
     const a = await run(5);

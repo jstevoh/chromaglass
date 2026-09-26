@@ -143,14 +143,30 @@ const api = {
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const parsed = kind === 'webm' ? readWebm(bytes) : readMp4(bytes);
     const track = parsed.tracks[0];
-    const codec = kind === 'webm' ? 'vp09.00.10.08' : track.codec === 'avc1' ? 'avc1.64001f' : 'vp09.00.10.08';
+    let codec = 'vp09.00.10.08';
+    let description: Uint8Array | undefined;
+    if (kind === 'mp4' && track.codec === 'avc1') {
+      // H.264 cannot be decoded without its parameter sets: the avcC box,
+      // after the 78 bytes of the visual sample entry's own fields.
+      const e = track.entry as { body: number; end: number };
+      const dv = new DataView(bytes.buffer, bytes.byteOffset);
+      for (let at = e.body + 78; at + 8 <= e.end;) {
+        const size = dv.getUint32(at);
+        if (String.fromCharCode(...bytes.subarray(at + 4, at + 8)) === 'avcC') { description = bytes.slice(at + 8, at + size); break; }
+        if (size < 8) break;
+        at += size;
+      }
+      if (!description) throw new Error('an avc1 entry with no avcC');
+      const hex = (n: number) => n.toString(16).padStart(2, '0');
+      codec = `avc1.${hex(description[1])}${hex(description[2])}${hex(description[3])}`;
+    }
     const hashes: string[] = [];
     const pending: Promise<void>[] = [];
     const dec = new VideoDecoder({
       output: (f) => { pending.push(hashVideoFrame(f).then((h) => { hashes.push(h); f.close(); })); },
       error: (e) => { throw e; },
     });
-    dec.configure({ codec });
+    dec.configure({ codec, ...(description ? { description } : {}) });
     for (const s of track.samples) dec.decode(new EncodedVideoChunk({ type: s.key ? 'key' : 'delta', timestamp: Math.round(s.timeUs), data: s.data }));
     await dec.flush();
     await Promise.all(pending);
