@@ -3,10 +3,9 @@ import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Wand2, Music } from 'lucide-react';
 import {
   ACTION_LABELS, FACTORY_MAPS, factoryFor, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
-  MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable,
+  MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable, soundMappable,
   type MidiAction, type MidiTarget, type MusicSource, type SoundBinding,
 } from '../lib/midi';
-import { SETTING_TRAVEL } from '../lib/sceneMap';
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { ControllerSurface } from './ControllerSurface';
@@ -37,7 +36,8 @@ const soundLabel = (b: SoundBinding): string =>
 /**
  * Why a control cannot be bound to the music, or null when it can.
  *
- * A setting can when the patch bay can ride it (`SETTING_TRAVEL`), which
+ * A setting can when the patch bay can ride it (`soundMappable`, the same rule
+ * a loaded file is held to, and held to `SETTING_TRAVEL` by `npm run learn`), which
  * leaves out the masters (Sound Impact and the rest decide how hard a source
  * drives the plate, and a source riding its own master is a loop) and the
  * room's own dials. An action can unless a beat pressing it twice a second
@@ -46,7 +46,7 @@ const soundLabel = (b: SoundBinding): string =>
  * music does not look like one that was forgotten.
  */
 function whyNotMusic(target: MidiTarget): string | null {
-  if (target.kind === 'setting') return SETTING_TRAVEL[target.key] ? null : 'This one sets how hard a source drives the plate, so the music cannot ride it';
+  if (target.kind === 'setting') return soundMappable(target.key) ? null : 'This one sets how hard a source drives the plate, so the music cannot ride it';
   if (target.kind === 'action') return triggerable(target.action) ? null : 'Not on a beat: pressed on every hit it would toggle twice a second';
   return null;
 }

@@ -165,22 +165,70 @@ export interface SoundBinding {
  * Actions a beat must not press.
  *
  * Every other action can be a trigger. These cannot, each for a reason that
- * shows the moment a kick presses it twice a second: recording would start
- * and stop a file every beat; pausing the show stops the thing that heard the
- * beat, so the next one never unpauses it; hiding the overlays blinks the
- * whole interface; watching the room opens and closes a camera; the tempo
- * pads would feed the beat clock its own output, which is a loop and not a
- * tempo; and a bank change under a performer's hands, on a drum, moves every
- * fader to a different setting without anyone touching one.
+ * shows the moment a kick presses it twice a second.
+ *
+ * Every toggle, first, because a toggle pressed on every hit is not a
+ * control, it is a coin: what state it is in when the song stops depends on
+ * whether the song had an odd or an even number of kicks. Recording would
+ * start and stop a file every beat; pausing the show stops the thing that
+ * heard the beat, so the next one never unpauses it; hiding the overlays
+ * blinks the whole interface; watching the room opens and closes a camera;
+ * Random Evolve and the macro lens flip on and off every beat, the lens
+ * zooming 1x to 4x and back; the sequencer's play/pause stutters the set.
+ *
+ * Blackout is the worst of them, and the one that was missed at first. Its
+ * fade is 1100 ms, so at 120 bpm each press interrupts the last one part-way
+ * down, and it remembers the dimmer to come back to *at the moment it is
+ * pressed*, part-way through that fade (App.tsx, `toggleBlackout`). Pressed on
+ * every beat it ratchets the room's dimmer down toward its 0.05 floor, and
+ * when the music stops the wall is left black about half the time.
+ *
+ * Then the ones that are not toggles but still cannot be played by a drum:
+ * the tempo pads would feed the beat clock its own output, which is a loop
+ * and not a tempo; and a bank change under a performer's hands, on a drum,
+ * moves every fader to a different setting without anyone touching one.
+ *
+ * What is left is one-shots, each of which does the same thing however many
+ * times it is pressed: seed, clear, drain, randomise, a spin, the sequencer's
+ * next, previous and stop, the preset and cue steps, Go and Back (Go sends
+ * what is armed and then has nothing armed, Back undoes once and then has
+ * nothing to undo). Some of them are drastic on every beat — Drain on a kick
+ * keeps the plate empty — but that is what they say, and it is what binding
+ * them to a kick asks for.
  */
 const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
+  // Toggles: every one in the action list.
   'record-toggle', 'performance-toggle', 'scene-toggle', 'play-toggle', 'overlays-toggle',
+  'blackout-toggle', 'automate-toggle', 'macro-toggle', 'seq-play-pause',
+  // Not toggles, and still not a drum's to press.
   'tap-tempo', 'tempo-clear', 'bank-next', 'bank-prev',
 ]);
 export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
 
 /** A binding that follows a level, rather than firing on a moment. */
 export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'setting';
+
+/**
+ * Whether the music can ride a setting: one a fader can learn *and* the patch
+ * bay can move.
+ *
+ * Not every learnable setting is the second. The masters (Film Drive, Film,
+ * Sound and Shapes Impact) and the room's own dials (Room Drive, Hands, Impact)
+ * decide how hard a source drives the plate, and the patch bay refuses them as
+ * targets because a source riding its own master is a loop (`NOT_A_TARGET` and
+ * the `scene` prefix in `sceneMap.ts`). A mapping onto one of them used to load
+ * from a file, do nothing, and still light the Sound Impact slider as if a
+ * patch were reading the sound.
+ *
+ * Written out here rather than read from `SETTING_TRAVEL`, because `sceneMap`
+ * imports `deskPins`, which imports this file, and the import back would be a
+ * cycle whose top-level constants are not built yet when this one reads them.
+ * `npm run learn` holds the two together: for every learnable setting, this
+ * says yes exactly when `SETTING_TRAVEL` has it.
+ */
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact']);
+export const soundMappable = (key: keyof VisualizerSettings): boolean =>
+  LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
 
 export interface MidiMap {
   format: 'chromaglass-midi';
@@ -614,8 +662,9 @@ export function parseMidiMap(text: string): MidiMap {
  *
  * A map is a file people copy between laptops and edit by hand, so each entry
  * is checked rather than trusted: a source the analyser does not have, an
- * action that is not one (or is one a beat must not press), or a setting this
- * build does not know would otherwise be a binding that silently does nothing
+ * action that is not one (or is one a beat must not press), a setting this
+ * build does not know, or one the patch bay cannot move (`soundMappable`: the
+ * masters) would otherwise be a binding that silently does nothing
  * or, for the actions, does something nobody meant. A mapping's depth is put
  * back on −1..1, which is all the travel there is.
  */
@@ -626,7 +675,7 @@ function parseSoundBindings(raw: unknown[]): SoundBinding[] {
     if (!b || typeof b !== 'object' || !MUSIC_SOURCES.includes(b.source as MusicSource) || !b.target || typeof b.target !== 'object') continue;
     const t = b.target as MidiTarget;
     let target: MidiTarget | null = null;
-    if (t.kind === 'setting' && LEARNABLE_BY_KEY.has(t.key) && (MAPPABLE_SOURCES as readonly string[]).includes(b.source as string)) target = onTodaysTravel(t);
+    if (t.kind === 'setting' && soundMappable(t.key) && (MAPPABLE_SOURCES as readonly string[]).includes(b.source as string)) target = onTodaysTravel(t);
     else if (t.kind === 'action' && t.action in ACTION_LABELS && triggerable(t.action)) target = { kind: 'action', action: t.action };
     else if (t.kind === 'preset' && typeof t.presetId === 'string') target = { kind: 'preset', presetId: t.presetId };
     else if (t.kind === 'dye' && Number.isInteger(t.paletteIndex) && t.paletteIndex >= 0) target = { kind: 'dye', paletteIndex: t.paletteIndex };

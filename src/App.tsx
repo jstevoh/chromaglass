@@ -57,7 +57,8 @@ import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import { triggerable, type MidiAction, type SoundBinding } from './lib/midi';
+import type { MidiAction, SoundBinding } from './lib/midi';
+import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -2535,10 +2536,18 @@ export default function App() {
       default: unhandled('an action', a);
     }
   };
-  /** The selected liquid takes a palette colour; the dropper becomes the tool. */
-  const selectDye = (paletteIndex: number) => {
+  /**
+   * The selected liquid takes a palette colour, and nothing else changes.
+   * What a sound trigger on a dye does (`TriggerHost.dye`): the music may
+   * recolour the dropper, never take a tool out of the performer's hand.
+   */
+  const colourDye = (paletteIndex: number) => {
     const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
     updateLiquidColor(selectedLiquidId, c.hex);
+  };
+  /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
+  const selectDye = (paletteIndex: number) => {
+    colourDye(paletteIndex);
     setActiveTool('dropper');
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
@@ -2831,22 +2840,15 @@ export default function App() {
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
   /*
-    A trigger the music fired (sound learn, PLAN §5): exactly what a pad bound
-    to the same target does, through the same three doors, so a kick on
-    Next Preset and a pad on Next Preset cannot come to mean different things.
-    An action a beat must not press is refused here as well as when the
-    binding is made or loaded: this is the last door before the show.
+    A trigger the music fired (sound learn, PLAN §5): the same action and
+    preset doors a pad goes through, so a kick on Next Preset and a pad on
+    Next Preset cannot come to mean different things. The dye is the one
+    difference, and it is deliberate: the colour changes and the tool does not
+    (`TriggerHost` in soundLearn.ts says why). `runTrigger` also refuses an
+    action a beat must not press, the last door before the show.
   */
   const runSoundTrigger = (b: SoundBinding) => {
-    const t = b.target;
-    switch (t.kind) {
-      case 'action':  if (triggerable(t.action)) runAction(t.action); break;
-      case 'preset':  cuePreset(t.presetId); break;
-      case 'dye':     selectDye(t.paletteIndex); break;
-      // A mapping is folded by the patch bay and never fired.
-      case 'setting': break;
-      default: unhandled('a sound trigger', t);
-    }
+    runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
   };
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),

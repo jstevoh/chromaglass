@@ -61,7 +61,7 @@
  */
 
 import type { AudioReading, SourceName } from './audioFeatures.ts';
-import { isMapping, type MusicSource, type SoundBinding } from './midi.ts';
+import { isMapping, triggerable, type MidiAction, type MusicSource, type SoundBinding } from './midi.ts';
 import type { SceneMapping } from '../types';
 
 /** What the trigger engine needs of the beat clock, read once a frame. */
@@ -262,4 +262,44 @@ export class SoundLearn {
 }
 
 const EMPTY: readonly SceneMapping[] = [];
+
+/**
+ * What a fired trigger may do to the show.
+ *
+ * Narrower than what a pad may do, on purpose. A pad bound to a dye calls
+ * `selectDye`, which sets the colour *and* picks up the dropper: pressing a
+ * dye pad is a hand saying "I am about to paint with this". A hats trigger is
+ * not a hand, and on the same path it snatched whatever tool the performer was
+ * holding — the magnet, a finger — four times a second. So the music gets the
+ * colour and nothing else: `dye` changes the selected liquid's colour and
+ * leaves the tool alone, and this interface has no way to reach the tool.
+ */
+export interface TriggerHost {
+  action: (action: MidiAction) => void;
+  preset: (presetId: string) => void;
+  /** The selected liquid takes this palette colour. The tool is not touched. */
+  dye: (paletteIndex: number) => void;
+}
+
+/**
+ * Run one fired trigger against the show.
+ *
+ * An action a beat must not press is refused here as well as when a binding is
+ * learned or loaded: bindings arrive in files and in storage written by older
+ * builds, and this is the last door before the show. A mapping is never fired
+ * (the patch bay folds it), so it does nothing here. Returns what it did, for
+ * `npm run learn` to read.
+ */
+export function runTrigger(b: SoundBinding, host: TriggerHost): 'action' | 'preset' | 'dye' | null {
+  const t = b.target;
+  switch (t.kind) {
+    case 'action':
+      if (!triggerable(t.action)) return null;
+      host.action(t.action);
+      return 'action';
+    case 'preset': host.preset(t.presetId); return 'preset';
+    case 'dye': host.dye(t.paletteIndex); return 'dye';
+    default: return null;
+  }
+}
 

@@ -24,7 +24,10 @@
  *     clamp;
  *   - a map with sound bindings saved and loaded is the same map, through the
  *     same file and the same storage key as the controller's bindings;
- *   - with the music stopped nothing fires and nothing moves.
+ *   - with the music stopped nothing fires and nothing moves;
+ *   - no toggle can be put on a beat, a mapping can only aim at what the
+ *     patch bay can move, and a fired dye recolours without taking the
+ *     performer's tool.
  *
  * The drums are the same recipe as `npm run bands` (a 60→50 Hz kick, a snare
  * of 200 Hz body and high-passed noise, three-pole high-passed hats), at 120
@@ -33,12 +36,15 @@
  */
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { BeatClock } from '../src/lib/beatClock.ts';
-import { SoundLearn } from '../src/lib/soundLearn.ts';
+import { SoundLearn, runTrigger } from '../src/lib/soundLearn.ts';
 import {
   parseMidiMap, serializeMidiMap, saveMidiMap, loadMidiMap, withLoadedMap, MIDI_MAP_KEY, LEARNABLE_SETTINGS,
+  ACTION_LABELS, triggerable, soundMappable,
 } from '../src/lib/midi.ts';
 import { PatchBay, SETTING_TRAVEL } from '../src/lib/sceneMap.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const SR = 44100;
 const FPS = 60;
@@ -467,11 +473,78 @@ const M = (source, depth, key = 'turbulenceScale') => {
     { id: 'x4', source: 'beat', target: { kind: 'setting', key: 'dimmer', min: 0, max: 1 }, depth: 0.5 },
     { id: 'x5', source: 'kick', target: { kind: 'setting', key: 'notASetting', min: 0, max: 1 }, depth: 0.5 },
     { id: 'x6', source: 'kick', target: { kind: 'setting', key: 'dimmer', min: 0.3, max: 0.4 }, depth: 7 },
+    // A toggle on a drum: the blackout's fade interrupted every beat ratchets
+    // the dimmer down, and the wall is left black half the time (midi.ts,
+    // NOT_ON_A_BEAT). The other three toggles the first version let through.
+    { id: 'x7', source: 'kick', target: { kind: 'action', action: 'blackout-toggle' } },
+    { id: 'x8', source: 'snare', target: { kind: 'action', action: 'automate-toggle' } },
+    { id: 'x9', source: 'bar', target: { kind: 'action', action: 'macro-toggle' } },
+    { id: 'x10', source: 'beat', target: { kind: 'action', action: 'seq-play-pause' } },
+    // A master: learnable on a fader, but the patch bay refuses it as a
+    // target, so as a mapping it would load, do nothing, and light Sound Impact.
+    { ...M('kick', 0.5, 'soundImpact'), id: 'x11' },
+    { ...M('hats', 0.5, 'sceneDrive'), id: 'x12' },
     null,
   ] }));
   check('a hand-edited file keeps only what the show can act on',
     bad.sound.length === 1 && bad.sound[0].id === 'x6' && bad.sound[0].depth === 1 && bad.sound[0].target.max === 1,
-    `kept ${bad.sound.map(b => `${b.id} depth ${b.depth} travel ${b.target.min}..${b.target.max}`).join(', ')}`);
+    `of 13 entries kept ${bad.sound.map(b => `${b.id} depth ${b.depth} travel ${b.target.min}..${b.target.max}`).join(', ')}`);
+}
+
+// ── What a trigger may press ──────────────────────────────────────────────
+{
+  /*
+    Every toggle is refused, by name pattern rather than by a second list, so
+    a toggle added to the action list later is caught here the day it is
+    added rather than the night a drum presses it. `seq-play-pause` is the one
+    toggle not named `-toggle`.
+  */
+  const actions = Object.keys(ACTION_LABELS);
+  const toggles = actions.filter(a => a.endsWith('-toggle') || a === 'seq-play-pause');
+  const letThrough = toggles.filter(a => triggerable(a));
+  check('no toggle can be pressed by the music', toggles.length >= 9 && letThrough.length === 0,
+    `${toggles.length} toggles refused${letThrough.length ? `; let through: ${letThrough.join(', ')}` : ''}; a trigger may press ${actions.filter(triggerable).join(', ')}`);
+
+  // The same rule for a setting as the patch bay's, both ways.
+  const disagree = LEARNABLE_SETTINGS.filter(s => soundMappable(s.key) !== !!SETTING_TRAVEL[s.key]).map(s => s.key);
+  check('the music may ride exactly the learnable settings the patch bay can move', disagree.length === 0,
+    disagree.length ? `disagree on ${disagree.join(', ')}` : `${LEARNABLE_SETTINGS.filter(s => soundMappable(s.key)).length} of ${LEARNABLE_SETTINGS.length}; not ${LEARNABLE_SETTINGS.filter(s => !soundMappable(s.key)).map(s => s.key).join(', ')}`);
+
+  /*
+    What a fired trigger reaches. The host records every call; a hats trigger
+    on a dye over the whole song must only ever recolour, and a blackout
+    binding that got past the file (an older build's storage) must never
+    press. The host has no tool to take: this counts that nothing but `dye`
+    was called for the dye binding, which is the half the app could get wrong
+    by wiring the host to `selectDye`.
+  */
+  /** Every call a host received while one binding played the song through. */
+  const record = (binding) => {
+    const calls = [];
+    const host = { action: (a) => calls.push(`action:${a}`), preset: (p) => calls.push(`preset:${p}`), dye: (i) => calls.push(`dye:${i}`) };
+    const fires = play(band.readings, [binding]).fires;
+    const refused = fires.map(f => runTrigger(f.binding, host)).filter(d => d === null).length;
+    return { fires: fires.length, calls, refused };
+  };
+  const dye = record(T('hats', { kind: 'dye', paletteIndex: 3 }));
+  check('a dye trigger recolours and does nothing else', dye.fires > 20 && dye.calls.length === dye.fires && dye.calls.every(c => c === 'dye:3'),
+    `${dye.fires} hats fires, ${dye.calls.filter(c => c === 'dye:3').length} recolours, ${dye.calls.filter(c => c !== 'dye:3').length} other calls`);
+  /*
+    And the app hands the music a host whose dye does not pick up a tool. The
+    first version ran a dye trigger through `selectDye`, the pad's path, which
+    also sets the dropper: a hats trigger took the magnet out of the
+    performer's hand four times a second. The wiring lives in App.tsx, which
+    node cannot run, so its source is read, the way `npm run panel` reads the
+    MIDI panel's: the function App passes as `dye` must not touch the tool.
+  */
+  const app = readFileSync(join(process.env.INIT_CWD ?? process.cwd(), 'src/App.tsx'), 'utf8');
+  const wired = /runTrigger\([^)]*\bdye:\s*(\w+)/.exec(app)?.[1] ?? null;
+  const body = wired ? new RegExp(`const ${wired} = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\};`).exec(app)?.[1] ?? null : null;
+  check("the app's dye for a trigger leaves the tool alone", !!body && !/setActiveTool|selectDye/.test(body),
+    wired ? `dye: ${wired}${body ? `, ${body.trim().split('\n').length} lines, ${/setActiveTool|selectDye/.test(body) ? 'touches the tool' : 'no tool'}` : ', body not found'}` : 'runTrigger is not wired with a dye');
+  const black = record(T('kick', { kind: 'action', action: 'blackout-toggle' }));
+  check('an action a beat must not press is refused at the last door', black.fires > 20 && black.calls.length === 0 && black.refused === black.fires,
+    `${black.fires} kick fires on Blackout, ${black.calls.length} presses`);
 }
 
 console.log(`\n${passed}/${passed + failed} sound learn checks passed${Number.isFinite(kickLead) ? `; a locked kick fires ${kickLead.toFixed(0)} ms ahead of its heard onset` : ''}`);
