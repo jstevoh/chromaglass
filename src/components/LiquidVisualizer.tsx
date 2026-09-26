@@ -22,6 +22,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
+import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -822,12 +823,19 @@ class FluidSimulation {
     this.meanColor = [0, 0, 0];
     this.lastSettings = null;
     this.lastStep = null;
+    this.cellClock = 0;
     this.rbSeq = 0;
     this.rimSeq = -1;
     this.prevCount = 0;
     this.coverCount = 0;
     this.fillingHoles = [];
   }
+  /**
+   * The dye's own travel, counted in plate-seconds at the default Advection
+   * and wrapped (lib/detailFlow.ts): the clock the closeup's drawn cells
+   * slide and breathe on, so they go exactly as far as the paint did.
+   */
+  cellClock = 0;
   /** Solver steps taken since the last `forgetHistory`: for a render's per-frame digest. */
   get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
@@ -2660,11 +2668,13 @@ class FluidSimulation {
     */
     const wantDt = dynamicSpeed * 0.2 * (this.dtSeconds / SIM_STEP);
     // Finite first, then clamped: a clamp cannot catch a NaN, it carries one.
-    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, 0.0000001), 0.05) : 0.0000001;
+    this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, DT_FLOOR), 0.05) : DT_FLOOR;
     this.stepIndex++;
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
     this.lastStep = p;
+    // The closeup's cells ride this: as far as this step moves the dye.
+    this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
     if (this.gpu) {
       const applied = this.dirty;
@@ -3622,9 +3632,10 @@ interface FrameView {
   macroOn: boolean;
   macroAmount: number;
   isDarkBlend: boolean;
-  /** The frame's own peak speed, and what it works out to in cells a second. */
-  velRange: number;
+  /** Plate-uv per unit of the cell clock per unit of solver velocity (lib/detailFlow.ts). */
   flowRate: number;
+  /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
+  cellClock: number;
 
   // What the show worked out this frame and the renderer only spends.
   /** Where each plate has turned to. */
@@ -6856,26 +6867,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // rather than the show's. They are the same numbers in the same
         // order; the draw now only reads them. (docs/webgpu-plan.md, P3.)
 
-        // Velocity range for the macro detail pass, encoded against the
-        // frame's own peak speed so slow and fast passages both resolve;
-        // u_flowRate converts back to fluid-UV per second in the shader.
-        let flowRate = 0;
-        let velRange = 1e-3;
-        if (macroOn) {
-          const probe = fluidsRef.current[0];
-          const pvx = probe.readVx, pvy = probe.readVy;
-          for (let j = 2; j < GRID_SIZE - 2; j += 4) {
-            for (let i = 2; i < GRID_SIZE - 2; i += 4) {
-              const idx = i + j * GRID_SIZE;
-              const ax = Math.abs(pvx[idx]), ay = Math.abs(pvy[idx]);
-              if (ax > velRange) velRange = ax;
-              if (ay > velRange) velRange = ay;
-            }
-          }
-          // cells advected per second = v * (dt * (N-2)) / N / realDt
-          const frameDt = Math.max(1 / 240, Math.min(0.2, realDt));
-          flowRate = velRange * (fluidsRef.current[0].dt * (GRID_SIZE - 2)) / GRID_SIZE / frameDt;
-        }
+        // How far the macro detail slides with the paint: plate-uv per unit
+        // of the cell clock per unit of the solver's velocity, which the
+        // shader multiplies the packed flow by. Zero at the plate itself,
+        // where the detail holds still, as it always has.
+        /*
+          A constant, and the clock does the work (lib/detailFlow.ts).
+
+          This was one step's travel over this frame's `realDt`, and the
+          closeup's cells slide by the flow times their whole life so far, so
+          every frame time that was not exactly a sixtieth moved all of them
+          at once: the reported jitter at 6x, where the cells are big enough
+          to see. Now the lead plate counts its dye's travel step by step
+          (`cellClock`) and the cells slide on that, so nothing measured from
+          a frame is in it. It also no longer needs the frame's peak speed,
+          which it read off a sparse pass over the grid every frame: the flow
+          is packed raw, in half float, which needs no range (pack.ts).
+        */
+        const flowRate = macroOn ? CELL_TRAVEL : 0;
+        const cellClock = fluidsRef.current[0]?.cellClock ?? 0;
 
         // The kaleidoscope's phase is integrated here rather than in the
         // shader, so a change of rate does not move where the rig already is.
@@ -7009,6 +7019,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             diceModulators: streamDraws('plate.modulators'),
             dicePhrasing: streamDraws('plate.phrasing'),
             macroClock: macroCamRef.current.time,
+            cellClock: f0?.cellClock ?? null,
             magnetHand: magnetHandRef.current ? `${magnetHandRef.current.x},${magnetHandRef.current.y},${magnetHandRef.current.at}` : 'none',
             magnetLook: magnetLookRef.current ? `${magnetLookRef.current.x},${magnetLookRef.current.y}` : 'none',
             rbCentre: rd?.[cell(0.5, 0.5)] ?? -1,
@@ -7022,7 +7033,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const lum = renderer?.drawFrame({
           settings: currentSettings, time, shot,
           macroOn, macroAmount, isDarkBlend,
-          velRange, flowRate,
+          flowRate, cellClock,
           rotations: rotationAnglesRef.current,
           harmony: harmonyRef.current,
           lamp: lampRef.current,
@@ -8081,7 +8092,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               plate.draw(
                 encoder,
                 cam ? cam.sceneView(size.width, size.height) : afterEffects,
-                size, live, Math.max(view.velRange, 1e-6),
+                size, live,
                 stage?.profiler.renderPass('plate'),
                 !!cam || !!post || !!out,
                 plateFormat,
