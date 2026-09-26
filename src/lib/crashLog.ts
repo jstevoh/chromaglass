@@ -93,6 +93,9 @@ export const IGNORE: RegExp[] = [
   /Failed to load resource/i,
 ];
 
+// Unseeded on purpose (`npm run seed` allows it): this names one page load
+// in the crash reports, so it has to differ between two loads on the same
+// `?seed=` — which is exactly the case a report about a seeded render is.
 const LOAD = Math.random().toString(36).slice(2, 8);
 const T0 = performance.now();
 

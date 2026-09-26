@@ -74,6 +74,18 @@ jobs:
       - name: The ear
         run: npm run music
 
+      # The bands: synthetic kicks, snares, hats, a bass line and a pad through
+      # the analyser the show and a song render both use, alone and mixed, loud
+      # and 20 dB down, at 60 and 30 fps. Each drum found on its own hits within
+      # a frame, nothing firing on another's, and two runs of the same song
+      # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
+      # the ubuntu runner does not have until it is installed here; with no
+      # decoder the script fails on CI rather than skipping the real music.
+      - name: ffmpeg, for the shelf
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+      - name: The bands
+        run: npm run bands
+
       # The shape of the quality ladder: that every rung is a rung, that a
       # step down gives something up, and that a rung asking for fewer device
       # pixels actually gets fewer. That last one was inert for a long while
@@ -96,6 +108,13 @@ jobs:
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist
+      # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
+      # src draws from Math.random outside a short allowlist of ids, and the
+      # beads, bubbles, closeup camera, chemistry, palette and automation run
+      # twice on one seed come out the same, on another seed differently, and
+      # none of them moves another's numbers.
+      - name: The seed
+        run: npm run seed
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
@@ -129,6 +148,16 @@ jobs:
       # of what it proves is what it will not do.
       - name: The report Worker
         run: npm run report-worker
+
+      # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
+      # control fits, reads, and is not painted over, at every width, and the
+      # mode switch stays put. The same measurements run again inside the show
+      # night on macOS; here they fail in two minutes rather than fifteen, and
+      # before the GPU shards have a chance to hide them behind another step.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: The layout
+        run: npm run layout
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -186,6 +215,12 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # And the GPU half of the same seed: seeded dye and bubbles through the
+      # solver and the plate shader twice, the same bytes; another seed, not.
+      # Then the built app: ?seed= reaches it, and it says which seed it is on.
+      - name: The seed on the GPU, and in the app
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run seed -- --lab --app
       # The closeup pushes in like a microscope: the cells come through as they resolve.
       - name: The microscope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}

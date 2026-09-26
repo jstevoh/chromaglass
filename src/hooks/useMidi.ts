@@ -76,6 +76,9 @@ type MidiAccessLike = {
 
 const hasWebMidi = () => typeof navigator !== 'undefined' && typeof (navigator as unknown as { requestMIDIAccess?: unknown }).requestMIDIAccess === 'function';
 
+// Unseeded on purpose (`npm run seed` allows it): a binding's name in saved
+// MIDI maps, never on the plate, and it must not repeat across sessions that
+// share a `?seed=` or two bindings would collide.
 const newId = () => `b-${Math.random().toString(36).slice(2, 8)}`;
 
 /**

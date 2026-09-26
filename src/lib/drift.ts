@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import { PINNABLE, PIN_RANGE } from './deskPins';
 import { STRUCTURE } from './lookFade';
+import { stream } from './rng';
 
 /**
  * Evolve, as a slow wander rather than a new look every few minutes.
@@ -40,7 +41,8 @@ import { STRUCTURE } from './lookFade';
  *   is, how hard a camera drives the plate. Drifting them changes what the
  *   show *responds to*, which is a decision rather than a mood.
  *
- *   **The mark** is a brand, and **the closeup** is a camera move.
+ *   **The mark** is a brand, **the closeup** is a camera move, and **where
+ *   the magnet sits** is the performer's hand.
  *
  *   **Stepped dials** jump rather than drift, so a nudge is a cut.
  */
@@ -62,6 +64,15 @@ const NOT_THE_LOOK = new Set([
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
+  /*
+    Where the magnet sits is the performer's hand, not the mood. A magnet the
+    Magnet tool sets down stays there until the look places its own somewhere
+    (LiquidVisualizer, magnetFor), and a drift of Magnet Across or Up is the
+    look placing it: under Evolve the magnet left in a corner would have
+    jumped back to the middle at the first nudge, which is the very thing the
+    owner asked to be rid of. How far it walks when nobody has it still drifts.
+  */
+  'magnetX', 'magnetY',
 ]);
 
 /** Dials that move in whole steps, where a nudge would be a jump. */
@@ -82,12 +93,18 @@ export const DRIFTABLE: readonly string[] = PINNABLE
  * `anchor` is the look as it was when evolving started. `amount` is the Evolve
  * Speed, so the same slider that decides how often a drop lands decides how
  * far the mood moves; at zero nothing moves at all.
+ *
+ * `rand`, left out, is the show's `show.drift` stream (lib/rng.ts): which
+ * dials wander and where to is on the plate within seconds, so it is seeded
+ * like everything else that reaches it. Not a `plate.` stream, so laying a
+ * look does not restart it and the wander does not repeat itself after
+ * every look change.
  */
 export function driftLook(
   current: VisualizerSettings,
   anchor: VisualizerSettings,
   amount: number,
-  rand: () => number = Math.random,
+  rand: () => number = stream('show.drift').float,
   dials = 2,
 ): Partial<VisualizerSettings> {
   const rate = Math.max(0, Math.min(1, amount));

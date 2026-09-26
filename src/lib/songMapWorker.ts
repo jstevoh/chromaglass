@@ -5,6 +5,7 @@
 //           fpHashes, fpFrames, fpDurationSec }
 
 import { extractPeakHashes } from './localFingerprint';
+import { fft } from './fft.ts';
 //
 // Pipeline: framed FFT → energy / chroma / spectral-centroid features →
 // self-similarity novelty curve → section boundaries → repetition-based
@@ -12,37 +13,6 @@ import { extractPeakHashes } from './localFingerprint';
 
 const FRAME = 2048;
 const HOP = 5512; // ~4 frames/sec at 22050 Hz
-
-// ── Radix-2 FFT (in-place, real input packed into re/im arrays) ────────
-function fft(re: Float32Array, im: Float32Array) {
-  const n = re.length;
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) {
-      let t = re[i]; re[i] = re[j]; re[j] = t;
-      t = im[i]; im[i] = im[j]; im[j] = t;
-    }
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const ang = -2 * Math.PI / len;
-    const wRe = Math.cos(ang), wIm = Math.sin(ang);
-    for (let i = 0; i < n; i += len) {
-      let curRe = 1, curIm = 0;
-      for (let k = 0; k < len / 2; k++) {
-        const uRe = re[i + k], uIm = im[i + k];
-        const vRe = re[i + k + len / 2] * curRe - im[i + k + len / 2] * curIm;
-        const vIm = re[i + k + len / 2] * curIm + im[i + k + len / 2] * curRe;
-        re[i + k] = uRe + vRe; im[i + k] = uIm + vIm;
-        re[i + k + len / 2] = uRe - vRe; im[i + k + len / 2] = uIm - vIm;
-        const nRe = curRe * wRe - curIm * wIm;
-        curIm = curRe * wIm + curIm * wRe;
-        curRe = nRe;
-      }
-    }
-  }
-}
 
 const hann = new Float32Array(FRAME);
 for (let i = 0; i < FRAME; i++) hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FRAME - 1)));
