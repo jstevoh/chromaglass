@@ -1166,7 +1166,17 @@ struct FsOut {
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
-  let closeup = macroAmt > 0.1;   // not 'macro': that is a reserved word in WGSL
+  let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
+  /*
+    How much of the plate-wide view is left: the plate's own dressing (the
+    meniscus relief, the cells, the droplets) fades out over the same travel
+    the closeup's fades in, rather than all going at once at 1.1x, which was
+    the step reported in the first notches of the zoom. The dish spread and
+    layer 1's throw are eased toward the whole plate on the CPU side
+    (plateUniforms.ts), so they are none at all once the closeup is in.
+  */
+  let plateAmt = 1.0 - macroAmt;
+  let plateOn = plateAmt > 0.001;
   let aspect = U.resolution.x / max(1.0, U.resolution.y);
   let uvScreen = uv;
 
@@ -1243,7 +1253,7 @@ struct FsOut {
   let c0 = cos(-U.rotation0);
   let s0 = sin(-U.rotation0);
   var fuv0 = uvToFluid(uv, c0, s0);
-  if (U.dishSpread > 0.001 && !closeup) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
+  if (U.dishSpread > 0.001) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
   // Where the eye meets the plate's surface: the drops sit here, and what is
   // under a drop is read through it (dropLens), before anything is sampled,
   // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
@@ -1267,7 +1277,7 @@ struct FsOut {
   gapScale = 1.0;
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
-  if (U.dishSpread > 0.001 && !closeup) {
+  if (U.dishSpread > 0.001) {
     dish0 = layerDish(uvScreen, 0, U.resolution.x / U.resolution.y);
     fluid0.a *= dish0.x;
   }
@@ -1303,12 +1313,12 @@ struct FsOut {
     let laced0 = lacing(fluid0.rgb, layer0, fuv0, fluid0.a, U.lacing);
     if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
   }
-  if (!closeup && U.edgeRelief > 0.005 && sharp0) {
-    fluid0 = vec4f(meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), fluid0.a);
+  if (plateOn && U.edgeRelief > 0.005 && sharp0) {
+    fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), plateAmt), fluid0.a);
   }
 
   // ── Plate cells ───────────────────────────────────────────────
-  if (!closeup && U.cells > 0.005 && fluid0.a > 0.03) {
+  if (plateOn && U.cells > 0.005 && fluid0.a > 0.03) {
     let cfreq = U.logicalGrid / 3.2;
     let cflow = fluidFlow(vel0, fuv0) * cfreq;
     let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13);
@@ -1322,7 +1332,7 @@ struct FsOut {
       let cc = vec2f(0.5 + 0.144 * U.dishSpread / casp, 0.5 - 0.02 * U.dishSpread);
       centreW = 1.0 - smoothstep(0.25, 0.7, length((uvScreen - cc) * vec2f(casp, 1.0)) / (0.5 * mix(0.98, 0.66, U.dishSpread)));
     }
-    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW;
+    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW * plateAmt;
     var rgb = fluid0.rgb * (1.0 - max(0.0, -crim) * 0.7 * kc);
     rgb *= 1.0 + max(0.0, crim) * 0.35 * kc;
     rgb = mix(rgb, rgb * 1.1 + vec3f(0.02), ccore * kc * 0.4);
@@ -1331,7 +1341,7 @@ struct FsOut {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    fluid0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    fluid0 = mix(fluid0, macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof), macroAmt);
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
@@ -1475,15 +1485,15 @@ struct FsOut {
     let c1 = cos(-U.rotation1);
     let s1 = sin(-U.rotation1);
     var fuv1 = uvToFluid(uv, c1, s1);
-    if (U.dishSpread > 0.001 && !closeup) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
-    if (!closeup && U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
+    if (U.dishSpread > 0.001) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
+    if (U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
     var flow1 = vec2f(0.0);
     if (closeup) {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
       fuv1 = macroWarp(fuv1);
     }
     var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
-    if (U.dishSpread > 0.001 && !closeup) {
+    if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
     }
@@ -1519,13 +1529,13 @@ struct FsOut {
       let laced1 = lacing(fluid1.rgb, layer1, fuv1, fluid1.a, U.lacing);
       if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
     }
-    if (!closeup && U.edgeRelief > 0.005 && sharp1) {
-      fluid1 = vec4f(meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), fluid1.a);
+    if (plateOn && U.edgeRelief > 0.005 && sharp1) {
+      fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), plateAmt), fluid1.a);
     }
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1 = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
+      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof), macroAmt);
     }
 
     if (U.photo > 0.5) {
@@ -1556,14 +1566,14 @@ struct FsOut {
   }
 
   // ── Satellite droplets ───────────────────────────────────────────
-  if (U.droplets > 0.001 && !closeup) {
+  if (U.droplets > 0.001 && plateOn) {
     let Ld = lampDir(fuvBase, U.lamp);
     let sideD = Ld.xy / max(length(Ld.xy), 0.06);
     let groundD = dot(outColor, vec3f(0.299, 0.587, 0.114));
     let keep = U.droplets * (0.18 + 0.32 * fluid0.a);
     var dropped = microDrops(outColor, fuvBase * U.logicalGrid * 0.55 + 17.0, sideD, groundD, keep);
     dropped = microDrops(dropped, fuvBase * U.logicalGrid * 1.1 + 5.0, sideD, groundD, keep * 0.6);
-    outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5));
+    outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5) * plateAmt);
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
@@ -1753,7 +1763,7 @@ struct FsOut {
   }
 
   // ── The projectors' rims ─────────────────────────────────────────
-  if (U.dishSpread > 0.001 && !closeup) {
+  if (U.dishSpread > 0.001) {
     var other = 0.0;
     if (U.layerCount > 1) { other = dish1.x; }
     let anyIn = max(dish0.x, other);

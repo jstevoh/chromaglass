@@ -154,6 +154,22 @@ const MACRO_FULL_ZOOM = 2.0;
 /** A preset or a saved show that sets `macroMode` with no zoom of its own. */
 const MACRO_PRESET_ZOOM = 4.0;
 
+/** The zoom the frame is asked for: the slider's, or a macro look's own. */
+function macroZoomOf(s: VisualizerSettings): number {
+  const setZoom = s.macroZoom ?? 1;
+  return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
+}
+
+/**
+ * How far into the closeup, 0 at the plate and 1 from MACRO_FULL_ZOOM on,
+ * eased at both ends so the first notch of the slider starts it moving
+ * rather than starting it at a slope.
+ */
+function macroAmountOf(s: VisualizerSettings): number {
+  const t = Math.max(0, Math.min(1, (macroZoomOf(s) - 1) / (MACRO_FULL_ZOOM - 1)));
+  return t * t * (3 - 2 * t);
+}
+
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 /** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
@@ -2663,7 +2679,11 @@ class FluidSimulation {
     // What the motor asks for, in the flywheel's units, so the twist below can
     // tell the plate's own momentum apart from the speed it was told to hold.
     const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
-    const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
+    // Eased down over the zoom's travel, not dropped at the first notch: the
+    // plate emptying at 1.05x was a jump of its own (reported as the zoom
+    // not being smooth, "especially at the beginning steps").
+    const budget = Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
+    const targetMean = budget + (0.28 - budget) * macroAmountOf(settings);
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     /*
       Steep enough to actually hold the budget.
@@ -6323,11 +6343,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // the zoom, so a floor of 4x under macroMode made every zoom from 1.05
         // to 4 render at 4x. The floor is only for a look that turns macroMode
         // on and leaves the zoom where it was.
-        const setZoom = currentSettings.macroZoom ?? 1;
-        const wantZoom = currentSettings.macroMode === true
-          ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM)
-          : Math.max(1, setZoom);
-        const macroAmount = Math.max(0, Math.min(1, (wantZoom - 1) / (MACRO_FULL_ZOOM - 1)));
+        const wantZoom = macroZoomOf(currentSettings);
+        const macroAmount = macroAmountOf(currentSettings);
         const macroOn = wantZoom > 1.005;
         if (macroOn !== lastMacroOnRef.current) {
           lastMacroOnRef.current = macroOn;
@@ -6360,6 +6377,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             );
             camBassRef.current = camBass;
           }
+          /*
+            Leaving the middle of the plate over the travel in, not at the
+            first notch. The camera goes to its subject as soon as there is
+            a zoom at all, and at 1.1x the frame may already move a fifth of
+            the plate: the first step of the slider was a lurch sideways.
+          */
+          const raw = macroShotRef.current;
+          macroShotRef.current = { ...raw, cx: 0.5 + (raw.cx - 0.5) * macroAmount, cy: 0.5 + (raw.cy - 0.5) * macroAmount };
         } else {
           macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
         }
@@ -7560,7 +7585,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // cursor at any magnification.
       const shot = macroShotRef.current;
       const z = Math.max(0.0001, shot.zoom);
-      const spread = settingsRef.current.macroMode ? 0 : Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0));
+      // As the plate's uniforms have it: gathered back to one plate as the closeup comes in.
+      const spread = Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0)) * (1 - macroAmountOf(settingsRef.current));
       if (spread > 0.001) {
         // The layers are spread into dishes: this layer's dish is its whole plate.
         const layer = activeLayerRef.current;

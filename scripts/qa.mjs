@@ -789,6 +789,43 @@ try {
     const homeZoom = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
     check('and it comes back to the plate again',
       homeZoom !== null && homeZoom < 1.05, `camera at ${homeZoom === null ? '?' : homeZoom.toFixed(2)}×`);
+
+    /*
+      And the first notches are notches. Reported: "the macro zoom is still
+      not completely smooth across its range - especially at the beginning
+      steps". At 1.1x the camera went to its subject a fifth of the plate
+      away, the dye budget dropped to the closeup's, and the plate's cells,
+      relief and droplets went off, all at once: the first step moved the
+      picture more than the whole rest of the way in. Each step here is
+      asked to be a fraction of the whole travel, with the plate still held.
+    */
+    const near = async (zoom) => {
+      await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
+      for (let i = 0; i < 40; i++) {
+        const z = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
+        if (z !== null && Math.abs(z - zoom) < 0.03) break;
+        await settle(150);
+      }
+      await settle(500);
+      return frame();
+    };
+    const notches = [1.1, 1.2, 1.3, 1.5];
+    const stepsApart = [];
+    let before = await near(1);
+    for (const z of notches) {
+      const now = await near(z);
+      stepsApart.push(apart(before, now));
+      before = now;
+    }
+    // Measured in the lab on a seeded plate: the first notch moved the
+    // picture 97.8 against 26, 14 and 22 for the next three; now 26 against
+    // 23, 23 and 48 (over the wider 1.3 to 1.5 step).
+    const firstStep = stepsApart[0];
+    const rest = Math.max(...stepsApart.slice(1));
+    check('and its first notch moves it no more than the ones after it',
+      firstStep < rest * 2 + drift + 2,
+      `steps ${stepsApart.map(v => v.toFixed(1)).join(', ')} against ${far.toFixed(1)} for the whole way in`);
+    await at(1);
     await page.evaluate((s) => window.chromaglassSettings?.(s), wasMoving);
 
     // The readout follows the zoom, not the old flag.

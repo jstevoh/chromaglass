@@ -289,7 +289,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('gel2', c2.r, c2.g, c2.b);
     pack.set('gel3', d.r, d.g, d.b);
     pack.set('beads', clamp01(s.beads ?? 0));
-    pack.set('dishSpread', clamp01(s.dishSpread ?? 0));
+    // Gathered back to the one plate as the closeup comes in (see `plateAmt` in wgsl/plate.ts).
+    pack.set('dishSpread', clamp01(s.dishSpread ?? 0) * (1 - clamp01(view.macroAmount)));
     pack.set('cells', clamp01(s.cells ?? 0));
     pack.set('filmOn', filmOn);
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
@@ -298,8 +299,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   }
   {
     const throw1 = view.layer1;
-    pack.set('layerZoom1', throw1.zoom);
-    pack.set('layerDrift1', throw1.dx, throw1.dy);
+    const plateAmt = 1 - clamp01(view.macroAmount);
+    pack.set('layerZoom1', 1 + (throw1.zoom - 1) * plateAmt);
+    pack.set('layerDrift1', throw1.dx * plateAmt, throw1.dy * plateAmt);
     const bubbles = view.bubbles;
     pack.setAll('bubbles', view.bubblePack.packed);
     pack.setAll('bubbleShape', view.bubblePack.shape);
