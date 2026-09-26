@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — ferrofluid that looks like ferrofluid
+
+- **The ferrofluid has an edge.** It ends on a sharp line at any zoom
+  instead of a brown ramp, is black all through (no orange worms in a
+  pool), has a thin bright meniscus and a glint on the side facing the
+  light, and a film too thin to pool still shows. `npm run ferrolook`
+  measures it.
+- **Two looks after Chemical Bouillon's ferrofluid films.** Ferro Maze is
+  black ferrofluid fingering into a maze on a white light table; Ferro
+  Paint works it through amber, teal and coral dye under a wandering
+  magnet, wet and glossy.
+
 ### Added — the liquids' own physics and chemistry
 
 Each is a setting, off by default (docs/physics-plan.md has the models and

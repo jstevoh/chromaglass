@@ -1506,7 +1506,15 @@ struct FsOut {
         */
         let lens = exp(-pow(max(-dc, 0.0) / 0.55, 2.0)) * (1.0 - cover);
         let phFar = select(ph, viewAt(fuvBase + outward * (4.5 + dc) * cell).phase, slope > 1e-4 && dc > -4.5);
-        let film = 9.0 * pow(clamp(phFar, 0.0, 0.5), 1.5) * (0.4 + 0.6 * amt);
+        /*
+          Less a trace. A maze leaves a fifth of the plate between a tenth and
+          half full (measured in the lab after eight seconds of Labyrinth:
+          9.5% of cells at 0.1–0.2, 5% at 0.2–0.3), and drawn as film that
+          was a brown haze over the water with a clean band round each domain,
+          where the domain had drawn it in. The references' water is clear.
+          So the first eighth is not drawn; a quarter-full film still is.
+        */
+        let film = 9.0 * pow(clamp((phFar - 0.12) / 0.88, 0.0, 0.43), 1.5) * (0.4 + 0.6 * amt);
         let lit = outColor * exp(-film * vec3f(0.45, 0.7, 1.0)) * (1.0 + 0.6 * lens * amt);
         outColor = mix(lit, pc, cover);
       }
