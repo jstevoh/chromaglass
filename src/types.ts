@@ -423,6 +423,26 @@ export interface VisualizerSettings {
     than a thin one barely touching.
   */
   spinDrag: number;
+  /*
+    Which way round, and how steadily.
+
+    `spinDirection` is -1, 0 or +1: anticlockwise, opposed, or clockwise. Zero
+    is what the plate always did and stays the default — the two plates turn
+    opposite ways, which is where the shear between them comes from — so a
+    look written before this reads exactly as it did. The other two turn every
+    plate the same way, which is the projectionist's move: one dish driven,
+    the whole wall going round together.
+
+    `spinWander` is how much the motor drifts off the speed it was set. It
+    multiplies the direction rather than the speed, so it crosses zero past
+    about 0.45 and the plate turns back on itself now and then instead of
+    only breathing — a hand on a dish is never a motor, and a plate that
+    holds one speed for an hour reads as a screensaver.
+  */
+  spinDirection: number;
+  spinWander: number;
+  /** How hard a routed band of the music pushes the plate round. 0 is what every look had. */
+  spinAudioDepth: number;
   /** How hard one flick hits, as a fraction of a turn a second. */
   spinImpulse: number;
   centerGravity: number;
@@ -666,6 +686,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
+  spinDirection: 0,         // opposed: what every look did before there was a choice
+  spinWander: 0,            // a motor holds its speed until it is asked not to
+  spinAudioDepth: 0,        // the nine looks that route a band keep exactly what they had
   spinImpulse: 0.5,
   centerGravity: 0.0,
   ledPlatform: false,

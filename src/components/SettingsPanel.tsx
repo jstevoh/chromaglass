@@ -3005,6 +3005,73 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             </button>
           ))}
         </div>
+        {/*
+          Which way, how steadily, and what drives it.
+
+          Direction is stepped rather than swept because there are three
+          answers and none of them is "0.4 of the way anticlockwise". Opposed
+          is the default and is what every look did before there was a choice.
+        */}
+        <Slider
+          label={`Spin Direction — ${
+            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
+              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
+              : 'plates opposed'}`}
+          value={settings.spinDirection ?? 0}
+          min={-1}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinDirection: Math.round(v) })}
+          settingKey="spinDirection"
+        />
+        <Slider
+          label="Spin Wander"
+          value={settings.spinWander ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ spinWander: v })}
+          settingKey="spinWander"
+        />
+        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+          Wander drifts the motor off its speed. Past about half it crosses zero and the plate
+          turns back on itself now and then, the way a dish nudged by hand does.
+        </p>
+        {/*
+          The audio route was reachable from a preset file and nowhere else.
+
+          `audioMappings.rotation` has accepted a feature since long before
+          this, and every shipped look sets it to 'none', so the one way to
+          turn a plate with the bass was to write a look by hand. That is the
+          same fault as a control hidden behind a mode: built, wired, and not
+          reachable by anyone using the app.
+        */}
+        <label className="mb-3 flex items-center gap-2 text-[12px] text-white/60">
+          <span className="w-28 shrink-0">Driven by</span>
+          <select
+            value={settings.audioMappings?.rotation ?? 'none'}
+            onChange={(e) => onUpdate({
+              audioMappings: { ...settings.audioMappings, rotation: e.target.value as AudioFeature },
+            })}
+            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85"
+            data-testid="spin-audio-route"
+            title="Turn the plates with the music: the chosen band adds to whatever the motor is already asking for"
+          >
+            {/* The one list, not a second copy of it: a feature added there
+                but not here is a route nobody can reach. */}
+            <option value="none">nothing — the motor only</option>
+            {AUDIO_FEATURES.map(([f, name]) => <option key={f} value={f}>{name}</option>)}
+          </select>
+        </label>
+        <Slider
+          label="Spin From Music"
+          value={settings.spinAudioDepth ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ spinAudioDepth: v })}
+          settingKey="spinAudioDepth"
+        />
         <Slider
           label="Flick Strength"
           value={settings.spinImpulse ?? 0.5}
