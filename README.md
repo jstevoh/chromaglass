@@ -492,6 +492,7 @@ with.
 | Film | Settings → Film: a film projector fed by a video file, the camera or another window; Film Mix and Film Key for how it shows, Film Drive to let it move the liquid rather than only light it |
 | Patches | Settings → Patches: the patch bay — any feature of the room, the film, the sound or a shape onto any control, on every plate or one — and the four masters over it |
 | Tempo | Settings → Sound: MIDI clock from the desk, four taps, or a typed bpm, instead of working it out from the microphone |
+| Labyrinth / Maze Detail | Settings → Squish Plate, under Physics & chemistry: under a strong field the ferrofluid fingers out into a maze; Maze Detail makes its fingers up to three times finer, as fine as the grid holds: on the hosted site's 512² it stops at about 0.6, and a local 1024² run reaches the full range (on the phone while a maze is up) |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp & Light | Settings → Lamp & Light: light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth, exposure |
 | Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film |
