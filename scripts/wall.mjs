@@ -468,10 +468,27 @@ try {
   // ── 2. Masking ─────────────────────────────────────────────────────
   // A hard edge, so the gate is "black" and not "dimmer".
   await withOutput({ maskBottom: 0.3, maskLeft: 0.2, maskFeather: 0 });
-  const masked = await gridOf();
+  /*
+    Lit inside the mask before anything is judged, as the identity read above
+    waits for a lit plate. One frame used to be taken as it came, and on
+    f5e678f (PR #160, which touched nothing the wall draws) it read 0.001
+    inside the mask a moment after the unmasked plate read 0.171, while the
+    same code on the commit before read 0.179. The plate's own automation
+    empties or dims it for moments (a drain, a look fading; inferred, not
+    caught in the act), and a single grab of such a moment measures the plate,
+    not the mask. The black gates lose nothing: they are read on this same
+    frame, so a mask that let light through would still show it, now on a
+    frame that has light to let through.
+  */
+  let masked = await gridOf();
+  const keptOf = g => meanOver(g, (x, y) => x > 0.25 && y < 0.65);
+  for (let tries = 0; keptOf(masked) <= LIT && tries < 20; tries++) {
+    await page.waitForTimeout(500);
+    masked = await gridOf();
+  }
   const maskedBottom = meanOver(masked, (x, y) => y > 0.72);
   const maskedLeft = meanOver(masked, (x, y) => x < 0.18 && y < 0.68);
-  const maskedKept = meanOver(masked, (x, y) => x > 0.25 && y < 0.65);
+  const maskedKept = keptOf(masked);
   check('a blanked bottom edge is black', maskedBottom < 0.004, `mean ${maskedBottom.toFixed(4)}`);
   check('a blanked left edge is black', maskedLeft < 0.004, `mean ${maskedLeft.toFixed(4)}`);
   check('the picture survives inside the mask', maskedKept > LIT, `mean ${maskedKept.toFixed(3)}`);
