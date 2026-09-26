@@ -417,7 +417,14 @@ export function PerformDesk(p: PerformDeskProps) {
         </div>
         {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
-        <div className="mt-3 flex h-9 shrink-0 items-center justify-between gap-3">
+        {/*
+          The tools, then the Amount and the dyes together, wrapping to a line
+          of their own when the column is short, as on the bench. The middle
+          column no longer grows to fit its content (the header's mode switch
+          moved when it did), so a row that did not wrap ran under the rides
+          column at 1280 and 1024 and Freeze was painted over the Amount chip.
+        */}
+        <div className="mt-3 flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
           {/* Right-click a tool for its own options (ToolOptions). */}
           <div
             className="contents"
@@ -436,7 +443,6 @@ export function PerformDesk(p: PerformDeskProps) {
             compact
           />
           </div>
-          {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
           {toolMenu && p.amountOf && p.onAmountFor && (
             <ToolOptions
               tool={toolMenu.tool}
@@ -446,6 +452,8 @@ export function PerformDesk(p: PerformDeskProps) {
               onClose={() => setToolMenu(null)}
             />
           )}
+          <div className="ml-auto flex items-center gap-3">
+          {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
               <Swatch
@@ -460,6 +468,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 testId={`dye-${hex.replace('#','')}`}
               />
             ))}
+          </div>
           </div>
         </div>
       </section>

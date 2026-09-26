@@ -361,6 +361,7 @@ export function DesignDesk(p: DesignDeskProps) {
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
             onChange={p.onTool}
             testId="tool-segmented"
+            compact
           />
           </div>
           {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
