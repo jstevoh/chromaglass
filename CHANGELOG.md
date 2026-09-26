@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it has no soap film facing the viewer. No highlight unless the second lamp
   is on; film colour only above the default Iridescence. The closeup keeps
   the camera's bubble. `npm run airlens` measures it on one bubble.
+- **A merge takes time to come round.** With Drops on, two drops that run
+  together become one drop drawn out along the line they met on (as wide as
+  the wider of the two, as long as its area needs: 1.41 to 1 for two of a
+  size), which rounds in a time that goes as the cube of its size, as a drop
+  between two plates does: a merged drop of four cells stays an oval for
+  about half a second, one of two cells is round within a few frames.
+  `npm run drops` measures it.
 - **Walls between drops are curved.** A small drop pushes harder than a big
   one, so the wall between them bows into the big one, an arc through the same
   two points the straight wall joined (`npm run drops`: the wall lands within a

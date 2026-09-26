@@ -39,6 +39,57 @@ export interface Bead {
    * `count` asks for, and never swallowed whole by a neighbour.
    */
   tiny?: true;
+  /**
+   * How far a drop is still drawn out along the line it last merged on,
+   * as that direction times the stretch (0, or absent, is round): the drop
+   * is 1 + s times its radius long that way and 1 / (1 + s) across, so its
+   * area is its radius's. Set by a merge, with drops on; relaxed over
+   * `mergeRelax(r)`.
+   */
+  sx?: number;
+  sy?: number;
+}
+
+/*
+  How long a merged drop takes to come round: its stretch falls by e in
+  this many seconds.
+
+  Drops merged in one frame into a bigger circle (reported with the rest as
+  "cartoon like"): a real merge is an event, a lozenge along the line the two
+  met on that slowly rounds. Between plates the slowest shape to relax is the
+  elongation, and Paterson's dispersion relation for a drop in a Hele-Shaw
+  cell gives it a time of 2 mu R^3 / (b^2 gamma): the cube of the radius
+  over the gap (the research on bubbles and drops, item 7). So a drop twice
+  the size stays drawn out eight times as long; big merged drops linger as
+  ovals and small ones snap round.
+
+  In units of half the gap, which is three cells of the 192 grid at rest
+  (DROP_HALF_GAP in wgsl/plate.ts), the physics leaves one constant: the
+  time a drop of that size takes, which carries the oil's viscosity and
+  tension. Real oil under glass a millimetre apart takes milliseconds at
+  that size, too quick to see; a light show's oils run thicker, and this is
+  set, as an inference rather than a measurement, so the field's biggest
+  drops (five and six cells) linger for most of a second to a second and a
+  half, a common three-cell bead loses most of its stretch in about a fifth
+  of a second, and a two-cell one is round within a few frames.
+*/
+const MERGE_TAU_S = 0.18;
+/** The seconds a merged drop of radius r cells, on a grid of `grid`, takes to lose all but 1/e of its stretch. */
+export function mergeRelax(r: number, grid: number): number {
+  const u = r / (3 * grid / 192);
+  return MERGE_TAU_S * u * u * u;
+}
+/*
+  How drawn out a drop is just after two merge. The neck fills in at the
+  waist between them, and the new drop has had no time to spread sideways,
+  so it starts as wide across as the wider of the two was, and as long as
+  its area then needs: R / max(Rb, Rs) - 1. For two of a size that is
+  sqrt(2) - 1 = 0.41, which is also the research's (R1 + R2) / R - 1 for a
+  pair meeting rim to rim; a small drop merging into a big one barely
+  stretches it (a third the size: 0.05). Held to a half.
+*/
+export function mergeStretch(Rb: number, Rs: number, Rnew: number): number {
+  return Math.min(0.5, Math.max(0, Rnew / Math.max(Rb, Rs, 1e-6) - 1));
 }
 
 /**
@@ -324,6 +375,11 @@ export class BeadField {
       b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + this.rng.centred() * 0.15;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
+      if (b.sx !== undefined) {
+        const f = Math.exp(-dt / mergeRelax(b.r, N));
+        b.sx *= f; b.sy = (b.sy ?? 0) * f;
+        if (Math.hypot(b.sx, b.sy) < 0.005) { delete b.sx; delete b.sy; }
+      }
     }
     if (this.drops > 0 && this.palette.length) {
       const k = Math.min(1, dt / RECOLOUR_S);
@@ -358,6 +414,8 @@ export class BeadField {
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       if (!Number.isFinite(b.x) || !Number.isFinite(b.y) || !Number.isFinite(b.r)) { bs.splice(i, 1); bad++; }
+      // A stretch gone bad is only a shape: the drop goes round rather than undrawn.
+      else if (b.sx !== undefined && !(Number.isFinite(b.sx) && Number.isFinite(b.sy ?? 0))) { delete b.sx; delete b.sy; }
     }
     if (bad > 0) {
       this.dirty = true;
@@ -455,6 +513,32 @@ export class BeadField {
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
             big.r = Math.sqrt(big.r * big.r + small.r * small.r);
+            /*
+              With drops on, the merged drop starts drawn out along the line
+              the two met on and rounds over mergeRelax (above). A stretch it
+              still had from an earlier merge is kept if it is the longer.
+              Not for a drop that went in whole (inside): there was no waist
+              to fill. No draw from the random stream, so the rings are the
+              rings.
+            */
+            if (this.drops > 0 && !inside) {
+              /*
+                And where the pair was: the merged drop sits on their
+                area-weighted middle, not on the bigger one's. Round, a
+                merge kept the bigger's centre and the new circle grew
+                over its partner; drawn out along the line, that put the
+                oval three cells past the far rim of the one that stayed
+                (two 3-cell drops) and short of the other's.
+              */
+              const wb = bigR * bigR / (big.r * big.r), ws = 1 - wb;
+              big.x = wb * big.x + ws * small.x; big.y = wb * big.y + ws * small.y;
+              const st = mergeStretch(bigR, small.r, big.r);
+              const had = Math.hypot(big.sx ?? 0, big.sy ?? 0);
+              if (st > had) {
+                const sign = big === b ? 1 : -1;
+                big.sx = sign * dx / d * st; big.sy = sign * dy / d * st;
+              }
+            }
             // Droplets that have run together into a drop of a cell are a
             // drop: without this one kept taking in every droplet it touched
             // and reached thirty-five cells (npm run drops).
@@ -714,10 +798,12 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
   let nHoles = 0;
   const k = S / grid;
   const n = beads.length;
-  const cx = new Float32Array(n), cy = new Float32Array(n), cr = new Float32Array(n);
+  const cx = new Float32Array(n), cy = new Float32Array(n), cr = new Float32Array(n), cA = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const b = beads[i];
     cx[i] = b.x * k; cy[i] = b.y * k; cr[i] = Math.max(1, b.r * k);
+    // How far past its radius a merge's oval reaches (below), drawn in by the slider.
+    cA[i] = 1 + (b.sx !== undefined ? amount * Math.hypot(b.sx, b.sy ?? 0) : 0);
   }
   // The walls of the drop being drawn, grown when a drop has more than 32:
   // each a direction, its apex along it, and its arc (dropWall).
@@ -741,7 +827,9 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
     for (let j = 0; j < n; j++) {
       if (j === i) continue;
       const dx = cx[j] - x0, dy = cy[j] - y0, Rj = cr[j];
-      const D2 = dx * dx + dy * dy, reach = R + Rj;
+      // Reached by an oval's long end too, or it paints into a neighbour
+      // whose circle it does not touch, with no wall between them.
+      const D2 = dx * dx + dy * dy, reach = R * cA[i] + Rj * cA[j];
       if (D2 >= reach * reach || !(D2 > 1e-6)) continue;
       const D = Math.sqrt(D2);
       const w = dropWall(R, Rj, D);
@@ -759,7 +847,22 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
     const ringA = fade * (0.8 + 0.2 * b.seed);
     const c = b.color ?? [1, 1, 1];
     const c0 = c[0] * 255, c1 = c[1] * 255, c2 = c[2] * 255;
-    const ext = R + 1;
+    /*
+      A drop still drawn out by a merge is an ellipse, 1 + st its radius
+      long along (ux, uy) and 1 / (1 + st) across, its area its radius's.
+      Each pixel is taken into the drop's own frame and squeezed back onto
+      the circle, and everything below (walls aside, which stay the pair's
+      circles) is the round drop's arithmetic on that distance. The edge is
+      measured in that squeezed distance, so the one-pixel antialiasing and
+      the rim's line are 1 + st times wider at the oval's ends and narrower
+      at its sides (1.41 and 0.71 for two of a size, fading as it rounds).
+      Drawn in by the slider, as a passenger is: at a twentieth of Drops a
+      merge is a twentieth of an oval, and moving the slider reshapes the
+      ovals already there.
+    */
+    const st0 = b.sx !== undefined ? Math.hypot(b.sx, b.sy ?? 0) : 0, st = amount * st0;
+    const A = 1 + st, ux = st > 0 ? b.sx! / st0 : 1, uy = st > 0 ? (b.sy ?? 0) / st0 : 0;
+    const ext = R * A + 1;
     const xa = Math.max(0, Math.floor(x0 - ext)), xb = Math.min(S - 1, Math.ceil(x0 + ext));
     const ya = Math.max(0, Math.floor(y0 - ext)), yb = Math.min(S - 1, Math.ceil(y0 + ext));
     const kS = 0.2 * R, invK = 1 / kS;
@@ -770,7 +873,11 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
       const pa = Math.max(xa, Math.floor(x0 - span)), pb = Math.min(xb, Math.ceil(x0 + span));
       for (let px = pa; px <= pb; px++) {
         const vx = px + 0.5 - x0;
-        const d = Math.sqrt(vx * vx + vy * vy);
+        let d: number;
+        if (st > 0) {
+          const along = (vx * ux + vy * uy) / A, across = (vy * ux - vx * uy) * A;
+          d = Math.sqrt(along * along + across * across);
+        } else d = Math.sqrt(vx * vx + vy * vy);
         if (d > ext) continue;
         /*
           Two distances to the edge. `edge`, the hard least of the circle and

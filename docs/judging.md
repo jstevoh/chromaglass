@@ -147,6 +147,17 @@ about 530 with droplets and curved walls (11 to 12 with straight ones), against 
 rings' canvas at 3.9, in the sandbox's Chromium. If
 `frameMs` climbs with it on, that is the number to report.
 
+Merges now take time. Two drops that run together become an oval along the
+line they met on and round off in a time that goes as the cube of their size
+(half a second for a four-cell drop, a few frames for a two-cell one). That
+constant (`MERGE_TAU_S` in `beads.ts`) is chosen, not measured: real oil under
+glass rounds in milliseconds at these sizes, too quick to see, so say if the
+ovals linger too long or not long enough. In the closeup the camera's lens
+was written for round drops; in the lab's picture of a freshly merged oval
+(merged-drops-stretched.png in the project's files) the view through it came
+out as two bright lobes side by side until it rounds, so say if a drawn-out
+drop's lens reads wrong.
+
 ## 8. The closeup's cells, riding the paint
 
 At about 6x the closeup's drawn cells and lacing used to shake: they slid by

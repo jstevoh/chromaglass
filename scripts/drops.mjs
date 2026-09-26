@@ -40,7 +40,7 @@ await build({
   stdin: { contents: "export * from './src/lib/beads.ts'; export { setShowSeed } from './src/lib/rng.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
-const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed, dropWall } = await import(`../${out}`);
+const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed, dropWall, mergeRelax, mergeStretch } = await import(`../${out}`);
 
 // The field draws from the show's seeded `plate.beads` stream (lib/rng.ts),
 // so a run is repeated by running the show on the same seed, as the app would.
@@ -224,20 +224,31 @@ const clusterStats = (fld, withColour) => {
   pressed together leave a triangle past every wall that nobody claims:
   the plate showed through the middle of a crowd, and a passenger drawn in
   one was how this was found.
+
+  A drop still drawn out by a merge is asked of its oval, its own shape
+  (the circle it came from is narrower than the oval across, and past the
+  oval's sides that circle is rightly nobody's), squeezed back onto the
+  circle as rasterDrops does. The mask here is drawn at full Drops.
 */
 {
-  let holes = 0, inside = 0;
+  let holes = 0, inside = 0, ovals = 0;
   for (const b of beads) {
     const R = Math.max(1, b.r * K), x0 = b.x * K, y0 = b.y * K;
-    for (let y = Math.max(0, Math.floor(y0 - R)); y <= Math.min(S - 1, Math.ceil(y0 + R)); y++) {
-      for (let x = Math.max(0, Math.floor(x0 - R)); x <= Math.min(S - 1, Math.ceil(x0 + R)); x++) {
-        if (Math.hypot(x + 0.5 - x0, y + 0.5 - y0) > R - 0.5) continue;
+    const st = b.sx !== undefined ? Math.hypot(b.sx, b.sy ?? 0) : 0, A = 1 + st;
+    const ux = st > 0 ? b.sx / st : 1, uy = st > 0 ? (b.sy ?? 0) / st : 0;
+    if (st > 0) ovals++;
+    const ext = R * A;
+    for (let y = Math.max(0, Math.floor(y0 - ext)); y <= Math.min(S - 1, Math.ceil(y0 + ext)); y++) {
+      for (let x = Math.max(0, Math.floor(x0 - ext)); x <= Math.min(S - 1, Math.ceil(x0 + ext)); x++) {
+        const vx = x + 0.5 - x0, vy = y + 0.5 - y0;
+        const d = Math.hypot((vx * ux + vy * uy) / A, (vy * ux - vx * uy) * A);
+        if (d > R - 0.5) continue;
         inside++;
         if (owner(x, y) < 0) holes++;
       }
     }
   }
-  check('no pixel inside a drop is left to nobody', inside > 10000 && holes === 0, `${holes} of ${inside}`);
+  check('no pixel inside a drop is left to nobody', inside > 10000 && holes === 0, `${holes} of ${inside} (${ovals} drops still drawn out)`);
 }
 
 // ── Droplets round the big drops ─────────────────────────────────────
@@ -459,6 +470,29 @@ const clusterStats = (fld, withColour) => {
   const held = light.beads.filter((b) => b.inner).length;
   check('at a twentieth, a swallowed drop is drawn a twentieth in', held > 10 && most <= 0.1 * 255,
     `${held} held, the most any pixel moves for them ${most} of 255`);
+  /*
+    And a merge's oval likewise: a drop stretched 0.4 is drawn 1.96 times
+    as long as it is wide at full Drops, and a twentieth of that stretch
+    (1.04) at a twentieth. The light field does merge drops into full
+    stretches (the merge sets the shape; the mask draws it in), so this is
+    asked of the drawing, on one drop each way.
+  */
+  const aspect = (amount) => {
+    const p = new Uint8ClampedArray(S * 2 * S * 4);
+    rasterDrops([{ x: 96, y: 96, r: 4, age: 5, seed: 0.5, color: [1, 1, 1], sx: 0.4, sy: 0 }], N, S, p, new Float32Array(S * S), new Int32Array(S * S), amount);
+    // From the coverage's second moments, which see a fraction of a pixel
+    // (an ellipse's are in the ratio of its axes squared).
+    const c = 96 * K; let ixx = 0, iyy = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const w = p[(y * S * 2 + x) * 4] / 255;
+      if (w > 0) { ixx += w * (x + 0.5 - c) ** 2; iyy += w * (y + 0.5 - c) ** 2; }
+    }
+    return Math.sqrt(ixx / iyy);
+  };
+  const stretched = light.beads.filter((b) => b.sx !== undefined).length;
+  const aLight = aspect(0.05), aFull = aspect(1);
+  check('and a merge is a twentieth of an oval', Math.abs(aLight - 1.04) < 0.01 && Math.abs(aFull - 1.96) < 0.03,
+    `a drop stretched 0.4 drawn ×${aLight.toFixed(3)} long over wide at a twentieth (says ×1.040), ×${aFull.toFixed(3)} at full (says ×1.96); ${stretched} drops of the light field stretched`);
 }
 
 // ── A look change recolours, it does not cut ───────────────────────
@@ -485,6 +519,176 @@ const clusterStats = (fld, withColour) => {
   check('a new look\'s colours arrive over a second or so, not in a frame',
     kept.length >= 100 && firstFrame < 0.05 && halves.every((h) => h >= 0.5 && h <= 3),
     `${kept.length} drops, at most ${(firstFrame * 100).toFixed(1)}% of the way after one frame, half way at ${mid.toFixed(2)} s (all within ${halves[0]?.toFixed(2)}–${halves.at(-1)?.toFixed(2)} s)`);
+}
+
+// ── A merge takes time to come round ────────────────────────────────
+/*
+  Two drops that merge become one drop drawn out along the line they met
+  on, which rounds in a time that goes as the cube of its size (item 7 of
+  the research on bubbles and drops; mergeStretch and mergeRelax in
+  beads.ts). A merge used to be one frame: two drops, then a bigger circle.
+
+  The pairs are merged by the field's own rule, not by hand: a field whose
+  random stream always draws 0 takes a pair pressed past its merge depth at
+  once (the rule's two-in-a-hundred chance) and adds no wander, so where
+  the pair lay is the line asked about. Pressed side by side, one above
+  the other, and on a slant, so a stretch that ignored the line, or took
+  one axis for it, fails on one of them.
+*/
+{
+  const still = { float: () => 0, centred: () => 0 };
+  const pair = (r1, r2, d, ang, drops = 1) => {
+    const f = new BeadField(N, still);
+    f.drops = drops;
+    const c = [96, 96], u = [Math.cos(ang), Math.sin(ang)];
+    f.beads.push({ x: c[0], y: c[1], r: r1, age: 5, seed: 0.5 }, { x: c[0] + u[0] * d, y: c[1] + u[1] * d, r: r2, age: 5, seed: 0.3 });
+    return { f, u };
+  };
+  const dt = 1 / 600;
+  const lines = [];
+  let lineOk = true;
+  /*
+    What the stretch should be, written out rather than asked of
+    mergeStretch, the function under test: sqrt(2) - 1 for two of a size,
+    and for 3 and 1.6 cells (not small enough to go in whole),
+    sqrt(3^2 + 1.6^2) / 3 - 1 = 0.1333, which a rule on the smaller of the
+    two would make 1.13 (held to 0.5). The step relaxes stretches before it
+    crowds and merges, so a drop merged in it has all of its stretch. And
+    it sits on the pair's area-weighted middle, to a hundredth of a cell.
+  */
+  for (const [r1, r2, d, ang, want] of [[3, 3, 2.9, 0, Math.SQRT2 - 1], [3, 3, 2.9, Math.PI / 2, Math.SQRT2 - 1], [3, 3, 2.9, 0.6, Math.SQRT2 - 1], [3, 1.6, 2.5, 0.6, Math.hypot(3, 1.6) / 3 - 1]]) {
+    const { f, u } = pair(r1, r2, d, ang);
+    const w2 = r2 * r2 / (r1 * r1 + r2 * r2), mid = [96 + u[0] * d * w2, 96 + u[1] * d * w2];
+    f.step(dt, () => [0, 0], 0, 0);
+    const b = f.beads[0];
+    const st = Math.hypot(b.sx ?? 0, b.sy ?? 0);
+    // Along the line either way round: an ellipse is the same both ways.
+    const off = st > 0 ? Math.acos(Math.min(1, Math.abs((b.sx * u[0] + b.sy * u[1]) / st))) * 180 / Math.PI : 90;
+    const away = Math.hypot(b.x - mid[0], b.y - mid[1]);
+    lineOk &&= f.beads.length === 1 && off < 0.5 && Math.abs(st - want) < 1e-6 && away < 0.01;
+    lines.push(`${r1}+${r2}: ${f.beads.length} drop, ${st.toFixed(4)} (says ${want.toFixed(4)}) at ${off.toFixed(2)}° off the line, ${away.toFixed(3)} cells from the pair's middle`);
+  }
+  check('two drops merge into one drawn out along the line they met on, as wide as the wider, on the pair\'s middle',
+    lineOk, lines.join('; '));
+
+  /*
+    A drop still drawn out that merges again keeps the longer stretch: two
+    3-cell drops, then a 2.2-cell one pressed in from above. The second
+    merge alone would stretch it 0.126 across; it keeps the first's 0.414
+    along the first line, less one step's relaxing.
+  */
+  {
+    const { f } = pair(3, 3, 2.9, 0);
+    f.step(dt, () => [0, 0], 0, 0);
+    const b = f.beads[0], s1 = Math.hypot(b.sx, b.sy), R1 = b.r;
+    f.beads.push({ x: b.x, y: b.y + 3.5, r: 2.2, age: 5, seed: 0.7 });
+    f.step(dt, () => [0, 0], 0, 0);
+    const kept = s1 * Math.exp(-dt / mergeRelax(R1, N));
+    const st = Math.hypot(b.sx ?? 0, b.sy ?? 0), off = Math.acos(Math.min(1, Math.abs((b.sx ?? 0) / (st || 1)))) * 180 / Math.PI;
+    check('and a second merge keeps the longer of the two stretches',
+      f.beads.length === 1 && Math.abs(st - kept) < 1e-6 && off < 0.5,
+      `${f.beads.length} drop, ${st.toFixed(4)} (the first merge's, relaxed a step: ${kept.toFixed(4)}) at ${off.toFixed(2)}° off its line`);
+  }
+
+  /*
+    How long each takes to lose all but 1/e of its stretch, stepped at 600
+    a second so a drop that rounds in a few frames is timed to a hundredth
+    of its time. A drop twice the size takes eight times as long, within a
+    tenth; and the big one, 4.2 cells (two 3-cell drops), is still drawn
+    out for a visible time (over a quarter of a second), where the small
+    one, 2.1 cells, is round again within six frames of 60.
+  */
+  /*
+    Stepped on until the stretch is let go, so a drop snapped round early
+    (the last stretch before it is gone must be under a hundredth, a tenth
+    of a pixel on a five-cell drop) fails as well as a slow one; and the
+    big one timed again at the app's own 60 a second, which must agree to a
+    frame, so a relaxing that ignored the step's length fails.
+  */
+  const settle = (r, d, step = dt) => {
+    const { f } = pair(r, r, d, 0);
+    f.step(step, () => [0, 0], 0, 0);
+    const b = f.beads[0], s0 = Math.hypot(b.sx ?? 0, b.sy ?? 0);
+    if (!(s0 > 0)) return { t: NaN, R: b.r, last: NaN };
+    let t = Infinity, last = s0;
+    for (let i = 1; i < 60000; i++) {
+      f.step(step, () => [0, 0], 0, 0);
+      if (b.sx === undefined) return { t, R: b.r, last };
+      last = Math.hypot(b.sx, b.sy ?? 0);
+      if (t === Infinity && last < s0 / Math.E) t = i * step;
+    }
+    return { t, R: b.r, last };
+  };
+  const big = settle(3, 2.9), small = settle(1.5, 1.4), big60 = settle(3, 2.9, 1 / 60);
+  const ratio = big.t / small.t, cube = (big.R / small.R) ** 3;
+  check('and it comes round in a time that goes as the cube of its size',
+    Math.abs(ratio / cube - 1) < 0.1 && big.t > 0.25 && small.t < 0.1 && big.last < 0.01 && small.last < 0.01 && Math.abs(big60.t - big.t) <= 1 / 60,
+    `${big.R.toFixed(2)} cells in ${big.t.toFixed(3)} s (${big60.t.toFixed(3)} at 60 a second), ${small.R.toFixed(2)} cells in ${small.t.toFixed(3)} s: ×${ratio.toFixed(2)}, the cube says ×${cube.toFixed(2)}; let go at ${big.last.toFixed(4)} and ${small.last.toFixed(4)}`);
+
+  /*
+    Not for a small drop that went in whole (there was no waist to fill),
+    and never for the rings: at drops 0 a merge is the rings' merge.
+  */
+  const swallow = pair(4, 1.8, 2, 0);
+  swallow.f.step(dt, () => [0, 0], 0, 0);
+  const rings = pair(3, 3, 2.9, 0, 0);
+  rings.f.step(dt, () => [0, 0], 0, 0);
+  const rc = crowd(0);
+  const ringStretched = rc.beads.filter((b) => b.sx !== undefined).length;
+  check('a drop that went in whole leaves none, and the rings never stretch',
+    swallow.f.beads.length === 1 && swallow.f.beads[0].sx === undefined && rings.f.beads.length === 1 && rings.f.beads[0].sx === undefined && ringStretched === 0,
+    `swallowed: ${swallow.f.beads.length} drop, stretch ${swallow.f.beads[0]?.sx ?? 'none'}; the rings' merge: ${rings.f.beads[0]?.sx ?? 'none'}; ${ringStretched} of ${rc.beads.length} rings in a crowded run stretched`);
+
+  /*
+    And the mask draws it as an oval of its own area: a 5-cell drop at a
+    stretch of 0.3 on a slant is 1.3 times its radius long that way and
+    1/1.3 across, so its length over its width is 1.69, and it covers what
+    its round self does.
+  */
+  const st = 0.3, a = Math.PI / 5;
+  const px = new Uint8ClampedArray(S * 2 * S * 4);
+  rasterDrops([{ x: 96, y: 96, r: 5, age: 5, seed: 0.5, color: [1, 1, 1], sx: st * Math.cos(a), sy: st * Math.sin(a) }], N, S, px, new Float32Array(S * S), new Int32Array(S * S), 1);
+  let cover = 0, lo = Infinity, hi = -Infinity, lo2 = Infinity, hi2 = -Infinity;
+  const c0 = 96 * K;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const v = px[(y * S * 2 + x) * 4];
+    cover += v / 255;
+    if (v < 128) continue;
+    const vx = x + 0.5 - c0, vy = y + 0.5 - c0;
+    const al = vx * Math.cos(a) + vy * Math.sin(a), ac = vy * Math.cos(a) - vx * Math.sin(a);
+    lo = Math.min(lo, al); hi = Math.max(hi, al); lo2 = Math.min(lo2, ac); hi2 = Math.max(hi2, ac);
+  }
+  const round = Math.PI * (5 * K) ** 2, aspect = (hi - lo) / (hi2 - lo2);
+  check('the mask draws a stretched drop as an oval of its own area',
+    Math.abs(cover / round - 1) < 0.03 && Math.abs(aspect / (1 + st) ** 2 - 1) < 0.06,
+    `${cover.toFixed(0)} px covered against ${round.toFixed(0)} round; ${(hi - lo).toFixed(1)} px long by ${(hi2 - lo2).toFixed(1)} across, ×${aspect.toFixed(3)} (says ×${((1 + st) ** 2).toFixed(3)})`);
+
+  /*
+    And meets a neighbour its long end reaches along a wall, as round drops
+    do: a 5-cell drop stretched 0.414 along x, and a round 4-cell drop whose
+    circle starts a cell short of the oval's end. The circles do not touch,
+    so a wall found from them alone left the oval painting into its
+    neighbour (6 to 10 of its pixels). Asked both ways round, as the drop
+    drawn first or second.
+  */
+  const ovalAt = [96, 96], nb = [96 + 5 * Math.SQRT2 - 1 + 4, 96];
+  const taken = [];
+  for (const order of [0, 1]) {
+    const oval = { x: ovalAt[0], y: ovalAt[1], r: 5, age: 5, seed: 0.5, color: [1, 1, 1], sx: Math.SQRT2 - 1, sy: 0 };
+    const other = { x: nb[0], y: nb[1], r: 4, age: 5, seed: 0.3, color: [0, 1, 0] };
+    const list = order ? [other, oval] : [oval, other];
+    const ids = new Int32Array(S * S);
+    rasterDrops(list, N, S, new Uint8ClampedArray(S * 2 * S * 4), new Float32Array(S * S), ids, 1);
+    const ovalId = list.indexOf(oval) + 1;
+    let n = 0, all = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      if (Math.hypot(x + 0.5 - nb[0] * K, y + 0.5 - nb[1] * K) > 4 * K - 1) continue;
+      all++; if (ids[y * S + x] === ovalId) n++;
+    }
+    taken.push(`${n} of ${all}`);
+  }
+  check('and meets a neighbour its long end reaches along a wall, not over it',
+    taken.every((t) => t.startsWith('0 of')), `pixels of the neighbour's circle the oval took, drawn first and second: ${taken.join(', ')}`);
 }
 
 console.log(`     the mask for ${beads.length} drops took ${ms.toFixed(1)} ms to draw (the rings' canvas is not timed here)`);
