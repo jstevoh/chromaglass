@@ -160,6 +160,16 @@ jobs:
       - name: The report Worker
         run: npm run report-worker
 
+      # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
+      # control fits, reads, and is not painted over, at every width, and the
+      # mode switch stays put. The same measurements run again inside the show
+      # night on macOS; here they fail in two minutes rather than fifteen, and
+      # before the GPU shards have a chance to hide them behind another step.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: The layout
+        run: npm run layout
+
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).

@@ -523,11 +523,17 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 | `npm run music` | The ear: level traces through the real calibration into the boundary detector, and synthetic songs through the real matcher |
 | `npm run wall` | The projector: which pixels the flip, the corner pin and the masks leave black, and how many times a second the whole screen is allowed to change |
 | `npm run qa` | The app itself — it builds, serves, and walks a browser through a show night, watching the console |
+| `npm run layout` | The show night's layout checks on their own, with no GPU: every control fits, reads and is not painted over at six widths, and the mode switch stays put. About twenty seconds after the build |
 | | Both browser harnesses render the plate at a fraction of the window (`?dpr=`), because with no GPU the browser spends three of four cores shading fragments and every step queues behind it. Everything they assert is resolution-independent. `QA_DPR=1` / `WALL_DPR=1` run them at full size |
 | `npm run shots` | Pictures of the plate, for the README. Run it on a machine with a real GPU: it says which engine drew them |
 
 `qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes
 `PW_CHROMIUM` for anywhere else. `npm run qa -- --head` watches it happen.
+
+**Before a push, `npm run check`.** It runs everything above that needs no GPU
+(the ubuntu job's list, read from `checks.yml`), the shader compile and the layout,
+in about a minute, and reports every failure rather than the first. What reads the
+plate is left to the macOS job, and it says so.
 
 ## Tech Stack
 
