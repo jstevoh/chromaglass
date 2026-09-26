@@ -187,11 +187,12 @@ export function Swatch({ hex, selected, onClick, midiKey, className = '', gap = 
 
 // ── Status dot ───────────────────────────────────────────────────────
 
-export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare = false, tight = false }: {
-  on: boolean; label: string; tone?: 'ok' | 'live'; testId?: string;
-  /** The dot alone at every width, its label only in the tooltip and to a screen reader. */
-  bare?: boolean;
-  /** The dot alone for now: the header has measured that the words do not fit (DeskHeader). */
+export function StatusDot({ on, label, short, tone = 'ok', testId, onClick, title, tight = false }: {
+  on: boolean; label: string;
+  /** What it says where there is little room (under the dot); the label when absent. */
+  short?: string;
+  tone?: 'ok' | 'live'; testId?: string;
+  /** Little room: the header has measured that the words beside the dots do not fit (DeskHeader). */
   tight?: boolean;
   /**
    * What clicking it opens. A dot that reports a thing you cannot reach is
@@ -201,31 +202,42 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare
   onClick?: () => void;
   title?: string;
 }) {
+  /*
+    Every dot says what it is, at every width.
+
+    The words used to go when the header ran out of room (and always below
+    1100px), leaving a row of unlabelled dots with the name only in a
+    tooltip: reported, with a screenshot, "these dots need to be labeled. I
+    don't know what goes to what." Where there is little room now the word
+    moves under its dot, small, rather than away: a stacked label costs its
+    own width and not the dot's and the gap's beside it, and the short form
+    ("MIDI" for a controller's full name) is what it says there.
+  */
+  const colour = on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim';
+  const small = short ?? label;
   const body = (
     <>
       <span
-        className="h-1.5 w-1.5 rounded-full"
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ background: on ? (tone === 'live' ? 'var(--color-live)' : 'var(--color-ok)') : 'var(--color-knob-off)' }}
       />
-      {/*
-        The label is what gives way when the header runs out of room.
-
-        These sit in the right-hand cluster of a header whose middle is a
-        switch pinned to the centre of the *window*, so the cluster's width is
-        the only thing deciding whether the two collide — and four labels
-        ("Mic", "Wall", "APC40 mkII", "Phone") are most of that width. Below
-        1400 they go and the dots remain: still coloured, still clickable,
-        still carrying the tooltip that says what they are and what clicking
-        does. A dot with no word beside it is worth more than a word painted
-        underneath a control.
-      */}
-      <span className={`${bare || tight ? 'sr-only' : 'hidden min-[1100px]:inline'} text-[12px] ${on ? (tone === 'live' ? 'text-live' : 'text-text-2') : 'text-dim'}`}>{label}</span>
+      {tight ? (
+        <span className={`text-[10px] leading-none ${colour}`}>{small}</span>
+      ) : (
+        <>
+          <span className={`text-[10px] leading-none min-[1100px]:hidden ${colour}`}>{small}</span>
+          <span className={`hidden text-[12px] min-[1100px]:inline ${colour}`}>{label}</span>
+        </>
+      )}
     </>
   );
+  const shape = tight
+    ? 'inline-flex flex-col items-center gap-1'
+    : 'inline-flex flex-col items-center gap-1 min-[1100px]:flex-row min-[1100px]:gap-1.5';
   const tip = title ?? `${label}: ${on ? 'yes' : 'no'}`;
   if (!onClick) {
     return (
-      <span className="inline-flex items-center gap-1.5" data-testid={testId} title={tip}>{body}</span>
+      <span className={shape} data-testid={testId} title={tip}>{body}</span>
     );
   }
   return (
@@ -234,7 +246,7 @@ export function StatusDot({ on, label, tone = 'ok', testId, onClick, title, bare
       onClick={onClick}
       data-testid={testId}
       title={tip}
-      className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 transition-colors hover:bg-hover${bare ? ' min-h-6 min-w-6 justify-center' : ''}`}
+      className={`${shape} rounded-md py-1 transition-colors hover:bg-hover ${tight ? 'px-0.5 -mx-0.5' : 'px-1.5 -mx-1.5'}`}
     >
       {body}
     </button>

@@ -2178,6 +2178,18 @@ try {
     for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860], [430, 932], [390, 844]]) {
       const hit = await coveredAt(w, h);
       check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
+      // And every status dot on the desk says what it is. The words used to
+      // go when the header was short of room, leaving a row of bare dots:
+      // reported as "these dots need to be labeled. I don't know what goes
+      // to what." They move under their dots instead now.
+      if (w >= 1024) {
+        const bare = await page.evaluate(() => [...document.querySelectorAll('header [data-testid^="dot-"]')]
+          .filter((el) => el.getBoundingClientRect().width > 0 && !(el.innerText || '').trim())
+          .map((el) => el.dataset.testid));
+        const all = await page.locator('header [data-testid^="dot-"]').count();
+        check(`every status dot is labelled at ${w}px`, all > 0 && bare.length === 0,
+          bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word`);
+      }
     }
     await page.setViewportSize({ width: 1600, height: 900 });
     await settle(900);
