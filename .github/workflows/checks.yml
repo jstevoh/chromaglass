@@ -271,6 +271,11 @@ jobs:
       - name: The ferrofluid pushes the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrodye
+      # No grating over the dye: the grid's one-cell checkerboard goes in a
+      # second, in every look, and edges, blobs and fine diagonals stay.
+      - name: No grating over the dye
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run grating
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

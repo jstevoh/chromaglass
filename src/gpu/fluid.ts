@@ -153,6 +153,18 @@ const CURRENT_ITERS = 10;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
 const DYE_ITERS = 4;
+/*
+  How much of the grid's checkerboard the dye loses a step, the diffusion's
+  share included (dampGrid). A twentieth: the grating the closeup showed is
+  gone in a second (4% of it left at sixty steps), and on a pressed plate
+  what the presses grow is held to a fifth of what it reaches without.
+  The price is the finest diagonal the liquid draws for itself: ripple four
+  cells across at 45° keeps 81% over the same second, six cells 98%, and
+  anything along the grid all of it. Stronger clears faster and softens
+  those more; this clears what a look already has before an audience
+  notices it going.
+*/
+const GRID_DAMP = 0.05;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
 /*
@@ -409,6 +421,8 @@ export class WebGPUFluid {
       ['deltaVel', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
+      // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
       ['divergence', [R32], true],
@@ -1151,6 +1165,22 @@ export class WebGPUFluid {
     const a = p.dt * p.diff * n2;
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
+    /*
+      The grid's checkerboard out of the dye (dampGrid, and why), topped up to
+      GRID_DAMP a step in every look. Jacobi above already removes 8a/(1+8a)
+      of it a step: all of it that matters in the looks with strong
+      diffusion, none in the eleven with none (Red Cabbage, Classic,
+      Fillmore, Oil & Water, Agate, the ferrofluids…), and a few percent in
+      the slow ones with a little (Galaxy at 512², 3%). So this takes only
+      what the diffusion leaves short, and is not run at all where it leaves
+      nothing: the looks the diffusion already clears are as they were.
+    */
+    const gridDiff = (8 * a) / (1 + 8 * a);
+    const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
+    stage('dye grid', (pass) => {
+      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], this.arg('dye grid', [gridTop, 0, 0, 0]));
+      this.dye.swap();
+    }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
