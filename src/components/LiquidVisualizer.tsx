@@ -4006,9 +4006,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /**
    * The magnet, when a hand has it: where on the plate (0–1) and when it was
    * last there. The Magnet tool, the phone pad and a replay all set it; the
-   * solver steps read it, and let go of it a moment after the hand does.
+   * solver steps read it, and keep the magnet there after the hand lets go.
    */
   const magnetHandRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  /** Where the lead plate's look put its magnet last frame, to see it moved (see magnetFor). */
+  const magnetLookRef = useRef<{ x: number; y: number } | null>(null);
   /** The magnet's own slow walk when nobody is holding it: where along its path. */
   const magnetWalkRef = useRef(0);
   const magnetWalkAtRef = useRef(0);
@@ -4723,25 +4725,54 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         Where the magnet is this frame.
 
         A hand on it wins: the Magnet tool (or the phone pad, or a replay)
-        puts it where the pointer is, at no less than a firm pull, and it
-        stays there a quarter of a second after the last touch. With nobody
-        holding it and the automation on, a look with ferrofluid on it gets a
-        magnet that walks: a slow figure around where the look put it, faster
-        when the music is. A magnet that sits still under a still plate is a
-        photograph of ferrofluid, not ferrofluid. Every other look is handed
-        its settings untouched.
+        puts it where the pointer is, at no less than a firm pull, for as long
+        as the hand keeps touching it (a quarter of a second of grace).
+
+        And where the hand lets go of it, it stays. It used to go back to the
+        look's own place a quarter of a second after the last touch, which on
+        almost every look is the middle of the plate (magnetX and magnetY are
+        0.5 unless a look says otherwise, and none does), so the ferrofluid
+        the hand had just dragged to a corner flowed back to the centre on its
+        own. Reported by the owner: "I don't like how the magnet draws the
+        ferrofluid back to the center automatically. I want to just control
+        it with the mouse." A magnet set down under a dish stays where it was
+        put, so this one does too: at the look's own strength and height once
+        released (the firm, low pull is the hand pressing it up to the glass),
+        and not walking, since a walk is the magnet moving on its own.
+
+        What takes it back from the hand is the look placing its magnet
+        somewhere: Magnet Across or Up moved (the slider, a MIDI fader, a
+        patch), seen as the lead plate's magnetX or magnetY changing from one
+        frame to the next. Evolve no longer drifts those two (lib/drift.ts),
+        so the automation cannot do it behind the performer's back. A new look
+        that keeps the magnet where the last one had it leaves the hand's
+        placement alone.
+
+        With no hand ever on it and the automation on, a look with ferrofluid
+        on it gets a magnet that walks: a slow figure around where the look
+        put it, faster when the music is. A magnet that sits still under a
+        still plate is a photograph of ferrofluid, not ferrofluid. Every other
+        look is handed its settings untouched.
       */
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
         const now = performance.now();
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
+        const lookX = look.magnetX ?? 0.5, lookY = look.magnetY ?? 0.5;
+        const seen = magnetLookRef.current;
+        magnetLookRef.current = { x: lookX, y: lookY };
+        if (!held && hand && seen && (Math.abs(lookX - seen.x) > 1e-4 || Math.abs(lookY - seen.y) > 1e-4)) {
+          magnetHandRef.current = null;
+        }
+        // Let go of, and left where the hand put it.
+        const placed = !held && magnetHandRef.current !== null;
         const strength = look.magnetStrength ?? 0;
         // The walk is a look setting, so a look (or a test) that places its
         // magnet keeps it there. Random Evolve walks it on any ferrofluid
         // look: at once, gently, and from then on its drift wanders the
         // setting itself (lib/drift.ts), which is what the slider shows.
         const walk = Math.max(look.magnetWalk ?? 0, isAutomatedRef.current ? 0.35 : 0);
-        const walks = !held && walk > 0 && isActiveRef.current
+        const walks = !held && !placed && walk > 0 && isActiveRef.current
           && strength > 0 && (look.phaseAmount ?? 0) > 0.002;
         /*
           The maze field plays the music: its strength breathes with how
@@ -4761,10 +4792,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
         }
-        if (!held && !walks) {
+        if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
           // as still held once the hand has gone stale.
-          lastMagnetRef.current = { x: look.magnetX ?? 0.5, y: look.magnetY ?? 0.5, strength, height: look.magnetHeight ?? 0.25, held: false, field };
+          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
@@ -4773,6 +4804,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // strong, so it grabs what is near it and drags it along, where a
           // look's own magnet is held further off and gathers broadly.
           mx = hand.x; my = hand.y; ms = Math.max(strength, 0.9) * toolAmountRef.current; mh = Math.min(mh, 0.15);
+        } else if (placed) {
+          mx = hand?.x ?? lookX; my = hand?.y ?? lookY;
         } else {
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
           const last = magnetWalkAtRef.current || now;
