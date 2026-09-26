@@ -381,7 +381,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -390,11 +390,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
   let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
   let s = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, 0.0, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, s.b, 0.0));
 }`,
 
   gapRest: `${HEAD}
-@group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(2) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -661,7 +661,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
@@ -672,18 +672,34 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
   var dhdt = s.g * S.gapMemory;
+  /*
+    How firmly a hand holds the glass here, 1 while it presses and falling
+    to nothing over a sixth of a second once it lets go.
+
+    Without it a held press read as the glass opening. The spring lifted
+    the gap off its floor every step and the press pushed it back down,
+    the floor clamped the press's half of that, and the film was left with
+    a steady positive dh/dt under a palm that was not moving: a sink, and
+    the liquid ran *in* under the hand (measured in the lab: the flow at
+    0.1 either side of a held press pointed at it, at 1.06, with dh/dt
+    +0.127). The dye went with it, piled up under the palm to the density
+    cap and was thrown away. A hand on the glass holds it where it is; the
+    spring takes over when the hand comes off.
+  */
+  var hold = max(0.0, s.b - S.dt / 0.15);
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
       let g2 = max(0.004, gap + dg);
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
+      if (dg < 0.0) { hold = 1.0; }
     }
   }
-  // The spring back toward the dome, and its motion counts.
-  let g3 = gap + (rest - gap) * S.gapSpring;
+  // The spring back toward the dome, and its motion counts; not while held.
+  let g3 = gap + (rest - gap) * S.gapSpring * (1.0 - hold);
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, 0.0, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, hold, 0.0));
 }`,
 
   /*

@@ -164,7 +164,6 @@ const GRAIN_PERIOD = 6;
 
 const VEL = 'rgba16float';
 const R32 = 'r32float';
-const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
@@ -340,7 +339,8 @@ export class WebGPUFluid {
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.vel = pp(this.N, VEL, 'vel');
-    this.squeeze = pp(this.N, RG32, 'squeeze');
+    // Four channels: the gap, its rate, and how firmly a hand holds it (squeezeUpdate).
+    this.squeeze = pp(this.N, 'rgba32float', 'squeeze');
     /*
       The second phase (H7): one number a cell, how much of the dark liquid is
       there.
@@ -1474,13 +1474,13 @@ export class WebGPUFluid {
   /**
    * The squeeze film, read back whole: the gap and its rate. For checks.
    *
-   * RG32, so eight bytes a texel and two floats a cell — r is the gap between
+   * RGBA32, so sixteen bytes a texel and four floats a cell — r is the gap between
    * the glasses, g is how fast it is changing, which is the thing that moves
    * any liquid at all.
    */
   async readSqueeze(): Promise<{ n: number; gap: Float32Array; rate: Float32Array } | null> {
     const n = this.N;
-    const row = Math.ceil((n * 8) / 256) * 256;
+    const row = Math.ceil((n * 16) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
     enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
@@ -1491,8 +1491,8 @@ export class WebGPUFluid {
     const stride = row / 4;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
-        gap[y * n + x] = all[y * stride + x * 2];
-        rate[y * n + x] = all[y * stride + x * 2 + 1];
+        gap[y * n + x] = all[y * stride + x * 4];
+        rate[y * n + x] = all[y * stride + x * 4 + 1];
       }
     }
     buf.unmap();
