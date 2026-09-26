@@ -2016,12 +2016,38 @@ try {
       await clickOn(`fade-segmented-${fade}`);
       await clickOn('go-button');
     };
+    // The frame's mean brightness, 0-255: what a flash is a jump in.
+    const luma = () => page.evaluate(() => {
+      const d = window.__cgFrame(32, 18); let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+      return s / (d.length / 4);
+    });
+    const jumps = async (ms) => {
+      const seen = [await luma()];
+      for (let t = 0; t < ms; t += 200) { await settle(200); seen.push(await luma()); }
+      let worst = 0;
+      for (let i = 1; i < seen.length; i++) worst = Math.max(worst, Math.abs(seen[i] - seen[i - 1]));
+      return { worst, seen };
+    };
     await goTo('solar-flare', 0);
-    await settle(8000);
+    await settle(6000);
+    const calm = await jumps(2000);
     const from = await colour();
     await goTo('deep-ocean', 4);
-    await settle(8000);
+    const fade = await jumps(4400);
+    await settle(3600);
     const faded = await colour();
+    /*
+      And through it, no flash. Reported: going from one item to the next
+      "flashes a couple of times, then starts the next item ... it's not a
+      smooth fade". The handover laid the new look in eight separate doses,
+      and the seeding is random, so each dose was a new picture. The biggest
+      jump in brightness from one fifth of a second to the next during the
+      fade, against the same look's own on a plate left alone.
+    */
+    check('and it fades rather than flashing', fade.worst < 3 * calm.worst + 4,
+      `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
+      + `(fade ${fade.seen.map((v) => v.toFixed(0)).join(' ')})`);
     await goTo('deep-ocean', 0);
     await settle(8000);
     const own = await colour();
