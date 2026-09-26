@@ -125,9 +125,40 @@ try {
     }
     return { ok: false, waited: limit / 1000, steps: seen, rebuilt, N: solver?.N ?? null, before };
   }, { curve, limit: 30000 });
+  /*
+    And a timeline of the wait, every quarter second: animation frames the
+    page got, frames the show's loop got through (the black box's heartbeat),
+    and steps the lead plate took. On the Mac the plate was seen to take no
+    step at all for the six seconds after a setting changed, on the same
+    solver; these three say where it stopped. No animation frames is the
+    main thread held; frames but no heartbeat is the loop returning early;
+    a heartbeat but no steps is the loop running and not stepping.
+  */
   const mark = () => page.evaluate(() => {
-    const f = window.chromaglassDebug().fluids?.[0];
-    window.__depthMark = { step: f?.stepIndex ?? 0, gpu: f?.gpu ?? null };
+    const d = window.chromaglassDebug();
+    const f = d.fluids?.[0];
+    const t0 = performance.now();
+    window.__depthMark = { step: f?.stepIndex ?? 0, gpu: f?.gpu ?? null, t0 };
+    let raf = 0;
+    const tick = () => { raf++; if (window.__depthMark?.t0 === t0) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    const line = [];
+    window.__depthLine = line;
+    const sample = () => {
+      if (window.__depthMark?.t0 !== t0) return;
+      const dd = window.chromaglassDebug();
+      line.push([((performance.now() - t0) / 1000).toFixed(2), raf, dd.crash?.beats?.() ?? -1, dd.fluids?.[0]?.stepIndex ?? -1]);
+      if (line.length < 60) setTimeout(sample, 250);
+    };
+    sample();
+  });
+  const timeline = () => page.evaluate(() => {
+    const m = window.__depthMark ?? {};
+    const since = Date.now() - (performance.now() - (m.t0 ?? 0));
+    const log = (window.chromaglassDebug().crash?.thisLoad?.() ?? [])
+      .filter((e) => e.t >= since - 2000)
+      .map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`);
+    return { line: window.__depthLine ?? [], log };
   });
   // Said every time, stepped or not: the first run on a slow runner is the
   // one that shows whether it was a stall or a rebuild.
@@ -147,8 +178,16 @@ try {
     does that on a slow machine, and the new solver lays the dome on its
     first step.
   */
-  check('the plate keeps stepping while its shape changes',
-    shaped.before.steps > 0 || !shaped.before.sameSolver, said(shaped));
+  const kept = shaped.before.steps > 0 || !shaped.before.sameSolver;
+  check('the plate keeps stepping while its shape changes', kept, said(shaped));
+  // DEPTH_TIMELINE=1 prints it on a run that kept stepping too.
+  if (!kept || process.env.DEPTH_TIMELINE) {
+    const { line, log } = await timeline();
+    console.log('     seconds after the change · animation frames · loop heartbeats · lead plate steps');
+    for (const [t, raf, beats, steps] of line.filter((_, i) => i % 2 === 0)) console.log(`       ${t}s  ${raf}  ${beats}  ${steps}`);
+    console.log(`     the black box around it: ${log.length ? '' : 'nothing'}`);
+    for (const l of log.slice(-12)) console.log(`       ${l}`);
+  }
   check('the lead plate is stepped with the shape it was given', shaped.ok, said(shaped));
 
   // 1. The gap takes the dome's shape.
