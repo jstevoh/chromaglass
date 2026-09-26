@@ -10,6 +10,7 @@
  * with a typo in it reads as "this preset has no liquid", silently, forever.
  */
 import { DEFAULT_LIQUID_TYPES } from './types';
+import type { PhasePourShape } from './lib/phasePour';
 
 // ─── Palette contracts ───────────────────────────────────────────────
 // A projected clock face carries two or three dyes, and the richness of a
@@ -215,6 +216,20 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'home-movie':         ['water', 'water', 'soap'],
   // Syrup finds the low point of a curved glass, which is the middle.
   'clock-glass':        ['water', 'syrup'],
+};
+
+/**
+ * How each look pours its ferrofluid when it is laid (src/lib/phasePour.ts).
+ *
+ * Keyed by preset, as the dye's seed is (seedPreset), because it is the plate
+ * as the look lays it and not a control: it acts once, when the look is laid
+ * or the Ferrofluid slider pours onto a bare plate, and nothing is gained by
+ * moving it mid-show. A look not listed pours the ring every look has always
+ * poured. `npm run plate` checks every entry is a look that pours any.
+ */
+export const PRESET_PHASE_POUR: Record<string, PhasePourShape> = {
+  // Colored I and II: ferrofluid worked through the colour edge to edge.
+  'ferro-paint':        'scatter',
 };
 
 /** Liquid id to its definition, for the dose the automation pours. */

@@ -7,6 +7,9 @@ import { fillPlateUniforms } from '../src/gpu/plateUniforms';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
+import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
+import { PRESETS } from '../src/presets';
+import { PRESET_PHASE_POUR } from '../src/presetPlate';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -74,6 +77,18 @@ const api = {
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */
+  look(id: string) {
+    const p = PRESETS.find(q => q.id === id);
+    if (!p) throw new Error(`no look ${id}`);
+    return { settings: p.settings, pour: PRESET_PHASE_POUR[id] ?? 'ring' };
+  },
+  /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */
+  pour(shape: PhasePourShape, scale: number, amount: number) {
+    const drops = phasePour(shape, scale, amount);
+    for (const d of drops) lab!.solver.addPhase(d.x, d.y, d.r, d.amount);
+    return drops.length;
+  },
   /** Ferro Pushes Dye's exchanges at full, as the engine runs them. */
   displace: { push: DISPLACE_PUSH, inside: DISPLACE_INSIDE },
   /**

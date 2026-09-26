@@ -23,7 +23,7 @@
  */
 
 import { PRESETS } from '../src/presets.ts';
-import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS } from '../src/presetPlate.ts';
+import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR } from '../src/presetPlate.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
 import { BeadField } from '../src/lib/beads.ts';
@@ -53,6 +53,17 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     }
   }
   check('every key is a preset that exists', stray.length === 0, stray.join(', '));
+}
+
+// ── 1b. A ferrofluid pour is only named for a look that pours any ─────
+{
+  // PRESET_PHASE_POUR is read only when a look lays its phase (layPhase in
+  // LiquidVisualizer), which a look with no Ferrofluid never does: an entry
+  // for one, or a typo in an id, would sit there doing nothing, silently.
+  const stray = Object.entries(PRESET_PHASE_POUR)
+    .filter(([id, shape]) => !(PRESETS.find(p => p.id === id)?.settings.phaseAmount > 0.002) || !['ring', 'scatter'].includes(shape))
+    .map(([id, shape]) => `${id}:${shape}`);
+  check('every ferrofluid pour is for a look that pours ferrofluid, in a shape that exists', stray.length === 0, stray.join(', '));
 }
 
 // ── 2. Every preset is fully described ───────────────────────────────
