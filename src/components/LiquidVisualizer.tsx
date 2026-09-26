@@ -41,6 +41,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
+import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
@@ -447,6 +448,8 @@ const SIM_MAX_CATCHUP = (() => {
     palette  which three of a look's dyes are the working set (`harmonyWithin`;
              `harmonyColor` and `pickHarmony` draw from the same stream).
     chem     where a reaction is seeded: the BZ waves and Boyle's chemistry.
+    pour     where a paced scene's flood lands (`pour` on the handle), so a
+             sequence's pours cannot move the automation's own draws.
 
   All of them are `plate.` streams, so laying a look restarts them from
   (seed, name, look) — see "Restarting, rather than continuing" in rng.ts.
@@ -460,6 +463,7 @@ const DICE = {
   liquids: stream('plate.liquids'),
   palette: stream('plate.palette'),
   chem: stream('plate.chemistry'),
+  pour: stream('plate.pour'),
 };
 
 // Density histogram used to expose the macro closeup (see "Macro film exposure").
@@ -561,6 +565,10 @@ export interface LiquidVisualizerHandle {
   kicks: () => number;
   /** Move the look's working dyes on by one, the way the hue journey would. */
   stepDyes: () => void;
+  /** Where a paced scene is (`lib/scenePacing.ts`); the plate follows it at its own rate. 1 and 1 is no pacing. */
+  pace: (sample: PaceSample) => void;
+  /** A flood across a good share of the lead plate, `gust` (0..1, default 0.8) its size and force. */
+  pour: (gust?: number) => void;
   /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids. */
   applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
@@ -843,6 +851,7 @@ class FluidSimulation {
     this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0;
     this.phrase = { drive: 1, gust: 0, drift: 0.5 };
     this.tempoMul = 1;
+    this.paceMul = 1;
     this.stepIndex = 0;
     this.meanDensity = 0;
     this.meanColor = [0, 0, 0];
@@ -951,6 +960,8 @@ class FluidSimulation {
   dtSeconds = 1 / 60;
   /** How much faster or slower the music wants this plate than its look (see `lib/tempoPace.ts`); set by the frame. */
   tempoMul = 1;
+  /** A paced scene's activity (`lib/scenePacing.ts`): under 1 a rest, over it a swell; set by the frame. */
+  paceMul = 1;
   /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
   private shp: Float32Array;
   /** The thickness as the sharpening pass found it: every channel gates on this. */
@@ -2690,6 +2701,15 @@ class FluidSimulation {
     dynamicSpeed *= this.clockLean;
     // And the music's own pace (lib/tempoPace.ts), already slewed by the frame.
     dynamicSpeed *= Number.isFinite(this.tempoMul) ? this.tempoMul : 1;
+    /*
+      And the scene's (lib/scenePacing.ts), after the lean rather than through
+      it. The phrase's drive can jump with a gust, so the lean slews it on 2.5
+      seconds; a scene's swell is already a smooth curve, arriving over 1.5 to
+      3 seconds, and put through that slew as well it measured as barely a
+      swell at all (`npm run pacing`: the clock reached about half of each
+      one). The frame smooths it on a third of a second, which is enough.
+    */
+    dynamicSpeed *= Number.isFinite(this.paceMul) ? this.paceMul : 1;
 
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
@@ -3695,7 +3715,7 @@ interface FrameView {
   bubbles: { count: number; strength: number; amount: number };
   /** Their geometry, packed for the shader. */
   bubblePack: { packed: Float32Array; shape: Float32Array };
-  /** The flash guard's gain, from the luminance the last frame read back. */
+  /** The flash guard's gain, from the luminance the last frame read back, times a paced scene's light (lib/scenePacing.ts). */
   dimmerGain: number;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
@@ -4120,6 +4140,56 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const phraseRef = useRef<Phrase>({ drive: 1, gust: 0, drift: 0.5 });
   /** When the last flood pour landed, so gusts cannot stack into a wash. */
   const lastFloodRef = useRef(-1e9);
+  /**
+   * A flood: a wide, soft pour across a good share of the lead plate in one of
+   * the working dyes, pushing the plate out of the way as it lands. `gust`
+   * (0..1) is its size and force.
+   *
+   * Written once for two callers. It was the peak of an evolve gust (off now,
+   * `EVOLVE_FLOODS`), and it is the moment a paced scene opens most swells
+   * with (`lib/scenePacing.ts`), which is where a pour this big belongs: once
+   * or twice a scene, with the light coming up on it, rather than whenever a
+   * gust peaked.
+   */
+  const floodPour = (gust: number, energy: number, bubbles: number, dice: Rng, colourDice?: Rng) => {
+    const af = fluidsRef.current[0];
+    if (!af) return;
+    // Evolve's flood leaves the colour to the palette's stream, as it always
+    // did; a paced pour hands its own, so it cannot move the draws the
+    // automation's palette picks read.
+    const color = harmonyColor(harmonyRef.current, colourDice);
+    const cx = GRID_SIZE * (0.25 + dice.float() * 0.5);
+    const cy = GRID_SIZE * (0.25 + dice.float() * 0.5);
+    // A third of the plate across, falling off to nothing, so it
+    // is a pour arriving rather than a rectangle being filled.
+    const R = GRID_SIZE * (0.18 + 0.16 * gust);
+    const strength = (28 + energy * 40) * (0.5 + gust);
+    for (let j = Math.max(1, Math.floor(cy - R)); j < Math.min(GRID_SIZE - 1, cy + R); j++) {
+      for (let i = Math.max(1, Math.floor(cx - R)); i < Math.min(GRID_SIZE - 1, cx + R); i++) {
+        const d = Math.hypot(i - cx, j - cy) / R;
+        if (d >= 1) continue;
+        const fall = (1 - d) * (1 - d);
+        af.addDensity(i, j, strength * fall * 0.06, color.r, color.g, color.b);
+      }
+    }
+    // And it lands: a pour pushes the plate out of the way.
+    af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
+    if (bubbles > 0) {
+      bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
+    }
+  };
+  /** The frame's Bubbles, patches and modulators folded in, for a pour that lands between frames. */
+  const frameBubblesRef = useRef(0);
+  /*
+    The scene a running sequence is playing (`lib/scenePacing.ts`): where the
+    sequencer says it should be, and where the plate has got to on its way
+    there, stepped a frame at a time by `approachPace`. The activity scales the
+    plate's clock (after the phrase's 2.5 s lean, not through it: see
+    `paceMul`) and how often the automation acts; the dim scales the light, on
+    top of the dimmer and the flash guard. Both 1 unless a sequence is pacing.
+  */
+  const paceTargetRef = useRef<PaceSample>({ ...PACE_NEUTRAL });
+  const paceNowRef = useRef<PaceSample>({ ...PACE_NEUTRAL });
   const lastThinRef = useRef(-1e9);
   /*
     What the automation has actually done, for `npm run evolving`.
@@ -4558,6 +4628,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fluid.injectImage(flipped);
     },
     kicks: () => kickCountRef.current,
+    pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
+    pour: (gust = 0.8) => {
+      const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
+      floodPour(Math.max(0, Math.min(1, gust)), energy, frameBubblesRef.current, DICE.pour, DICE.pour);
+    },
     stepDyes: () => {
       const w = paletteWindowRef.current;
       const n = presetContractRef.current?.length ?? 0;
@@ -5271,14 +5346,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The LFOs, on the bar rather than on the second: see `modulators.ts`.
         if (isActiveRef.current) modRef.current.step(realDt, clockIsFixed() ? 0 : tempoRef?.current?.bpm ?? 0);
 
+        // Followed while paused too, so a sequence stopped in the dark still
+        // brings the light back up on a paused plate.
+        paceNowRef.current = approachPace(paceNowRef.current, paceTargetRef.current, realDt);
+        frameBubblesRef.current = currentSettings.bubbles ?? 0;
         if (isActiveRef.current) {
-          phraseRef.current = phrasingRef.current.step(
+          const phrased = phrasingRef.current.step(
             realDt,
             currentSettings.surge ?? 0,
             currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
           );
+          phraseRef.current = phrased;
           for (const f of fluidsRef.current) if (f) {
             f.phrase = phraseRef.current; f.dtSeconds = simStepS;
+            f.paceMul = paceNowRef.current.activity;
             f.dropHeight = currentSettings.dropHeight ?? 0;
             f.dropFingering = currentSettings.fingering ?? 0;
           }
@@ -5940,35 +6021,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (EVOLVE_FLOODS && ph.gust > 0.45 && now - lastFloodRef.current > 4.5 && DICE.evolve.float() < 0.06) {
               lastFloodRef.current = now;
               autoEventsRef.current.poured++;
-              const af = fluidsRef.current[0];
-              if (af) {
-                const color = harmonyColor(harmonyRef.current);
-                const cx = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
-                const cy = GRID_SIZE * (0.25 + DICE.evolve.float() * 0.5);
-                // A third of the plate across, falling off to nothing, so it
-                // is a pour arriving rather than a rectangle being filled.
-                const R = GRID_SIZE * (0.18 + 0.16 * ph.gust);
-                const strength = (28 + energy * 40) * (0.5 + ph.gust);
-                for (let j = Math.max(1, Math.floor(cy - R)); j < Math.min(GRID_SIZE - 1, cy + R); j++) {
-                  for (let i = Math.max(1, Math.floor(cx - R)); i < Math.min(GRID_SIZE - 1, cx + R); i++) {
-                    const d = Math.hypot(i - cx, j - cy) / R;
-                    if (d >= 1) continue;
-                    const fall = (1 - d) * (1 - d);
-                    af.addDensity(i, j, strength * fall * 0.06, color.r, color.g, color.b);
-                  }
-                }
-                // And it lands: a pour pushes the plate out of the way.
-                af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
-                if ((currentSettings.bubbles ?? 0) > 0) {
-                  bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
-                }
-              }
+              floodPour(ph.gust, energy, currentSettings.bubbles ?? 0, DICE.evolve);
             }
 
             // About one small event every seven seconds at the default rate,
             // about one a second at full — against two or three a
             // second before, each of them large.
-            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive) {
+            // A paced scene's rests are rests for the automation's hands too.
+            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive * paceNowRef.current.activity) {
               const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
                 const rx = DICE.evolve.int(GRID_SIZE - 20) + 10;
@@ -7082,7 +7142,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,
           bubblePack: { packed: bubblesRef.current.packed, shape: bubblesRef.current.packedShape },
-          dimmerGain: flashGainRef.current,
+          dimmerGain: flashGainRef.current * paceNowRef.current.dim,
           filmLevel: filmLevelRef.current,
           filmGain: filmGainRef.current,
           mark: markRef.current,

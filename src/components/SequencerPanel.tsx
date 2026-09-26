@@ -297,6 +297,33 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                   <option value="off">Off</option>
                 </select>
               </Field>
+              {/*
+                How the stage ends when Pacing is up (lib/scenePacing.ts). One
+                choice rather than two switches, because a drain only happens
+                in the dark: the dye swirling away is a scene change the room
+                should not watch. A stage that does not advance on its own
+                clock never ends dark, whatever this says, since nothing knows
+                when its section will change.
+              */}
+              <Field label="Ending (with Pacing up)">
+                <select
+                  value={stage.pace?.endDark === undefined ? '' : !stage.pace.endDark ? 'lit' : stage.pace.moments?.includes('drain') ? 'drain' : 'dark'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const moments = stage.pace?.moments?.filter(m => m !== 'drain');
+                    const pace = v === '' ? { moments } : v === 'lit' ? { endDark: false, moments }
+                      : { endDark: true, moments: v === 'drain' ? [...(moments ?? ['pour', 'burst', 'dyes'] as const), 'drain' as const] : moments };
+                    updateStage(editIndex, { pace: pace.moments || pace.endDark !== undefined ? pace : undefined });
+                  }}
+                  className={inputCls}
+                  data-testid="seq-stage-ending"
+                >
+                  <option value="">As Pacing says</option>
+                  <option value="dark">Into the dark</option>
+                  <option value="drain">Into the dark, draining the dish</option>
+                  <option value="lit">Stay lit</option>
+                </select>
+              </Field>
               <div className="text-[13px] font-medium opacity-60 mb-2 mt-2">Overrides</div>
               {OVERRIDE_FIELDS.map(f => {
                 const v = stage.settings?.[f.key];

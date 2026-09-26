@@ -95,6 +95,15 @@ jobs:
       - name: Sound learn
         run: npm run learn
 
+      # Pacing (PLAN.md §10, step 1): a running sequence's stages played as
+      # scenes. At Pacing 0 every built-in sequence hands the plate exactly 1
+      # and 1 and fires nothing; "Light Show Night", measured with the
+      # footage's own yardstick, swells 1.5 to 3.5 a minute and is calm 20 to
+      # 40 % of the time; dark endings reach near-black without a step; and a
+      # locate neither piles moments up nor loses them.
+      - name: Pacing
+        run: npm run pacing
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments

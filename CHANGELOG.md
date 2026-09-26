@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the sequencer plays like a light show
+
+- **Pacing.** With a sequence running, each stage plays as a scene:
+  swells opened by a pour, a press or the next dyes, the plate resting
+  between them, and from halfway up a fade to near-black at the stage's
+  end, the next stage coming up out of the dark. At 0, the default,
+  nothing changes. On the sheet beside Surge, on MIDI, the desks and the
+  phone.
+- **An Ending for each stage**: as Pacing says, into the dark, into the
+  dark with the dish drained, or stay lit.
+- **Light Show Night**, a built-in sequence of 22–30 second scenes.
+- `npm run pacing` measures a paced set with the footage's own yardstick.
+
 ### Added — ferrofluid that looks like ferrofluid
 
 - **The ferrofluid has an edge.** It ends on a sharp line at any zoom
