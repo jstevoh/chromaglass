@@ -660,6 +660,48 @@ export class BeadField {
 /** Pixels inside a drop's circle but past one of its walls (see the holes in `rasterDrops`), and their list, kept between calls. */
 let holes = new Uint8Array(0);
 let holeList = new Int32Array(0);
+/*
+  The wall between two pressed drops, as the drop of radius R sees it, its
+  neighbour of radius Rj a distance D away along a unit direction e.
+
+  Not a straight line. A drop's pressure is its tension over its radius, so
+  a small drop pushes harder than a big one, and the film between them bows
+  into the big one: an arc of radius Rs Rb / (Rb - Rs), the difference of the
+  two pressures over the film's tension (the research in the project's
+  shared files, drops/research/bubbles-and-drops.md, item 6). It passes
+  through the two points where the circles cross, the same ends the straight
+  power line had, so the walls still meet the round edges where they did;
+  only the middle moves, by the arc's sagitta. In packed foams and emulsions
+  small cells are round-sided and bulge into big ones; straight walls read
+  as a Voronoi diagram. Between drops of a size (the arc flatter than fifty
+  times their reach) it is the straight line it was.
+
+  The wall's apex, where it crosses the line of centres, is held at least a
+  third of a radius (and a pixel) from either centre, as the straight wall
+  was, so a drop pressed hard into a bigger one keeps its middle; the arc
+  moves with it. Seen from the other drop the same arc comes out, so the two
+  still share every pixel of their overlap exactly.
+
+  Returns the apex's distance along e, and the arc: its radius (0 for a
+  straight wall) and which side of it is this drop's (+1 inside the arc's
+  circle, when this is the smaller drop; -1 outside).
+*/
+export function dropWall(R: number, Rj: number, D: number): { apex: number; rho: number; side: number } {
+  const lo = Math.max(1, 0.35 * R), hi = D - Math.max(1, 0.35 * Rj);
+  const t = (D * D + R * R - Rj * Rj) / (2 * D);
+  const small = Math.min(R, Rj), big = Math.max(R, Rj);
+  const rho = big - small > 1e-9 ? small * big / (big - small) : Infinity;
+  let apex = t, side = 0;
+  if (rho < 50 * (R + Rj)) {
+    const h2 = Math.max(0, R * R - t * t);
+    const sag = rho - Math.sqrt(Math.max(0, rho * rho - h2));
+    side = R < Rj ? 1 : -1;
+    apex = t + side * sag;
+  }
+  apex = lo <= hi ? Math.min(hi, Math.max(lo, apex)) : (lo + hi) / 2;
+  return { apex, rho: side === 0 ? 0 : rho, side };
+}
+
 export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out: Uint8ClampedArray, own: Float32Array, ids: Int32Array, amount = 1): void {
   const W = S * 2;
   // Opaque black everywhere: alpha stays 255 so the upload never divides a
@@ -677,8 +719,9 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
     const b = beads[i];
     cx[i] = b.x * k; cy[i] = b.y * k; cr[i] = Math.max(1, b.r * k);
   }
-  // The walls of the drop being drawn, grown when a drop has more than 32.
-  let cutE = new Float64Array(64), cutT = new Float64Array(32);
+  // The walls of the drop being drawn, grown when a drop has more than 32:
+  // each a direction, its apex along it, and its arc (dropWall).
+  let cutE = new Float64Array(64), cutT = new Float64Array(32), cutR = new Float64Array(32), cutS = new Float64Array(32);
   for (let i = 0; i < n; i++) {
     const b = beads[i];
     if (!Number.isFinite(cx[i]) || !Number.isFinite(cy[i]) || !Number.isFinite(cr[i])) continue;
@@ -701,14 +744,15 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
       const D2 = dx * dx + dy * dy, reach = R + Rj;
       if (D2 >= reach * reach || !(D2 > 1e-6)) continue;
       const D = Math.sqrt(D2);
-      const lo = Math.max(1, 0.35 * R), hi = D - Math.max(1, 0.35 * Rj);
-      const t = (D2 + R * R - Rj * Rj) / (2 * D);
+      const w = dropWall(R, Rj, D);
       if (nCut === cutT.length) {
         const e2 = new Float64Array(cutE.length * 2); e2.set(cutE); cutE = e2;
-        const t2 = new Float64Array(cutT.length * 2); t2.set(cutT); cutT = t2;
+        const grow = (a: Float64Array) => { const b2 = new Float64Array(a.length * 2); b2.set(a); return b2; };
+        cutT = grow(cutT); cutR = grow(cutR); cutS = grow(cutS);
       }
       cutE[2 * nCut] = dx / D; cutE[2 * nCut + 1] = dy / D;
-      cutT[nCut++] = lo <= hi ? Math.min(hi, Math.max(lo, t)) : (lo + hi) / 2;
+      cutR[nCut] = w.rho; cutS[nCut] = w.side;
+      cutT[nCut++] = w.apex;
     }
     const fade = Math.min(1, b.age / 0.6);
     const lw = Math.max(1, R * 0.12);
@@ -742,7 +786,16 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
         */
         let edge = R - d, second = 1e9, wall = 1e9;
         for (let q = 0; q < nCut; q++) {
-          const s = cutT[q] - (vx * cutE[2 * q] + vy * cutE[2 * q + 1]);
+          const ex = cutE[2 * q], ey = cutE[2 * q + 1];
+          let s: number;
+          if (cutS[q] === 0) s = cutT[q] - (vx * ex + vy * ey);
+          else {
+            // The arc's centre lies on the line of centres, its radius back
+            // from the apex toward the smaller drop.
+            const along = cutT[q] - cutS[q] * cutR[q];
+            const ax = vx - ex * along, ay = vy - ey * along;
+            s = cutS[q] * (cutR[q] - Math.sqrt(ax * ax + ay * ay));
+          }
           if (s < wall) wall = s;
           if (s < edge) { second = edge; edge = s; } else if (s < second) second = s;
         }

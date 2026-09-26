@@ -254,6 +254,13 @@ The lens changes from projector to camera over the middle fifth of the zoom's
 fade, near 1.45x, because the blend between them reads a whole drop from its
 centre at one point, which on the zoom's own fade sat at 1.2x.
 
+And item 6: the wall between two pressed drops is the arc their pressures give,
+radius Rs·Rb/(Rb − Rs) through the points where their circles cross, bowed into the
+bigger one, so a crowd of mixed sizes reads as packed drops rather than as a Voronoi
+diagram (`npm run drops`: a 3- and an 8-cell drop meet 5.5 px from the small one's
+centre, the arc says 5.2, the straight wall was at 2.7). The mask takes a square root
+more per wall: 15 ms for the crowd of 529 in the sandbox, against 11.
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`

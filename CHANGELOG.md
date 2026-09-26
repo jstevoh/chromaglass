@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closeup, as in the photographs of backlit oil, a small drop shows the plate
   round it upside down and a big one is flat on top. In both the white dot is
   gone. `npm run droplens` measures each on one drop.
+- **Walls between drops are curved.** A small drop pushes harder than a big
+  one, so the wall between them bows into the big one, an arc through the same
+  two points the straight wall joined (`npm run drops`: the wall lands within a
+  pixel of the arc the two pressures give, 2.4 px past the straight line).
 - **The gap sets how flat a drop is.** A drop smaller than half the gap
   between the glasses is a ball, a bigger one a pool with an edge half the gap
   wide, so a press flattens every drop and thins every dark edge at once.

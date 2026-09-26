@@ -92,10 +92,13 @@ try {
       the drop, all the way in. The closeup's own paint detail (cells, lacing,
       relief, depth of field, the edge warp) is turned off for the camera:
       it is laid over the whole frame, drop or none, and what is asked here
-      is where the lens puts a colour.
+      is where the lens puts a colour. Both hand the plate the solver's own
+      view field, the gap at rest in it, as the app does: without it the
+      plate falls back to a gap of its own, and a plate that read the real
+      gap wrong passed every check but the press.
     */
-    const PLATE = { cam: { macroAmount: 0 }, set: {} };
-    const CAMERA = { cam: { macroAmount: 1 }, set: { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 } };
+    const PLATE = { cam: { macroAmount: 0, view: true }, set: {} };
+    const CAMERA = { cam: { macroAmount: 1, view: true }, set: { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 } };
     /*
       A plate painted by a rule: rows of small discs packed closely enough
       that each region is one flat colour. A couple of steps put the dye in
@@ -288,7 +291,7 @@ try {
           if (k > 20) continue;
           bins[k] += lum(s.on, i) / Math.max(24, lum(s.off, i)); n[k]++;
         }
-        return bins.map((b, k) => (n[k] ? b / n[k] : 1));
+        return bins.map((b, k) => { if (!n[k]) throw new Error(`no pixel in the profile's bin ${k}`); return b / n[k]; });
       };
       /*
         Where the brightness first falls under a half, walking out from the
@@ -311,6 +314,7 @@ try {
       const mean = (p, lo, hi) => { let t = 0, c = 0; for (let k = Math.round(lo * 20); k <= Math.round(hi * 20); k++) { t += p[k]; c++; } return t / c; };
       await plate(() => DIM);
       out.dim = await swatch(0.5, 0.25);
+      out.dimCam = await swatch(0.5, 0.25, CAMERA);
       const sS = await shoot(0.3, 0.25, Rs, PLATE), sB = await shoot(0.7, 0.25, Rb, PLATE);
       const small = profile(sS), big = profile(sB);
       // Pixels per plate unit, and the frame difference's overhang, from the two drops.
@@ -323,6 +327,30 @@ try {
       await plate((x) => (x < 0.5 ? A : B));
       const refs = { A: await swatch(0.3, 0.42), B: await swatch(0.7, 0.42) };
       out.proj.upright = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, PLATE), refs, [1, 0]);
+      /*
+        And by how much: the line a quarter of a radius right of the drop's
+        centre, inside its core. Where the dye changes along the middle row
+        (half way from A's colour to B's, to the pixel), as a distance from
+        the centre, through the drop over without it: the ball's M, 1.23.
+        Asked as a ratio of two positions read the same way, so the plate's
+        own edge (the lattice of discs puts it a little off 0.5) cancels.
+      */
+      {
+        const m = await shoot(0.5 - 0.25 * Rs, 0.42, Rs, PLATE);
+        // The camera is on the drop's centre, so that is the frame's middle.
+        const y = S / 2, cxp = S / 2;
+        const ab = (px, x) => { const c = rgb(px, x, y); const d = [refs.B[0] - refs.A[0], refs.B[1] - refs.A[1], refs.B[2] - refs.A[2]]; return ((c[0] - refs.A[0]) * d[0] + (c[1] - refs.A[1]) * d[1] + (c[2] - refs.A[2]) * d[2]) / (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]); };
+        const at = (px) => {
+          let prev = null;
+          for (let x = cxp; x <= cxp + Math.round(0.65 * m.rad); x++) {
+            const f = ab(px, x);
+            if (f >= 0.5) return prev === null ? 0 : (x - 1 + 0.5 - S / 2) + (0.5 - prev) / (f - prev);
+            prev = f;
+          }
+          return NaN;
+        };
+        out.proj.mag = { on: at(m.on), off: at(m.off) };
+      }
       /*
         Part way into the closeup. The lens changes from the projector's to
         the camera's over the middle fifth of the zoom's fade (dropCam in
@@ -337,17 +365,15 @@ try {
       out.proj.early = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, part(0.3)), await pRefs(0.3), [1, 0]);
       out.proj.late = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, part(0.7)), await pRefs(0.7), [1, 0]);
       const pressed = async (curve) => {
-        await plate(() => A);
+        await plate(() => DIM);
         await lab.step(2, { plateCurve: curve });
         const gap = await lab.squeeze();
         const mid = gap ? gap.gap[Math.floor(gap.n / 2) * gap.n + Math.floor(gap.n / 2)] : 0;
         const cam = { zoom: 3, macroAmount: 0, cx: 0.5, cy: 0.5, view: true };
         const on = await lab.render(S, { beads: 0.8 }, { ...cam, beadMask: mask([{ x: 0.5 * N, y: 0.5 * N, r: Rb * N }]) });
         const off = await lab.render(S, { beads: 0 }, cam);
-        // The dark edge: pixels of the middle row, both sides, under a half.
-        let dark = 0;
-        for (let x = 0; x < S; x++) { const i = (S / 2 * S + x) * 4; if (lum(on, i) / Math.max(24, lum(off, i)) < 0.5) dark++; }
-        return { mid, dark };
+        // Where the band begins, as a fraction of the laid radius.
+        return { mid, edge: cross({ on, off, cx: S / 2, cy: S / 2, rad: perUnit * Rb + 4 }) / (perUnit * Rb) };
       };
       out.proj.rest = await pressed(0);
       out.proj.press = await pressed(-0.5);
@@ -362,14 +388,14 @@ try {
       where the lens stops, and passed with the cap removed (a copy of the
       lens's arithmetic on the pair's mask: the farthest read 0.23 of the
       plate for two of a size, 1.55 for these). They sit in the middle of a
-      disc of A three tenths across, B all round it; the farthest a drop of
+      disc of A 0.22 of the plate in radius, B all round it; the farthest a drop of
       the biggest size can see is two tenths, so no pixel may show B.
       Near the wall the dark outline takes most of the light, so a pixel's
       dye is asked of its hue (its colour over its sum), not its brightness.
     */
     {
       const pc = [0.4, 0.42];
-      await plate((x, y) => (Math.hypot(x - pc[0], y - pc[1]) < 0.3 ? A : B));
+      await plate((x, y) => (Math.hypot(x - pc[0], y - pc[1]) < 0.22 ? A : B));
       const refs = { A: await swatch(pc[0], pc[1], CAMERA), B: await swatch(0.9, 0.9, CAMERA) };
       const hue = (c) => { const s = c[0] + c[1] + c[2]; return s < 30 ? null : c.map((v) => v / s); };
       const hueRefs = { A: hue(refs.A), B: hue(refs.B) };
@@ -527,14 +553,14 @@ try {
     m.big.width > 0 && m.big.width < 0.2 && m.big.inside === 0 && m.big.flank > 0.85,
     `${(100 * m.big.width).toFixed(0)}% of the radius under seven tenths, ${m.big.inside} px of it inside three quarters; ${(100 * m.big.flank).toFixed(0)}% of the plate's brightness from half way out to five sixths`);
   const P = m.proj;
-  const dimOk = Math.max(...m.dim) < 180 && Math.max(...m.dim) > 40;
-  console.log(`     the grey plate: ${m.dim.join(',')}`);
+  const dimOk = [m.dim, m.dimCam].every((c) => Math.max(...c) < 180 && Math.max(...c) > 40);
+  console.log(`     the grey plate: ${m.dim.join(',')} (${m.dimCam.join(',')} in the closeup)`);
   check('no highlight: no drop is brighter than the plate beneath it by more than the light it gathers',
     dimOk && m.bright.small < 1.45 && m.bright.big < 1.45 && m.brightP.small < 1.1 && m.brightP.big < 1.1,
     `at most ×${m.bright.small.toFixed(2)} in the small drop, ×${m.bright.big.toFixed(2)} in the big one in the closeup; ×${m.brightP.small.toFixed(2)} and ×${m.brightP.big.toFixed(2)} projected`);
   check('projected, a small drop is as bright as the plate in its middle, not lit up like a lens',
-    dimOk && P.small.core > 0.85 && P.small.coreMax < 1.1,
-    `to half its radius ${(100 * P.small.core).toFixed(0)}% of the plate on average, ${(100 * P.small.coreMax).toFixed(0)}% at most`);
+    dimOk && Math.abs(P.small.core - 0.971) <= 0.03 && P.small.coreMax < 1.1,
+    `to half its radius ${(100 * P.small.core).toFixed(1)}% of the plate on average (the oil's warm tint says 97.1%), ${(100 * P.small.coreMax).toFixed(0)}% at most`);
   const predS = halfPoint(3 / 192, HALF_GAP_UV), predB = halfPoint(7 / 192, HALF_GAP_UV);
   console.log(`     ${P.perUnit.toFixed(0)} px to the plate's width at 3x, the frame difference ${P.over.toFixed(1)} px past a drop; the core ends at ${CORE.toFixed(3)} of the curved part (NA ${NA})`);
   /*
@@ -554,20 +580,28 @@ try {
   check('and still does a third of the way into the closeup, turned over by two thirds',
     P.early.near && P.early.kept >= 0.7 && P.early.seen < 0.1 && turnedOk(P.late),
     `at 0.3 of the way its ${P.early.near ?? '?'} half shows ${P.early.near ?? '?'} in ${(100 * P.early.kept).toFixed(0)}%; at 0.7, ${P.late.far ?? '?'} in ${(100 * P.late.seen).toFixed(0)}%`);
+  check('and magnifies what is under its middle as a ball does, by 1.23',
+    Number.isFinite(P.mag.on) && P.mag.off > 3 && Math.abs(P.mag.on / P.mag.off - 1.23) <= 0.08,
+    `the dye's edge ${P.mag.on.toFixed(1)} px from the centre through the drop, ${P.mag.off.toFixed(1)} px without: ×${(P.mag.on / P.mag.off).toFixed(3)}`);
   /*
-    Half the gap should halve the band's width; measured it is a third,
-    since pressed the dark part of a big drop's edge is under half a cell of
-    the grid and the mask's antialiasing, which fades the whole drop into the
-    plate over its outer texel, takes a share of it. So: narrower by a
-    quarter at least (the gap ignored, it is the same width), and still
-    there (two pixels or more).
+    Bowed to half the gap under it, the big drop's band moves out by as much
+    as the aperture and the narrower gap say, within a fifth; at rest it
+    starts where the rest gap says, to two hundredths of the radius (two
+    pixels). Positions and a shift, not a ratio of widths, which let a half
+    gap that followed the square root of the gap pass. The shift and not the
+    pressed position alone: pressed, the band's inner edge is two pixels
+    from the mask's antialiased rim, which pulls both renderers' reading of
+    it outward by about as much again.
   */
-  check('a narrower gap flattens a drop and thins its dark edge',
-    P.rest.mid > 0.025 && P.press.mid < 0.6 * P.rest.mid && P.rest.dark > 6 && P.press.dark >= 2 && P.press.dark / P.rest.dark <= 0.75,
-    `the glasses bowed to half the gap under it, ${P.rest.mid.toFixed(4)} → ${P.press.mid.toFixed(4)}; its dark edge ${P.rest.dark} → ${P.press.dark} px across the middle row`);
+  const rhoPress = HALF_GAP_UV * P.press.mid / 0.03;
+  const predRest = halfPoint(7 / 192, HALF_GAP_UV), predPress = halfPoint(7 / 192, rhoPress);
+  const shift = P.press.edge - P.rest.edge, predShift = predPress - predRest;
+  check('a narrower gap flattens a drop and moves its dark edge out',
+    P.rest.mid > 0.025 && P.press.mid < 0.6 * P.rest.mid && Math.abs(P.rest.edge - predRest) <= 0.02 && Math.abs(shift - predShift) <= 0.2 * predShift,
+    `the glasses bowed from ${P.rest.mid.toFixed(4)} to ${P.press.mid.toFixed(4)} under it; its band from ${P.rest.edge.toFixed(3)} of the radius (says ${predRest.toFixed(3)}) to ${P.press.edge.toFixed(3)}, out by ${shift.toFixed(3)} (says ${predShift.toFixed(3)})`);
   check('where two drops press together, neither shows the far side of the plate in the closeup',
     m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
-    `pixels of the dye beyond three tenths: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
+    `pixels of the dye beyond 0.22: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
   check('a dyed drop is its dye in the middle', m.dyed.c[1] - m.dyed.p[1] > 40,
     `green ${m.dyed.p[1]} → ${m.dyed.c[1]} (the plate ${m.dyed.p.join(',')}, the drop ${m.dyed.c.join(',')})`);
   check('and the wide mask\'s seam is not a drop', m.dyed.seam === 0, `${m.dyed.seam} pixels changed at the plate's right edge`);

@@ -138,10 +138,12 @@ since the gap sets where a ball becomes a pool: Clock Glass, whose glasses bow
 apart in the middle, now has rounder drops there and thin-edged pools near its
 rim. Zooming in, the drops change from the projector's to the camera's near
 1.45x, all at once over a few hundredths of the zoom; say if that reads as a
-jump. This changes the rings in every look
+jump. The closeup's lens is measured with the closeup's own paint
+detail (cells, lacing, relief) turned off, since that is laid over the whole
+frame; with it on, whether a drop still reads as a lens is for your eye. This changes the rings in every look
 that has beads, not only the drops. And the frame time: the drops' mask
-is drawn a pixel at a time on the main thread: 11 to 12 ms for the crowd of
-about 530 with droplets, against 6.7 ms for the 330 without them and the
+is drawn a pixel at a time on the main thread: about 15 ms for the crowd of
+about 530 with droplets and curved walls (11 to 12 with straight ones), against 6.7 ms for the 330 without them and the
 rings' canvas at 3.9, in the sandbox's Chromium. If
 `frameMs` climbs with it on, that is the number to report.
 

@@ -40,7 +40,7 @@ await build({
   stdin: { contents: "export * from './src/lib/beads.ts'; export { setShowSeed } from './src/lib/rng.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
-const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed } = await import(`../${out}`);
+const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed, dropWall } = await import(`../${out}`);
 
 // The field draws from the show's seeded `plate.beads` stream (lib/rng.ts),
 // so a run is repeated by running the show on the same seed, as the app would.
@@ -136,10 +136,17 @@ const colourAt = (x, y) => { const o = (y * S * 2 + x + S) * 4; return [px[o], p
   line, held a third of a radius (and a pixel) off either centre. In mask
   pixels from a's centre; Ra, Rb and D in mask pixels too.
 */
-const wallAt = (Ra, Rb, D) => {
-  const lo = Math.max(1, 0.35 * Ra), hi = D - Math.max(1, 0.35 * Rb);
-  const t = (D * D + Ra * Ra - Rb * Rb) / (2 * D);
-  return lo <= hi ? Math.min(hi, Math.max(lo, t)) : (lo + hi) / 2;
+/*
+  Where the wall between two pressed drops crosses a line parallel to their
+  line of centres, perp pixels off it, as a distance along it from the first
+  centre. The wall is the arc dropWall (beads.ts) describes; its sagitta is
+  checked on its own, against the pressures, below.
+*/
+const wallAt = (Ra, Rb, D, perp = 0) => {
+  const w = dropWall(Ra, Rb, D);
+  if (w.side === 0) return w.apex;
+  const centre = w.apex - w.side * w.rho;
+  return centre + w.side * Math.sqrt(Math.max(0, w.rho * w.rho - perp * perp));
 };
 /** A colour read back from the mask, as its nearest palette slot (or -1). */
 const slotOf = (rgb) => {
@@ -307,7 +314,7 @@ const clusterStats = (fld, withColour) => {
     const ex = (b.x - a.x) / d, ey = (b.y - a.y) / d, nx = -ey, ny = ex;
     const t = wallAt(Ra, Rb, D);
     const half = Math.sqrt(Math.max(0, Math.min(Ra * Ra - t * t, Rb * Rb - (D - t) * (D - t))));
-    const px = (off, perp) => ({ x: Math.floor(a.x * K + ex * (t + off) + nx * perp), y: Math.floor(a.y * K + ey * (t + off) + ny * perp) });
+    const px = (off, perp) => { const tw = wallAt(Ra, Rb, D, perp); return { x: Math.floor(a.x * K + ex * (tw + off) + nx * perp), y: Math.floor(a.y * K + ey * (tw + off) + ny * perp) }; };
     const places = half >= 4 ? [0, 0.5 * half, -0.5 * half] : [0];
     let third = false, good = true, low = true;
     for (const perp of places) {
@@ -328,8 +335,39 @@ const clusterStats = (fld, withColour) => {
   }
   check('touching drops press into each other', judged >= 30 && deepest >= 0.08,
     `${judged} pairs a pixel and a half or more into each other, the deepest ${(deepest * 100).toFixed(0)}% of their reach`);
-  check('and meet along one wall, each drop on its own side', judged > 0 && straight >= 0.95 * judged, `${straight} of ${judged}`);
+  check('and meet along one wall, each drop on its own side of it', judged > 0 && straight >= 0.95 * judged, `${straight} of ${judged}`);
   check('and the dome falls to nothing at the wall', judged > 0 && lowWall >= 0.9 * judged, `${lowWall} of ${judged}`);
+}
+
+// ── A wall bows into the bigger drop ─────────────────────────────────
+/*
+  A small drop pushes harder than a big one (its pressure is its tension
+  over its radius), so the wall between them is an arc bowed into the big
+  one, of radius Rs Rb / (Rb - Rs), through the two points where their
+  circles cross. Two drops, 3 and 8 cells, pressed two and a half cells into
+  each other: along their line of centres, the first pixel the big one owns
+  must be where that arc crosses the line, a sagitta past the straight power
+  line, within a pixel; and the sagitta must be more than two pixels, or a
+  straight wall would pass as well. Worked from the circles here, not from
+  dropWall.
+*/
+{
+  const rs = 3, rb = 8, dCells = rs + rb - 2.5;
+  const pair = [
+    { x: 60, y: 96, r: rs, age: 5, seed: 0.2, color: [1, 0, 0] },
+    { x: 60 + dCells, y: 96, r: rb, age: 5, seed: 0.7, color: [0, 0, 1] },
+  ];
+  const px2 = new Uint8ClampedArray(S * 2 * S * 4), o2 = new Float32Array(S * S), i2 = new Int32Array(S * S);
+  rasterDrops(pair, N, S, px2, o2, i2);
+  const Rs = rs * K, Rb = rb * K, D = dCells * K;
+  const t = (D * D + Rs * Rs - Rb * Rb) / (2 * D);
+  const h2 = Rs * Rs - t * t, rho = Rs * Rb / (Rb - Rs);
+  const sag = rho - Math.sqrt(rho * rho - h2);
+  const y = Math.floor(96 * K), x0 = 60 * K;
+  let first = -1;
+  for (let x = Math.floor(x0); x < Math.floor(x0 + D); x++) if (i2[y * S + x] === 2) { first = x + 0.5 - x0; break; }
+  check('a wall bows into the bigger drop, as their pressures say', first > 0 && sag > 2 && Math.abs(first - (t + sag)) <= 1,
+    `the big drop starts ${first.toFixed(1)} px from the small one's centre; the straight wall was at ${t.toFixed(1)}, the arc (radius ${rho.toFixed(1)} px) at ${(t + sag).toFixed(1)}`);
 }
 
 // ── A lone drop's dome is the one the lens was written for ──────────
