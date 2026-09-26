@@ -169,19 +169,51 @@ try {
       drift on the other runs (2.5 against 2.5, 2.1 against 2.2). The median
       of four is untouched by one such event, and an echo on every drop moves
       it exactly as much as the mean. The maps above still print the mean.
+
+      And each drop is judged against its own drift, not a median of the four
+      changes against a median of the four drifts. A drop's drift is the
+      1.3 s just before it, so a region the plate sets moving on its own
+      shows in both of that drop's windows or, when it starts mid-drop, in
+      one drop's change alone. Taken apart, the two medians pair windows from
+      different drops. On the Mac, Classic's layer 1 (once turned a quarter,
+      once not) failed twice this way, at a cell in the middle that began
+      moving by itself partway through the four drops: once at row 2,
+      column 4, each drop 4.8 3.5 64.1 55.1 against drift 4.9 3.6 4.2 48.6
+      (a median of 29.9 against one of 4.6), and once at row 3, column 3,
+      2.5 63.3 49.9 48.4 against 2.9 2.7 44.5 36.8 (49.1 against an
+      allowance of 43.7). Paired, each drop's change past its own
+      drift is -0.1 -0.1 59.9 6.5 and -0.4 60.6 5.4 11.6: one drop caught a
+      region starting up and the others stayed within about 12 of their
+      drift, medians 3.2 and 8.5.
+
+      For an echo nothing changes. A drop that adds e to its window's drift
+      d changes the cell by d + e; before, median(d) + e was allowed
+      2 median(d) + 4, now e is allowed median(d) + 4, the same bound, and the
+      floor of 0.3 of the change round the hand moves across the same way.
+      The derive pass's echo (35 to 53 against a drift of 15) fails it as it
+      did, and the fixed plate (1.5 against 1.9) passes as it did.
+
+      What it gives up is the case it was changed for. When the plate's own
+      movement lands in a drop's change but not in its drift (a region
+      starting up mid-drop, drift 0 0 40 40 against the plate's own change
+      0 40 40 40), the old test was already at 40 against 44 with no echo at
+      all, and this one lets an echo 20 larger through there. An echo on a
+      plate that is not starting up somewhere under it is judged as before.
     */
     const median = (reps, y, x) => {
       const v = reps.map((m) => m[y][x]).sort((a, b) => a - b);
       return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
     };
+    const pastReps = changeReps.map((m, i) => m.map((row, y) => row.map((c, x) => c - driftReps[i][y][x])));
     const away = [];
     for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
       if (near(y, x)) continue;
-      const v = median(changeReps, y, x), dm = median(driftReps, y, x);
+      const v = median(pastReps, y, x), dm = median(driftReps, y, x);
       // How far past what the plate does alone, in its own terms.
-      const allowed = Math.max(2 * dm + 4, 0.3 * here);
+      const allowed = Math.max(dm + 4, 0.3 * here - dm);
       away.push({ y, x, v, allowed, over: v / allowed, tag: tags.get(`${y},${x}`) ?? '',
-        reps: changeReps.map((m) => m[y][x].toFixed(1)).join(' '), dreps: driftReps.map((m) => m[y][x].toFixed(1)).join(' ') });
+        reps: changeReps.map((m) => m[y][x].toFixed(1)).join(' '), dreps: driftReps.map((m) => m[y][x].toFixed(1)).join(' '),
+        preps: pastReps.map((m) => m[y][x].toFixed(1)).join(' ') });
     }
     away.sort((a, b) => b.over - a.over);
     const rot = await page.evaluate(() => window.chromaglassDebug?.().rotation?.current ?? null);
@@ -198,12 +230,12 @@ try {
     if (sc.judge !== false) check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
       `${here.toFixed(1)} round the hand`);
     if (sc.judge === false) {
-      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
+      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} past its drift at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
       await page.close();
       continue;
     }
     check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
-      worst ? `most away from the hand ${worst.v.toFixed(1)} (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}` : 'nothing');
+      worst ? `most away from the hand ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'nothing');
     await page.close();
   }
 } finally {

@@ -10,6 +10,10 @@
  */
 
 import type { VisualizerSettings } from '../types';
+// With its extension, because `npm run panel` and `npm run rungs` load this
+// file through esbuild but a strip-types harness may load it directly, and
+// node resolves no extensionless import.
+import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 
 /** Where a message comes from: a controller or a note, on a channel (0–15). */
 export interface MidiSource {
@@ -91,6 +95,141 @@ export interface MidiBinding {
   bank?: number;
 }
 
+/**
+ * What in the music a sound-learn binding listens to (PLAN §5).
+ *
+ * The named sources and bands are the analyser's (`audioFeatures.ts`): each
+ * has a 0..1 value, which a *mapping* follows, and an onset, which a
+ * *trigger* fires on. `beat` and `bar` are the beat clock's, and are triggers
+ * only: they have no level to follow, only a moment.
+ *
+ * `bar` is every fourth beat counted from the moment the clock locked. The
+ * clock knows the period and the phase of the beat and nothing about which
+ * beat is the one: the song map has sections but no downbeats, and neither a
+ * tap nor a MIDI clock says where the bar starts either. So a bar trigger
+ * steps on a bar line, evenly and on the beat, but which of the four beats it
+ * treats as one is wherever the clock happened to lock. Stated rather than
+ * guessed at, because a guess ("the loudest kick is the one") is right for
+ * some songs and wrong for the rest, and wrong looks like a bug.
+ */
+export type MusicSource = SourceName | 'beat' | 'bar';
+export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', 'bar'];
+/** The sources a mapping can follow: everything with a level. */
+export const MAPPABLE_SOURCES: readonly SourceName[] = SOURCE_NAMES;
+
+const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
+/**
+ * What each source is called on a panel. The bands carry their range, since
+ * "band 5" means nothing to anyone and "800 Hz–1.7k" tells a sound engineer
+ * exactly which instrument lives there.
+ */
+export const MUSIC_SOURCE_LABELS: Record<MusicSource, string> = {
+  level: 'Level', kick: 'Kick', bass: 'Bass', snare: 'Snare', hats: 'Hats',
+  ...Object.fromEntries(BAND_SOURCES.map((b, i) => [b, `Band ${i + 1} · ${hz(BAND_EDGES_HZ[i])}–${hz(BAND_EDGES_HZ[i + 1])} Hz`])) as Record<typeof BAND_SOURCES[number], string>,
+  beat: 'Every beat', bar: 'Every bar',
+};
+
+/**
+ * One control, bound to the music instead of to a hand (PLAN §5, "Sound learn").
+ *
+ * The same `MidiTarget` a controller binds to, so there is one vocabulary of
+ * things the show can be told to do whoever is telling it. What the target is
+ * decides what the binding does:
+ *
+ *   - a `setting` is a *mapping*: the setting follows the source's level,
+ *     moved by `depth` of its travel when the source is at full. It is folded
+ *     by the patch bay (`sceneMap.ts`), the same arithmetic a look's sound
+ *     patches use, so two of them on one setting add and clamp exactly as two
+ *     patches do;
+ *   - an `action`, a `preset` or a `dye` is a *trigger*: it fires once per
+ *     onset of the source, on the beat clock's predicted beat when there is
+ *     one (`soundLearn.ts`).
+ *
+ * Kept in the MIDI map, in its own list beside `bindings` rather than in it,
+ * so the file a rig is saved to holds both and a map with none is exactly the
+ * map it was. Not in `bindings` itself because everything that reads that list
+ * — the message handler, the LED feedback, auto-map, the controller picture,
+ * the desk's CC labels — reads `source.channel` and `source.number`, and a
+ * kick has neither. One list per kind of hand keeps every one of those
+ * readers exactly as correct as it was.
+ */
+export interface SoundBinding {
+  id: string;
+  source: MusicSource;
+  target: MidiTarget;
+  /** Mappings only: how far the setting moves at full source, as a share of its travel, −1..1. */
+  depth?: number;
+}
+
+/**
+ * Actions a beat must not press.
+ *
+ * Every other action can be a trigger. These cannot, each for a reason that
+ * shows the moment a kick presses it twice a second.
+ *
+ * Every toggle, first, because a toggle pressed on every hit is not a
+ * control, it is a coin: what state it is in when the song stops depends on
+ * whether the song had an odd or an even number of kicks. Recording would
+ * start and stop a file every beat; pausing the show stops the thing that
+ * heard the beat, so the next one never unpauses it; hiding the overlays
+ * blinks the whole interface; watching the room opens and closes a camera;
+ * Random Evolve and the macro lens flip on and off every beat, the lens
+ * zooming 1x to 4x and back; the sequencer's play/pause stutters the set.
+ *
+ * Blackout is the worst of them, and the one that was missed at first. Its
+ * fade is 1100 ms, so at 120 bpm each press interrupts the last one part-way
+ * down, and it remembers the dimmer to come back to *at the moment it is
+ * pressed*, part-way through that fade (App.tsx, `toggleBlackout`). Pressed on
+ * every beat it ratchets the room's dimmer down toward its 0.05 floor, and
+ * when the music stops the wall is left black about half the time.
+ *
+ * Then the ones that are not toggles but still cannot be played by a drum:
+ * the tempo pads would feed the beat clock its own output, which is a loop
+ * and not a tempo; and a bank change under a performer's hands, on a drum,
+ * moves every fader to a different setting without anyone touching one.
+ *
+ * What is left is one-shots, each of which does the same thing however many
+ * times it is pressed: seed, clear, drain, randomise, a spin, the sequencer's
+ * next, previous and stop, the preset and cue steps, Go and Back (Go sends
+ * what is armed and then has nothing armed, Back undoes once and then has
+ * nothing to undo). Some of them are drastic on every beat — Drain on a kick
+ * keeps the plate empty — but that is what they say, and it is what binding
+ * them to a kick asks for.
+ */
+const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
+  // Toggles: every one in the action list.
+  'record-toggle', 'performance-toggle', 'scene-toggle', 'play-toggle', 'overlays-toggle',
+  'blackout-toggle', 'automate-toggle', 'macro-toggle', 'seq-play-pause',
+  // Not toggles, and still not a drum's to press.
+  'tap-tempo', 'tempo-clear', 'bank-next', 'bank-prev',
+]);
+export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
+
+/** A binding that follows a level, rather than firing on a moment. */
+export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'setting';
+
+/**
+ * Whether the music can ride a setting: one a fader can learn *and* the patch
+ * bay can move.
+ *
+ * Not every learnable setting is the second. The masters (Film Drive, Film,
+ * Sound and Shapes Impact) and the room's own dials (Room Drive, Hands, Impact)
+ * decide how hard a source drives the plate, and the patch bay refuses them as
+ * targets because a source riding its own master is a loop (`NOT_A_TARGET` and
+ * the `scene` prefix in `sceneMap.ts`). A mapping onto one of them used to load
+ * from a file, do nothing, and still light the Sound Impact slider as if a
+ * patch were reading the sound.
+ *
+ * Written out here rather than read from `SETTING_TRAVEL`, because `sceneMap`
+ * imports `deskPins`, which imports this file, and the import back would be a
+ * cycle whose top-level constants are not built yet when this one reads them.
+ * `npm run learn` holds the two together: for every learnable setting, this
+ * says yes exactly when `SETTING_TRAVEL` has it.
+ */
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact']);
+export const soundMappable = (key: keyof VisualizerSettings): boolean =>
+  LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
+
 export interface MidiMap {
   format: 'chromaglass-midi';
   version: 1;
@@ -98,6 +237,11 @@ export interface MidiMap {
   /** The controller this was made on, for the reader's benefit. */
   device?: string;
   bindings: MidiBinding[];
+  /**
+   * What the music is bound to. Absent in a map made before sound learn and in
+   * a file that says nothing about the music; see `withLoadedMap`.
+   */
+  sound?: SoundBinding[];
 }
 
 export const MIDI_FORMAT = 'chromaglass-midi';
@@ -487,6 +631,16 @@ export function padVelocityFor(r: number, g: number, b: number, dim = false): nu
 
 export function serializeMidiMap(map: MidiMap): string { return JSON.stringify(map, null, 2) + '\n'; }
 
+
+/*
+  The fallback id of a loaded binding that arrived without one, controller
+  (`b-`) or music (`s-`). Unseeded on purpose (`npm run seed` allows it): a
+  name for a loaded binding, never on the plate, and two sessions on one
+  `?seed=` must not mint the same one. One helper for both kinds, so the seed
+  gate's count of unseeded draws in this file stays the one it allows.
+*/
+const fallbackId = (prefix: 'b' | 's') => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+
 export function parseMidiMap(text: string): MidiMap {
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new Error('That is not a JSON file.'); }
@@ -496,19 +650,79 @@ export function parseMidiMap(text: string): MidiMap {
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
     (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
-    // The fallback id below is unseeded on purpose (`npm run seed` allows it):
-    // a name for a loaded binding, never on the plate.
     .map(b => ({
       ...b,
       target: onTodaysTravel(b.target),
-      id: typeof b.id === 'string' ? b.id : `b-${Math.random().toString(36).slice(2, 8)}`,
+      id: typeof b.id === 'string' ? b.id : fallbackId('b'),
       mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'],
       // A map written before banks existed has none, and every binding in it
       // is always live — which is exactly what `undefined` means, so old maps
       // keep working without being migrated.
       bank: Number.isInteger(b.bank) && (b.bank as number) >= 0 && (b.bank as number) < MIDI_BANKS ? b.bank : undefined,
     }));
-  return { format: MIDI_FORMAT, version: 1, name: typeof o.name === 'string' ? o.name : 'MIDI map', device: typeof o.device === 'string' ? o.device : undefined, bindings };
+  const map: MidiMap = { format: MIDI_FORMAT, version: 1, name: typeof o.name === 'string' ? o.name : 'MIDI map', device: typeof o.device === 'string' ? o.device : undefined, bindings };
+  // Only when the file says something about the music: absent stays absent,
+  // so an old controller file loaded over a rig leaves the rig's music alone.
+  if (Array.isArray(o.sound)) map.sound = parseSoundBindings(o.sound);
+  return map;
+}
+
+/**
+ * Sound bindings from a file, keeping only what the show can act on.
+ *
+ * A map is a file people copy between laptops and edit by hand, so each entry
+ * is checked rather than trusted: a source the analyser does not have, an
+ * action that is not one (or is one a beat must not press), a setting this
+ * build does not know, or one the patch bay cannot move (`soundMappable`: the
+ * masters) would otherwise be a binding that silently does nothing
+ * or, for the actions, does something nobody meant. A mapping's depth is put
+ * back on −1..1, which is all the travel there is.
+ */
+function parseSoundBindings(raw: unknown[]): SoundBinding[] {
+  const out: SoundBinding[] = [];
+  for (const r of raw) {
+    const b = r as Partial<SoundBinding> | null;
+    if (!b || typeof b !== 'object' || !MUSIC_SOURCES.includes(b.source as MusicSource) || !b.target || typeof b.target !== 'object') continue;
+    const t = b.target as MidiTarget;
+    let target: MidiTarget | null = null;
+    if (t.kind === 'setting' && soundMappable(t.key) && (MAPPABLE_SOURCES as readonly string[]).includes(b.source as string)) target = onTodaysTravel(t);
+    else if (t.kind === 'action' && t.action in ACTION_LABELS && triggerable(t.action)) target = { kind: 'action', action: t.action };
+    else if (t.kind === 'preset' && typeof t.presetId === 'string') target = { kind: 'preset', presetId: t.presetId };
+    else if (t.kind === 'dye' && Number.isInteger(t.paletteIndex) && t.paletteIndex >= 0) target = { kind: 'dye', paletteIndex: t.paletteIndex };
+    if (!target) continue;
+    const binding: SoundBinding = {
+      id: typeof b.id === 'string' ? b.id : fallbackId('s'),
+      source: b.source as MusicSource,
+      target,
+    };
+    if (target.kind === 'setting') {
+      const d = typeof b.depth === 'number' && Number.isFinite(b.depth) ? b.depth : 0.5;
+      binding.depth = Math.max(-1, Math.min(1, d));
+    }
+    out.push(binding);
+  }
+  return out;
+}
+
+/**
+ * Two sound bindings that do the same thing: one source onto one target.
+ * Learning the pair again replaces it (a new depth), rather than stacking a
+ * second copy that would double the mapping or fire the trigger twice.
+ */
+export const sameSoundBinding = (a: Pick<SoundBinding, 'source' | 'target'>, b: Pick<SoundBinding, 'source' | 'target'>): boolean =>
+  a.source === b.source && JSON.stringify(a.target) === JSON.stringify(b.target);
+
+/**
+ * A map loaded over the one in use.
+ *
+ * The controller half is replaced whole: that is what loading a controller
+ * file means. The music half is replaced only when the file carries one. A
+ * file saved before sound learn existed, or a factory map, says nothing about
+ * the music, and treating its silence as "bind nothing" would throw away the
+ * rig's kick and snare every time somebody plugged in a different controller.
+ */
+export function withLoadedMap(prev: MidiMap, loaded: MidiMap): MidiMap {
+  return loaded.sound !== undefined ? loaded : { ...loaded, sound: prev.sound };
 }
 
 export function loadMidiMap(): MidiMap | null {

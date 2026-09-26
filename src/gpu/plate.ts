@@ -20,7 +20,7 @@ import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
-import { PACK_KERNELS } from './wgsl/pack';
+import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -185,7 +185,7 @@ export class WebGPUPlate {
       this.layers[i] = {
         size,
         dye: tex('packed dye', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
-        vel: tex('packed velocity', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
+        vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
         // COPY_SRC so npm run derive can read where the slopes were found.
         derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
       };
@@ -236,15 +236,13 @@ export class WebGPUPlate {
 
   /**
    * Draw the plate into `target`. `fields` is one entry per layer, straight
-   * from the solver; `velRange` is the frame's peak speed, which the flow is
-   * encoded against.
+   * from the solver.
    */
   draw(
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
-    velRange: number,
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -261,7 +259,7 @@ export class WebGPUPlate {
     this.ensureLayers(fields.length, grid);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
     const args = new ArrayBuffer(PACK_ARGS);
-    new Float32Array(args).set([grid, velRange, 0, 0]);
+    new Float32Array(args).set([grid, 0, 0, 0]);
     this.device.queue.writeBuffer(this.packArgs, 0, args);
 
     // ── Pack ────────────────────────────────────────────────────────

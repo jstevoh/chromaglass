@@ -374,16 +374,36 @@ try {
     look that does not set a plate shape can notice this exists. If that ever
     stops being true, thirty-two presets change character at once.
   */
+  /*
+    In alternated pairs, like the rim above, and for the reason given there.
+
+    This was one reading each way, five seconds apart, and one reading of a
+    plate's centre speed wanders by itself. Over 22 runs on the Mac on
+    2026-09-26 it read a median of 0.9% apart and under 5% in 20 of them,
+    but 9.7% once (the reading with the drag on ran high) and 14.5% once
+    (0.3074 with the drag off, where every other run read that one at
+    0.252–0.268, and the same run's rim check read 0.2571). The drag was
+    not what moved: the side that jumped changed from run to run. So the
+    claim is judged on three pairs averaged, as the rim's is, and the limit
+    is the same 12%.
+  */
   await set({ plateCurve: 0, depthDrag: 0 });
   await page.waitForTimeout(5000);
-  const flatOff = await speeds();
-  await set({ depthDrag: DRAG });
-  await page.waitForTimeout(5000);
-  const flatOn = await speeds();
-  const drift = Math.abs(flatOn.inner / flatOff.inner - 1);
+  const flatOffs = [], flatOns = [];
+  for (let i = 0; i < 3; i++) {
+    await set({ depthDrag: 0 });
+    await page.waitForTimeout(4000);
+    flatOffs.push(await speeds());
+    await set({ depthDrag: DRAG });
+    await page.waitForTimeout(4000);
+    flatOns.push(await speeds());
+  }
+  const flatOff = mean(flatOffs, 'inner'), flatOn = mean(flatOns, 'inner');
+  const drift = Math.abs(flatOn / flatOff - 1);
   check('a flat plate does not notice the drag at all',
     drift < 0.12,
-    `centre ${flatOff.inner.toFixed(4)} → ${flatOn.inner.toFixed(4)}, ${(drift * 100).toFixed(1)}% apart`);
+    `centre ${flatOff.toFixed(4)} → ${flatOn.toFixed(4)} over three pairs, ${(drift * 100).toFixed(1)}% apart`
+    + ` (each pair ${flatOffs.map((o, i) => `${o.inner.toFixed(3)}/${flatOns[i].inner.toFixed(3)}`).join(', ')})`);
 
   /*
     And a change of shape does not wipe a press.

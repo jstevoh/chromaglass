@@ -15,9 +15,15 @@ import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 
-export async function openLab() {
-  const out = 'node_modules/.cache/lab-page.js';
-  await build({ entryPoints: ['scripts/lab-entry.ts'], bundle: true, format: 'esm', outfile: out, logLevel: 'warning' });
+/**
+ * `entry` swaps the page's script for one that imports lab-entry.ts and adds
+ * to it (`npm run render-lab` adds the render's encoders); each entry gets
+ * its own bundle, so two checks running at once never load each other's.
+ */
+export async function openLab({ entry = 'scripts/lab-entry.ts' } = {}) {
+  const out = entry === 'scripts/lab-entry.ts' ? 'node_modules/.cache/lab-page.js'
+    : `node_modules/.cache/lab-page-${entry.replace(/^.*\//, '').replace(/\.[^.]+$/, '')}.js`;
+  await build({ entryPoints: [entry], bundle: true, format: 'esm', outfile: out, logLevel: 'warning' });
   const js = readFileSync(out, 'utf8');
   const server = createServer((req, res) => {
     if (req.url === '/page.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(js); return; }

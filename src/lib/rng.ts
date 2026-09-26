@@ -319,6 +319,17 @@ export function stream(name: string): Rng {
 }
 
 /**
+ * How many numbers the stream called `name` has drawn since it was last
+ * (re)started, or null when nothing has asked for it yet. For a render's
+ * frame digest, which must read every stream without making one: `stream`
+ * would create a stream that does not exist yet, and a digest that changes
+ * the registry it reads is not a reading.
+ */
+export function streamDraws(name: string): number | null {
+  return streams.get(name)?.rng.draws ?? null;
+}
+
+/**
  * Restart every stream whose name starts with `prefix` from (seed, name,
  * `event`). The visualizer calls this with `look:<id>` and `plate.` each time
  * it lays a look (see "Restarting, rather than continuing" above). Returns how
