@@ -7,9 +7,9 @@
  *
  * Needs a GPU that presents WebGPU and reads frames back (a Mac): the app on
  * software WebGPU reads back nothing, so in a cloud session this stops at
- * its first check and says why. It is not in CI yet; run it by hand on the
- * macOS runner or at the owner's desk. `npm run render-lab` is the version
- * that runs anywhere, on the lab's plate.
+ * its first check and says why. CI runs it on the macOS show shard, after
+ * the build (checks.yml, "A song rendered in the app"). `npm run render-lab`
+ * is the version that runs anywhere, on the lab's plate.
  *
  * What `npm run render` and `npm run render-lab` cannot reach is the app's
  * own plate under the render: the visualizer's frame loop driven by frame
