@@ -704,8 +704,13 @@ const laidOver = (page) => page.evaluate(async () => {
     const off = changed(before, await shot(), null);
     return { floor: fl, beads: off, count: n };
   };
-  const samples = [await beadSample(), await beadSample(), await beadSample()];
-  const median = (pick) => samples.map(pick).sort((x, y) => x - y)[1];
+  // Five, not three: main's #143 deploy read the beads at 0.4% against a
+  // floor of 0.3% on a plate that had drifted pale, where the PR runs either
+  // side of it read the same code well clear. The middle of five is not
+  // moved by two pale moments.
+  const samples = [];
+  for (let k = 0; k < 5; k++) samples.push(await beadSample());
+  const median = (pick) => samples.map(pick).sort((x, y) => x - y)[2];
   const beadFloor = { outside: median(s => s.floor.outside) };
   const beads = { outside: median(s => s.beads.outside) };
   const count = median(s => s.count);

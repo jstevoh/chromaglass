@@ -260,7 +260,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   const safeValue = value ?? 0;
   const curve = settingKey ? curveOf(settingKey) : 1;
   return (
-    <div className={`flex flex-col gap-2 mb-4 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined}>
+    <div className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
       <div className="flex items-center justify-between gap-2">
         {/*
           The rail beside this pane is sentence case and so is every control
@@ -270,7 +270,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           controls. Section headings keep their uppercase eyebrow, which the
           rail's category headers share — that is a level, not a label.
         */}
-        <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text">
+        <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text-2">
           {Icon && <Icon size={14} />}
           <span className="truncate">{label}</span>
         </div>
@@ -283,7 +283,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
             screens — and `0.02` for a speed that rides 0.005 to 0.3 told you
             nothing at all.
           */}
-          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">
+          <span className="min-w-[44px] rounded-md bg-white/[0.06] px-1.5 py-0.5 text-center font-mono text-[11.5px] font-medium tabular-nums text-text">
             {disabled ? disabled : readSetting(String(settingKey ?? ''), safeValue, min, max)}
           </span>
         </div>
@@ -302,11 +302,34 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           // Three figures, not the setting's step: see handValueAt.
           onChange(handValueAt(raw, min, max, curve));
         }}
-        className={`w-full h-1 bg-white/10 rounded-full appearance-none accent-white transition-all ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:accent-gray-300'}`}
+        className="set-range"
+        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
       />
     </div>
   );
 };
+
+/*
+  A section is a card, and its heading a title.
+
+  Every section was bare on the pane with its heading an 12px uppercase
+  eyebrow at 30% opacity, and a section opened from elsewhere got a ring
+  drawn tight round its content, which put the controls flush against a line
+  (reported, with a screenshot: "the left margin doesn't have enough
+  space"). The card carries its own padding, so nothing touches an edge, and
+  "opened from elsewhere" is its border turning the accent.
+*/
+/*
+  And two sliders to a row where the pane is wide enough: most sections are
+  a long run of them, and one to a row made the Look a four-screen column.
+  Everything else in a section (its title, a choice, a note, a group) keeps
+  the full width, so a row only ever pairs two sliders that were side by
+  side in the list anyway.
+*/
+const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 pb-4 pt-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]';
+/** The layout of a section that is showing: two sliders to a row where there is room. Not on a hidden one, or its grid would win over `hidden`. */
+const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
+const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
@@ -442,7 +465,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
         {/* ── Where you are ─────────────────────────────────── */}
         <nav
-          className="flex max-h-[38%] shrink-0 gap-1 overflow-x-auto overflow-y-auto border-b border-white/10 p-2 sm:max-h-none sm:w-[216px] sm:flex-col sm:border-b-0 sm:border-r"
+          className="flex max-h-[38%] shrink-0 gap-1 overflow-x-auto overflow-y-auto border-b border-white/10 bg-black/20 p-2 sm:max-h-none sm:w-[220px] sm:flex-col sm:border-b-0 sm:border-r sm:px-3 sm:py-3"
           aria-label="Settings sections"
           data-testid="settings-rail"
         >
@@ -451,20 +474,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           )}
           {railGroups.map(group => (
             <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
-              <div className="hidden px-2 pb-1 pt-3 text-[9px] uppercase tracking-[0.3em] text-white/25 sm:block">
+              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
                 {group.name}
-                <span className="ml-1.5 normal-case tracking-normal text-white/15">{group.hint}</span>
               </div>
-              <div className="flex gap-1 sm:flex-col">
+              <div className="flex gap-0.5 sm:flex-col">
                 {group.rows.map(row => (
                   <button
                     key={row.id}
                     onClick={() => { setSection(row.id); setQuery(''); }}
                     aria-current={!q && section === row.id ? 'page' : undefined}
-                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors sm:whitespace-normal ${
+                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:whitespace-normal ${
                       !q && section === row.id
-                        ? 'bg-white text-black'
-                        : 'text-white/55 hover:bg-white/10 hover:text-white'
+                        ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                        : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
                     }`}
                     data-testid={`settings-nav-${row.id}`}
                   >
@@ -477,7 +499,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </nav>
 
         {/* ── What is in it ─────────────────────────────────── */}
-        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
+        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-7 py-6">
 
       {/*
         A box to type into.
@@ -491,7 +513,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         query is in the box the rail narrows to the hits and the pane shows all
         of them at once, which is what a result list is.
       */}
-      <div className="relative mb-6">
+      <div className="relative mb-5">
         <input
           type="search"
           value={query}
@@ -499,7 +521,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           placeholder="Search every setting — try “camera”, “people”, “keystone”"
           aria-label="Search settings"
           data-testid="settings-search"
-          className="h-10 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
+          className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-[13px] text-white/90 outline-none transition-colors placeholder:text-white/30 focus:border-accent-border focus:bg-white/[0.05]"
         />
         {q && (
           <button
@@ -529,8 +551,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         which is where nobody reaching for the house lights in a dark room looks,
         and the sheet opened on the microphone's sensitivity. It opens here now.
       */}
-      <section id="settings-master" className={`mb-8 scroll-mt-4 ${shown('master') ? '' : 'hidden'} ${focusSection === 'master' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="master">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-master" className={`${SECTION_CARD} ${shown('master') ? SECTION_GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
+        <h3 className={SECTION_TITLE}>
           <Lightbulb size={12} /> Master
         </h3>
         {/* The house lights */}
@@ -596,8 +618,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Sound Section */}
-      <section id="settings-audio-input" className={`mb-8 scroll-mt-4 ${shown('audio-input') ? '' : 'hidden'} ${focusSection === 'audio-input' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-input">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-audio-input" className={`${SECTION_CARD} ${shown('audio-input') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+        <h3 className={SECTION_TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
         <Slider
@@ -621,7 +643,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
         {/* What is listening at all */}
         {onAudioSource && (
-          <div className="flex flex-col gap-1.5 mb-4 mt-2">
+          <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Source</span>
             <Segmented
               value={audioSource === 'file' ? 'file' : audioSource}
@@ -644,7 +666,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
         {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
         {onAudioInput && (
-          <div className="flex flex-col gap-1.5 mb-4 mt-2">
+          <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Input</span>
             <select
               value={audioInputId}
@@ -662,7 +684,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
 
         {/* Room calibration */}
-        <div className="flex items-center justify-between mb-3 mt-5">
+        <div className="mb-3 mt-2 flex items-center justify-between">
           <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
           <button
             onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
@@ -711,7 +733,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 onClick={onTap}
                 data-testid="tempo-tap"
                 title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-11 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
+                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
               >
                 Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
               </button>
@@ -720,7 +742,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className={`min-h-11 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
+                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
                   tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
                 }`}
               >
@@ -745,7 +767,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                   const v = parseFloat(e.target.value);
                   if (Number.isFinite(v)) onTempoBpm?.(v);
                 }}
-                className="min-h-11 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-white/30"
+                className="h-9 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-accent-border"
               />
               <span className="text-[12px] opacity-30">off the setlist</span>
             </div>
@@ -846,8 +868,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Sound Mappings Section */}
-      <section id="settings-audio-mappings" className={`mb-8 scroll-mt-4 ${shown('audio-mappings') ? '' : 'hidden'} ${focusSection === 'audio-mappings' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="audio-mappings">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-audio-mappings" className={`${SECTION_CARD} ${shown('audio-mappings') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-mappings' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-mappings">
+        <h3 className={SECTION_TITLE}>
           <Activity size={12} /> Sound Mappings
         </h3>
 
@@ -904,8 +926,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Light Show Look Section */}
-      <section id="settings-look" className={`mb-8 scroll-mt-4 ${shown('look') ? '' : 'hidden'} ${focusSection === 'look' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="look">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-look" className={`${SECTION_CARD} ${shown('look') ? SECTION_GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+        <h3 className={SECTION_TITLE}>
           <Palette size={12} /> Light Show Look
         </h3>
         <Slider
@@ -1095,8 +1117,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Show Section */}
-      <section id="settings-show" className={`mb-8 scroll-mt-4 ${shown('show') ? '' : 'hidden'} ${focusSection === 'show' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="show">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-show" className={`${SECTION_CARD} ${shown('show') ? SECTION_GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
+        <h3 className={SECTION_TITLE}>
           <Clapperboard size={12} /> Show
         </h3>
         <Info>
@@ -1184,8 +1206,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Camera Section */}
-      <section id="settings-camera" className={`mb-8 scroll-mt-4 ${shown('camera') ? '' : 'hidden'} ${focusSection === 'camera' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="camera">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-camera" className={`${SECTION_CARD} ${shown('camera') ? SECTION_GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
+        <h3 className={SECTION_TITLE}>
           <Aperture size={12} /> Camera
         </h3>
         <Info>
@@ -1256,8 +1278,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Film stock — what the whole show is photographed on (F1). */}
-      <section id="settings-stock" className={`mb-8 scroll-mt-4 ${shown('stock') ? '' : 'hidden'} ${focusSection === 'stock' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="look" data-section="stock">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-stock" className={`${SECTION_CARD} ${shown('stock') ? SECTION_GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
+        <h3 className={SECTION_TITLE}>
           <Film size={12} /> Film Stock
         </h3>
         <Info>
@@ -1343,8 +1365,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         to play it. Folds, how fast the rig turns, and how much plate feeds
         each wedge, together, and all three on the MIDI list.
       */}
-      <section id="settings-kaleidoscope" className={`mb-8 scroll-mt-4 ${shown('kaleidoscope') ? '' : 'hidden'} ${focusSection === 'kaleidoscope' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="kaleidoscope">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-kaleidoscope" className={`${SECTION_CARD} ${shown('kaleidoscope') ? SECTION_GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
+        <h3 className={SECTION_TITLE}>
           <Aperture size={12} /> Kaleidoscope
         </h3>
         <Info>
@@ -1394,8 +1416,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Lamp & Light Section */}
-      <section id="settings-lamp" className={`mb-8 scroll-mt-4 ${shown('lamp') ? '' : 'hidden'} ${focusSection === 'lamp' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="lamp">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-lamp" className={`${SECTION_CARD} ${shown('lamp') ? SECTION_GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
+        <h3 className={SECTION_TITLE}>
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
         <Info>
@@ -1528,8 +1550,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* The Room Section */}
-      <section id="settings-room" className={`mb-8 scroll-mt-4 ${shown('room') ? '' : 'hidden'} ${focusSection === 'room' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="room">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-room" className={`${SECTION_CARD} ${shown('room') ? SECTION_GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+        <h3 className={SECTION_TITLE}>
           <Video size={12} /> The Room
         </h3>
         <Info>
@@ -1662,8 +1684,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         made that section the longest on the rail. A reel, a camera on a real
         dish or another window, how it shows, and what it does to the liquid.
       */}
-      <section id="settings-film" className={`mb-8 scroll-mt-4 ${shown('film') ? '' : 'hidden'} ${focusSection === 'film' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="film">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-film" className={`${SECTION_CARD} ${shown('film') ? SECTION_GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
+        <h3 className={SECTION_TITLE}>
           <Film size={12} /> Film
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
@@ -1808,8 +1830,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         while the shapes had none on screen at all. The bay and every master
         over it are one place now, after the sources it reads.
       */}
-      <section id="settings-patches" className={`mb-8 scroll-mt-4 ${shown('patches') ? '' : 'hidden'} ${focusSection === 'patches' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="patches">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-patches" className={`${SECTION_CARD} ${shown('patches') ? SECTION_GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
+        <h3 className={SECTION_TITLE}>
           <Cable size={12} /> Patches
         </h3>
         <Info>
@@ -2033,8 +2055,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         right map as one button. Everything past that (learn, banks, bindings,
         the picture) is still the panel, one click away.
       */}
-      <section id="settings-midi" className={`mb-8 scroll-mt-4 ${shown('midi') ? '' : 'hidden'} ${focusSection === 'midi' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="inputs" data-section="midi">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-midi" className={`${SECTION_CARD} ${shown('midi') ? SECTION_GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
+        <h3 className={SECTION_TITLE}>
           <Sliders size={12} /> Controller
         </h3>
         {!midi ? (
@@ -2184,8 +2206,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         effects that shared it are under Lamp & Light, and the film projector
         is an input of its own.
       */}
-      <section id="settings-projectors" className={`mb-8 scroll-mt-4 ${shown('projectors') ? '' : 'hidden'} ${focusSection === 'projectors' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="projectors">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-projectors" className={`${SECTION_CARD} ${shown('projectors') ? SECTION_GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
+        <h3 className={SECTION_TITLE}>
           <Projector size={12} /> Wall
         </h3>
         {onProjectorMode && (
@@ -2214,8 +2236,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Mapping Section */}
-      <section id="settings-mapping" className={`mb-8 scroll-mt-4 ${shown('mapping') ? '' : 'hidden'} ${focusSection === 'mapping' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="mapping">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-mapping" className={`${SECTION_CARD} ${shown('mapping') ? SECTION_GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
+        <h3 className={SECTION_TITLE}>
           <Shapes size={12} /> Mapping
         </h3>
         {output && onOutput && <MappingPanel output={output} onChange={onOutput} />}
@@ -2231,8 +2253,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         whoever is paying for the room: it dissolves in about four seconds.
         This one sits over the top and stays put for three hours.
       */}
-      <section id="settings-mark" className={`mb-8 scroll-mt-4 ${shown('mark') ? '' : 'hidden'} ${focusSection === 'mark' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="stage" data-section="mark">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-mark" className={`${SECTION_CARD} ${shown('mark') ? SECTION_GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
+        <h3 className={SECTION_TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
         <div className="flex gap-2 mb-5">
@@ -2277,8 +2299,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </Info>
       </section>
 
-      <section id="settings-simulation" className={`mb-8 scroll-mt-4 ${shown('simulation') ? '' : 'hidden'} ${focusSection === 'simulation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="simulation">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-simulation" className={`${SECTION_CARD} ${shown('simulation') ? SECTION_GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
+        <h3 className={SECTION_TITLE}>
           <Zap size={12} /> Simulation
         </h3>
         <div className="flex flex-col gap-2 mb-3">
@@ -2353,8 +2375,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Macro Closeup Section */}
-      <section id="settings-macro" className={`mb-8 scroll-mt-4 ${shown('macro') ? '' : 'hidden'} ${focusSection === 'macro' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="macro">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-macro" className={`${SECTION_CARD} ${shown('macro') ? SECTION_GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
+        <h3 className={SECTION_TITLE}>
           <Microscope size={12} /> Macro Closeup
         </h3>
         {/*
@@ -2515,8 +2537,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Squish Plate Section */}
-      <section id="settings-squish" className={`mb-8 scroll-mt-4 ${shown('squish') ? '' : 'hidden'} ${focusSection === 'squish' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="squish">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-squish" className={`${SECTION_CARD} ${shown('squish') ? SECTION_GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
+        <h3 className={SECTION_TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
         <Slider
@@ -2825,8 +2847,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Heat Slide Section */}
-      <section id="settings-heat" className={`mb-8 scroll-mt-4 ${shown('heat') ? '' : 'hidden'} ${focusSection === 'heat' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="heat">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-heat" className={`${SECTION_CARD} ${shown('heat') ? SECTION_GRID : 'hidden'} ${focusSection === 'heat' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="heat">
+        <h3 className={SECTION_TITLE}>
           <Thermometer size={12} /> Heat Slide
         </h3>
         {/* Heat Intensity and Boiling Point were here: nothing in either solver
@@ -2854,8 +2876,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Manual Interaction Section */}
-      <section id="settings-interaction" className={`mb-8 scroll-mt-4 ${shown('interaction') ? '' : 'hidden'} ${focusSection === 'interaction' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="interaction">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-interaction" className={`${SECTION_CARD} ${shown('interaction') ? SECTION_GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
+        <h3 className={SECTION_TITLE}>
           <Wind size={12} /> Manual Interaction
         </h3>
         {/* "Updraft", not "Blow Velocity": it is a constant draught over the
@@ -2895,16 +2917,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
-      <section id="settings-liquids" className={`mb-8 scroll-mt-4 ${shown('liquids') ? '' : 'hidden'} ${focusSection === 'liquids' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="liquids">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-liquids" className={`${SECTION_CARD} ${shown('liquids') ? SECTION_GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
+        <h3 className={SECTION_TITLE}>
           <FlaskConical size={12} /> Liquids
         </h3>
         {liquids ? <LiquidDesigner {...liquids} /> : <div className="text-[12px] opacity-35">The shelf is not available here.</div>}
       </section>
 
       {/* Fluid Physics Section */}
-      <section id="settings-physics" className={`mb-8 scroll-mt-4 ${shown('physics') ? '' : 'hidden'} ${focusSection === 'physics' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="setup" data-section="physics">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-physics" className={`${SECTION_CARD} ${shown('physics') ? SECTION_GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
+        <h3 className={SECTION_TITLE}>
           <Zap size={12} /> Fluid Physics
         </h3>
         {/*
@@ -2959,8 +2981,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Automation Section */}
-      <section id="settings-automation" className={`mb-8 scroll-mt-4 ${shown('automation') ? '' : 'hidden'} ${focusSection === 'automation' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="automation">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-automation" className={`${SECTION_CARD} ${shown('automation') ? SECTION_GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
+        <h3 className={SECTION_TITLE}>
           <Sparkles size={12} /> Automation
         </h3>
         <Slider
@@ -2990,8 +3012,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
 
       {/* Mixer Section */}
-      <section id="settings-layers" className={`mb-8 scroll-mt-4 ${shown('layers') ? '' : 'hidden'} ${focusSection === 'layers' ? 'rounded-lg ring-1 ring-white/25' : ''}`} data-group="perform" data-section="layers">
-        <h3 className="text-[12px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
+      <section id="settings-layers" className={`${SECTION_CARD} ${shown('layers') ? SECTION_GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
+        <h3 className={SECTION_TITLE}>
           <Layers size={12} /> Multi-Layer Mixer
         </h3>
         <Slider

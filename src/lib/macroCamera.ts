@@ -258,7 +258,7 @@ export class MacroCamera {
     // A slow push with the energy, and a strong kick's push-in that eases back.
     const push = 1 + energy * (0.05 + sync * 0.05);
     const punch = 1 + this.punchLeft * this.punchLeft * 0.06;
-    const wantZoom = Math.max(1, opts.zoom * breathe * dolly * push * punch);
+    const wantZoom = Math.max(1, opts.zoom * this.eased(opts.zoom, breathe * dolly * push * punch));
     // The punch is quicker in than out; everything eases.
     const zoomRate = wantZoom > this.smoothZoom ? 4 + sync * 4 : 3;
     this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-zoomRate * step));
@@ -325,7 +325,7 @@ export class MacroCamera {
 
     const push = 1 + m.energy * m.sync * 0.08;
     const punch = 1 + this.punchLeft * this.punchLeft * 0.06;
-    const wantZoom = Math.max(1, opts.zoom * push * punch);
+    const wantZoom = Math.max(1, opts.zoom * this.eased(opts.zoom, push * punch));
     const zoomRate = wantZoom > this.smoothZoom ? 4 + m.sync * 4 : 3;
     this.smoothZoom += (wantZoom - this.smoothZoom) * (1 - Math.exp(-zoomRate * step));
 
@@ -480,6 +480,16 @@ export class MacroCamera {
   }
 
   /** Centre a frame of half-width `half` inside 0..1, centring it if it doesn't fit. */
+  /**
+   * The breathing, the dolly and the music's push, in proportion to how far in
+   * the zoom is: at 1.1x a breath of 13% swung the frame past the plate's edge
+   * and back, which read as the first steps of the zoom not being smooth.
+   * Fully itself from 2x.
+   */
+  private eased(zoom: number, mod: number): number {
+    return 1 + (mod - 1) * clamp(zoom - 1, 0, 1);
+  }
+
   private frameClamp(c: number, half: number): number {
     if (half >= 0.5) return 0.5;
     return clamp(c, half, 1 - half);

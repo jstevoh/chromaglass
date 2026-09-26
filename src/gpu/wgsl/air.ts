@@ -50,6 +50,8 @@ struct VOut {
   @location(0) local: vec2f,
   @location(1) amt: f32,
   @location(2) @interpolate(flat) rim: vec4f,
+  /** Its size, film age and number, packed (see below), as the plate reads them. */
+  @location(3) @interpolate(flat) look: vec2f,
 };
 
 @vertex
@@ -68,6 +70,16 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
   o.local = corner * reach;
   o.amt = d.w;
   o.rim = f;
+  /*
+    Its size (16 steps on a log scale, 0.004 to 0.16 of the plate, so a
+    small bubble's size is as well told as a large one's), its film's age (16 steps)
+    and a number of its own (8, from its finger phase, random per bubble),
+    as one whole number under 2048, which half floats hold exactly.
+  */
+  let sizeQ = floor(clamp(log2(max(d.z, 1e-4) / 0.004) / 5.321928, 0.0, 1.0) * 15.0 + 0.5);
+  let ageQ = floor(clamp(f.w, 0.0, 1.0) * 15.0 + 0.5);
+  let idQ = floor(fract(f.z / 6.2831853) * 7.99);
+  o.look = vec2f((sizeQ * 128.0 + ageQ * 8.0 + idQ) / 2048.0, 0.0);
   return o;
 }
 
@@ -92,6 +104,8 @@ fn rimAt(theta: f32, rim: vec4f) -> f32 {
 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4f {
+  // A texel, in units of this bubble's radius (before anything is discarded).
+  let px = fwidth(in.local.x);
   let r = length(in.local);
   let edge = rimAt(atan2(in.local.y, in.local.x), in.rim);
   if (r > edge) { discard; }
@@ -106,7 +120,24 @@ fn fs(in: VOut) -> @location(0) vec4f {
     a peak of 0.01: present, plausible, and useless. A check that only asked
     whether there was air would have passed.
   */
-  let a = in.amt * (1.0 - smoothstep(edge * (1.0 - max(A.soft, 0.01)), edge, r));
-  return vec4f(a, 0.0, 0.0, 1.0);
+  /*
+    And never softer than a texel and a half: a bubble three texels across
+    with a rim one texel soft is a staircase, and the dye taken out round it
+    and the plate's relief on that hole drew each small bubble with a square,
+    stepped halo.
+  */
+  let soft = clamp(max(A.soft, 1.5 * px / max(edge, 1e-3)), 0.01, 0.9);
+  let a = in.amt * (1.0 - smoothstep(edge * (1.0 - soft), edge, r));
+  /*
+    Where in the bubble this is, across and down in units of its radius, in
+    0-1 and weighted by the coverage: the plate divides the coverage back
+    out, so filtering between texels gives the true position (it is linear
+    across a bubble) even at the rim. The slope of a height field was tried
+    first and on a small bubble came out in visible wedges, a slope measured
+    on a coarse grid being a step function. The height follows from this.
+    The field is read y-down, and the quad's local position is clip space's y-up.
+  */
+  let q = clamp(in.local / max(edge, 1e-3), vec2f(-1.0), vec2f(1.0));
+  return vec4f(a, a * (0.5 + 0.5 * q.x), a * (0.5 - 0.5 * q.y), in.look.x);
 }
 `;

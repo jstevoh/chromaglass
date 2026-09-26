@@ -75,6 +75,8 @@ export interface SetItem {
 export interface SetList {
   name: string;
   items: SetItem[];
+  /** Emptied on purpose ("New empty set"), so it opens empty rather than as the starter set. */
+  emptied?: boolean;
 }
 
 export interface SetListFile {
@@ -91,6 +93,37 @@ let counter = 0;
 export const setItemId = (): string => `set-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 export const emptySet = (): SetList => ({ name: 'My set', items: [] });
+
+/**
+ * What a first visit starts with: every look, in order, as items of a set
+ * that can be trimmed. The items take the looks' own ids, so a set built
+ * from this one still names its rows the way the desk always has.
+ */
+export const starterSet = (lookIds: string[]): SetList => ({
+  name: 'All presets',
+  items: lookIds.map((ref) => ({ id: ref, kind: 'look' as const, ref })),
+});
+
+/** The sets kept by name, as the set menu's Save and Open see them. */
+export const SAVED_SETS_KEY = 'chromaglass-sets';
+
+export function loadSavedSets(): SetList[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SAVED_SETS_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((x): x is SetList => isObj(x) && typeof x.name === 'string' && Array.isArray(x.items)) : [];
+  } catch { return []; }
+}
+
+export function storeSavedSets(sets: SetList[]): void {
+  try { localStorage.setItem(SAVED_SETS_KEY, JSON.stringify(sets)); } catch { /* private window: this session only */ }
+}
+
+/** `set` kept under its name, replacing a set of the same name. */
+export function withSavedSet(sets: SetList[], set: SetList): SetList[] {
+  const kept = { name: set.name, items: set.items.map((i) => ({ ...i })) };
+  const at = sets.findIndex((x) => x.name === set.name);
+  return at < 0 ? [...sets, kept] : sets.map((x, i) => (i === at ? kept : x));
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
@@ -226,18 +259,26 @@ export function writeSetListFile(list: SetList, presets: UserPreset[], sequences
   }, null, 2);
 }
 
-export function loadSetList(): SetList {
+/**
+ * The set the desk opens with: the one left there last time, or, on a first
+ * visit, `first` (the starter set of every look). A stored set with nothing
+ * in it and no mark of having been emptied on purpose is from before there
+ * was a starter set, when an empty set meant "all looks": it gets the
+ * starter too.
+ */
+export function loadSetList(first: () => SetList = emptySet): SetList {
   try {
     const raw = localStorage.getItem(SETLIST_KEY);
-    if (!raw) return emptySet();
+    if (!raw) return first();
     const parsed = JSON.parse(raw);
     if (isObj(parsed) && Array.isArray(parsed.items)) {
       const items = parsed.items.filter((i: unknown): i is SetItem =>
         isObj(i) && typeof i.id === 'string' && typeof i.ref === 'string' && ['look', 'saved', 'sequence'].includes(i.kind as string));
-      return { name: str(parsed.name) ?? 'My set', items };
+      if (items.length === 0 && parsed.emptied !== true) return first();
+      return { name: str(parsed.name) ?? 'My set', items, ...(parsed.emptied === true ? { emptied: true } : {}) };
     }
-  } catch { /* a broken store is an empty set */ }
-  return emptySet();
+  } catch { /* a broken store is a fresh start */ }
+  return first();
 }
 
 export function saveSetList(list: SetList): void {

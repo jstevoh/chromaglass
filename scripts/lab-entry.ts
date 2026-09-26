@@ -84,7 +84,7 @@ const api = {
    * (the app ramps it from 1x to 2x).
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
@@ -95,7 +95,7 @@ const api = {
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false, flowRate: 0.05,
         rotations: [0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
-        kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: 0 },
+        kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3, mark: null, film: { kind: 'none', video: null },
       },
@@ -104,7 +104,7 @@ const api = {
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: null, view: null }], 1);
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: null }], 1);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
