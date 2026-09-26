@@ -43,7 +43,9 @@ concurrency:
 
 jobs:
   film:
-    name: Film (macOS)${{ github.event_name == 'pull_request' && '' || format(' {0}/6', matrix.shard) }}
+    # `&& ''` would fall through (an empty string is false in an expression),
+    # which labelled a pull request's single runner "1/6".
+    name: Film (macOS) ${{ matrix.shard }}/${{ github.event_name == 'pull_request' && '1' || '6' }}
     runs-on: macos-15
     timeout-minutes: 240
     strategy:
