@@ -1402,6 +1402,30 @@ check('and neither starts over the limit',
     walked > 20 && lo >= 0.29 && hi <= 0.71,
     `walked ${walked} times, between ${lo.toFixed(2)} and ${hi.toFixed(2)}`);
 }
+/*
+  But it never moves where the magnet sits. The Magnet tool sets the magnet
+  down and it stays until the look places its own somewhere (magnetFor in
+  LiquidVisualizer), and a drift of Magnet Across or Up is the look placing
+  it: before magnetX and magnetY were held out of the drift, 165 of these
+  4000 rolls moved one of them, and under Evolve the magnet the owner left in
+  a corner went back to the middle at the first. Measured on the same
+  ferrofluid look as the walk above, where they would otherwise be live.
+*/
+{
+  const anchor = { ...DEFAULT_SETTINGS, phaseAmount: 0.8, magnetStrength: 0.8, magnetWalk: 0.5 };
+  let bits = 20260926;
+  const roll = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
+  let current = { ...anchor }, placed = 0, walked = 0;
+  for (let i = 0; i < 4000; i++) {
+    const patch = driftLook(current, anchor, 1, roll);
+    if ('magnetX' in patch || 'magnetY' in patch) placed++;
+    if ('magnetWalk' in patch) walked++;
+    current = { ...current, ...patch };
+  }
+  check('evolve never moves where the magnet sits, only how it walks',
+    placed === 0 && walked > 20,
+    `Magnet Across or Up moved ${placed} times in 4000 drifts, the walk ${walked}`);
+}
 
 // ── The plate's speed follows the music (lib/tempoPace.ts) ─────────
 /*

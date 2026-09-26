@@ -1726,9 +1726,11 @@ export class WebGPUFluid {
     const phi0 = field.read;
     this.run(pass, 'advect', this.scratchA, [phi0, velTex, this.sampler], fwd);
     this.run(pass, 'advect', this.scratchB, [this.scratchA, velTex, this.sampler], back);
-    this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.sampler], fwd);
+    // The dye is an amount and thins where the flow spreads (see macCormack);
+    // the velocity is carried as it was.
+    const last = label === 'dye' ? this.arg('advect dye conserving', [disp, 1, 0, 0]) : fwd;
+    this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.sampler], last);
     field.swap();
-    void label;
   }
 
   /** One frame of the drain: inward spiral, transport, evaporate. */
