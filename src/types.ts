@@ -505,9 +505,10 @@ export interface VisualizerSettings {
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
   /*
     How far the beads go from dark-rimmed rings to drops (PLAN.md batch 3):
-    each its own colour from the look's palette, a domed body lit by the lamp
-    with one highlight, walls pressed flat where drops crowd, and a drop that
-    swallowed a smaller one still showing it. 0 is the rings exactly as they
+    each its own colour from the look's palette, a lens over what is under it
+    (no highlight: a plate lit from beneath shows transmitted light), walls
+    pressed flat where drops crowd, droplets round the big ones, and a drop
+    that swallowed a smaller one still showing it. 0 is the rings exactly as they
     were, so every look made before this is the same picture.
   */
   beadDrops: number;

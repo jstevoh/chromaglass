@@ -123,7 +123,7 @@ like oil or like sweets.
 Three things to look at. Whether a crowd reads as liquid or as candy: after
 your "very cartoon like", both the rings and the drops were matched to
 photographs of backlit oil, water drops and emulsions
-(`/mnt/project-files/drops/references`). A small drop now shows the plate
+(kept in the project's shared files, drops/references, not in the repo). A small drop now shows the plate
 round it upside down, a big one is flat on top and shows what is under it as
 it is, every drop is outlined by a thin dark line at its contact, and there is
 no highlight at all, since none of the backlit pictures has one. Every drop
@@ -132,8 +132,9 @@ carry two colours, and with Drops up, the big drops gather rings of droplets. Th
 the rings in every look that has beads, not only the drops. Whether the
 inverted view reads as liquid when the plate moves under it, and whether you
 want a highlight back. And the frame time: the drops' mask
-is drawn a pixel at a time on the main thread, 6.7 ms against the rings'
-canvas at 3.9 in the sandbox's Chromium for the same crowd of about 330. If
+is drawn a pixel at a time on the main thread: 11 to 12 ms for the crowd of
+about 530 with droplets, against 6.7 ms for the 330 without them and the
+rings' canvas at 3.9, in the sandbox's Chromium. If
 `frameMs` climbs with it on, that is the number to report.
 
 ---

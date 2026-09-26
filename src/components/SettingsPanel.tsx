@@ -1174,7 +1174,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="beadDrops"
         />
         <Info>
-          Drops turns the oil beads from dark-rimmed rings into drops of colour: each takes a dye from the look, catches the lamp in one highlight, presses flat against its neighbours, and keeps a smaller drop it swallowed visible inside it.
+          Drops turns the oil beads from dark-rimmed rings into drops of colour: each takes a dye from the look, is a lens over the liquid under it, presses flat against its neighbours, gathers a ring of droplets, and keeps a smaller drop it swallowed visible inside it.
         </Info>
         <Slider
           label="Plate Cells"

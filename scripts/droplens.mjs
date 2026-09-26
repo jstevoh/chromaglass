@@ -6,7 +6,7 @@
  *
  * Reported: the beads and drops "look very cartoon like". Photographs of oil
  * on backlit water and of projected liquid light shows (the "Drops, not
- * rings" thread; /mnt/project-files/drops/references) agree on what a drop
+ * rings" thread, kept in the project's shared files, not the repo) agree on what a drop
  * is and none of it was drawn: a small drop turns the plate round it upside
  * down, a big one is flat on top and shows what is under it as it is, both
  * are outlined by a thin dark line where the meniscus throws the light
@@ -60,6 +60,14 @@ try {
       for (const b of beads) f.beads.push({ age: 5, seed: 0.5, ...b });
       f.dirty = true;
       return f.render();
+    };
+    // The drops' mask as the field draws it (rasterDrops), twice as wide.
+    const wide = (beads) => {
+      const px = new Uint8ClampedArray(S * 2 * S * 4);
+      lab.rasterDrops(beads.map((b) => ({ age: 5, seed: 0.5, color: [1, 0.48, 0], ...b })), N, S, px, new Float32Array(S * S), new Int32Array(S * S), 1);
+      const c = new OffscreenCanvas(S * 2, S);
+      c.getContext('2d').putImageData(new ImageData(px, S * 2, S), 0, 0);
+      return c;
     };
     const lum = (px, i) => 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
     const rgb = (px, x, y) => { const i = (y * S + x) * 4; return [px[i], px[i + 1], px[i + 2]]; };
@@ -190,6 +198,68 @@ try {
       out.reach = { d, e, dOff, eApart: which(refs, refs.E) === 'E' };
     }
     /*
+      Where drops press together. At a wall between two drops the dome is
+      nearly level across the lens's taps, and the size it implied ran up to
+      the whole plate: a push of a few radii then read the plate from far
+      across it, flecks of distant colour down every wall at 3x. The pair is
+      a three-cell drop pressed a fifth into one of three and a half, as in
+      a crowd: a pair of one size put the level spot on the wall's middle,
+      where the lens stops, and passed with the cap removed (a copy of the
+      lens's arithmetic on the pair's mask: the farthest read 0.23 of the
+      plate for two of a size, 1.55 for these). They sit in the middle of a
+      disc of A three tenths across, B all round it; the farthest a drop of
+      the biggest size can see is two tenths, so no pixel may show B.
+      Near the wall the dark outline takes most of the light, so a pixel's
+      dye is asked of its hue (its colour over its sum), not its brightness.
+    */
+    {
+      const pc = [0.4, 0.42];
+      await plate((x, y) => (Math.hypot(x - pc[0], y - pc[1]) < 0.3 ? A : B));
+      const refs = { A: await swatch(pc[0], pc[1]), B: await swatch(0.9, 0.9) };
+      const hue = (c) => { const s = c[0] + c[1] + c[2]; return s < 30 ? null : c.map((v) => v / s); };
+      const hueRefs = { A: hue(refs.A), B: hue(refs.B) };
+      const whichHue = (c) => { const h = hue(c); return h && which(hueRefs, h); };
+      const pair = [{ x: pc[0] * N - 2.4, y: pc[1] * N, r: 3 }, { x: pc[0] * N + 2.6, y: pc[1] * N, r: 3.4 }];
+      const cam = { zoom: 3, macroAmount: 0, cx: pc[0], cy: pc[1] };
+      const far = {};
+      for (const [name, over, bm] of [['rings', { beads: 0.8 }, mask(pair)], ['drops', { beads: 0.8, beadDrops: 1 }, wide(pair)]]) {
+        const on = await lab.render(S, over, { ...cam, beadMask: bm });
+        const off = await lab.render(S, { beads: 0 }, cam);
+        let changed = 0, b = 0;
+        for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
+          const i = (yy * S + xx) * 4;
+          if (Math.abs(on[i] - off[i]) + Math.abs(on[i + 1] - off[i + 1]) + Math.abs(on[i + 2] - off[i + 2]) > 24) changed++;
+          if (whichHue(rgb(on, xx, yy)) === 'B' && whichHue(rgb(off, xx, yy)) !== 'B') b++;
+        }
+        far[name] = { changed, b };
+      }
+      out.pairApart = which(hueRefs, hueRefs.B) === 'B' && which(hueRefs, hueRefs.A) === 'A' && hueRefs.A && hueRefs.B;
+      out.pair = far;
+    }
+    /*
+      The drops' own mask, twice as wide: each drop's colour in the right
+      half. A green drop on the red plate is green in its middle; and the
+      mask's seam is not a drop. The plate's right edge reads the mask just
+      left of the seam, and a drop at the plate's left edge has its colour
+      just right of it: a tap that strayed across would draw that colour as
+      a drop where there is none.
+    */
+    {
+      await plate(() => A);
+      const G = [0.31, 0.78, 0.47];
+      const bm = wide([{ x: 0.03 * N, y: 0.42 * N, r: 3, color: G }, { x: 0.5 * N, y: 0.42 * N, r: 4, color: G }]);
+      const mid = { zoom: 3, macroAmount: 0, cx: 0.5, cy: 0.42 };
+      const on = await lab.render(S, { beads: 0.8, beadDrops: 1 }, { ...mid, beadMask: bm });
+      const off = await lab.render(S, { beads: 0 }, mid);
+      const c = rgb(on, S / 2, S / 2), p = rgb(off, S / 2, S / 2);
+      const edge = { zoom: 3, macroAmount: 0, cx: 0.97, cy: 0.42 };
+      const eOn = await lab.render(S, { beads: 0.8, beadDrops: 1 }, { ...edge, beadMask: bm });
+      const eOff = await lab.render(S, { beads: 0 }, edge);
+      let seam = 0;
+      for (let i = 0; i < eOn.length; i += 4) if (Math.abs(eOn[i] - eOff[i]) + Math.abs(eOn[i + 1] - eOff[i + 1]) + Math.abs(eOn[i + 2] - eOff[i + 2]) > 24) seam++;
+      out.dyed = { c, p, seam };
+    }
+    /*
       The second plate turns the line over: A below y = 0.5, B above. The
       same small drop across it asks the lens's other axis, which the first
       plate's middle row cannot see. Then a big drop, seven cells (a merged
@@ -286,6 +356,12 @@ try {
   check('no highlight: no drop is brighter than the plate beneath it by more than the light it gathers',
     m.bright.small < 1.45 && m.bright.big < 1.45,
     `at most ×${m.bright.small.toFixed(2)} in the small drop, ×${m.bright.big.toFixed(2)} in the big one`);
+  check('where two drops press together, neither shows the far side of the plate',
+    m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
+    `pixels of the dye beyond three tenths: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
+  check('a dyed drop is its dye in the middle', m.dyed.c[1] - m.dyed.p[1] > 40,
+    `green ${m.dyed.p[1]} → ${m.dyed.c[1]} (the plate ${m.dyed.p.join(',')}, the drop ${m.dyed.c.join(',')})`);
+  check('and the wide mask\'s seam is not a drop', m.dyed.seam === 0, `${m.dyed.seam} pixels changed at the plate's right edge`);
   check('the rings\' mask carries a bead\'s fade in its red, on an opaque canvas',
     Math.abs(m.fade.red - 128) <= 12 && m.fade.clear === 0,
     `red ${m.fade.red} half way through the fade; ${m.fade.clear} texels less than opaque`);

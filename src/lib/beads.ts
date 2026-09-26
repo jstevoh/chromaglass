@@ -156,6 +156,9 @@ export class BeadField {
     this.palette = colors.map(c => [c.r, c.g, c.b]);
   }
 
+  /** Whether the field has been handed a palette yet: until it has, drops are drawn white. */
+  get hasPalette(): boolean { return this.palette.length > 0; }
+
   private slotColour(seed: number): [number, number, number] | undefined {
     const p = this.palette;
     return p.length ? p[paletteSlot(seed, p.length)] : undefined;
@@ -443,8 +446,11 @@ export class BeadField {
           // current packs them on top of each other, and one in six lost its
           // own middle to a neighbour.
           const smaller = b.r < o.r ? b : o, larger = smaller === b ? o : b;
-          const takes = !smaller.tiny || larger.tiny;
-          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < 0.02) || (larger.tiny && d < touch * 0.6))) {
+          // Droplets merge only with droplets: a bead can be smaller than a
+          // droplet, and a droplet that took one in carried it as a passenger
+          // (eighteen did on the drops check's crowd).
+          const takes = !!smaller.tiny === !!larger.tiny;
+          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < 0.02) || (smaller.tiny && d < touch * 0.6))) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
@@ -461,7 +467,7 @@ export class BeadField {
               halves of one drop, not one inside another), and a drop holds
               one: a second merge keeps whichever is larger.
             */
-            if (this.drops > 0 && !small.tiny && small.r < bigR * 0.7 && (!big.inner || big.inner.r < small.r)) {
+            if (this.drops > 0 && !small.tiny && !big.tiny && small.r < bigR * 0.7 && (!big.inner || big.inner.r < small.r)) {
               let dx = small.x - big.x, dy = small.y - big.y;
               const room = Math.max(0, (big.r - small.r) * 0.8);
               const dl = Math.hypot(dx, dy);
@@ -507,8 +513,10 @@ export class BeadField {
           if (Math.abs(dx) > o.r || Math.abs(dy) > o.r) continue;
           const d = Math.hypot(dx, dy);
           if (d >= o.r) continue;
-          const k = (o.r + t.r * 0.6) / Math.max(d, 1e-3);
-          t.x = o.x + (d > 1e-3 ? dx : t.r) * k; t.y = o.y + (d > 1e-3 ? dy : 0) * k;
+          // Out along the line from the drop's centre (any way at all from the
+          // centre itself), to sit a little into its rim.
+          const ux = d > 1e-3 ? dx / d : 1, uy = d > 1e-3 ? dy / d : 0, to = o.r + t.r * 0.6;
+          t.x = o.x + ux * to; t.y = o.y + uy * to;
         }
       }
     }

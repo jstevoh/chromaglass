@@ -6172,7 +6172,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // palette with the populate below, since a new one is eased
                 // toward over a second and a half rather than cut to.
                 beads.drops = currentSettings.beadDrops ?? 0; // clamped, and NaN made 0, by the field
-                if (simStep === 0 && beadFrameRef.current % 30 === 0 && beads.drops > 0) {
+                if (simStep === 0 && (beadFrameRef.current % 30 === 0 || !beads.hasPalette) && beads.drops > 0) {
                   beads.setPalette(harmonyRef.current.map(i => PALETTE_RGB[i] ?? PALETTE_RGB[0]));
                 }
                 if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {

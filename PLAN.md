@@ -194,8 +194,8 @@ along one straight wall with the dome under a pixel high there, and every
 compound drop showing its passenger. Each of those claims was run against the
 fault it names (a dome that ignores its walls, a gap down every contact, a
 passenger drawn white, the rings' arithmetic touched at 0) and goes red. The
-fourth, the highlight, is the shader's; the lab shows one per drop toward the
-lamp, and whether it reads as oil is for the Mac. On the lab's plate, same
+fourth, the highlight, is the shader's, and was later dropped (below: the
+photographs have none). On the lab's plate, same
 field, rings against drops: structure at 8 px 3.0 % → 4.7 %, and on a 2× crop
 0.9 % → 1.7 %, with 4 px 0.5 % → 0.8 %. That lab plate is not the Fillmore
 plate batch 2 was measured on, so the 4 and 8 px gate carried here from batch 2
@@ -212,7 +212,7 @@ two drops in five were compound after twenty crowded seconds; they dissolve.
 
 **Reshaded against photographs, and the highlight is gone.** On "very cartoon
 like", the drops were matched to pictures of the real thing
-(`/mnt/project-files/drops/references`: oil on backlit water, projected light
+(the project's shared files, drops/references, not in the repo: oil on backlit water, projected light
 shows, water drops, emulsions, foam). They agree, and they disagree with the
 gate's "visible highlights": a plate lit from beneath shows transmitted light,
 and not one of the backlit pictures has a white dot. What they do show is now

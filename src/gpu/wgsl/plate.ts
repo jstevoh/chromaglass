@@ -1088,6 +1088,8 @@ fn viewAt(uv: vec2f) -> View {
 */
 const DROP_INVERT: f32 = 3.0;
 const DROP_REACH: f32 = 0.06;
+/** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
+const DROP_BIGGEST: f32 = 0.045;
 fn beadWide() -> bool {
   let d = textureDimensions(beadTex);
   return d.x > d.y;
@@ -1128,9 +1130,18 @@ fn dropLens(uv: vec2f) -> vec4f {
   let g2 = dot(g, g);
   let r = clamp(1.0 - h, 0.0, 1.0);
   if (g2 < 1.0) { return vec4f(0.0, 0.0, r, 0.0); }
-  let R = inverseSqrt(g2);
+  /*
+    No drop is bigger than DROP_BIGGEST. Where the taps straddle the wall
+    between two drops of a size, the dome is nearly level across them, the
+    size it implies runs up to the whole plate, and a push of three radii
+    read the plate from up to three plate-widths away: eight in a hundred
+    fragments of a crowd at 3x sampled farther than any drop can see, most
+    within a texel of a wall (a copy of this arithmetic run on the drops
+    check's crowd). Held to the biggest drop, a wall shows a nearby patch.
+  */
+  let R = min(inverseSqrt(g2), DROP_BIGGEST);
   // toC runs from here to the centre, r radii long.
-  let toC = g * (1.0 - h) / g2;
+  let toC = normalize(g) * r * R;
   /*
     The push comes in with the mask's coverage rather than at a threshold.
     The outermost texels of a drop are its antialiasing, and there both the
@@ -1340,7 +1351,7 @@ struct FsOut {
   if (U.dishSpread > 0.001) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
   // Where the eye meets the plate's surface: the drops sit here, and what is
   // under a drop is read through it (dropLens), before anything is sampled,
-  // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
+  // so the dye, the ferrofluid, the oil and the chemistry are all seen through it.
   let fuvSurf = fuv0;
   var drop = vec4f(0.0, 0.0, -1.0, 0.0);
   if (U.beads > 0.001) {
