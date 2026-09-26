@@ -405,7 +405,20 @@ export class BeadField {
     }
     const ctx = this.ctx!;
     const S = this.size, k = S / this.grid;
-    ctx.clearRect(0, 0, S, S);
+    /*
+      Opaque black under everything, as the drops' mask has (rasterDrops).
+      The canvas keeps its pixels premultiplied and the upload hands the
+      texture straight alpha, so on a clear canvas every texel a bead's
+      antialiased edge touched came back fully red however little of it
+      the bead covered, its dome divided back up to noise, and a bead's age
+      fade never reached the red at all. At 3x the lens and the edge line
+      read those texels as a staircase of dark squares round every bead.
+      Drawn over black, the red is coverage times fade, which is what the
+      shader was always told it was.
+    */
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, S, S);
     ctx.lineJoin = 'round';
     /*
       Belt as well as braces: `step` drops a non-finite bead, and this is
@@ -430,6 +443,16 @@ export class BeadField {
       ctx.fillStyle = grad;
       ctx.beginPath(); ctx.arc(b.x * k, b.y * k, rr, 0, Math.PI * 2); ctx.fill();
     }
+    /*
+      The rims go into green alone, added, as the drops' mask keeps them
+      (rasterDrops). Laid over the interiors in the ordinary way, a rim at
+      nine tenths alpha took nine tenths of the red and the blue under it, so
+      the outer tenth of every bead read to the shader as barely a bead and
+      its dome as a tenth of itself: the lens found a centre ten radii away
+      and showed a piece of plate from there, a pale fleck on the rim, and
+      the contact line was drawn at a tenth of its strength (npm run droplens).
+    */
+    ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = 'rgb(0,255,0)';
     for (const b of this.beads) {
       if (!drawable(b)) continue;
@@ -441,6 +464,7 @@ export class BeadField {
       ctx.beginPath(); ctx.arc(b.x * k, b.y * k, rr - ctx.lineWidth * 0.5, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
     this.dirty = false;
     return this.canvas;
   }

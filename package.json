@@ -74,6 +74,7 @@
     "microscope": "node scripts/microscope.mjs",
     "pops": "node scripts/pops.mjs",
     "drops": "node scripts/drops.mjs",
+    "droplens": "node scripts/droplens.mjs",
     "particles": "node scripts/particles.mjs",
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",

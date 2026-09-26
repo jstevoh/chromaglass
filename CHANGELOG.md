@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   swallows a smaller one keeps it visible for fifteen to thirty-five seconds.
   `npm run drops` measures the field and its mask (PLAN.md batch 3).
 
+### Changed — beads shaded from photographs
+
+- **The beads and drops are lenses, not stickers.** Matched to photographs of
+  backlit oil, water drops and emulsions: a small drop shows the plate round
+  it upside down, a big one is flat on top and shows what is under it, each is
+  outlined by a thin dark line at its contact, and the white dot is gone.
+  `npm run droplens` measures each on one drop.
+- **Fixed: dark squares and pale flecks round beads when zoomed.** The rings'
+  mask was drawn on a clear canvas, and the upload's straight alpha turned
+  every edge texel full red and the fade-in into nothing; its rims also took
+  nine tenths of the dome under them. It is drawn on black now, rims added
+  into green alone, as the drops' mask always was.
+
 ### Added — the liquids' own physics and chemistry
 
 Each is a setting, off by default (docs/physics-plan.md has the models and

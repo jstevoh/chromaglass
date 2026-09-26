@@ -108,7 +108,7 @@ on, that is the thing to report.
 
 `beadDrops` (Settings, Show, under Oil Beads; MIDI-learnable) turns the beads from
 dark-rimmed lenses into drops of colour: each takes a dye from the look's palette,
-is lit across its dome with one highlight toward the lamp, presses flat against
+is a lens over what is under it (see below), presses flat against
 its neighbours, and keeps a smaller drop it swallowed visible inside it for
 fifteen to thirty-five seconds. It ships at zero everywhere, so nothing changes
 until you ask. `npm run drops` measures the field and the mask; the lab
@@ -121,11 +121,15 @@ like oil or like sweets.
 ```
 
 Three things to look at. Whether a crowd reads as liquid or as candy: after
-your "very cartoon like", both the rings and the drops are shaded as backlit
-oil lenses (a dimmed edge in the plate's own colour, a brighter middle, a
-glint instead of a white dot, and dyed oil that is clear at its rim), and
-this changes the rings in every look that has beads, not only the drops. Whether the highlight
-sits where the lamp is as the lamp wanders. And the frame time: the drops' mask
+your "very cartoon like", both the rings and the drops were matched to
+photographs of backlit oil, water drops and emulsions
+(`/mnt/project-files/drops/references`). A small drop now shows the plate
+round it upside down, a big one is flat on top and shows what is under it as
+it is, every drop is outlined by a thin dark line at its contact, and there is
+no highlight at all, since none of the backlit pictures has one. This changes
+the rings in every look that has beads, not only the drops. Whether the
+inverted view reads as liquid when the plate moves under it, and whether you
+want a highlight back. And the frame time: the drops' mask
 is drawn a pixel at a time on the main thread, 6.7 ms against the rings'
 canvas at 3.9 in the sandbox's Chromium for the same crowd of about 330. If
 `frameMs` climbs with it on, that is the number to report.

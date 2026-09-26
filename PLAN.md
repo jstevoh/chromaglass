@@ -197,6 +197,22 @@ thirty-nine cells in twenty seconds; only a drop no bigger than the
 population's own big lenses swallows now. And a passenger held forever meant
 two drops in five were compound after twenty crowded seconds; they dissolve.
 
+**Reshaded against photographs, and the highlight is gone.** On "very cartoon
+like", the drops were matched to pictures of the real thing
+(`/mnt/project-files/drops/references`: oil on backlit water, projected light
+shows, water drops, emulsions, foam). They agree, and they disagree with the
+gate's "visible highlights": a plate lit from beneath shows transmitted light,
+and not one of the backlit pictures has a white dot. What they do show is now
+drawn, and `npm run droplens` measures each on a single drop over a two-colour
+plate: a small drop turns the plate round it over (its near half reads 0.88 of
+the way to the far side's colour, 0.06 without it); a big drop is flat on top,
+so an edge under it stays on the same pixel; a thin dark line at the contact,
+23 % of the plate at its darkest, under seven tenths for 12 % of the radius and
+the flank inside it at full brightness (the first reshade's shadow held it to
+77 %); and nothing in a drop more than 1.08 × the plate under it, where the
+glint made it 2.4 ×. Whether to bring a highlight back (for the camera pass,
+which looks at the plate rather than through it) is the owner's.
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`

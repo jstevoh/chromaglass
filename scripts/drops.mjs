@@ -10,8 +10,9 @@
  * of those four are facts about the field and its mask rather than about the
  * shading, so they are measured here, where nothing depends on a GPU: the
  * mask is a pure function of the beads (`rasterDrops`), and it is exactly
- * what the plate shader reads. The highlight is the shader's, and is the
- * `look` skill's to photograph in the lab and the owner's to judge.
+ * what the plate shader reads. The fourth is the shader's, and after the
+ * owner's "very cartoon like" the photographs said a backlit drop has no
+ * highlight at all; `npm run droplens` measures the lens that replaced it.
  *
  * Every claim is measured on a field that has been *crowded* — drops pulled
  * toward three points for twenty seconds the way a slow current gathers

@@ -1028,20 +1028,43 @@ fn viewAt(uv: vec2f) -> View {
 }
 
 /*
-  A drop of oil sitting on the plate is a lens: a spherical cap, thick in the
-  middle and thin at its edge, so what lies under it is seen magnified at the
-  centre and squeezed toward the rim, the way a drop under a microscope shows
-  the pattern beneath it bigger than the pattern round it.
+  A drop of oil sitting on the plate is a lens, and which kind depends on its
+  size. Photographs of oil on water lit from beneath (references in the
+  "Drops, not rings" thread) all show the same two things, and neither is
+  the magnifying glass this used to draw:
+
+  - **A small drop is a ball lens, and it turns the world over.** Its eye is
+    past its focus, so it shows a small, upside-down picture of the plate
+    round it: where a yellow and a blue meet beside the drop, the drop shows
+    the blue on the yellow's side. That is what makes a cluster of droplets
+    read as liquid rather than as dots.
+  - **A big drop is a pancake**, flat on top once it is wider than the
+    meniscus is tall, so its middle is a window onto what is under it, seen
+    as it is. Only the curved band at its edge bends light, and it bends it
+    hard: that band shows a sliver of the far side, flipped, the crescent of
+    the wrong colour along one edge of every large drop in the pictures.
+
+  So the sample under a point at radius r (0 centre, 1 rim) is pushed toward
+  the centre and past it by an amount set by the surface's slope there. On
+  a small drop the slope climbs from the middle, so the push is DROP_INVERT
+  times r and the whole drop is one inverted view reaching DROP_INVERT - 1
+  radii past its far edge. On a big one it is zero across the flat and
+  climbs across the band. How flat a drop is comes from its size in the
+  plate's own units, since the meniscus has a size of its own (the
+  capillary length) and a drop only goes flat when it is wider than that.
+  There is no attempt to join the view to the plate outside at the rim:
+  real ones do not either, and the dark line at the contact (the shading,
+  below) is where the jump goes.
 
   The bead mask's blue is a ramp 1 - d/R (d from the bead's centre, R its
   radius), times the bead's fade in red. Its gradient points at the centre
   with length 1/R, so from any point inside, the centre is (1 - h)/|grad h|
-  away along it, which finds the drop's middle without a list of beads. The
-  point at radius r (0 centre, 1 rim) shows what lies at radius rs, with rs =
-  r(a + (1 - a) r^2): a = 1/magnification at the centre, and rs = r at the
-  rim, so the view joins the plate outside without a seam.
+  away along it, which finds the drop's middle and its size without a list
+  of beads.
 
-  Returns the offset to add (plate uv) and r, or r = -1 outside every drop.
+  Returns the offset to add (plate uv), r, and R in plate uv (0 where the
+  gradient is too flat to say, at a drop's very centre); r = -1 outside
+  every drop.
 
   The mask comes in two shapes. The rings' is square. Once drops are asked for
   (beadDrops, PLAN.md batch 3) it is twice as wide, with each drop's colour
@@ -1051,7 +1074,7 @@ fn viewAt(uv: vec2f) -> View {
   that reads it can never disagree about the layout: the setting moves on the
   frame it is changed, the mask only on the next frame the beads are drawn.
 */
-const DROP_MAGNIFY: f32 = 1.7;
+const DROP_INVERT: f32 = 3.0;
 fn beadWide() -> bool {
   let d = textureDimensions(beadTex);
   return d.x > d.y;
@@ -1068,22 +1091,45 @@ fn beadColour(uv: vec2f) -> vec3f {
   let w = f32(textureDimensions(beadTex).x);
   return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
 }
-fn dropLens(uv: vec2f) -> vec3f {
+/** How much of a drop of radius R (plate uv) is flat on top: none for the
+    common bead (up to three cells of the 192 grid), most of it by the size
+    two or three merged drops reach. */
+fn dropFlat(R: f32) -> f32 {
+  return 0.8 * smoothstep(0.014, 0.034, R);
+}
+/** Where on its meniscus a point is: 0 on the flat top (or the middle of a
+    small drop), 1 at the contact. */
+fn dropBand(r: f32, R: f32) -> f32 {
+  let f = dropFlat(R);
+  return clamp((r - f) / (1.0 - f), 0.0, 1.0);
+}
+fn dropLens(uv: vec2f) -> vec4f {
   // One texel of the plate either way; the height is the plate's in both shapes.
   let px = 1.0 / f32(textureDimensions(beadTex).y);
   let m = beadAt(uv);
-  if (m.r < 0.02) { return vec3f(0.0, 0.0, -1.0); }
+  if (m.r < 0.02) { return vec4f(0.0, 0.0, -1.0, 0.0); }
   let h = clamp(m.b / m.r, 0.0, 1.0);
   let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
   let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
   let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
   let g2 = dot(g, g);
   let r = clamp(1.0 - h, 0.0, 1.0);
-  if (g2 < 1.0) { return vec3f(0.0, 0.0, r); }
+  if (g2 < 1.0) { return vec4f(0.0, 0.0, r, 0.0); }
+  let R = inverseSqrt(g2);
+  // toC runs from here to the centre, r radii long.
   let toC = g * (1.0 - h) / g2;
-  let a = 1.0 / DROP_MAGNIFY;
-  let rs = r * (a + (1.0 - a) * r * r);
-  return vec3f(toC * (1.0 - rs / max(r, 1e-4)), r);
+  /*
+    The push comes in with the mask's coverage rather than at a threshold.
+    The outermost texels of a drop are its antialiasing, and there both the
+    dome and the coverage are a few steps of eight bits, so the centre they
+    point at can be anywhere; pushed in full, those texels showed a patch of
+    plate from well outside the drop, a staircase of odd pixels round every
+    rim at 3x. Faded in over the edge they show the plate beside them, as
+    the coverage there says most of the texel is.
+  */
+  let push = DROP_INVERT * dropBand(r, R) * smoothstep(0.02, 0.6, m.r);
+  // A push in radii along a vector r radii long.
+  return vec4f(toC * (push / max(r, 1e-3)), r, R);
 }
 `;
 
@@ -1283,7 +1329,7 @@ struct FsOut {
   // under a drop is read through it (dropLens), before anything is sampled,
   // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
   let fuvSurf = fuv0;
-  var drop = vec3f(0.0, 0.0, -1.0);
+  var drop = vec4f(0.0, 0.0, -1.0, 0.0);
   if (U.beads > 0.001) {
     drop = dropLens(fuvSurf);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
@@ -1749,85 +1795,81 @@ struct FsOut {
 
   // ── Oil drops ────────────────────────────────────────────────────
   /*
-    A drop of oil on the plate, lit from beneath as a projector lights it and
-    seen from above: a lens, not a painted disc. Reshaded on the owner's
-    word that the beads and the drops "look very cartoon like", and the lab
-    pictures agreed: every bead carried a grey outline and the same white
-    dot in its middle, and the drops were flat discs of palette colour with
-    a pale ring round each, which is how a sticker is drawn, not a liquid.
-    What a drop of oil backlit on water actually shows, and what each part
-    here is for:
+    A drop of oil on the plate, lit from beneath as a projector lights it:
+    a lens, not a painted disc. Reshaded twice on the owner's word that the
+    beads and drops "look very cartoon like", the second time against
+    photographs: macro shots of oil on backlit water, stills of projected
+    liquid light shows, and a paper on why a drop between plates has a dark
+    ring (refraction at the meniscus throws the light out of the lens's
+    aperture; the ring is sharp and its width is the meniscus's). What they
+    agree on, and what each part here is for:
 
-    - **What is under it, magnified** (dropLens, above), so the dye runs on
-      through the drop rather than stopping at an outline.
-    - **A dark edge that is the light going somewhere else**, not a line
-      drawn round it. Where the dome is steep, light from beneath is bent out
-      of the eye's path, so the edge is the plate's own colour dimmed, never
-      grey, and it fades in over the outer half of the radius rather than
-      sitting in a band, then eases back to the plate at the contact, where
-      the meniscus is shallow again.
-    - **A brighter middle**: the dome is a lens and gathers the light behind
-      it into the centre.
-    - **The meniscus as refracted light**, a lift of the colour under it at
-      the contact, instead of a pale grey stroke laid on top.
-    - **A small highlight**: a lamp is a small bright thing a long way off,
-      and its reflection in a millimetre of oil is a point, placed where the
-      dome faces the half-vector. The exponent was 90, a white disc a fifth
-      of the drop across on every bead; at 320 it is a glint, and a broad,
-      faint sheen on the flank facing the lamp carries the roundness the
-      big dot was standing in for.
+    - **What is under it, through the lens** (dropLens, above): turned over
+      and shrunk in a small drop, as it is in a big drop's flat middle.
+    - **A thin, crisp dark line at the contact**, and nothing else drawn.
+      The meniscus is steep, so light from beneath leaves it sideways; its
+      width is the meniscus's own, a fixed size on the plate, so it is a
+      hair on a big drop and most of a tiny one, which is why droplets in
+      the photographs read as dark rings round a bright point. The first
+      reshade dimmed the outer half of every drop's radius, which read as a
+      shadow painted round it.
+    - **A brighter middle only where the drop is round**: a ball gathers the
+      light behind it, a pancake does not.
+    - **No highlight.** The white dot every bead carried is a lamp seen in
+      reflection, and a plate lit from beneath and watched on a screen (or
+      from beside the projector) shows transmitted light only. Not one of
+      the photographs has it, and it was the loudest thing saying sticker.
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
     let bm = beadAt(fuvSurf);
     let inner = bm.r;
     let ring = bm.g;
     let r = drop.z;
+    let R = drop.w;
     let inDye = smoothstep(0.015, 0.2, auxH);
     let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
-    // The dome: tilted outward toward the edge, steepest at the rim.
-    let off = drop.xy;
-    var outward = vec2f(0.0);
-    if (dot(off, off) > 1e-12) { outward = -normalize(off); }
-    let tilt = 0.85 * r;
-    let n = vec3f(outward * tilt, sqrt(max(0.0, 1.0 - tilt * tilt)));
-    let Lb = lampDir(fuvSurf, U.lamp);
-    let H = normalize(Lb + vec3f(0.0, 0.0, 1.0));
-    let nh = max(0.0, dot(n, H));
-    // How much oil the light crosses: a spherical cap, 1 in the middle, 0 at the rim.
-    let th = sqrt(max(0.0, 1.0 - r * r));
-    // Darkest a little inside the rim and back to the plate at the contact
-    // itself: the outermost texels of a small bead's mask are its
-    // antialiasing, and dimmed there they drew a blocky square halo round
-    // every bead a few pixels across once the camera closed in.
-    let edgeLoss = smoothstep(0.5, 0.9, r) * (1.0 - smoothstep(0.9, 1.0, r));
-    let focus = 1.0 + 0.3 * (1.0 - r) * (1.0 - r);
-    let glint = pow(nh, 320.0) * 0.8;
-    let sheen = pow(nh, 12.0) * pow(1.0 - n.z, 1.5) * 0.12;
-    let lampC = vec3f(1.0, 0.97, 0.9);
+    let flat = dropFlat(R);
+    let t = dropBand(r, R);
+    // How much oil the light crosses: 1 over the flat top (or a small drop's
+    // middle), falling as a quarter circle across the meniscus.
+    let th = sqrt(max(0.0, 1.0 - t * t));
+    // The contact line, about two and a half texels of the plate wide whatever
+    // the drop's size, as a fraction of this one's radius; R is 0 where the
+    // lens could not tell (a drop's very centre), and there r is 0 too.
+    let px = 1.0 / f32(textureDimensions(beadTex).y);
+    let w = clamp(2.4 * px / max(R, 1e-4), 0.08, 0.5);
+    // Up sharply across the line's inner edge and held to the contact: the
+    // coverage in kDrop fades the drop, line and all, into the plate over
+    // the mask's own antialiasing, so the line never ends in a hard step.
+    // That fade takes the outer texel, so the line is a texel and a half
+    // inside it, or the fade eats it: at a texel and a half across it came
+    // out 62% of the plate at its darkest (npm run droplens).
+    let rim = smoothstep(1.0 - w, 1.0 - 0.5 * w, r);
+    let focus = 1.0 + 0.3 * (1.0 - r) * (1.0 - r) * (1.0 - flat / 0.8);
     // Clear oil: nearly colourless, a breath warmer than the water round it.
-    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * focus * (1.0 - 0.7 * edgeLoss);
-    dropC += outColor * ring * 0.3;
-    dropC += lampC * (glint + sheen);
+    let shade = focus * (1.0 - 0.85 * rim);
+    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * shade;
+    dropC += outColor * ring * 0.15;
 
     /*
       Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
-      each drop is oil carrying a dye of its own. Shaded as dyed oil rather
-      than as a disc of that colour:
+      each drop is oil carrying a dye of its own, which a projected show
+      draws as a flat pool of colour outlined in a thin dark line:
 
       - **Beer and Lambert.** The dye absorbs in proportion to how much oil
-        the light crosses, so the middle is the dye's full colour and the
-        thin edge nearly clear: the drop fades into what is under it at its
-        rim, which is what makes it read as a liquid lying on a liquid. The
-        first version painted the colour at 85% right to the edge.
+        the light crosses, so a big drop is its colour right across its flat
+        top and only the meniscus thins toward clear, and a small round one
+        is deepest in its middle. The first version painted the colour at
+        85% right to the edge.
       - **The dye's own light.** On this plate dye is light (bare water is
         dark), so a dyed drop over bare water still glows its colour, as
-        thick in the middle as the oil is.
-      - **The same lens** as the clear drop above: dimmed edge, gathered
-        middle, glint and sheen. None of it is a colour laid on top.
+        thick as the oil is.
+      - **The same lens and line** as the clear drop above. None of it is a
+        colour laid on top.
 
       The flattened walls and the compound drops are in the mask itself
       (rasterDrops in lib/beads.ts): the dome falls to zero along a wall, so
-      the shading here follows the wall without knowing it is one.
+      the line follows the wall without knowing it is one.
     */
     var kDrop = k;
     if (U.beadDrops > 0.001 && beadWide()) {
@@ -1835,9 +1877,8 @@ struct FsOut {
       let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
       let trans = exp(-absorb * th * 1.4);
       let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15;
-      var body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * focus * (1.0 - 0.7 * edgeLoss);
-      body += (outColor * trans + glowC) * ring * 0.3;
-      body += lampC * (glint + sheen);
+      var body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
+      body += (outColor * trans + glowC) * ring * 0.15;
       dropC = mix(dropC, body, U.beadDrops);
       kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
     }
