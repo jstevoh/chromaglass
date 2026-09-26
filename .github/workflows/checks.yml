@@ -241,7 +241,8 @@ jobs:
       - name: The microscope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run microscope
-      # An oil drop is a lens: small ones turn the plate over, big ones are flat, no highlight.
+      # An oil drop as a projector throws it (upright, dark past its aperture's core) and as the
+      # closeup's camera sees it (small ones turn the plate over, big ones flat); no highlight.
       - name: The drop lens
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run droplens

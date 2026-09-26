@@ -132,9 +132,13 @@ line at the contact. No highlight in either. How dark the edge is comes from
 one number, the projector's effective aperture (NA 0.25 in `plate.ts`); the
 bare lens of an overhead projector (0.08) blacks out two thirds of every
 droplet, which is how the physics reads but was a field of black doughnuts in
-the lab, so tell me if the edges want to be heavier or lighter. A press
-(`plateCurve`, or the hand) flattens every drop and thins every edge, since
-the gap sets where a ball becomes a pool. This changes the rings in every look
+the lab, so tell me if the edges want to be heavier or lighter. A narrower
+gap (a press, or the plate's curve) flattens every drop and thins every edge,
+since the gap sets where a ball becomes a pool: Clock Glass, whose glasses bow
+apart in the middle, now has rounder drops there and thin-edged pools near its
+rim. Zooming in, the drops change from the projector's to the camera's near
+1.45x, all at once over a few hundredths of the zoom; say if that reads as a
+jump. This changes the rings in every look
 that has beads, not only the drops. And the frame time: the drops' mask
 is drawn a pixel at a time on the main thread: 11 to 12 ms for the crowd of
 about 530 with droplets, against 6.7 ms for the 330 without them and the

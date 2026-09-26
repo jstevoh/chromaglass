@@ -247,8 +247,12 @@ camera's inverting lens. The aperture is an effective NA of 0.25 (the bare lens'
 so a droplet is dark over its outer three tenths. And item 3: the gap sets the
 shape, a ball until its radius is half the gap and a pool with an edge half the
 gap wide past that, so a press flattens every drop and thins every edge
-(`npm run droplens`: 19 checks, projected and closeup; the press halves the gap
-under a drop and its dark edge goes from 18 to 6 pixels).
+(`npm run droplens`: 20 checks, projected and closeup; the dark band's half
+point lands within 0.011 of the radius of where the aperture puts it; bowing the
+glasses to half the gap under a drop takes its dark edge from 18 to 6 pixels).
+The lens changes from projector to camera over the middle fifth of the zoom's
+fade, near 1.45x, because the blend between them reads a whole drop from its
+centre at one point, which on the zoom's own fade sat at 1.2x.
 
 ### 4. Liquids that behave differently
 

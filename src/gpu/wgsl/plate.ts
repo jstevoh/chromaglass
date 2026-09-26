@@ -1158,6 +1158,8 @@ const DROP_MAG: f32 = 1.23;
   meniscus.
 */
 const DROP_HALF_GAP: f32 = 0.016;
+/** Half the gap where the last dropLens call found a drop (it reads it only there). */
+var<private> dropRho: f32 = DROP_HALF_GAP;
 /** Half the gap at uv, in plate uv. */
 fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
@@ -1191,11 +1193,15 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   let f = dropFlat(R, rho);
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
-fn dropLens(uv: vec2f, rho: f32, cam: f32) -> vec4f {
+fn dropLens(uv: vec2f, cam: f32) -> vec4f {
   // One texel of the plate either way; the height is the plate's in both shapes.
   let px = 1.0 / f32(textureDimensions(beadTex).y);
   let m = beadAt(uv);
   if (m.r < 0.02) { return vec4f(0.0, 0.0, -1.0, 0.0); }
+  // The gap, read only under a drop: four packed texels, too many for every
+  // pixel of every look with beads.
+  let rho = dropHalfGap(uv);
+  dropRho = rho;
   let h = clamp(m.b / m.r, 0.0, 1.0);
   let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
   let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
@@ -1435,14 +1441,20 @@ struct FsOut {
   // so the dye, the ferrofluid, the oil and the chemistry are all seen through it.
   let fuvSurf = fuv0;
   var drop = vec4f(0.0, 0.0, -1.0, 0.0);
-  // Half the gap where the drop sits, which makes it a ball or a pancake.
-  var dropRho = DROP_HALF_GAP;
-  // Who is looking at the drops (dropLens): a camera in the closeup, the
-  // projector everywhere else.
-  let dropCam = macroAmt;
+  /*
+    Who is looking at the drops (dropLens): a camera in the closeup, the
+    projector everywhere else. Not the zoom's own fade: the lens blends
+    where it reads, and between the projector's slight pull toward the
+    centre and the camera's push past it there is a blend that reads every
+    point of a drop from its centre, a disc of one colour, then one that
+    blows it up eight times. On the zoom's fade that sat at 1.1x to 1.3x, a
+    zoom a performer parks on (the pre-push review). Changed over the middle
+    fifth of the fade instead, the whole of it passes in a few hundredths
+    of the zoom, near 1.45x.
+  */
+  let dropCam = smoothstep(0.4, 0.6, macroAmt);
   if (U.beads > 0.001) {
-    dropRho = dropHalfGap(fuvSurf);
-    drop = dropLens(fuvSurf, dropRho, dropCam);
+    drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
   let fuvBase = fuv0;
