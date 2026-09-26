@@ -989,7 +989,7 @@ class FluidSimulation {
    * rather than inferred from a field. It is the same operator that fills a
    * popped bubble, run the other way: take a share of what is under the palm
    * and put it in the annulus outside, conserving by construction because both
-   * halves read the same mirror.
+   * halves are the same amounts, read from the same mirror (see below).
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
@@ -1023,10 +1023,33 @@ class FluidSimulation {
     }
     if (!(mass > 1e-4)) return;
     this.dirty = true;
-    // Out of the disc, through the multiplicative channel that exists for dye
-    // being taken away...
-    for (const i of disc) this.mul[i] *= 1 - take;
-    // ...and into the ring, in the mirror's own log space so the colour that
+    /*
+      Out of the disc as an amount, the same amount the ring receives.
+
+      This took it out through the multiplicative channel, as a share of
+      whatever the plate held under the palm when the move reached it, and
+      put into the ring a share of what the *mirror* held, a frame or more
+      earlier. Under a press those are not the same: the squeeze film is
+      pushing the dye out from under the palm the whole time, so by the time
+      the multiply lands there is less there than the mirror says. The ring
+      got the mirror's amount and the disc gave up less, and the plate gained
+      the difference every press (`npm run tools`, 90 -> 285 against -12 for
+      the pool left alone, twice as bad on a runner at 9 fps, whose mirror
+      trails by more steps). The lab, which runs the solver with no mirror,
+      loses dye under the same press (3363 -> 3101), so it is not the flow.
+
+      Taken as an amount, both halves read the same numbers and the plate's
+      total cannot rise. If the flow has already carried off more than the
+      share, the GPU clamps the cell at zero (capDye) and the move takes
+      what is there, which at a share of at most 0.6 needs the mirror to be
+      badly stale.
+    */
+    for (const i of disc) {
+      const i4 = i * 4;
+      this.density[i] -= dye[i4 + 3] * take;
+      this.densityR[i] -= dye[i4] * take; this.densityG[i] -= dye[i4 + 1] * take; this.densityB[i] -= dye[i4 + 2] * take;
+    }
+    // Into the ring, in the mirror's own log space so the colour that
     // arrives is the colour that left.
     const w = 1 / ring.length;
     for (const i of ring) {
