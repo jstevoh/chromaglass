@@ -112,6 +112,16 @@ export function videoBitrate(codec: string, width: number, height: number, fps: 
 }
 
 /**
+ * About how big a film will be, in bytes, before anything is encoded: the
+ * H.264 rate (the larger of the two this writer uses) and the AAC rate, for
+ * the length of the song. An estimate for a warning, not a promise: the
+ * encoders aim at the rate and land near it.
+ */
+export function estimateFilmBytes(width: number, height: number, fps: number, seconds: number): number {
+  return ((videoBitrate('avc1', width, height, fps) + 192_000) * seconds) / 8;
+}
+
+/**
  * The best this browser can write for a film of this size, or null when it
  * can write none (no WebCodecs, or no codec at this size).
  */
@@ -152,12 +162,27 @@ export interface RenderSink extends ByteSink {
   settled(): Promise<void>;
   /** Close the file (or hand over the download). */
   close(): Promise<void>;
-  /** Throw away what was written. */
-  abort(): Promise<void>;
+  /**
+   * Throw away what was written, and say what is left: nothing
+   * ('discarded', 'removed'), or an empty file where the person chose to
+   * save ('left-empty'). Safe to call more than once; every call gets the
+   * first one's answer.
+   */
+  abort(): Promise<SinkAbort>;
   readonly kind: 'file' | 'memory';
   /** The whole file, for a memory sink after `close` (and for the checks). */
   bytes?(): Uint8Array;
 }
+
+/**
+ * What a cancelled render leaves behind. Chrome's save dialog creates the
+ * file the moment it is chosen, empty, and aborting the writer throws away
+ * only what was written into it; the empty file stays unless the handle can
+ * remove it (`FileSystemHandle.remove`, where the browser has it). So the
+ * message after a cancel says which, rather than promising a file is gone
+ * that is sitting in the person's folder at 0 bytes.
+ */
+export type SinkAbort = { left: 'discarded' | 'removed' } | { left: 'left-empty'; name: string };
 
 type SaveFilePicker = (opts: { suggestedName?: string; types?: { description: string; accept: Record<string, string[]> }[] }) => Promise<FileSystemFileHandle>;
 
@@ -172,7 +197,7 @@ export async function openRenderSink(suggestedName: string, format: RenderFormat
   if (picker && !preferMemory) {
     const handle = await picker({ suggestedName, types: [{ description: format.label, accept: { [format.mime]: [`.${format.ext}`] } }] });
     const writable = await handle.createWritable();
-    return fileSink(writable);
+    return fileSink(writable, handle);
   }
   return memorySink(suggestedName, format.mime);
 }
@@ -183,8 +208,9 @@ export async function openRenderSink(suggestedName: string, format: RenderFormat
  * in the order the muxer made them; `settled` is what the render loop waits
  * on so the chain never runs more than a frame or two ahead of the disk.
  */
-export function fileSink(writable: FileSystemWritableFileStream): RenderSink {
+export function fileSink(writable: FileSystemWritableFileStream, handle?: FileSystemFileHandle): RenderSink {
   let chain: Promise<void> = Promise.resolve();
+  let aborted: Promise<SinkAbort> | null = null;
   let pos = 0;
   let error: unknown = null;
   const queue = (position: number, data: Uint8Array) => {
@@ -196,7 +222,18 @@ export function fileSink(writable: FileSystemWritableFileStream): RenderSink {
     patch(position, bytes) { queue(position, bytes); },
     async settled() { await chain; if (error) throw error; },
     async close() { await chain; if (error) throw error; await writable.close(); },
-    async abort() { try { await chain; } catch { /* aborting anyway */ } try { await writable.abort(); } catch { /* already closed */ } },
+    abort() {
+      aborted ??= (async (): Promise<SinkAbort> => {
+        try { await chain; } catch { /* aborting anyway */ }
+        try { await writable.abort(); } catch { /* already closed */ }
+        const remove = (handle as unknown as { remove?: () => Promise<void> } | undefined)?.remove;
+        if (handle && remove) {
+          try { await remove.call(handle); return { left: 'removed' }; } catch { /* not allowed here: say so below */ }
+        }
+        return handle ? { left: 'left-empty', name: handle.name } : { left: 'discarded' };
+      })();
+      return aborted;
+    },
   };
 }
 
@@ -211,7 +248,12 @@ export function memorySink(name: string, mime: string, download = true): RenderS
     bytes: () => mem.bytes(),
     async close() {
       if (!download || typeof document === 'undefined') return;
-      const url = URL.createObjectURL(new Blob(mem.chunks as BlobPart[], { type: mime }));
+      const blob = new Blob(mem.chunks as BlobPart[], { type: mime });
+      // The Blob holds the film now; the chunks were a second copy of it,
+      // which for a long song on a browser with no file streaming is the
+      // difference between one film in memory and two.
+      mem.clear();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = name;
@@ -220,7 +262,7 @@ export function memorySink(name: string, mime: string, download = true): RenderS
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
-    async abort() { mem.chunks.length = 0; },
+    async abort() { mem.clear(); return { left: 'discarded' as const }; },
   };
 }
 
@@ -357,6 +399,10 @@ export class RenderEncoder {
     for (const p of packets) mux.addAudio(p);
     mux.endAudio();
     this.audioPackets = packets.length;
+    // The samples are in the file now (the muxer holds the packets until the
+    // frames beside them are written): let go of the song, which for four
+    // minutes of stereo is some 90 MB the render no longer needs.
+    this.opts.audio = null;
   }
   audioDescription: Uint8Array | null = null;
   audioPackets = 0;

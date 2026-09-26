@@ -146,6 +146,12 @@ export class MemorySink implements ByteSink {
       done += n;
     }
   }
+  /** Let go of everything written: the Blob made from it keeps its own copy. */
+  clear(): void {
+    this.chunks.length = 0;
+    this.starts.length = 0;
+    this.size = 0;
+  }
   bytes(): Uint8Array {
     const out = new Uint8Array(this.size);
     for (let c = 0; c < this.chunks.length; c++) out.set(this.chunks[c], this.starts[c]);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Film, X } from 'lucide-react';
 import type { SongRenderState } from '../hooks/useSongRender';
+import { estimateFilmBytes } from '../lib/render';
 
 /**
  * Render this song: the size, the rate and the seed, then progress and a
@@ -13,11 +14,22 @@ import type { SongRenderState } from '../hooks/useSongRender';
  * seed, so a render of a night that looked right is that night's dice. A
  * seed typed here is a whole number, or a word (it is hashed, as `?seed=` is).
  *
- * The line under the choices says what the browser will actually write
- * before anything is pressed: H.264 and AAC in MP4 on Chrome on a Mac, VP9
- * and Opus in WebM where H.264 cannot be encoded, and on a browser with no
- * WebCodecs at all, that it cannot and that Record still captures the screen.
+ * The line under the choices says how many frames that is and where the
+ * film goes, before anything is pressed; on a browser with no WebCodecs at
+ * all, that it cannot and that Record still captures the screen. Where the
+ * film cannot be written to disk as it renders (no File System Access), it
+ * is held in memory until the end, and the panel says about how much that
+ * is, and warns outright past a size a tab may not hold: a render that runs
+ * for twenty minutes and then dies at the download is the worst way to
+ * find out.
+ *
+ * Sized for the room, like every control on the desks: hit targets of at
+ * least 24 px, text of at least 11 px, nothing a person has to read below
+ * 60% white.
  */
+
+/** Past this, a film held in memory is a real risk to the tab. */
+const MEMORY_WARN_BYTES = 1.5e9;
 
 export const RENDER_SIZES = [
   { id: '1080p', label: '1080p', width: 1920, height: 1080 },
@@ -48,12 +60,14 @@ interface Props {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 export function RenderPanel(p: Props) {
-  const [size, setSize] = useState<string>('1080p');
+  const [sizeId, setSizeId] = useState<string>('1080p');
   const [fps, setFps] = useState<number>(60);
   const [seed, setSeed] = useState<string>(String(p.currentSeed));
   useEffect(() => { if (!p.running) setSeed((s) => s || String(p.currentSeed)); }, [p.currentSeed, p.running]);
-  const chosen = RENDER_SIZES.find((s) => s.id === size) ?? RENDER_SIZES[0];
+  const chosen = RENDER_SIZES.find((s) => s.id === sizeId) ?? RENDER_SIZES[0];
   const frames = Math.ceil(p.songSeconds * fps);
+  const filmBytes = estimateFilmBytes(chosen.width, chosen.height, fps, p.songSeconds);
+  const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
   const st = p.state;
   const pct = st.frames > 0 ? Math.round((st.frame / st.frames) * 100) : 0;
   const finished = st.phase === 'done' || st.phase === 'failed' || st.phase === 'cancelled';
@@ -64,22 +78,22 @@ export function RenderPanel(p: Props) {
         <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/70">
           <Film size={12} /> Render this song
         </span>
-        <button onClick={p.onClose} disabled={p.running} className="p-1 rounded-full hover:bg-white/10 text-white/50 disabled:opacity-30" aria-label="Close the render panel"><X size={12} /></button>
+        <button onClick={p.onClose} disabled={p.running} className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-white/10 text-white/70 disabled:opacity-30" aria-label="Close the render panel" data-testid="render-close"><X size={13} /></button>
       </div>
       <p className="px-1 text-[12px] text-white/80 truncate" title={p.songName}>{p.songName} · {clock(p.songSeconds)}</p>
 
       {!p.webcodecs ? (
-        <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-100" data-testid="render-unsupported">
+        <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[12px] leading-relaxed text-amber-100" data-testid="render-unsupported">
           This browser cannot render a song: it has no WebCodecs (Chrome and Edge do). The Record button still captures the show as it plays, with MediaRecorder, which drops frames when the machine is busy.
         </p>
       ) : (
         <>
-          <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-1 text-[11px] text-white/60">
+          <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-1 text-[11px] text-white/70">
             <span>Size</span>
             <div className="flex flex-wrap gap-1">
               {RENDER_SIZES.map((s) => (
-                <button key={s.id} disabled={p.running} onClick={() => setSize(s.id)} data-testid={`render-size-${s.id}`}
-                  className={`rounded-full border px-2 py-0.5 ${size === s.id ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 text-white/50 hover:text-white/80'} disabled:opacity-40`}>
+                <button key={s.id} disabled={p.running} onClick={() => setSizeId(s.id)} data-testid={`render-size-${s.id}`}
+                  className={`h-6 rounded-full border px-2.5 ${sizeId === s.id ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
                   {s.label}
                 </button>
               ))}
@@ -88,28 +102,34 @@ export function RenderPanel(p: Props) {
             <div className="flex gap-1">
               {RENDER_RATES.map((r) => (
                 <button key={r} disabled={p.running} onClick={() => setFps(r)} data-testid={`render-fps-${r}`}
-                  className={`rounded-full border px-2 py-0.5 ${fps === r ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 text-white/50 hover:text-white/80'} disabled:opacity-40`}>
+                  className={`h-6 rounded-full border px-2.5 ${fps === r ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
                   {r} fps
                 </button>
               ))}
             </div>
             <span>Seed</span>
             <input value={seed} disabled={p.running} onChange={(e) => setSeed(e.target.value)} data-testid="render-seed"
-              className="w-40 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px] text-white/90 disabled:opacity-40"
+              className="h-6 w-40 rounded-md border border-white/20 bg-white/5 px-2 font-mono text-[11px] text-white/90 disabled:opacity-60"
               title="Tonight's seed by default: the same seed and look render the same film. A word works too." />
           </div>
-          <p className="mt-2 px-1 text-[10px] leading-relaxed text-white/40">
-            {chosen.width}x{chosen.height} at {fps} fps: {frames.toLocaleString()} frames, every one computed, none dropped.
-            {' '}{p.streamsToDisk ? 'Written to a file you choose as it renders.' : 'Kept in memory and downloaded at the end.'}
+          <p className="mt-2 px-1 text-[11px] leading-relaxed text-white/60">
+            {chosen.width}x{chosen.height} at {fps} fps: {frames.toLocaleString()} frames, every one computed, none dropped, about {size(filmBytes)}.
+            {p.streamsToDisk && ' Written to a file you choose as it renders.'}
             {' '}The film plays the look on the plate now, with Evolve if it is on.
             {p.showRunning && ' The running sequence or song show stops for the render: it does not play in a render yet.'}
           </p>
+          {!p.streamsToDisk && (
+            <p className={`mt-2 rounded-lg px-2 py-1.5 text-[11px] leading-relaxed ${filmBytes > MEMORY_WARN_BYTES ? 'bg-amber-500/15 text-amber-100' : 'bg-white/5 text-white/70'}`} data-testid="render-memory">
+              This browser cannot write to disk as it renders, so the whole film, about {size(filmBytes)}, is held in memory until it is downloaded at the end.
+              {filmBytes > MEMORY_WARN_BYTES && ' That may be more than a tab can hold: a smaller size, a lower rate or Chrome, which writes to disk as it goes, is safer.'}
+            </p>
+          )}
         </>
       )}
 
       {st.phase !== 'idle' && (
         <div className="mt-2 px-1" data-testid="render-progress">
-          {st.format && <p className="text-[10px] text-white/40">{st.format}</p>}
+          {st.format && <p className="text-[11px] text-white/60">{st.format}</p>}
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div className={`h-full ${st.phase === 'failed' ? 'bg-red-400' : st.phase === 'done' ? 'bg-emerald-400' : 'bg-white/70'}`} style={{ width: `${finished ? 100 : pct}%` }} />
           </div>

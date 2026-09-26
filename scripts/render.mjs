@@ -50,7 +50,7 @@ import {
   RENDER_ORIGIN_MS, beginFixedClock, clearShowInterval, clockIsFixed, endFixedClock, showEpochS, showInterval,
   showIntervalCount, showNow, tickFixedClock,
 } from '../src/lib/showClock.ts';
-import { songAudioTrack, DEFAULT_LEVEL_PARAMS } from '../src/lib/songTrack.ts';
+import { songAudioTrack, SongEar, DEFAULT_LEVEL_PARAMS } from '../src/lib/songTrack.ts';
 import { analysePcm, AnalyserEmulator } from '../src/lib/audioFeatures.ts';
 import { AutoRange, RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SoundLevels, bytesFromDb, smoothLevels, waveBytes } from '../src/lib/soundLevels.ts';
@@ -198,6 +198,18 @@ function song() {
   const t60a = songAudioTrack(pcm, SR, 60), t60b = songAudioTrack(pcm, SR, 60);
   const t30 = songAudioTrack(pcm, SR, 30);
   check('the same song twice is the same track, byte for byte', hashTrack(t60a) === hashTrack(t60b), `${t60a.length} frames, ${hashTrack(t60a)}`);
+  // The render hears the song a frame at a time (SongEar), not as a whole
+  // track up front; the track is that ear run to the end, and this is the
+  // ear asked frame by frame the way the render loop asks it.
+  {
+    const ear = new SongEar(pcm, SR, 60);
+    const heard = [];
+    for (let i = 0; i < ear.frames; i++) heard.push(ear.next());
+    let threw = false;
+    try { ear.next(); } catch { threw = true; }
+    check('the ear, asked frame by frame, hears the same track, and stops at its end', hashTrack(heard) === hashTrack(t60a) && heard.length === t60a.length && threw,
+      `${heard.length} frames, ${hashTrack(heard)}, frame ${heard.length} ${threw ? 'refused' : 'NOT refused'}`);
+  }
   check('a frame for every 1/fps of the song', t60a.length === Math.ceil(SECONDS * 60) && t30.length === Math.ceil(SECONDS * 30), `${t60a.length} at 60, ${t30.length} at 30`);
   const direct = analysePcm(pcm, SR, 60);
   check('its named readings are exactly analysePcm\'s', JSON.stringify(direct) === JSON.stringify(t60a.map((f) => f.features)), `${direct.length} readings compared`);

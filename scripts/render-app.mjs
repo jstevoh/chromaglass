@@ -35,7 +35,11 @@
  *      Evolve render twice is still the same film;
  *   6. 60 fps renders twice the frames for the same song, at i/60;
  *   7. the app is given back as it was: the settings, the seed, the canvas's
- *      size, and the live loop drawing again.
+ *      size, and the live loop drawing again; no fade or glide left running
+ *      on the film's clock (one is started in the last half second of a
+ *      render on purpose, a blackout, to be sure there is one to leave);
+ *      the beat clock not holding the render's lock; and a song that was
+ *      playing before the render playing again after it.
  */
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
@@ -117,17 +121,44 @@ try {
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const canvas = document.getElementById('liquid-canvas');
-    const state = () => ({ settings: JSON.stringify(window.chromaglassCastState().settings), seed: window.__cgSeed, w: canvas?.width, h: canvas?.height });
+    const audio = () => document.querySelector('audio');
+    const state = () => ({
+      settings: JSON.stringify(window.chromaglassCastState().settings), seed: window.__cgSeed, w: canvas?.width, h: canvas?.height,
+      playing: !!audio() && !audio().paused, pending: window.chromaglassRenderPending(), beat: window.chromaglassDebug().beat,
+    });
     if (o.evolve) window.chromaglassAction('automate-toggle');
+    if (o.music) {
+      // A track from the shelf, playing, so the render has a song to pause and give back.
+      window.chromaglassMusic();
+      for (let k = 0; k < 100 && !(audio() && !audio().paused); k++) await new Promise(r => setTimeout(r, 100));
+    }
     await new Promise(r => setTimeout(r, 50));
     const before = state();
     const t0 = performance.now();
-    const r = await window.chromaglassRender({ song: bytes.buffer, width: o.w, height: o.h, fps: o.fps, seed: o.seed, maxFrames: o.maxFrames });
+    const framesAtStart = window.chromaglassDebug().frames;
+    const job = window.chromaglassRender({ song: bytes.buffer, width: o.w, height: o.h, fps: o.fps, seed: o.seed, maxFrames: o.maxFrames });
+    if (o.blackoutNearEnd) {
+      // A dimmer fade begun in the render's last half second (it lasts 1.1 s,
+      // 33 frames at 30 fps), so it is still running on the film's clock when
+      // the render hands back: the case where it used to carry over.
+      const at = framesAtStart + o.frames - 15;
+      while (window.chromaglassDebug().frames < at) await new Promise(r => setTimeout(r, 5));
+      window.chromaglassAction('blackout-toggle');
+    }
+    if (o.loseAt) {
+      // The GPU taken away a second into the render, as a driver would.
+      const at = framesAtStart + o.loseAt;
+      while (window.chromaglassDebug().frames < at) await new Promise(r => setTimeout(r, 5));
+      window.chromaglassDebug().loseDevice();
+    }
+    const r = await job;
     const ms = performance.now() - t0;
     const after = state();
     if (o.evolve) window.chromaglassAction('automate-toggle');
     // The live loop draws again: the frame counter moves in the next half second.
     const f0 = window.chromaglassDebug().frames ?? null;
+    // A lost device first has to come back (a new device, a new stage) before it can draw.
+    if (o.loseAt) await new Promise(res => setTimeout(res, 4000));
     await new Promise(res => setTimeout(res, 500));
     const f1 = window.chromaglassDebug().frames ?? null;
     return { ...r, ms, before, after, liveFrames: f0 === null || f1 === null ? null : f1 - f0 };
@@ -143,14 +174,23 @@ try {
     ['E1: seed 7, Evolve', { seed: SEED, w: W, h: H, fps: FPS, evolve: true }],
     ['E2: seed 7, Evolve again', { seed: SEED, w: W, h: H, fps: FPS, evolve: true }],
     ['F: seed 7 at 60 fps', { seed: SEED, w: W, h: H, fps: 60 }],
+    // Last, because a playing track and a blackout change the live show between renders.
+    ['L: seed 7, the GPU lost a second in', { seed: SEED, w: W, h: H, fps: FPS, loseAt: FPS }],
+    ['R: seed 7 again, after the loss, two seconds', { seed: SEED, w: W, h: H, fps: FPS, maxFrames: 2 * FPS }],
+    ['M: seed 7, music playing, blackout near the end', { seed: SEED, w: W, h: H, fps: FPS, music: true, blackoutNearEnd: true, frames: SONG_S * FPS }],
   ]) {
     runs[name[0] + (name[1] === '1' || name[1] === '2' ? name[1] : '')] = await render(o).then((r) => { say(name, r); return r; });
   }
-  const { A, B, C, S, E1, E2, F } = runs;
+  const { A, B, C, S, E1, E2, F, L, R, M } = runs;
   const frames = SONG_S * FPS;
 
   // 1. The file.
-  check('every render finished', Object.values(runs).every((r) => r.phase === 'done'), Object.values(runs).map((r) => r.phase).join(', '));
+  check('every render finished (but L, whose GPU was taken away)', Object.entries(runs).every(([n, r]) => n === 'L' || r.phase === 'done'), Object.entries(runs).map(([n, r]) => `${n} ${r.phase}`).join(', '));
+  check('a GPU lost mid-render fails the render and says why', L.phase === 'failed' && /GPU was lost|plate was rebuilt/.test(L.message), `${L.phase}: ${L.message}`);
+  check('after the loss, the next render runs to the end', R.phase === 'done' && R.summary?.videoFrames === 2 * FPS, `${R.phase}, ${R.summary?.videoFrames ?? 0} frames`);
+  // Printed, not gated: a rebuilt stage may sit on another rung of the
+  // quality ladder, and a render on another grid is another film.
+  console.log(`   after the loss, ${(R.frameHashes ?? []).filter((h, i) => h !== A.frameHashes?.[i]).length} of ${2 * FPS} frames differ from A's first ${2 * FPS}`);
   const bytesA = A.bytes ? Buffer.from(A.bytes, 'base64') : Buffer.alloc(0);
   const reader = /MP4/.test(A.format ?? '') ? readMp4 : readWebm;
   let parsed = null, err = null;
@@ -181,13 +221,37 @@ try {
 
   // 7. The app given back.
   for (const [name, r] of Object.entries(runs)) {
-    const same = r.before.settings === r.after.settings && r.before.seed === r.after.seed && r.before.w === r.after.w && r.before.h === r.after.h;
-    if (!same || name === 'A' || name === 'E1') {
+    // M's settings are left out of this one: starting a track can roll a new
+    // look live (On new song), between the reading and the render's own
+    // snapshot, which is the show doing its job and not the render failing to
+    // give anything back. Its seed and canvas are held to it all the same.
+    const sameSettings = name === 'M' || r.before.settings === r.after.settings;
+    const same = sameSettings && r.before.seed === r.after.seed && r.before.w === r.after.w && r.before.h === r.after.h;
+    if (!same || name === 'A' || name === 'E1' || name === 'M') {
       check(`after ${name}, the app is as it was: settings, seed ${r.after.seed}, canvas ${r.after.w}x${r.after.h}`, same,
-        same ? '' : `settings ${r.before.settings === r.after.settings ? 'same' : 'CHANGED'}, seed ${r.before.seed}→${r.after.seed}, canvas ${r.before.w}x${r.before.h}→${r.after.w}x${r.after.h}`);
+        same ? '' : `settings ${sameSettings ? 'same' : 'CHANGED'}, seed ${r.before.seed}→${r.after.seed}, canvas ${r.before.w}x${r.before.h}→${r.after.w}x${r.after.h}`);
     }
   }
-  check('the live loop draws again after a render', (A.liveFrames ?? 0) > 5, A.liveFrames === null ? 'no frame counter on the debug hook' : `${A.liveFrames} frames in half a second`);
+  // After every render, including one that failed halfway (a GPU lost mid-render
+  // used to leave the live show with no frame loop at all).
+  const stalled = Object.entries(runs).filter(([, r]) => !((r.liveFrames ?? 0) > 5));
+  check('the live loop draws again after every render', stalled.length === 0,
+    stalled.length ? stalled.map(([n, r]) => `${n}: ${r.liveFrames ?? 'no counter'}`).join('; ') : Object.entries(runs).map(([n, r]) => `${n} ${r.liveFrames}`).join(', ') + ' frames in half a second');
+  /*
+    What a render used to leave running in the live show: a fade stamped on
+    the film's clock, which a young page read as not yet begun and ran over
+    the settings just put back; and the beat clock's lock, stamped in film
+    milliseconds, held in the future. Read in the same task the render
+    resolved in.
+  */
+  const pendingAfter = Object.entries(runs).filter(([, r]) => r.after.pending.lookFade || r.after.pending.dimmerFade || r.after.pending.glides > 0);
+  check('no fade or glide is left running after any render', pendingAfter.length === 0,
+    pendingAfter.map(([n, r]) => `${n}: ${JSON.stringify(r.after.pending)}`).join('; '));
+  const lockedAfter = Object.entries(runs).filter(([, r]) => r.after.beat.period > 0 && r.after.beat.confidence >= 0.5);
+  check('the beat clock is not locked on the render\'s beat right after', lockedAfter.length === 0,
+    lockedAfter.map(([n, r]) => `${n}: period ${r.after.beat.period} ms, confidence ${r.after.beat.confidence}`).join('; '));
+  check('the music was playing before render M (so the next gate means something)', M.before.playing);
+  check('the music plays on after a render that paused it', M.before.playing && M.after.playing, `playing before ${M.before.playing}, after ${M.after.playing}`);
 } finally {
   await browser.close();
 }

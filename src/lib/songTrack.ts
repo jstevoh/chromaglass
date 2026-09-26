@@ -51,39 +51,80 @@ export const DEFAULT_LEVEL_PARAMS: LevelParams = { sensitivity: 0.4, bassBoost: 
  * frames to the bit, on every run.
  */
 export function songAudioTrack(pcm: Float32Array, sampleRate: number, fps: number, params: LevelParams = DEFAULT_LEVEL_PARAMS): AudioData[] {
-  const analyser = new AnalyserEmulator(sampleRate);
-  const features = new AudioFeatures();
-  const bins = analyser.fftSize / 2;
-  const levels = new SoundLevels(sampleRate, bins);
-  const freq = new Uint8Array(bins);
-  const wave = new Uint8Array(bins);
-  const frames = Math.ceil((pcm.length * fps) / sampleRate);
-  /** Live frames each of ours stands for, for the smoothing (see `smoothLevels`). */
-  const span = ANALYSER_RATE_HZ / fps;
+  const ear = new SongEar(pcm, sampleRate, fps, params);
   const out: AudioData[] = [];
-  let prev: SmoothedLevels | null = null;
-  for (let i = 0; i < frames; i++) {
+  for (let i = 0; i < ear.frames; i++) out.push(ear.next());
+  return out;
+}
+
+/**
+ * The same readings as `songAudioTrack`, one frame at a time, as the render
+ * asks for them: the ear is sequential (each frame's smoothing and ranges
+ * follow from the one before), so frame `i` is the `i`-th `next()`, and
+ * `songAudioTrack` is nothing but this run to the end, which is how `npm run
+ * render`'s checks of the track are checks of this.
+ *
+ * Why not the whole track up front: a frame carries two 1024-byte spectra
+ * and a reading, a few kilobytes, and a four-minute song at 60 fps is 14,400
+ * of them, tens of megabytes held for the length of the render beside the
+ * song itself. The render reads each frame once, in order, and lets it go.
+ */
+export class SongEar {
+  readonly frames: number;
+  private readonly pcm: Float32Array;
+  private readonly sampleRate: number;
+  private readonly fps: number;
+  private readonly params: LevelParams;
+  private readonly analyser: AnalyserEmulator;
+  private readonly features = new AudioFeatures();
+  private readonly levels: SoundLevels;
+  private readonly freq: Uint8Array;
+  private readonly wave: Uint8Array;
+  /** Live frames each of ours stands for, for the smoothing (see `smoothLevels`). */
+  private readonly span: number;
+  private prev: SmoothedLevels | null = null;
+  private i = 0;
+
+  constructor(pcm: Float32Array, sampleRate: number, fps: number, params: LevelParams = DEFAULT_LEVEL_PARAMS) {
+    this.pcm = pcm;
+    this.sampleRate = sampleRate;
+    this.fps = fps;
+    this.params = params;
+    this.analyser = new AnalyserEmulator(sampleRate);
+    const bins = this.analyser.fftSize / 2;
+    this.levels = new SoundLevels(sampleRate, bins);
+    this.freq = new Uint8Array(bins);
+    this.wave = new Uint8Array(bins);
+    this.frames = Math.ceil((pcm.length * fps) / sampleRate);
+    this.span = ANALYSER_RATE_HZ / fps;
+  }
+
+  /** The next frame's reading. Past the last frame, it throws. */
+  next(): AudioData {
+    const { pcm, sampleRate, fps, params, analyser, freq, wave } = this;
+    const i = this.i;
+    if (i >= this.frames) throw new Error(`the song has ${this.frames} frames; frame ${i} was asked for`);
+    this.i++;
     const end = Math.round((i * sampleRate) / fps);
     const db = analyser.frame(pcm, end, 1 / fps);
-    const reading = features.update({ bins: db, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps);
+    const reading = this.features.update({ bins: db, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps);
     // The hook's dt: the time since its previous frame, 0 on the first, at
     // most a quarter of a second.
     const dt = i === 0 ? 0 : Math.min(0.25, 1 / fps);
-    const win = levels.calibrate(db, dt, params.autoCalibrate);
+    const win = this.levels.calibrate(db, dt, params.autoCalibrate);
     bytesFromDb(db, win.minDb, win.maxDb, freq);
     waveBytes(pcm, end, analyser.fftSize, wave);
-    const raw = levels.levels(freq, wave, dt, params);
-    const smooth = smoothLevels(prev, raw, span);
-    prev = smooth;
-    out.push({
+    const raw = this.levels.levels(freq, wave, dt, params);
+    const smooth = smoothLevels(this.prev, raw, this.span);
+    this.prev = smooth;
+    return {
       frequencyData: new Uint8Array(freq),
       timeDomainData: new Uint8Array(wave),
       ...smooth,
       calibration: raw.calibration ? { ...raw.calibration } : null,
       features: reading,
-    });
+    };
   }
-  return out;
 }
 
 /** A song decoded for a render: its channels for the film's sound, and one mono mix for the ear. */
@@ -124,7 +165,10 @@ export async function decodeSong(data: ArrayBuffer | Blob | string, sampleRate =
     : data instanceof ArrayBuffer ? data : await data.arrayBuffer();
   const ctx = new OfflineAudioContext(2, 1, sampleRate);
   const buf = await ctx.decodeAudioData(bytes);
+  // The buffer's own arrays, not copies of them: a copy doubled a long
+  // song's footprint for nothing, since nothing writes to them. The render
+  // lets go of the channels once the sound is encoded (useSongRender).
   const channels: Float32Array[] = [];
-  for (let c = 0; c < Math.min(2, buf.numberOfChannels); c++) channels.push(new Float32Array(buf.getChannelData(c)));
+  for (let c = 0; c < Math.min(2, buf.numberOfChannels); c++) channels.push(buf.getChannelData(c));
   return { sampleRate: buf.sampleRate, channels, mono: monoMix(channels), seconds: buf.length / buf.sampleRate };
 }
