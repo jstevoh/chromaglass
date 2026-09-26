@@ -38,11 +38,15 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | You touched | Run before pushing |
 |---|---|
 | anything | `npm run lint` (typecheck) |
-| `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `microscope`, `straw`, `derive` as relevant |
+| `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `microscope`, `straw`, `derive` as relevant (`physics` takes over five minutes in a cloud session) |
 | `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`) | `shelf`, `music` |
+| `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
+| `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
+| a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
+| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -80,3 +84,11 @@ When CI is red, use the `steward` skill.
 - `.claude/skills/ship/`: merge, confirm the deploy, restart the branch.
 - `.claude/agents/prepush-reviewer.md`: adversarial review of the diff before a push.
 - `.claude/agents/preset-auditor.md`: photograph every preset and flag the broken ones.
+- `.claude/skills/crash-triage/`: turn a crash report or the report Worker's digest
+  into a cause, a reproduction and a fix (`docs/crash-plan.md`).
+- `.claude/agents/check-skeptic.md`: find the ways a new or changed check can pass
+  while measuring nothing (the rules in `docs/roadmap.md`).
+- `.claude/agents/setting-auditor.md`: hold a new setting to `PLAN.md`'s operating
+  rules (a default that keeps today's look; MIDI, the desks and the phone).
+- `.claude/hooks/session-start.sh`: a cloud session runs `npm install` before it
+  starts, so the checks above can run at once.
