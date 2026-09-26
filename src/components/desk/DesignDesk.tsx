@@ -123,7 +123,7 @@ export function DesignDesk(p: DesignDeskProps) {
   const [toolMenu, setToolMenu] = useState<{ tool: string; at: { x: number; y: number } } | null>(null);
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
-      style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
+      style={{ gridTemplateColumns: '272px minmax(0, 1fr) 312px', gridTemplateRows: '48px 1fr 28px' }}
       data-testid="design-desk">
 
       <DeskHeader

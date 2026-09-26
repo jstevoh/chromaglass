@@ -2081,8 +2081,8 @@ try {
       await clickOn('go-button');
     };
     // The frame's mean brightness, 0-255: what a flash is a jump in.
-    const luma = () => page.evaluate(() => {
-      const d = window.__cgFrame(32, 18); let s = 0;
+    const luma = () => page.evaluate(async () => {
+      const d = await window.__cgFrame(32, 18); let s = 0;
       for (let i = 0; i < d.length; i += 4) s += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
       return s / (d.length / 4);
     });

@@ -113,10 +113,16 @@ export function ToolAmountChip({ tool, value, onOpen }: { tool: string; value: n
     <button
       onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpen({ x: r.left, y: r.top }); }}
       title={`How much the ${TOOL_NAMES[tool] ?? tool} does (${means}). Click, or right-click any tool, for its options.`}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] transition-colors hover:bg-hover ${value === 1 ? 'border-border text-muted' : 'border-accent-border text-accent-text'}`}
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[12px] transition-colors hover:bg-hover ${value === 1 ? 'border-border text-muted' : 'border-accent-border text-accent-text'}`}
       data-testid="tool-amount-chip"
     >
-      <span className="opacity-70">Amount</span>
+      {/*
+        The word only where there is room for it. On the macOS runner's fonts
+        the chip with its word pushed the tool row past the middle column at
+        1440, which widened the whole desk and slid the header's centred mode
+        switch off true (npm run qa: "the mode switch does not move").
+      */}
+      <span className="hidden opacity-70 2xl:inline">Amount</span>
       <span className="font-mono tabular-nums">{value.toFixed(1)}×</span>
     </button>
   );

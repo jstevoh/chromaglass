@@ -204,7 +204,7 @@ export function PerformDesk(p: PerformDeskProps) {
 
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
-      style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
+      style={{ gridTemplateColumns: '272px minmax(0, 1fr) 312px', gridTemplateRows: '48px 1fr 28px' }}
       data-testid="perform-desk">
 
       <DeskHeader
@@ -251,7 +251,7 @@ export function PerformDesk(p: PerformDeskProps) {
             <button
               onClick={() => setRenaming(true)}
               title="Rename the set"
-              className="min-w-0 truncate rounded-md text-left text-[13px] font-medium text-text hover:text-accent"
+              className="min-h-7 min-w-0 truncate rounded-md px-1 -mx-1 text-left text-[13px] font-medium text-text hover:text-accent"
               data-testid="set-name"
             >
               {p.setName}
