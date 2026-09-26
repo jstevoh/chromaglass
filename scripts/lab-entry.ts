@@ -3,6 +3,8 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { fillPlateUniforms } from '../src/gpu/plateUniforms';
+import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 
 export const BASE: GpuStepParams = {
@@ -75,6 +77,45 @@ const api = {
   solver() { return lab!.solver; },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /**
+   * The finished picture of the lab's plate, as the app would draw it with
+   * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
+   * the closeup's magnification; `macroAmount` how far into the closeup
+   * (the app ramps it from 1x to 2x).
+   */
+  async render(size: number, over: Partial<VisualizerSettings> = {},
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number } = {}) {
+    const l = lab!;
+    const device = l.solver['device'] as GPUDevice;
+    const plate = new WebGPUPlate(device, 'rgba8unorm');
+    const zoom = cam.zoom ?? 1;
+    fillPlateUniforms(plate.pack, {
+      view: {
+        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: l.time,
+        shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
+        macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false, flowRate: 0.05,
+        rotations: [0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
+        kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: 0 },
+        bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
+        filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3, mark: null, film: { kind: 'none', video: null },
+      },
+      fluids: [{ gpu: l.solver as never }], width: size, height: size, derived: true, grid: l.N,
+    });
+    const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+    const enc = device.createCommandEncoder();
+    plate.draw(enc, target.createView(), { width: size, height: size },
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: null, view: null }], 1);
+    const row = Math.ceil(size * 4 / 256) * 256;
+    const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const src = new Uint8Array(buf.getMappedRange());
+    const out = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) out.set(src.subarray(y * row, y * row + size * 4), y * size * 4);
+    buf.unmap(); buf.destroy(); target.destroy(); plate.dispose();
+    return Array.from(out);
+  },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

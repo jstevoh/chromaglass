@@ -697,6 +697,21 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
 
 fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
 
+/*
+  How far a structure of this size on the plate (in plate widths) is
+  resolved at the zoom the camera is at: 0 while it is too small on screen to
+  see, 1 once it spans the given fraction of the frame. The frame shows 1/1.5
+  of the plate at 1x (see the exposure in LiquidVisualizer).
+
+  So the closeup is a microscope pushing in, not a filter: reported, the
+  cells were all there at full strength the moment the zoom left 1x. Now the
+  paint comes closer first, then the coarse cells break out of it, then the
+  fine cells between them and the lacing, each as it grows big enough to see.
+*/
+fn resolved(size: f32, lo: f32, hi: f32) -> f32 {
+  return smoothstep(lo, hi, size * 1.5 * max(U.camZoom, 1.0));
+}
+
 // Decode an already-fetched texel — the defocused path doesn't need bicubic
 // filtering or a gooey blur, so it costs 5 plain fetches instead of 5 decodes.
 fn decodeFluidRaw(raw: vec4f) -> vec4f {
@@ -749,7 +764,13 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // Larger, higher-contrast patches: a real pour breaks out in cell-covered
     // areas next to smooth ones, rather than pebbling the whole frame evenly.
     let clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.26, 0.60, fbm3(cuv * 8.0 + U.time * 0.015));
-    k = U.macroCells * focus * clumping;
+    // Each generation as it resolves (see resolved): at the default Cell
+    // Size the coarse cells break out from about 2.5x to 5x, the fine ones
+    // from about 6x to 12x. Bigger cells show sooner, smaller ones later.
+    let cell = 1.0 / freq;
+    let seeCoarse = resolved(cell, 0.078, 0.156);
+    let seeFine = resolved(cell / 2.9, 0.065, 0.13);
+    k = U.macroCells * focus * clumping * seeCoarse;
 
     // Coarse cells: two generations, half a cycle apart
     let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13);
@@ -765,10 +786,13 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // real pour, and read as the grain of the film rather than as bubbles.
     let h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16);
     let h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16);
-    let gap = clamp(1.0 - core * 1.6, 0.0, 1.0);
-    fineCore = max(h0.core, h1.core) * gap;
-    fineRim = max(h0.rim, h1.rim) * gap;
-    cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap;
+    // The fine cells crowd the gaps the coarse ones leave, once those are there.
+    let gap = clamp(1.0 - core * 1.6 * seeCoarse, 0.0, 1.0);
+    // Everything below scales by k, which is whole by the time these begin
+    // to resolve (the fine cells are 2.9 times smaller).
+    fineCore = max(h0.core, h1.core) * gap * seeFine;
+    fineRim = max(h0.rim, h1.rim) * gap * seeFine;
+    cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap * seeFine;
 
     let dark = col * 0.03;
     let ring = mix(col, vec3f(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
@@ -789,7 +813,8 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     let n = fbm3(q + U.time * 0.03) - 0.5;
     let line = 1.0 - smoothstep(0.0, 0.055, abs(n));
     let edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
-    lace = line * edgeMask * U.macroLacing * focus;
+    // Filaments a fraction of a cell wide: they come through last.
+    lace = line * edgeMask * U.macroLacing * focus * smoothstep(4.0, 9.0, U.camZoom);
     col = mix(col, col * 0.04, lace);
   }
 
