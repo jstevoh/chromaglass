@@ -120,8 +120,11 @@ like oil or like sweets.
 ?set=beads=0.8;beadDrops=0.5     half way: rings taking on colour
 ```
 
-Three things to look at. Whether a crowd reads as liquid or as candy: the
-colours are the palette's own, at 85% over the plate. Whether the highlight
+Three things to look at. Whether a crowd reads as liquid or as candy: after
+your "very cartoon like", both the rings and the drops are shaded as backlit
+oil lenses (a dimmed edge in the plate's own colour, a brighter middle, a
+glint instead of a white dot, and dyed oil that is clear at its rim), and
+this changes the rings in every look that has beads, not only the drops. Whether the highlight
 sits where the lamp is as the lamp wanders. And the frame time: the drops' mask
 is drawn a pixel at a time on the main thread, 6.7 ms against the rings'
 canvas at 3.9 in the sandbox's Chromium for the same crowd of about 330. If

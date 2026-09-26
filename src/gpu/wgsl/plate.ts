@@ -1749,13 +1749,33 @@ struct FsOut {
 
   // ── Oil drops ────────────────────────────────────────────────────
   /*
-    A drop of oil on the plate, as a microscope sees one: the pattern under
-    it magnified (dropLens, above, moved where everything is read), a dark
-    band just inside the edge where the surface is steep enough that light
-    from below is bent away from the eye, a thin bright line where the drop
-    meets the film round it, and one hard highlight where its dome faces the
-    lamp. Oil takes none of the water's dye, so it is faintly paler and warm.
-    In the closeup too, where a drop fills the frame.
+    A drop of oil on the plate, lit from beneath as a projector lights it and
+    seen from above: a lens, not a painted disc. Reshaded on the owner's
+    word that the beads and the drops "look very cartoon like", and the lab
+    pictures agreed: every bead carried a grey outline and the same white
+    dot in its middle, and the drops were flat discs of palette colour with
+    a pale ring round each, which is how a sticker is drawn, not a liquid.
+    What a drop of oil backlit on water actually shows, and what each part
+    here is for:
+
+    - **What is under it, magnified** (dropLens, above), so the dye runs on
+      through the drop rather than stopping at an outline.
+    - **A dark edge that is the light going somewhere else**, not a line
+      drawn round it. Where the dome is steep, light from beneath is bent out
+      of the eye's path, so the edge is the plate's own colour dimmed, never
+      grey, and it fades in over the outer half of the radius rather than
+      sitting in a band, then eases back to the plate at the contact, where
+      the meniscus is shallow again.
+    - **A brighter middle**: the dome is a lens and gathers the light behind
+      it into the centre.
+    - **The meniscus as refracted light**, a lift of the colour under it at
+      the contact, instead of a pale grey stroke laid on top.
+    - **A small highlight**: a lamp is a small bright thing a long way off,
+      and its reflection in a millimetre of oil is a point, placed where the
+      dome faces the half-vector. The exponent was 90, a white disc a fifth
+      of the drop across on every bead; at 320 it is a glint, and a broad,
+      faint sheen on the flank facing the lamp carries the roundness the
+      big dot was standing in for.
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
     let bm = beadAt(fuvSurf);
@@ -1772,41 +1792,38 @@ struct FsOut {
     let n = vec3f(outward * tilt, sqrt(max(0.0, 1.0 - tilt * tilt)));
     let Lb = lampDir(fuvSurf, U.lamp);
     let H = normalize(Lb + vec3f(0.0, 0.0, 1.0));
-    let spec = pow(max(0.0, dot(n, H)), 90.0);
-    // Light under the steep edge is refracted out of view: a dark band.
-    let band = smoothstep(0.7, 0.92, r) * (1.0 - smoothstep(0.97, 1.0, r));
-    let oilTint = mix(outColor, vec3f(0.96, 0.93, 0.84) * (0.3 + 0.7 * outColor), 0.18);
-    var dropC = oilTint * (1.0 - 0.72 * band);
-    // The meniscus catches the room: a fine bright line at the contact.
-    dropC += vec3f(0.85, 0.87, 0.9) * ring * 0.35;
-    // Fresnel: the dome's flank reflects a little of the light above.
-    let fres = 0.04 + 0.96 * pow(1.0 - n.z, 5.0);
-    dropC += vec3f(0.8, 0.82, 0.86) * fres * 0.25;
-    dropC += vec3f(1.0, 0.98, 0.94) * spec * 1.1;
+    let nh = max(0.0, dot(n, H));
+    // How much oil the light crosses: a spherical cap, 1 in the middle, 0 at the rim.
+    let th = sqrt(max(0.0, 1.0 - r * r));
+    // Darkest a little inside the rim and back to the plate at the contact
+    // itself: the outermost texels of a small bead's mask are its
+    // antialiasing, and dimmed there they drew a blocky square halo round
+    // every bead a few pixels across once the camera closed in.
+    let edgeLoss = smoothstep(0.5, 0.9, r) * (1.0 - smoothstep(0.9, 1.0, r));
+    let focus = 1.0 + 0.3 * (1.0 - r) * (1.0 - r);
+    let glint = pow(nh, 320.0) * 0.8;
+    let sheen = pow(nh, 12.0) * pow(1.0 - n.z, 1.5) * 0.12;
+    let lampC = vec3f(1.0, 0.97, 0.9);
+    // Clear oil: nearly colourless, a breath warmer than the water round it.
+    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * focus * (1.0 - 0.7 * edgeLoss);
+    dropC += outColor * ring * 0.3;
+    dropC += lampC * (glint + sheen);
 
     /*
       Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
-      each drop is a bead of coloured oil rather than a clear lens with a dark
-      rim. What changes from the ring above, and why each:
+      each drop is oil carrying a dye of its own. Shaded as dyed oil rather
+      than as a disc of that colour:
 
-      - **Its own colour.** A drop is dyed, so it is its colour lit through,
-        not the plate's. Mostly opaque, not wholly: a thin drop still shows a
-        little of the magnified pattern under it, which is what keeps a field
-        of them reading as liquid on liquid instead of stickers.
-      - **A body, not only a rim.** Lit by the lamp across its dome: the side
-        facing the lamp brighter, the far side and the steep band at the edge
-        darker, and the middle a little brighter again where the dome gathers
-        the light as a lens would. That falloff is what makes a disc of
-        colour read as round.
-      - **One highlight, placed and sized by the lamp.** The dome's normal
-        faces the half-vector at one point, which is toward the lamp, so a
-        lamp off to the side puts the highlight off centre on that side. A
-        low lamp sees a steeper, smaller mirror of itself than one overhead,
-        so the highlight tightens as the lamp drops: the exponent runs from
-        50 with the lamp straight above to 200 at grazing.
-      - **Seen on bare glass too.** The ring above fades to a third off the
-        dye, because a clear lens over nothing is nothing; a coloured drop is
-        visible wherever it sits.
+      - **Beer and Lambert.** The dye absorbs in proportion to how much oil
+        the light crosses, so the middle is the dye's full colour and the
+        thin edge nearly clear: the drop fades into what is under it at its
+        rim, which is what makes it read as a liquid lying on a liquid. The
+        first version painted the colour at 85% right to the edge.
+      - **The dye's own light.** On this plate dye is light (bare water is
+        dark), so a dyed drop over bare water still glows its colour, as
+        thick in the middle as the oil is.
+      - **The same lens** as the clear drop above: dimmed edge, gathered
+        middle, glint and sheen. None of it is a colour laid on top.
 
       The flattened walls and the compound drops are in the mask itself
       (rasterDrops in lib/beads.ts): the dome falls to zero along a wall, so
@@ -1815,15 +1832,12 @@ struct FsOut {
     var kDrop = k;
     if (U.beadDrops > 0.001 && beadWide()) {
       let dc = beadColour(fuvSurf);
-      let diffuse = max(0.0, dot(n, Lb));
-      let gather = (1.0 - r) * (1.0 - r);
-      var body = dc * (0.42 + 0.7 * diffuse) * (1.0 - 0.45 * band) + dc * 0.22 * gather;
-      // A thin drop still shows a little of what is under it.
-      body = mix(outColor * dc * 1.4, body, 0.85);
-      body += vec3f(0.85, 0.87, 0.9) * ring * 0.45;
-      body += vec3f(0.8, 0.82, 0.86) * fres * 0.3;
-      let shine = mix(50.0, 200.0, clamp(1.0 - Lb.z, 0.0, 1.0));
-      body += vec3f(1.0, 0.98, 0.94) * pow(max(0.0, dot(n, H)), shine) * 1.3;
+      let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
+      let trans = exp(-absorb * th * 1.4);
+      let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15;
+      var body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * focus * (1.0 - 0.7 * edgeLoss);
+      body += (outColor * trans + glowC) * ring * 0.3;
+      body += lampC * (glint + sheen);
       dropC = mix(dropC, body, U.beadDrops);
       kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
     }
