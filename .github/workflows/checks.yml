@@ -299,8 +299,9 @@ jobs:
         run: npm run fx
       # The show opens without stopping (scripts/startup.mjs): what the look
       # opens with is built before it opens and the rest behind it, none is
-      # built on a frame, no two frames are more than two seconds apart, and
-      # the plate moves for good no later than it did the old way. On a shard
+      # built on a frame, no two frames are more than two seconds apart but
+      # the one stop Chromium makes starting its GPU (held to the old way's),
+      # and the plate moves for good no later than it did the old way. On a shard
       # of its own, because it empties the Mac's shader cache, and one after
       # another check would find it warm; depth, first on the tools shard,
       # is how the nine-second freeze was found and still sees it cold.
