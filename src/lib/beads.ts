@@ -31,6 +31,12 @@ export interface Bead {
    * away over `innerLife` seconds (`age` is how long it has been held).
    */
   inner?: { dx: number; dy: number; r: number; seed: number; color: [number, number, number]; age: number };
+  /**
+   * A droplet: one of the crowd of tiny drops that sits round the big ones
+   * once drops are asked for (`populate`). Kept apart from the population
+   * `count` asks for, and never swallowed whole by a neighbour.
+   */
+  tiny?: true;
 }
 
 /**
@@ -49,6 +55,8 @@ export function innerLife(seed: number): number { return 15 + 20 * seed; }
 
 /** How long a drop takes to take on a new look's colour: a look fade's order. */
 const RECOLOUR_S = 1.5;
+/** Droplets per bead the population asks for, at full drops (see `populateTiny`). */
+const TINY_SHARE = 0.8;
 
 /**
  * Which palette entry a drop takes. From the bead's own seed rather than a
@@ -172,9 +180,17 @@ export class BeadField {
    */
   populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number): void {
     const N = this.grid;
-    while (this.beads.length > count) { this.beads.shift(); this.dirty = true; }
+    // With no droplets (always, at drops 0) the population is the beads, as it
+    // always was, and so is every line and every draw below.
+    const tinies = this.beads.reduce((n, b) => n + (b.tiny ? 1 : 0), 0);
+    const want = tinies ? count + tinies : count;
+    while (this.beads.length > want) {
+      const i = this.beads.findIndex((b) => !b.tiny);
+      if (i < 0) break;
+      this.beads.splice(i, 1); this.dirty = true;
+    }
     let tries = 0;
-    while (this.beads.length < count && tries++ < count * 6) {
+    while (this.beads.length - tinies < count && tries++ < count * 6) {
       // Two populations: mostly small beads of clearly different sizes, and
       // a tail of big lenses; the small ones spread over a wider range than
       // before so the carpet is not one size.
@@ -204,6 +220,63 @@ export class BeadField {
         this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]] } : { x, y, r, age: 0, seed });
         this.dirty = true;
       }
+    }
+    if (this.drops > 0 || tinies > 0) this.populateTiny(Math.round(count * TINY_SHARE * this.drops), sizeScale);
+  }
+
+  /*
+    The droplets. The owner, on a macro photograph of oil on water: "there
+    are also a great diversity of bubble sizes". There, a big drop is ringed
+    by droplets a twentieth its size and less, packed into every gap round
+    it, where this field's smallest bead was a tenth of its biggest and
+    stood about in the open like the rest. Oil breaking up leaves them: a
+    thread pinching off between two drops sheds a satellite (Rayleigh and
+    Plateau), and they stay because a small drop against a big one drains
+    the film between them slowly.
+
+    So, with drops on, a second population of `count` times TINY_SHARE
+    (scaled by the slider), each a third of a cell to most of one (one to
+    two and a half pixels of the mask: a quarter of a cell, tried first,
+    is under a pixel, and the mask drew those as smudges and spikes where
+    they met a big drop), born against the rim of a drop that is already there
+    and left to the crowding to settle. Retired oldest first like the rest,
+    and none at all at drops 0, so the rings' field is the rings' to the
+    draw.
+  */
+  private populateTiny(target: number, sizeScale: number): void {
+    const N = this.grid;
+    let have = 0;
+    for (const b of this.beads) if (b.tiny) have++;
+    while (have > target) {
+      const i = this.beads.findIndex((b) => b.tiny);
+      this.beads.splice(i, 1); have--; this.dirty = true;
+    }
+    const hosts = this.beads.filter((b) => !b.tiny && b.r >= 1.2 * (N / 192));
+    if (!hosts.length) return;
+    // Round the big drops most: a host is taken in proportion to its area,
+    // as the photographs have the droplets thickest round the biggest drops.
+    const rMax = hosts.reduce((m, b) => Math.max(m, b.r), 0);
+    let tries = 0;
+    while (have < target && tries++ < target * 8) {
+      const host = hosts[Math.floor(Math.random() * hosts.length)];
+      if (Math.random() > (host.r / rMax) ** 2) continue;
+      const u = Math.random();
+      const r = (0.35 + u * u * 0.55) * sizeScale * (N / 192);
+      const a = Math.random() * Math.PI * 2;
+      const d = host.r + r + 0.05;
+      const x = host.x + Math.cos(a) * d, y = host.y + Math.sin(a) * d;
+      if (x < 2 || y < 2 || x > N - 2 || y > N - 2) continue;
+      let ok = true;
+      for (const b of this.beads) {
+        if (b === host) continue;
+        const dx = b.x - x, dy = b.y - y;
+        if (dx * dx + dy * dy < (b.r + r) * (b.r + r)) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const seed = Math.random();
+      const c = this.slotColour(seed);
+      this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]], tiny: true } : { x, y, r, age: 0, seed, tiny: true });
+      have++; this.dirty = true;
     }
   }
 
@@ -346,11 +419,23 @@ export class BeadField {
           // How deep counts as inside scales with the slider, so the first
           // notch swallows almost nothing and the rule grows in with the rest.
           const inside = this.drops > 0 && d < big * this.drops && Math.min(b.r, o.r) < 0.5 * big && big < 6 * (this.grid / 192);
-          if (inside || (d < touch * 0.7 - press && touch < 7 && Math.random() < 0.02)) {
+          // A droplet is never taken in by a drop: it is what the crowd is
+          // ringed with, and one swallowed is a passenger too small to see
+          // (npm run drops counted two in a hundred drawn as nothing). Two
+          // droplets pressed together do run into one, as droplets do, or a
+          // current packs them on top of each other, and one in six lost its
+          // own middle to a neighbour.
+          const smaller = b.r < o.r ? b : o, larger = smaller === b ? o : b;
+          const takes = !smaller.tiny || larger.tiny;
+          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && Math.random() < 0.02) || (larger.tiny && d < touch * 0.6))) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
             big.r = Math.sqrt(big.r * big.r + small.r * small.r);
+            // Droplets that have run together into a drop of a cell are a
+            // drop: without this one kept taking in every droplet it touched
+            // and reached thirty-five cells (npm run drops).
+            if (big.tiny && big.r > this.grid / 192) delete big.tiny;
             /*
               A compound drop: with drops on, the one swallowed stays visible
               inside the one that swallowed it, where it went in, the way a
@@ -359,7 +444,7 @@ export class BeadField {
               halves of one drop, not one inside another), and a drop holds
               one: a second merge keeps whichever is larger.
             */
-            if (this.drops > 0 && small.r < bigR * 0.7 && (!big.inner || big.inner.r < small.r)) {
+            if (this.drops > 0 && !small.tiny && small.r < bigR * 0.7 && (!big.inner || big.inner.r < small.r)) {
               let dx = small.x - big.x, dy = small.y - big.y;
               const room = Math.max(0, (big.r - small.r) * 0.8);
               const dl = Math.hypot(dx, dy);
@@ -638,9 +723,13 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
     // The drop it holds: its own dome and rim, standing inside this one.
     const inn = b.inner;
     if (inn && Number.isFinite(inn.dx) && Number.isFinite(inn.dy)) {
-      // Dissolving: the passenger narrows to nothing over its life.
+      // Dissolving: the passenger narrows to nothing over its life. Never
+      // under a pixel and a quarter while it is held: at one pixel, a
+      // passenger whose middle fell on a pixel's corner covered four
+      // pixels by four-fifths each and was drawn as its host's colour
+      // with a tint of its own (npm run drops found one, sixteen seconds in).
       const ix = x0 + inn.dx * k, iy = y0 + inn.dy * k;
-      const iR = Math.max(1, inn.r * k * Math.sqrt(Math.max(0, 1 - inn.age / innerLife(inn.seed))));
+      const iR = Math.max(1.25, inn.r * k * Math.sqrt(Math.max(0, 1 - inn.age / innerLife(inn.seed))));
       const ilw = Math.max(1, iR * 0.12);
       const ic = inn.color, i0 = ic[0] * 255, i1 = ic[1] * 255, i2 = ic[2] * 255;
       const iya = Math.max(0, Math.floor(iy - iR - 1)), iyb = Math.min(S - 1, Math.ceil(iy + iR + 1));

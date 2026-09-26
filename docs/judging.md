@@ -126,7 +126,9 @@ photographs of backlit oil, water drops and emulsions
 (`/mnt/project-files/drops/references`). A small drop now shows the plate
 round it upside down, a big one is flat on top and shows what is under it as
 it is, every drop is outlined by a thin dark line at its contact, and there is
-no highlight at all, since none of the backlit pictures has one. This changes
+no highlight at all, since none of the backlit pictures has one. Every drop
+sees the same stretch of plate round it, so small ones near a colour edge
+carry two colours, and with Drops up, the big drops gather rings of droplets. This changes
 the rings in every look that has beads, not only the drops. Whether the
 inverted view reads as liquid when the plate moves under it, and whether you
 want a highlight back. And the frame time: the drops' mask

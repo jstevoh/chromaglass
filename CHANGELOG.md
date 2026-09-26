@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it upside down, a big one is flat on top and shows what is under it, each is
   outlined by a thin dark line at its contact, and the white dot is gone.
   `npm run droplens` measures each on one drop.
+- **Several colours in one drop.** Every drop sees the same stretch of plate
+  round it, turned over, however small it is, so a droplet near where two
+  dyes meet carries both, as the droplets in the photographs do.
+- **Droplets.** With Drops on, big drops are ringed by droplets a tenth their
+  size and less, and the sizes in one cluster span 17 to 1 (10 to 1 before).
+  Droplets run into each other but are never swallowed by a drop.
 - **Fixed: dark squares and pale flecks round beads when zoomed.** The rings'
   mask was drawn on a clear canvas, and the upload's straight alpha turned
   every edge texel full red and the fade-in into nothing; its rims also took

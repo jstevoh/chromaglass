@@ -201,6 +201,32 @@ const clusterStats = (fld, withColour) => {
   check('and is more than one colour, read from the mask', dropsC.colours >= 3, `${dropsC.colours} of the palette's ${FILLMORE.length}`);
 }
 
+// ── Droplets round the big drops ─────────────────────────────────────
+/*
+  The owner, on a macro photograph of oil on water: "there are also a great
+  diversity of bubble sizes". There every big drop is ringed by droplets a
+  tenth its size and less; here the smallest bead was a tenth of the
+  biggest and none gathered anywhere in particular. Asked of the crowded
+  field: of the drops three and a half cells or more across their radius,
+  how many have three or more drops under a sixth their radius touching
+  them. The rings, the same run at 0, are the control: they have almost
+  none, and no droplets at all.
+*/
+{
+  const ringed = (bs) => {
+    const big = bs.filter((b) => b.r >= 3.5);
+    let n = 0;
+    for (const b of big) {
+      const small = bs.filter((o) => o !== b && o.r < b.r / 6 && Math.hypot(o.x - b.x, o.y - b.y) < (o.r + b.r) * 1.15).length;
+      if (small >= 3) n++;
+    }
+    return { n, of: big.length };
+  };
+  const d = ringed(beads), r = ringed(crowd(0, { palette: null }).beads);
+  check('big drops are ringed by droplets', d.of >= 30 && d.n >= 0.25 * d.of && r.n <= 0.05 * r.of,
+    `${d.n} of ${d.of} big drops have three or more a sixth their size touching them (rings: ${r.n} of ${r.of})`);
+}
+
 // ── A drop is its own colour ─────────────────────────────────────────
 {
   let right = 0, asked = 0;
@@ -304,7 +330,7 @@ const clusterStats = (fld, withColour) => {
     // Its own colour at its middle, and its own rim a radius out.
     // Its rim: the brightest of the few pixels just inside its edge, which
     // is where the line is drawn whatever the pixel grid does to it.
-    const iR = Math.max(1, b.inner.r * K * Math.sqrt(Math.max(0, 1 - b.inner.age / innerLife(b.inner.seed))));
+    const iR = Math.max(1.25, b.inner.r * K * Math.sqrt(Math.max(0, 1 - b.inner.age / innerLife(b.inner.seed))));
     const cxp = (b.x + b.inner.dx) * K;
     const rimX = Math.floor(cxp + iR - 0.8);
     let rim = 0;
@@ -320,12 +346,25 @@ const clusterStats = (fld, withColour) => {
   check('a drop that swallowed a smaller one still shows it', held.length >= 3 && seen === held.length - skipped && seen >= 0.8 * held.length,
     `${held.length} compound drops of ${beads.length}, ${seen} with the passenger's colour and rim${skipped ? `, ${skipped} with it behind a neighbour's wall` : ''}`);
 
-  // And lets it go: forty quiet seconds later, every one has dissolved.
+  /*
+    And lets it go: forty quiet seconds later, every passenger that was held
+    at the start has dissolved, and no drop holds one for longer than its
+    life. This asked for no passengers at all after forty seconds, which
+    was a moment of the field rather than the feature: once droplets ring
+    the drops, the crowd is still settling when the current stops, a pair
+    pressed hard still runs together now and then, and a drop that took a
+    passenger ten seconds into the quiet rightly still holds it at forty.
+    What the feature promises is that a passenger goes, so that is asked
+    of each one, by identity, and of its age.
+  */
   const g = crowd(1);
-  const before = g.beads.filter((b) => b.inner).length;
+  const held0 = new Set(g.beads.filter((b) => b.inner).map((b) => b.inner));
   for (let i = 0; i < 40 * 60; i++) g.step(1 / 60, () => [0, 0], 0, 0);
-  const after = g.beads.filter((b) => b.inner).length;
-  check('and in time lets it go', before > 0 && after === 0, `${before} held, ${after} after forty seconds`);
+  const still = g.beads.filter((b) => b.inner && held0.has(b.inner)).length;
+  const overdue = g.beads.filter((b) => b.inner && b.inner.age > innerLife(b.inner.seed)).length;
+  const fresh = g.beads.filter((b) => b.inner && !held0.has(b.inner)).length;
+  check('and in time lets it go', held0.size > 0 && still === 0 && overdue === 0,
+    `${held0.size} held, ${still} of them after forty seconds, ${overdue} held past their life (${fresh} taken since)`);
 }
 
 // ── The first notch is a notch ──────────────────────────────────────

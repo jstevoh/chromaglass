@@ -147,30 +147,47 @@ try {
     const out = {};
     const Rs = 3 / N, Rb = 7 / N;
     /*
-      The first plate: A left of x = 0.5, B right of it, and a stripe of a
-      third dye three to four small radii right of the small drop's centre.
-      The drop, three cells across its radius (the common size), sits just
-      left of the line, off the middle row, its centre a sixth of a radius
-      from it, so both what its left half covers and what it shows there
-      are a clear dye's width from the line's blur. Turned over, its left
-      half shows B, what lies past its right edge. But not the stripe: the
-      view reaches about two radii past the far edge, and a lens turned up
-      until it reaches three would show a plate the drop is nowhere near.
+      The first plate: A left of x = 0.5, B right of it. The drop, three
+      cells across its radius (the common size), sits just left of the line,
+      off the middle row, its centre a sixth of a radius from it, so both
+      what its left half covers and what it shows there are a clear dye's
+      width from the line's blur. Turned over, its left half shows B, what
+      lies past its right edge.
     */
     {
       const xs = 0.5 - 0.15 * Rs, ys = 0.42;
-      await plate((x) => (x >= xs + 3 * Rs && x <= xs + 4 * Rs ? D : x < 0.5 ? A : B));
-      const refs = { A: await swatch(0.3, ys), B: await swatch(0.52, ys), D: await swatch(xs + 3.5 * Rs, ys) };
+      await plate((x) => (x < 0.5 ? A : B));
+      const refs = { A: await swatch(0.3, ys), B: await swatch(0.7, ys) };
       const s = await shoot(xs, ys, Rs);
-      const t = turned(s, refs, [1, 0]);
-      let stripe = 0;
+      out.x = { ...turned(s, refs, [1, 0]), rad: s.rad };
+    }
+    /*
+      How far a drop sees. The owner, on the macro photographs: "some of the
+      bubbles have multiple background colors in them". A droplet there
+      shows, small and turned over, the colours for some way round it, not
+      only the patch it sits on. So on a plate of A with a stripe of D two
+      and a half to three and a half radii to the right of the small drop,
+      the drop must show D; a lens that sees only a radius or two past
+      itself (the first version) shows none. And a stripe of B seven to
+      eight radii away must not be in it: the view has a reach, and a lens
+      turned up past it would put the whole plate in every droplet.
+    */
+    {
+      const xs = 0.3, ys = 0.42;
+      const inD = (x) => x >= xs + 2.5 * Rs && x <= xs + 3.5 * Rs;
+      const inE = (x) => x >= xs + 7 * Rs && x <= xs + 8 * Rs;
+      await plate((x) => (inD(x) ? D : inE(x) ? B : A));
+      const refs = { A: await swatch(xs, 0.2), D: await swatch(xs + 3 * Rs, ys), E: await swatch(xs + 7.5 * Rs, ys) };
+      const s = await shoot(xs, ys, Rs);
+      let d = 0, e = 0;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
         if (Math.hypot(xx - s.cx, yy - s.cy) > 0.9 * s.rad) continue;
-        if (which(refs, rgb(s.on, xx, yy)) === 'D') stripe++;
+        const k = which(refs, rgb(s.on, xx, yy));
+        if (k === 'D') d++; else if (k === 'E') e++;
       }
-      let stripeOff = 0;
-      for (let xx = 0; xx < S; xx++) if (which(refs, rgb(s.off, xx, Math.round(s.cy))) === 'D') stripeOff++;
-      out.x = { ...t, stripe, stripeOff, rad: s.rad };
+      let dOff = 0;
+      for (let xx = 0; xx < S; xx++) if (which(refs, rgb(s.off, xx, Math.round(s.cy))) === 'D') dOff++;
+      out.reach = { d, e, dOff, eApart: which(refs, refs.E) === 'E' };
     }
     /*
       The second plate turns the line over: A below y = 0.5, B above. The
@@ -255,8 +272,9 @@ try {
     turnedOk(m.x), `its ${m.x.near ?? '?'} half shows ${m.x.far ?? '?'} in ${(100 * m.x.seen).toFixed(0)}% of pixels (${(100 * m.x.plain).toFixed(0)}% ${m.x.near ?? '?'} with no drop)`);
   check('and top to bottom',
     turnedOk(m.y), `its ${m.y.near ?? '?'} half shows ${m.y.far ?? '?'} in ${(100 * m.y.seen).toFixed(0)}% of pixels (${(100 * m.y.plain).toFixed(0)}% ${m.y.near ?? '?'} with no drop)`);
-  check('but not what lies three radii past it', m.x.stripeOff > 10 && m.x.stripe === 0,
-    `${m.x.stripe} pixels of the stripe inside the drop (it is ${m.x.stripeOff} px wide in the frame)`);
+  check('a small drop shows the plate a few radii round it, not only what it sits on', m.reach.dOff > 10 && m.reach.d >= 30,
+    `${m.reach.d} pixels of a stripe three radii off inside the drop (it is ${m.reach.dOff} px wide in the frame)`);
+  check('but not what lies seven radii away', m.reach.eApart && m.reach.e === 0, `${m.reach.e} pixels of a stripe seven radii off`);
   check('a big drop is flat on top: the edge under it stays where it is',
     m.big.off > 0 && m.big.on > 0 && Math.abs(m.big.on - m.big.off) <= 2,
     `the dye's edge at ${m.big.on} px through the drop, ${m.big.off} px without`);

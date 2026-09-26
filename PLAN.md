@@ -213,6 +213,16 @@ the flank inside it at full brightness (the first reshade's shadow held it to
 glint made it 2.4 ×. Whether to bring a highlight back (for the camera pass,
 which looks at the plate rather than through it) is the owner's.
 
+Then, on the owner's reading of the same photographs ("some of the bubbles
+have multiple background colors in them … a great diversity of bubble
+sizes"): every drop's view reaches the same stretch of plate, so a droplet
+carries several colours (`npm run droplens`: a stripe three radii off is in
+it, one seven radii off is not), and with drops on, a second population of
+droplets rings the big drops (`npm run drops`: 61 of 170 big drops have three
+or more a sixth their size touching them, against 1 of 107 for the rings;
+one cluster spans 17:1). The mask for the larger crowd takes 11.7 ms in the
+sandbox against 8.6, a number for the Mac's `frameMs`.
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`

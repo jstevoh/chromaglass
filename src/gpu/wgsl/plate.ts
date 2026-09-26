@@ -1046,10 +1046,22 @@ fn viewAt(uv: vec2f) -> View {
 
   So the sample under a point at radius r (0 centre, 1 rim) is pushed toward
   the centre and past it by an amount set by the surface's slope there. On
-  a small drop the slope climbs from the middle, so the push is DROP_INVERT
-  times r and the whole drop is one inverted view reaching DROP_INVERT - 1
-  radii past its far edge. On a big one it is zero across the flat and
-  climbs across the band. How flat a drop is comes from its size in the
+  a small drop the slope climbs from the middle, so the push grows with r
+  and the whole drop is one inverted view. On a big one it is zero across
+  the flat and climbs across the band.
+
+  How far past a drop its view reaches is not a number of its own radii.
+  The first version pushed by three radii, which gave every drop a view of
+  the plate within a radius or two of itself, one colour, since the dye
+  changes over a much larger distance than a bead is wide. The owner, on
+  the macro photographs: "some of the bubbles have multiple background
+  colors in them". A drop's view is set by what it looks through to, and
+  that is the same for every drop, so each is a push of DROP_INVERT radii
+  plus a fixed DROP_REACH of the plate: a big drop's crescent reaches a
+  little past its far side, and a droplet a tenth its size shows, turned
+  over, much the same stretch of plate the big one does, which is how a
+  cluster of droplets in the photographs each carry the same small
+  picture of the colours round them. How flat a drop is comes from its size in the
   plate's own units, since the meniscus has a size of its own (the
   capillary length) and a drop only goes flat when it is wider than that.
   There is no attempt to join the view to the plate outside at the rim:
@@ -1075,6 +1087,7 @@ fn viewAt(uv: vec2f) -> View {
   frame it is changed, the mask only on the next frame the beads are drawn.
 */
 const DROP_INVERT: f32 = 3.0;
+const DROP_REACH: f32 = 0.06;
 fn beadWide() -> bool {
   let d = textureDimensions(beadTex);
   return d.x > d.y;
@@ -1127,7 +1140,7 @@ fn dropLens(uv: vec2f) -> vec4f {
     rim at 3x. Faded in over the edge they show the plate beside them, as
     the coverage there says most of the texel is.
   */
-  let push = DROP_INVERT * dropBand(r, R) * smoothstep(0.02, 0.6, m.r);
+  let push = (DROP_INVERT + DROP_REACH / max(R, px)) * dropBand(r, R) * smoothstep(0.02, 0.6, m.r);
   // A push in radii along a vector r radii long.
   return vec4f(toC * (push / max(r, 1e-3)), r, R);
 }
@@ -1875,7 +1888,7 @@ struct FsOut {
     if (U.beadDrops > 0.001 && beadWide()) {
       let dc = beadColour(fuvSurf);
       let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
-      let trans = exp(-absorb * th * 1.4);
+      let trans = exp(-absorb * th * 1.0);
       let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15;
       var body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
       body += (outColor * trans + glowC) * ring * 0.15;
