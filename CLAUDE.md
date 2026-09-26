@@ -45,6 +45,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`) | `shelf`, `music` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
+| `scripts/watch.mjs` | `npm run watch -- --selftest` |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
@@ -81,6 +82,10 @@ When CI is red, use the `steward` skill.
 
 - `.claude/skills/steward/`: drive a red PR to green.
 - `.claude/skills/look/`: render before/after pictures of a visual change in the lab.
+- `.claude/skills/watch/`: watch a video (a reference link, a recording of the app) as
+  contact sheets, a slit-scan timeline and motion, colour and sound numbers (`npm run watch`).
+- `.claude/agents/video-watcher.md`: watch long or several videos in its own context and
+  return an account with numbers, or the app compared against a reference.
 - `.claude/skills/ship/`: merge, confirm the deploy, restart the branch.
 - `.claude/agents/prepush-reviewer.md`: adversarial review of the diff before a push.
 - `.claude/agents/preset-auditor.md`: photograph every preset and flag the broken ones.
