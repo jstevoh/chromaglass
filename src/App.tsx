@@ -63,7 +63,7 @@ import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
-import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
+import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -1585,11 +1585,18 @@ export default function App() {
   const cuedRef = useRef(cued);
   cuedRef.current = cued;
   /*
-    The set: the operator's own cue list (lib/setList.ts). Empty, the desk
-    lists every look as it always has; with items in it, the desk lists the
-    set, in its order, and each row arms its item.
+    The set: the operator's own cue list (lib/setList.ts), and what the desk
+    lists, in its order; each row arms its item. A first visit opens on the
+    starter set, every look as an item that can be removed. It used to list
+    every look whenever the set was empty, and those rows were not the set's,
+    so nothing on the desk could be taken off it.
   */
-  const [setList, setSetList] = useState<SetList>(loadSetList);
+  const [setList, setSetList] = useState<SetList>(() => loadSetList(() => starterSet(PRESETS.map(p => p.id))));
+  /** Sets kept by name (the set menu's Save and Open). The working set above is kept on its own. */
+  const [savedSets, setSavedSets] = useState<SetList[]>(loadSavedSets);
+  const changeSaved = useCallback((f: (prev: SetList[]) => SetList[]) => {
+    setSavedSets(prev => { const v = f(prev); storeSavedSets(v); return v; });
+  }, []);
   const setListRef = useRef(setList);
   setListRef.current = setList;
   const changeSet = useCallback((next: SetList | ((prev: SetList) => SetList)) => {
@@ -1712,9 +1719,6 @@ export default function App() {
   }, []);
   const setActive = setList.items.length > 0;
   const cues = useMemo<Cue[]>(() => {
-    if (!setActive) {
-      return allPresets.map(pr => ({ id: pr.id, name: pr.name, swatch: swatchOf(pr.id), fade: fadeSeconds }));
-    }
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
       const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
@@ -1729,7 +1733,7 @@ export default function App() {
         missing: item.kind === 'sequence' ? !seq : !look,
       };
     });
-  }, [allPresets, fadeSeconds, setActive, setList, swatchOf]);
+  }, [allPresets, fadeSeconds, setList, swatchOf]);
   cuesRef.current = cues;
 
   /**
@@ -1999,15 +2003,22 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changeSet]);
-  const onSetAction = useCallback((a: SetAction) => {
+  const onSetAction = useCallback((a: SetAction, name?: string) => {
     if (a === 'import') setAddingToSet(true);
+    else if (a === 'save') changeSaved(prev => withSavedSet(prev, setListRef.current));
+    else if (a === 'open' && name) {
+      const kept = loadSavedSets().find(x => x.name === name);
+      if (kept) { changeSet({ name: kept.name, items: kept.items.map(i => ({ ...i })) }); setLiveItemId(null); }
+    } else if (a === 'delete' && name) changeSaved(prev => prev.filter(x => x.name !== name));
+    else if (a === 'rename' && name?.trim()) changeSet(prev => ({ ...prev, name: name.trim() }));
+    else if (a === 'new') { changeSet({ name: 'New set', items: [], emptied: true }); setLiveItemId(null); }
     else if (a === 'export') {
       const list = setListRef.current;
       downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    } else if (a === 'clear') { changeSet({ name: 'My set', items: [] }); setLiveItemId(null); }
+    } else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
     else if (a === 'song-shows') setShowSongs(true);
-  }, [changeSet]);
+  }, [changeSet, changeSaved]);
   const onItemAction = useCallback((id: string, a: SetItemAction) => {
     changeSet(prev => {
       if (a === 'up' || a === 'down') return moveItem(prev, id, a === 'up' ? -1 : 1);
@@ -4206,7 +4217,8 @@ export default function App() {
           automated={isAutomated}
           onAutomate={setIsAutomated}
           cues={cues}
-          setName={setActive ? setList.name : null}
+          setName={setList.name}
+          savedSets={savedSets.map(x => x.name)}
           onAddToSet={() => setAddingToSet(true)}
           onSetAction={onSetAction}
           onItemAction={onItemAction}

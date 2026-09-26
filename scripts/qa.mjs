@@ -1958,24 +1958,31 @@ try {
 
   // ── The set: the operator's own cue list ──────────────────────────
   //
-  // Empty, the desk lists every look. Two looks added from the sheet make a
-  // set of two, in that order; a row arms its item and Go sends it; cleared,
-  // the desk lists every look again.
+  // A first visit opens on every look as a set that can be trimmed. A new
+  // empty set with two looks added from the sheet is a set of two, in that
+  // order; a row arms its item and Go sends it; × takes one off; saved by
+  // name, it comes back from the menu; and "start from all presets" puts
+  // every look back.
   {
     await clickOn('mode-segmented-perform');
     await settle(600);
-    const allLooks = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    const rowSel = '[data-testid="cue-list"] [data-testid^="cue-"][data-state]';
+    const allLooks = await page.locator(rowSel).count();
+    const starter = await page.getByTestId('set-name').innerText().catch(() => '');
+    check('a first visit opens on every look, as a set', allLooks > 20 && /all presets/i.test(starter),
+      `${allLooks} rows in "${starter}"`);
+    await clickOn('set-menu');
+    await clickOn('set-new');
+    await settle(300);
     await clickOn('set-add');
     await settle(300);
     const firstTwo = await page.locator('[data-testid^="add-to-set-look-"]').evaluateAll((els) => els.slice(0, 2).map((e) => e.getAttribute('data-testid')));
     for (const t of firstTwo) await clickOn(t);
     await clickOn('add-to-set-done');
     await settle(400);
-    const rows = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
-    const name = await page.getByTestId('set-name').innerText().catch(() => '');
-    check('two looks added from the sheet make a set of two', rows === 2 && name !== 'All looks',
-      `${allLooks} looks → ${rows} rows, "${name}"`);
-    const first = page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').first();
+    const rows = await page.locator(rowSel).count();
+    check('two looks added to a new set make a set of two', rows === 2, `${allLooks} looks → ${rows} rows`);
+    const first = page.locator(rowSel).first();
     await first.click();
     await settle(200);
     const armed = await first.getAttribute('data-state');
@@ -1985,11 +1992,31 @@ try {
     check('a set row arms its item and Go sends it', armed === 'next' && live === 'live', `${armed} → ${live}`);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-setlist') || '{"items":[]}').items.length);
     check('and the set is kept', stored === 2, `${stored} stored`);
+    // Named and saved, then trimmed with its ×.
+    await clickOn('set-name');
+    await page.getByTestId('set-name-input').fill('QA set');
+    await page.keyboard.press('Enter');
+    await clickOn('set-save');
+    await settle(200);
+    const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-sets') || '[]').map((x) => `${x.name}:${x.items.length}`));
+    check('saved, the set is kept by its name', kept.includes('QA set:2'), kept.join(', ') || 'nothing kept');
+    const lastId = await page.locator(rowSel).last().getAttribute('data-testid');
+    await clickOn(lastId.replace(/^cue-/, 'cue-remove-'));
+    await settle(300);
+    check('× takes an item off the set', await page.locator(rowSel).count() === 1, `${await page.locator(rowSel).count()} left`);
     await clickOn('set-menu');
     await clickOn('set-clear');
     await settle(400);
-    const back = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
-    check('cleared, the desk lists every look again', back === allLooks, `${back} of ${allLooks}`);
+    const back = await page.locator(rowSel).count();
+    check('starting from all presets lists every look again', back === allLooks, `${back} of ${allLooks}`);
+    await clickOn('set-menu');
+    await clickOn('set-open-QA set');
+    await settle(400);
+    check('and the saved set opens again as it was saved', await page.locator(rowSel).count() === 2,
+      `${await page.locator(rowSel).count()} rows`);
+    await clickOn('set-menu');
+    await clickOn('set-clear');
+    await settle(300);
   }
 
   // ── A look replaces the one before it ────────────────────────────

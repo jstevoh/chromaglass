@@ -405,7 +405,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       data-testid={testId}
       data-state={state}
       data-midi-hit={hit ? 'true' : undefined}
-      className={`flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
+      className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />
