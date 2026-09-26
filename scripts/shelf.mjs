@@ -41,7 +41,8 @@ const check = (name, ok, detail) => {
 
 const browser = await launchChromium(chromium);
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  // Wide enough for the desk: the tabs only exist when there is room for it.
+  const page = await browser.newPage({ viewport: { width: 1500, height: 940 } });
   await page.goto(`http://localhost:${port}/?debug`, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
 
@@ -58,13 +59,43 @@ try {
       `${r.status} ${r.type ?? '?'}`);
   }
 
-  if (await page.evaluate(() => typeof window.chromaglassMusic !== 'function'))
-    throw new Error('chromaglassMusic() is not there — nothing below could put a track on');
+  /*
+    Through the tab a person clicks, not the back door.
 
+    The first version of this drove `chromaglassMusic()` because the shelf
+    could not be found in the DOM — and that was the finding, not an
+    inconvenience to route around. The sources were gated on
+    `showControls && !showSettings && !deskUp`, so they hid when Settings
+    opened and hid again whenever a desk was up. The shelf shipped where
+    nobody could reach it and the harness proved the audio path while saying
+    nothing about whether a hand could get to it. So this clicks the tab.
+  */
   const first = LIBRARY[1];   // a short one, so the test is not waiting on a 31-minute set
-  const put = await page.evaluate((src) => window.chromaglassMusic(src), first.src);
-  check('a track can be put on', put?.src === first.src, `${put?.title} — ${put?.artist}`);
-  await page.waitForTimeout(1200);
+  const tab = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  check('there is a Sound tab on the desk', tab, 'beside Perform, Design and Songs');
+  if (!tab) throw new Error('no Sound tab, so nothing below can be reached by hand');
+  await page.waitForTimeout(700);
+  const panel = await page.evaluate(() => !!document.querySelector('[data-testid="sound-panel"]'));
+  check('and it opens the sound panel', panel, `${LIBRARY.length} tracks, ${Math.round(librarySeconds() / 60)} minutes`);
+
+  const clicked = await page.evaluate((id) => {
+    const b = document.querySelector(`[data-testid="sound-track-${id}"]`);
+    if (!b) return false;
+    b.click();
+    return true;
+  }, first.src.split('/').pop().replace('.mp3', ''));
+  check('a track on the shelf can be clicked', clicked, first.title);
+  await page.waitForTimeout(1400);
+  const put = await page.evaluate(() => {
+    const el = document.querySelector('audio');
+    return el?.currentSrc?.split('/').pop() ?? null;
+  });
+  check('and clicking it loads that track', put === first.src.split('/').pop(), put ?? 'nothing loaded');
   /*
     Only if it needs it. Autoplay may want a gesture, and the play button is
     there for exactly that — but pressing it on a track that is already running
@@ -123,6 +154,48 @@ try {
     !!credited && credited.includes(owed.artist), credited ?? 'no credit shown');
   const inLine = credits();
   check('and the shelf credit line names them too', inLine.includes(owed.artist), inLine);
+
+  /*
+    The plate playing itself, measured the same way as the shelf.
+
+    A synth that runs and cannot be heard is the same failure as a track that
+    plays to a deaf analyser, so it is asked the same question: does the
+    energy the show is driven by actually move? Four voices tuned from the
+    plate should read well clear of silence within a few seconds.
+  */
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
+    b?.click();
+  });
+  await page.waitForTimeout(600);
+  const droneOn = await page.evaluate(() => {
+    const b = document.querySelector('[data-testid="sound-source-drone"]');
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  check('the plate is offered as an instrument', droneOn, 'a source beside the microphone and the shelf');
+  await page.waitForTimeout(1200);
+  const knobs = await page.evaluate(() =>
+    !!document.querySelector('[data-testid="drone-controls"]') &&
+    ['root', 'scale', 'wave', 'voices', 'octave', 'cutoff', 'resonance', 'sub', 'drift', 'reverb', 'level']
+      .filter(k => document.querySelector(`[data-testid="drone-${k}"]`)).length);
+  check('and it has its controls', knobs === 11, `${knobs} of 11 on screen`);
+
+  let droneLoud = 0, droneReads = 0;
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(200);
+    const e = await page.evaluate(() => {
+      const a = window.chromaglassCastState().audio;
+      return a ? a.energy : null;
+    });
+    if (e === null) continue;
+    droneReads++;
+    if (e > droneLoud) droneLoud = e;
+  }
+  if (!droneReads) throw new Error('the show reported no audio at all while the drone ran — not quiet, absent');
+  check('and the show can hear the plate playing itself', droneLoud > 0.01,
+    `loudest energy ${droneLoud.toFixed(4)} over ${droneReads} reads`);
   check('the shelf carries no non-commercial or no-derivatives licence',
     LIBRARY.every(t => !/\b(nc|nd)\b/i.test(t.licenceUrl) && !/-nc|-nd/.test(t.licenceUrl)),
     LIBRARY.map(t => t.licence).join(', '));

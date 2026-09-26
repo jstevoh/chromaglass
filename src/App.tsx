@@ -15,6 +15,8 @@ import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
+import { SoundPanel } from './components/SoundPanel';
+import { startPlateDrone, DRONE_DEFAULTS, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
@@ -82,7 +84,7 @@ function loadMusicSettings(): MusicSettings {
   return { ...DEFAULT_MUSIC_SETTINGS };
 }
 
-type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated';
+type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 /**
@@ -395,6 +397,18 @@ export default function App() {
   const playTrackRef = useRef<(t: Track) => void>(() => {});
   const [musicLoop, setMusicLoop] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /*
+    Sound is a tab, because the strip it used to live in could not be found.
+
+    The audio sources were gated on `showControls && !showSettings && !deskUp`:
+    they hid when Settings opened, and hid again whenever either desk was up,
+    which is where the work happens. A shelf of music shipped into that strip
+    and the owner reported not being able to see any of it, which is the right
+    outcome for a control nobody can reach.
+  */
+  const [showSound, setShowSound] = useState(false);
+  const droneRef = useRef<Drone | null>(null);
+  const [droneParams, setDroneParams] = useState<DroneParams>(DRONE_DEFAULTS);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
   const musicElRef = useRef<HTMLAudioElement>(null);
@@ -648,6 +662,9 @@ export default function App() {
       setAudioStream(null);
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    // The drone owns an AudioContext and four running oscillators; leaving it
+    // behind would keep them sounding under whatever replaced it.
+    if (droneRef.current) { droneRef.current.stop(); droneRef.current = null; }
 
     setAudioSource(source);
     try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
@@ -655,6 +672,21 @@ export default function App() {
     if (source === 'none') return;
     if (source === 'file') {
       // The stream comes from the element once it is ready; see playMusicFile.
+      return;
+    }
+    if (source === 'drone') {
+      /*
+        The plate playing itself. It is a stream like any other from here on,
+        so the analyser, the calibration and the beat clock are all exercised
+        for real — and because it also sounds out of this tab, a shared tab
+        carries it to a call.
+      */
+      const drone = startPlateDrone(
+        () => visualizerRef.current?.plateReading(4) ?? null,
+        droneParams,
+      );
+      droneRef.current = drone;
+      setAudioStream(drone.stream);
       return;
     }
     if (source === 'simulated') {
@@ -727,6 +759,13 @@ export default function App() {
       setAudioSource('none');
     }
   }, [audioStream, audioInputId, refreshAudioInputs]);
+  const changeDrone = useCallback((patch: Partial<DroneParams>) => {
+    setDroneParams(prev => {
+      const next = { ...prev, ...patch };
+      droneRef.current?.setParams(next);
+      return next;
+    });
+  }, []);
   const chooseAudioInput = useCallback((id: string) => {
     setAudioInputId(id);
     try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
@@ -3693,6 +3732,27 @@ export default function App() {
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
+        {showSound && (
+          <SoundPanel
+            source={audioSource}
+            onSource={(x) => { void handleSourceChange(x); }}
+            inputs={audioInputs}
+            inputId={audioInputId}
+            onInput={chooseAudioInput}
+            playing={musicPlaying}
+            time={musicTime}
+            loop={musicLoop}
+            onLoop={setMusicLoop}
+            onToggle={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }}
+            onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
+            nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
+            onPickFile={playMusicFile}
+            onPickTrack={playTrack}
+            drone={droneParams}
+            onDrone={changeDrone}
+            onClose={() => setShowSound(false)}
+          />
+        )}
         {showSongs && (
           <SongsPanel
             shows={songShows}
@@ -4036,8 +4096,10 @@ export default function App() {
           }}
           dots={deskDots}
           onSearch={() => setShowPalette(true)}
-          mode={showSongs || showSequencer ? 'sequence' : 'perform'}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'perform'}
           onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
             if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
             setShowSongs(false);
             setShowSequencer(false);
@@ -4108,8 +4170,10 @@ export default function App() {
           onNew={newLook}
           dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
-          mode={showSongs || showSequencer ? 'sequence' : 'design'}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'design'}
           onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
             if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
             setShowSongs(false);
             setShowSequencer(false);
