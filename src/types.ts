@@ -489,6 +489,18 @@ export interface VisualizerSettings {
    * during them, and the clock itself leans forward and back.
    */
   surge: number;
+  /**
+   * How much a running sequence plays each stage as a scene of a light show
+   * (`lib/scenePacing.ts`, PLAN.md §10): swells opened by a pour, a press or
+   * the next dyes, the plate left to rest between them, and from a half up the
+   * light going down to near-black at each stage's end.
+   *
+   * 0 is today's plate exactly: nothing is planned and the clock and the
+   * dimmer are untouched. It does nothing without a sequence playing, because
+   * a scene is a stage; a stage may set it, and it survives a look change,
+   * since it belongs to the set rather than to any one look.
+   */
+  pacing: number;
   automateRate: number;
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
@@ -757,6 +769,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // beat it invented: a busy few seconds every ten or so, and genuinely quiet
   // in between.
   surge: 0.55,
+  pacing: 0,
   automateRate: 0.12,
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments

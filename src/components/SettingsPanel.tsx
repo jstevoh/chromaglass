@@ -3055,6 +3055,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ surge: v })}
           settingKey="surge"
         />
+        {/*
+          Pacing is Surge's big brother, and lives beside it. Surge bunches the
+          automation's small events into gusts; Pacing makes a running
+          sequence's stages into scenes, with whole-plate moments, real rests
+          and the light going down between them. It does nothing until a
+          sequence is playing, so its 0 is today's show.
+        */}
+        <Slider
+          label="Pacing"
+          value={settings.pacing ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ pacing: v })}
+          settingKey="pacing"
+        />
       </section>
 
       {/* Mixer Section */}
