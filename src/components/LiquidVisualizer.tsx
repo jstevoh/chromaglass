@@ -464,7 +464,7 @@ export interface LiquidVisualizerHandle {
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
   drawnRect: () => DOMRect | null;
   /** What the dye is doing, cheaply, for an instrument that plays the plate. */
-  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[] } | null;
+  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
@@ -4140,11 +4140,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const idx = Math.max(0, Math.min(d.length - 1, x + y * GRID_SIZE));
         cells.push(Number.isFinite(d[idx]) ? d[idx] : 0);
       }
+      /*
+        And how the plate is moving: its mean speed and its mean turn, from
+        the flow already read back, every eighth cell each way. The
+        instrument's pulse and its air follow these, so a stirred plate
+        sounds busier than a still one.
+      */
+      const vx = fluid.readVx, vy = fluid.readVy;
+      let speed = 0, curl = 0, m = 0;
+      if (vx?.length && vy?.length) {
+        for (let j = 8; j < GRID_SIZE - 8; j += 8) {
+          for (let i = 8; i < GRID_SIZE - 8; i += 8) {
+            const k = i + j * GRID_SIZE;
+            const u = vx[k], v = vy[k];
+            if (!Number.isFinite(u) || !Number.isFinite(v)) continue;
+            speed += Math.hypot(u, v);
+            // Turn about the middle: r × v, normalised by r.
+            const rx = i - GRID_SIZE / 2, ry = j - GRID_SIZE / 2;
+            curl += (rx * v - ry * u) / Math.max(1, Math.hypot(rx, ry));
+            m++;
+          }
+        }
+      }
       const c = fluid.meanColor;
       return {
         wetness: Number.isFinite(fluid.meanDensity) ? fluid.meanDensity : 0,
         colour: [c?.[0] ?? 0, c?.[1] ?? 0, c?.[2] ?? 0] as [number, number, number],
         cells,
+        flow: m ? speed / m : 0,
+        swirl: m ? curl / m : 0,
       };
     },
     injectImage: (imageData: ImageData) => {

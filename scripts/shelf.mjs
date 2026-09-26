@@ -178,9 +178,9 @@ try {
   await page.waitForTimeout(1200);
   const knobs = await page.evaluate(() =>
     !!document.querySelector('[data-testid="drone-controls"]') &&
-    ['root', 'scale', 'wave', 'voices', 'octave', 'cutoff', 'resonance', 'sub', 'drift', 'reverb', 'level']
+    ['root', 'scale', 'wave', 'voices', 'octave', 'cutoff', 'resonance', 'sub', 'drift', 'reverb', 'level', 'bass', 'bells', 'air', 'toggle']
       .filter(k => document.querySelector(`[data-testid="drone-${k}"]`)).length);
-  check('and it has its controls', knobs === 11, `${knobs} of 11 on screen`);
+  check('and it has its controls, a start/stop among them', knobs === 15, `${knobs} of 15 on screen`);
 
   let droneLoud = 0, droneReads = 0;
   for (let i = 0; i < 30; i++) {
@@ -196,6 +196,40 @@ try {
   if (!droneReads) throw new Error('the show reported no audio at all while the drone ran — not quiet, absent');
   check('and the show can hear the plate playing itself', droneLoud > 0.01,
     `loudest energy ${droneLoud.toFixed(4)} over ${droneReads} reads`);
+
+  /*
+    It stops, and it starts again. Reported: "there is no stop/start button
+    for playing the music". Stopped, the show hears nothing of it.
+  */
+  const running = () => page.evaluate(() => document.querySelector('[data-testid="drone-toggle"]')?.getAttribute('data-running') ?? null);
+  await page.click('[data-testid="drone-toggle"]');
+  await page.waitForTimeout(1500);
+  let quietest = Infinity;
+  for (let i = 0; i < 8; i++) {
+    await page.waitForTimeout(200);
+    const e = await page.evaluate(() => window.chromaglassCastState().audio?.energy ?? 0);
+    quietest = Math.min(quietest, e);
+  }
+  const stoppedSays = await running();
+  check('its Stop stops it', stoppedSays === 'false' && quietest < droneLoud * 0.25,
+    `button says ${stoppedSays}, energy ${quietest.toFixed(4)} against ${droneLoud.toFixed(4)} playing`);
+  await page.click('[data-testid="drone-toggle"]');
+  await page.waitForTimeout(800);
+  check('and its Play starts it again', (await running()) === 'true', `button says ${await running()}`);
+
+  /*
+    And music takes over. Reported: starting a track on the shelf or a file
+    of one's own left the synthesiser playing underneath it.
+  */
+  const firstTrack = LIBRARY[0].src.split('/').pop().replace('.mp3', '');
+  await page.click(`[data-testid="sound-track-${firstTrack}"]`);
+  await page.waitForTimeout(1500);
+  const afterTrack = await page.evaluate(() => ({
+    running: document.querySelector('[data-testid="drone-toggle"]')?.getAttribute('data-running') ?? 'gone',
+    source: window.chromaglassCastState().audioSource ?? null,
+  }));
+  check('a track from the shelf stops the synthesiser', afterTrack.running !== 'true',
+    `instrument ${afterTrack.running}, source ${afterTrack.source}`);
   check('the shelf carries no non-commercial or no-derivatives licence',
     LIBRARY.every(t => !/\b(nc|nd)\b/i.test(t.licenceUrl) && !/-nc|-nd/.test(t.licenceUrl)),
     LIBRARY.map(t => t.licence).join(', '));
