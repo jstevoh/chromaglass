@@ -54,6 +54,8 @@
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
+    "watch": "node scripts/watch.mjs",
+    "moving": "npm run build && node scripts/moving.mjs",
     "report-worker": "node scripts/report-worker.mjs",
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
