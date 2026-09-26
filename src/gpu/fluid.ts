@@ -982,6 +982,11 @@ export class WebGPUFluid {
     const a = p.dt * p.diff * n2;
     stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
+    // And its continuity term: thinned where that flow spreads, thickened where it gathers (see `dilute`).
+    stage('dye continuity', (pass) => {
+      this.run(pass, 'dilute', this.dye.write, [this.dye.read, this.velForced], this.arg('dilute', [disp, 0, 0, 0]));
+      this.dye.swap();
+    });
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,

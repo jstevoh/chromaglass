@@ -1204,6 +1204,50 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
 }`,
 
+  /*
+    The dye's continuity term: what the advection leaves out.
+
+    The dye is carried semi-Lagrangian (advect, then macCormack), which moves
+    a value along the flow and has no term for the flow converging or
+    spreading. Where it spreads, a cell backtraces into a denser one and the
+    plate gains dye; where it converges, the MacCormack clamp will not let a
+    cell rise above its neighbours' peak, and the dye arriving from the edges
+    has nowhere to go and is lost. Most of the plate's flow is projected
+    divergence-free and neither happens; the flows that are not are exactly
+    the ones meant to squeeze liquid about. The squeeze film under a press,
+    the air a bubble displaces, the depth's drag.
+
+    Measured in the lab: a press at the app's strength on a pool of 250 left
+    0 of it, the pool eaten from its edge inward (rings 223 27 -> 27 0),
+    the gap back at rest 300 steps later and the dye not with it. In the app
+    the emptied plate is then seeded afresh, which is the dye the Press
+    check read as made.
+
+    So each cell's dye is scaled by the flow's expansion there: exp(-div·dt),
+    the continuity equation's own factor, thinned where the liquid spreads
+    and thickened where it gathers. The divergence is of the velocity the dye
+    was just carried by, in the same units: A.a.x is the displacement per
+    unit velocity (uv), and the central difference over two cells is
+    (v+ − v−)·N/2 per uv. Clamped so a single step never scales by more than
+    e^±0.7, which a runaway velocity could otherwise ask for.
+  */
+  dilute: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let vxp = textureLoad(vel, clampP(p + vec2i(1, 0), S.n), 0).x;
+  let vxm = textureLoad(vel, clampP(p - vec2i(1, 0), S.n), 0).x;
+  let vyp = textureLoad(vel, clampP(p + vec2i(0, 1), S.n), 0).y;
+  let vym = textureLoad(vel, clampP(p - vec2i(0, 1), S.n), 0).y;
+  let div = ((vxp - vxm) + (vyp - vym)) * 0.5 * S.n;
+  let k = exp(-clamp(div * A.a.x, -0.7, 0.7));
+  let d = textureLoad(src, p, 0) * select(1.0, k, finite4(vec4f(k)));
+  textureStore(dst, p, capDye(d));
+}`,
+
   // MacCormack: phi1 + ½(phi0 − phi0b), clamped to the four cells the forward step sampled.
   macCormack: `${HEAD}
 @group(0) @binding(2) var phi0: texture_2d<f32>;
