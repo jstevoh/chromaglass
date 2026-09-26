@@ -21,7 +21,17 @@
  * (`SMOOTHING`), so the sound follows the plate's weather over seconds rather
  * than its surface frame by frame. Every voice change is a `setTargetAtTime`
  * glide, never a step, for the same reason and also because steps click.
+ *
+ * ── Its noise, seeded ────────────────────────────────────────────────
+ *
+ * The reverb's tail and the breath are white noise, drawn from the show's
+ * `audio.drone` stream (lib/rng.ts) rather than `Math.random`. Not for the
+ * sound's sake — nobody can hear which white noise it is — but because this
+ * is a source the analyser listens to, and what the analyser hears is on the
+ * plate. A drone rendered offline on the same seed is then the same signal,
+ * which is the half of reproducing it that is this file's to give.
  */
+import { stream } from './rng';
 
 export const SCALES = {
   'Pentatonic Minor': [0, 3, 5, 7, 10],
@@ -133,11 +143,12 @@ export function degreeHz(root: number, scale: ScaleName, octave: number, degree:
 function reverbImpulse(ctx: AudioContext, seconds: number): AudioBuffer {
   const n = Math.max(1, Math.floor(ctx.sampleRate * seconds));
   const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+  const rng = stream('audio.drone');
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch);
     for (let i = 0; i < n; i++) {
       // A little brightness off the front, dark by the end.
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.4);
+      d[i] = rng.signed() * Math.pow(1 - i / n, 2.4);
     }
   }
   return buf;
@@ -250,7 +261,8 @@ export function startPlateDrone(read: () => PlateReading | null, initial?: Parti
     const n = ctx.sampleRate * 2;
     const buf = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const noiseRng = stream('audio.drone');
+    for (let i = 0; i < n; i++) d[i] = noiseRng.signed();
     noise.buffer = buf;
     noise.loop = true;
   }

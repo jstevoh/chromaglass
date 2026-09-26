@@ -16,6 +16,7 @@
  * Everything here works in grid cells; `update()` returns fluid-UV (0..1) so
  * the shader can use it directly as its sampling center.
  */
+import { stream, type Rng } from './rng';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -119,6 +120,15 @@ export class MacroCamera {
   /** The aim last acted on (grid cells), so follow locks on again only when it moves. */
   private lastAimX = NaN;
   private lastAimY = NaN;
+
+  /**
+   * The jitter on which drop wins a cut and how long the shot holds. Seeded
+   * (the show's `plate.macro` stream) so "repeat runs don't look scripted"
+   * stays true from one night to the next, and a render of one night is the
+   * same film twice: the cut is where the closeup camera goes, which is most
+   * of what a macro look shows.
+   */
+  constructor(private readonly rng: Rng = stream('plate.macro')) {}
 
   /** Force a cut to a new bead on the next update (preset change, drain, seed). */
   reset() {
@@ -456,7 +466,7 @@ export class MacroCamera {
           const dist = Math.hypot(i - avoid.x, j - avoid.y);
           if (dist < size * 0.12) score *= 0.15;   // don't cut back to the same drop
         }
-        score *= 0.75 + Math.random() * 0.5;       // keeps repeat runs from looking scripted
+        score *= 0.75 + this.rng.float() * 0.5;       // keeps repeat runs from looking scripted
 
         if (score > bestScore) {
           bestScore = score;
@@ -470,7 +480,7 @@ export class MacroCamera {
     this.beadY = bestY;
     this.beadMass = this.recenter(field).mass;
     // Jittered hold — cuts should never land on a metronome.
-    this.holdLeft = Math.max(0.6, hold * (0.7 + Math.random() * 0.6));
+    this.holdLeft = Math.max(0.6, hold * (0.7 + this.rng.float() * 0.6));
   }
 
   private gridIndex(x: number, y: number, size: number): number {

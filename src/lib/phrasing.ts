@@ -48,6 +48,7 @@
  * unbidden, which is a decision rather than a tuning, so this stops here and
  * provides the shape for whatever makes that call.
  */
+import { stream } from './rng';
 
 /** What the plate should be doing right now, all 0..1 unless noted. */
 export interface Phrase {
@@ -78,8 +79,12 @@ export class Phrasing {
   private untilNext = GUST_EVERY * 0.5;
   private rand: () => number;
 
-  /** `random` is injectable so a check can drive this deterministically. */
-  constructor(random: () => number = Math.random) {
+  /**
+   * `random` is injectable so a check can drive this deterministically; left
+   * out, it is the show's `plate.phrasing` stream, so when a gust arrives and
+   * where the wander heads is the same on a render of the same seed.
+   */
+  constructor(random: () => number = stream('plate.phrasing').float) {
     this.rand = random;
   }
 

@@ -9,6 +9,7 @@
  * by the flow. The field is small and cheap; a handful of iterations a frame
  * is plenty at the rate the patterns need to move.
  */
+import { makeRng, showSeed, stream, type Rng } from './rng';
 
 export class ChemistryField {
   readonly u: Float32Array;
@@ -18,7 +19,19 @@ export class ChemistryField {
   private uCur: Float32Array;
   private vCur: Float32Array;
 
-  constructor(readonly size: number) {
+  /**
+   * `rng` places the seeds a reset lays: the show's `plate.chemistry` stream
+   * unless a check hands in its own.
+   *
+   * The seeds laid while constructing come from a generator of their own,
+   * keyed on the show's seed, not from `rng`. The visualizer builds this as
+   * `useRef(new ChemistryField(…))`, which constructs one on every React
+   * render and keeps only the first; four draws from the shared stream per
+   * render would move every later reaction by however many times React
+   * happened to render, which no replay can reproduce. `npm run seed` builds
+   * one and checks the stream did not move.
+   */
+  constructor(readonly size: number, private readonly rng: Rng = stream('plate.chemistry')) {
     const n = size * size;
     this.u = new Float32Array(n);
     this.v = new Float32Array(n);
@@ -26,15 +39,15 @@ export class ChemistryField {
     this.v2 = new Float32Array(n);
     this.uCur = this.u;
     this.vCur = this.v;
-    this.reset();
+    this.reset(makeRng(showSeed(), 'plate.chemistry', 'opening'));
   }
 
   /** Substrate everywhere, activator nowhere; a few seeds so something grows. */
-  reset(): void {
+  reset(rng: Rng = this.rng): void {
     this.uCur.fill(1);
     this.vCur.fill(0);
     for (let i = 0; i < 4; i++) {
-      this.seed(0.2 + Math.random() * 0.6, 0.2 + Math.random() * 0.6, 3 + Math.random() * 3);
+      this.seed(0.2 + rng.float() * 0.6, 0.2 + rng.float() * 0.6, 3 + rng.float() * 3);
     }
   }
 
