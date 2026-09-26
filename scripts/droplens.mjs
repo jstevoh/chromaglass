@@ -11,9 +11,15 @@
  * down, a big one is flat on top and shows what is under it as it is, both
  * are outlined by a thin dark line where the meniscus throws the light
  * sideways, and there is no highlight, because a plate lit from beneath
- * shows transmitted light. Each of those is asked here of a single drop
- * laid on a plate that is one colour on the left and another on the right,
- * so the answer is a fact about where a colour lands, not about a picture.
+ * shows transmitted light. Then the research (bubbles-and-drops.md, same
+ * place) found that a camera and a projector see a drop differently, and
+ * the owner chose both: the macro closeup is the camera, as above; the
+ * plate is the projector, which turns nothing over and draws each drop as
+ * a bright middle ringed in dark where the curve bends light out of its
+ * aperture, the curve set by the gap between the glasses. Each of those is
+ * asked here of a single drop laid on a plate that is one colour on the
+ * left and another on the right (or one grey, for brightness), so the
+ * answer is a fact about where a colour lands, not about a picture.
  *
  * Where a drop is in the frame is found from the frame, not from the camera
  * arithmetic: every pixel that differs from the same plate rendered without
@@ -42,6 +48,26 @@ try {
   const m = await page.evaluate(async () => {
     const N = 192, S = 512;
     const A = [0.2, 1.4, 1.4], B = [1.4, 1.4, 0.2], D = [1.4, 0.2, 1.4];
+    /*
+      A grey dye, for anything that asks how bright a drop is against the
+      plate. The dyes above are absorbers that leave a channel or two of
+      the lamp at 255, where a drop that lit its middle up by a third came
+      out 2% brighter: the no-highlight and not-lit-up checks passed with
+      the camera's focus brightening put on the projected plate. This one
+      comes out near 135 in every channel, and its swatch is asked to be
+      well clear of both ends.
+    */
+    const DIM = [0.6, 0.6, 0.6];
+    /*
+      The two ways of looking (dropLens in plate.ts): the plate as the
+      projector throws it, and the macro closeup, a camera looking through
+      the drop, all the way in. The closeup's own paint detail (cells, lacing,
+      relief, depth of field, the edge warp) is turned off for the camera:
+      it is laid over the whole frame, drop or none, and what is asked here
+      is where the lens puts a colour.
+    */
+    const PLATE = { cam: { macroAmount: 0 }, set: {} };
+    const CAMERA = { cam: { macroAmount: 1 }, set: { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 } };
     /*
       A plate painted by a rule: rows of small discs packed closely enough
       that each region is one flat colour. A couple of steps put the dye in
@@ -76,7 +102,7 @@ try {
       What a dye looks like on this plate: the plain frame's middle, with the
       camera on a point that is that dye and nothing else.
     */
-    const swatch = async (x, y) => rgb(await lab.render(S, { beads: 0 }, { zoom: 3, macroAmount: 0, cx: x, cy: y }), S / 2, S / 2);
+    const swatch = async (x, y, look = PLATE) => rgb(await lab.render(S, { beads: 0, ...look.set }, { zoom: 3, ...look.cam, cx: x, cy: y }), S / 2, S / 2);
     // Which of the swatches a pixel is, or null when it is near none of them.
     const which = (refs, c) => {
       let best = null, bd = Infinity, gap = Infinity;
@@ -92,10 +118,10 @@ try {
       frames differ; with the camera on the drop that must be the frame's
       middle, and a frame with no difference is an error, not a pass.
     */
-    const shoot = async (x, y, R) => {
-      const cam = { zoom: 3, macroAmount: 0, cx: x, cy: y };
-      const on = await lab.render(S, { beads: 0.8 }, { ...cam, beadMask: mask([{ x: x * N, y: y * N, r: R * N }]) });
-      const off = await lab.render(S, { beads: 0 }, cam);
+    const shoot = async (x, y, R, look = PLATE) => {
+      const cam = { zoom: 3, ...look.cam, cx: x, cy: y };
+      const on = await lab.render(S, { beads: 0.8, ...look.set }, { ...cam, beadMask: mask([{ x: x * N, y: y * N, r: R * N }]) });
+      const off = await lab.render(S, { beads: 0, ...look.set }, cam);
       let x0 = S, x1 = -1, y0 = S, y1 = -1;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
         const i = (yy * S + xx) * 4;
@@ -130,9 +156,9 @@ try {
         if (!near) continue;
         const far = near === 'A' ? 'B' : 'A';
         const seen = read(s.on, sign);
-        return { near, far, plain: (plain[near] ?? 0) / plain.all, seen: (seen[far] ?? 0) / seen.all };
+        return { near, far, plain: (plain[near] ?? 0) / plain.all, seen: (seen[far] ?? 0) / seen.all, kept: (seen[near] ?? 0) / seen.all };
       }
-      return { near: null, plain: 0, seen: 0 };
+      return { near: null, plain: 0, seen: 0, kept: 0 };
     };
     /*
       No highlight: a drop of radius R on one flat colour, and the most any
@@ -140,8 +166,8 @@ try {
       light into its middle, by up to a third here; a lamp's glint is an
       added white, which on this plate was double the dye's brightness.
     */
-    const brightest = async (x, y, R) => {
-      const s = await shoot(x, y, R);
+    const brightest = async (x, y, R, look) => {
+      const s = await shoot(x, y, R, look);
       let worst = 0, n = 0;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
         if (Math.hypot(xx - s.cx, yy - s.cy) > s.rad) continue;
@@ -154,6 +180,8 @@ try {
 
     const out = {};
     const Rs = 3 / N, Rb = 7 / N;
+    // How much of the big drop is flat on top: all but half the gap at rest (plate.ts).
+    const HALF_GAP = 0.016, FLAT_B = 1 - HALF_GAP / Rb;
     /*
       The first plate: A left of x = 0.5, B right of it. The drop, three
       cells across its radius (the common size), sits just left of the line,
@@ -165,8 +193,8 @@ try {
     {
       const xs = 0.5 - 0.15 * Rs, ys = 0.42;
       await plate((x) => (x < 0.5 ? A : B));
-      const refs = { A: await swatch(0.3, ys), B: await swatch(0.7, ys) };
-      const s = await shoot(xs, ys, Rs);
+      const refs = { A: await swatch(0.3, ys, CAMERA), B: await swatch(0.7, ys, CAMERA) };
+      const s = await shoot(xs, ys, Rs, CAMERA);
       out.x = { ...turned(s, refs, [1, 0]), rad: s.rad };
     }
     /*
@@ -185,8 +213,8 @@ try {
       const inD = (x) => x >= xs + 2.5 * Rs && x <= xs + 3.5 * Rs;
       const inE = (x) => x >= xs + 7 * Rs && x <= xs + 8 * Rs;
       await plate((x) => (inD(x) ? D : inE(x) ? B : A));
-      const refs = { A: await swatch(xs, 0.2), D: await swatch(xs + 3 * Rs, ys), E: await swatch(xs + 7.5 * Rs, ys) };
-      const s = await shoot(xs, ys, Rs);
+      const refs = { A: await swatch(xs, 0.2, CAMERA), D: await swatch(xs + 3 * Rs, ys, CAMERA), E: await swatch(xs + 7.5 * Rs, ys, CAMERA) };
+      const s = await shoot(xs, ys, Rs, CAMERA);
       let d = 0, e = 0;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
         if (Math.hypot(xx - s.cx, yy - s.cy) > 0.9 * s.rad) continue;
@@ -196,6 +224,73 @@ try {
       let dOff = 0;
       for (let xx = 0; xx < S; xx++) if (which(refs, rgb(s.off, xx, Math.round(s.cy))) === 'D') dOff++;
       out.reach = { d, e, dOff, eApart: which(refs, refs.E) === 'E' };
+    }
+    /*
+      The projector (the plate, dropLens and the Oil drops block in
+      plate.ts). A projection lens focused on the dye sees nothing turned
+      over, and loses the light the drop's curved part bends past its
+      aperture: a bright middle out to DROP_CORE (0.71) of the curved part,
+      dark beyond it. Each drop on one flat colour, its middle row read
+      outward as a fraction of the plain frame, in bins of a twentieth of
+      the radius:
+      - the small drop (a ball: three cells is half the gap at rest) is as
+        bright as the plate to half its radius, neither lit up like a
+        camera's ball lens nor dimmed, and dark from within a tenth of 0.71
+        out. Dark is asked of 0.75 to 0.85: the outer texel of the mask is
+        its antialiasing, where the coverage fades the whole drop into the
+        plate, and on a drop eight texels across that is the outer seventh
+        (measured, the profile climbs back from 18% at 0.8 to 83% at 0.95);
+      - the big one is a pancake whose curved band is half the gap (0.44
+        of its radius), so it stays the plate's brightness to three
+        quarters out and goes dark only past 0.56 + 0.71 * 0.44 = 0.87;
+      - the small drop across the first plate's line shows its near dye on
+        its near side, upright, where the camera shows the far one;
+      - and a press: with the glasses bowed to half the gap at the plate's
+        middle (plateCurve -0.5, the solver's own gap, handed to the plate
+        as the app hands it), a big drop there is flatter, and its dark edge
+        about half as wide as at rest.
+    */
+    {
+      const profile = (s) => {
+        const bins = new Array(21).fill(0), n = new Array(21).fill(0);
+        const y = Math.round(s.cy);
+        for (let x = Math.round(s.cx - s.rad) - 2; x <= Math.round(s.cx); x++) {
+          const i = (y * S + x) * 4;
+          const k = Math.round(20 * (s.cx - x) / s.rad);
+          if (k > 20) continue;
+          bins[k] += lum(s.on, i) / Math.max(24, lum(s.off, i)); n[k]++;
+        }
+        return bins.map((b, k) => (n[k] ? b / n[k] : 1));
+      };
+      // Where the profile first falls under a half, as a fraction of the radius.
+      const edge = (p) => { const k = p.findIndex((f) => f < 0.5); return k < 0 ? 2 : k / 20; };
+      const mean = (p, lo, hi) => { let t = 0, c = 0; for (let k = Math.round(lo * 20); k <= Math.round(hi * 20); k++) { t += p[k]; c++; } return t / c; };
+      await plate(() => DIM);
+      out.dim = await swatch(0.5, 0.25);
+      const small = profile(await shoot(0.3, 0.25, Rs, PLATE));
+      const big = profile(await shoot(0.7, 0.25, Rb, PLATE));
+      out.proj = {
+        small: { core: mean(small, 0, 0.5), coreMax: Math.max(...small.slice(0, 11)), edge: edge(small), dark: mean(small, 0.75, 0.85) },
+        big: { top: mean(big, 0.1, 0.75), edge: edge(big), dark: Math.min(...big.slice(17, 21)) },
+      };
+      await plate((x) => (x < 0.5 ? A : B));
+      const refs = { A: await swatch(0.3, 0.42), B: await swatch(0.7, 0.42) };
+      out.proj.upright = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, PLATE), refs, [1, 0]);
+      const pressed = async (curve) => {
+        await plate(() => A);
+        await lab.step(2, { plateCurve: curve });
+        const gap = await lab.squeeze();
+        const mid = gap ? gap.gap[Math.floor(gap.n / 2) * gap.n + Math.floor(gap.n / 2)] : 0;
+        const cam = { zoom: 3, macroAmount: 0, cx: 0.5, cy: 0.5, view: true };
+        const on = await lab.render(S, { beads: 0.8 }, { ...cam, beadMask: mask([{ x: 0.5 * N, y: 0.5 * N, r: Rb * N }]) });
+        const off = await lab.render(S, { beads: 0 }, cam);
+        // The dark edge: pixels of the middle row, both sides, under a half.
+        let dark = 0;
+        for (let x = 0; x < S; x++) { const i = (S / 2 * S + x) * 4; if (lum(on, i) / Math.max(24, lum(off, i)) < 0.5) dark++; }
+        return { mid, dark };
+      };
+      out.proj.rest = await pressed(0);
+      out.proj.press = await pressed(-0.5);
     }
     /*
       Where drops press together. At a wall between two drops the dome is
@@ -215,16 +310,16 @@ try {
     {
       const pc = [0.4, 0.42];
       await plate((x, y) => (Math.hypot(x - pc[0], y - pc[1]) < 0.3 ? A : B));
-      const refs = { A: await swatch(pc[0], pc[1]), B: await swatch(0.9, 0.9) };
+      const refs = { A: await swatch(pc[0], pc[1], CAMERA), B: await swatch(0.9, 0.9, CAMERA) };
       const hue = (c) => { const s = c[0] + c[1] + c[2]; return s < 30 ? null : c.map((v) => v / s); };
       const hueRefs = { A: hue(refs.A), B: hue(refs.B) };
       const whichHue = (c) => { const h = hue(c); return h && which(hueRefs, h); };
       const pair = [{ x: pc[0] * N - 2.4, y: pc[1] * N, r: 3 }, { x: pc[0] * N + 2.6, y: pc[1] * N, r: 3.4 }];
-      const cam = { zoom: 3, macroAmount: 0, cx: pc[0], cy: pc[1] };
+      const cam = { zoom: 3, ...CAMERA.cam, cx: pc[0], cy: pc[1] };
       const far = {};
       for (const [name, over, bm] of [['rings', { beads: 0.8 }, mask(pair)], ['drops', { beads: 0.8, beadDrops: 1 }, wide(pair)]]) {
-        const on = await lab.render(S, over, { ...cam, beadMask: bm });
-        const off = await lab.render(S, { beads: 0 }, cam);
+        const on = await lab.render(S, { ...over, ...CAMERA.set }, { ...cam, beadMask: bm });
+        const off = await lab.render(S, { beads: 0, ...CAMERA.set }, cam);
         let changed = 0, b = 0;
         for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
           const i = (yy * S + xx) * 4;
@@ -263,21 +358,24 @@ try {
       The second plate turns the line over: A below y = 0.5, B above. The
       same small drop across it asks the lens's other axis, which the first
       plate's middle row cannot see. Then a big drop, seven cells (a merged
-      drop's size), with the line through its flat middle a third of a radius
+      drop's size), with the line through its flat middle a fifth of a radius
       from its centre: flat on top, it shows the line where it is. Read down
       its middle column, the first pixel that is the other dye must be where
-      the plain frame has it. A magnifier moves it outward; an inverting lens
+      the plain frame has it. Read only across the flat: its edge is the
+      meniscus, half the gap wide (DROP_HALF_GAP in plate.ts, three cells at
+      rest), which is 0.56 of this drop's radius in; the column is read to
+      eight tenths of that. A magnifier moves it outward; an inverting lens
       puts it on the other side.
     */
     {
       await plate((x, y) => (y < 0.5 ? A : B));
-      const refs = { A: await swatch(0.3, 0.3), B: await swatch(0.3, 0.7) };
-      const s = await shoot(0.3, 0.5 - 0.15 * Rs, Rs);
+      const refs = { A: await swatch(0.3, 0.3, CAMERA), B: await swatch(0.3, 0.7, CAMERA) };
+      const s = await shoot(0.3, 0.5 - 0.15 * Rs, Rs, CAMERA);
       out.y = { ...turned(s, refs, [0, 1]), rad: s.rad };
 
-      const b = await shoot(0.7, 0.5 - Rb / 3, Rb);
+      const b = await shoot(0.7, 0.5 - Rb / 5, Rb, CAMERA);
       const cross = (px) => {
-        const x = Math.round(b.cx), top = Math.round(b.cy - 0.6 * b.rad), bot = Math.round(b.cy + 0.6 * b.rad);
+        const x = Math.round(b.cx), top = Math.round(b.cy - 0.8 * FLAT_B * b.rad), bot = Math.round(b.cy + 0.8 * FLAT_B * b.rad);
         const first = which(refs, rgb(b.off, x, top));
         if (!first) return -1;
         for (let y = top; y <= bot; y++) { const k = which(refs, rgb(px, x, y)); if (k && k !== first) return y; }
@@ -285,26 +383,32 @@ try {
       };
       out.big = { on: cross(b.on), off: cross(b.off), rad: b.rad };
       /*
-        The dark line: along the middle row (all A: the line is a third of a
-        radius off it), left of centre, the frame's brightness as a fraction
-        of the plain frame's. How dark it gets and where, how many pixels are
-        under seven tenths and whether any of them is inside three quarters
-        of the radius, and how bright the flank inside the line is.
+        The dark line: the same big drop on one flat colour (A, well below
+        the line), along its middle row left of centre, the frame's
+        brightness as a fraction of the plain frame's. How dark it gets and
+        where, how many pixels are under seven tenths and whether any of
+        them is inside three quarters of the radius, and how bright the
+        flank inside the line is. Across the line the camera's band shows
+        the far side, so a drop straddling two dyes would be measuring the
+        dyes' brightness, not the line.
       */
-      const y = Math.round(b.cy);
+      const o = await shoot(0.7, 0.25, Rb, CAMERA);
+      const y = Math.round(o.cy);
       let dark = 1, at = 0, width = 0, inside = 0, flank = 0, nf = 0;
-      for (let x = Math.round(b.cx - b.rad) - 2; x <= Math.round(b.cx); x++) {
+      for (let x = Math.round(o.cx - o.rad) - 2; x <= Math.round(o.cx); x++) {
         const i = (y * S + x) * 4;
-        const f = lum(b.on, i) / Math.max(24, lum(b.off, i));
-        const rr = (b.cx - x) / b.rad;
+        const f = lum(o.on, i) / Math.max(24, lum(o.off, i));
+        const rr = (o.cx - x) / o.rad;
         if (f < dark) { dark = f; at = rr; }
         if (f < 0.7) { width++; if (rr < 0.75) inside++; }
         // Half way to five sixths of the way out: where the first reshade's
         // shadow was deepest, and a flat drop is still its window.
         if (rr >= 0.5 && rr <= 0.85) { flank += f; nf++; }
       }
-      Object.assign(out.big, { dark, at, width: width / b.rad, inside, flank: flank / Math.max(1, nf) });
-      out.bright = { small: await brightest(0.3, 0.25, Rs), big: await brightest(0.7, 0.25, Rb) };
+      Object.assign(out.big, { dark, at, width: width / o.rad, inside, flank: flank / Math.max(1, nf) });
+      await plate(() => DIM);
+      out.bright = { small: await brightest(0.3, 0.25, Rs, CAMERA), big: await brightest(0.7, 0.25, Rb, CAMERA) };
+      out.brightP = { small: await brightest(0.3, 0.25, Rs, PLATE), big: await brightest(0.7, 0.25, Rb, PLATE) };
     }
     /*
       The rings' mask, read back from the canvas as the upload reads it. One
@@ -353,9 +457,27 @@ try {
   check('and thin, a band at the contact, not a shadow round it',
     m.big.width > 0 && m.big.width < 0.2 && m.big.inside === 0 && m.big.flank > 0.85,
     `${(100 * m.big.width).toFixed(0)}% of the radius under seven tenths, ${m.big.inside} px of it inside three quarters; ${(100 * m.big.flank).toFixed(0)}% of the plate's brightness from half way out to five sixths`);
+  const P = m.proj;
+  const dimOk = Math.max(...m.dim) < 180 && Math.max(...m.dim) > 40;
+  console.log(`     the grey plate: ${m.dim.join(',')}`);
   check('no highlight: no drop is brighter than the plate beneath it by more than the light it gathers',
-    m.bright.small < 1.45 && m.bright.big < 1.45,
-    `at most ×${m.bright.small.toFixed(2)} in the small drop, ×${m.bright.big.toFixed(2)} in the big one`);
+    dimOk && m.bright.small < 1.45 && m.bright.big < 1.45 && m.brightP.small < 1.1 && m.brightP.big < 1.1,
+    `at most ×${m.bright.small.toFixed(2)} in the small drop, ×${m.bright.big.toFixed(2)} in the big one in the closeup; ×${m.brightP.small.toFixed(2)} and ×${m.brightP.big.toFixed(2)} projected`);
+  check('projected, a small drop is as bright as the plate in its middle, not lit up like a lens',
+    dimOk && P.small.core > 0.85 && P.small.coreMax < 1.1,
+    `to half its radius ${(100 * P.small.core).toFixed(0)}% of the plate on average, ${(100 * P.small.coreMax).toFixed(0)}% at most`);
+  check('and dark round it past seven tenths of its radius',
+    Math.abs(P.small.edge - 0.71) <= 0.1 && P.small.dark < 0.4,
+    `the middle ends ${P.small.edge.toFixed(2)} of the radius out; ${(100 * P.small.dark).toFixed(0)}% of the plate from 0.75 to 0.85`);
+  check('projected, a big drop is flat to three quarters out and dark only at its edge',
+    dimOk && P.big.top > 0.9 && P.big.top < 1.1 && Math.abs(P.big.edge - 0.87) <= 0.06 && P.big.dark < 0.4,
+    `${(100 * P.big.top).toFixed(0)}% of the plate to 0.75, dark from ${P.big.edge.toFixed(2)} of the radius (half the gap says 0.87), down to ${(100 * P.big.dark).toFixed(0)}%`);
+  check('projected, a small drop shows the plate the right way round',
+    P.upright.near && P.upright.plain >= 0.8 && P.upright.kept >= 0.7 && P.upright.seen < 0.1,
+    `its ${P.upright.near ?? '?'} half shows ${P.upright.near ?? '?'} in ${(100 * P.upright.kept).toFixed(0)}% of pixels, ${P.upright.far ?? '?'} in ${(100 * P.upright.seen).toFixed(0)}%`);
+  check('a press flattens a drop and thins its dark edge',
+    P.rest.mid > 0.025 && P.press.mid < 0.6 * P.rest.mid && P.rest.dark > 6 && P.press.dark / P.rest.dark >= 0.3 && P.press.dark / P.rest.dark <= 0.75,
+    `the gap under it ${P.rest.mid.toFixed(4)} → ${P.press.mid.toFixed(4)}; its dark edge ${P.rest.dark} → ${P.press.dark} px across the middle row`);
   check('where two drops press together, neither shows the far side of the plate',
     m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
     `pixels of the dye beyond three tenths: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);

@@ -236,6 +236,20 @@ or more a sixth their size touching them, against 1 of 107 for the rings;
 one cluster spans 17:1). The mask for the larger crowd takes 11.7 ms in the
 sandbox against 8.6, a number for the Mac's `frameMs`.
 
+**A projector and a camera see a drop differently, and the owner chose both.**
+The research (the project's shared files, drops/research/bubbles-and-drops.md,
+item 1) traced what a projection lens focused on the plate sees: nothing turned
+over, and a dark band wherever the drop's curve bends the light past its
+aperture, from u* = X/sqrt(1 + X²), X = NA / (2 n_water (1 − n_water/n_oil)), of
+the curved part out. The plate now draws that; the macro closeup keeps the
+camera's inverting lens. The aperture is an effective NA of 0.25 (the bare lens's
+0.08 drew a field of black doughnuts; the one measurement matched 0.30 to 0.35),
+so a droplet is dark over its outer three tenths. And item 3: the gap sets the
+shape, a ball until its radius is half the gap and a pool with an edge half the
+gap wide past that, so a press flattens every drop and thins every edge
+(`npm run droplens`: 19 checks, projected and closeup; the press halves the gap
+under a drop and its dark edge goes from 18 to 6 pixels).
+
 ### 4. Liquids that behave differently
 
 `src/types.ts` (`LiquidType` grows behaviour fields), `src/components/LiquidVisualizer.tsx`

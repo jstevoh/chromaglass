@@ -120,18 +120,22 @@ like oil or like sweets.
 ?set=beads=0.8;beadDrops=0.5     half way: rings taking on colour
 ```
 
-Three things to look at. Whether a crowd reads as liquid or as candy: after
-your "very cartoon like", both the rings and the drops were matched to
-photographs of backlit oil, water drops and emulsions
-(kept in the project's shared files, drops/references, not in the repo). A small drop now shows the plate
-round it upside down, a big one is flat on top and shows what is under it as
-it is, every drop is outlined by a thin dark line at its contact, and there is
-no highlight at all, since none of the backlit pictures has one. Every drop
-sees the same stretch of plate round it, so small ones near a colour edge
-carry two colours, and with Drops up, the big drops gather rings of droplets. This changes
-the rings in every look that has beads, not only the drops. Whether the
-inverted view reads as liquid when the plate moves under it, and whether you
-want a highlight back. And the frame time: the drops' mask
+Three things to look at. Whether a crowd reads as liquid or as candy:
+after your "very cartoon like", the beads and drops were matched to
+photographs and then to the optics of a projector, and you chose both. On the
+plate each drop is drawn as a projector throws it: its middle upright and as
+bright as the plate, and dark round its edge where the curve bends the light
+out of the lens, the outer three tenths of a droplet and a hair round a big
+pool. Zoom into the closeup and it is drawn as a camera sees it: a small drop
+shows the plate round it upside down, a big one is flat on top, a thin dark
+line at the contact. No highlight in either. How dark the edge is comes from
+one number, the projector's effective aperture (NA 0.25 in `plate.ts`); the
+bare lens of an overhead projector (0.08) blacks out two thirds of every
+droplet, which is how the physics reads but was a field of black doughnuts in
+the lab, so tell me if the edges want to be heavier or lighter. A press
+(`plateCurve`, or the hand) flattens every drop and thins every edge, since
+the gap sets where a ball becomes a pool. This changes the rings in every look
+that has beads, not only the drops. And the frame time: the drops' mask
 is drawn a pixel at a time on the main thread: 11 to 12 ms for the crowd of
 about 530 with droplets, against 6.7 ms for the 330 without them and the
 rings' canvas at 3.9, in the sandbox's Chromium. If

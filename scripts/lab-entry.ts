@@ -84,10 +84,12 @@ const api = {
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
    * the closeup's magnification; `macroAmount` how far into the closeup
-   * (the app ramps it from 1x to 2x).
+   * (the app ramps it from 1x to 2x). `view` hands the plate the solver's
+   * packed view field (the gap, the mix, the reactions) as the app does;
+   * without it the plate reads a blank one, a flat gap at rest.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; beadMask?: CanvasImageSource } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; beadMask?: CanvasImageSource; view?: boolean } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
@@ -110,7 +112,7 @@ const api = {
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: null }], 1);
+      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view ? (l.solver as unknown as { viewTex: GPUTexture | null }).viewTex : null }], 1);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);

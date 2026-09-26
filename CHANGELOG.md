@@ -18,14 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed — beads shaded from photographs
 
-- **The beads and drops are lenses, not stickers.** Matched to photographs of
-  backlit oil, water drops and emulsions: a small drop shows the plate round
-  it upside down, a big one is flat on top and shows what is under it, each is
-  outlined by a thin dark line at its contact, and the white dot is gone.
-  `npm run droplens` measures each on one drop.
-- **Several colours in one drop.** Every drop sees the same stretch of plate
-  round it, turned over, however small it is, so a droplet near where two
-  dyes meet carries both, as the droplets in the photographs do.
+- **The beads and drops are lenses, not stickers, seen as a projector sees
+  them on the plate and as a camera does in the closeup.** Projected, each
+  drop is a bright, upright middle ringed in dark where its curved edge bends
+  the light out of the lens (the outer three tenths of a droplet, a hair round
+  a big pool), from the optics of a projector's aperture. In the macro
+  closeup, as in the photographs of backlit oil, a small drop shows the plate
+  round it upside down and a big one is flat on top. In both the white dot is
+  gone. `npm run droplens` measures each on one drop.
+- **The gap sets how flat a drop is.** A drop smaller than half the gap
+  between the glasses is a ball, a bigger one a pool with an edge half the gap
+  wide, so a press flattens every drop and thins every dark edge at once.
+- **Several colours in one drop, in the closeup.** Every drop sees the same
+  stretch of plate round it, turned over, however small it is, so a droplet
+  near where two dyes meet carries both, as the droplets in the photographs do.
 - **Droplets.** With Drops on, big drops are ringed by droplets a tenth their
   size and less, and the sizes in one cluster span 17 to 1 (10 to 1 before).
   Droplets run into each other but are never swallowed by a drop.
