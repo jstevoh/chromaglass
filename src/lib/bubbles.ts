@@ -48,6 +48,13 @@ export interface Bubble {
 
 export const MAX_BUBBLES = 40;
 
+/**
+ * How fast gas crosses from a small bubble to a large neighbour, in cells² a
+ * second per unit of 1/r difference: a 3-cell bubble beside an 8-cell one
+ * gives up its gas in about half a minute, which is slow enough to watch.
+ */
+const RIPEN = 1.4;
+
 /** Solver velocity units → cells per second: one step moves v·dt·(N−2) cells at 60 steps/s. */
 const CELLS_PER_UNIT = 0.05 * 190 * 60;
 
@@ -64,7 +71,7 @@ export class BubbleField {
   readonly packed = new Float32Array(MAX_BUBBLES * 4);
   /** sx, sy, wobble amplitude, wobble phase — the shader's shape block. */
   readonly packedShape = new Float32Array(MAX_BUBBLES * 4);
-  /** fingering, finger count, finger phase, 0 — the air splat's shape block. */
+  /** fingering, finger count, finger phase, film age (0-1) — the air splat's shape block. */
   readonly packedFinger = new Float32Array(MAX_BUBBLES * 4);
   /** The bubble on the end of the straw, while there is one. */
   private strawBubble: Bubble | null = null;
@@ -112,10 +119,32 @@ export class BubbleField {
 
   /** Blow `count` bubbles at (x, y), scattered within `spread` cells. Fresh air arrives wobbling. */
   spawn(x: number, y: number, r: number, count = 1, spread = 0): void {
+    const N = this.grid;
     for (let i = 0; i < count; i++) {
+      /*
+        Air on a plate does not arrive at one size. Every bubble came out
+        within ±35% of the size asked for, which read as a sheet of identical
+        rings (reported: "all basically the same size and take over the
+        visualization"). Sizes in a real froth run heavy-tailed: many small,
+        a few large. u³ puts two in three under 0.6 of the asked size and one
+        in twenty past 1.7.
+      */
+      const u = Math.random();
+      // Not under two cells: the air field is a grid, and a bubble smaller
+      // than a cell cut a square hole in the dye rather than a round one.
+      const size = Math.max(2, r * (0.3 + 2.1 * u * u * u));
+      /*
+        And they leave the liquid showing. Past a sixth of the plate under
+        air the look is the bubbles rather than the liquid they sit in, so a
+        spawn that would take it further is skipped (a blow through the
+        straw is not a spawn and is not held to it).
+      */
+      let under = 0;
+      for (const b of this.bubbles) under += b.r * b.r;
+      if (Math.PI * (under + size * size) > N * N * 0.16) return;
       const a = Math.random() * Math.PI * 2;
       const d = Math.random() * spread;
-      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.65 + Math.random() * 0.7), 9 + Math.random() * 14, 0.1 + Math.random() * 0.08));
+      this.push(this.make(x + Math.cos(a) * d, y + Math.sin(a) * d, size, 9 + Math.random() * 14, 0.1 + Math.random() * 0.08));
     }
   }
 
@@ -305,6 +334,35 @@ export class BubbleField {
       }
     }
 
+    /*
+      Ostwald ripening: the big grow at the small's expense.
+
+      The gas in a small bubble is at a higher pressure than in a large one
+      (Laplace: the excess goes as 1/r), so where two sit close the gas
+      diffuses through the liquid from the small to the large, and the small
+      one shrinks away. It is what spreads a froth's sizes apart over time
+      rather than leaving them all alike. The rate goes with the difference
+      in 1/r and falls off with the gap; area is conserved.
+    */
+    for (let i = 0; i < bs.length; i++) {
+      for (let j = i + 1; j < bs.length; j++) {
+        const a = bs[i], c = bs[j];
+        // Not the bubble on the straw, or its own ring: the breath sets those.
+        if (a.held || c.held || a.straw || c.straw) continue;
+        const gap = Math.hypot(c.x - a.x, c.y - a.y) - a.r - c.r;
+        const reach = 1.2 * (a.r + c.r);
+        if (gap > reach) continue;
+        const [sm, lg] = a.r < c.r ? [a, c] : [c, a];
+        const dA = RIPEN * dt * (1 / Math.max(0.5, sm.r) - 1 / Math.max(0.5, lg.r)) * (1 - Math.max(0, gap) / reach);
+        if (!(dA > 0)) continue;
+        const take = Math.min(dA, sm.r * sm.r);
+        sm.r = Math.sqrt(Math.max(0, sm.r * sm.r - take));
+        lg.r = Math.min(N * 0.05, Math.sqrt(lg.r * lg.r + take));
+      }
+    }
+    // Dissolved: ripened away to nothing, it goes without a pop.
+    for (let i = bs.length - 1; i >= 0; i--) if (bs[i].r < 0.6 && !bs[i].held) bs.splice(i, 1);
+
     // Split: a bubble stretched hard enough tears in two along its axis.
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
@@ -365,7 +423,10 @@ export class BubbleField {
       this.packedFinger[o] = b.fing;
       this.packedFinger[o + 1] = b.lobes;
       this.packedFinger[o + 2] = b.fph;
-      this.packedFinger[o + 3] = 0;
+      // How far through its life the film is: it drains and thins as it
+      // ages, which the plate draws as its colours shifting and then going
+      // dark just before it pops, as a soap film does.
+      this.packedFinger[o + 3] = Math.max(0, Math.min(1, b.age / Math.max(0.1, end)));
       n++;
     }
     return n;

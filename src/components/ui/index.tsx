@@ -91,10 +91,12 @@ export function Segmented<T extends string>({
   height?: number;
   testId?: string;
   /**
-   * Tighter, for a row that has to share its line: below 1280 the padding
-   * narrows and the key letters step back into the tooltip. Perform's eight
-   * tools next to the dye tray pushed Freeze and Drain off a 1024 screen
-   * without it.
+   * Tighter, for a row that has to share its line: below 1536 the padding
+   * narrows and the key letters step back into the tooltip, and below 1280
+   * the labels drop to 12px. Perform's nine tools next to the dye tray pushed
+   * Freeze and Drain off a 1024 screen without it; and once the middle column
+   * stopped growing to fit, the full-size row ran 70px past it at 1280 and
+   * the rides column was painted over the Amount chip.
    */
   compact?: boolean;
 }) {
@@ -109,12 +111,12 @@ export function Segmented<T extends string>({
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
           title={compact && kbd ? `${label} (${kbd})` : undefined}
-          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 xl:px-4' : 'px-4'} text-[13px] font-medium transition-colors duration-[120ms] ${
+          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
             value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
           }`}
         >
           {label}
-          {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden xl:inline' : ''}`}>{kbd}</span>}
+          {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden 2xl:inline' : ''}`}>{kbd}</span>}
         </button>
       ))}
     </div>
@@ -405,7 +407,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       data-testid={testId}
       data-state={state}
       data-midi-hit={hit ? 'true' : undefined}
-      className={`flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
+      className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />

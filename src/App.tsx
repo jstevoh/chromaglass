@@ -16,7 +16,7 @@ import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { DesignDesk } from './components/desk/DesignDesk';
 import { SoundPanel } from './components/SoundPanel';
-import { startPlateDrone, DRONE_DEFAULTS, type Drone, type DroneParams } from './lib/plateDrone';
+import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
@@ -63,7 +63,7 @@ import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
-import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
+import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -432,6 +432,19 @@ export default function App() {
   const [showSound, setShowSound] = useState(false);
   const droneRef = useRef<Drone | null>(null);
   const [droneParams, setDroneParams] = useState<DroneParams>(DRONE_DEFAULTS);
+  /** Whether the plate's instrument is sounding: it can be stopped without choosing another source. */
+  const [droneRunning, setDroneRunning] = useState(false);
+  /**
+   * Silence the plate's instrument. It owns an AudioContext and running
+   * oscillators, and sounds into the room as well as into its stream, so
+   * dropping the stream alone left it playing under whatever came next
+   * (reported: starting a track on the shelf or a file of one's own did not
+   * stop it).
+   */
+  const stopDrone = useCallback(() => {
+    if (droneRef.current) { droneRef.current.stop(); droneRef.current = null; }
+    setDroneRunning(false);
+  }, []);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
   const musicElRef = useRef<HTMLAudioElement>(null);
@@ -687,7 +700,7 @@ export default function App() {
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
-    if (droneRef.current) { droneRef.current.stop(); droneRef.current = null; }
+    stopDrone();
 
     setAudioSource(source);
     try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
@@ -705,10 +718,11 @@ export default function App() {
         carries it to a call.
       */
       const drone = startPlateDrone(
-        () => visualizerRef.current?.plateReading(4) ?? null,
+        () => visualizerRef.current?.plateReading(PLATE_PLACES) ?? null,
         droneParams,
       );
       droneRef.current = drone;
+      setDroneRunning(true);
       setAudioStream(drone.stream);
       return;
     }
@@ -782,6 +796,15 @@ export default function App() {
       setAudioSource('none');
     }
   }, [audioStream, audioInputId, refreshAudioInputs]);
+  /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
+  const toggleDrone = useCallback(() => {
+    if (droneRef.current) {
+      stopDrone();
+      if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
+      return;
+    }
+    void handleSourceChange('drone');
+  }, [audioStream, handleSourceChange, stopDrone]);
   const changeDrone = useCallback((patch: Partial<DroneParams>) => {
     setDroneParams(prev => {
       const next = { ...prev, ...patch };
@@ -797,6 +820,28 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioSource]);
 
+  /** What the show hears of the music element. */
+  const musicStream = useCallback((el: HTMLAudioElement): MediaStream | null => {
+    let stream: MediaStream | null = null;
+    // Chrome: the element's own stream. Elsewhere: route it through an
+    // AudioContext to a stream destination, and to the speakers as well.
+    const cap = (el as HTMLMediaElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
+    try { stream = cap.captureStream?.() ?? cap.mozCaptureStream?.() ?? null; } catch { stream = null; }
+    if (!stream) {
+      try {
+        if (!musicCtxRef.current) {
+          const ctx = new AudioContext();
+          const src = ctx.createMediaElementSource(el);
+          const dest = ctx.createMediaStreamDestination();
+          src.connect(dest);
+          src.connect(ctx.destination);
+          musicCtxRef.current = { ctx, src, dest };
+        }
+        stream = musicCtxRef.current.dest.stream;
+      } catch { stream = null; }
+    }
+    return stream;
+  }, []);
   /** A music file: the element plays it aloud and its stream is what the show hears. */
   const startMusic = useCallback((
     url: string,
@@ -810,35 +855,38 @@ export default function App() {
     if (musicFile?.objectUrl) URL.revokeObjectURL(musicFile.url);
     setMusicFile({ name, url, objectUrl: opts.objectUrl, track: opts.track });
     setMusicTime({ t: 0, d: 0 });
+    // Music takes over: the plate's instrument and the band in a box stop.
+    stopDrone();
+    if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
     if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
     el.src = url;
     el.onloadedmetadata = () => setMusicTime({ t: 0, d: el.duration || 0 });
     el.oncanplay = () => {
       el.oncanplay = null;
-      let stream: MediaStream | null = null;
-      // Chrome: the element's own stream. Elsewhere: route it through an
-      // AudioContext to a stream destination, and to the speakers as well.
-      const cap = (el as HTMLMediaElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
-      try { stream = cap.captureStream?.() ?? cap.mozCaptureStream?.() ?? null; } catch { stream = null; }
-      if (!stream) {
-        try {
-          if (!musicCtxRef.current) {
-            const ctx = new AudioContext();
-            const src = ctx.createMediaElementSource(el);
-            const dest = ctx.createMediaStreamDestination();
-            src.connect(dest);
-            src.connect(ctx.destination);
-            musicCtxRef.current = { ctx, src, dest };
-          }
-          stream = musicCtxRef.current.dest.stream;
-        } catch { stream = null; }
-      }
       setAudioSource('file');
-      setAudioStream(stream);
+      setAudioStream(musicStream(el));
       void el.play().catch(() => { /* needs a gesture; the play button is there */ });
     };
     el.load();
-  }, [audioStream, musicFile]);
+  }, [audioStream, musicFile, stopDrone, musicStream]);
+  /**
+   * The transport's play/pause. Playing a file that is loaded but not the
+   * show's source (the plate's instrument or another took over since) makes
+   * it the source again and silences what was playing.
+   */
+  const toggleMusic = useCallback(() => {
+    const el = musicElRef.current;
+    if (!el) return;
+    if (!el.paused) { el.pause(); return; }
+    if (audioSource !== 'file') {
+      stopDrone();
+      if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+      if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+      setAudioSource('file');
+      setAudioStream(musicStream(el));
+    }
+    void el.play();
+  }, [audioSource, audioStream, stopDrone, musicStream]);
   const playMusicFile = useCallback((file: File) => {
     startMusic(URL.createObjectURL(file), file.name.replace(/\.[^.]+$/, ''), { objectUrl: true });
   }, [startMusic]);
@@ -1585,11 +1633,18 @@ export default function App() {
   const cuedRef = useRef(cued);
   cuedRef.current = cued;
   /*
-    The set: the operator's own cue list (lib/setList.ts). Empty, the desk
-    lists every look as it always has; with items in it, the desk lists the
-    set, in its order, and each row arms its item.
+    The set: the operator's own cue list (lib/setList.ts), and what the desk
+    lists, in its order; each row arms its item. A first visit opens on the
+    starter set, every look as an item that can be removed. It used to list
+    every look whenever the set was empty, and those rows were not the set's,
+    so nothing on the desk could be taken off it.
   */
-  const [setList, setSetList] = useState<SetList>(loadSetList);
+  const [setList, setSetList] = useState<SetList>(() => loadSetList(() => starterSet(PRESETS.map(p => p.id))));
+  /** Sets kept by name (the set menu's Save and Open). The working set above is kept on its own. */
+  const [savedSets, setSavedSets] = useState<SetList[]>(loadSavedSets);
+  const changeSaved = useCallback((f: (prev: SetList[]) => SetList[]) => {
+    setSavedSets(prev => { const v = f(prev); storeSavedSets(v); return v; });
+  }, []);
   const setListRef = useRef(setList);
   setListRef.current = setList;
   const changeSet = useCallback((next: SetList | ((prev: SetList) => SetList)) => {
@@ -1712,9 +1767,6 @@ export default function App() {
   }, []);
   const setActive = setList.items.length > 0;
   const cues = useMemo<Cue[]>(() => {
-    if (!setActive) {
-      return allPresets.map(pr => ({ id: pr.id, name: pr.name, swatch: swatchOf(pr.id), fade: fadeSeconds }));
-    }
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
       const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
@@ -1729,7 +1781,7 @@ export default function App() {
         missing: item.kind === 'sequence' ? !seq : !look,
       };
     });
-  }, [allPresets, fadeSeconds, setActive, setList, swatchOf]);
+  }, [allPresets, fadeSeconds, setList, swatchOf]);
   cuesRef.current = cues;
 
   /**
@@ -1999,15 +2051,22 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changeSet]);
-  const onSetAction = useCallback((a: SetAction) => {
+  const onSetAction = useCallback((a: SetAction, name?: string) => {
     if (a === 'import') setAddingToSet(true);
+    else if (a === 'save') changeSaved(prev => withSavedSet(prev, setListRef.current));
+    else if (a === 'open' && name) {
+      const kept = loadSavedSets().find(x => x.name === name);
+      if (kept) { changeSet({ name: kept.name, items: kept.items.map(i => ({ ...i })) }); setLiveItemId(null); }
+    } else if (a === 'delete' && name) changeSaved(prev => prev.filter(x => x.name !== name));
+    else if (a === 'rename' && name?.trim()) changeSet(prev => ({ ...prev, name: name.trim() }));
+    else if (a === 'new') { changeSet({ name: 'New set', items: [], emptied: true }); setLiveItemId(null); }
     else if (a === 'export') {
       const list = setListRef.current;
       downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    } else if (a === 'clear') { changeSet({ name: 'My set', items: [] }); setLiveItemId(null); }
+    } else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
     else if (a === 'song-shows') setShowSongs(true);
-  }, [changeSet]);
+  }, [changeSet, changeSaved]);
   const onItemAction = useCallback((id: string, a: SetItemAction) => {
     changeSet(prev => {
       if (a === 'up' || a === 'down') return moveItem(prev, id, a === 'up' ? -1 : 1);
@@ -3121,7 +3180,7 @@ export default function App() {
       )}
       {musicFile && overlaysVisible && (
         <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-xl shadow-2xl" data-testid="music-player">
-          <button onClick={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
+          <button onClick={toggleMusic} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
             {musicPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
           </button>
           <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 max-w-[160px] truncate"
@@ -3903,13 +3962,15 @@ export default function App() {
             time={musicTime}
             loop={musicLoop}
             onLoop={setMusicLoop}
-            onToggle={() => { const el = musicElRef.current; if (!el) return; if (el.paused) void el.play(); else el.pause(); }}
+            onToggle={toggleMusic}
             onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
             nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
             onPickFile={playMusicFile}
             onPickTrack={playTrack}
             drone={droneParams}
             onDrone={changeDrone}
+            droneRunning={droneRunning}
+            onDroneToggle={toggleDrone}
             onClose={() => setShowSound(false)}
           />
         )}
@@ -4206,7 +4267,8 @@ export default function App() {
           automated={isAutomated}
           onAutomate={setIsAutomated}
           cues={cues}
-          setName={setActive ? setList.name : null}
+          setName={setList.name}
+          savedSets={savedSets.map(x => x.name)}
           onAddToSet={() => setAddingToSet(true)}
           onSetAction={onSetAction}
           onItemAction={onItemAction}
@@ -4246,6 +4308,8 @@ export default function App() {
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
           onToolAmount={(v) => setToolAmount(activeTool, v)}
+          amountOf={(t: string) => toolAmounts[t] ?? 1}
+          onAmountFor={setToolAmount}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -4319,6 +4383,8 @@ export default function App() {
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
           onToolAmount={(v) => setToolAmount(activeTool, v)}
+          amountOf={(t: string) => toolAmounts[t] ?? 1}
+          onAmountFor={setToolAmount}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}

@@ -133,10 +133,24 @@ jobs:
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).
+  #
+  # Three runners side by side rather than one after another. On one runner
+  # the job took sixteen minutes, every check waiting on the one before it,
+  # and the first failure skipped everything after it, so a push with three
+  # things wrong took three rounds to find them. Each shard is about five
+  # minutes of checks (timed on main's #147 deploy: the show night 3:17, the
+  # smoke 1:34, the black box 1:42, tools 1:36, the drop map 2:27 of which a
+  # minute was printed-only cases, now left to MIRROR_ALL=1), and within a
+  # shard every check runs whatever failed before it. The repository is
+  # public, so the extra runners cost nothing.
   webgpu:
-    name: WebGPU (macOS)
+    name: WebGPU (macOS) · ${{ matrix.shard }}
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [show, tools, plate]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -146,27 +160,39 @@ jobs:
       - run: npm ci
       - name: Install Chromium
         run: npx playwright install chromium
+      # Once, first: the scripts run with plain `node` read the built app.
+      - name: Build
+        id: build
+        run: npm run build
       # Every shader compiles, before anything builds a pipeline from one.
       - name: The shaders compile
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run wgsl
       # The solver's physics on its own: the projection is incompressible
       # (multigrid against the sweeps), and the magnet draws ferrofluid in
       # without making, losing or over-packing any.
       - name: The physics
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run physics
       # Particles are drawn where their dye is, not at its mirror.
       - name: The particles
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run particles
       # The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.
       - name: The relief
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run derive
       # Held still, the Blow grows a bubble with a fingered rim and a ring of satellites.
       - name: The straw bubble
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
       # The closeup pushes in like a microscope: the cells come through as they resolve.
       - name: The microscope
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run microscope
-      - run: npm run webgpu
+      - name: The WebGPU smoke
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        run: npm run webgpu
       # And the show night itself, on the WebGPU stage. It runs here rather
       # than beside the other one because it needs a GPU: a Linux runner's
       # software WebGPU can compute but cannot present a canvas (the P0
@@ -175,11 +201,13 @@ jobs:
       # A show night on what a visitor actually gets, at the real device pixel
       # ratio and on the GPU solver — neither of which the ubuntu job can do.
       - name: A show night
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: QA_DPR=1 QA_GPU=mid npm run qa
       # The post chain in the app: the chain with nothing in it draws the
       # plate's own picture, the ring keeps what it was given, and the
       # effects' randomness is the same twice.
       - name: The post chain
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fx
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
@@ -189,45 +217,60 @@ jobs:
       # the gate asks for 10% — because what it guards is a sign and a place,
       # not a tuning.
       - name: Depth reaches the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run depth
       # The Magnet in the hand (reported: "magnet tool isn't really
       # working"): picked on a look with no ferrofluid it pours some, and
       # dragged across the plate the ferrofluid goes with it, against the
       # same plate left alone.
       - name: The magnet moves the ferrofluid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet
       # Every other tool in the hand (asked for: "check all of the tools to
       # make sure they work in expected ways"): each does what it says and
       # nothing else, and hovering does nothing (scripts/tools.mjs).
       - name: Every tool does what it says
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/tools.mjs
 
       # A drop lands where it is dropped: on the Design desk, on either layer,
       # the cell under the hand changes and its mirror image across the middle
       # does not (reported: an echo of the gesture "in the mirrored section").
-      # It runs even when an earlier step failed, so the map it prints is
-      # there to read whatever else is red.
       - name: A drop lands only where it is dropped
-        if: success() || failure()
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: node scripts/mirror.mjs
 
       # And the physics under it: the ferrofluid gathers where the magnet is
       # (not at its mirror), held close pulls harder than held away, and the
       # magnet neither makes nor loses liquid.
       - name: The ferrofluid's physics
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: node scripts/ferro.mjs
       # Performances start and stop by hand (reported: "the performance auto
       # detect doesn't work well"): T starts one, nothing painted keeps
       # nothing, and what is painted is kept, on its own clock with no song.
       - name: A performance starts and stops by hand
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: node scripts/take.mjs
       # The black box records (crash-plan.md): errors land with a snapshot,
       # a device loss and its recovery are logged, frames that stop become a
       # fatal and light the button, a report from a destroyed device still
       # returns with no screenshot, and the log survives the reload.
       - name: The black box
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/crash.mjs
       # And the projector's geometry, on a GPU: which pixels are black, and
       # how many times a second the whole screen is allowed to change.
       - name: The wall
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run wall
+
+  # The one name the rest of the repository knows this stage by: green only
+  # when every shard is.
+  webgpu-all:
+    name: WebGPU (macOS)
+    needs: webgpu
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.webgpu.result }}" = success

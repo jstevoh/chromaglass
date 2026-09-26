@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ToolAmount } from '../ToolAmount';
+import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
@@ -50,7 +50,7 @@ export interface Cue {
 /** What a set item's menu can do. */
 export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'down' | 'remove';
 /** What the set's own menu can do. */
-export type SetAction = 'import' | 'export' | 'clear' | 'song-shows';
+export type SetAction = 'import' | 'export' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
 
 /**
  * What the strip starts with: the controls a light show is actually played on.
@@ -89,14 +89,13 @@ const WHITE = new Set<string>(['dimmer']);
 
 interface PerformDeskProps {
   cues: Cue[];
-  /**
-   * The set's name while the list is the operator's set; null while it is
-   * every look, in which case there is nothing to edit but the Add that
-   * starts one.
-   */
-  setName: string | null;
+  /** The set's name. The desk always lists the set; a first visit's is every look. */
+  setName: string;
+  /** The names of the sets kept by name, for Open. */
+  savedSets: string[];
   onAddToSet: () => void;
-  onSetAction: (a: SetAction) => void;
+  /** `name` for open, delete and rename. */
+  onSetAction: (a: SetAction, name?: string) => void;
   onItemAction: (id: string, a: SetItemAction) => void;
   /** The song playing now, if one was identified: a set item can be linked to it. */
   songNow: string | null;
@@ -136,6 +135,9 @@ interface PerformDeskProps {
   onLayer: (n: number) => void;
   tool: string;
   onTool: (t: string) => void;
+  /** How much each tool does, and a way to set any of them (ToolOptions, from a right-click on a tool). */
+  amountOf?: (tool: string) => number;
+  onAmountFor?: (tool: string, v: number) => void;
   /** How much the tool in hand does (ToolAmount). */
   toolAmount?: number;
   onToolAmount?: (v: number) => void;
@@ -188,17 +190,21 @@ const dyeKey = (hex: string): string | null => {
 
 export function PerformDesk(p: PerformDeskProps) {
   const [picking, setPicking] = useState(false);
+  /** A tool's own options, open by a right-click on it or the Amount chip. */
+  const [toolMenu, setToolMenu] = useState<{ tool: string; at: { x: number; y: number } } | null>(null);
   /** The row whose menu is open, and the set's own menu. */
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [setMenu, setSetMenu] = useState(false);
   const itemAct = (a: SetItemAction) => { if (menuFor) p.onItemAction(menuFor, a); setMenuFor(null); };
-  const setAct = (a: SetAction) => { p.onSetAction(a); setSetMenu(false); };
+  const setAct = (a: SetAction, name?: string) => { p.onSetAction(a, name); setSetMenu(false); };
+  const [renaming, setRenaming] = useState(false);
+  const [saved, setSaved] = useState(false);
   const next = p.cues.find(c => c.id === p.nextId) ?? null;
   const live = p.cues.find(c => c.id === p.liveId) ?? null;
 
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
-      style={{ gridTemplateColumns: '272px 1fr 312px', gridTemplateRows: '48px 1fr 28px' }}
+      style={{ gridTemplateColumns: '272px minmax(0, 1fr) 312px', gridTemplateRows: '48px 1fr 28px' }}
       data-testid="perform-desk">
 
       <DeskHeader
@@ -227,21 +233,69 @@ export function PerformDesk(p: PerformDeskProps) {
 
       {/* ── Cues ────────────────────────────────────────────── */}
       <aside className="flex min-h-0 flex-col border-r border-border" data-testid="cue-list">
-        <div className="relative flex h-11 shrink-0 items-center justify-between gap-2 px-4">
-          <span className="min-w-0 truncate text-[13px] font-medium text-text" data-testid="set-name">
-            {p.setName ?? 'All looks'}
-          </span>
-          <span className="flex shrink-0 items-center gap-1">
-            <span className="mr-1 font-mono text-[12px] text-faint">{p.cues.length}</span>
+        <div className="relative flex shrink-0 flex-col gap-1.5 px-4 pb-2 pt-3">
+          <div className="flex min-w-0 items-center">
+          {renaming ? (
+            <input
+              autoFocus
+              defaultValue={p.setName}
+              onBlur={e => { p.onSetAction('rename', e.currentTarget.value); setRenaming(false); }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') { e.currentTarget.value = p.setName; e.currentTarget.blur(); }
+              }}
+              className="h-7 min-w-0 flex-1 rounded-md border border-border-strong bg-elevated px-2 text-[13px] font-medium text-text outline-none focus:border-accent"
+              data-testid="set-name-input"
+            />
+          ) : (
+            <button
+              onClick={() => setRenaming(true)}
+              title="Rename the set"
+              className="min-h-7 min-w-0 truncate rounded-md px-1 -mx-1 text-left text-[13px] font-medium text-text hover:text-accent"
+              data-testid="set-name"
+            >
+              {p.setName}
+            </button>
+          )}
+            <span className="ml-auto shrink-0 whitespace-nowrap pl-2 font-mono text-[12px] text-faint" data-testid="set-count">{p.cues.length} {p.cues.length === 1 ? 'item' : 'items'}</span>
+          </div>
+          <span className="flex items-center gap-1 whitespace-nowrap [&>*]:flex-1">
             <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
-            <Button height={28} onClick={() => setSetMenu(v => !v)} testId="set-menu" title="The set: import, export, song shows">⋯</Button>
+            <Button
+              height={28}
+              onClick={() => { setAct('save'); setSaved(true); window.setTimeout(() => setSaved(false), 1400); }}
+              testId="set-save"
+              title={`Keep this set as “${p.setName}”, to open again from the menu`}
+            >
+              {saved ? 'Saved' : 'Save'}
+            </Button>
+            <Button height={28} onClick={() => setSetMenu(v => !v)} testId="set-menu" title="Sets: open, new, import, export, song shows">⋯</Button>
           </span>
           {setMenu && (
-            <div className="absolute right-3 top-10 z-30 w-56 rounded-md border border-border-strong bg-elevated p-1 shadow-lg" data-testid="set-menu-list">
+            <div className="absolute right-3 top-full z-30 w-56 rounded-md border border-border-strong bg-elevated p-1 shadow-lg" data-testid="set-menu-list">
+              {p.savedSets.length > 0 && (
+                <>
+                  <p className="px-2 pb-1 pt-1.5 text-[11px] uppercase tracking-wide text-faint">Open a saved set</p>
+                  {p.savedSets.map(n => (
+                    <div key={n} className="flex items-center">
+                      <MenuItem onClick={() => setAct('open', n)} testId={`set-open-${n}`}>{n}</MenuItem>
+                      <button
+                        onClick={() => p.onSetAction('delete', n)}
+                        title={`Forget the saved set “${n}”`}
+                        className="shrink-0 rounded px-2 py-1 text-[13px] text-faint hover:bg-hover hover:text-text"
+                        data-testid={`set-delete-${n}`}
+                      >×</button>
+                    </div>
+                  ))}
+                  <div className="my-1 h-px bg-border" />
+                </>
+              )}
+              <MenuItem onClick={() => setAct('new')} testId="set-new">New empty set</MenuItem>
+              <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all presets</MenuItem>
+              <div className="my-1 h-px bg-border" />
               <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
-              <MenuItem onClick={() => setAct('export')} disabled={!p.setName} testId="set-export">Export this set</MenuItem>
+              <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
               <MenuItem onClick={() => setAct('song-shows')} testId="set-song-shows">Song shows…</MenuItem>
-              <MenuItem onClick={() => setAct('clear')} disabled={!p.setName} testId="set-clear">Clear the set (back to all looks)</MenuItem>
             </div>
           )}
         </div>
@@ -261,11 +315,22 @@ export function PerformDesk(p: PerformDeskProps) {
                   {c.id === p.liveId ? <Tag tone="live">live</Tag>
                   : c.id === p.nextId ? <Tag tone="next">next</Tag>
                   : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
+                  {/* Take it off the set. A span, not a button: the row is the button. */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={e => { e.stopPropagation(); p.onItemAction(c.id, 'remove'); }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); p.onItemAction(c.id, 'remove'); } }}
+                    title="Remove from the set"
+                    aria-label={`Remove ${c.name} from the set`}
+                    className="-mr-1 shrink-0 rounded px-1.5 text-[15px] leading-none text-faint opacity-0 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                    data-testid={`cue-remove-${c.id}`}
+                  >×</span>
                 </>
               }
               onClick={() => p.onCue(c.id)}
               onDoubleClick={() => p.onCueNow(c.id)}
-              onContextMenu={p.setName ? (e) => { e.preventDefault(); setMenuFor(c.id); } : undefined}
+              onContextMenu={(e) => { e.preventDefault(); setMenuFor(c.id); }}
               midiKey={`preset:${c.id}`}
               testId={`cue-${c.id}`}
             />
@@ -285,8 +350,13 @@ export function PerformDesk(p: PerformDeskProps) {
               </div>
             );
           })()}
-          {p.setName && p.cues.length > 0 && (
-            <p className="px-2 pt-1 text-[11px] text-faint">Right-click an item for its song, controls and order.</p>
+          {p.cues.length > 0 ? (
+            <p className="px-2 pt-1 text-[11px] text-faint">Right-click an item for its song, controls and order; × takes it off.</p>
+          ) : (
+            <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
+              <p>This set is empty.</p>
+              <p className="mt-1 text-[12px] text-faint">+ Add looks to it, or start from all presets in the ⋯ menu.</p>
+            </div>
           )}
         </div>
         <div className="shrink-0 border-t border-border p-3">
@@ -347,7 +417,24 @@ export function PerformDesk(p: PerformDeskProps) {
         </div>
         {/* The hole the plate's canvas is painted over — it is never re-parented. */}
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
-        <div className="mt-3 flex h-9 shrink-0 items-center justify-between gap-3">
+        {/*
+          The tools, then the Amount and the dyes together, wrapping to a line
+          of their own when the column is short, as on the bench. The middle
+          column no longer grows to fit its content (the header's mode switch
+          moved when it did), so a row that did not wrap ran under the rides
+          column at 1280 and 1024 and Freeze was painted over the Amount chip.
+        */}
+        <div className="mt-3 flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {/* Right-click a tool for its own options (ToolOptions). */}
+          <div
+            className="contents"
+            onContextMenu={(e) => {
+              const t = toolUnder(e, 'tool-segmented');
+              if (!t || !p.amountOf) return;
+              e.preventDefault();
+              setToolMenu({ tool: t, at: { x: e.clientX, y: e.clientY } });
+            }}
+          >
           <Segmented
             value={p.tool}
             options={TOOLS.map(([id, label, k]) => [id, label, k] as const)}
@@ -355,7 +442,18 @@ export function PerformDesk(p: PerformDeskProps) {
             testId="tool-segmented"
             compact
           />
-          {p.onToolAmount && <ToolAmount tool={p.tool} value={p.toolAmount ?? 1} onChange={p.onToolAmount} className="hidden w-0 max-w-44 flex-1 overflow-hidden text-muted xl:flex" />}
+          </div>
+          {toolMenu && p.amountOf && p.onAmountFor && (
+            <ToolOptions
+              tool={toolMenu.tool}
+              value={p.amountOf(toolMenu.tool)}
+              onChange={(v) => p.onAmountFor!(toolMenu.tool, v)}
+              at={toolMenu.at}
+              onClose={() => setToolMenu(null)}
+            />
+          )}
+          <div className="ml-auto flex items-center gap-3">
+          {p.onToolAmount && <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />}
           <div className="flex items-center gap-1.5 rounded-md bg-elevated p-1.5" data-testid="dye-tray">
             {p.dyes.map(hex => (
               <Swatch
@@ -370,6 +468,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 testId={`dye-${hex.replace('#','')}`}
               />
             ))}
+          </div>
           </div>
         </div>
       </section>

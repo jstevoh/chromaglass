@@ -789,6 +789,43 @@ try {
     const homeZoom = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
     check('and it comes back to the plate again',
       homeZoom !== null && homeZoom < 1.05, `camera at ${homeZoom === null ? '?' : homeZoom.toFixed(2)}×`);
+
+    /*
+      And the first notches are notches. Reported: "the macro zoom is still
+      not completely smooth across its range - especially at the beginning
+      steps". At 1.1x the camera went to its subject a fifth of the plate
+      away, the dye budget dropped to the closeup's, and the plate's cells,
+      relief and droplets went off, all at once: the first step moved the
+      picture more than the whole rest of the way in. Each step here is
+      asked to be a fraction of the whole travel, with the plate still held.
+    */
+    const near = async (zoom) => {
+      await page.evaluate(z => window.chromaglassSettings?.({ macroZoom: z }), zoom);
+      for (let i = 0; i < 40; i++) {
+        const z = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
+        if (z !== null && Math.abs(z - zoom) < 0.03) break;
+        await settle(150);
+      }
+      await settle(500);
+      return frame();
+    };
+    const notches = [1.1, 1.2, 1.3, 1.5];
+    const stepsApart = [];
+    let before = await near(1);
+    for (const z of notches) {
+      const now = await near(z);
+      stepsApart.push(apart(before, now));
+      before = now;
+    }
+    // Measured in the lab on a seeded plate: the first notch moved the
+    // picture 97.8 against 26, 14 and 22 for the next three; now 26 against
+    // 23, 23 and 48 (over the wider 1.3 to 1.5 step).
+    const firstStep = stepsApart[0];
+    const rest = Math.max(...stepsApart.slice(1));
+    check('and its first notch moves it no more than the ones after it',
+      firstStep < rest * 2 + drift + 2,
+      `steps ${stepsApart.map(v => v.toFixed(1)).join(', ')} against ${far.toFixed(1)} for the whole way in`);
+    await at(1);
     await page.evaluate((s) => window.chromaglassSettings?.(s), wasMoving);
 
     // The readout follows the zoom, not the old flag.
@@ -1958,24 +1995,31 @@ try {
 
   // ── The set: the operator's own cue list ──────────────────────────
   //
-  // Empty, the desk lists every look. Two looks added from the sheet make a
-  // set of two, in that order; a row arms its item and Go sends it; cleared,
-  // the desk lists every look again.
+  // A first visit opens on every look as a set that can be trimmed. A new
+  // empty set with two looks added from the sheet is a set of two, in that
+  // order; a row arms its item and Go sends it; × takes one off; saved by
+  // name, it comes back from the menu; and "start from all presets" puts
+  // every look back.
   {
     await clickOn('mode-segmented-perform');
     await settle(600);
-    const allLooks = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    const rowSel = '[data-testid="cue-list"] [data-testid^="cue-"][data-state]';
+    const allLooks = await page.locator(rowSel).count();
+    const starter = await page.getByTestId('set-name').innerText().catch(() => '');
+    check('a first visit opens on every look, as a set', allLooks > 20 && /all presets/i.test(starter),
+      `${allLooks} rows in "${starter}"`);
+    await clickOn('set-menu');
+    await clickOn('set-new');
+    await settle(300);
     await clickOn('set-add');
     await settle(300);
     const firstTwo = await page.locator('[data-testid^="add-to-set-look-"]').evaluateAll((els) => els.slice(0, 2).map((e) => e.getAttribute('data-testid')));
     for (const t of firstTwo) await clickOn(t);
     await clickOn('add-to-set-done');
     await settle(400);
-    const rows = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
-    const name = await page.getByTestId('set-name').innerText().catch(() => '');
-    check('two looks added from the sheet make a set of two', rows === 2 && name !== 'All looks',
-      `${allLooks} looks → ${rows} rows, "${name}"`);
-    const first = page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').first();
+    const rows = await page.locator(rowSel).count();
+    check('two looks added to a new set make a set of two', rows === 2, `${allLooks} looks → ${rows} rows`);
+    const first = page.locator(rowSel).first();
     await first.click();
     await settle(200);
     const armed = await first.getAttribute('data-state');
@@ -1985,11 +2029,31 @@ try {
     check('a set row arms its item and Go sends it', armed === 'next' && live === 'live', `${armed} → ${live}`);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-setlist') || '{"items":[]}').items.length);
     check('and the set is kept', stored === 2, `${stored} stored`);
+    // Named and saved, then trimmed with its ×.
+    await clickOn('set-name');
+    await page.getByTestId('set-name-input').fill('QA set');
+    await page.keyboard.press('Enter');
+    await clickOn('set-save');
+    await settle(200);
+    const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-sets') || '[]').map((x) => `${x.name}:${x.items.length}`));
+    check('saved, the set is kept by its name', kept.includes('QA set:2'), kept.join(', ') || 'nothing kept');
+    const lastId = await page.locator(rowSel).last().getAttribute('data-testid');
+    await clickOn(lastId.replace(/^cue-/, 'cue-remove-'));
+    await settle(300);
+    check('× takes an item off the set', await page.locator(rowSel).count() === 1, `${await page.locator(rowSel).count()} left`);
     await clickOn('set-menu');
     await clickOn('set-clear');
     await settle(400);
-    const back = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
-    check('cleared, the desk lists every look again', back === allLooks, `${back} of ${allLooks}`);
+    const back = await page.locator(rowSel).count();
+    check('starting from all presets lists every look again', back === allLooks, `${back} of ${allLooks}`);
+    await clickOn('set-menu');
+    await clickOn('set-open-QA set');
+    await settle(400);
+    check('and the saved set opens again as it was saved', await page.locator(rowSel).count() === 2,
+      `${await page.locator(rowSel).count()} rows`);
+    await clickOn('set-menu');
+    await clickOn('set-clear');
+    await settle(300);
   }
 
   // ── A look replaces the one before it ────────────────────────────
@@ -2016,12 +2080,38 @@ try {
       await clickOn(`fade-segmented-${fade}`);
       await clickOn('go-button');
     };
+    // The frame's mean brightness, 0-255: what a flash is a jump in.
+    const luma = () => page.evaluate(async () => {
+      const d = await window.__cgFrame(32, 18); let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+      return s / (d.length / 4);
+    });
+    const jumps = async (ms) => {
+      const seen = [await luma()];
+      for (let t = 0; t < ms; t += 200) { await settle(200); seen.push(await luma()); }
+      let worst = 0;
+      for (let i = 1; i < seen.length; i++) worst = Math.max(worst, Math.abs(seen[i] - seen[i - 1]));
+      return { worst, seen };
+    };
     await goTo('solar-flare', 0);
-    await settle(8000);
+    await settle(6000);
+    const calm = await jumps(2000);
     const from = await colour();
     await goTo('deep-ocean', 4);
-    await settle(8000);
+    const fade = await jumps(4400);
+    await settle(3600);
     const faded = await colour();
+    /*
+      And through it, no flash. Reported: going from one item to the next
+      "flashes a couple of times, then starts the next item ... it's not a
+      smooth fade". The handover laid the new look in eight separate doses,
+      and the seeding is random, so each dose was a new picture. The biggest
+      jump in brightness from one fifth of a second to the next during the
+      fade, against the same look's own on a plate left alone.
+    */
+    check('and it fades rather than flashing', fade.worst < 3 * calm.worst + 4,
+      `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
+      + `(fade ${fade.seen.map((v) => v.toFixed(0)).join(' ')})`);
     await goTo('deep-ocean', 0);
     await settle(8000);
     const own = await colour();

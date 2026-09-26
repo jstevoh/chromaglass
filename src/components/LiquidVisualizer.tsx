@@ -154,6 +154,22 @@ const MACRO_FULL_ZOOM = 2.0;
 /** A preset or a saved show that sets `macroMode` with no zoom of its own. */
 const MACRO_PRESET_ZOOM = 4.0;
 
+/** The zoom the frame is asked for: the slider's, or a macro look's own. */
+function macroZoomOf(s: VisualizerSettings): number {
+  const setZoom = s.macroZoom ?? 1;
+  return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
+}
+
+/**
+ * How far into the closeup, 0 at the plate and 1 from MACRO_FULL_ZOOM on,
+ * eased at both ends so the first notch of the slider starts it moving
+ * rather than starting it at a slope.
+ */
+function macroAmountOf(s: VisualizerSettings): number {
+  const t = Math.max(0, Math.min(1, (macroZoomOf(s) - 1) / (MACRO_FULL_ZOOM - 1)));
+  return t * t * (3 - 2 * t);
+}
+
 const GRID_SIZE = 192;                    // sim resolution — higher = smoother liquid edges
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 /** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
@@ -296,18 +312,13 @@ const SELF_HEAL_FRAMES = 90;
   (over the specified time) completely to the new preset and not keep any
   aspects of the previous preset." It used to thin the old dye to 0.45 and
   pour the new palette on top, so every look carried the one before it. Now
-  the old dye goes (to HANDOFF_KEEP) through the first part of the fade, and
-  the new look is laid as it would be from cold, in doses: its own seed,
-  its phase, its liquids, on a plate cleared of the old chemistry.
+  the old dye thins (to HANDOFF_KEEP) through the fade while the new look's
+  own seed, worked out once, rises in place at the matching rate, on a plate
+  cleared of the old chemistry; its phase and liquids arrive half way. The
+  stage never sags darker than either end, and nothing flashes.
 */
 /** How much of the old dye is left once the handover is done. */
 const HANDOFF_KEEP = 0.02;
-/**
-  The new look's seed arrives in this many doses through the fade, each at
-  the strength the plate lost since the last, so the old look drains as the
-  new one fills and the stage never sags darker than either end.
-*/
-const HANDOFF_DOSES = 8;
 /** How many pours of the new palette arrive through the fade, on top of its seed. */
 const HANDOFF_POURS = 4;
 /** Whether Evolve pours whole-plate floods at the peak of a gust. Off: evolve is subtle. */
@@ -453,7 +464,7 @@ export interface LiquidVisualizerHandle {
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
   drawnRect: () => DOMRect | null;
   /** What the dye is doing, cheaply, for an instrument that plays the plate. */
-  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[] } | null;
+  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
   startFilmCamera: () => Promise<void>;
@@ -1403,6 +1414,39 @@ class FluidSimulation {
    * state on the CPU path and the pending deltas on the GPU path, and a seed
    * only adds to them, so the difference it made can be scaled either way.
    */
+  /**
+   * What `lay` would put on the plate, as a picture to add later rather than
+   * dye added now: the dye it lays is taken back out and returned (its
+   * velocity stays, laid once). A look change lays the incoming look a share
+   * at a time from one of these, so the same picture rises in place; laying
+   * the look again for each share put its blobs somewhere new each time (the
+   * seeding is random) and the change flashed through several pictures.
+   */
+  captureSeed(lay: () => void): Float32Array[] {
+    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
+    const before = arrays.map(a => a.slice());
+    lay();
+    const delta = arrays.map((a, c) => {
+      const d = new Float32Array(a.length);
+      for (let i = 0; i < a.length; i++) d[i] = a[i] - before[c][i];
+      a.set(before[c]);
+      return d;
+    });
+    this.dirty = true;
+    return delta;
+  }
+
+  /** Add `k` of a captured seed (see `captureSeed`) to the plate. */
+  addSeedShare(seed: Float32Array[], k: number): void {
+    if (!(k > 0)) return;
+    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
+    for (let c = 0; c < 4; c++) {
+      const a = arrays[c], d = seed[c];
+      for (let i = 0; i < a.length; i++) a[i] += d[i] * k;
+    }
+    this.dirty = true;
+  }
+
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = Math.max(0, Math.min(1, w));
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
@@ -2635,7 +2679,11 @@ class FluidSimulation {
     // What the motor asks for, in the flywheel's units, so the twist below can
     // tell the plate's own momentum apart from the speed it was told to hold.
     const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
-    const targetMean = settings.macroMode ? 0.28 : Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
+    // Eased down over the zoom's travel, not dropped at the first notch: the
+    // plate emptying at 1.05x was a jump of its own (reported as the zoom
+    // not being smooth, "especially at the beginning steps").
+    const budget = Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
+    const targetMean = budget + (0.28 - budget) * macroAmountOf(settings);
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     /*
       Steep enough to actually hold the budget.
@@ -3707,7 +3755,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     thins to a little under half and six pours of the new palette arrive
     through the second half, so the colours change hands with the settings.
   */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number } | null>(null);
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -4092,11 +4140,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const idx = Math.max(0, Math.min(d.length - 1, x + y * GRID_SIZE));
         cells.push(Number.isFinite(d[idx]) ? d[idx] : 0);
       }
+      /*
+        And how the plate is moving: its mean speed and its mean turn, from
+        the flow already read back, every eighth cell each way. The
+        instrument's pulse and its air follow these, so a stirred plate
+        sounds busier than a still one.
+      */
+      const vx = fluid.readVx, vy = fluid.readVy;
+      let speed = 0, curl = 0, m = 0;
+      if (vx?.length && vy?.length) {
+        for (let j = 8; j < GRID_SIZE - 8; j += 8) {
+          for (let i = 8; i < GRID_SIZE - 8; i += 8) {
+            const k = i + j * GRID_SIZE;
+            const u = vx[k], v = vy[k];
+            if (!Number.isFinite(u) || !Number.isFinite(v)) continue;
+            speed += Math.hypot(u, v);
+            // Turn about the middle: r × v, normalised by r.
+            const rx = i - GRID_SIZE / 2, ry = j - GRID_SIZE / 2;
+            curl += (rx * v - ry * u) / Math.max(1, Math.hypot(rx, ry));
+            m++;
+          }
+        }
+      }
       const c = fluid.meanColor;
       return {
         wetness: Number.isFinite(fluid.meanDensity) ? fluid.meanDensity : 0,
         colour: [c?.[0] ?? 0, c?.[1] ?? 0, c?.[2] ?? 0] as [number, number, number],
         cells,
+        flow: m ? speed / m : 0,
+        swirl: m ? curl / m : 0,
       };
     },
     injectImage: (imageData: ImageData) => {
@@ -4220,7 +4292,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     handoff: (seconds: number) => {
       if (!(seconds > 0)) { handoffRef.current = null; return; }
       const now = performance.now();
-      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0 };
+      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
@@ -5632,24 +5704,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               for (const fluid of fluidsRef.current) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
               const id = livePresetRef.current;
               const lead = fluidsRef.current[0];
-              const doses = Math.min(HANDOFF_DOSES, Math.floor(p * HANDOFF_DOSES + 0.5 + 1e-6));
-              while (h.dosed < doses) {
-                h.dosed++;
-                // The first dose clears the old look's chemistry and its
-                // liquids; the middle one lays the new look's phase.
-                if (h.dosed === 1) {
-                  for (const fluid of fluidsRef.current) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
-                  chemRef.current.reset();
-                }
-                if (h.dosed === Math.ceil(HANDOFF_DOSES / 2)) {
-                  if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
-                  else lead?.gpu?.clearPhase?.();
-                  if (id) for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, id);
-                }
-                if (lead && id) {
-                  const seeded = lead.seedPresetScaled(id, noise2D, Math.min(1, lambda / HANDOFF_DOSES));
-                  if (h.dosed === 1 && !harmonyLockRef.current && !presetContractRef.current) harmonyRef.current = seeded;
-                  for (let i = 0; i < 2; i++) {
+              /*
+                The incoming look, laid once and risen into.
+
+                At the start its seed is worked out once per plate and kept
+                (captureSeed), the old look's chemistry and liquids cleared;
+                every frame after, the same share of that one picture goes in
+                as the plate thins, so what arrives is the new look coming up
+                in place. Laid in eight separate doses it flashed: the seeding
+                is random, so each dose put its blobs somewhere new, and a look
+                with no palette of its own picked a new palette for each.
+                The share balances the thinning (λ a fade), so by the end the
+                new look is all but HANDOFF_KEEP of the plate.
+              */
+              if (!h.seeds) {
+                for (const fluid of fluidsRef.current) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                chemRef.current.reset();
+                h.seeds = fluidsRef.current.map((fluid, i) => {
+                  if (!id) return null;
+                  if (i === 0) {
+                    let seeded: number[] = [];
+                    const seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(id, noise2D); });
+                    if (!harmonyLockRef.current && !presetContractRef.current) harmonyRef.current = seeded;
+                    return seed;
+                  }
+                  return id === 'fillmore-1969' ? fluid.captureSeed(() => laySecondPlate(fluid, id)) : null;
+                });
+                h.dosed = 1;
+              }
+              const share = Math.min(1, lambda * dtMs / h.dur);
+              h.seeds.forEach((seed, i) => { if (seed) fluidsRef.current[i]?.addSeedShare(seed, share); });
+              // The second phase, once, half way: it is a body, not a wash.
+              if (h.dosed === 1 && p >= 0.5) {
+                h.dosed = 2;
+                if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
+                else lead?.gpu?.clearPhase?.();
+                if (lead) {
+                  for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + Math.random() * (GRID_SIZE - 20), 10 + Math.random() * (GRID_SIZE - 20), 1.2);
                   }
                 }
@@ -6276,11 +6367,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // the zoom, so a floor of 4x under macroMode made every zoom from 1.05
         // to 4 render at 4x. The floor is only for a look that turns macroMode
         // on and leaves the zoom where it was.
-        const setZoom = currentSettings.macroZoom ?? 1;
-        const wantZoom = currentSettings.macroMode === true
-          ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM)
-          : Math.max(1, setZoom);
-        const macroAmount = Math.max(0, Math.min(1, (wantZoom - 1) / (MACRO_FULL_ZOOM - 1)));
+        const wantZoom = macroZoomOf(currentSettings);
+        const macroAmount = macroAmountOf(currentSettings);
         const macroOn = wantZoom > 1.005;
         if (macroOn !== lastMacroOnRef.current) {
           lastMacroOnRef.current = macroOn;
@@ -6313,6 +6401,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             );
             camBassRef.current = camBass;
           }
+          /*
+            Leaving the middle of the plate over the travel in, not at the
+            first notch. The camera goes to its subject as soon as there is
+            a zoom at all, and at 1.1x the frame may already move a fifth of
+            the plate: the first step of the slider was a lurch sideways.
+          */
+          const raw = macroShotRef.current;
+          macroShotRef.current = { ...raw, cx: 0.5 + (raw.cx - 0.5) * macroAmount, cy: 0.5 + (raw.cy - 0.5) * macroAmount };
         } else {
           macroShotRef.current = { cx: 0.5, cy: 0.5, zoom: 1, whip: 0 };
         }
@@ -7513,7 +7609,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // cursor at any magnification.
       const shot = macroShotRef.current;
       const z = Math.max(0.0001, shot.zoom);
-      const spread = settingsRef.current.macroMode ? 0 : Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0));
+      // As the plate's uniforms have it: gathered back to one plate as the closeup comes in.
+      const spread = Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0)) * (1 - macroAmountOf(settingsRef.current));
       if (spread > 0.001) {
         // The layers are spread into dishes: this layer's dish is its whole plate.
         const layer = activeLayerRef.current;

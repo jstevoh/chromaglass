@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Sparkles, Slash, Play, Pause, Repeat, Waves } from 'lucide-react';
+import { Mic, Monitor, FileAudio, Music, Sparkles, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
 import { Sheet } from './ui';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
@@ -32,7 +32,7 @@ const SOURCES: ReadonlyArray<{
   { id: 'file', label: 'Your file', icon: FileAudio,
     blurb: 'Play a track from this machine. It plays out of this tab, so a shared tab carries the music too.' },
   { id: 'drone', label: 'The plate', icon: Waves,
-    blurb: 'The glass plays itself: four voices tuned to a scale, lit by where the dye is and keyed by the colour on it. It sounds out of this tab, so a shared tab carries it.' },
+    blurb: 'The glass plays itself: a pad keyed by its colour, a bass paced by its flow, bells where dye arrives and air as it stirs. It sounds out of this tab, so a shared tab carries it.' },
   { id: 'simulated', label: 'A band in a box', icon: Sparkles,
     blurb: 'A synthesised band — kick, snare, hats, bass and a pad, in verses and choruses. No device, no permission, nothing to be asked for.' },
 ];
@@ -40,7 +40,7 @@ const SOURCES: ReadonlyArray<{
 export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
-  nowPlaying, onPickFile, onPickTrack, drone, onDrone, onClose,
+  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
@@ -58,6 +58,9 @@ export function SoundPanel({
   onPickTrack: (t: Track) => void;
   drone: DroneParams;
   onDrone: (p: Partial<DroneParams>) => void;
+  /** Whether the instrument is sounding, and its start/stop. */
+  droneRunning: boolean;
+  onDroneToggle: () => void;
   onClose: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -95,7 +98,24 @@ export function SoundPanel({
 
         {source === 'drone' && (
           <div className="mt-3 rounded-xl border border-border p-3" data-testid="drone-controls">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
+            <div className="mb-3 flex items-center gap-3">
+              <button
+                onClick={onDroneToggle}
+                className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-[12px] font-bold transition-colors ${
+                  droneRunning
+                    ? 'border-white/50 bg-white/15 text-text hover:bg-white/20'
+                    : 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'
+                }`}
+                aria-label={droneRunning ? 'Stop the instrument' : 'Start the instrument'}
+                data-testid="drone-toggle"
+                data-running={droneRunning ? 'true' : 'false'}
+              >
+                {droneRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                {droneRunning ? 'Stop' : 'Play'}
+              </button>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
+              <span className="ml-auto text-[11px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex items-center gap-2 text-[12px] text-muted">
                 <span className="w-20 shrink-0">Key</span>
@@ -139,6 +159,9 @@ export function SoundPanel({
                 ['drift', 'Drift', 0, 60, 1, (v: number) => `${Math.round(v)}¢`],
                 ['reverb', 'Room', 0, 6, 0.1, (v: number) => (v < 0.05 ? 'dry' : `${v.toFixed(1)}s`)],
                 ['level', 'Level', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
+                ['bass', 'Bass', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
+                ['bells', 'Bells', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
+                ['air', 'Air', 0, 1, 0.01, (v: number) => `${Math.round(v * 100)}%`],
               ] as const).map(([key, label, min, max, step, fmt]) => (
                 <label key={key} className="flex items-center gap-2 text-[12px] text-muted">
                   <span className="w-20 shrink-0">{label}</span>
@@ -158,9 +181,11 @@ export function SoundPanel({
               source: it listens to the plate it is driving.
             */}
             <p className="mt-3 text-[11px] leading-relaxed text-faint">
-              The plate voices this and this drives the plate, which is a loop — so it reads slowly
-              and glides rather than steps, and follows the plate's weather over seconds instead of
-              chasing every frame.
+              Four parts, all played by the plate: a pad keyed by the colour on the glass, a bass
+              that pulses faster as the plate is stirred, bells rung wherever fresh dye arrives round
+              the ring, and air that breathes with the flow. The plate voices this and this drives the
+              plate, which is a loop — so the pad glides rather than steps, and follows the plate's
+              weather over seconds. Playing a track or a file stops it.
             </p>
           </div>
         )}

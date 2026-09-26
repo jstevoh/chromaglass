@@ -1499,7 +1499,8 @@ export class WebGPUFluid {
     if (!this.air) return null;
     const n = this.N;
     /*
-      Two bytes a texel, because the field is `r16float`.
+      Eight bytes a texel, because the field is `rgba16float` (it was
+      `r16float`, two bytes, before it carried the bubbles' looks).
 
       This read assumed four and a `Float32Array` when the field was
       `r32float`, and kept assuming it after the format changed. What it
@@ -1508,7 +1509,8 @@ export class WebGPUFluid {
       bubble was. Two half floats read as one single. Every conclusion drawn
       from it was about the reader.
     */
-    const row = Math.ceil((n * 2) / 256) * 256;
+    // Four half floats a texel since the field carries the bubbles' looks too; the coverage is the first.
+    const row = Math.ceil((n * 8) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read air', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read air' });
     enc.copyTextureToBuffer({ texture: this.air.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
@@ -1519,7 +1521,7 @@ export class WebGPUFluid {
     const stride = row / 2;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
-        const h = halves[y * stride + x];
+        const h = halves[y * stride + x * 4];
         const sign = h & 0x8000 ? -1 : 1;
         const exp = (h >> 10) & 0x1f;
         const man = h & 0x3ff;

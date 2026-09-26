@@ -1166,7 +1166,17 @@ struct FsOut {
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
-  let closeup = macroAmt > 0.1;   // not 'macro': that is a reserved word in WGSL
+  let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
+  /*
+    How much of the plate-wide view is left: the plate's own dressing (the
+    meniscus relief, the cells, the droplets) fades out over the same travel
+    the closeup's fades in, rather than all going at once at 1.1x, which was
+    the step reported in the first notches of the zoom. The dish spread and
+    layer 1's throw are eased toward the whole plate on the CPU side
+    (plateUniforms.ts), so they are none at all once the closeup is in.
+  */
+  let plateAmt = 1.0 - macroAmt;
+  let plateOn = plateAmt > 0.001;
   let aspect = U.resolution.x / max(1.0, U.resolution.y);
   let uvScreen = uv;
 
@@ -1243,7 +1253,7 @@ struct FsOut {
   let c0 = cos(-U.rotation0);
   let s0 = sin(-U.rotation0);
   var fuv0 = uvToFluid(uv, c0, s0);
-  if (U.dishSpread > 0.001 && !closeup) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
+  if (U.dishSpread > 0.001) { fuv0 = dishToPlate(uvScreen, 0, aspect, c0, s0); }
   // Where the eye meets the plate's surface: the drops sit here, and what is
   // under a drop is read through it (dropLens), before anything is sampled,
   // so the dye, the ferrofluid, the oil and the chemistry are all magnified.
@@ -1267,7 +1277,7 @@ struct FsOut {
   gapScale = 1.0;
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
-  if (U.dishSpread > 0.001 && !closeup) {
+  if (U.dishSpread > 0.001) {
     dish0 = layerDish(uvScreen, 0, U.resolution.x / U.resolution.y);
     fluid0.a *= dish0.x;
   }
@@ -1303,12 +1313,12 @@ struct FsOut {
     let laced0 = lacing(fluid0.rgb, layer0, fuv0, fluid0.a, U.lacing);
     if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
   }
-  if (!closeup && U.edgeRelief > 0.005 && sharp0) {
-    fluid0 = vec4f(meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), fluid0.a);
+  if (plateOn && U.edgeRelief > 0.005 && sharp0) {
+    fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), plateAmt), fluid0.a);
   }
 
   // ── Plate cells ───────────────────────────────────────────────
-  if (!closeup && U.cells > 0.005 && fluid0.a > 0.03) {
+  if (plateOn && U.cells > 0.005 && fluid0.a > 0.03) {
     let cfreq = U.logicalGrid / 3.2;
     let cflow = fluidFlow(vel0, fuv0) * cfreq;
     let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13);
@@ -1322,7 +1332,7 @@ struct FsOut {
       let cc = vec2f(0.5 + 0.144 * U.dishSpread / casp, 0.5 - 0.02 * U.dishSpread);
       centreW = 1.0 - smoothstep(0.25, 0.7, length((uvScreen - cc) * vec2f(casp, 1.0)) / (0.5 * mix(0.98, 0.66, U.dishSpread)));
     }
-    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW;
+    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW * plateAmt;
     var rgb = fluid0.rgb * (1.0 - max(0.0, -crim) * 0.7 * kc);
     rgb *= 1.0 + max(0.0, crim) * 0.35 * kc;
     rgb = mix(rgb, rgb * 1.1 + vec3f(0.02), ccore * kc * 0.4);
@@ -1331,7 +1341,7 @@ struct FsOut {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    fluid0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    fluid0 = mix(fluid0, macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof), macroAmt);
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
@@ -1475,15 +1485,15 @@ struct FsOut {
     let c1 = cos(-U.rotation1);
     let s1 = sin(-U.rotation1);
     var fuv1 = uvToFluid(uv, c1, s1);
-    if (U.dishSpread > 0.001 && !closeup) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
-    if (!closeup && U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
+    if (U.dishSpread > 0.001) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
+    if (U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
     var flow1 = vec2f(0.0);
     if (closeup) {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
       fuv1 = macroWarp(fuv1);
     }
     var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
-    if (U.dishSpread > 0.001 && !closeup) {
+    if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
     }
@@ -1519,13 +1529,13 @@ struct FsOut {
       let laced1 = lacing(fluid1.rgb, layer1, fuv1, fluid1.a, U.lacing);
       if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
     }
-    if (!closeup && U.edgeRelief > 0.005 && sharp1) {
-      fluid1 = vec4f(meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), fluid1.a);
+    if (plateOn && U.edgeRelief > 0.005 && sharp1) {
+      fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), plateAmt), fluid1.a);
     }
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1 = macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof);
+      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof), macroAmt);
     }
 
     if (U.photo > 0.5) {
@@ -1556,14 +1566,14 @@ struct FsOut {
   }
 
   // ── Satellite droplets ───────────────────────────────────────────
-  if (U.droplets > 0.001 && !closeup) {
+  if (U.droplets > 0.001 && plateOn) {
     let Ld = lampDir(fuvBase, U.lamp);
     let sideD = Ld.xy / max(length(Ld.xy), 0.06);
     let groundD = dot(outColor, vec3f(0.299, 0.587, 0.114));
     let keep = U.droplets * (0.18 + 0.32 * fluid0.a);
     var dropped = microDrops(outColor, fuvBase * U.logicalGrid * 0.55 + 17.0, sideD, groundD, keep);
     dropped = microDrops(dropped, fuvBase * U.logicalGrid * 1.1 + 5.0, sideD, groundD, keep * 0.6);
-    outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5));
+    outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5) * plateAmt);
   }
 
   // ── Bubbles ──────────────────────────────────────────────────────
@@ -1593,158 +1603,120 @@ struct FsOut {
     and it is why the lens mix below now has less to do than it did.
   */
   if (U.bubbleStrength > 0.001) {
-    let aC = textureSampleLevel(air0, samp, fuvBase, 0.0).r;
+    let airC = textureSampleLevel(air0, samp, fuvBase, 0.0);
+    let aC = airC.r;
     if (aC > 0.02) {
-      let e = 1.5 / U.logicalGrid;
-      let gx = textureSampleLevel(air0, samp, fuvBase + vec2f(e, 0.0), 0.0).r
-             - textureSampleLevel(air0, samp, fuvBase - vec2f(e, 0.0), 0.0).r;
-      let gy = textureSampleLevel(air0, samp, fuvBase + vec2f(0.0, e), 0.0).r
-             - textureSampleLevel(air0, samp, fuvBase - vec2f(0.0, e), 0.0).r;
-      let g = vec2f(gx, gy);
-      let gl = length(g);
-      // Out of the bubble, and how far out. At the very middle the gradient
-      // vanishes and the direction is arbitrary, which is also where nothing
-      // below depends on it.
-      let outward = select(vec2f(1.0, 0.0), -g / max(gl, 1e-6), gl > 1e-5);
-      let bestD = outward * (1.0 - aC);
-      // A typical bubble is about three plate-hundredths across; the only
-      // thing this scales is how far the lens samples, and a per-bubble
-      // radius is not something a field carries.
-      let bestRad = 0.03;
+      /*
+        Each bubble drawn as the one it is.
+
+        The air field carries, besides the coverage, where in its bubble each
+        texel is (g, b) and the bubble's size, film age and a number of its
+        own (a) — see wgsl/air.ts. With only the coverage,
+        which is flat inside a bubble, every bubble was drawn alike: the same
+        dark ring and the same dot, at an assumed radius (reported: "not
+        varied enough ... either transparency differences, or light shining
+        off them, or color"). Now its shape is a dome lit from the lamp, its
+        clarity, its film colour and its highlight are its own, and its film
+        drains and thins as it ages the way a soap film does.
+      */
+      // Where in its bubble, from the coverage-weighted position (see wgsl/air.ts).
+      let p = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
+      let rr = min(1.0, length(p));
+      let h = sqrt(max(0.0, 1.0 - rr * rr));
+      let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
+      /*
+        Its size, film age and number: packed whole, so read unfiltered —
+        and from the largest of the four texels round the point, since just
+        past a small bubble's rim the filtered coverage is still there while
+        the nearest texel is already empty, and read from that the rim was
+        drawn as a different, tiny bubble: a square halo round each one.
+      */
+      let looks = textureGather(3, air0, samp, fuvBase);
+      let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
+      // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
+      let R = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
+      let age = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
+      let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
+      let k1 = fract(id * 7.13 + 0.17);
+      let k2 = fract(id * 13.71 + 0.53);
+      let k3 = fract(id * 23.37 + 0.91);
+      let bestD = p;
+      // Pressed between two plates it is a lens, flatter than a sphere.
+      let n = normalize(vec3f(p * 0.85, h + 0.15));
       let opac = smoothstep(0.02, 0.28, aC);
-      let edge = aC * 3.0;
-      let membrane = smoothstep(0.86, 1.0, edge) * (1.0 - smoothstep(1.0, 1.22, edge));
-      let inside = smoothstep(1.0, 1.3, edge);
-      let centre = smoothstep(1.3, 3.0, edge);
       let play = U.lightPlay;
       let Lb = lampDir(fuvBase, U.lamp);
       let lampSide = Lb.xy / max(length(Lb.xy), 0.06);
-      let nd = normalize(bestD + vec2f(1e-5));
-      let toward = dot(nd, lampSide);
+      let toward = dot(select(vec2f(1.0, 0.0), normalize(p), rr > 1e-3), lampSide);
       /*
-        The liquid this bubble sits in, sampled just outside its own rim.
-
-        Every optic below is scaled by how much light and colour is around:
-        'ground' sets the rim strength, the specular and the arc; 'filmT'
-        decides how much the bubble takes the liquid's hue; 'tint' is that
-        hue. All three were read at this pixel — and this pixel is *inside*
-        the bubble, where the solver has just taken the dye away. So they all
-        answered "clear and dark", which greyed the interior and scaled the
-        membrane, the caustic arc and the specular dot to nothing. The
-        bubbles came out as flat grey discs with the optics still running and
-        nothing to run on.
-
-        Reading them from beyond the rim is also what the plan asks for:
-        tinted by what refraction bends in from the edge, rather than by the
-        hole it made.
+        The liquid round it: its light and colour, averaged over a ring just
+        outside the rim, so one bubble has one tint. It used to be read
+        outward along the line through each point, and a bubble sitting
+        between two colours came out in pie slices, each line tinted by what
+        lay beyond it at that angle.
       */
-      /*
-        Walk outward until the air stops, and read the liquid there (H6 A).
-
-        This used to step a fixed fraction of the frame -- bestRad, which is
-        the constant 0.03 -- because that was the radius a bubble was given
-        before the air field replaced the forty uniforms. Once the exclusion
-        actually emptied a bubble, that constant became a bug with a measured
-        size: on any bubble wider than it, the sample meant to find the liquid
-        BEYOND the rim landed inside the hole, where there is now no dye at
-        all. So the film thickness read zero, the tint went white, and the
-        check asking whether a bubble is the liquid lit rather than paint on
-        top of it went from 14.6 degrees to 27.2.
-
-        Six taps, out to 0.12 of the frame, which covers the largest bubble a
-        look asks for. The march is inside the branch that already requires
-        air here, so a plate with no bubbles on it pays nothing.
-      */
-      var rimUv = fuvBase + outward * 0.012;
-      var walk = 0.012;
+      let centre = fuvBase - p * R;
+      var rimCol = vec3f(0.0);
+      var rimA = 0.0;
       for (var ri = 0; ri < 6; ri++) {
-        walk = walk + 0.018;
-        let probe = fuvBase + outward * walk;
-        if (textureSampleLevel(air0, samp, probe, 0.0).r < 0.05) {
-          rimUv = probe + outward * 0.012;
-          break;
-        }
+        let ang = f32(ri) * 1.0471976 + id * 6.2831853;
+        let rf = decodeFluid(layer0, centre + vec2f(cos(ang), sin(ang)) * (R * 1.5 + 0.004), 0.0, false);
+        rimCol += mix(bgColor, rf.rgb, rf.a);
+        rimA += rf.a;
       }
-      let rimF = decodeFluid(layer0, rimUv, 0.0, false);
-      let rimCol = mix(bgColor, rimF.rgb, rimF.a);
+      rimCol /= 6.0;
+      let rimF = vec4f(rimCol, rimA / 6.0);
       let ground = dot(rimCol, vec3f(0.299, 0.587, 0.114));
-      let rimK = mix(0.18, 0.42, smoothstep(0.08, 0.5, ground));
-      var c = outColor;
       let filmT = smoothstep(0.02, 0.28, rimF.a);
       let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
-      let lensUv = fuvBase - bestD * bestRad * (0.15 + 0.35 * play);
+
+      // Through it: the liquid beyond, magnified by the lens (more toward the middle).
+      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play);
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
       let lensCol = mix(bgColor, lensF.rgb, lensF.a);
-      c = mix(c, lensCol, inside * 0.45 * play);
-      /*
-        The gap is clear, so the lamp comes through it (H6 · A).
+      // And the lamp through the clear gap, carrying the liquid's hue
+      // (0.18 toward white: measured, see git history of this block).
+      let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * h + 0.55 * ground);
+      // Some bubbles are all but clear, some milky with a thicker film.
+      let clarity = mix(0.3, 0.95, k1);
+      var c = mix(lensCol, through, 0.25 + 0.55 * clarity);
+      c = mix(outColor, c, smoothstep(0.0, 0.2, h));
 
-        The solver has already taken the dye out from under the bubble, and
-        this compositor draws dye over a background that is black — so
-        without this, a bubble is a black hole punched in the picture, which
-        is exactly what the first run of it looked like. A bubble in a
-        backlit dish is the *brightest* thing in the frame: there is nothing
-        left to absorb the lamp. Tinted a little by the liquid it sits in,
-        because the rim refracts some of that back inward.
-      */
-      let dome = clamp(1.0 - dot(bestD, bestD), 0.0, 1.0);
-      /*
-        The lamp through a clear gap, carrying the liquid's colour.
+      // The film: interference colour, strongest at a glancing angle (the
+      // rim), thicker at the bottom where it drains to, thinner with age
+      // until it goes dark just before it breaks.
+      let F = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.2);
+      // Radially, from the height, which is smooth at any size; the drainage
+      // toward the bottom only as a gentle lean, since which way is "down"
+      // across a bubble three cells wide is too coarse to draw colour from.
+      let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
+      let filmC = thinFilmColour(thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0));
+      let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+      c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
+      c *= 1.0 - 0.35 * smoothstep(0.85, 1.0, age) * F;
 
-        Weighted toward the tint rather than toward white: a bubble in
-        magenta liquid is a magenta bubble, and pulling hard to white is what
-        made these read as grey circles pasted on the picture rather than as
-        glass sitting in it.
+      // The rim: a glint where it faces the lamp, a thin meniscus line where
+      // it faces away, each its own weight — not one dark ring on them all.
+      let rimBand = smoothstep(0.78, 0.97, rr);
+      c += (vec3f(1.0, 0.98, 0.94) * 0.5 + tint * 0.3) * rimBand * pow(max(0.0, toward), 1.5) * (0.35 + 0.5 * k2) * play;
+      let meniscus = smoothstep(0.9, 0.995, rr) * (1.0 - smoothstep(0.995, 1.0, rr));
+      c *= 1.0 - meniscus * (0.15 + 0.35 * k1) * (0.5 + 0.5 * max(0.0, -toward));
 
-        And mixed in gently — the membrane, the arc and the specular dot are
-        what say "glass", so the interior has to stay behind them rather than
-        wash them out.
-      */
-      /*
-        How much of the lamp shows through the gap, and it was measured
-        rather than chosen.
-
-        The interior is empty now, so every bit of its colour comes from this
-        one mix: pull toward white and the bubble is the lamp, pull toward
-        the rim's tint and it is the liquid. Both ends are wrong in a way the
-        two checks beside it can each see, and neither could see alone —
-
-          0.25   hue shift 8.9-13.1 degrees, on its gate of 12
-                 thick dye brightened 0.159 against thin 0.110  (1.45x)
-          0.10   hue shift 1.7 degrees
-                 thick 0.094 against thin 0.085  (1.11x) — fails
-          0.18   hue shift 9.3, thick 0.169 against thin 0.046  (3.7x)
-
-        Tinting harder keeps the liquid's hue and flattens how much the lamp
-        depends on the dye it is coming through, which is the one thing that
-        tells a hole from a highlight painted on top. Eighteen hundredths
-        holds both, with room on each.
-      */
-      let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * dome + 0.55 * ground);
-      c = mix(c, through, inside * (0.3 + 0.35 * dome));
-      c = mix(c, c * 1.18 + tint * 0.06, inside * 0.55 + centre * 0.3);
-      c *= 1.0 - 0.3 * play * max(0.0, toward) * inside + 0.2 * play * max(0.0, -toward) * inside;
-      let arcBand = smoothstep(0.78, 1.0, edge) * (1.0 - smoothstep(1.0, 1.4, edge));
-      c += (c * 0.9 + tint * 0.16) * arcBand * max(0.0, -toward) * 0.9 * play;
-      let halo = smoothstep(0.3, 0.7, edge) * (1.0 - smoothstep(0.7, 0.92, edge));
-      c *= 1.0 - halo * max(0.0, -toward) * 0.22 * play;
-      c = mix(c, c * c * 1.1, membrane * (rimK + 0.35 * max(0.0, toward) * play));
-      if (U.iridescence > 0.001) {
-        let filmC = thinFilmColour(edge * 2.2 + atan2(bestD.y, bestD.x) * 0.5 + U.time * 0.05);
-        c = mix(c, c * (0.55 + 1.2 * filmC), membrane * U.iridescence * 0.7 * (0.35 + 0.65 * ground));
-      }
-      let hd = bestD - lampSide * 0.36;
-      let hl = exp(-dot(hd, hd) * 26.0) * inside;
-      c += mix(vec3f(1.0, 0.98, 0.92), tint, 0.65 * filmT) * hl * (0.18 + 0.24 * ground);
+      // The lamp's reflection off its dome: sharp on a small bubble, broad
+      // on a large one, and a fainter second one off the far wall.
+      let H = normalize(Lb + vec3f(0.0, 0.0, 1.0));
+      let shine = mix(60.0, 260.0, clamp(0.02 / max(R, 0.004), 0.0, 1.0)) * mix(0.7, 1.3, k3);
+      let spec = pow(max(dot(n, H), 0.0), shine);
+      let n2 = normalize(vec3f(-p * 0.6, h + 0.3));
+      let spec2 = pow(max(dot(n2, H), 0.0), shine * 0.5) * 0.3;
+      c += mix(vec3f(1.0, 0.98, 0.92), tint, 0.4 * filmT) * (spec + spec2) * (0.7 + 0.6 * ground) * (0.6 + 0.8 * k2);
       if (U.lamp2.w > 0.001) {
         let L2 = lampDir(fuvBase, U.lamp2);
-        let side2 = L2.xy / max(length(L2.xy), 0.06);
-        let toward2 = dot(nd, side2);
-        c += tint * vec3f(0.72, 0.86, 1.0) * (0.12 + ground * 0.38) * arcBand * max(0.0, -toward2) * play * U.lamp2.w;
-        let hd2 = bestD - side2 * 0.36;
-        c += mix(vec3f(0.75, 0.86, 1.0), tint, 0.6 * filmT) * exp(-dot(hd2, hd2) * 26.0) * inside * 0.22 * U.lamp2.w;
+        let H2 = normalize(L2 + vec3f(0.0, 0.0, 1.0));
+        c += vec3f(0.75, 0.86, 1.0) * pow(max(dot(n, H2), 0.0), shine * 0.8) * 0.5 * U.lamp2.w;
       }
-      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.6, 1.0, filmT));
+      let inside = smoothstep(0.0, 0.2, h);
+      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
       auxN = mix(auxN, -bestD * 0.8, opac * inside);
       auxB = max(auxB, opac * inside);
     }
@@ -1791,7 +1763,7 @@ struct FsOut {
   }
 
   // ── The projectors' rims ─────────────────────────────────────────
-  if (U.dishSpread > 0.001 && !closeup) {
+  if (U.dishSpread > 0.001) {
     var other = 0.0;
     if (U.layerCount > 1) { other = dish1.x; }
     let anyIn = max(dish0.x, other);

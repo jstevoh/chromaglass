@@ -40,6 +40,17 @@ const GPU_ARGS = process.platform === 'darwin' && !process.env.PW_SOFTWARE
   ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
   : [];
 
+/*
+  And WebGPU on a machine with no GPU, in software. A Linux box (a cloud
+  session, a container) gets no adapter at all by default, so every harness
+  that drives the app stopped at "needs WebGPU" and could only be run on CI's
+  Mac. `PW_WEBGPU=1` gives the app SwiftShader's WebGPU, as the lab has always
+  had (scripts/lab.mjs): slow, but the same engine and the same checks.
+*/
+const SOFTWARE_WEBGPU = process.platform !== 'darwin' && process.env.PW_WEBGPU
+  ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader']
+  : [];
+
 /** What the harnesses launch with, on top of whatever each one needs. */
 export const BASE_ARGS = [
   '--no-sandbox',
@@ -47,6 +58,7 @@ export const BASE_ARGS = [
   '--use-fake-ui-for-media-stream',
   '--use-fake-device-for-media-stream',
   ...GPU_ARGS,
+  ...SOFTWARE_WEBGPU,
 ];
 
 /**
