@@ -1128,6 +1128,25 @@ class FluidSimulation {
         full, and the same dye went to the rim once per deposit: the Blow's
         bubble turned 36 of dye into 358 in the tools check. Each cell's dye
         now goes to the rim once, the first time the bubble covers it.
+
+        And what a bubble covers by growing goes to the rim not at all: its
+        own flow has already taken it there. The air arriving is a source in
+        the projection (the divergence pass, wgsl/fluid.ts), so a growing
+        bubble pushes the liquid and its dye out ahead of its edge, and the
+        multiply finds next to nothing left to remove. Measured in the lab
+        with the straw's own growth (bubbles.ts, blow: to 0.047 of the plate
+        in 1.5 s, fingers and all) on a pool of 834 and no deposit at all,
+        the plate kept its dye: 834 -> 827. The same growth with this deposit
+        emulated as the app runs it made 50 to 74 more (+7 to +10%), all of
+        it laid round the bubble, and more the staler the mirror: the Blow's
+        "pushes it out to the rim rather than making more" read 494 -> 920
+        on CI's Mac. A bubble that appears where it was not, or moves onto
+        dye, is not the same: the multiply takes what is under it before
+        any flow has moved it (the lab: -12.6% for a bubble put down whole,
+        -10.4% for one drifting across a pool, with no deposit), and that is
+        what the ring is for. So a bubble that was here at the last deposit
+        counts only the cells it has moved onto at the size it was then; the
+        ring it has grown into is the flow's.
       */
       let was: { x: number; y: number; r: number } | null = null;
       for (let j = 0; j < this.coverCount; j++) {
@@ -1135,13 +1154,14 @@ class FluidSimulation {
         const px = this.coverPacked[q] * N, py = this.coverPacked[q + 1] * N, pr = this.coverPacked[q + 2] * N;
         if (Math.hypot(px - b.x, py - b.y) < Math.max(2, R * 0.5) && (!was || pr > was.r)) was = { x: px, y: py, r: pr };
       }
+      const reach = was ? Math.min(R, was.r) : R;
       let mass = 0, aR = 0, aG = 0, aB = 0;
       const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
       const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
       for (let y = lo; y <= hi; y++) {
         for (let x = xl; x <= xh; x++) {
           const dx = x - b.x, dy = y - b.y;
-          if (dx * dx + dy * dy > R * R) continue;
+          if (dx * dx + dy * dy > reach * reach) continue;
           if (was && (x - was.x) * (x - was.x) + (y - was.y) * (y - was.y) <= was.r * was.r) continue;
           const i4 = (x + y * N) * 4;
           const d = dye[i4 + 3];
