@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-26:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **built on the sequencer, in review**; steps 2–7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; steps 2–7 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -683,7 +683,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
    10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
    from a seeded run, and the film table.
-   *Built* (in review) on the stage sequencer rather than the phrase generator, because a
+   *Shipped* (#170) on the stage sequencer rather than the phrase generator, because a
    stage is already a scene: `src/lib/scenePacing.ts` plans each stage of a running
    sequence (a pour, press or dye change opening each swell, rests where the plate's clock
    drops as low as a fifth, and from Pacing ½ a slow fade to near-black at the stage's
@@ -732,18 +732,18 @@ Batches 5 and 6 were the ones that mattered most, and the seeded generator was t
 hinge between them. The generator, the render and sound learn are in; batch 5's shutter
 and look link are not. The order from here, as of 2026-09-26:
 
-1. **Batch 10, step 0 then step 1.** Run `film.yml` by hand for the
-   first full baseline, then build rest, big events and darkness. It is the change an
-   audience would notice first, it needs no new physics (the events exist and
-   `phrasing.ts` has the shape), and the film table can measure it.
+1. **Batch 10, the film.** Step 1, rest, big events and darkness, shipped in #170.
+   Run `film.yml` by hand for the first full baseline, and film Light Show Night with
+   Pacing up: the harness measured what the sequence asks for, and only the film can
+   say whether the plate delivers it.
 2. **The rest of batch 5**: the look link and the shutter are independent of
    everything else and can be built while the Mac is judging a look.
 3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
 
 Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
-freeze (#164) finish in their own threads first.
+freeze (#164, shipped) finish in their own threads first.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
-pick them up from `docs/roadmap.md` when step 1 is in.
+pick them up from `docs/roadmap.md` now that step 1 is in.
 
 ## Operating rules
 
