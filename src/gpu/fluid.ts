@@ -27,6 +27,8 @@ import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
+import { SOLVER_VEL_FORMAT } from './wgsl/pack';
+import { stepDisplacement } from '../lib/detailFlow';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 
@@ -162,7 +164,7 @@ const MAGNET_CELLS = 2.4;
 const PHASE_SUBSTEPS = 6;
 const GRAIN_PERIOD = 6;
 
-const VEL = 'rgba16float';
+const VEL = SOLVER_VEL_FORMAT;
 const R32 = 'r32float';
 const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
@@ -713,7 +715,7 @@ export class WebGPUFluid {
   /** One solver step. Call applyDeltas first when there is anything to add. */
   step(p: GpuStepParams, deltasApplied: boolean): void {
     const N = this.N;
-    const disp = p.dt * p.advection * ((N - 2) / N);
+    const disp = stepDisplacement(p.dt, p.advection, N);
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
     // Never under twelve cells a period: the edge is three or four wide, and
@@ -1549,7 +1551,7 @@ export class WebGPUFluid {
       // would pick up a colour that is mostly the plate's own floor and lay
       // it back down as a haze.
       floor: 0.02,
-      disp: p.dt * p.advection * ((this.N - 2) / this.N),
+      disp: stepDisplacement(p.dt, p.advection, this.N),
       dt: p.dt,
       seed: 0x9e3779b9,
     }, this.stageTimings ? (label) => this.profiler.pass(label) : undefined);

@@ -41,7 +41,7 @@ try {
     const target = device.createTexture({ size: [320, 320], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT });
     const enc = device.createCommandEncoder();
     plate.draw(enc, target.createView(), { width: 320, height: 320 },
-      [{ dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view: null }], 1);
+      [{ dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view: null }]);
     device.queue.submit([enc.finish()]);
     const tex = plate.layers[0].derived;
     const w = tex.width, h = tex.height;
