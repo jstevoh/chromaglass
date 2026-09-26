@@ -247,13 +247,46 @@ export class PingPong {
 
 // ── Readback ─────────────────────────────────────────────────────────
 
+/*
+  Readbacks, for a song render (lib/render.ts, PLAN.md §6).
+
+  Live, a readback lands when the GPU gets to it, a frame or two after it was
+  asked for, and which frame's code sees it is the machine's timing. That is
+  fine for a show and fatal for a render that has to come out the same twice:
+  the dye regulator, the beads and the flash guard all act on what came back,
+  so a copy that lands one frame later in the second render is a different
+  film from there on. So a render waits, after each frame, for every readback
+  that frame asked for (`readbacksLanded`), and each frame then sees exactly
+  the previous frame's copies, every time.
+
+  And it starts clean. What the rings hold from before the render is the live
+  plate's, in whatever state the evening left it; `forgetReadbacks` makes
+  every ring report nothing until a copy asked for after it lands, so the
+  render's first frames read either nothing (the same nothing every time) or
+  the render's own plate. Live, neither is ever called, and a ring behaves
+  exactly as it did: the in-flight set is bookkeeping, and the epoch never
+  moves.
+*/
+const inFlight = new Set<Promise<void>>();
+let epoch = 0;
+
+/** Every ring reports nothing until a copy asked for from now on lands. */
+export function forgetReadbacks(): void { epoch++; }
+
+/** Resolves once every readback asked for so far has landed (or failed). */
+export async function readbacksLanded(): Promise<void> {
+  while (inFlight.size) await Promise.allSettled([...inFlight]);
+}
+
 /**
  * Small results back to the CPU without a stall: a few buffers in rotation,
  * each copied into and mapped asynchronously, the newest landed one kept. A
  * frame or more late, as the WebGL path's fenced reads were.
  */
 export class ReadbackRing {
-  private readonly slots: { buf: GPUBuffer; busy: boolean; seq: number }[];
+  private readonly slots: { buf: GPUBuffer; busy: boolean; seq: number; epoch: number }[];
+  /** The epoch the newest data was asked for in; data from an older one is not handed out. */
+  private dataEpoch = 0;
   private seq = 0;
   private landedSeq = -1;
   private data: ArrayBuffer | null = null;
@@ -262,6 +295,7 @@ export class ReadbackRing {
       buf: disposer.track(device.createBuffer({ label: `${label} ${i}`, size: bytes, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ })),
       busy: false,
       seq: 0,
+      epoch: 0,
     }));
   }
 
@@ -275,6 +309,7 @@ export class ReadbackRing {
     encoder.copyBufferToBuffer(src, offset, slot.buf, 0, this.bytes);
     slot.busy = true;
     slot.seq = ++this.seq;
+    slot.epoch = epoch;
     return slot.buf;
   }
 
@@ -282,12 +317,12 @@ export class ReadbackRing {
   collect(buf: GPUBuffer): void {
     const slot = this.slots.find((s) => s.buf === buf);
     if (!slot) return;
-    buf.mapAsync(GPUMapMode.READ).then(() => {
+    const landing = buf.mapAsync(GPUMapMode.READ).then(() => {
       // Free the slot whatever happens: a slot left busy is a readback that
       // never comes back, and with two or three of them that is the flash
       // guard and the dye readback stopped for the rest of the show.
       try {
-        if (slot.seq > this.landedSeq) {
+        if (slot.seq > this.landedSeq && slot.epoch === epoch) {
           // Into the ring's one buffer, made on the first landing — and only
           // published once the copy is done, so a mapping that throws on the
           // first read leaves `latest` null rather than a buffer of zeros
@@ -296,6 +331,7 @@ export class ReadbackRing {
           const into = this.data ?? new ArrayBuffer(this.bytes);
           new Uint8Array(into).set(mapped);
           this.data = into;
+          this.dataEpoch = slot.epoch;
           this.landedSeq = slot.seq;
         }
       } finally {
@@ -303,6 +339,10 @@ export class ReadbackRing {
         slot.busy = false;
       }
     }, () => { slot.busy = false; });
+    inFlight.add(landing);
+    // Not caught here: a landing that throws still surfaces as an unhandled
+    // rejection with the same reason, once, as it did before it was tracked.
+    void landing.finally(() => inFlight.delete(landing));
   }
 
   /**
@@ -321,7 +361,7 @@ export class ReadbackRing {
    * their few numbers and let go. A reader that wants the data past an
    * `await` or into the next frame copies it.
    */
-  get latest(): ArrayBuffer | null { return this.data; }
+  get latest(): ArrayBuffer | null { return this.dataEpoch === epoch ? this.data : null; }
 
   /** Which copy the newest data came from: it rises each time a fresh one lands. */
   get landed(): number { return this.landedSeq; }

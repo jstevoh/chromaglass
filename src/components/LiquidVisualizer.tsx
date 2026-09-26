@@ -5,6 +5,7 @@ import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
+import { forgetReadbacks, readbacksLanded } from '../gpu/kit';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms } from '../gpu/plateUniforms';
@@ -449,7 +450,42 @@ function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number,
   fluid.liquid.deposit(x, y, r, liq.behaviour, AUTO_DOSE * strength * room);
 }
 
+/**
+ * A song render's hold on the plate (lib/render.ts, PLAN.md §6).
+ *
+ * The show normally draws a frame when the browser asks and steps the solver
+ * as many times as the wall clock says it owes. A render inverts both: the
+ * caller asks for frame i, the plate takes exactly the solver steps that
+ * frame is owed at the render's step rate (worked out from i, not from a
+ * clock), draws it at the film's size, and hands the drawn canvas back as a
+ * VideoFrame in the same task, which is the only moment a WebGPU canvas is
+ * guaranteed to still hold what was drawn.
+ *
+ * The caller owns the show clock (`beginFixedClock` before `begin`,
+ * `endFixedClock` before `end`) and the seed (`setShowSeed` before
+ * `begin`, which lays the look).
+ */
+export interface VisualizerRender {
+  /**
+   * Take the plate: the live loop stops, the canvas becomes width x height,
+   * the solvers are rebuilt fresh at `grid` (the current grid when not
+   * given), the plate's clocks and counters start from zero, and the look is
+   * laid from the seed. Resolves once the laid plate's first readbacks have
+   * landed, so the first frame reads the render's own plate, not the live
+   * one's.
+   */
+  begin: (o: { fps: number; width: number; height: number; stepRate?: number; grid?: number | null; lookId?: string | null }) => Promise<{ grid: number; lookId: string; stepRate: number }>;
+  /** Draw the next frame with this frame's sound, and return it as a VideoFrame with these times. */
+  step: (audio: AudioData | null, timestampUs: number, durationUs: number) => VideoFrame;
+  /** Resolves once the GPU has finished the frame and every readback it asked for has landed. */
+  settle: () => Promise<void>;
+  /** Give the plate back to the live loop, at its own size. */
+  end: () => void;
+}
+
 export interface LiquidVisualizerHandle {
+  /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
+  render: () => VisualizerRender | null;
   injectImage: (imageData: ImageData) => void;
   /**
    * Pour words into the lead plate: each row drawn at the biggest size its
@@ -699,6 +735,8 @@ class FluidSimulation {
   private squishSteps = 0;
   private squishLastAt = 0;
   private squishLastStep = -1;
+  /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
@@ -3849,6 +3887,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   // Refs for reactive data (avoids useEffect thrashing).
   const audioDataRef = useRef(audioData);
+  /** The sound the app is handing over, for a render to give back to when it ends. */
+  const audioDataPropRef = useRef(audioData);
+  audioDataPropRef.current = audioData;
   const settingsRef = useRef(settings);
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
@@ -3936,6 +3977,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const simMsRef = useRef(0);
   /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
   const stepsPerSecRef = useRef(60);
+  /**
+   * Frames the loop has been through, live or rendered: how `npm run render-app`
+   * tells that the live loop is drawing again once a render hands the plate back.
+   */
+  const framesDrawnRef = useRef(0);
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
@@ -3953,6 +3999,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   frameRef.current = frame;
   const resizeRef = useRef<() => void>(() => {});
   const [staged, setStaged] = useState(false);
+  /**
+   * A song render in progress: its rate, the steps a second it holds the
+   * solver to, the frame it is on, the film's size and grid. Null live, and
+   * every branch that reads it leaves the live show exactly as it was.
+   */
+  const renderingRef = useRef<{ fps: number; stepRate: number; frame: number; width: number; height: number; grid: number } | null>(null);
+  const renderApiRef = useRef<VisualizerRender | null>(null);
   const lastMacroOnRef = useRef(false);
   const filmLevelRef = useRef(0.3);
   const filmGainRef = useRef(4.5);
@@ -4209,6 +4262,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   layPlateRef.current = layPlate;
 
   useImperativeHandle(ref, () => ({
+    render: () => renderApiRef.current,
     drawnRect: () => drawnRectRef.current?.() ?? null,
     /*
       Numbers, not a photograph.
@@ -4747,6 +4801,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
     const render = () => {
+      // A song render is drawing the frames (`renderApiRef` below): the
+      // browser's frame is not one of them.
+      if (renderingRef.current) return;
       try {
         renderFrame();
         frameErrors = 0;
@@ -4766,6 +4823,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
     const renderFrame = () => {
+      framesDrawnRef.current++;
       // The context is gone and not back yet. Keep the loop alive but touch
       // nothing: the restore bumps `glEpoch`, which rebuilds and restarts it.
       if (glLostRef.current) { animationFrameId = requestAnimationFrame(render); return; }
@@ -4789,7 +4847,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         the beads, the bubbles, the rocks, the room and film stirs, the liquid
         chemistry — agrees with the solver about how long a step is.
       */
-      const stepRate = PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
+      const rendering = renderingRef.current;
+      const stepRate = rendering?.stepRate ?? PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
       const simStepS = 1 / stepRate;
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
@@ -4891,7 +4950,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
       if (fluidsRef.current.length > 0 && canvas.width > 0 && canvas.height > 0) {
         const now = showEpochS();
-        const realDt = now - lastTimeRef.current;
+        // A render's frame is exactly 1/fps: the clock's own difference of two
+        // large doubles is that to within a last bit, which would still be a
+        // different last bit in every uniform downstream.
+        const realDt = rendering ? 1 / rendering.fps : now - lastTimeRef.current;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat
@@ -5006,8 +5068,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
         simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
-        const simSteps = Math.floor(simAccumRef.current / simStepS);
+        let simSteps = Math.floor(simAccumRef.current / simStepS);
         simAccumRef.current -= simSteps * simStepS;
+        if (rendering) {
+          /*
+            A render's steps are counted, not measured: frame i is owed the
+            steps between floor(i·rate/fps) and floor((i+1)·rate/fps), in
+            integers. The accumulator above works in floating seconds, where
+            1/60 + 1/60 can floor to one step and then three, a judder a film
+            would keep; and its catch-up cap is set from how busy the machine
+            is, which a render must never depend on.
+          */
+          const i = rendering.frame;
+          simSteps = Math.floor(((i + 1) * rendering.stepRate) / rendering.fps) - Math.floor((i * rendering.stepRate) / rendering.fps);
+          simAccumRef.current = 0;
+        }
         stepsThisFrame = simSteps;
         /*
           The same elapsed time, counted in sixtieths of a second (H2b).
@@ -5136,7 +5211,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           dprRef.current = wantDpr;
           renderer?.resize();
         }
-        const wantRes = renderer ? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture) : 0;
+        const wantRes = renderer ? (rendering?.grid ?? resolveSimResolution(currentSettings.simResolution, governor, renderer.maxTexture)) : 0;
         for (const fluid of fluidsRef.current) {
           if (renderer && !renderer.attachSolver(fluid, gpuSupportedRef.current === false ? 0 : wantRes)) {
             gpuSupportedRef.current = false;
@@ -6682,7 +6757,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mark: markRef.current,
           film: filmRef.current,
           beadMask,
-          outputCfg: outputCfgRef.current,
+          outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,
           postForce: postForceRef.current,
           postTest: postTestRef.current,
           fxFrame: fxFrameRef.current,
@@ -6712,7 +6787,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Governor: judge this frame. A rung change takes effect through the
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
-      if (frameS > 0 && governorRef.current) {
+      if (frameS > 0 && governorRef.current && !rendering) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
         // What this frame cost the GPU, where the engine can say. Without it
@@ -6723,6 +6798,116 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
 
       animationFrameId = requestAnimationFrame(render);
+    };
+
+    /*
+      A song render's hold on the plate (see `VisualizerRender` for the
+      contract, lib/render.ts for the other half).
+
+      Everything the plate keeps from one frame to the next that is not the
+      glass itself starts from zero here, because a render has to be a
+      function of (seed, look, settings, song) and not of the evening before
+      it: the time stamps the timers compare against (they held the browser's
+      clock, and the show clock has just been handed to the render), the
+      phrase, the modulators, the beat clock, the frame counters the beads,
+      the drops and the effects count by, the flash guard's memory. The
+      solvers are rebuilt rather than cleared, because a solver keeps state
+      no clear reaches (its particles' frame count, its grain), and the
+      readback rings are told to forget the live plate (gpu/kit.ts).
+
+      Not reset, and so still able to differ between two renders in one
+      page: anything a person set (the settings, a locked palette, the layer
+      count), the bead carpet's own dice (cleared, but drawn from its stream
+      before the look restarts it, which is the same draw every time), and
+      the post chain's ring of past frames, which a delay effect reads.
+    */
+    const resetStamps = () => {
+      lastTimeRef.current = showEpochS();
+      soapAtRef.current = 0;
+      bzSeedAtRef.current = 0;
+      liesSeedAtRef.current = 0;
+      mazeKickRef.current = { env: 0, at: 0 };
+      magnetWalkAtRef.current = 0;
+      magnetHandRef.current = null;
+      handoffRef.current = null;
+      externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
+      journeyRef.current.lastAt = -1;
+      flashRef.current.reset();
+      flashGainRef.current = 1;
+      for (const f of fluidsRef.current) f.forgetPress();
+    };
+    const resetPlateClocks = () => {
+      resetStamps();
+      simulationTimeRef.current = 0;
+      simAccumRef.current = 0;
+      wanderClockRef.current = 0;
+      loudnessRef.current = 0;
+      tempoMulRef.current = 1;
+      kickRef.current = { kick: false, predicted: false };
+      kickCountRef.current = 0;
+      magnetWalkRef.current = 0;
+      beatClockRef.current = new BeatClock();
+      phrasingRef.current.reset();
+      phraseRef.current = { drive: 1, gust: 0, drift: 0.5 };
+      modRef.current.reset();
+      beadsRef.current.clear();
+      fxFrameRef.current = 0;
+      dropClockRef.current = 0;
+      beadFrameRef.current = 0;
+      gestureFrameRef.current = 0;
+    };
+    renderApiRef.current = {
+      begin: async (o) => {
+        if (!renderer || !stage) throw new Error('the plate is not up yet');
+        const governor = governorRef.current;
+        const grid = o.grid ?? (governor ? resolveSimResolution(settingsRef.current.simResolution, governor, renderer.maxTexture) : 256);
+        const stepRate = o.stepRate ?? 60;
+        cancelAnimationFrame(animationFrameId);
+        renderingRef.current = { fps: o.fps, stepRate, frame: 0, width: o.width, height: o.height, grid };
+        renderer.resize();
+        resize();
+        setStaged(true);
+        for (const f of fluidsRef.current) {
+          if (f.gpu) f.detachGpu();
+          renderer.attachSolver(f, grid);
+        }
+        resetPlateClocks();
+        forgetReadbacks();
+        const lookId = o.lookId ?? livePresetRef.current;
+        layPlateRef.current(lookId);
+        // The laid plate, read back twice, so the first frame's readers (the
+        // dye regulator, the beads) see this plate and not nothing.
+        for (let k = 0; k < 2; k++) {
+          for (const f of fluidsRef.current) f.syncFromGpu();
+          await stage.device.queue.onSubmittedWorkDone();
+          await readbacksLanded();
+        }
+        return { grid, lookId, stepRate };
+      },
+      step: (audio, timestampUs, durationUs) => {
+        const r = renderingRef.current;
+        if (!r) throw new Error('step with no render running');
+        audioDataRef.current = audio;
+        cancelAnimationFrame(animationFrameId);
+        renderFrame();
+        r.frame++;
+        return new VideoFrame(canvas, { timestamp: timestampUs, duration: durationUs });
+      },
+      settle: async () => {
+        if (stage) await stage.device.queue.onSubmittedWorkDone();
+        await readbacksLanded();
+      },
+      end: () => {
+        if (!renderingRef.current) return;
+        renderingRef.current = null;
+        resetStamps();
+        audioDataRef.current = audioDataPropRef.current;
+        setStaged(stageRef.current !== null);
+        renderer?.resize();
+        resize();
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      },
     };
 
     /*
@@ -6743,6 +6928,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       display interval is not drawn again.
     */
     (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+      if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
       if (now - lastExternalFrame < 6) return;     // this interval already has a frame
       lastExternalFrame = now;
@@ -6760,6 +6946,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** Frames through the loop since the page loaded, live or rendered. */
+        frames: framesDrawnRef.current,
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -7029,7 +7217,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const size = () => {
       scopeSoon = 2;   // the canvas's own targets are about to be reallocated
       const dpr = dprRef.current;
-      const px = canvasPixelsFor(
+      const px = renderingRef.current ?? canvasPixelsFor(
         dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
         devicePixels(), { width: window.innerWidth, height: window.innerHeight },
       );
@@ -7677,7 +7865,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       window that changed size kept the pixels it started with.
     */
     const resize = () => {
-      const px = canvasPixelsFor(
+      const px = renderingRef.current ?? canvasPixelsFor(
         dprRef.current, stageRef.current, renderer?.maxTexture ?? 8192,
         devicePixels(), { width: window.innerWidth, height: window.innerHeight },
       );

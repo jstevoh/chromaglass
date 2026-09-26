@@ -34,7 +34,7 @@
  *
  * What is *not* here, because it needs a browser: the real encoders and a
  * player's opinion of the file (`npm run render-lab`), and the plate itself
- * (the app itself, on a real GPU).
+ * (`npm run render-app`, the app itself, on a real GPU).
  *
  * Nothing here pins a level, a dye total or a frame's content: every gate is
  * a comparison within the run (the same input twice, 30 against 60, what
