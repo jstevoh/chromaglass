@@ -4,7 +4,9 @@
  * shows were.
  *
  *   npm run film
- *   FILM_ONLY=fillmore-1969,soap-film FILM_SECONDS=90 npm run film
+ *   FILM_ONLY=fillmore-1969,soap-film FILM_SECONDS=90 FILM_TAKES=1 npm run film
+ *   FILM_SHARD=2/6 npm run film        every sixth look from the second
+ *   FILM_COMBINE=shards npm run film   one table from the shards' film.json
  *
  * Asked for (the plan "Playing the plate like the real thing", step 0,
  * chosen by the owner as "measure first"): before anything changes how the
@@ -16,7 +18,8 @@
  * stopped). Each later step of the plan says what it changed in these
  * columns, so this is the before.
  *
- * For each look: a fresh page, the band in a box, nine seconds to settle,
+ * For each look, FILM_TAKES takes (default 3) on seeds 1, 2, 3, each a
+ * fresh page with the band in a box, waited on until the show runs steadily,
  * then FILM_SECONDS (default 120) through the app's own Record button
  * (`scripts/recorder.mjs`), watched with `scripts/watch.mjs` and reduced to
  * its shape (`shape()` there says what each number is and how it was
@@ -31,7 +34,7 @@
  * length, long black, a stopped picture, or a silent band.
  *
  * Writes FILM_OUT (default `film/`): film.md (the table), film.json (every
- * number), and per look a folder with its timeline, sheets and summary. The
+ * number), and per look and seed a folder with its timeline, sheets and summary. The
  * takes themselves are deleted after watching (tens of megabytes each)
  * unless FILM_KEEP=1. Needs a GPU that presents WebGPU and ffmpeg: the
  * macOS runner, by hand (.github/workflows/film.yml).
@@ -68,39 +71,120 @@ const YARDSTICK = [
   { id: 'Sheep at The Dip 2016 (live, one camera)', swells: 2.0, gap: 21.3, peak: 1.9, calm: 0.20, half: 4.8, black: [0.61, 0.79], hues: 0, reorg: 0, r1: 0.22, r20: 0.39 },
 ];
 
-const looks = PRESETS.filter(p => !ONLY || ONLY.includes(p.id));
-if (ONLY && looks.length !== ONLY.length) {
+// Each look is filmed on the same seeds every run (`?seed=1`, `?seed=2`, …),
+// one take a seed. Why more than one. The first two Metal runs of the same
+// three looks disagreed by far more than any change we would want to judge:
+// Classic's motion half-life read 8.3 s on one and 0.3 s on the other, and
+// Fillmore's motion against loudness over 20 s windows 0.40 and -0.41. Each
+// load draws its own seed (#153), so a single two-minute take is one plate
+// among many, and a later change measured on one take could not be told from
+// a luckier seed. So each column is the median over the takes, with their
+// range beside it, and the seeds are fixed so a later run is the same plates
+// with the change, not new ones.
+const TAKES = Number(process.env.FILM_TAKES || 3);
+if (!(Number.isInteger(TAKES) && TAKES >= 1 && TAKES <= 9)) { console.error(`FILM_TAKES must be a whole number from 1 to 9 (got "${process.env.FILM_TAKES}")`); process.exit(2); }
+const SEEDS = Array.from({ length: TAKES }, (_, i) => i + 1);
+
+// FILM_SHARD=k/n films every n-th look from the k-th, so film.yml can spread
+// the whole list over parallel runners (three takes of every look is several
+// hours on one); FILM_COMBINE=<dir> reads every film.json under it and writes
+// the one table, without filming anything.
+const SHARD = process.env.FILM_SHARD ? process.env.FILM_SHARD.split('/').map(Number) : null;
+if (SHARD && !(SHARD.length === 2 && Number.isInteger(SHARD[0]) && Number.isInteger(SHARD[1]) && SHARD[0] >= 1 && SHARD[0] <= SHARD[1])) {
+  console.error(`FILM_SHARD must be k/n with 1 <= k <= n (got "${process.env.FILM_SHARD}")`); process.exit(2);
+}
+const COMBINE = process.env.FILM_COMBINE ? path.resolve(process.env.FILM_COMBINE) : null;
+
+const picked = PRESETS.filter(p => !ONLY || ONLY.includes(p.id));
+if (ONLY && picked.length !== ONLY.length) {
   const known = new Set(PRESETS.map(p => p.id));
   console.error(`no such look: ${ONLY.filter(id => !known.has(id)).join(', ')}`);
   process.exit(2);
 }
+const looks = SHARD ? picked.filter((_, i) => i % SHARD[1] === SHARD[0] - 1) : picked;
 fs.mkdirSync(OUT, { recursive: true });
 
-// The table: the yardstick first, then every look in the same columns.
+// The columns, each read off one take's shape().
+const COLUMNS = [
+  { head: 'swells/min', get: s => s.swells.perMin, fmt: 'n1' },
+  { head: 'gap s', get: s => s.swells.gap, fmt: 'n1' },
+  { head: 'peak × median', get: s => s.swells.peakOverMedian, fmt: 'n1' },
+  { head: 'calm', get: s => s.calm, fmt: 'pc' },
+  { head: 'half-life s', get: s => s.halfLife, fmt: 'n1' },
+  { head: 'near black 5%', get: s => s.black.p5, fmt: 'pc' },
+  { head: 'near black 95%', get: s => s.black.p95, fmt: 'pc' },
+  { head: 'hues', get: s => s.hues, fmt: 'n0' },
+  { head: 'colour changes/min', get: s => s.reorgPerMin, fmt: 'n1' },
+  { head: 'r 1 s', get: s => s.sections?.[1]?.r, fmt: 'n2' },
+  { head: 'r 20 s', get: s => s.sections?.[20]?.r, fmt: 'n2' },
+];
+const YARD = y => [y.swells, y.gap, y.peak, y.calm, y.half, y.black[0], y.black[1], y.hues, y.reorg, y.r1, y.r20];
+
+const n0 = x => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(0));
 const n1 = x => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(1));
 const n2 = x => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(2));
 const pc = x => (x == null || !Number.isFinite(x) ? '–' : `${(x * 100).toFixed(0)}%`);
-function tableLines() {
+const FMT = { n0, n1, n2, pc };
+
+/**
+ * One look's column over its takes: the median, and the range when the takes
+ * differ. Only takes that were a show count (a take with a problem is listed
+ * under the table instead), and a number a take had nothing to measure for
+ * (a dash) is left out rather than read as zero. The median of an even count
+ * is the mean of the middle two, so two takes do not quietly report the
+ * larger.
+ */
+function spread(look, col) {
+  const v = look.takes.filter(t => t.shape && !t.shape.still && !t.problems.length)
+    .map(t => col.get(t.shape)).filter(x => x != null && Number.isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return { med: null, lo: null, hi: null, n: 0 };
+  const m = v.length >> 1;
+  return { med: v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2, lo: v[0], hi: v[v.length - 1], n: v.length };
+}
+function cell(look, col) {
+  const s = spread(look, col), f = FMT[col.fmt];
+  if (!s.n) return '–';
+  return f(s.lo) === f(s.hi) ? f(s.med) : `${f(s.med)} (${f(s.lo)}–${f(s.hi)})`;
+}
+const problemsOf = look => look.takes.flatMap(t => t.problems.map(p => `seed ${t.seed}: ${p}`));
+
+function tableLines(results) {
   return [
     `# The looks, filmed`,
     '',
-    `${results.length} of ${looks.length} looks, ${SECONDS} s each with the band in a box, watched at ${RATE} samples a second. What each column is: \`shape()\` in scripts/watch.mjs ("colour changes" sees colour, not where shapes are). The first rows are real shows for scale, not targets. A dash is a number there was nothing to measure for (a still take, a flat sound, too few windows).`,
+    `${results.length} looks, ${TAKES} take${TAKES > 1 ? 's' : ''} each on seeds ${SEEDS.join(', ')}, ${SECONDS} s a take with the band in a box, watched at ${RATE} samples a second. Each cell is the median over the takes, with their range in brackets when they differ. What each column is: \`shape()\` in scripts/watch.mjs ("colour changes" sees colour, not where shapes are). The first rows are real shows for scale, not targets. A dash is a number there was nothing to measure for (a still take, a flat sound, too few windows).`,
     '',
-    '| | swells/min | gap s | peak × median | calm | half-life s | near black 5–95% | hues | colour changes/min | r 1 s | r 20 s |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
-    ...YARDSTICK.map(y => `| *${y.id}* | ${n1(y.swells)} | ${n1(y.gap)} | ${n1(y.peak)} | ${pc(y.calm)} | ${n1(y.half)} | ${pc(y.black[0])}–${pc(y.black[1])} | ${y.hues} | ${n1(y.reorg)} | ${n2(y.r1)} | ${n2(y.r20)} |`),
-    ...results.map(r => {
-      const s = r.shape;
-      if (!s) return `| ${r.id} | ${r.problems.join('; ')} | | | | | | | | | |`;
-      return `| ${r.id}${r.problems.length ? ' ⚠' : ''} | ${n1(s.swells.perMin)} | ${n1(s.swells.gap)} | ${n1(s.swells.peakOverMedian)} | ${pc(s.calm)} | ${n1(s.halfLife)} | ${pc(s.black.p5)}–${pc(s.black.p95)} | ${s.hues} | ${n1(s.reorgPerMin)} | ${n2(s.sections?.[1]?.r)} | ${n2(s.sections?.[20]?.r)} |`;
-    }),
+    `| | ${COLUMNS.map(c => c.head).join(' | ')} |`,
+    `|---|${COLUMNS.map(() => '---').join('|')}|`,
+    ...YARDSTICK.map(y => `| *${y.id}* | ${YARD(y).map((x, i) => FMT[COLUMNS[i].fmt](x)).join(' | ')} |`),
+    ...results.map(r => `| ${r.id}${problemsOf(r).length ? ' ⚠' : ''} | ${COLUMNS.map(c => cell(r, c)).join(' | ')} |`),
     '',
-    ...results.filter(r => r.problems.length).map(r => `- ${r.id}: ${r.problems.join('; ')}`),
+    ...results.filter(r => problemsOf(r).length).map(r => `- ${r.id}: ${problemsOf(r).join('; ')}`),
   ];
 }
-function writeTable() {
-  fs.writeFileSync(path.join(OUT, 'film.md'), tableLines().join('\n') + '\n');
-  fs.writeFileSync(path.join(OUT, 'film.json'), JSON.stringify({ seconds: SECONDS, rate: RATE, yardstick: YARDSTICK, looks: results }, null, 1));
+function writeTable(results) {
+  fs.writeFileSync(path.join(OUT, 'film.md'), tableLines(results).join('\n') + '\n');
+  fs.writeFileSync(path.join(OUT, 'film.json'), JSON.stringify({ seconds: SECONDS, rate: RATE, seeds: SEEDS, yardstick: YARDSTICK, looks: results }, null, 1));
+}
+
+if (COMBINE) {
+  // The shards' film.json files, in the preset list's order.
+  const found = [];
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else if (e.name === 'film.json') found.push(f); } };
+  walk(COMBINE);
+  const all = found.flatMap(f => JSON.parse(fs.readFileSync(f, 'utf8')).looks ?? []);
+  const order = new Map(PRESETS.map((p, i) => [p.id, i]));
+  all.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
+  if (!all.length) { console.error(`no film.json under ${COMBINE}`); process.exit(1); }
+  // A runner that died before its first take leaves no film.json, and the
+  // table would simply be shorter. So every look asked for that no shard
+  // brought back is its own row and its own failure.
+  const have = new Set(all.map(r => r.id));
+  for (const look of picked) if (!have.has(look.id)) all.push({ id: look.id, name: look.name, takes: [{ seed: '-', problems: ['no runner brought this look back'] }] });
+  all.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
+  writeTable(all);
+  console.log(`${tableLines(all).slice(4).join('\n')}\n\n  ${found.length} shard(s), ${all.length} looks: ${path.join(OUT, 'film.md')}`);
+  process.exit(all.some(r => problemsOf(r).length) ? 1 : 0);
 }
 
 /**
@@ -156,64 +240,68 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
-console.log(`  ${looks.length} looks, ${SECONDS} s each with the band in a box, into ${OUT}\n`);
+console.log(`  ${looks.length} looks${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, ${TAKES} take${TAKES > 1 ? 's' : ''} each on seeds ${SEEDS.join(', ')}, ${SECONDS} s a take with the band in a box, into ${OUT}\n`);
 const results = [];
 const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 try {
   for (const look of looks) {
-    const dir = path.join(OUT, look.id), take = path.join(dir, 'take.webm');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.rmSync(take, { force: true });
-    const row = { id: look.id, name: look.name, problems: [] }, started = Date.now();
+    const row = { id: look.id, name: look.name, takes: [] };
     results.push(row);
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
-    try {
-      const page = await context.newPage();
-      page.on('pageerror', e => row.problems.push(`page error: ${e.message.slice(0, 120)}`));
-      await withBand(page);
-      await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look.id}${engineQuery()}`, { waitUntil: 'load' });
-      // The opening freeze of a fresh runner is waited out, not filmed
-      // (`untilRunning` in recorder.mjs says why), and how long it took is
-      // printed with the look. Nine seconds first, as `npm run depth` does:
-      // the freeze starts about four and a half seconds after load, so two
-      // steady seconds looked for any sooner can be the two before it.
-      await page.waitForTimeout(9000);
-      const running = await untilRunning(page);
-      row.opening = 9 + running.waited;
-      if (!running.ok) row.problems.push(`the show never ran steadily in ${row.opening.toFixed(0)} s after load`);
-      else {
-        const got = await recordTake(page, SECONDS, take);
-        if (!got.ok) row.problems.push(got.reason);
-      }
-    } catch (e) {
-      row.problems.push(`recording failed: ${e.message.split('\n')[0]}`);
-    } finally {
-      await context.close();
-    }
-    if (fs.existsSync(take)) {
+    for (const seed of SEEDS) {
+      const dir = path.join(OUT, look.id, `seed-${seed}`), take = path.join(dir, 'take.webm');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.rmSync(take, { force: true });
+      const t = { seed, problems: [] }, started = Date.now();
+      row.takes.push(t);
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
       try {
-        const r = await watchVideo(take, { out: dir, frames: 12, rate: RATE, quiet: true });
-        Object.assign(row, { span: r.span, shape: r.shape, timeline: r.timeline });
-        row.problems.push(...notAShow(r));
+        const page = await context.newPage();
+        page.on('pageerror', e => t.problems.push(`page error: ${e.message.slice(0, 120)}`));
+        await withBand(page);
+        await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look.id}&seed=${seed}${engineQuery()}`, { waitUntil: 'load' });
+        // The opening freeze of a fresh runner is waited out, not filmed
+        // (`untilRunning` in recorder.mjs says why), and how long it took is
+        // printed with the take. Nine seconds first, as `npm run depth` does:
+        // the freeze starts about four and a half seconds after load, so two
+        // steady seconds looked for any sooner can be the two before it.
+        await page.waitForTimeout(9000);
+        const running = await untilRunning(page);
+        t.opening = 9 + running.waited;
+        if (!running.ok) t.problems.push(`the show never ran steadily in ${t.opening.toFixed(0)} s after load`);
+        else {
+          const got = await recordTake(page, SECONDS, take);
+          if (!got.ok) t.problems.push(got.reason);
+        }
       } catch (e) {
-        if (!(e instanceof WatchError)) throw e;
-        row.problems.push(`the take could not be read: ${e.message.split('\n')[0]}`);
+        t.problems.push(`recording failed: ${e.message.split('\n')[0]}`);
+      } finally {
+        await context.close();
       }
-      if (!KEEP) fs.rmSync(take, { force: true });
+      if (fs.existsSync(take)) {
+        try {
+          const r = await watchVideo(take, { out: dir, frames: 12, rate: RATE, quiet: true });
+          Object.assign(t, { span: r.span, shape: r.shape, timeline: r.timeline });
+          t.problems.push(...notAShow(r));
+        } catch (e) {
+          if (!(e instanceof WatchError)) throw e;
+          t.problems.push(`the take could not be read: ${e.message.split('\n')[0]}`);
+        }
+        if (!KEEP) fs.rmSync(take, { force: true });
+      }
+      t.seconds = (Date.now() - started) / 1000;
+      const s = t.shape;
+      console.log(` ${t.problems.length ? 'FAIL' : 'ok  '} ${look.id} seed ${seed} (${t.seconds.toFixed(0)} s, running ${t.opening?.toFixed(1) ?? '?'} s after load)${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, half-life ${n1(s.halfLife)} s, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${t.problems.length ? ` — ${t.problems.join('; ')}` : ''}`);
+      // After every take, so a run that hits the job's time limit still
+      // leaves the table for what it did.
+      writeTable(results);
     }
-    row.seconds = (Date.now() - started) / 1000;
-    const s = row.shape;
-    console.log(` ${row.problems.length ? 'FAIL' : 'ok  '} ${look.id} (${row.seconds.toFixed(0)} s, running ${row.opening?.toFixed(1) ?? '?'} s after load)${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${row.problems.length ? ` — ${row.problems.join('; ')}` : ''}`);
-    // After every look, so a run that hits the job's time limit still leaves
-    // the table for the looks it did.
-    writeTable();
   }
 } finally {
   await browser.close();
 }
 
-writeTable();
-console.log(`\n${tableLines().slice(4).join('\n')}\n\n  ${path.join(OUT, 'film.md')}`);
-const failed = results.filter(r => r.problems.length);
-console.log(`\n${results.length - failed.length}/${results.length} looks filmed`);
+writeTable(results);
+console.log(`\n${tableLines(results).slice(4).join('\n')}\n\n  ${path.join(OUT, 'film.md')}`);
+const failed = results.filter(r => problemsOf(r).length);
+console.log(`\n${results.length - failed.length}/${results.length} looks filmed on every seed`);
 process.exit(failed.length ? 1 : 0);

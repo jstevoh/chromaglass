@@ -91,9 +91,12 @@ owner's login.
   if the plate stands still for two seconds or the take is black, silent or
   short. It prints motion vs loudness without judging it; a threshold waits on
   runs from the owner's machine. Output in `/tmp/chromaglass-moving`.
-- **`npm run film`** (by hand, `film.yml`): every look recorded for two minutes
-  with the band, and its shape in one table under the real shows'. The before
-  and after for any change to how the plate moves. Output in `film/`.
+- **`npm run film`** (by hand, `film.yml`, over six Mac runners): every look
+  recorded for two minutes with the band, three times on seeds 1, 2, 3, and
+  its shape in one table under the real shows' (the median, with the range).
+  One take is not enough: the same look on two seeds read a half-life of 8.3 s
+  and 0.3 s. The before and after for any change to how the plate moves, on
+  the same seeds. Output in `film/`.
 - **`npm run gig`** films the whole worked show (`GIG_FILM=0` to not) and lists
   every freeze and jump cut with the action done just before it; the timeline
   is in `/tmp/chromaglass-gig`.
