@@ -988,11 +988,13 @@ export class WebGPUFluid {
       reading the same soap the dye was moved by.
     */
     stage('marangoni', (pass) => {
-      const k = this.arg('marangoni', [soap * SOAP_PULL * (p.magnetSeconds ?? 1 / 60) * N, 0, 0, 0]);
+      const pull = soap * SOAP_PULL * (p.magnetSeconds ?? 1 / 60) * N;
+      const k = this.arg('marangoni', [pull, 0, 0, 0]);
+      const kMix = this.arg('marangoni mix', [pull, 1, 0, 0]);
       for (let s2 = 0; s2 < 2; s2++) {
         this.run(pass, 'marangoniFlux', this.dye.write, [this.dye.read, mix!.read], k);
         this.dye.swap();
-        this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read], k);
+        this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read], kMix);
         mix!.swap();
       }
     }, !!mix && this.mixLive && soap > 0.001);

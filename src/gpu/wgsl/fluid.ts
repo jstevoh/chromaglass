@@ -1645,7 +1645,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     front and nothing is made or lost. The milk-and-soap burst, and the
     fronts a drop of detergent sends across a plate.
 
-    A.a.x = k (face speed per unit of Γ across it, in cells a step).
+    A.a.x = k (face speed per unit of Γ across it, in cells a step);
+    A.a.y = 1 when what is moved is the mix itself (the soap's own spread).
   */
   marangoniFlux: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -1655,8 +1656,15 @@ fn gm(p: vec2i, n: i32) -> f32 { return textureLoad(mix, clamp(p, vec2i(0), vec2
 fn face(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
-  let c = clamp(-A.a.x * (gm(b, n) - gm(a, n)), -0.24, 0.24);
-  return c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
+  let dg = gm(b, n) - gm(a, n);
+  let c = clamp(-A.a.x * dg, -0.24, 0.24);
+  var f = c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
+  // The soap's own spread is a diffusion (flux kΓ∇Γ) and, explicit, it is
+  // stable only below a quarter of the difference a face (a checkerboard
+  // grows past it). At full k it ran near two: the soap flipped between
+  // neighbouring cells every step and carried the dye into a lattice of dots.
+  if (A.a.y > 0.5) { f.g = clamp(f.g, -0.12 * abs(dg), 0.12 * abs(dg)); }
+  return f;
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
