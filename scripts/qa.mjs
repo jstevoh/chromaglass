@@ -738,14 +738,28 @@ try {
     // a settled plate) once Classic opened lit rather than dark, and a zoom
     // that moved the picture 73.7 failed the 4x margin.
     await settle(7000);
+    /*
+      And held still while the camera is measured. The claim is that the zoom
+      alone moves the picture, and the plate moving on its own is the noise
+      against it: the zoom moved the picture 82-87 on every run, while the
+      plate's own drift read 3.6, 13.6, 20.0, 22.6 and 24.8 across runs (the
+      calmer of two windows, after seven seconds' settling) and failed a
+      camera that did the same thing each time. The plate's clock, its
+      turbulence, its sound drive and its automation are stopped for these
+      few seconds and put back after; the camera runs on its own clock.
+    */
+    const STILL = { globalSpeed: 0, tempoSync: 0, turbulenceScale: 0, audioImpact: 0, automateRate: 0 };
+    const wasMoving = await page.evaluate((keys) => {
+      const s = window.chromaglassSettings?.() ?? {};
+      return Object.fromEntries(keys.map((k) => [k, s[k]]));
+    }, Object.keys(STILL));
+    await page.evaluate((s) => window.chromaglassSettings?.(s), STILL);
+    await settle(1500);
     const plate = await frame();
 
     // The plate goes on moving under all of this, so measure how far it
     // wanders on its own first: nothing below counts unless it clears this.
-    // The calmer of two windows: the zoom moved the picture 86.9, 87.0 and
-    // 86.9 on three runs, and the one window's drift read 13.6, 3.6 and 24.8,
-    // the last on a plate still spreading from its seed, which failed a
-    // camera that did exactly what it did on the others.
+    // The calmer of two windows, as a guard on the stillness above.
     await settle(1800);
     const mid = await frame();
     await settle(1800);
@@ -775,6 +789,7 @@ try {
     const homeZoom = await page.evaluate(() => window.chromaglassDebug?.().shot?.zoom ?? null);
     check('and it comes back to the plate again',
       homeZoom !== null && homeZoom < 1.05, `camera at ${homeZoom === null ? '?' : homeZoom.toFixed(2)}×`);
+    await page.evaluate((s) => window.chromaglassSettings?.(s), wasMoving);
 
     // The readout follows the zoom, not the old flag.
     await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 5 }));
@@ -1941,16 +1956,94 @@ try {
       `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
   }
 
+  // ── The set: the operator's own cue list ──────────────────────────
+  //
+  // Empty, the desk lists every look. Two looks added from the sheet make a
+  // set of two, in that order; a row arms its item and Go sends it; cleared,
+  // the desk lists every look again.
+  {
+    await clickOn('mode-segmented-perform');
+    await settle(600);
+    const allLooks = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    await clickOn('set-add');
+    await settle(300);
+    const firstTwo = await page.locator('[data-testid^="add-to-set-look-"]').evaluateAll((els) => els.slice(0, 2).map((e) => e.getAttribute('data-testid')));
+    for (const t of firstTwo) await clickOn(t);
+    await clickOn('add-to-set-done');
+    await settle(400);
+    const rows = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    const name = await page.getByTestId('set-name').innerText().catch(() => '');
+    check('two looks added from the sheet make a set of two', rows === 2 && name !== 'All looks',
+      `${allLooks} looks → ${rows} rows, "${name}"`);
+    const first = page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').first();
+    await first.click();
+    await settle(200);
+    const armed = await first.getAttribute('data-state');
+    await clickOn('go-button');
+    await settle(1500);
+    const live = await first.getAttribute('data-state');
+    check('a set row arms its item and Go sends it', armed === 'next' && live === 'live', `${armed} → ${live}`);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('chromaglass-setlist') || '{"items":[]}').items.length);
+    check('and the set is kept', stored === 2, `${stored} stored`);
+    await clickOn('set-menu');
+    await clickOn('set-clear');
+    await settle(400);
+    const back = await page.locator('[data-testid="cue-list"] [data-testid^="cue-"][data-state]').count();
+    check('cleared, the desk lists every look again', back === allLooks, `${back} of ${allLooks}`);
+  }
+
+  // ── A look replaces the one before it ────────────────────────────
+  //
+  // Asked for: "as each preset loads, the visuals should shift (over the
+  // specified time) completely to the new preset and not keep any aspects of
+  // the previous preset." The handover kept 45% of the old paint and laid the
+  // new look over it, so an orange plate faded into a blue one stayed half
+  // orange. Measured as the plate's colour (its mean absorptions, as shares,
+  // so how much dye there is does not count): after a 4 s fade from Solar
+  // Flare into Deep Ocean, and on Deep Ocean cut to cleanly, each read the
+  // same time after its Go. The faded plate has to sit far nearer Deep
+  // Ocean's own colour than Solar Flare's does.
+  {
+    const colour = () => page.evaluate(() => {
+      const c = window.chromaglassDebug().plateStats()[0].colour;
+      const t = c.reduce((a, b) => a + b, 0) || 1;
+      return c.map((v) => v / t);
+    });
+    const dist = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+    const goTo = async (id, fade) => {
+      await page.evaluate((id) => window.chromaglassApplyPreset?.(id), id);
+      await settle(400);
+      await clickOn(`fade-segmented-${fade}`);
+      await clickOn('go-button');
+    };
+    await goTo('solar-flare', 0);
+    await settle(8000);
+    const from = await colour();
+    await goTo('deep-ocean', 4);
+    await settle(8000);
+    const faded = await colour();
+    await goTo('deep-ocean', 0);
+    await settle(8000);
+    const own = await colour();
+    const f = (c) => c.map((v) => v.toFixed(2)).join('/');
+    check('a look fades all the way into the next: none of the last one\'s colour is left',
+      dist(faded, own) < 0.35 * dist(from, own),
+      `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
+      + `${dist(faded, own).toFixed(3)} from its own colour against ${dist(from, own).toFixed(3)} for Solar Flare`);
+  }
+
   // ── Songs: a look for each song, and what happens while it plays ──
   //
-  // The desk's third mode. A song is added, given an action from the menu,
-  // the action is moved to a time, and the show is run by hand: the action has
-  // to reach the plate when it says, and the song has to be there after.
+  // Folded into the Perform desk: song shows open from the set's menu. A song
+  // is added, given an action from the menu, the action is moved to a time,
+  // and the show is run by hand: the action has to reach the plate when it
+  // says, and the song has to be there after.
   {
-    await clickOn('mode-segmented-sequence');
+    await clickOn('set-menu');
+    await clickOn('set-song-shows');
     let up = 0;
     for (let i = 0; i < 20 && !up; i++) { up = await page.getByTestId('songs-panel').count(); if (!up) await settle(300); }
-    check('the desk\'s third mode opens Songs', up === 1);
+    check('the set\'s menu opens song shows', up === 1);
     if (up) {
       await page.getByTestId('songs-new-title').fill('QA Song');
       await page.getByTestId('songs-new-artist').fill('QA Band');
@@ -2100,6 +2193,18 @@ try {
     for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860], [900, 860], [430, 932], [390, 844]]) {
       const hit = await coveredAt(w, h);
       check(`nothing covers a control at ${w}px`, hit.length === 0, hit.slice(0, 4).join('; '));
+      // And every status dot on the desk says what it is. The words used to
+      // go when the header was short of room, leaving a row of bare dots:
+      // reported as "these dots need to be labeled. I don't know what goes
+      // to what." They move under their dots instead now.
+      if (w >= 1024) {
+        const bare = await page.evaluate(() => [...document.querySelectorAll('header [data-testid^="dot-"]')]
+          .filter((el) => el.getBoundingClientRect().width > 0 && !(el.innerText || '').trim())
+          .map((el) => el.dataset.testid));
+        const all = await page.locator('header [data-testid^="dot-"]').count();
+        check(`every status dot is labelled at ${w}px`, all > 0 && bare.length === 0,
+          bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word`);
+      }
     }
     await page.setViewportSize({ width: 1600, height: 900 });
     await settle(900);

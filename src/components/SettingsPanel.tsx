@@ -72,6 +72,13 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
 
 interface SettingsPanelProps {
   settings: VisualizerSettings;
+  /**
+   * Song detection, the master switch: whether the app listens for which song
+   * is playing at all. Off, nothing is identified, so no set item, song show,
+   * sequence or saved look made for a song goes up on its own.
+   */
+  songDetection?: boolean;
+  onSongDetection?: (on: boolean) => void;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
   /** Live room-calibration readout, null when auto-calibration is off. */
   calibration?: RoomCalibration | null;
@@ -301,7 +308,7 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
   );
 };
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -761,6 +768,26 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 <span className="text-[12px] opacity-40">the sequence is following the desk</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Song detection: the master switch for everything that follows a song. */}
+        {onSongDetection && (
+          <div className="mb-4 mt-2 flex items-center justify-between gap-3" data-testid="song-detection">
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-text">Song Detection</div>
+              <div className="text-[12px] text-muted">Listen for which song is playing, so set items, song shows and looks made for a song go up on their own.</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={!!songDetection}
+              onClick={() => onSongDetection(!songDetection)}
+              className={`h-5 w-9 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
+              title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
+              data-testid="song-detection-toggle"
+            >
+              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
           </div>
         )}
 

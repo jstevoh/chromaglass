@@ -77,7 +77,7 @@ try {
     b.click();
     return true;
   });
-  check('there is a Sound tab on the desk', tab, 'beside Perform, Design and Songs');
+  check('there is a Sound tab on the desk', tab, 'beside Perform and Design');
   if (!tab) throw new Error('no Sound tab, so nothing below can be reached by hand');
   await page.waitForTimeout(700);
   const panel = await page.evaluate(() => !!document.querySelector('[data-testid="sound-panel"]'));

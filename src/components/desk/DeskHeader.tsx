@@ -143,23 +143,23 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         moves when you use it. Measured at 1280 it was still overlapping
         anyway, because 1280 is not where it stops fitting.
 
-        So it stays pinned, and the *labels* on the status dots give way
-        instead. See `StatusDot`: they are most of the right-hand cluster's
-        width, and a dot without its word is still a dot you can see, click
-        and hover.
+        So it stays pinned, and the *labels* on the status dots make room
+        instead: they move under their dots, small (see `StatusDot`). They
+        used to go altogether, and a row of unlabelled dots was reported as
+        impossible to read.
       */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div ref={switchRef} className="pointer-events-auto">
           <Segmented
             value={mode}
-            options={[['perform', 'Perform'], ['design', 'Design'], ['sequence', 'Songs'], ['sound', 'Sound']] as const}
+            options={[['perform', 'Perform'], ['design', 'Design'], ['sound', 'Sound']] as const}
             onChange={onMode}
             height={32}
             testId="mode-segmented"
           />
         </div>
       </div>
-      <div ref={clusterRef} className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+      <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
         <StatusDot
           on={dots.mic}
           label="Mic" tight={tight}
@@ -176,7 +176,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         />
         <StatusDot
           on={dots.midi}
-          label={midiName ?? 'MIDI'} tight={tight}
+          label={midiName ?? 'MIDI'} short="MIDI" tight={tight}
           onClick={onMidi}
           title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
           testId="dot-midi"
@@ -188,19 +188,19 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
           testId="dot-phone"
         />
-        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} tight={tight} testId="dot-rec" />}
+        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} short="Rec" tight={tight} testId="dot-rec" />}
         {/*
           Performances start and stop here, by hand (T). They used to follow
           the song detection, which started late and ran on into the next
           song; the song that is playing is still attached, on its own.
-          Bare, with the clock in its tooltip: a label here pushed Mic and
-          Wall under the centred mode switch at 1440 (npm run qa).
+          A short word, with the clock in its tooltip: "Performance 0:42"
+          beside it pushed Mic and Wall under the centred mode switch at 1440
+          (npm run qa), and with no word at all nobody could tell what it was.
         */}
         <StatusDot
-          bare
           on={!!dots.perf}
           tone="live"
-          label={dots.perf ? `Performance ${dots.perf}` : 'Performance'}
+          label="Perf" tight={tight}
           onClick={onPerformance}
           title={dots.perf
             ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
@@ -209,7 +209,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         />
         <button
           onClick={onSearch}
-          className="ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong px-3 text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
+          className={`ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong ${tight ? 'px-2' : 'px-3'} text-[13px] text-muted transition-colors hover:bg-hover hover:text-text`}
           data-testid="search-chip"
         >
           {/*

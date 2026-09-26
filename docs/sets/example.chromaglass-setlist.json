@@ -1,0 +1,17 @@
+{
+  "format": "chromaglass-setlist",
+  "version": 1,
+  "name": "Example set",
+  "items": [
+    { "look": "classic", "fade": 4 },
+    {
+      "look": "timbre-shifter",
+      "name": "Dark Star wash",
+      "fade": 8,
+      "song": { "title": "Dark Star", "artist": "Grateful Dead" },
+      "controls": { "globalSpeed": 0.03, "beatSqueeze": 0.6, "turbulenceScale": 0.4 },
+      "rides": ["dimmer", "globalSpeed", "beatSqueeze", "turbulenceScale"]
+    },
+    { "look": "deep-ocean", "fade": 0 }
+  ]
+}

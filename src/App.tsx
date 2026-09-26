@@ -18,6 +18,8 @@ import { DesignDesk } from './components/desk/DesignDesk';
 import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
+import { AddToSetSheet } from './components/desk/AddToSetSheet';
+import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet } from 'lucide-react';
@@ -60,7 +62,8 @@ import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
-import { sameSong, songRefFromTrack, type SongRef } from './lib/songRef';
+import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
+import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -188,6 +191,26 @@ export const OPENING_LOOK: string = (() => {
   const pool = PRESETS.filter(p => !p.settings.macroMode);
   return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : 'classic';
 })();
+
+
+/**
+ * What Go will send: a look (built-in or saved) with any controls a set item
+ * lays on top, or a stage sequence. `item` is the set item it came from, when
+ * it came from one, so the desk can light that row and not every row that
+ * happens to hold the same look.
+ */
+interface ArmedLook {
+  id: string;
+  name: string;
+  settings: Partial<VisualizerSettings>;
+  item?: string;
+  /** Its own fade, seconds; absent, the desk's. */
+  fade?: number;
+  /** The strip the desk shows while it is live. */
+  rides?: (keyof VisualizerSettings)[];
+  /** A stage sequence to start rather than a look to send. */
+  sequence?: string;
+}
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
@@ -1557,10 +1580,31 @@ export default function App() {
   // over a few seconds, so nothing is ever wiped. `npm run desk` drives a
   // whole fade and checks the stage never darkens; today's clearing path is
   // the control, and it fails that check by a mile.
-  const [cued, setCued] = useState<{ id: string; name: string; settings: Partial<VisualizerSettings> } | null>(null);
+  const [cued, setCued] = useState<ArmedLook | null>(null);
   /** The armed look, for the action handlers that are defined above the state they read. */
   const cuedRef = useRef(cued);
   cuedRef.current = cued;
+  /*
+    The set: the operator's own cue list (lib/setList.ts). Empty, the desk
+    lists every look as it always has; with items in it, the desk lists the
+    set, in its order, and each row arms its item.
+  */
+  const [setList, setSetList] = useState<SetList>(loadSetList);
+  const setListRef = useRef(setList);
+  setListRef.current = setList;
+  const changeSet = useCallback((next: SetList | ((prev: SetList) => SetList)) => {
+    setSetList(prev => {
+      const v = typeof next === 'function' ? next(prev) : next;
+      saveSetList(v);
+      return v;
+    });
+  }, []);
+  /** The set item on stage, so its row reads live even when another row holds the same look. */
+  const [liveItemId, setLiveItemId] = useState<string | null>(null);
+  /** The desk's list as last drawn, for the keys and pads that step it. */
+  const cuesRef = useRef<Cue[]>([]);
+  /** The sequencer, from above where it is created (a set item can be a sequence). */
+  const sequencerRef = useRef<{ startAt: (id: string, positionSec: number) => void; sequences: ShowSequence[] } | null>(null);
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
   const [fading, setFading] = useState(0);        // 0..1 while a Go is running
   // On a timer rather than requestAnimationFrame, for the same reason the
@@ -1657,15 +1701,36 @@ export default function App() {
    * row is recognisable without reading it. The live one is what is on the
    * wall; the next one is whatever is armed.
    */
-  const cues = useMemo<Cue[]>(() => allPresets.map(pr => {
-    const contract = isUserPresetId(pr.id)
-      ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
-      : PRESET_CONTRACTS[pr.id];
+  const swatchOf = useCallback((presetId: string | undefined): string => {
+    const contract = !presetId ? null : isUserPresetId(presetId)
+      ? userPresetsRef.current.find(u => u.id === presetId)?.contract
+      : PRESET_CONTRACTS[presetId];
     const [a, b] = contract && contract.length
       ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
       : ['#52525B', '#27272A'];
-    return { id: pr.id, name: pr.name, swatch: `linear-gradient(135deg, ${a}, ${b})`, fade: fadeSeconds };
-  }), [allPresets, fadeSeconds]);
+    return `linear-gradient(135deg, ${a}, ${b})`;
+  }, []);
+  const setActive = setList.items.length > 0;
+  const cues = useMemo<Cue[]>(() => {
+    if (!setActive) {
+      return allPresets.map(pr => ({ id: pr.id, name: pr.name, swatch: swatchOf(pr.id), fade: fadeSeconds }));
+    }
+    return setList.items.map(item => {
+      const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
+      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
+      const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
+      return {
+        id: item.id,
+        name,
+        swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
+        fade: item.fade ?? fadeSeconds,
+        song: item.song ? songLabel(item.song) : undefined,
+        kind: item.kind,
+        missing: item.kind === 'sequence' ? !seq : !look,
+      };
+    });
+  }, [allPresets, fadeSeconds, setActive, setList, swatchOf]);
+  cuesRef.current = cues;
 
   /**
    * The controller, reachable from above where it is created.
@@ -1698,6 +1763,31 @@ export default function App() {
     const name = up?.name ?? built?.name ?? presetId;
     if (settings) setCued({ id: presetId, name, settings });
   }, []);
+
+  /** What a set item will send: its look with its own controls on top, or its sequence. */
+  const lookOfItem = useCallback((item: SetItem): ArmedLook | null => {
+    const extra = { item: item.id, fade: item.fade, rides: item.rides };
+    if (item.kind === 'sequence') {
+      const seq = sequencerRef.current?.sequences.find(q => q.id === item.ref);
+      return seq ? { id: `sequence:${seq.id}`, name: item.name ?? seq.name, settings: {}, sequence: seq.id, ...extra } : null;
+    }
+    const up = isUserPresetId(item.ref) ? userPresetsRef.current.find(p => p.id === item.ref) : null;
+    const built = PRESETS.find(p => p.id === item.ref);
+    const base = up ? up.settings : built?.settings;
+    if (!base) return null;
+    return { id: item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
+  }, []);
+  const cueItem = useCallback((itemId: string) => {
+    const item = setListRef.current.items.find(i => i.id === itemId);
+    const look = item ? lookOfItem(item) : null;
+    if (look) setCued(look);
+  }, [lookOfItem]);
+  /** Arm a row of the desk's list, whichever list it is showing. */
+  const cueAny = useCallback((id: string) => {
+    if (setListRef.current.items.length > 0) cueItem(id); else cueLook(id);
+  }, [cueItem, cueLook]);
+  const liveItemIdRef = useRef<string | null>(null);
+  liveItemIdRef.current = liveItemId;
 
   /**
    * Send a look to the stage, over `seconds`. With no fade this is still not
@@ -1736,7 +1826,15 @@ export default function App() {
     }, 33);
   }, []);
 
-  const sendLook = useCallback((next: { id: string; name: string; settings: Partial<VisualizerSettings> }, seconds: number) => {
+  const sendLook = useCallback((next: ArmedLook, seconds: number) => {
+    setLiveItemId(next.item ?? null);
+    // A set item's own strip goes up with it.
+    if (next.rides && next.rides.length) setRideKeys(next.rides);
+    if (next.sequence) {
+      setCued(null);
+      sequencerRef.current?.startAt(next.sequence, 0);
+      return;
+    }
     const from = settingsRef.current;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
@@ -1750,8 +1848,8 @@ export default function App() {
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
   /** Go: the armed look, at the chosen fade. */
-  const goLook = useCallback((seconds = fadeSeconds) => {
-    if (cued) sendLook(cued, seconds);
+  const goLook = useCallback((seconds?: number) => {
+    if (cued) sendLook(cued, seconds ?? cued.fade ?? fadeSeconds);
   }, [cued, fadeSeconds, sendLook]);
 
   /** The same, for a look that was never armed — the palette's ⇧⏎. */
@@ -1839,6 +1937,7 @@ export default function App() {
     presets: allPresets,
     timecodeAt: timecode?.at ?? null,
   });
+  sequencerRef.current = sequencer;
   // ── Files made for a song ───────────────────────────────────────
   // When a song is identified, a sequence made for it starts at the right
   // point in it and a preset made for it is applied; when the song ends or
@@ -1856,6 +1955,10 @@ export default function App() {
       songBoundRef.current = null;
     }
     if (!song) return;
+    // A set item made for this song goes up on its own, at its own fade.
+    const setHit = setListRef.current.items.find(i => sameSong(i.song, song));
+    const setLook = setHit ? lookOfItem(setHit) : null;
+    if (setLook) { sendLook(setLook, setLook.fade ?? fadeSeconds); return; }
     const seq = sequencer.sequences.find(q => sameSong(q.song, song));
     if (seq) {
       sequencer.startAt(seq.id, musicIntel.state.positionSec);
@@ -1875,6 +1978,58 @@ export default function App() {
     if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.state.positionSec]);
+  // ── The set's own edits ─────────────────────────────────────────
+  const [addingToSet, setAddingToSet] = useState(false);
+  const addToSet = useCallback((kind: SetItemKind, ref: string) => {
+    changeSet(prev => ({ ...prev, items: [...prev.items, { id: setItemId(), kind, ref }] }));
+  }, [changeSet]);
+  /** A file into the set: a whole set list replaces it; a saved look or a sequence is one more item. */
+  const importToSet = useCallback(async (file: File): Promise<{ summary: string; warnings: string[] }> => {
+    const known = (k: string) => k in DEFAULT_SETTINGS;
+    const read = readSetListFile(await file.text(), known);
+    for (const p of read.presets) userPresets.upsert(p);
+    for (const q of read.sequences) sequencer.upsertSequence(q);
+    const whole = read.list.items.length > 1 || /setlist/i.test(file.name);
+    if (whole) changeSet(read.list);
+    else changeSet(prev => ({ ...prev, items: [...prev.items, ...read.list.items] }));
+    const n = read.list.items.length;
+    return {
+      summary: whole ? `The set is now “${read.list.name}”: ${n} item${n === 1 ? '' : 's'}.` : `Added ${read.list.items[0].name ?? read.list.items[0].ref}.`,
+      warnings: read.warnings,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changeSet]);
+  const onSetAction = useCallback((a: SetAction) => {
+    if (a === 'import') setAddingToSet(true);
+    else if (a === 'export') {
+      const list = setListRef.current;
+      downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
+        writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
+    } else if (a === 'clear') { changeSet({ name: 'My set', items: [] }); setLiveItemId(null); }
+    else if (a === 'song-shows') setShowSongs(true);
+  }, [changeSet]);
+  const onItemAction = useCallback((id: string, a: SetItemAction) => {
+    changeSet(prev => {
+      if (a === 'up' || a === 'down') return moveItem(prev, id, a === 'up' ? -1 : 1);
+      if (a === 'remove') return { ...prev, items: prev.items.filter(i => i.id !== id) };
+      return {
+        ...prev,
+        items: prev.items.map(i => {
+          if (i.id !== id) return i;
+          if (a === 'link-song') return currentSong ? { ...i, song: currentSong } : i;
+          if (a === 'unlink-song') { const { song: _s, ...rest } = i; void _s; return rest; }
+          // The strip as it stands: which controls, and where each one is now.
+          const controls: Partial<Record<keyof VisualizerSettings, number>> = {};
+          for (const k of rideKeys) {
+            const v = settingsRef.current[k];
+            if (typeof v === 'number' && k !== 'dimmer') controls[k] = v;
+          }
+          return { ...i, controls, rides: [...rideKeys] };
+        }),
+      };
+    });
+  }, [changeSet, currentSong, rideKeys]);
+
   const bindSequenceToSong = (seq: ShowSequence, song: SongRef | null) => {
     sequencer.upsertSequence({ ...seq, song: song ?? undefined });
   };
@@ -2256,11 +2411,14 @@ export default function App() {
    * first press arms its neighbour rather than jumping to the top of the list.
    */
   const stepCue = (dir: 1 | -1) => {
-    if (allPresets.length === 0) return;
-    const from = cuedRef.current?.id ?? activePresetId;
-    const i = allPresets.findIndex(p => p.id === from);
-    const next = allPresets[((i < 0 ? 0 : i + dir) + allPresets.length) % allPresets.length];
-    if (next) cueLook(next.id);
+    // The desk's own list: the set when there is one, every look when not.
+    const list = cuesRef.current;
+    if (list.length === 0) return;
+    const set = setListRef.current.items.length > 0;
+    const from = set ? (cuedRef.current?.item ?? liveItemIdRef.current) : (cuedRef.current?.id ?? activePresetId);
+    const i = list.findIndex(c => c.id === from);
+    const next = list[((i < 0 ? 0 : i + dir) + list.length) % list.length];
+    if (next) cueAny(next.id);
   };
   /** For the debug hook, which is installed once and above the callback it calls. */
   const cuePresetRef = useRef<((id: string) => void) | null>(null);
@@ -2788,14 +2946,14 @@ export default function App() {
       // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
       // and Space sends it, which is how a lighting desk has always worked.
       if (e.key >= '1' && e.key <= '9') {
-        const cue = allPresets[Number(e.key) - 1];
-        if (cue) cueLook(cue.id);
+        const cue = cuesRef.current[Number(e.key) - 1];
+        if (cue) cueAny(cue.id);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueLook, allPresets, togglePerformance]);
+  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -3650,6 +3808,8 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <SettingsPanel
+            songDetection={musicSettings.enabled}
+            onSongDetection={(on) => updateMusicSettings({ enabled: on })}
             settings={settings}
             onUpdate={updateSettings}
             calibration={audioData?.calibration ?? null}
@@ -4046,11 +4206,21 @@ export default function App() {
           automated={isAutomated}
           onAutomate={setIsAutomated}
           cues={cues}
-          liveId={activePresetId}
-          nextId={cued?.id ?? null}
+          setName={setActive ? setList.name : null}
+          onAddToSet={() => setAddingToSet(true)}
+          onSetAction={onSetAction}
+          onItemAction={onItemAction}
+          songNow={currentSong ? songLabel(currentSong) : null}
+          liveId={setActive ? liveItemId : activePresetId}
+          nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
           liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
-          onCue={cueLook}
-          onCueNow={(id) => goLookNow(id)}
+          onCue={cueAny}
+          onCueNow={(id) => {
+            if (!setActive) { goLookNow(id); return; }
+            const item = setListRef.current.items.find(i => i.id === id);
+            const look = item ? lookOfItem(item) : null;
+            if (look) sendLook(look, look.fade ?? fadeSeconds);
+          }}
           onGo={() => goLook()}
           onBack={previousLook.current ? revertLook : null}
           onBlackout={toggleBlackout}
@@ -4203,6 +4373,18 @@ export default function App() {
       {deskUp && <CrashReportButton floating />}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <QuickReportDot />}
+
+      {addingToSet && (
+        <AddToSetSheet
+          looks={PRESETS.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.description }))}
+          saved={userPresets.presets.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.song ? songLabel(p.song) : p.description }))}
+          sequences={sequencer.sequences.map(q => ({ id: q.id, name: q.name, detail: `${q.stages.length} stage${q.stages.length === 1 ? '' : 's'}${q.song ? ` · ${songLabel(q.song)}` : ''}` }))}
+          count={setList.items.length}
+          onAdd={addToSet}
+          onImport={importToSet}
+          onClose={() => setAddingToSet(false)}
+        />
+      )}
 
       {showSave && (
         <SaveLookSheet
