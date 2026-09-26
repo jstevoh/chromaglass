@@ -130,6 +130,10 @@ jobs:
       # one kept inside and let go, and at 0 the rings' field to the bit.
       - name: The drops
         run: npm run drops
+      # A soap film's own colours (Film Physics): the research's film.py to a level of
+      # 8-bit colour, the textbook sequence in the shader's table, and the shader carrying it.
+      - name: The film table
+        run: npm run film
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist
@@ -268,6 +272,11 @@ jobs:
       - name: The air lens
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run airlens
+      # Film Physics on the plate: nothing but the film changes; the projector's bubbles take the
+      # faint tint the light through a film is, the closeup's the soap's own reflected gold.
+      - name: The film, photographed
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run filmlook
       # The ferrofluid is drawn with an edge: a line at any zoom, black all
       # through, a thin film still visible, the glint fixed as the plate turns.
       - name: The ferrofluid's edge

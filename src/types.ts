@@ -576,6 +576,7 @@ export interface VisualizerSettings {
   refraction: number;         // how much the dye and the bubbles bend what is under them
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
+  filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -790,6 +791,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   refraction: 0.6,
   microDroplets: 0,
   thinFilm: 0,
+  filmPhysics: 0,           // the rainbow: the film every look was made with
   lumia: 0,
   chemistry: 0,
   gelWheel: 0,

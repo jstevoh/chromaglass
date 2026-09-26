@@ -94,6 +94,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['bloom', 0.05],
   ['microDroplets', 0.05],
   ['thinFilm', 0.05],
+  ['filmPhysics', 0.05],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],

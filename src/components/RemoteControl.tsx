@@ -556,6 +556,14 @@ export default function RemoteControl() {
           {(settings?.ferroLabyrinth ?? 0) > 0.001 && (
             <Slider label="Maze Detail" field="mazeDetail" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/*
+            Only while there is a film to colour (Thin Film on the dye, or the
+            bubbles' Iridescence), as Maze Detail is only there with a maze:
+            Film Physics does nothing without one.
+          */}
+          {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
+            <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
+          )}
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">

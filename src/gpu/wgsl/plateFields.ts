@@ -112,6 +112,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'saturation', type: 'f32', note: 'final grade saturation multiplier' },
   { name: 'colourBody', type: 'f32', note: 'how solid thin dye reads: opacity and body saturation, 0-1' },
   { name: 'thinFilm', type: 'f32', note: 'interference colour where the dye runs thinnest' },
+  { name: 'filmPhysics', type: 'f32', note: "film colour: the rainbow (0) to a soap film's own colours (1), for Thin Film and the bubbles' film" },
   { name: 'time', type: 'f32' },
   { name: 'cellClock', type: 'f32', note: "the lead plate's dye travel, wrapped: what the drawn cells slide and breathe on (lib/detailFlow.ts)" },
   { name: 'transmission', type: 'f32' },

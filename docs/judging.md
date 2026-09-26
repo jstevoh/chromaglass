@@ -234,6 +234,27 @@ printed through it, since the maze's force per cell is strongest there and
 `npm run maze` only measures 512². What to report: the setting where it
 starts to look like the references, and any shimmer or brown haze.
 
+## 11. Film Physics
+
+The film colour (Thin Film, and the bubbles' Iridescence) can now be a real
+soap film's instead of a rainbow (research item 8; `lib/filmTable.ts`). It
+is 0 by default, so nothing changes until it is turned up.
+
+```
+?set=thinFilm=1;iridescence=0.9;filmPhysics=1;bubbles=0.6
+```
+
+Three things to look at. In the closeup, whether a bubble's gold-to-olive
+film (film-bubble.png in the project's files, bottom right) reads as soap or
+as dirty; the rainbow was never grey and a real film often is. On the
+plate, the projected bubbles lose their film almost entirely, a pale grey
+window with a faint blue: that is what a projector throws through a film,
+so say whether the plate's Iridescence should keep a rainbow anyway (the
+setting can be left below 1 for a mix). And on Thin Film looks, whether the
+dye's thin edges show the black film and the straw and purple bands, or
+wash out; the film's thickness is read from the dye amount and does not
+drift with time as the rainbow's hue did.
+
 ---
 
 ## Reading the frame time while you do it

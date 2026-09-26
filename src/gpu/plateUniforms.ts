@@ -273,6 +273,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('paperB', pb.r, pb.g, pb.b);
     pack.set('droplets', clamp01(s.microDroplets ?? 0));
     pack.set('thinFilm', clamp01(s.thinFilm ?? 0));
+    // Not clamp01 alone: it passes NaN, and ?set=filmPhysics=x is how the owner is asked to try it.
+    pack.set('filmPhysics', Number.isFinite(s.filmPhysics) ? clamp01(s.filmPhysics) : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they

@@ -31,6 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   swallows a smaller one keeps it visible for fifteen to thirty-five seconds.
   `npm run drops` measures the field and its mask (PLAN.md batch 3).
 
+### Added — a soap film's own colours
+
+- **Film Physics** (`filmPhysics`, Settings next to Thin Film, pinnable and
+  MIDI-learnable; 0 by default, so every look is unchanged): the film colour
+  Thin Film and the bubbles' Iridescence draw goes from a rainbow to a real
+  soap film's, worked out from interference and the eye's colour matching
+  (black where thinnest, then silver, straw, purple, blue, green-gold,
+  orange, magenta, and paler orders washing out to grey). In the closeup,
+  as a camera sees it, a bubble's film turns gold where the rainbow turned
+  it blue; on the plate, as a projector throws it, a film is only the faint
+  complementary tint of the light through it. `npm run film` holds the
+  colours to the research's own script; `npm run filmlook` photographs them.
+
 ### Changed — beads shaded from photographs
 
 - **The beads and drops are lenses, not stickers, seen as a projector sees

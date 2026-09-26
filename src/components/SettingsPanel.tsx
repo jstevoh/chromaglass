@@ -1292,6 +1292,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })}
           settingKey="thinFilm"
         />
+        {/* The film's colours: the rainbow at 0, as every look was made; a
+            real soap film's at 1 (black where thinnest, straw, purple, blue,
+            gold, washing out as it thickens), and on the plate the pale
+            tint a projector throws through one. Thin Film and the bubbles'
+            Iridescence both draw through it. */}
+        <Slider label="Film Physics" value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
+          settingKey="filmPhysics"
+        />
       </section>
 
       {/* Film stock — what the whole show is photographed on (F1). */}

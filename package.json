@@ -89,6 +89,8 @@
     "drops": "node scripts/drops.mjs",
     "droplens": "node scripts/droplens.mjs",
     "airlens": "node scripts/airlens.mjs",
+    "film": "node scripts/film.mjs",
+    "filmlook": "node scripts/filmlook.mjs",
     "particles": "node scripts/particles.mjs",
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",

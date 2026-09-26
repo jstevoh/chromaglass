@@ -445,6 +445,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The grid sets how far it goes: on the hosted 512² nothing changes past
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
+  // The film's colours, the rainbow to a real soap film's. A fader because
+  // the mix between them is a look of its own, not only the two ends.
+  { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));

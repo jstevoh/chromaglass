@@ -93,7 +93,7 @@ const api = {
    * hands it none, and it reads a blank one, a flat gap at rest.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean } = {}) {
+    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
@@ -103,7 +103,10 @@ const api = {
     if (cam.beadMask) plate.setSource('beads', cam.beadMask);
     fillPlateUniforms(plate.pack, {
       view: {
-        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: l.time,
+        // The plate's clock can be set apart from the solver's, to ask what
+        // the picture does with time alone (in `npm run filmlook`, the film's
+        // thickness must not drift with it).
+        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: cam.time ?? l.time,
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.

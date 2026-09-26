@@ -22,6 +22,7 @@
  */
 
 import { PLATE_STRUCT } from './plateFields';
+import { filmTableWgsl } from '../../lib/filmTable';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -247,6 +248,39 @@ fn lampDir(fuv: vec2f, lamp: vec4f) -> vec3f {
 
 fn thinFilmColour(t: f32) -> vec3f {
   return 0.5 + 0.5 * cos(6.28318530718 * (t + vec3f(0.0, 0.33, 0.67)));
+}
+
+// A soap film's own colours, reflected and transmitted, one entry every
+// 20 nm from none to 1260 nm (lib/filmTable.ts works them out from Airy's
+// sum and the CIE matching functions, the research's item 8). The rainbow
+// above goes round the same three hues for ever; a real film is black
+// where it is thinnest, then silver, straw, purple, blue, green-gold,
+// orange, magenta, and paler orders after, washing out to grey.
+${filmTableWgsl()}
+
+// Read one of the two tables at t rainbow periods, one period being one
+// interference order of soap (FILM_NM_PER_T nm), linearly between entries.
+// Indexed straight from the constants, as the camera's DISC is: a copy to a
+// function var would be a kilobyte of private memory a pixel on a backend
+// that did not fold it away.
+fn filmTableAt(t: f32, transmit: bool) -> vec3f {
+  let x = clamp(max(t, 0.0) * FILM_NM_PER_T / FILM_MAX_NM, 0.0, 1.0) * f32(FILM_STEPS - 1u);
+  let i = min(u32(floor(x)), FILM_STEPS - 2u);
+  let f = x - f32(i);
+  if (transmit) { return mix(FILM_T[i], FILM_T[i + 1u], f); }
+  return mix(FILM_R[i], FILM_R[i + 1u], f);
+}
+
+// The film colour a look asks for: the rainbow at Film Physics 0, exactly
+// as it always was (the branch, not a mix at zero, so not one bit of any
+// look moves), the reflected soap film at 1. tR is the rainbow's phase,
+// which may drift with time as it always has; tP the film's thickness in
+// periods, which must not, since a film that thickened with the clock
+// would wash every look out to grey in a minute.
+fn filmColourAt(tR: f32, tP: f32) -> vec3f {
+  let rainbow = thinFilmColour(tR);
+  if (U.filmPhysics <= 0.0) { return rainbow; }
+  return mix(rainbow, filmTableAt(tP, false), U.filmPhysics);
 }
 
 fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> vec3f {
@@ -1783,7 +1817,13 @@ struct FsOut {
 
   if (U.thinFilm > 0.001 && fluid0.a > 0.004 && fluid0.a < 0.4) {
     let thin = smoothstep(0.4, 0.04, fluid0.a) * smoothstep(0.004, 0.03, fluid0.a);
-    let filmC = thinFilmColour(fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4 + U.time * 0.02);
+    let filmT = fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
+    // The soap film's thickness: the dye amount, with a little of the same
+    // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
+    // which as thickness would be up to 290 nm that is not the dye's, and
+    // would put the thinnest film at straw rather than black.
+    let filmThick = fluid0.a * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
+    let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
     outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
   }
 
@@ -1999,7 +2039,8 @@ struct FsOut {
       // toward the bottom only as a gentle lean, since which way is "down"
       // across a bubble three cells wide is too coarse to draw colour from.
       let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
-      let filmC = thinFilmColour(thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0));
+      let filmP = thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0);
+      let filmC = filmColourAt(filmP, filmP);
       let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
       // A second lamp to the side is the one light that can put a glint on
       // an air pocket seen from beneath (below, as the projector throws it).
@@ -2058,8 +2099,19 @@ struct FsOut {
         let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
+        let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
+        // With Film Physics up, the projector's film is the one it really
+        // throws: the light through the film, 1 - R, which for soap is 92 to
+        // 100 per cent of the lamp in pale complements of the reflected
+        // colours (the research, item 8). So the reflected film above gives
+        // way to that, as the setting rises; a soap film on a projected
+        // plate is a faint tint, not a rainbow.
+        if (U.filmPhysics > 0.0) {
+          let cpT = cp0 * filmTableAt(filmP, true);
+          cp = mix(cp, mix(cp0, cpT, clamp(iridP, 0.0, 1.0)), U.filmPhysics);
+        }
         cp = cp * (1.0 - AIR_DARK * blackB) + side;
       }
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
