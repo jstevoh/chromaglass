@@ -120,6 +120,20 @@ export class BeatClock {
     }
   }
 
+  /**
+   * Whether the clock is sure enough of its beat to run ahead of the
+   * microphone: it has a period, and either something outside is setting the
+   * tempo or its confidence, scaled by how far the show trusts it (Beat
+   * Prediction), is at least a half.
+   *
+   * Public because sound learn's triggers (`soundLearn.ts`) fire ahead of the
+   * sound on exactly the beats this clock fires ahead on, and two copies of
+   * the rule would be two answers to "is the beat locked" on the same frame.
+   */
+  isLocked(now: number, trust: number): boolean {
+    return this.period > 0 && (this.driven(now) || this.confidence * trust >= 0.5);
+  }
+
   /** The next beat the clock expects, in ms, or 0 while it has no beat. */
   get nextBeat(): number {
     return this.period > 0 ? this.predictedAt : 0;
@@ -147,7 +161,7 @@ export class BeatClock {
     // to run ahead of a *microphone*, and there is no microphone in a cable
     // from the desk or a hand on a tap button.
     const driven = this.driven(now);
-    const locked = this.period > 0 && (driven || this.confidence * trust >= 0.5);
+    const locked = this.isLocked(now, trust);
 
     if (onset) {
       this.lastOnsetAt = now;

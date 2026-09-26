@@ -1,3 +1,5 @@
+import type { SourceName } from './lib/audioFeatures';
+
 export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
 
 /**
@@ -196,8 +198,17 @@ export type SceneFeature =
  * The first three are sensors — the room, the film and the sound all report
  * what is happening. `shape` is the LFOs and envelopes: what was asked for
  * rather than what was noticed. See `lib/modulators.ts`.
+ *
+ * `bands` is the sound again, heard by name: the kick, the snare, the hats,
+ * the overall level and eight bands, each against its own recent range
+ * (`lib/audioFeatures.ts`). A second source rather than more features on
+ * `sound` because two of the names collide: `sound`'s `bass` is the hook's
+ * smoothed 30–250 Hz level trimmed by Sensitivity, and the named `bass` is the
+ * same region ranged on its own, and a look saved with one must not quietly
+ * start reading the other. It shares `sound`'s master, Sound Impact, because
+ * it is the same microphone.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -210,8 +221,8 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'shape';
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
-  /** A room/film feature or an audio one, depending on the source. */
-  feature: SceneFeature | AudioFeature;
+  /** A room/film feature, an audio one or a named source, depending on the source. */
+  feature: SceneFeature | AudioFeature | SourceName;
   /** Any numeric setting — the same list a MIDI fader can learn. */
   setting: keyof VisualizerSettings;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */

@@ -57,7 +57,7 @@ import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction } from './lib/midi';
+import { triggerable, type MidiAction, type SoundBinding } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -2830,6 +2830,24 @@ export default function App() {
     }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
+  /*
+    A trigger the music fired (sound learn, PLAN §5): exactly what a pad bound
+    to the same target does, through the same three doors, so a kick on
+    Next Preset and a pad on Next Preset cannot come to mean different things.
+    An action a beat must not press is refused here as well as when the
+    binding is made or loaded: this is the last door before the show.
+  */
+  const runSoundTrigger = (b: SoundBinding) => {
+    const t = b.target;
+    switch (t.kind) {
+      case 'action':  if (triggerable(t.action)) runAction(t.action); break;
+      case 'preset':  cuePreset(t.presetId); break;
+      case 'dye':     selectDye(t.paletteIndex); break;
+      // A mapping is folded by the patch bay and never fired.
+      case 'setting': break;
+      default: unhandled('a sound trigger', t);
+    }
+  };
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
     action: runAction,
@@ -3111,6 +3129,8 @@ export default function App() {
         frame={preview.frame}
         output={output}
         tempoRef={tempoRef}
+        soundBindings={midi.map.sound}
+        onSoundTrigger={runSoundTrigger}
         onManualGesture={musicIntel.recordGesture}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while

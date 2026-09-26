@@ -29,6 +29,7 @@
 import { ROOM_STALE_MS } from './roomStir';
 import { getSceneValue, type SceneReading } from './sceneSense';
 import { getAudioValue, type AudioFeatureKey } from '../constants';
+import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures';
 import type { ModulatorFeature, Modulators } from './modulators';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
@@ -132,6 +133,7 @@ export interface PatchContext {
 }
 
 const sourceOf = (m: SceneMapping): PatchSource => m.source ?? 'room';
+const NAMED: ReadonlySet<string> = new Set(SOURCE_NAMES);
 const layerOf = (m: SceneMapping): number | 'all' => m.layer ?? 'all';
 
 /**
@@ -151,6 +153,15 @@ function liveValue(
   if (source === 'sound') {
     if (ctx.soundImpact <= 0 || !ctx.sound) return null;
     return { value: getAudioValue(ctx.sound, feature as AudioFeatureKey), impact: ctx.soundImpact };
+  }
+  // The sound by name: read raw from the analyser's reading of this frame, no
+  // smoothing, because a mapping on the kick is meant to move with the kick.
+  // A producer of AudioData with no spectrum behind it (the cast display
+  // rebuilds one from the wire) has no reading, and that is nothing to say.
+  if (source === 'bands') {
+    const reading = ctx.sound?.features;
+    if (ctx.soundImpact <= 0 || !reading || !NAMED.has(feature)) return null;
+    return { value: sourceValue(reading, feature as SourceName), impact: ctx.soundImpact };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".
@@ -199,11 +210,20 @@ export class PatchBay {
     layerCount: number,
     /** Passed in rather than read here, so staleness can be tested without a clock. */
     now: number = performance.now(),
+    /**
+     * Patches that belong to the rig rather than the look: sound learn's
+     * mappings (`soundLearn.ts`), which live in the MIDI map and so ride
+     * whatever look is up. Folded after the look's own, by the same
+     * arithmetic, so a learned kick on Turbulence and a look's patch on
+     * Turbulence add and clamp exactly as two patches in one look do.
+     */
+    extra?: readonly SceneMapping[],
   ): void {
     const layers = Math.max(1, Math.min(this.scratch.length - 1, layerCount));
     for (let i = 0; i < this.out.length; i++) this.out[i] = base;
 
-    const maps = base.sceneMappings;
+    const own = base.sceneMappings;
+    const maps = extra && extra.length > 0 ? (own && own.length > 0 ? [...own, ...extra] : extra) : own;
     if (!maps || maps.length === 0) return;
 
     // One pass to find what is actually live, so a patch list with nothing

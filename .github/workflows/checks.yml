@@ -86,6 +86,15 @@ jobs:
       - name: The bands
         run: npm run bands
 
+      # Sound learn: controls bound to the music. A synthesised song through
+      # the analyser, the beat clock and the trigger engine frame by frame: a
+      # kick trigger fires once per kick and never on a hat, ahead of the heard
+      # onset once the clock is locked; a mapping moves its setting by its depth
+      # and two add and clamp; the map file round-trips; and with the music
+      # stopped nothing fires.
+      - name: Sound learn
+        run: npm run learn
+
       # The shape of the quality ladder: that every rung is a rung, that a
       # step down gives something up, and that a rung asking for fewer device
       # pixels actually gets fewer. That last one was inert for a long while

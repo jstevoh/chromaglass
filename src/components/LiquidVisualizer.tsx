@@ -31,7 +31,8 @@ import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
-import { LEARNABLE_SETTINGS } from '../lib/midi';
+import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
+import { SoundLearn } from '../lib/soundLearn';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { Modulators } from '../lib/modulators';
@@ -130,6 +131,14 @@ interface LiquidVisualizerProps {
    * so putting it in state would re-render the app around it for nothing.
    */
   tempoRef?: React.MutableRefObject<TempoSource | null>;
+  /**
+   * What the music is bound to (sound learn, PLAN §5; the MIDI map's
+   * `sound`). Mappings are folded with the look's own patches, triggers are
+   * stepped against the beat clock here, where the clock is, and handed back
+   * through `onSoundTrigger` to run as the action, preset or dye they name.
+   */
+  soundBindings?: readonly SoundBinding[];
+  onSoundTrigger?: (binding: SoundBinding) => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -3515,7 +3524,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -3809,6 +3818,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
+  /*
+    Sound learn, read by the loop through refs like every other live prop: the
+    bindings change when the map does, the trigger handler on every render of
+    the app, and neither is a reason to rebuild the loop.
+  */
+  const soundLearnRef = useRef(new SoundLearn());
+  const soundBindingsRef = useRef(soundBindings);
+  soundBindingsRef.current = soundBindings;
+  const onSoundTriggerRef = useRef(onSoundTrigger);
+  onSoundTriggerRef.current = onSoundTrigger;
   /**
    * The plate's phrasing: what it should be doing this second.
    *
@@ -4713,7 +4732,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
-      }, settingsRef.current.layerCount ?? 1, performance.now());
+      }, settingsRef.current.layerCount ?? 1, performance.now(),
+      // Sound learn's mappings: the rig's, not the look's, folded the same way.
+      soundLearnRef.current.patchesOf(soundBindingsRef.current));
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -4811,6 +4832,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           beatClockRef.current.setExternal(nowMs, tempoRef?.current?.read(nowMs) ?? null);
           kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
+          /*
+            Sound learn's triggers, right after the clock has decided this
+            frame's beat, so a trigger on the kick and the plate's own kick
+            reactions are promised the same beat by the same clock
+            (`soundLearn.ts`). Paused, the show hears nothing: the engine is
+            handed no reading and forgets its patterns, so nothing fires until
+            the music is back and has been heard again.
+          */
+          const learned = soundBindingsRef.current;
+          if (learned && learned.length > 0) {
+            const clock = beatClockRef.current;
+            const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
+            const fired = soundLearnRef.current.step(nowMs, heard, {
+              period: clock.period,
+              nextBeat: clock.nextBeat,
+              locked: clock.isLocked(nowMs, trust),
+              leadMs: Math.max(0, currentSettings.beatLead ?? 0),
+            }, learned);
+            for (const f of fired) onSoundTriggerRef.current?.(f.binding);
+          }
           /*
             Soap Bursts: with Soap Flow up, a drop of soap lands on the beat
             somewhere on the plate and the Marangoni flow blows the dye out
