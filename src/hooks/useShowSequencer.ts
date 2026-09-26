@@ -18,6 +18,11 @@ import {
   ShowSequence, ShowStage, SequencerStatus,
   builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
 } from '../lib/sequencer';
+import {
+  PACE_NEUTRAL, type PaceMoment, type PaceSample, type ScenePlan, type SceneCursor,
+  planScene, cursorAt, stepScene,
+} from '../lib/scenePacing';
+import { stream } from '../lib/rng';
 
 export interface UseShowSequencerArgs {
   /** The live settings, read at tick time. */
@@ -56,6 +61,14 @@ export interface UseShowSequencerArgs {
    * and the stage clock runs as it always has.
    */
   timecodeAt?: number | null;
+  /**
+   * Where the scene is: how busy the plate should be and how far the light is
+   * down (`lib/scenePacing.ts`). Called when it changes, and with 1 and 1 when
+   * nothing is pacing the plate — stopped, paused, held in Design, or Pacing at 0.
+   */
+  pace?: (sample: PaceSample) => void;
+  /** A scene's swell opening: pour, press, the next dyes, or the drain in the dark. */
+  moment?: (kind: PaceMoment) => void;
 }
 
 interface Run {
@@ -68,12 +81,42 @@ interface Run {
   transition: number;
   sectionAtEntry: string | null;
   glideDone: boolean;
+  /** The stage's scene, when Pacing is up; null at Pacing 0 (planned on the first tick it rises). */
+  plan: ScenePlan | null;
+  /** Where the plan has been played to: the moments fired, the last tick's time. */
+  cursor: SceneCursor;
 }
 
 const now = () => showNow() * 0.001;
 const TICK_MS = 250;
 /** A section change can only advance a stage after this long in it. */
 const MIN_SECTION_SECONDS = 8;
+/**
+ * How long a scene is planned for when the stage has no end of its own clock:
+ * a section stage or a hold. Long enough for any song section, and no dark
+ * ending, because the plan cannot know when the section will change and a fade
+ * that lands at the stage's minimum would leave the plate black until it did.
+ */
+const OPEN_SCENE_SECONDS = 600;
+
+const pacingOf = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+/**
+ * Plan a stage as a scene (see `lib/scenePacing.ts`). Its dice are the show's
+ * `show.pacing` stream: seeded with the night, and not a `plate.` stream,
+ * because a scene belongs to the set and should not start over when a look is
+ * laid in the middle of it.
+ */
+function planStage(stage: ShowStage, pacing: number, fromDark: boolean): ScenePlan | null {
+  if (pacing <= 0.001) return null;
+  const timed = stage.advance === 'time';
+  return planScene(
+    timed ? stage.seconds : Math.max(stage.seconds, OPEN_SCENE_SECONDS),
+    pacing,
+    stream('show.pacing').float,
+    { fromDark, pace: timed ? stage.pace : { ...stage.pace, endDark: false } },
+  );
+}
 
 export function useShowSequencer(args: UseShowSequencerArgs) {
   const argsRef = useRef(args);
@@ -87,6 +130,14 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
 
   const [selectedId, setSelectedId] = useState<string>(builtIns[0]?.id ?? '');
   const runRef = useRef<Run | null>(null);
+  /** What the plate was last told, so a tick that changes nothing sends nothing. */
+  const paceSentRef = useRef<PaceSample>({ ...PACE_NEUTRAL });
+  const sendPace = useCallback((s: PaceSample) => {
+    const last = paceSentRef.current;
+    if (Math.abs(s.activity - last.activity) < 1e-4 && Math.abs(s.dim - last.dim) < 1e-4) return;
+    paceSentRef.current = { ...s };
+    argsRef.current.pace?.(s);
+  }, []);
   const [status, setStatus] = useState<SequencerStatus>({
     sequenceId: null, name: null, running: false, stageIndex: 0, stageName: null, progress: 0, stages: [],
   });
@@ -116,6 +167,15 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     for (const key of Object.keys(target) as (keyof VisualizerSettings)[]) (from as Record<string, unknown>)[key] = current[key];
     a.setPaletteWindow(stage.paletteSize ?? null, stage.paletteLead ?? 0);
     const prev = runRef.current;
+    /*
+      The scene is planned at the Pacing the stage is going to, not the one it
+      is leaving: a stage that glides Pacing up plans the busier scene it is
+      becoming. It comes up out of the dark when the light is actually down as
+      it enters, which is the stage before's dark ending, or Next pressed in
+      the middle of one.
+    */
+    const pacing = pacingOf(target.pacing ?? current.pacing);
+    const fromDark = !!prev && prev.sequenceId === seq.id && paceSentRef.current.dim < 0.5;
     runRef.current = {
       sequenceId: seq.id,
       stageIndex: index,
@@ -125,6 +185,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       transition: Math.max(0, stage.transition),
       sectionAtEntry: a.sectionLabel,
       glideDone: false,
+      plan: planStage(stage, pacing, fromDark),
+      cursor: { nextSwell: 0, drained: false, lastElapsed: 0 },
     };
     // Non-numeric fields (blend mode, viscosity) switch at once when there is
     // nothing to glide through; numeric ones start moving on the next tick.
@@ -216,8 +278,9 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
   const stop = useCallback(() => {
     runRef.current = null;
     argsRef.current.setPaletteWindow(null, 0);
+    sendPace(PACE_NEUTRAL);
     publish();
-  }, [publish]);
+  }, [publish, sendPace]);
 
   const next = useCallback(() => { if (runRef.current) goTo(runRef.current.stageIndex + 1); }, [goTo]);
   const prev = useCallback(() => { if (runRef.current) goTo(runRef.current.stageIndex - 1); }, [goTo]);
@@ -229,13 +292,19 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       if (!run) return;
       const seq = findSequence(run.sequenceId);
       const stage = seq?.stages[run.stageIndex];
-      if (!seq || !stage) { runRef.current = null; publish(); return; }
+      if (!seq || !stage) { runRef.current = null; sendPace(PACE_NEUTRAL); publish(); return; }
       const a = argsRef.current;
-      if (run.pausedAt !== null) return;
+      /*
+        Paused, the operator has the plate: the light comes back up and the
+        clock back to its own pace (at the plate's rate limit, so not in a
+        blink), and a stage resumed picks its scene up where it was. The same
+        in Design, where a look is being built and must be seen at full light.
+      */
+      if (run.pausedAt !== null) { sendPace(PACE_NEUTRAL); return; }
       // Held: the stage clock is pushed forward by the tick it just skipped,
       // so returning to Perform resumes where the set was rather than where
       // it would have got to on its own.
-      if (a.suspended) { run.enteredAt += TICK_MS * 0.001; return; }
+      if (a.suspended) { run.enteredAt += TICK_MS * 0.001; sendPace(PACE_NEUTRAL); return; }
       /*
         Locked to a desk.
 
@@ -281,6 +350,26 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
         if (t >= 1) run.glideDone = true;
       }
 
+      /*
+        The scene: fire the swells that are due, and tell the plate where it
+        is. Pacing is read live, so a stage gliding it, a fader or a MIDI knob
+        deepens or flattens the scene as it moves, and 0 hands back exactly
+        today's plate.
+      */
+      const pacing = pacingOf(a.getSettings().pacing);
+      if (!run.plan && pacing > 0.001) {
+        // Pacing came up mid-stage: plan from here, with nothing owed from before.
+        run.plan = planStage(stage, pacing, false);
+        if (run.plan) run.cursor = cursorAt(run.plan, elapsed + 0.001);
+      }
+      if (run.plan) {
+        const { sample, moments } = stepScene(run.plan, run.cursor, elapsed, pacing);
+        for (const k of moments) a.moment?.(k);
+        sendPace(sample);
+      } else {
+        sendPace(PACE_NEUTRAL);
+      }
+
       // Advance.
       let advance = false;
       if (stage.advance === 'time') advance = elapsed >= stage.seconds;
@@ -299,8 +388,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       }
       publish();
     }, TICK_MS, 'sequencer');
-    return () => clearShowInterval(timer);
-  }, [enterStage, findSequence, publish]);
+    return () => { clearShowInterval(timer); sendPace(PACE_NEUTRAL); };
+  }, [enterStage, findSequence, publish, sendPace]);
 
   const upsertSequence = useCallback((seq: ShowSequence) => {
     const next = userSequences.some(q => q.id === seq.id)

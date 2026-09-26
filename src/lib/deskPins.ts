@@ -233,6 +233,8 @@ const FROM_PANEL: DeskSpec[] = [
     a look that wants none should say none.
   */
   { key: 'surge', label: "Surge", min: 0, max: 1, section: 'automation' },
+  // Pacing: a running sequence's stages played as scenes (lib/scenePacing.ts).
+  { key: 'pacing', label: "Pacing", min: 0, max: 1, section: 'automation' },
   { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: DIFFUSION_CEILING, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },

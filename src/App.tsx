@@ -2016,6 +2016,20 @@ export default function App() {
     suspended: designing,
     presets: allPresets,
     timecodeAt: timecode?.at ?? null,
+    // A paced stage's scene (lib/scenePacing.ts): the plate's pace and light,
+    // and the moments that open its swells, which are the same moves a song
+    // show's actions make.
+    pace: (sample) => visualizerRef.current?.pace(sample),
+    moment: (kind) => {
+      const v = visualizerRef.current;
+      switch (kind) {
+        case 'pour': v?.pour(); break;
+        case 'burst': v?.applyGesture({ tool: 'press', x: 0.5, y: 0.5, layer: 0, amount: 1 }); break;
+        case 'dyes': v?.stepDyes(); break;
+        case 'drain': runActionRef.current?.('drain'); break;
+        default: unhandled("a paced scene's moment", kind);
+      }
+    },
   });
   sequencerRef.current = sequencer;
   // ── Files made for a song ───────────────────────────────────────

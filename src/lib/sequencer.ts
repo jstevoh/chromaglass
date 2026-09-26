@@ -19,6 +19,7 @@
 import type { VisualizerSettings } from '../types';
 import type { SongRef } from './songRef';
 import { onSettingStep } from './deskPins';
+import type { StagePace } from './scenePacing';
 
 /** How a stage hands over to the next one. */
 export type StageAdvance = 'time' | 'section' | 'hold';
@@ -41,6 +42,12 @@ export interface ShowStage {
   macro?: boolean;
   /** Seconds the settings take to arrive. */
   transition: number;
+  /**
+   * How the stage plays as a scene when Pacing is up (`lib/scenePacing.ts`):
+   * whether it ends in the dark, and which moments open its swells. Omit for
+   * what the Pacing amount says.
+   */
+  pace?: StagePace;
 }
 
 export interface ShowSequence {
@@ -99,6 +106,9 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['gelWheel', 0.05],
   ['macroZoom', 0.5],
   ['macroSync', 0.05],
+  // How much a stage plays as a scene: swells, rests, a dark ending. A set can
+  // open flat and grow into its shape, or a stage can hold still for a song.
+  ['pacing', 0.05],
 ];
 
 /** The numeric fields a stage may glide; everything else switches at stage entry. */
@@ -225,6 +235,36 @@ export function builtInSequences(): ShowSequence[] {
         s('Fillmore East', 180, { presetId: 'fillmore-1969', transition: 12 }),
         s('Oil on water, photographed', 150, { presetId: 'oil-on-water', transition: 12 }),
         s('Lumia interlude', 120, { presetId: 'lumia', transition: 20 }),
+      ],
+    },
+    /*
+      The research's shape, as a sequence (PLAN.md §10, step 1).
+
+      The measured shows changed scene every 15 to 30 seconds and went near
+      black between them, so these stages are that long, each ending in the
+      dark and the next coming up out of it with a pour. Pacing is set by the
+      stages rather than left to the dial, so this plays like a show whatever
+      Pacing was at: 0.7 puts the swells near 2.9 a minute, the Joshua Light
+      Show's rate. The looks are the Set Journey's; which of them carry a
+      dark ending best is for the film on the Mac to say.
+
+      Transitions are short because each change happens in the dark: the
+      light is down when a stage starts, so the settings can arrive before
+      anyone sees them.
+    */
+    {
+      id: 'light-show-night',
+      name: 'Light Show Night',
+      description: 'Played like the filmed shows: a scene every twenty-odd seconds, big pours and presses with the plate left alone between them, and the light going down to near-black between scenes.',
+      loop: true,
+      builtIn: true,
+      stages: [
+        s('Out of the dark', 28, { presetId: 'fillmore-1969', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
+        s('Oil wheel', 24, { presetId: 'oil-wheel', transition: 3, settings: { pacing: 0.7 } }),
+        s('Poster', 22, { presetId: 'poster-1969', transition: 3, settings: { pacing: 0.75 } }),
+        s('Chemistry', 26, { presetId: 'sensual-laboratory', transition: 3, settings: { pacing: 0.7 } }),
+        s('The dish, pressed', 24, { presetId: 'fillmore-1969', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
+        s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { moments: ['pour', 'dyes', 'drain'] }, settings: { pacing: 0.6 } }),
       ],
     },
   ];
