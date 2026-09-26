@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import { PINNABLE, PIN_RANGE } from './deskPins';
 import { STRUCTURE } from './lookFade';
+import { stream } from './rng';
 
 /**
  * Evolve, as a slow wander rather than a new look every few minutes.
@@ -82,12 +83,18 @@ export const DRIFTABLE: readonly string[] = PINNABLE
  * `anchor` is the look as it was when evolving started. `amount` is the Evolve
  * Speed, so the same slider that decides how often a drop lands decides how
  * far the mood moves; at zero nothing moves at all.
+ *
+ * `rand`, left out, is the show's `show.drift` stream (lib/rng.ts): which
+ * dials wander and where to is on the plate within seconds, so it is seeded
+ * like everything else that reaches it. Not a `plate.` stream, so laying a
+ * look does not restart it and the wander does not repeat itself after
+ * every look change.
  */
 export function driftLook(
   current: VisualizerSettings,
   anchor: VisualizerSettings,
   amount: number,
-  rand: () => number = Math.random,
+  rand: () => number = stream('show.drift').float,
   dials = 2,
 ): Partial<VisualizerSettings> {
   const rate = Math.max(0, Math.min(1, amount));

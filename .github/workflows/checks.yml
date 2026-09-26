@@ -96,6 +96,13 @@ jobs:
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist
+      # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
+      # src draws from Math.random outside a short allowlist of ids, and the
+      # beads, bubbles, closeup camera, chemistry, palette and automation run
+      # twice on one seed come out the same, on another seed differently, and
+      # none of them moves another's numbers.
+      - name: The seed
+        run: npm run seed
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
@@ -186,6 +193,12 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # And the GPU half of the same seed: seeded dye and bubbles through the
+      # solver and the plate shader twice, the same bytes; another seed, not.
+      # Then the built app: ?seed= reaches it, and it says which seed it is on.
+      - name: The seed on the GPU, and in the app
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run seed -- --lab --app
       # The closeup pushes in like a microscope: the cells come through as they resolve.
       - name: The microscope
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}

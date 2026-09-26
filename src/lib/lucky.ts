@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import { DROPPER_COLORS } from '../constants';
 import { DIFFUSION_CEILING } from './deskPins';
+import { stream } from './rng';
 
 /**
  * The backdrop's two colours, which have to be two.
@@ -59,12 +60,17 @@ const paperPair = (rand: () => number): { paperA: string; paperB: string } => {
  * range for every setting either of them names.
  *
  * `rand` is injected so that check can be deterministic; everything else
- * takes it straight from `Math.random`.
+ * takes the show's `show.lucky` stream (lib/rng.ts). Seeded, though it is a
+ * button a person presses, because what it rolls goes straight onto the
+ * plate: with `?seed=` the same presses give the same looks, which is what
+ * lets a session that found something good be played again. It is not a
+ * `plate.` stream, so laying a look does not restart it — restarting would
+ * hand anyone who presses Lucky after each new look the same roll every time.
  */
 export function luckyLook(
   current: VisualizerSettings,
   ledColors: string[],
-  rand: () => number = Math.random,
+  rand: () => number = stream('show.lucky').float,
 ): VisualizerSettings {
   const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
   const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];

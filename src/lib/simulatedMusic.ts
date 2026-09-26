@@ -16,7 +16,15 @@
  *
  * It is also silent. The destination node goes to a stream, not to the
  * speakers, so this can run all day next to someone working.
+ *
+ * Its noise and the hats' start offsets come from the show's `audio.sim`
+ * stream (lib/rng.ts), not `Math.random`. It is a demo, and the choice was
+ * whether a demo deserves a seed; it does, because the analyser listens to
+ * it and the analyser drives the plate, so on the same seed the band that is
+ * "always in the room" is at least the same band — and rendered offline, the
+ * same signal.
  */
+import { stream } from './rng';
 
 export type Section = 'intro' | 'verse' | 'chorus' | 'break';
 
@@ -72,7 +80,8 @@ export function startSimulatedMusic(): SimulatedMusic {
   const noise = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
   {
     const d = noise.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const rng = stream('audio.sim');
+    for (let i = 0; i < d.length; i++) d[i] = rng.signed();
   }
 
   const secondsPerStep = 60 / BPM / 4;
@@ -125,7 +134,7 @@ export function startSimulatedMusic(): SimulatedMusic {
     src.connect(filter);
     filter.connect(amp);
     amp.connect(master);
-    src.start(at, Math.random() * 0.2);
+    src.start(at, stream('audio.sim').float() * 0.2);
     src.stop(at + dur + 0.02);
   };
 

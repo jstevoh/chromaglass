@@ -10,6 +10,8 @@
  * they are drawn as a mask texture (hundreds of them, too many for
  * uniforms) that the shader reads for the rim and the interior.
  */
+import { makeRng, showSeed, stream, type Rng } from './rng';
+
 export interface Bead {
   x: number;   // logical grid cells
   y: number;
@@ -30,8 +32,18 @@ export class BeadField {
   dirty = true;
   readonly size = 512;
 
-  /** A per-population offset for the patch field, so every plate clusters differently. */
-  private patchSeed = Math.random() * 1000;
+  /**
+   * A per-population offset for the patch field, so every plate clusters differently.
+   *
+   * The first one is drawn from a generator of its own, keyed on the show's
+   * seed, and not from `rng`. The visualizer builds this object as
+   * `useRef(new BeadField(…))`, which constructs one on every React render
+   * and throws all but the first away; a draw here from the shared stream
+   * would move the beads' sequence once per render, and how often React
+   * renders is nothing a replay can reproduce. `npm run seed` builds one and
+   * checks the stream did not move.
+   */
+  private patchSeed = makeRng(showSeed(), 'plate.beads', 'opening').float() * 1000;
 
   /*
     The crowding step's scratch, kept from one step to the next (S13,
@@ -45,9 +57,14 @@ export class BeadField {
   private readonly spareLists: Bead[][] = [];
   private readonly gone = new Set<Bead>();
 
-  constructor(private readonly grid: number) {}
+  /**
+   * `rng` is where every bead's size, place, wander and merge comes from:
+   * the show's `plate.beads` stream unless a check hands in its own, so the
+   * same seed lays the same carpet (lib/rng.ts, `npm run seed`).
+   */
+  constructor(private readonly grid: number, private readonly rng: Rng = stream('plate.beads')) {}
 
-  clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = Math.random() * 1000; }
+  clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = this.rng.float() * 1000; }
 
   /**
    * Where the beads gather: a smooth 0..1 field over the plate with a few
@@ -93,13 +110,13 @@ export class BeadField {
       // before so the carpet is not one size.
       // Small beads span four to one in diameter within a patch, as in the
       // reference; the big lenses are a tail on top.
-      const u = Math.random();
-      const r = (Math.random() < 0.8 ? 0.45 + Math.random() * Math.random() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
-      let x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
+      const u = this.rng.float();
+      const r = (this.rng.float() < 0.8 ? 0.45 + this.rng.float() * this.rng.float() * 2.6 : 1.8 + u * u * 3.4) * sizeScale * (N / 192);
+      let x = 4 + this.rng.float() * (N - 8), y = 4 + this.rng.float() * (N - 8);
       if (density) {
         let best = density(x, y);
         for (let t = 0; t < 3; t++) {
-          const px = 4 + Math.random() * (N - 8), py = 4 + Math.random() * (N - 8);
+          const px = 4 + this.rng.float() * (N - 8), py = 4 + this.rng.float() * (N - 8);
           const d = density(px, py);
           if (d > best) { best = d; x = px; y = py; }
         }
@@ -107,11 +124,11 @@ export class BeadField {
       // Patches: none where the field is zero, dense where it is high, and
       // packed tighter there (the crowding step keeps them from overlapping).
       const p = this.patchField(x, y);
-      if (p <= 0 || Math.random() > p) continue;
+      if (p <= 0 || this.rng.float() > p) continue;
       const gap = 1.3 - 0.3 * p;
       let ok = true;
       for (const b of this.beads) { const dx = b.x - x, dy = b.y - y; if (dx * dx + dy * dy < (b.r + r) * (b.r + r) * gap) { ok = false; break; } }
-      if (ok) { this.beads.push({ x, y, r, age: 0, seed: Math.random() }); this.dirty = true; }
+      if (ok) { this.beads.push({ x, y, r, age: 0, seed: this.rng.float() }); this.dirty = true; }
     }
   }
 
@@ -135,8 +152,8 @@ export class BeadField {
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
       // Heavier than the dye: they lag the flow and drift little on their own.
-      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + (Math.random() - 0.5) * 0.15;
-      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + (Math.random() - 0.5) * 0.15;
+      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + this.rng.centred() * 0.15;
+      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + this.rng.centred() * 0.15;
       b.age += dt;
     }
     /*
@@ -200,7 +217,7 @@ export class BeadField {
           const touch = b.r + o.r;
           const want = touch * (0.96 + 0.06 * b.seed);
           if (d >= touch * 1.3) continue;
-          if (d < touch * 0.7 && touch < 7 && Math.random() < 0.02) {
+          if (d < touch * 0.7 && touch < 7 && this.rng.float() < 0.02) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             big.r = Math.sqrt(big.r * big.r + small.r * small.r);
