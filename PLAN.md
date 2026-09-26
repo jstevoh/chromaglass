@@ -51,7 +51,7 @@ Where each batch stands, as of 2026-09-26:
 | 0 | The dye a tool makes | **Shipped** (#152) |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
-| 3 | Drops, not rings | **In progress** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
+| 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
 | 4 | Liquids that behave differently | **Shipped**; milk's opacity still owed |
 | 5 | Playing it | Sound learn **shipped** (#155, on #154's bands); shutter and look link **not started** |
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
@@ -817,7 +817,7 @@ and look link are not. The order from here, as of 2026-09-26:
 3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
 
 Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
-freeze (#164, shipped) finish in their own threads first.
+freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
 pick them up from `docs/roadmap.md` now that step 1 is in.
 
