@@ -78,9 +78,11 @@ jobs:
       # the analyser the show and a song render both use, alone and mixed, loud
       # and 20 dB down, at 60 and 30 fps. Each drum found on its own hits within
       # a frame, nothing firing on another's, and two runs of the same song
-      # byte-identical. The shelf's MP3s are decoded with ffmpeg where the
-      # runner has it (the script prints a SKIP line where it has neither
-      # ffmpeg nor a browser, rather than passing quietly).
+      # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
+      # the ubuntu runner does not have until it is installed here; with no
+      # decoder the script fails on CI rather than skipping the real music.
+      - name: ffmpeg, for the shelf
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         run: npm run bands
 

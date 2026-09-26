@@ -78,8 +78,9 @@ const DRUMS = ['kick', 'snare', 'hats'];
   source's 0..1 value differs by at most that, on average over the song.
 
   RATE 0.1: on real music, no source fires on more than one frame in ten, six
-  a second. The refractory period alone caps a source near one in four, so a
-  source anywhere near the cap is a detector firing on its own noise.
+  a second. The refractory period alone caps a source near one frame in five
+  (70 ms is more than four frames at 60 fps, so hits are at least five apart),
+  so a source anywhere near that cap is a detector firing on its own noise.
 */
 const RECALL = 0.95;
 const PRECISION = 0.95;
@@ -88,7 +89,7 @@ const STRAYS = 0.05;
 const LEVEL_COUNT = 0.05;
 const LEVEL_VALUE = 0.05;
 const RATE = 0.1;
-/** How much of each shelf track is analysed: all of the three short ones, the first six minutes of the long one. */
+/** How much of each shelf track is analysed: the first six minutes. Every track on the shelf is longer than that (the AmbiSpheres run 386-431 s), so all four are cut. */
 const SHELF_SECONDS = 360;
 
 let failed = 0, passed = 0;
@@ -438,7 +439,12 @@ function viaFfmpeg(file) {
     { maxBuffer: 1 << 30 });
   if (run.error || run.status !== 0) return null;
   const b = run.stdout;
-  return new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4).slice();
+  // Copied into a fresh buffer rather than viewed in place: Node hands small
+  // outputs back as slices of a shared pool at offsets that need not be a
+  // multiple of four, and a Float32Array view of one throws. Anything short
+  // of a second of audio is not a decode worth measuring.
+  if (b.byteLength < SR * 4) return null;
+  return new Float32Array(Uint8Array.from(b).buffer, 0, Math.floor(b.byteLength / 4));
 }
 
 /**
@@ -506,7 +512,17 @@ async function viaChromium(files) {
     how = 'Chromium';
   }
   if (!results) {
-    console.log('  SKIP  no ffmpeg on the path and no Playwright Chromium to decode MP3 with: the shelf was NOT measured on this machine');
+    /*
+      On a laptop with neither decoder this is a SKIP, said out loud. On CI it
+      is a failure: the Measure job installs ffmpeg for this step, so a CI run
+      with no decoder is a broken runner or a broken step, and a green tick
+      that measured none of the real music would be the quiet pass this file
+      exists to refuse. (The first version of this step passed on CI with the
+      shelf skipped, because the runner has no ffmpeg of its own.)
+    */
+    const where = process.env.CI ? 'FAIL' : 'SKIP';
+    console.log(`  ${where}  no ffmpeg on the path and no Playwright Chromium to decode MP3 with: the shelf was NOT measured on this machine`);
+    if (process.env.CI) failed++;
   } else {
     console.log(`  decoded with ${how}`);
     const names = [...SOUND_SOURCES, ...SOURCE_NAMES.filter((n) => !SOUND_SOURCES.includes(n))];
