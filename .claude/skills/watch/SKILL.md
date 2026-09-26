@@ -30,6 +30,16 @@ it peaks. That is a measurement, not a verdict. A slow pour under a drone can
 be right and score zero; a plate that is meant to hit on the beat and scores
 zero is not.
 
+And **the shape** over minutes, in the units the footage study measured real
+shows in (`shape()` in `scripts/watch.mjs` defines each): swells a minute and
+their gap, rise, decay and height; the share of time the plate is calm; how
+long motion stays like itself; near black at the 5th and 95th percentile; hues
+a frame; composition changes a minute; and motion vs loudness over 1, 5, 10
+and 20 s windows. For scale, at `--rate 4`: the Joshua Light Show film reads
+3.1 swells a minute, calm 42%, 2 hues, 9.8 changes a minute; the Dregs (2023)
+2.0, 23%, 3, 8.7, with r −0.13 at 1 s; a 2016 show in a bar 2.0, 20%, with r
+0.22 at 1 s rising to 0.39 at 20 s. Real shows do not follow the beat.
+
 ## Setting up
 
 Needs ffmpeg, and yt-dlp for a URL. In a cloud session:
@@ -81,6 +91,15 @@ owner's login.
   if the plate stands still for two seconds or the take is black, silent or
   short. It prints motion vs loudness without judging it; a threshold waits on
   runs from the owner's machine. Output in `/tmp/chromaglass-moving`.
+- **`npm run film`** (by hand, `film.yml`, over six Mac runners): every look
+  recorded for two minutes with the band, three times on seeds 1, 2, 3, and
+  its shape in one table under the real shows' (the median, with the range).
+  One take is not enough: the same look on two seeds read a half-life of 8.3 s
+  and 0.3 s. A fixed seed does not make a take repeat either (the same code
+  on seed 3 read 1.0 s and 11.3 s on two runs), so read the range, not the
+  median: a change to how the plate moves shows when its range leaves the
+  one before it. Near-black and hues hold from run to run; swells, calm and
+  half-life do not. Output in `film/`.
 - **`npm run gig`** films the whole worked show (`GIG_FILM=0` to not) and lists
   every freeze and jump cut with the action done just before it; the timeline
   is in `/tmp/chromaglass-gig`.

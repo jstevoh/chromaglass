@@ -34,7 +34,9 @@
  *   2. the film tells frozen from moving: outside the control the plate moves
  *      several times more than inside it (if not, every check below would be
  *      measuring grain)
- *   3. the freeze made on purpose is found, where it was made
+ *   3. the plate stops stepping when frozen and steps again when thawed
+ *      (read from the plate, since the key press is not the freeze), and
+ *      the film finds the freeze where the plate stood
  *   4. and nowhere else does the plate stand still for two seconds
  *
  * And it prints, without judging, how motion follows loudness: the
@@ -53,6 +55,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { watchVideo, freezes, WatchError } from './watch.mjs';
+import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
 
 const PORT = Number(process.env.MOVING_PORT ?? 4351);
 const LOOK = process.env.MOVING_LOOK ?? 'soap-film';
@@ -77,60 +80,82 @@ fs.mkdirSync(OUT, { recursive: true });
 const take = path.join(OUT, 'take.webm');
 fs.rmSync(take, { force: true });
 
-// Without this the band in a box never starts (no one has clicked the page,
-// so its AudioContext stays suspended), its audio track gives the recorder
-// no data, and MediaRecorder hands back an empty file that the app then
-// quietly does not save: no download, no error. An owner has always clicked.
-const browser = await launchChromium(chromium, { args: ['--autoplay-policy=no-user-gesture-required'] });
-let froze = 0, thawed = 0;
+// The autoplay flag, the band, and the palette: scripts/recorder.mjs says
+// why each is there (every one was a silent empty take without it).
+const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
+let froze = 0, thawed = 0, steps = [], t0 = 0, opening = null;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
-  await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
+  await withBand(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${LOOK}${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
-
-  // Through the command palette, as qa.mjs reaches things under a desk: the
-  // round Record button is hidden while a desk is up, and a desk is up at
-  // this size, as on the owner's laptop. Resolves when the command has run.
-  const viaPalette = async (query) => {
-    await page.keyboard.press('Control+k');
-    await page.waitForTimeout(400);
-    await page.evaluate((q) => {
-      const input = document.querySelector('[data-testid="palette-input"]');
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, q);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.focus();
-    }, query);
-    await page.waitForTimeout(400);
-    const row = await page.evaluate(() => document.querySelector('[data-row="0"]')?.textContent ?? '');
-    // A row carries its key after the name ("Freeze the liquidF").
-    if (!row.startsWith(query)) throw new Error(`the palette offered "${row}" for "${query}"`);
-    await page.keyboard.press('Enter');
-  };
-  await viaPalette('Record the plate');
-  const t0 = Date.now();
-  const at = s => page.waitForTimeout(Math.max(0, t0 + s * 1000 - Date.now()));
-  await at(FREEZE_AT);
-  await viaPalette('Freeze the liquid');
-  froze = (Date.now() - t0) / 1000;
-  await at(FREEZE_AT + FREEZE_FOR);
-  await viaPalette('Thaw the liquid');
-  thawed = (Date.now() - t0) / 1000;
-  await at(SECONDS);
-  const download = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
-  await viaPalette('Stop recording');
-  const file = await download;
-  if (!file) {
-    check('the recorder hands back a file', false, 'no download within 20 s of Stop: an empty recording, or the recorder failed to start');
+  // The opening freeze of a fresh runner is waited out (recorder.mjs says
+  // why): a take begun inside it has a stretch of stillness no one made.
+  opening = await untilRunning(page);
+  if (!opening.ok) {
+    check('the show runs steadily before the take', false, `not in ${(9 + opening.waited).toFixed(0)} s after load`);
     process.exit(1);
   }
-  await file.saveAs(take);
+  /*
+    When the plate really stopped and started, from the plate.
+
+    The palette's key press is not the freeze. Run 36251764464 made it at
+    12.8 s and the film found the plate still from 14.1 s, 1.3 s on, and
+    failed the one-second bound; the two runs before found it 0.8 s and
+    0.3 s on, while the thaw landed within 0.1 s every time. Something
+    between the command and the picture takes a varying time to stop it,
+    and a check timed from the key press measures that as much as it
+    measures the film. So the lead plate's step count is sampled every
+    tenth of a second on the page's own clock, and the freeze the film is
+    asked to find is the stretch in which it did not step. How far that
+    was from the key press is printed, so a lag in the product is seen
+    rather than absorbed.
+  */
+  await page.evaluate(() => {
+    const rows = [];
+    window.__movingSteps = rows;
+    const tick = () => {
+      rows.push([Date.now(), window.chromaglassDebug?.()?.fluids?.[0]?.stepIndex ?? -1]);
+      if (rows.length < 3000) setTimeout(tick, 100);
+    };
+    tick();
+  });
+  const got = await recordTake(page, SECONDS, take, [
+    { at: FREEZE_AT, query: 'Freeze the liquid' },
+    { at: FREEZE_AT + FREEZE_FOR, query: 'Thaw the liquid' },
+  ]);
+  if (!got.ok) {
+    check('the recorder hands back a file', false, got.reason);
+    process.exit(1);
+  }
+  [froze, thawed] = got.cues.map(c => c.ran);
+  t0 = got.t0;
+  steps = (await page.evaluate(() => window.__movingSteps ?? [])).map(([ms, n]) => ({ t: (ms - t0) / 1000, n }));
 } finally {
   await browser.close();
 }
 
-console.log(`  ${LOOK}, recorded ${SECONDS} s with a band in a box, frozen on purpose ${froze.toFixed(1)}–${thawed.toFixed(1)} s: ${take}\n`);
+console.log(`  ${LOOK}, recorded ${SECONDS} s with a band in a box (running ${(9 + opening.waited).toFixed(1)} s after load${opening.gap >= 1 ? `, after ${opening.gap.toFixed(1)} s with no frame` : ''}), frozen on purpose ${froze.toFixed(1)}–${thawed.toFixed(1)} s: ${take}\n`);
+
+// The stretch the plate did not step: from the first sample showing the
+// count it held at the thaw command, to the first showing more.
+const reported = steps.length > 0 && steps.every(x => x.n >= 0);
+const held = [...steps].reverse().find(x => x.t < thawed)?.n;
+const stopped = steps.find(x => x.t > froze - 0.5 && x.n === held)?.t;
+const resumed = steps.find(x => x.t > thawed && x.n > held)?.t;
+const stood = reported && stopped != null && resumed != null && steps.filter(x => x.t >= stopped && x.t < resumed).every(x => x.n === held);
+// Both ends bounded, and tightly: the key reaches the loop through one
+// React effect (isActiveRef), a frame or two, and the thaw has landed within
+// a tenth of a second on every run. Half a second either way is a lag an
+// operator would feel, and a product fault this check must not absorb by
+// timing the film from the plate instead of the key.
+check('the plate stops stepping when frozen and steps again when thawed',
+  stood && stopped - froze < 0.5 && resumed - thawed < 0.5,
+  !reported ? 'the page does not report the plate\'s steps'
+    : stood ? `freeze pressed ${froze.toFixed(1)} s, last step ${stopped.toFixed(1)} s; thaw pressed ${thawed.toFixed(1)} s, stepping ${resumed.toFixed(1)} s`
+      : `no still stretch in the steps between ${froze.toFixed(1)} and ${thawed.toFixed(1)} s`);
+if (!stood) process.exit(1);
 let r;
 try {
   r = await watchVideo(take, { out: OUT, frames: 12, quiet: true });
@@ -160,8 +185,8 @@ check('with the plate drawn in it', mean(x => x.dark) < 0.95 && mean(x => x.lum)
 
 // Half a second in from each edge of the control, for the palette's own
 // latency and the recorder's; a second clear of it on the outside.
-const inside = rows.filter(x => x.t > froze + 0.5 && x.t < thawed - 0.5).map(x => x.motion);
-const outside = rows.filter(x => x.t > 2 && (x.t < froze - 1 || x.t > thawed + 1) && !x.cut).map(x => x.motion);
+const inside = rows.filter(x => x.t > stopped + 0.5 && x.t < resumed - 0.5).map(x => x.motion);
+const outside = rows.filter(x => x.t > 2 && (x.t < froze - 1 || x.t > resumed + 1) && !x.cut).map(x => x.motion);
 const frozenP90 = q(inside, 0.9), movingMedian = q(outside, 0.5);
 check('the film tells a frozen plate from a moving one', inside.length >= 20 && movingMedian > 4 * frozenP90,
   `moving: median change ${movingMedian.toFixed(3)}% a sample; frozen on purpose: 90th percentile ${frozenP90.toFixed(3)}%`);
@@ -173,11 +198,11 @@ const below = Math.max(2 * frozenP90, 0.005);
 const found = freezes(r, { below, minSeconds: 2 })
   .map(f => ({ ...f, from: Math.max(f.from, r.rows[0].t + 2) }))   // the recorder's own start-up is not the plate
   .filter(f => f.to - f.from >= 2 - 1e-9);
-const control = found.filter(f => f.from < thawed && f.to > froze);
+const control = found.filter(f => f.from < resumed && f.to > stopped);
 const show = a => a.map(f => `${f.from.toFixed(1)}–${f.to.toFixed(1)} s`).join(', ') || 'none';
 check('the freeze made on purpose is found where it was made',
-  control.length === 1 && Math.abs(control[0].from - froze) <= 1 && Math.abs(control[0].to - thawed) <= 1,
-  `made ${froze.toFixed(1)}–${thawed.toFixed(1)} s, found ${show(control)} (still = under ${below.toFixed(3)}%)`);
+  control.length === 1 && Math.abs(control[0].from - stopped) <= 1 && Math.abs(control[0].to - resumed) <= 1,
+  `the plate stood ${stopped.toFixed(1)}–${resumed.toFixed(1)} s, found ${show(control)} (still = under ${below.toFixed(3)}%)`);
 const others = found.filter(f => !control.includes(f));
 check('and nowhere else does the plate stand still for two seconds', !others.length, `elsewhere: ${show(others)}`);
 

@@ -1,0 +1,108 @@
+name: Film the looks
+
+# Every look recorded with the band playing and measured in the units the
+# footage study measured real liquid light shows in: swells a minute, calm,
+# near black, hues, composition changes, motion against loudness by section
+# (scripts/film.mjs; the plan "Playing the plate like the real thing", step 0).
+# It is the before for any change to how the plate moves, and it runs only by
+# hand from the Actions tab. Each look is filmed on three fixed seeds and the
+# table gives the median and range (film.mjs says why one take was not
+# enough), which is several hours on one runner, so the looks are spread over
+# six runners and a last job puts their tables together. A pull request that
+# changes the filming or the watching films three looks on one runner, so the
+# tool is proven on Metal before it is trusted with all of them (a cloud
+# session cannot film the app: its WebGPU device is lost and the recorder
+# hands back nothing). The table comes back as the `film` artifact, and each
+# runner's timelines as `film-<k>`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated look ids (blank for all)'
+        required: false
+        default: ''
+      seconds:
+        description: 'Seconds to film each take (120 gives section-scale sync five windows)'
+        required: false
+        default: '120'
+      takes:
+        description: 'Takes a look, on seeds 1, 2, 3, ...'
+        required: false
+        default: '3'
+  pull_request:
+    paths:
+      - 'scripts/film.mjs'
+      - 'scripts/recorder.mjs'
+      - 'scripts/watch.mjs'
+      - '.github/workflows/film.yml'
+
+concurrency:
+  group: film-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  film:
+    # `&& ''` would fall through (an empty string is false in an expression),
+    # which labelled a pull request's single runner "1/6".
+    name: Film (macOS) ${{ matrix.shard }}/${{ github.event_name == 'pull_request' && '1' || '6' }}
+    runs-on: macos-15
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'pull_request' && '[1]' || '[1, 2, 3, 4, 5, 6]') }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: ffmpeg, to watch a take
+        run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+      - name: Film the looks
+        run: npm run film
+        env:
+          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,fillmore-1969,soap-film' || inputs.only }}
+          FILM_SECONDS: ${{ inputs.seconds || '120' }}
+          FILM_TAKES: ${{ inputs.takes || '3' }}
+          FILM_SHARD: ${{ matrix.shard }}/${{ github.event_name == 'pull_request' && '1' || '6' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: film-${{ matrix.shard }}
+          path: film/
+          retention-days: 30
+
+  table:
+    name: The table
+    needs: film
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: film-*
+          path: shards
+      - name: One table from every runner's
+        run: npm run film
+        env:
+          FILM_COMBINE: shards
+          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,fillmore-1969,soap-film' || inputs.only }}
+          FILM_TAKES: ${{ inputs.takes || '3' }}
+          FILM_SECONDS: ${{ inputs.seconds || '120' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: film
+          path: film/
+          retention-days: 30
