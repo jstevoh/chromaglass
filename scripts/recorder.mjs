@@ -31,7 +31,8 @@ export const withBand = page => page.addInitScript(() => { try { localStorage.se
 
 /**
  * Resolves once the show's loop has beaten in every quarter second for two
- * seconds running (up to `limit` ms), to `{ ok, waited }` in seconds.
+ * seconds running, to `{ ok, waited, gap }`: seconds waited, and the longest
+ * stretch with no beat that it saw.
  *
  * Why not a fixed wait. Every fresh Mac runner opens with a freeze of about
  * nine seconds a few seconds after load: no animation frames, no loop
@@ -40,25 +41,38 @@ export const withBand = page => page.addInitScript(() => { try { localStorage.se
  * cold). A take started inside it is short by however much of it was left,
  * since a canvas that draws nothing gives MediaRecorder nothing: the first
  * film run lost 8.7 s of Classic's 120 that way and failed on its length,
- * which says nothing about Classic. So the take starts on a running show, and
- * how long that took is said on every run rather than hidden. A freeze that
- * comes after this is still in the take, and still fails it.
+ * which says nothing about Classic. A freeze that comes after this is still
+ * in the take, and still fails it.
+ *
+ * Two steady seconds are not enough by themselves: they can be the two
+ * before the freeze, whose start was seen once at about four and a half
+ * seconds and is not known to be fixed. So it also waits until either a gap
+ * of three seconds or more has been seen (the freeze, over) or `settle` ms
+ * have passed since it was called, whichever is first; a page that never
+ * freezes pays the settle once per load. The gap is returned so a caller
+ * can print it, and the opening freeze is reported rather than hidden.
  *
  * Counted by `crash.beats()`, the loop's own heartbeat, as `npm run crash`
- * does, not by the stage's frames, which a grab can draw by itself.
+ * does, not by the stage's frames, which a grab can draw by itself. It is
+ * null without `?debug`, and null never counts as a beat.
  */
-export async function untilRunning(page, limit = 45000) {
-  return page.evaluate(async (limit) => {
+export async function untilRunning(page, { limit = 45000, settle = 11000 } = {}) {
+  return page.evaluate(async ({ limit, settle }) => {
     const t0 = performance.now();
     const beats = () => window.chromaglassDebug?.()?.crash?.beats?.() ?? null;
     const seen = [];
+    let last = null, lastAt = t0, gap = 0;
     const steady = () => seen.length >= 9 && seen.slice(-9).every((b, i, r) => i === 0 || (b !== null && r[i - 1] !== null && b > r[i - 1]));
-    while (!steady() && performance.now() - t0 < limit) {
-      seen.push(beats());
-      if (!steady()) await new Promise((r) => setTimeout(r, 250));
+    const done = () => steady() && (gap >= 3 || performance.now() - t0 >= settle);
+    while (!done() && performance.now() - t0 < limit) {
+      const b = beats(), now = performance.now();
+      if (b !== null && b !== last) { gap = Math.max(gap, (now - lastAt) / 1000); last = b; lastAt = now; }
+      seen.push(b);
+      if (!done()) await new Promise((r) => setTimeout(r, 250));
     }
-    return { ok: steady(), waited: (performance.now() - t0) / 1000 };
-  }, limit);
+    gap = Math.max(gap, (performance.now() - lastAt) / 1000 * (steady() ? 0 : 1));
+    return { ok: done(), waited: (performance.now() - t0) / 1000, gap };
+  }, { limit, settle });
 }
 
 /** Run a command from the palette. Resolves once it has been chosen. */

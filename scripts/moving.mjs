@@ -136,7 +136,7 @@ try {
   await browser.close();
 }
 
-console.log(`  ${LOOK}, recorded ${SECONDS} s with a band in a box (running ${(9 + opening.waited).toFixed(1)} s after load), frozen on purpose ${froze.toFixed(1)}–${thawed.toFixed(1)} s: ${take}\n`);
+console.log(`  ${LOOK}, recorded ${SECONDS} s with a band in a box (running ${(9 + opening.waited).toFixed(1)} s after load${opening.gap >= 1 ? `, after ${opening.gap.toFixed(1)} s with no frame` : ''}), frozen on purpose ${froze.toFixed(1)}–${thawed.toFixed(1)} s: ${take}\n`);
 
 // The stretch the plate did not step: from the first sample showing the
 // count it held at the thaw command, to the first showing more.
@@ -145,8 +145,13 @@ const held = [...steps].reverse().find(x => x.t < thawed)?.n;
 const stopped = steps.find(x => x.t > froze - 0.5 && x.n === held)?.t;
 const resumed = steps.find(x => x.t > thawed && x.n > held)?.t;
 const stood = reported && stopped != null && resumed != null && steps.filter(x => x.t >= stopped && x.t < resumed).every(x => x.n === held);
+// Both ends bounded, and tightly: the key reaches the loop through one
+// React effect (isActiveRef), a frame or two, and the thaw has landed within
+// a tenth of a second on every run. Half a second either way is a lag an
+// operator would feel, and a product fault this check must not absorb by
+// timing the film from the plate instead of the key.
 check('the plate stops stepping when frozen and steps again when thawed',
-  stood && stopped < thawed - 1 && stopped - froze < FREEZE_FOR / 2,
+  stood && stopped - froze < 0.5 && resumed - thawed < 0.5,
   !reported ? 'the page does not report the plate\'s steps'
     : stood ? `freeze pressed ${froze.toFixed(1)} s, last step ${stopped.toFixed(1)} s; thaw pressed ${thawed.toFixed(1)} s, stepping ${resumed.toFixed(1)} s`
       : `no still stretch in the steps between ${froze.toFixed(1)} and ${thawed.toFixed(1)} s`);

@@ -144,7 +144,11 @@ function spread(look, col) {
 function cell(look, col) {
   const s = spread(look, col), f = FMT[col.fmt];
   if (!s.n) return '–';
-  return f(s.lo) === f(s.hi) ? f(s.med) : `${f(s.med)} (${f(s.lo)}–${f(s.hi)})`;
+  // How many takes a cell is over, when it is not all of them: a column two
+  // takes had nothing to measure for is one take's number, not a median.
+  const of = s.n < SEEDS.length ? `, ${s.n} of ${SEEDS.length}` : '';
+  if (f(s.lo) === f(s.hi)) return of ? `${f(s.med)} (${of.slice(2)})` : f(s.med);
+  return `${f(s.med)} (${f(s.lo)}–${f(s.hi)}${of})`;
 }
 const problemsOf = look => look.takes.flatMap(t => t.problems.map(p => `seed ${t.seed}: ${p}`));
 
@@ -181,6 +185,13 @@ if (COMBINE) {
   // brought back is its own row and its own failure.
   const have = new Set(all.map(r => r.id));
   for (const look of picked) if (!have.has(look.id)) all.push({ id: look.id, name: look.name, takes: [{ seed: '-', problems: ['no runner brought this look back'] }] });
+  // And a look that came back with other than one take on each seed (a
+  // runner timed out between takes, since the table is written after every
+  // one) fails too, so its median is not quietly over fewer takes.
+  for (const r of all) {
+    const got = r.takes.map(t => t.seed).sort((a, b) => a - b).join(',');
+    if (got !== SEEDS.join(',')) r.takes.push({ seed: '-', problems: [`takes on seeds ${got || 'none'}, not ${SEEDS.join(', ')}`] });
+  }
   all.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
   writeTable(all);
   console.log(`${tableLines(all).slice(4).join('\n')}\n\n  ${found.length} shard(s), ${all.length} looks: ${path.join(OUT, 'film.md')}`);
@@ -267,6 +278,7 @@ try {
         await page.waitForTimeout(9000);
         const running = await untilRunning(page);
         t.opening = 9 + running.waited;
+        t.gap = running.gap;
         if (!running.ok) t.problems.push(`the show never ran steadily in ${t.opening.toFixed(0)} s after load`);
         else {
           const got = await recordTake(page, SECONDS, take);
@@ -290,7 +302,7 @@ try {
       }
       t.seconds = (Date.now() - started) / 1000;
       const s = t.shape;
-      console.log(` ${t.problems.length ? 'FAIL' : 'ok  '} ${look.id} seed ${seed} (${t.seconds.toFixed(0)} s, running ${t.opening?.toFixed(1) ?? '?'} s after load)${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, half-life ${n1(s.halfLife)} s, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${t.problems.length ? ` — ${t.problems.join('; ')}` : ''}`);
+      console.log(` ${t.problems.length ? 'FAIL' : 'ok  '} ${look.id} seed ${seed} (${t.seconds.toFixed(0)} s, running ${t.opening?.toFixed(1) ?? '?'} s after load${t.gap >= 1 ? `, after ${t.gap.toFixed(1)} s with no frame` : ''})${s && !s.still ? ` — ${s.swells.perMin.toFixed(1)} swells/min, calm ${(s.calm * 100).toFixed(0)}%, half-life ${n1(s.halfLife)} s, black ${(s.black.p5 * 100).toFixed(0)}–${(s.black.p95 * 100).toFixed(0)}%, ${s.hues} hues` : ''}${t.problems.length ? ` — ${t.problems.join('; ')}` : ''}`);
       // After every take, so a run that hits the job's time limit still
       // leaves the table for what it did.
       writeTable(results);
