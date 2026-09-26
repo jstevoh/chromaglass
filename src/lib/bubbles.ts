@@ -222,6 +222,9 @@ export class BubbleField {
     const bs = this.bubbles;
     this.events.length = 0;
 
+    // The bubbles on the end of the straw this step: held where it is, so
+    // nothing below moves them (a satellite pressed against one, a merge).
+    const heldNow = new Set(bs.filter((b) => b.held));
     for (const b of bs) {
       // A bubble on the end of the straw is held there; one let go rounds off.
       if (!b.held) b.fing *= Math.exp(-dt / 1.2);
@@ -261,15 +264,18 @@ export class BubbleField {
         const ddx = c.x - a.x, ddy = c.y - a.y;
         const dist = Math.hypot(ddx, ddy) || 1e-3;
         const touch = a.r + c.r;
+        // A held bubble does not give: the other takes the whole of the move.
+        const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
+        const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
         if (dist < touch * 3 && dist > touch * 0.95) {
           const pull = 2.5 * dt * (1 - dist / (touch * 3));
-          a.x += (ddx / dist) * pull; a.y += (ddy / dist) * pull;
-          c.x -= (ddx / dist) * pull; c.y -= (ddy / dist) * pull;
+          a.x += (ddx / dist) * pull * ka; a.y += (ddy / dist) * pull * ka;
+          c.x -= (ddx / dist) * pull * kc; c.y -= (ddy / dist) * pull * kc;
         } else if (dist < touch * 0.95) {
           // Overlapping: push apart to rest edge to edge.
           const push = (touch * 0.95 - dist) * 0.5;
-          a.x -= (ddx / dist) * push; a.y -= (ddy / dist) * push;
-          c.x += (ddx / dist) * push; c.y += (ddy / dist) * push;
+          a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
+          c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
         }
       }
     }
@@ -282,8 +288,10 @@ export class BubbleField {
         const dist2 = ddx * ddx + ddy * ddy;
         if (a.age > 2 && c.age > 2 && dist2 < (a.r + c.r) * (a.r + c.r) * 0.92 && Math.random() < dt * 0.12) {
           const wa = a.r * a.r, wc = c.r * c.r;
-          a.x = (a.x * wa + c.x * wc) / (wa + wc);
-          a.y = (a.y * wa + c.y * wc) / (wa + wc);
+          // Merged into the one on the straw, it stays on the straw.
+          const pin = heldNow.has(a) ? a : heldNow.has(c) ? c : null;
+          a.x = pin ? pin.x : (a.x * wa + c.x * wc) / (wa + wc);
+          a.y = pin ? pin.y : (a.y * wa + c.y * wc) / (wa + wc);
           a.r = Math.min(a.straw || c.straw ? N * 0.07 : N * 0.05, Math.sqrt(wa + wc));
           if (c.straw) { a.straw = true; a.held = c.held; if (this.strawBubble === c) this.strawBubble = a; }
           a.age = Math.min(a.age, c.age);
