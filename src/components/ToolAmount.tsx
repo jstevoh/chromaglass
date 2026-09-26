@@ -120,7 +120,7 @@ export function ToolAmountChip({ tool, value, onOpen }: { tool: string; value: n
         The word only where there is room for it. On the macOS runner's fonts
         the chip with its word pushed the tool row past the middle column at
         1440, which widened the whole desk and slid the header's centred mode
-        switch off true (npm run qa: "the mode switch does not move").
+        switch off true ("the mode switch does not move", in npm run qa).
       */}
       <span className="hidden opacity-70 2xl:inline">Amount</span>
       <span className="font-mono tabular-nums">{value.toFixed(1)}×</span>
