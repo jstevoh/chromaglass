@@ -19,11 +19,17 @@ import { readFileSync } from 'node:fs';
  * `entry` swaps the page's script for one that imports lab-entry.ts and adds
  * to it (`npm run render-lab` adds the render's encoders); each entry gets
  * its own bundle, so two checks running at once never load each other's.
+ *
+ * `plugins` and `tag` build a lab on altered sources, for a check that needs
+ * a control drawn by a shader without the thing it asks about (`npm run
+ * filmlook` draws the film with the rainbow alone): the plugins are
+ * esbuild's, and the tag names the bundle so it is never the plain lab's.
  */
-export async function openLab({ entry = 'scripts/lab-entry.ts' } = {}) {
-  const out = entry === 'scripts/lab-entry.ts' ? 'node_modules/.cache/lab-page.js'
-    : `node_modules/.cache/lab-page-${entry.replace(/^.*\//, '').replace(/\.[^.]+$/, '')}.js`;
-  await build({ entryPoints: [entry], bundle: true, format: 'esm', outfile: out, logLevel: 'warning' });
+export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], tag = '' } = {}) {
+  const base = entry === 'scripts/lab-entry.ts' ? 'lab-page'
+    : `lab-page-${entry.replace(/^.*\//, '').replace(/\.[^.]+$/, '')}`;
+  const out = `node_modules/.cache/${base}${tag ? `-${tag}` : ''}.js`;
+  await build({ entryPoints: [entry], bundle: true, format: 'esm', outfile: out, logLevel: 'warning', plugins });
   const js = readFileSync(out, 'utf8');
   const server = createServer((req, res) => {
     if (req.url === '/page.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(js); return; }
