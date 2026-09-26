@@ -231,6 +231,12 @@ export const PRESET_PHASE_POUR: Record<string, PhasePourShape> = {
   // Colored I and II: ferrofluid worked through the colour edge to edge.
   'ferro-paint':        'scatter',
 };
+/**
+ * The one place a look's pour is looked up, for the app and the lab alike.
+ * By the built-in id, as the dye's seed is, so a look saved from Ferro Paint
+ * under a new name pours the ring, as it lays the default dye.
+ */
+export const phasePourShape = (presetId: string): PhasePourShape => PRESET_PHASE_POUR[presetId] ?? 'ring';
 
 /** Liquid id to its definition, for the dose the automation pours. */
 export const LIQUIDS_BY_ID = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l]));

@@ -34,14 +34,24 @@ export type PhasePourShape = 'ring' | 'scatter';
 export interface PhaseDrop { x: number; y: number; r: number; amount: number }
 
 /*
-  How much of the plate the scatter covers with ferrofluid, per unit of
-  Ferrofluid (phaseAmount). At Ferro Paint's 0.8 that is 0.4 of the plate's
-  area in liquid (180 drops), and in the lab at 512² under Ferro Paint's field
-  it set into black channels winding through the colour, Colored I's
-  labyrinth. At 0.29 (130 drops) it broke up into separate black beads and
-  worms on the colour instead: Colored I's spots, but none of its channels.
+  How much ferrofluid the scatter pours, as a share of the plate's area:
+  about 180 drops at Ferro Paint's Scale. In the lab at 512² under Ferro
+  Paint's field that set into black channels winding through the colour,
+  Colored I's labyrinth. At 0.29 (130 drops) it broke up into separate black
+  beads and worms on the colour instead: Colored I's spots, but none of its
+  channels.
+
+  A constant, and not scaled by Ferrofluid (phaseAmount), for the same reason
+  the ring pours the same whatever that is: the pour happens at one moment,
+  and at that moment the setting is often on its way somewhere else. A look
+  faded in pours when Ferrofluid first passes 0.002 on its way up (the "turned
+  up on a bare plate" pour in LiquidVisualizer), and Go pours half way through
+  its hand-off, at about half the look's amount. Scaled by the amount, those
+  poured 0 or 1 drops and about 80 where the look asks for 180 (measured by
+  replaying a fade into Ferro Paint through lookFade's ease). Ferrofluid
+  still sets how dark it is drawn, as it always has.
 */
-const SCATTER_COVER = 0.5;
+export const SCATTER_COVER = 0.4;
 /*
   A splat is 0.9 full at its middle, as the ring's are: under half full it
   would not separate at all, and a full one clamps where drops overlap and
@@ -49,20 +59,18 @@ const SCATTER_COVER = 0.5;
 */
 const DROP_FILL = 0.9;
 /*
-  Enough to cover the plate with the finest drop Scale gives (0.02 of the
-  plate), and a cap on how many one-off dispatches the pour makes.
+  Enough for the finest drop Scale gives (0.02 of the plate, 707 drops), and a
+  cap on how many one-off dispatches a pour makes.
 */
-const SCATTER_MAX = 400;
+const SCATTER_MAX = 800;
 
 /**
  * The drops for a pour, in plate coordinates (0–1).
  *
  * @param scale Ferrofluid Scale (phaseScale), 0–1: bigger and fewer drops.
- * @param amount Ferrofluid (phaseAmount), 0–1: how much is poured. The ring
- *   has always poured the same whatever this is (it sets how dark the
- *   ferrofluid draws), and it still does, so no look laid today changes.
+ *   How much is poured does not depend on Ferrofluid (see SCATTER_COVER).
  */
-export function phasePour(shape: PhasePourShape, scale: number, amount: number): PhaseDrop[] {
+export function phasePour(shape: PhasePourShape, scale: number): PhaseDrop[] {
   const s = Math.max(0, Math.min(1, scale));
   const drops: PhaseDrop[] = [];
   if (shape === 'scatter') {
@@ -70,8 +78,7 @@ export function phasePour(shape: PhasePourShape, scale: number, amount: number):
     // about a third the width of the ring's at the same Scale, which is what
     // lets the maze start everywhere at once rather than from a few edges.
     const r = 0.02 + s * 0.066;
-    const cover = SCATTER_COVER * Math.max(0, Math.min(1, amount));
-    const count = Math.min(SCATTER_MAX, Math.round(cover / (DROP_FILL * Math.PI * r * r / 2)));
+    const count = Math.min(SCATTER_MAX, Math.round(SCATTER_COVER / (DROP_FILL * Math.PI * r * r / 2)));
     for (let k = 0; k < count; k++) {
       // The R2 sequence (the plastic number's powers): even without a grid,
       // so there are no rows for the eye to find and no clumps or bare

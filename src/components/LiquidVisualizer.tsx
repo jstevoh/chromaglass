@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeH
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
@@ -4432,7 +4432,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (amt > 0.002 && lead?.addPhase) {
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
-      for (const d of phasePour(PRESET_PHASE_POUR[presetId] ?? 'ring', scale, amt)) lead.addPhase(d.x, d.y, d.r, d.amount);
+      for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
