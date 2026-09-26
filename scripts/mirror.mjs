@@ -74,9 +74,15 @@ const SCENARIOS = [
   { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press', judge: false },
 ];
 
+/*
+  The printed-only plates take a minute of CI between them and can fail
+  nothing, so they run when asked for (MIRROR_ALL=1) rather than on every push.
+*/
+const RUN = process.env.MIRROR_ALL ? SCENARIOS : SCENARIOS.filter((sc) => sc.judge !== false);
+
 const browser = await launchChromium(chromium);
 try {
-  for (const sc of SCENARIOS) {
+  for (const sc of RUN) {
     const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     await page.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* none */ } });
