@@ -37,6 +37,13 @@ export interface SimulatedMusic {
   section(): Section;
   /** The browser will not let audio run before a gesture; call this on one. */
   resume(): Promise<void>;
+  /**
+   * The kicks scheduled so far, and how many were scheduled too late to
+   * sound whole: a kick whose start had already passed when the timer got to
+   * it plays only the tail of its envelope, or nothing. For `npm run kicks`'s
+   * question about a busy page, read under `?debug` as `window.__band()`.
+   */
+  stats(): { kicks: number; late: number; worstLateMs: number };
   stop(): void;
 }
 
@@ -61,6 +68,58 @@ const CHORD = [0, 3, 7, 10];
 
 const hz = (semitonesFromA1: number) => 55 * Math.pow(2, semitonesFromA1 / 12);
 
+/** One note of the band's score: an enveloped oscillator, or a burst of filtered noise. */
+export type BandNote =
+  | { kind: 'tone'; after: number; type: OscillatorType; freq: number; dur: number; gain: number; sweepTo?: number; cutoff?: number }
+  | { kind: 'hit'; after: number; dur: number; gain: number; filter: BiquadFilterType; cutoff: number };
+
+/** Seconds a sixteenth lasts. */
+export const BAND_STEP_S = 60 / BPM / 4;
+
+/**
+ * What the band plays on sixteenth `s` from the top, and in which section.
+ *
+ * The score on its own, apart from the Web Audio that plays it, so that
+ * `npm run kicks` can play the same band into the show's ear offline and
+ * count the kicks it hears against the kicks this says were played. The
+ * running band schedules exactly these notes (`schedule` below).
+ */
+export function bandStep(s: number): { part: Section; notes: BandNote[] } {
+  const bar = Math.floor(s / STEPS);
+  const beat = s % STEPS;
+  const slot = Math.floor(bar / SECTION_BARS) % ARRANGEMENT.length;
+  const part = ARRANGEMENT[slot];
+  const root = ROOTS[slot];
+  const loud = part === 'chorus' ? 1 : part === 'verse' ? 0.75 : part === 'intro' ? 0.5 : 0.35;
+  const notes: BandNote[] = [];
+
+  // ── Kick: four on the floor, and off in the break ──────────────
+  if (part !== 'break' && beat % 4 === 0) {
+    notes.push({ kind: 'tone', after: 0, type: 'sine', freq: 120, dur: 0.28, gain: 0.9 * loud, sweepTo: 42 });
+    if (part === 'chorus' && beat === 12) notes.push({ kind: 'tone', after: BAND_STEP_S * 2, type: 'sine', freq: 120, dur: 0.22, gain: 0.7, sweepTo: 42 });
+  }
+  // ── Snare on two and four ──────────────────────────────────────
+  if (part !== 'intro' && part !== 'break' && (beat === 4 || beat === 12)) {
+    notes.push({ kind: 'hit', after: 0, dur: 0.16, gain: 0.42 * loud, filter: 'bandpass', cutoff: 1900 });
+  }
+  // ── Hats on the eighths, doubled in a chorus ───────────────────
+  if (beat % 2 === 0 || (part === 'chorus' && beat % 1 === 0)) {
+    notes.push({ kind: 'hit', after: 0, dur: 0.045, gain: (beat % 4 === 0 ? 0.1 : 0.16) * loud, filter: 'highpass', cutoff: 7200 });
+  }
+  // ── Bass: root, fifth, octave, with a walk into the bar ────────
+  if (part !== 'break' && beat % 4 === 0) {
+    const note = beat === 0 ? 0 : beat === 8 ? 7 : beat === 12 ? 10 : 0;
+    notes.push({ kind: 'tone', after: 0, type: 'sawtooth', freq: hz(root + note), dur: BAND_STEP_S * 3.4, gain: 0.5 * loud, cutoff: part === 'chorus' ? 900 : 480 });
+  }
+  // ── Pad: the chord, once a bar, held ───────────────────────────
+  if (beat === 0) {
+    for (const interval of CHORD) {
+      notes.push({ kind: 'tone', after: 0, type: 'triangle', freq: hz(root + interval + 24), dur: BAND_STEP_S * STEPS * 0.95, gain: 0.075 * loud, cutoff: 2400 });
+    }
+  }
+  return { part, notes };
+}
+
 export function startSimulatedMusic(): SimulatedMusic {
   const AudioCtor: typeof AudioContext =
     window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -84,7 +143,7 @@ export function startSimulatedMusic(): SimulatedMusic {
     for (let i = 0; i < d.length; i++) d[i] = rng.signed();
   }
 
-  const secondsPerStep = 60 / BPM / 4;
+  const secondsPerStep = BAND_STEP_S;
   let step = 0;
   let nextAt = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -138,38 +197,22 @@ export function startSimulatedMusic(): SimulatedMusic {
     src.stop(at + dur + 0.02);
   };
 
+  let kicks = 0, late = 0, worstLateMs = 0;
   const schedule = (s: number, at: number) => {
-    const bar = Math.floor(s / STEPS);
-    const beat = s % STEPS;
-    const slot = Math.floor(bar / SECTION_BARS) % ARRANGEMENT.length;
-    const part = ARRANGEMENT[slot];
+    const { part, notes } = bandStep(s);
     current = part;
-    const root = ROOTS[slot];
-    const loud = part === 'chorus' ? 1 : part === 'verse' ? 0.75 : part === 'intro' ? 0.5 : 0.35;
-
-    // ── Kick: four on the floor, and off in the break ──────────────
-    if (part !== 'break' && beat % 4 === 0) {
-      tone(at, 'sine', 120, 0.28, 0.9 * loud, 42);
-      if (part === 'chorus' && beat === 12) tone(at + secondsPerStep * 2, 'sine', 120, 0.22, 0.7, 42);
-    }
-    // ── Snare on two and four ──────────────────────────────────────
-    if (part !== 'intro' && part !== 'break' && (beat === 4 || beat === 12)) {
-      hit(at, 0.16, 0.42 * loud, 'bandpass', 1900);
-    }
-    // ── Hats on the eighths, doubled in a chorus ───────────────────
-    if (beat % 2 === 0 || (part === 'chorus' && beat % 1 === 0)) {
-      hit(at, 0.045, (beat % 4 === 0 ? 0.1 : 0.16) * loud, 'highpass', 7200);
-    }
-    // ── Bass: root, fifth, octave, with a walk into the bar ────────
-    if (part !== 'break' && beat % 4 === 0) {
-      const note = beat === 0 ? 0 : beat === 8 ? 7 : beat === 12 ? 10 : 0;
-      tone(at, 'sawtooth', hz(root + note), secondsPerStep * 3.4, 0.5 * loud, undefined, part === 'chorus' ? 900 : 480);
-    }
-    // ── Pad: the chord, once a bar, held ───────────────────────────
-    if (beat === 0) {
-      for (const interval of CHORD) {
-        tone(at, 'triangle', hz(root + interval + 24), secondsPerStep * STEPS * 0.95, 0.075 * loud, undefined, 2400);
+    for (const n of notes) {
+      // Every kick counted at its own time, the chorus's second kick in the
+      // bar (two sixteenths after beat 12) included, as `npm run kicks`
+      // counts them: a count short by one a chorus bar would be a tenth of
+      // the chorus's kicks missing from what the ear is compared against.
+      if (n.kind === 'tone' && n.type === 'sine' && n.freq === 120) {
+        kicks++;
+        const behind = (ctx.currentTime - (at + n.after)) * 1000;
+        if (behind > 0) { late++; worstLateMs = Math.max(worstLateMs, behind); }
       }
+      if (n.kind === 'tone') tone(at + n.after, n.type, n.freq, n.dur, n.gain, n.sweepTo, n.cutoff);
+      else hit(at + n.after, n.dur, n.gain, n.filter, n.cutoff);
     }
   };
 
@@ -205,6 +248,7 @@ export function startSimulatedMusic(): SimulatedMusic {
       return sum / bins.length / 255;
     },
     section: () => current,
+    stats: () => ({ kicks, late, worstLateMs }),
     async resume() {
       await ctx.resume().catch(() => {});
       start();

@@ -23,7 +23,7 @@ import { extractPeakHashes, buildIndex, addToIndex, forEachEntry, matchSnippet, 
 import { RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SongBoundary, roomIsQuiet, DEFAULT_BOUNDARY } from '../src/lib/songBoundary.ts';
 import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
-import { BeatClock } from '../src/lib/beatClock.ts';
+import { BeatClock, LevelOnsets } from '../src/lib/beatClock.ts';
 
 const HZ = 20;
 const DT = 1 / HZ;
@@ -294,11 +294,13 @@ console.log('\nTelling the show the tempo rather than making it work it out:\n')
   /** Run the clock for `seconds`, driven by `tempo`, and collect when it fired. */
   const runClock = ({ seconds, tempo, bass = () => 0, feed = () => {}, lead = 0 }) => {
     const clock = new BeatClock();
+    // A synthetic bass level, heard where it crosses the clock's old line.
+    const level = new LevelOnsets();
     const fired = [];
     for (let t = 0; t < seconds * 1000; t += FRAME) {
       feed(t, tempo);
       clock.setExternal(t, tempo ? tempo.read(t) : null);
-      const tick = clock.update(t, bass(t), 0, lead);
+      const tick = clock.update(t, level.at(t, bass(t)), 0, lead);
       if (tick.kick) fired.push(t);
     }
     return { clock, fired };

@@ -339,7 +339,20 @@ const STRENGTH_FALL_S = 8;
  * tried instead; it cost a frame of latency on every hat and fixed less.)
  */
 const FRESH_RISE_DB = 6;
-const KICK_TILT_DB = 6;
+/*
+  3 dB, not the 6 it was. The show's own band (`npm run kicks`) starts a
+  sawtooth bass note on every kick, and on beat 12 a snare with it; the
+  bass note's harmonics and the snare's body are new energy at 150–400 Hz in
+  the same frame as the kick's, and measured the kick's lead over them at
+  3.9 to 5.9 dB. At 6 the ear called 134 of the chorus's 160 kicks at 48 kHz
+  and 124 at 44.1 kHz, where the bins fall differently, and the intro lost
+  4 of 31: a kick with its bass note is the commonest thing in dance music,
+  not a corner. At 3 it calls all 255 at both rates. The other side: the
+  lone snare (`npm run bands`) first fires a kick at 1 dB (1 in 15), and at
+  2 and 3 fires none, so 3 sits between the two with a dB either way.
+  Nothing else `bands` or `learn` measures moved.
+*/
+const KICK_TILT_DB = 3;
 const LOW_UNDER_REF_DB = 30;
 const HAT_TILT_DB = 4;
 
