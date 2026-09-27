@@ -18,6 +18,14 @@
  *   corner pin  outside the pinned quad is black, inside it is the picture
  *   flip        the picture reverses inside the quad while the quad stays put
  *   grade       gain lifts what is on the wall, and gamma is not gain
+ *   one clock   with the projector window open and both windows animating,
+ *               the plate draws at most 1.1 times one display's refresh and
+ *               at least 0.9 of what the show drew alone, at every phase
+ *               between the two clocks, and with draws that hold the thread
+ *               for 0.7 of a refresh; covered, every ask the projector makes
+ *               draws, however raggedly (PLAN.md §14b; lib/drawGate.ts in
+ *               arithmetic first, then the app, counted rather than
+ *               photographed, so it runs without a GPU too)
  *
  * One page load, one plate: the config is set on the plate that is already
  * running, so a before and an after are the same look half a second apart
@@ -35,6 +43,7 @@ import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { FlashGuard } from '../src/lib/flashGuard.ts';
+import { DrawGate, refreshStamp } from '../src/lib/drawGate.ts';
 import { engineQuery, installFrameReader } from './frame.mjs';
 
 const PORT = Number(process.env.WALL_PORT ?? 4324);
@@ -198,6 +207,194 @@ const check = (name, ok, detail = '') => {
   console.log('');
 }
 
+// ── One clock with the wall up, in arithmetic (PLAN.md §14b) ─────────
+//
+// lib/drawGate.ts in node, on two clocks run the way a browser runs them on
+// one main thread: the show window's animation frames on its display's
+// refresh, the projector window's asks on its own, at a phase from the show's
+// that drifts through every value over a set. Each callback carries its
+// refresh's own time (the rAF timestamp), and runs at that refresh or when
+// the thread is free, whichever is later: a draw holds the thread for its
+// cost, so the second of two callbacks in one refresh runs only after the
+// first one's draw has finished. A callback asks for the next frame after the
+// refresh it ran in, and one held up past a whole refresh runs in the later
+// one. An ask that draws cancels the show's pending frame and asks again,
+// which leaves it on the same refresh.
+//
+// Beside the gate, controls on the same clocks, so that a pass means the gate
+// and not the layout: the guard the show had (an ask compared only with the
+// projector's previous ask, 6 ms back, on the time the callback ran); the fix
+// PLAN.md first wrote (the asks gated against every draw, the show's own
+// frames not); and the gate itself stamped with the time its callback *ran*
+// rather than its refresh's time, which is what the first version of this
+// fix did (`performance.now()` in the callback). That last one draws once a
+// refresh while draws are cheap and twice once one costs more than 0.6 of a
+// refresh, because the second callback of the refresh then runs late enough
+// to look like the next refresh's (found in review: 87 draws a second at
+// 60 Hz with 10.5 ms draws). If these clocks could not produce a doubled
+// rate, the controls would pass too.
+{
+  const run = ({ showHz, wallHz, phase, jitter = 0, cost = 0, rule, stamp = 'refresh', covered = false, seconds = 4 }) => {
+    let seed = 11;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const end = seconds * 1000;
+    // Each clock's refreshes, with their timestamps' jitter.
+    const vsyncs = (period, from) => { const v = []; for (let t = from; t < end + 200; t += period) v.push(t + (rand() - 0.5) * jitter); return v; };
+    const clocks = {
+      frame: covered ? [] : vsyncs(1000 / showHz, 0),
+      ask: vsyncs(1000 / wallHz, phase),
+    };
+    const next = { frame: 0, ask: 0 };
+    const gate = new DrawGate();
+    let busy = 0, lastAsk = -Infinity, lastDraw = -Infinity, asks = 0;
+    const draws = [];
+    for (;;) {
+      const f = clocks.frame[next.frame] ?? Infinity, a = clocks.ask[next.ask] ?? Infinity;
+      const source = f <= a ? 'frame' : 'ask';
+      const v = clocks[source];
+      const ranAt = Math.max(v[next[source]], busy);
+      if (ranAt >= end) break;
+      // Held up past a whole refresh, it runs in the latest one it reached.
+      while (next[source] + 1 < v.length && v[next[source] + 1] <= ranAt) next[source]++;
+      const refreshAt = v[next[source]];
+      next[source]++;
+      const at = stamp === 'refresh' ? refreshAt : ranAt;
+      let drawn;
+      if (rule === 'gate') drawn = gate.offer(source, at);
+      else if (rule === 'old') {
+        drawn = source === 'frame' || ranAt - lastAsk >= 6;
+        if (source === 'ask' && drawn) lastAsk = ranAt;
+      } else {
+        drawn = source === 'frame' || at - lastDraw >= 0.6 * 1000 / wallHz;
+      }
+      if (drawn) { lastDraw = at; busy = ranAt + cost; }
+      // The first second is the gate learning the clocks; judged after it.
+      if (ranAt < 1000) continue;
+      if (source === 'ask') asks++;
+      // The governor is fed the time between draws as the frame loop reads
+      // it when it runs (`frameS`), not the refresh's.
+      if (drawn) draws.push(ranAt);
+    }
+    const gaps = draws.slice(1).map((t, i) => t - draws[i]).sort((a, b) => a - b);
+    return { perS: draws.length / (seconds - 1), asksPerS: asks / (seconds - 1), medianGap: gaps[gaps.length >> 1] ?? 0 };
+  };
+  /**
+   * Over twenty phases between the two clocks: the highest rate and where,
+   * the lowest rate, and the shortest median gap between draws. The lowest
+   * is the floor: a gate that froze the plate (0 a second), or turned down
+   * one frame in two (30), passed every ceiling here in review.
+   */
+  const sweep = (showHz, wallHz, opts) => {
+    let hi = { perS: 0, phase: 0 }, lo = Infinity, shortest = Infinity;
+    for (let i = 0; i < 20; i++) {
+      const phase = (i / 20) * (1000 / wallHz);
+      const r = run({ showHz, wallHz, phase, ...opts });
+      if (r.perS > hi.perS) hi = { perS: r.perS, phase };
+      lo = Math.min(lo, r.perS);
+      shortest = Math.min(shortest, r.medianGap);
+    }
+    return { ...hi, min: lo, medianGap: shortest };
+  };
+  console.log('One clock with the wall up, in arithmetic (draws a second, lowest to highest of twenty phases):\n');
+  /*
+    Displays as they come (a 59.94 Hz projector drifts through every phase
+    in seventeen seconds; ProMotion laptops at 120), and busy machines: 28
+    on both, the Mac runner's app, and 20, where a gate that held its
+    refresh to a 30 Hz display's at most let both clocks through (40.0 a
+    second, tried). Each with draws that cost nothing, and with draws that
+    cost 0.7 of the faster display's refresh: a machine that is busy but
+    keeps up, where a gate stamping callbacks by when they ran doubles.
+  */
+  for (const [showHz, wallHz] of [[60, 60], [60, 59.94], [120, 60], [60, 120], [60, 50], [28, 28], [20, 20]]) {
+    const faster = Math.max(showHz, wallHz);
+    const refresh = 1000 / faster;
+    for (const cost of [0, 0.7 * refresh]) {
+      for (const jitter of [0, 2]) {
+        const gate = sweep(showHz, wallHz, { rule: 'gate', jitter, cost });
+        const old = sweep(showHz, wallHz, { rule: 'old', jitter, cost });
+        const asksOnly = sweep(showHz, wallHz, { rule: 'asks', jitter, cost });
+        const ran = sweep(showHz, wallHz, { rule: 'gate', jitter, cost, stamp: 'ran' });
+        const label = `laptop ${showHz} Hz, projector ${wallHz} Hz${cost ? `, ${cost.toFixed(1)} ms draws` : ''}${jitter ? `, ${jitter} ms jitter` : ''}`;
+        console.log(`  ${label.padEnd(54)} gate ${gate.min.toFixed(1)} to ${gate.perS.toFixed(1)}/s; the old guard ${old.perS.toFixed(1)}, asks alone ${asksOnly.perS.toFixed(1)}, stamped when run ${ran.perS.toFixed(1)}`);
+        check(`${label}: at most 1.1 times the faster display, at every phase`, gate.perS <= 1.1 * faster,
+          `${gate.perS.toFixed(1)}/s against ${faster} Hz`);
+        check(`  and at least 0.95 times it, at every phase`, gate.min >= 0.95 * faster,
+          `${gate.min.toFixed(1)}/s against ${faster} Hz`);
+        if (!cost) {
+          check(`  control: the old guard draws past it on the same clocks`, old.perS > 1.1 * faster,
+            `${old.perS.toFixed(1)}/s against ${faster} Hz`);
+        }
+        if (showHz === wallHz) {
+          if (!cost) {
+            // Why the show's own frames are gated too (lib/drawGate.ts).
+            check(`  control: gating the asks alone still doubles at some phase`, asksOnly.perS > 1.5 * faster,
+              `${asksOnly.perS.toFixed(1)}/s against ${faster} Hz`);
+          } else {
+            // Why each offer carries its refresh's time (lib/drawGate.ts).
+            check(`  control: the same gate stamped with when its callback ran draws past it`, ran.perS > 1.1 * faster,
+              `${ran.perS.toFixed(1)}/s against ${faster} Hz, the governor fed a median ${ran.medianGap.toFixed(1)} ms`);
+          }
+          /*
+            The governor is fed the interval between draws. Doubled, the typical
+            one was half a refresh (or, stamped when run, the draw's own cost),
+            and a machine dropping frames read as one with room to spare; at
+            one draw a refresh it is a whole one.
+          */
+          check(`  and the governor is fed a whole refresh between draws, not half`, gate.medianGap >= 0.9 * refresh,
+            `median ${gate.medianGap.toFixed(1)} ms at the worst phase against a ${refresh.toFixed(1)} ms refresh (the old guard ${old.medianGap.toFixed(1)} ms)`);
+        }
+      }
+    }
+  }
+  // Covered: the show's own frames have stopped, and every ask has to draw.
+  for (const [wallHz, jitter] of [[60, 0], [60, 2], [120, 1], [30, 2]]) {
+    const r = run({ showHz: 60, wallHz, phase: 3, jitter, cost: 0.7 * 1000 / wallHz, rule: 'gate', covered: true });
+    check(`covered, every one of a ${wallHz} Hz projector's asks draws${jitter ? ` (${jitter} ms jitter)` : ''}, with draws of 0.7 of its refresh`,
+      Math.abs(r.perS - r.asksPerS) < 0.5, `${r.perS.toFixed(1)} of ${r.asksPerS.toFixed(1)} a second`);
+  }
+  /*
+    Covered on a busy machine: the Mac runner's covered show drew 44 a second
+    from asks 20 to 200 ms apart (lib/earClock.ts), and one alternating 12 and
+    30 ms apart has a median the short gap is well under 0.6 of. Each ask is
+    a frame the wall shows; a gate that turned down the early one would show
+    the late one's picture twice. A first version, which gated the asks
+    whether or not the show's own frames were running, passed every line
+    above and turned down 8 of these 43 ragged asks and 95 of the 191
+    alternating ones.
+  */
+  for (const [name, gapOf] of [['20 to 200 ms apart', (r, i) => 20 + 180 * r], ['alternately 12 and 30 ms apart', (r, i) => (i % 2 ? 12 : 30)]]) {
+    const gate = new DrawGate();
+    let seed = 3, offered = 0, drawn = 0, i = 0;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let t = 0; t < 4000; t += gapOf(rand(), i++)) { offered++; if (gate.offer('ask', t)) drawn++; }
+    check(`covered, with the wall's asks ${name}, every one draws`, drawn === offered, `${drawn} of ${offered}`);
+  }
+  /*
+    No wall: the show's own frames are never gated, whatever they do. Frames
+    bunched after a long task (one in ten 3 ms after the last) all draw, as
+    they always did.
+  */
+  {
+    const gate = new DrawGate();
+    let drawn = 0, offered = 0, seed = 5;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let t = 0; t < 3000; t += rand() < 0.1 ? 3 : 1000 / 60) { offered++; if (gate.offer('frame', t)) drawn++; }
+    check('with no wall asking, every one of the show\'s own frames draws, even two 3 ms apart', drawn === offered, `${drawn} of ${offered}`);
+  }
+  /*
+    The stamp: a refresh's own time when there is a believable one (held up
+    behind a draw, it is older than now, which is the point), and the time
+    now when there is none or it is from some other clock.
+  */
+  {
+    const cases = [[990, 1000, 990], [700, 1000, 700], [undefined, 1000, 1000], [NaN, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
+    const wrong = cases.filter(([ts, now, want]) => refreshStamp(ts, now) !== want);
+    check('an offer is stamped with its refresh\'s time, or now when that is missing or not believable', wrong.length === 0,
+      wrong.length ? wrong.map(([ts, now, want]) => `${ts} at ${now} gave ${refreshStamp(ts, now)}, not ${want}`).join('; ') : `${cases.length} cases`);
+  }
+  console.log('');
+}
+
 // Its own server, and it must be its own: a survivor from a killed run would
 // serve a stale bundle and the whole run would measure the wrong build.
 {
@@ -238,6 +435,321 @@ const BASE = {
 
 let page;
 let failed = 0;
+
+/*
+  One clock with the wall up, in the app (PLAN.md §14b).
+
+  Found by reading the code: the projector window asks the show for a frame on
+  every one of its own refreshes, and the guard on that ask compared it only
+  with the projector's previous ask. With both windows visible, each on its own
+  display's clock, an ask landing part way into the show's refresh drew a
+  second frame there, so the plate drew up to twice a refresh (each draw with
+  its readback and mirror copy) and the governor, fed the interval between
+  them, never saw a machine falling behind.
+
+  So: the real app, the real projector window (`?cast=true`, CastDisplay's
+  StageMirror, asking on its own animation frames), both animating, and the
+  frames the show's loop draws in a second (`chromaglassDebug().frames`)
+  against the refresh the browser gives these windows, counted by a loop of
+  their own that draws nothing. Counted, not photographed: the count needs no
+  readback, so this runs on the Mac and in a cloud session with no GPU at all,
+  where no renderer comes up and the show's loop is started by the
+  projector's first ask and runs on the show's own frames from then on (the
+  clocks are the whole of what is measured here, and a frame with nothing to
+  draw is still a pass through the loop). There the governor is not fed, and
+  its line says so.
+
+  A headless browser gives both windows one display, so "a different
+  display's clock" is made the only way this page can: the projector window's
+  animation frames are handed to it `__phaseMs` late, a display whose refresh
+  lags the laptop's by that much. A quarter, a half and three quarters of a
+  refresh, and none: the phases a projector's clock drifts through over a set,
+  including the ones past 0.6 of a refresh where gating the asks alone would
+  still have drawn twice.
+
+  Each phase is held to a ceiling and a floor: at most 1.1 times one
+  display's refresh, and at least 0.9 times what the show drew on its own
+  (or the display's refresh, if that is lower). A gate that froze the plate,
+  or turned down one frame in two, passed the ceiling alone in review. And
+  both clocks have to have been offering: the gate turns down about one
+  offer a refresh when they are, so a run where one of them had quietly
+  stopped cannot pass for one where the gate held them to one.
+
+  Then with every draw made to cost 0.7 of a refresh (the harness holds the
+  thread after each one), with both clocks on one refresh: the second of the
+  two callbacks then runs only after the first one's draw. A gate that
+  stamped offers with the time its callback ran saw that one as the next
+  refresh's and drew it too (PLAN.md §14b, found in review); stamped with
+  the refresh's own time, it is turned down.
+
+  Then covered, as `npm run ears` covers a window (its animation frames held,
+  the page saying hidden): the show's own frames stop and every ask has to
+  draw, or the wall freezes, which is what the ask is for. The projector's
+  frames are handed over alternately on time and 12 ms late while it is,
+  the ragged rhythm of a busy machine: a headless window's are as regular as
+  clockwork, and on those a gate that wrongly gated a lone clock passed too.
+
+  First, and in a context of its own, so that a failure in the pixel checks
+  below (which need readbacks) cannot hide it and it cannot disturb them.
+*/
+{
+  const context = await browser.newContext({ viewport: { width: 640, height: 400 } });
+  try {
+    await context.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      const caf = window.cancelAnimationFrame.bind(window);
+      // The refresh this window is given, as the browser delivers it: a loop
+      // of its own that draws nothing, on the untouched clock.
+      window.__rafs = 0;
+      const count = () => { window.__rafs++; raf(count); };
+      raf(count);
+      if (new URLSearchParams(location.search).has('cast')) {
+        // The projector: its animation frames, `__phaseMs` behind (a display
+        // whose refresh begins that much later, so its timestamp moves with
+        // it), alternately on time and 12 ms late while `__ragged` is set,
+        // and withheld altogether while `__mute` is set.
+        window.__phaseMs = 0;
+        window.__mute = false;
+        window.__ragged = false;
+        let late = false;
+        window.requestAnimationFrame = (cb) => {
+          const deliver = (ts) => {
+            if (window.__mute) { raf(deliver); return; }
+            late = !late;
+            const p = window.__phaseMs + (window.__ragged && late ? 12 : 0);
+            if (p > 0) setTimeout(() => cb(ts + p), p); else cb(ts);
+          };
+          return raf(deliver);
+        };
+        return;
+      }
+      /*
+        What a draw costs, while `__drawCostMs` is set: after any callback
+        that drew (the show's frame count went up), the thread is held that
+        long, as a heavy plate holds it. Whatever else wants the thread in
+        that refresh, the projector's ask among them, waits for it.
+      */
+      window.__drawCostMs = 0;
+      const drawsSoFar = () => window.chromaglassDebug?.().frames ?? 0;
+      const costly = (fn) => {
+        if (!(window.__drawCostMs > 0)) return fn();
+        const before = drawsSoFar();
+        const out = fn();
+        if (drawsSoFar() > before) { const until = performance.now() + window.__drawCostMs; while (performance.now() < until) { /* the draw */ } }
+        return out;
+      };
+      // The show: covered on demand, as `npm run ears` does it (see there).
+      const held = new Map();
+      let nextId = 1e9;
+      window.__covered = false;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__covered });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__covered ? 'hidden' : 'visible') });
+      window.requestAnimationFrame = (cb) => {
+        if (!window.__covered) return raf((ts) => costly(() => cb(ts)));
+        const id = nextId++;
+        held.set(id, cb);
+        return id;
+      };
+      window.cancelAnimationFrame = (id) => { if (!held.delete(id)) caf(id); };
+      window.__uncover = () => {
+        window.__covered = false;
+        const cbs = [...held.values()];
+        held.clear();
+        for (const cb of cbs) raf(cb);
+      };
+      // Every ask the projector makes, counted before the show decides
+      // anything about it, and passed on with its refresh's time.
+      // Configurable, because the show deletes it on the way out.
+      window.__asks = 0;
+      let inner;
+      Object.defineProperty(window, '__chromaglassFrame', {
+        configurable: true,
+        get: () => inner && ((...args) => { window.__asks++; return costly(() => inner(...args)); }),
+        set: (f) => { inner = f; },
+      });
+    });
+    const show = await context.newPage();
+    show.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
+    await show.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
+    await show.waitForFunction(() => typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
+    await show.waitForTimeout(5000);
+
+    /**
+     * Over `ms`: frames the show's loop drew, the refresh each window was
+     * given, and the asks the projector made, all a second; and what the
+     * governor is being fed, where there is a governor.
+     */
+    const measure = (ms) => show.evaluate(async (ms) => {
+      const read = () => ({
+        frames: window.chromaglassDebug().frames,
+        rafs: window.__rafs,
+        wallRafs: window.__wall && !window.__wall.closed ? window.__wall.__rafs : 0,
+        asks: window.__asks,
+        // Which window's offer each draw came from, and how many offers were
+        // turned down (lib/drawGate.ts); absent on a build without the gate.
+        gate: window.chromaglassDebug().drawGate?.drawn ?? null,
+        skipped: window.chromaglassDebug().drawGate?.skipped ?? null,
+        t: performance.now(),
+      });
+      const a = read();
+      await new Promise((r) => setTimeout(r, ms));
+      const b = read();
+      const s = (b.t - a.t) / 1000;
+      const d = window.chromaglassDebug();
+      return {
+        gate: a.gate && b.gate ? { frame: (b.gate.frame - a.gate.frame) / s, ask: (b.gate.ask - a.gate.ask) / s } : null,
+        skipped: a.skipped && b.skipped ? (b.skipped.frame - a.skipped.frame + b.skipped.ask - a.skipped.ask) / s : null,
+        offered: a.gate && b.gate && a.skipped && b.skipped ? {
+          frame: (b.gate.frame - a.gate.frame + b.skipped.frame - a.skipped.frame) / s,
+          ask: (b.gate.ask - a.gate.ask + b.skipped.ask - a.skipped.ask) / s,
+        } : null,
+        drawn: (b.frames - a.frames) / s,
+        drawnCount: b.frames - a.frames,
+        hz: (b.rafs - a.rafs) / s,
+        wallHz: (b.wallRafs - a.wallRafs) / s,
+        asks: (b.asks - a.asks) / s,
+        askCount: b.asks - a.asks,
+        frameMs: d.governor?.frameMs ?? null,
+        fallbacks: d.drawGate?.stampFallbacks ?? null,
+        engine: d.engine,
+      };
+    }, ms);
+    const f1 = (n) => (n === null || n === undefined ? '-' : n.toFixed(1));
+
+    const [wall] = await Promise.all([
+      show.waitForEvent('popup'),
+      show.evaluate(() => { window.__wall = window.open('about:blank', 'wall', 'popup,width=480,height=270'); }),
+    ]);
+    /*
+      Opened blank and then sent to the projector's address, which is what
+      `useCastSession` opens: a popup opened straight onto a URL ran this
+      context's init script on its first blank document only, and the
+      projector came up on the untouched clock. `goto` keeps the opener.
+    */
+    await wall.goto(`http://localhost:${PORT}/?cast=true&debug`, { waitUntil: 'load' });
+    // The mirror (not the receiver a window with no opener becomes; see
+    // CastDisplay), on the clock this page controls.
+    await wall.waitForSelector('[data-testid="cast-display"]', { timeout: 30_000 });
+    if (await wall.evaluate(() => typeof window.__phaseMs !== 'number')) throw new Error('the projector window came up on the untouched clock');
+    await show.waitForFunction(() => window.__asks > 30, null, { timeout: 30_000 });
+    /*
+      Two clocks need the show's own to be running, so it is measured first
+      on its own: the projector window open, its asks held back (its
+      animation frames withheld, as a covered window's are). Measured with the
+      wall open rather than before it, because with no renderer at all (a
+      container with no WebGPU) the loop is started by the first frame asked
+      for and never before, and from then on runs on this window's animation
+      frames like any other; a renderer that is up starts it at once. If it is
+      not running, nothing below could double, and the run says it measured
+      nothing rather than passing.
+    */
+    await wall.evaluate(() => { window.__mute = true; });
+    await show.waitForTimeout(300);
+    const alone = await measure(2000);
+    await wall.evaluate(() => { window.__mute = false; });
+    console.log(`\nOne clock with the wall up, in the app (${alone.engine || 'no engine label'}):\n`);
+    console.log(`  the wall's asks held    ${f1(alone.drawn)} drawn/s, display ${f1(alone.hz)} Hz, ${f1(alone.asks)} asks/s, governor fed ${f1(alone.frameMs)} ms`);
+    const ownLoop = alone.drawn >= 10 && alone.asks === 0;
+    check('the show draws on its own frames with the wall\'s asks held (there are two clocks to measure)', ownLoop,
+      `${f1(alone.drawn)} a second against a ${f1(alone.hz)} Hz display, ${f1(alone.asks)} asks a second`);
+    if (ownLoop) {
+      const refreshMs = 1000 / Math.max(1, alone.hz);
+      /** The lines every phase is held to: a ceiling, a floor, and both clocks offering. */
+      const judge = (m, label, { floor = true } = {}) => {
+        const faster = Math.max(m.hz, m.wallHz);
+        console.log(`  wall ${label.padEnd(30)} ${f1(m.drawn)} drawn/s${m.gate ? ` (${f1(m.gate.frame)} on the show's frames, ${f1(m.gate.ask)} on asks, ${f1(m.skipped)} turned down)` : ''}, displays ${f1(m.hz)} and ${f1(m.wallHz)} Hz, ${f1(m.asks)} asks/s, governor fed ${f1(m.frameMs)} ms`);
+        check(`both windows animating, the wall ${label}: at most 1.1 times one display's refresh`,
+          m.drawn <= 1.1 * faster && m.asks > 10,
+          `${f1(m.drawn)} drawn a second against ${f1(faster)} Hz (${f1(m.drawn / Math.max(1, faster))}x), ${f1(m.asks)} asks a second`);
+        if (floor) {
+          const least = 0.9 * Math.min(faster, alone.drawn);
+          check('  and at least 0.9 times what the show drew on its own', m.drawn >= least,
+            `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(Math.min(faster, alone.drawn))})`);
+        }
+        /*
+          Each clock against its own window's refresh: the show's frames
+          offered (drawn or turned down) at least 0.8 of the show's rate, and
+          the wall's asks at least 0.8 of the wall's. Not "one turned down a
+          refresh" against the faster display, which is only true when both
+          windows get the same number of frames: headless on one display they
+          do, but a Mac runner drawing 28 a second with a wall at 40, or a
+          120 Hz laptop with a 60 Hz projector, turns down fewer than the
+          faster display's rate with a gate that is right (the second pre-push
+          review). What it has to catch is one clock that quietly stopped
+          offering, and this does.
+        */
+        const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against ${f1(m.wallHz)}` : 'this build has no draw gate to ask';
+        /*
+          And every refresh's timestamp believed. A wall whose time origin was
+          converted the wrong way, or a clock ahead of this one, falls back to
+          the time its callback ran, which is the stamping that let a slow
+          frame's second clock draw too; on one display the gate still holds
+          without the draw cost, so the rate lines would not see it.
+        */
+        if (m.fallbacks !== null) {
+          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran`);
+        }
+        check('  and both clocks were offering, each at its own window\'s rate',
+          m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.offered.ask >= 0.8 * m.wallHz && m.skipped > 0, offered);
+      };
+      for (const frac of [0, 0.25, 0.5, 0.75]) {
+        await wall.evaluate((p) => { window.__phaseMs = p; }, frac * refreshMs);
+        await show.waitForTimeout(500);
+        const m = await measure(2000);
+        judge(m, frac === 0 ? 'on its own clock' : `${frac} of a refresh behind`);
+        /*
+          And the governor, fed the interval between draws: what the show fed
+          it on its own frames, not the half two interleaved clocks gave it.
+          Half a refresh behind is where the old guard's two clocks
+          interleaved evenly, so where the governor's average fell furthest.
+          Judged against this machine's own interval rather than the display's
+          refresh, so that a busy machine (the Mac runner's app draws about 28
+          a second) is judged too. No governor with a renderer up is a
+          failure; with none (a container with no WebGPU) there is nothing to
+          feed, and it says so.
+        */
+        if (frac === 0.5) {
+          if (m.frameMs !== null && alone.frameMs !== null) {
+            check('  and the governor is fed what the show fed it on its own, not half of it', m.frameMs >= 0.8 * alone.frameMs,
+              `${f1(m.frameMs)} ms against ${f1(alone.frameMs)} ms with the wall's asks held`);
+          } else if (alone.engine) {
+            check('  and the governor is fed what the show fed it on its own, not half of it', false,
+              `a renderer came up (${alone.engine}) and there is no governor to read`);
+          } else {
+            console.log('  (the governor\'s interval not judged: there is no governor, because no renderer came up)');
+          }
+        }
+      }
+      /*
+        Draws that cost 0.7 of a refresh, both clocks on one refresh. No floor
+        here: on a machine whose own draw already costs most of a refresh, a
+        thread held for 0.7 more drops frames for reasons that are not the
+        gate's. The frozen and halving gates are the phases' floors to catch.
+      */
+      await wall.evaluate(() => { window.__phaseMs = 0; });
+      await show.evaluate((ms) => { window.__drawCostMs = ms; }, 0.7 * refreshMs);
+      await show.waitForTimeout(500);
+      judge(await measure(2000), `on its own clock, ${f1(0.7 * refreshMs)} ms draws`, { floor: false });
+      await show.evaluate(() => { window.__drawCostMs = 0; });
+      // Covered: the show's own frames stop; every ask the wall makes draws,
+      // handed over raggedly.
+      await wall.evaluate(() => { window.__ragged = true; });
+      await show.evaluate(() => { window.__covered = true; });
+      await show.waitForTimeout(500);
+      const c = await measure(2000);
+      console.log(`  covered, ragged                ${f1(c.drawn)} drawn/s from ${f1(c.asks)} asks/s (${c.drawnCount} of ${c.askCount})`);
+      check('covered, every ask the wall makes draws, on time or 12 ms late', c.askCount > 20 && c.drawnCount >= c.askCount - 2 && c.drawnCount <= c.askCount,
+        `${c.drawnCount} drawn from ${c.askCount} asks in 2 s`);
+      await show.evaluate(() => window.__uncover());
+      await wall.close();
+    }
+  } catch (err) {
+    check('the wall\'s clock section completed', false, String(err?.message ?? err));
+  } finally {
+    await context.close();
+  }
+  console.log('');
+}
 
 try {
   page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
