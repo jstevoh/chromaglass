@@ -542,6 +542,54 @@ async function openings(ids) {
   return out;
 }
 
+/**
+ * A bare WebGPU canvas on a cold cache, in a browser of its own: no app, no
+ * pipeline, a clear every frame. Printed, not judged: it is the bar for the
+ * stop that follows the show's first step (see where it is printed).
+ */
+async function bare() {
+  const cache = coldCache();
+  const browser = await launchChromium(chromium);
+  try {
+    const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+    await page.route(`http://localhost:${PORT}/bare`, (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body style="margin:0;background:#000"><canvas width="1060" height="700"></canvas></body>' }));
+    await page.goto(`http://localhost:${PORT}/bare`, { waitUntil: 'load' });
+    return { cache, ...await page.evaluate(async () => {
+      const frames = [];
+      let presenting = false;
+      const tick = (t) => { frames.push(t); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      const adapter = await navigator.gpu.requestAdapter();
+      const device = await adapter.requestDevice();
+      const given = performance.now();
+      // Three seconds of the page's own frames first, so the stop at the
+      // GPU's start (4b) is over and cannot be taken for this one.
+      await new Promise((r) => setTimeout(r, 3000));
+      const context = document.querySelector('canvas').getContext('webgpu');
+      context.configure({
+        device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode: 'opaque',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      const first = performance.now();
+      const draw = () => {
+        const enc = device.createCommandEncoder();
+        enc.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.1, g: 0, b: 0.2, a: 1 } }] }).end();
+        device.queue.submit([enc.finish()]);
+        if (presenting) requestAnimationFrame(draw);
+      };
+      presenting = true;
+      draw();
+      await new Promise((r) => setTimeout(r, 5000));
+      presenting = false;
+      const now = performance.now();
+      const after = [first, ...frames.filter((t) => t > first), now];
+      let gap = 0, at = null;
+      for (let i = 1; i < after.length; i++) if (after[i] - after[i - 1] > gap) { gap = after[i] - after[i - 1]; at = after[i - 1]; }
+      return { given: given / 1000, first: first / 1000, gap: gap / 1000, at: at / 1000 };
+    }) };
+  } finally { await browser.close(); }
+}
+
 /** When the device came and the pipelines were built, against load. */
 const milestones = (o) => {
   const at = (t) => (t == null ? 'never' : `${t.toFixed(2)} s`);
@@ -600,6 +648,20 @@ try {
     + ` first step at ${c.firstStep == null ? 'never' : `${(c.firstStep / 1000).toFixed(2)} s`}`);
   console.log(`     ${milestones(c)}`);
   if (process.env.STARTUP_TIMELINE) timeline(c);
+
+  /*
+    The bar for the stop after the first step. The show's canvas is drawn
+    by WebGPU for the first time at its first step; until then the page
+    shows the starting frame. On 2ec45a6's Mac run the first frame to ask
+    for the canvas's texture did so at 13.85 s, the stop began at 13.97 s,
+    and nothing the page asked WebGPU for in between was asked for the
+    first time. Whether a bare canvas's first WebGPU frame stops a cold
+    Mac for as long says whether that stop is Chromium's or the show's.
+  */
+  const bb = await bare().catch((err) => ({ error: String(err).split('\n')[0] }));
+  console.log(bb.error ? `  a bare WebGPU canvas: could not be opened (${bb.error})`
+    : `  a bare WebGPU canvas (shader cache ${bb.cache}): device given ${bb.given.toFixed(2)} s, first drawn ${bb.first.toFixed(2)} s;`
+      + ` its longest wait for a frame after that ${bb.gap.toFixed(2)} s from ${bb.at.toFixed(2)} s`);
 
   // ── The show as it ships ──────────────────────────────────────────
   const o = await open('', presetIds);
