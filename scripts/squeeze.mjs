@@ -79,11 +79,25 @@ try {
   });
   // Settle into the look and let the band start before counting anything.
   await page.waitForTimeout(8000);
+  /*
+    A window of at least `ms`, held open until the band has kicked six times
+    or 45 s have passed. The simulated band plays a song with sections: on
+    the Mac's first run it kicked 9 times in the first 12 s and not once in
+    the next 12 (a breakdown), and the control, which needs kicks to show
+    that at 0 they press nothing, had none to ask about. Counting to a
+    number of kicks asks the same thing whatever section the song is in.
+  */
   const window_ = async (ms) => {
     const a = await read();
+    const t0 = Date.now();
     await page.waitForTimeout(ms);
-    const b = await read();
+    let b = await read();
+    while (b.kicks - a.kicks < 6 && Date.now() - t0 < 45_000) {
+      await page.waitForTimeout(1000);
+      b = await read();
+    }
     return {
+      seconds: (Date.now() - t0) / 1000,
       kicks: b.kicks - a.kicks, cells: b.kick - a.kick, depth: b.depth - a.depth, steps: b.steps - a.steps, squeeze: b.squeeze,
       released: b.released - a.released, pressedKicks: b.pressedKicks - a.pressedKicks, owed: b.owed, total: b,
     };
@@ -102,7 +116,7 @@ try {
     return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
   }, null, { timeout: 10_000 }).catch(() => {});
   const off = await window_(12000);
-  console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in 12 s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps at 0`);
+  console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
   if (errors.length) {
     check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
@@ -124,7 +138,7 @@ try {
     check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
       on.squeeze === 0.9 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
-    check('with the band playing, the show hears kicks', on.kicks >= 5, `${on.kicks} in 12 s`);
+    check('with the band playing, the show hears kicks', on.kicks >= 5, `${on.kicks} in ${on.seconds.toFixed(0)} s`);
     /*
       And pressed as deep as a kick at this look's squeeze: each cell 0.0024
       × 0.9 × the bass (/70, capped at 1) × the accent (1 at Accent 0), so
