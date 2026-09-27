@@ -424,6 +424,15 @@ jobs:
       - name: The show opens without stopping
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run startup
+      # The show keeps hearing while its window is hidden behind the wall's
+      # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
+      # window asking for frames as the projector window does, and the level
+      # the plate reads has to keep moving. After startup, on the shard that
+      # finishes first, because it only needs a plate that draws, not a cold one.
+      # Run directly, as render-app is, on the build step's own output.
+      - name: The ear behind the wall
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node --experimental-strip-types scripts/ears.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a
