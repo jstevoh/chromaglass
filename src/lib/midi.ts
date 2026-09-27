@@ -15,6 +15,7 @@ import type { VisualizerSettings } from '../types';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
+import { MIX_CONTROLS } from './mixer.ts';
 
 /** Where a message comes from: a controller or a note, on a channel (0–15). */
 export interface MidiSource {
@@ -67,7 +68,13 @@ export type MidiAction =
    * one that does not is always live, which is where presets, dyes and the
    * transport belong.
    */
-  | 'bank-next' | 'bank-prev';
+  | 'bank-next' | 'bank-prev'
+  /**
+   * The mixer's order, on pads (lib/mixer.ts, raiseInMix): each press takes a
+   * source a row up the stack, and from the top back to the lowest row it can
+   * have, so one pad walks it through every place it can go.
+   */
+  | 'mix-raise-led' | 'mix-raise-back' | 'mix-raise-film' | 'mix-raise-mark';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -210,6 +217,8 @@ const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
   'blackout-toggle', 'automate-toggle', 'macro-toggle', 'seq-play-pause',
   // Not toggles, and still not a drum's to press.
   'tap-tempo', 'tempo-clear', 'bank-next', 'bank-prev',
+  // The mixer's order: on a kick it would reshuffle the stack every beat.
+  'mix-raise-led', 'mix-raise-back', 'mix-raise-film', 'mix-raise-mark',
 ]);
 export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
 
@@ -363,6 +372,8 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
   'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',
   'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
+  'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
+  'mix-raise-film': 'Mixer: Raise Film', 'mix-raise-mark': 'Mixer: Raise Logo',
 };
 
 /**
@@ -466,6 +477,14 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.
   { key: 'pacing',          label: 'Pacing',           min: 0, max: 1 },
+  /*
+    The mixer (lib/mixer.ts): each source's level and its four grade controls.
+    Learnable because they are what a video mixer's channel strip is, and a
+    channel strip is ridden: the film's brightness down as a verse comes in,
+    the LED ring's saturation up for the chorus. Twenty-three of them, which
+    is what the shift banks are for.
+  */
+  ...MIX_CONTROLS.map(({ key, label, min, max }) => ({ key, label, min, max })),
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));

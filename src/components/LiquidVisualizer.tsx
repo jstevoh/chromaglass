@@ -8283,6 +8283,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const [dimmerNow] = plate.pack.get('dimmer');
             const [markOnNow] = plate.pack.get('markOn');
             const markRectNow = plate.pack.get('markRect') as [number, number, number, number];
+            const markGradeNow = plate.pack.get('markGrade') as [number, number, number, number];
             if (cam) {
               fillCameraUniforms(cam.pack, {
                 time: view.time,
@@ -8400,6 +8401,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   dimmer: dimmerNow,
                   markOn: markOnNow,
                   markRect: markRectNow,
+                  markGrade: markGradeNow,
                 }, stage?.profiler.renderPass('finish'), !!out);
               }
               if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));

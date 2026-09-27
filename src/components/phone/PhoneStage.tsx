@@ -3,10 +3,11 @@ import {
   Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Sparkles, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
-  Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves,
+  Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical,
 } from 'lucide-react';
 import { Slider } from '../ui';
-import type { LiquidType } from '../../types';
+import type { LiquidType, VisualizerSettings } from '../../types';
+import { MixerPanel } from '../MixerPanel';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 
@@ -21,7 +22,7 @@ import type { Track } from '../../lib/musicLibrary';
  * holds the nine tools, always in reach at the bottom, and everything else is
  * one tap away in a sheet that comes up over the lower part of the plate and
  * goes again: the bottles and colours, the looks, the sound, the play
- * controls, and the rest.
+ * controls, the mixer, and the rest.
  *
  * What a phone does that a laptop cannot is also here. Several fingers paint
  * at once (LiquidVisualizer's extra hands). On the closeup two fingers are the
@@ -59,7 +60,7 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'more';
+type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more';
 type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 export interface PhoneStageProps {
@@ -120,6 +121,12 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /*
+    The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
+    draw, at the phone's sizes, so the order and the grades are one thumb
+    away like everything else here.
+  */
+  mixer: { settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void; hasFilm: boolean; hasMark: boolean };
   // The rest
   onSettings: () => void;
   onSongs: () => void;
@@ -343,11 +350,12 @@ export function PhoneStage(p: PhoneStageProps) {
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
-        <div className="grid shrink-0 grid-cols-4 gap-1 border-t border-border pt-1.5 landscape:w-[232px] landscape:border-l landscape:border-t-0 landscape:pl-1.5 landscape:pt-0">
+        <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:w-[264px] landscape:border-l landscape:border-t-0 landscape:pl-1.5 landscape:pt-0">
           {([
             ['looks', 'Looks', Sparkles],
             ['sound', 'Sound', Music],
             ['play', 'Play', Waves],
+            ['mix', 'Mix', SlidersVertical],
             ['more', 'More', MoreHorizontal],
           ] as const).map(([name, label, Icon]) => (
             <button
@@ -567,6 +575,19 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />
           </div>
+        </PhoneSheet>
+      )}
+
+      {sheet === 'mix' && (
+        <PhoneSheet title="Mixer" onClose={close} testId="phone-sheet-mix">
+          <MixerPanel
+            settings={p.mixer.settings}
+            onSetting={p.mixer.onSetting}
+            hasFilm={p.mixer.hasFilm}
+            hasMark={p.mixer.hasMark}
+            touch
+            testId="phone-mixer"
+          />
         </PhoneSheet>
       )}
 

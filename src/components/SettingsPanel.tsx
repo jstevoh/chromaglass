@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MAPPABLE_SOURCES, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
@@ -8,6 +8,7 @@ import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
+import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig } from '../lib/outputConfig';
@@ -618,6 +619,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ tempoSync: v })}
           settingKey="tempoSync"
+        />
+      </section>
+
+      {/*
+        The mixer (lib/mixer.ts, docs/rig-plan.md R7): the same panel the
+        Perform desk and the phone open, with the pin chips this sheet puts on
+        every control. Its sliders are drawn from MIX_CONTROLS, and `npm run
+        panel` reads that list as this section's, since there is no literal
+        slider here to read.
+      */}
+      <section id="settings-mixer" className={`${SECTION_CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+        <h3 className={SECTION_TITLE}>
+          <SlidersVertical size={12} /> Mixer
+        </h3>
+        <MixerPanel
+          settings={settings}
+          onSetting={onUpdate}
+          hasFilm={filmSource !== 'none'}
+          hasMark={markLoaded}
+          chips={(k) => <PinChips settingKey={k} />}
+          testId="settings-mixer-panel"
         />
       </section>
 
@@ -3076,7 +3098,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* Mixer Section */}
       <section id="settings-layers" className={`${SECTION_CARD} ${shown('layers') ? SECTION_GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
         <h3 className={SECTION_TITLE}>
-          <Layers size={12} /> Multi-Layer Mixer
+          <Layers size={12} /> Plates &amp; LED
         </h3>
         <Slider
           label="Layers"

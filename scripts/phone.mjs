@@ -22,6 +22,7 @@
  *   the plate     at least two thirds of a portrait screen is the plate, not
  *                 controls (half in landscape)
  *   the sheets    each opens, stays on screen, and closes from above it
+ *   the mixer     its stack top first, arrows a thumb's size, and they move it
  *   clean screen  hides everything, and a still finger brings it back
  *   tilt          the phone's lean read into Gravity and Tilt Direction, from
  *                 where it was held, the same for the same turn whichever
@@ -128,7 +129,7 @@ const visible = (page, testId) => page.getByTestId(testId).first().isVisible().c
 const box = (page, testId) => page.getByTestId(testId).first().boundingBox();
 
 const TOOLS = ['dropper', 'spray', 'splatter', 'pour', 'streak', 'blow', 'press', 'finger', 'magnet'];
-const DOCK = [...TOOLS.map(t => `phone-tool-${t}`), 'phone-open-dye', 'phone-open-looks', 'phone-open-sound', 'phone-open-play', 'phone-open-more'];
+const DOCK = [...TOOLS.map(t => `phone-tool-${t}`), 'phone-open-dye', 'phone-open-looks', 'phone-open-sound', 'phone-open-play', 'phone-open-mix', 'phone-open-more'];
 
 try {
   // ── Not a phone: a laptop window at a phone's width ──────────────
@@ -139,7 +140,7 @@ try {
     await ctx.close();
   }
 
-  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a small phone', 375, 667, 0.6]]) {
+  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
     const { ctx, page } = await phonePage(w, h);
     const up = await visible(page, 'phone-stage');
     check(`${label} ${w}×${h}: the phone layout is up`, up);
@@ -150,7 +151,7 @@ try {
     // Every mode in reach at once: on screen, a thumb's size, uncovered.
     const boxes = await Promise.all(DOCK.map(id => box(page, id)));
     const off = DOCK.filter((id, i) => !boxes[i] || boxes[i].x < 0 || boxes[i].y < 0 || boxes[i].x + boxes[i].width > w + 0.5 || boxes[i].y + boxes[i].height > h + 0.5);
-    check(`${label}: all nine tools and the five sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
+    check(`${label}: all nine tools and the six sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
     const small = DOCK.filter((id, i) => boxes[i] && Math.min(boxes[i].width, boxes[i].height) < 48);
     check(`${label}: each is 48 px or more`, small.length === 0,
       small.length ? small.map(id => { const b = boxes[DOCK.indexOf(id)]; return `${id} ${Math.round(b.width)}×${Math.round(b.height)}`; }).join(', ')
@@ -238,7 +239,7 @@ try {
     await tap(page, 'phone-tool-dropper');
 
     // The sheets: each opens, fits, and closes from above it.
-    for (const s of ['dye', 'looks', 'sound', 'play', 'more']) {
+    for (const s of ['dye', 'looks', 'sound', 'play', 'mix', 'more']) {
       await tap(page, `phone-open-${s}`);
       const open = await visible(page, `phone-sheet-${s}`);
       if (!open) { check(`${label}: the ${s} sheet opens`, false); continue; }
@@ -258,6 +259,32 @@ try {
     }
 
     if (label === 'portrait') {
+      /*
+        The mixer (lib/mixer.ts), from the dock: the same stack the desk and
+        the settings sheet draw, top of the wall first, every arrow a thumb's
+        size, and an arrow that moves what it says. Asked for with the mixer:
+        "make sure we're building mobile versions of everything".
+      */
+      await tap(page, 'phone-open-mix');
+      const rowsOf = () => page.$$eval('[data-testid="phone-sheet-mix"] [data-row]', els => els.map(e => e.getAttribute('data-row')).join(' '));
+      const before = await rowsOf();
+      const arrows = await Promise.all(['led', 'back', 'film', 'mark'].flatMap(id => [box(page, `phone-mixer-${id}-up`), box(page, `phone-mixer-${id}-down`)]));
+      const smallest = Math.min(...arrows.map(b => (b ? Math.min(b.width, b.height) : 0)));
+      check('portrait: the Mixer lists the stack top first, with every arrow 48 px or more',
+        before === 'mark film back front led' && smallest >= 48, `${before}; smallest arrow ${Math.round(smallest)} px`);
+      await tap(page, 'phone-mixer-film-down');
+      const after = await rowsOf();
+      await tap(page, 'phone-mixer-back-open');
+      const graded = await visible(page, 'phone-mixer-back-grade');
+      check('portrait: and a tap moves the film under the back plate, and opens a row\'s grade',
+        after === 'mark back film front led' && graded, `${after}; grade ${graded ? 'open' : 'not open'}`);
+      // And back up, so the rest of the run plays the default stack.
+      await tap(page, 'phone-mixer-film-up');
+      const back = await rowsOf();
+      check('portrait: and back up again with the other arrow', back === before, back);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await page.waitForTimeout(250);
+
       // A bottle from the Dye sheet is the one in the dock.
       await tap(page, 'phone-open-dye');
       await tap(page, 'phone-liquid-ink');
@@ -277,12 +304,12 @@ try {
       const bandOn = async () => (await page.getByTestId('phone-sound-band').first().getAttribute('aria-pressed')) === 'true';
       const wasOn = await bandOn();
       if (wasOn) { await tap(page, 'phone-sound-band'); await page.waitForTimeout(400); }
-      const before = (await bandOn()) ? 'the band would not stop' : (await visible(page, 'phone-song-shape')) ? 'shown with no sound' : '';
+      const songBefore = (await bandOn()) ? 'the band would not stop' : (await visible(page, 'phone-song-shape')) ? 'shown with no sound' : '';
       await tap(page, 'phone-sound-band');
       await page.waitForTimeout(400);
       const line = (await visible(page, 'phone-song-shape')) ? (await page.getByTestId('phone-song-shape').innerText()).trim() : '';
-      check('the Sound sheet says what it hears of the song, once there is sound', !before && /^(Listening for builds|The song: )/.test(line),
-        `${before ? `${before}; ` : ''}"${line}"`);
+      check('the Sound sheet says what it hears of the song, once there is sound', !songBefore && /^(Listening for builds|The song: )/.test(line),
+        `${songBefore ? `${songBefore}; ` : ''}"${line}"`);
       if (!wasOn) await tap(page, 'phone-sound-band');
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 

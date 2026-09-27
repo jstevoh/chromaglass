@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import { PINNABLE, PIN_RANGE } from './deskPins';
 import { STRUCTURE } from './lookFade';
+import { MIX_KEYS } from './mixer';
 import { stream } from './rng';
 
 /**
@@ -76,6 +77,9 @@ const NOT_THE_LOOK = new Set([
     owner asked to be rid of. How far it walks when nobody has it still drifts.
   */
   'magnetX', 'magnetY',
+  // The mixer is the operator's desk: a grade that wandered on its own would
+  // be a film going grey under nobody's hand.
+  ...MIX_KEYS.map(String),
 ]);
 
 /** Dials that move in whole steps, where a nudge would be a jump. */

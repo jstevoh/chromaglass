@@ -419,8 +419,16 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 // ── Sheet ────────────────────────────────────────────────────────────
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
+  /**
+   * Beside the plate rather than over it: no dimmed, blurred scrim, the panel
+   * against the right edge, and the rest of the window still live. For a
+   * sheet whose controls are judged by eye on the plate itself (the Mixer's
+   * brightness and hue, judged through half-black glass, read wrong), and
+   * which is ridden while the desk around it is still being played.
+   */
+  docked?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -429,14 +437,18 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6"
-      onClick={onClose}
+      className={docked
+        // Between the desk's 48 px header and its 28 px status bar, so the
+        // header's buttons and lights stay in reach and in view beside it.
+        ? 'pointer-events-none fixed bottom-7 right-0 top-12 z-50 flex items-stretch justify-end p-2'
+        : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
+      onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: width, maxHeight: height }}
-        className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]"
+        style={{ maxWidth: width, maxHeight: height, width: docked ? width : undefined }}
+        className={`pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]`}
         data-testid={testId}
       >
         <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-5">
