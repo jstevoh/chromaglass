@@ -40,6 +40,7 @@ import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
+import { MIX_CONTROLS } from '../src/lib/mixer.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -115,7 +116,39 @@ check('every control the panel draws is one a desk can hold', missing.length ===
   exactly what the question means.
 */
 const chipped = [...panel.matchAll(/<PinChips settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]);
-const drawn = new Set([...sliders.map(s => s.key), ...chipped]);
+/*
+  And the mixer's, which are drawn from a list.
+
+  The Mixer (lib/mixer.ts) is one component in three places, the Perform
+  desk, this sheet and the phone, so its twenty-three sliders are not typed
+  out here: \`MixerPanel\` draws one per source for the level and one per grade,
+  from \`MIX_CONTROLS\`, at the registry's range. A reader of this file's
+  markup would call all of them invisible. So they count as drawn only when
+  each link in that chain is there to read: the sheet renders the panel in the
+  Mixer section with its pin chips, and the panel draws the level and every
+  grade through one slider that takes its range from the registry and offers
+  the chips.
+*/
+const mixerSrc = readFileSync(join(root, 'src/components/MixerPanel.tsx'), 'utf8');
+const mixerSection = panel.match(/<section id="settings-mixer"[\s\S]*?<\/section>/)?.[0] ?? '';
+const mixerLinks = {
+  'the sheet draws the Mixer in its own section': /<MixerPanel\b/.test(mixerSection),
+  'with the pin chips': /chips=\{\(k\) => <PinChips settingKey=\{k\} \/>\}/.test(mixerSection),
+  'the panel draws each source\'s level': /slider\(info\.level,/.test(mixerSrc),
+  'and each of its grades': /MIX_GRADES\.map\(g => slider\(gradeKey\(id, g\)/.test(mixerSrc),
+  'at the registry\'s range': /PIN_RANGE\.get\(String\(key\)\)/.test(mixerSrc) && /min=\{spec\.min\}/.test(mixerSrc) && /max=\{spec\.max\}/.test(mixerSrc),
+  'offering the chips beside each': /chips\(key\)/.test(mixerSrc),
+};
+const brokenLinks = Object.entries(mixerLinks).filter(([, ok]) => !ok).map(([k]) => k);
+check('the Mixer draws its controls in the sheet, from the registry', brokenLinks.length === 0,
+  brokenLinks.length ? `missing: ${brokenLinks.join('; ')}` : `${MIX_CONTROLS.length} controls`);
+const mixerOff = MIX_CONTROLS.filter(c => {
+  const spec = PIN_RANGE.get(String(c.key));
+  return !spec || spec.min !== c.min || spec.max !== c.max || spec.section !== 'mixer';
+});
+check('and every one of them is in the registry at its own range, in the Mixer section', mixerOff.length === 0,
+  mixerOff.map(c => String(c.key)).join(', '));
+const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : MIX_CONTROLS.map(c => String(c.key)))]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');
@@ -1059,6 +1092,9 @@ check('and neither starts over the limit',
     'macroMode', 'macroZoom',
     // The paper backdrop's two colours: a look's, chosen with the dyes.
     'paperA', 'paperB',
+    // The mixer's order: its rows' arrows and the four raise pads, which are
+    // moves in a stack rather than a value a slider could hold (lib/mixer.ts).
+    'mixOrder',
   ]);
   const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
   const drawn = new Set([

@@ -9,6 +9,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
+import { MixerPanel } from './MixerPanel';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
 
@@ -175,6 +176,32 @@ export default function RemoteControl() {
     setLocalValues((prev) => ({ ...prev, [field]: v }));
     patchThrottled({ [field]: v } as Partial<VisualizerSettings>);
   }, [patchThrottled]);
+
+  /*
+    The mixer's own sliders and arrows go through here rather than straight
+    to the patch: MixerPanel's sliders are controlled and have no drag
+    callback, so without this the laptop's next snapshot would pull a thumb
+    back mid-drag, and two taps on an arrow inside one round trip would both
+    work from the same old order and send the same string, losing the second.
+    So each change is held locally, and trusted over the laptop's snapshots,
+    until a moment after the last one, the same way `onSliderDrag` holds a
+    slider while a finger is on it.
+  */
+  const mixerHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mixerHeldRef = useRef<Set<keyof VisualizerSettings>>(new Set());
+  const onMixerSetting = useCallback((partial: Partial<VisualizerSettings>) => {
+    const keys = Object.keys(partial) as (keyof VisualizerSettings)[];
+    for (const k of keys) { draggingRef.current.add(k); mixerHeldRef.current.add(k); }
+    setLocalValues((prev) => ({ ...prev, ...partial }));
+    patchThrottled(partial);
+    if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current);
+    mixerHoldRef.current = setTimeout(() => {
+      mixerHoldRef.current = null;
+      for (const k of mixerHeldRef.current) draggingRef.current.delete(k);
+      mixerHeldRef.current.clear();
+    }, 400);
+  }, [patchThrottled]);
+  useEffect(() => () => { if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current); }, []);
 
   const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
 
@@ -664,6 +691,28 @@ export default function RemoteControl() {
                 </div>
               )}
             </div>
+          )}
+
+          {/*
+            The mixer (lib/mixer.ts), the same panel the desk and the phone
+            layout draw. Folded, because it is set between songs more than it
+            is ridden, and the dials above are what a thumb across the room
+            wants first. Every move goes as a patch like any slider here.
+          */}
+          {settings && (
+            <details className="mb-7 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2" data-testid="remote-mixer">
+              <summary className="cursor-pointer py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Mixer</summary>
+              <div className="pb-2 pt-1">
+                <MixerPanel
+                  settings={{ ...settings, ...localValues } as VisualizerSettings}
+                  onSetting={onMixerSetting}
+                  hasFilm={!!state?.filmLoaded}
+                  hasMark={!!state?.markLoaded}
+                  touch
+                  testId="remote-mixer-panel"
+                />
+              </div>
+            </details>
           )}
 
           {/* One-shot gestures */}

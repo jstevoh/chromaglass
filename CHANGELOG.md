@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the mixer
+
+- **A Mixer** over every picture the plate draws: the LED ring, the front
+  plate, the back plate, the film and the logo, top of the list on top on
+  the wall. Move the film between the plates, the logo under the film, or
+  raise the LED ring from the lamp under the glass to a beam over it.
+- **A grade per source**: brightness, contrast, saturation and hue, and a
+  level, for each row. At the defaults the picture is the same as before
+  to the bit.
+- On the Perform desk (the Mixer button), in Settings → Live → Mixer, on
+  the phone's Mix sheet and on the remote. Every control is MIDI-learnable
+  and pinnable, and four pads (Mixer: Raise …) walk a source up the stack.
+- `npm run mixer` measures the order, the grades and every control.
+
 ### Added — the sequencer plays like a light show
 
 - **Pacing.** With a sequence running, each stage plays as a scene:
