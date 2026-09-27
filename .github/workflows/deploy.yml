@@ -40,17 +40,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Was this exact tree already measured? A squash merge of a PR whose head
+  # already contained main publishes, file for file, the tree its PR's
+  # `Checks` run passed on. Running the four macOS shards over it again cannot
+  # find a bug the first run missed, only a flaky check, and on 2026-09-27 that
+  # is what 3 of the 5 red deploys were (#189, #195, #196), each one holding
+  # every merge behind it and doubling the Mac queue. The reasoning, and the
+  # four conditions, are in `scripts/deploygate.sh`; `npm run deploygate --
+  # --history 20` replays it over recent merges (16 of 20 would have skipped).
+  # A run started by hand always checks: that is what someone reaching for the
+  # button usually wants.
+  verified:
+    name: Already checked on its PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      tested: ${{ steps.gate.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v5
+      # A gate that cannot answer (the API down, a rate limit) must not stop a
+      # deploy or wave one through: it leaves `tested` unset and the checks run.
+      - id: gate
+        if: ${{ github.event_name == 'push' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # main as it stood before this push, for the gate's fallback rule.
+          BEFORE: ${{ github.event.before }}
+        run: bash scripts/deploygate.sh "$GITHUB_SHA" "$BEFORE"
+
   # Nothing reaches the live site until the app has been measured and driven.
   # `npm run show` pulls main on show night, so what is on main is what turns
   # up at the venue; a deploy gated only on the typechecker was a deploy gated
-  # on nothing that an audience can see.
+  # on nothing that an audience can see. That still holds: either this run
+  # measures it, or `verified` found the PR run that measured this same tree.
   checks:
     name: Checks
+    needs: verified
+    if: ${{ needs.verified.outputs.tested != 'true' }}
     uses: ./.github/workflows/checks.yml
 
   deploy:
     name: Build and deploy
-    needs: checks
+    needs: [verified, checks]
+    # `checks` is skipped only when `verified` said the tree had passed; a
+    # skipped `checks` for any other reason (a failed `verified`) never deploys.
+    if: >-
+      ${{ !cancelled() && needs.verified.result == 'success' &&
+          (needs.checks.result == 'success' ||
+           (needs.checks.result == 'skipped' && needs.verified.outputs.tested == 'true')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
