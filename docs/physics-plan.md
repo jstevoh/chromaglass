@@ -186,7 +186,7 @@ doubles the edge of eighteen drops (2866 against 1352), conserves them, and
 leaves the black solid.
 
 **Maze Detail** (`mazeDetail`) makes the maze finer, as a thinner gap
-between the plates does. Steve's references (Chemical Bouillon's ferrofluid
+between the plates does. The owner's references (Chemical Bouillon's ferrofluid
 films) run fingers about a sixtieth of the frame wide, and the maze above
 drew them two to three times wider. Detail divides the period by up to three
 (MAZE_FINEST): at 1 it is 0.015 of the plate. The twelve-cell floor still

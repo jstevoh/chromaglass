@@ -22,13 +22,15 @@ is about 38k tokens, and see "Keeping a session small" for why that matters.
   obvious thing. Short code, long reasons.
 - **Commit messages** say what was wrong, what changed and what it measured.
   No model names in commits, PRs or code.
+- **The repository is public.** Files, commits, PRs and comments say "the owner",
+  never a name, email, machine name or account figure. What is private to the owner
+  goes in the project's memory or its shared files, which only the owner can see.
 
 ## Keeping a session small
 
 A session sends its whole context again on every step, so what it read hours ago it
 pays for on every tool call since. Measured 2026-09-27 on the busiest threads: about
-70% of their usage was that re-reading, at 200–380k tokens of context each, and the
-weekly limit stood at 74% with five days left.
+70% of their usage was that re-reading, at 200–380k tokens of context each.
 
 - Read the section, not the file. Pipe long output (`npm run check`, a `git diff` of
   `PLAN.md`, job logs) through `tail` or `grep FAIL`; a long log or a wide search
@@ -37,7 +39,7 @@ weekly limit stood at 74% with five days left.
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
   one fallback check-in, not a chain of half-hourly ones: each wake re-reads the whole
   context even when all it finds is "still running".
-- One thread per PR (Steve, 2026-09-27). When a thread's PR has merged, its next
+- One thread per PR (the owner, 2026-09-27). When a thread's PR has merged, its next
   piece starts in a new thread, not this one: say what it is in the closing reply.
 
 ## What can be verified where
