@@ -345,6 +345,9 @@ export default function App() {
     // Which layer the hand is on, as the layer switch does (scripts/mirror.mjs).
     (window as unknown as { chromaglassLayer?: unknown }).chromaglassLayer =
       (layer: number) => { setActiveLayer(Math.max(0, Math.min(1, Math.round(layer)))); };
+    // Which bottle is in the hand, as the shelf does (npm run bottles).
+    (window as unknown as { chromaglassLiquid?: unknown }).chromaglassLiquid =
+      (id: string) => { setSelectedLiquidId(id); };
     // And its Amount, as the Amount slider does (npm run tools).
     (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
       (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };

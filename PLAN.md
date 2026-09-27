@@ -63,6 +63,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15b–15e open, the ferrofluid's under 9n |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by Steve 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 16a first; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -2171,6 +2172,79 @@ machine whose capacity sinks, rung changes in ten minutes bounded.
 - *A deploy mid-show can mix versions:* a projector window opened after a deploy runs
   the new build against the old show, and the cast hello carries no build version
   (`castProtocol.ts`). Inferred; send the version and warn on a mismatch.
+
+## 15. Every tool on every liquid
+
+Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",
+then "look at the liquid and tools interactions across all of them"). Read from the
+code, with the velocity numbers measured in the lab. The whole table is in
+`docs/tool-by-liquid.md`. What it found, by what a
+performer would notice first:
+
+### 15a. Only the Dropper lays the bottle's liquid (shipped)
+
+Pour, Spray, Splat and Streak laid the colour and nothing else. With Ferrofluid in
+the bottle, a Pour made a pool of near-black dye that the Magnet could not move.
+With Oil, it made orange water that never became an oil body. Soap, milk, silicone
+and glycerine were only colours. Every laying tool now lays the bottle
+(`layBottle`), and a magnetic bottle lays its own dose of dye instead of a heavy
+stain (`bottleDye`). The hands that are not the mouse (a replayed take, the pad,
+OSC: `performGesture`) had the same gap in their own copy of the tools. Their
+Dropper, Pour, Spray, Splat and Streak lay the bottle now too, and their Pour
+spreads from where it lands, as the mouse's does. The show's own pour (Evolve, the
+music, Seed, the looks' inject styles) still runs toward +y as it always has. Every
+tool lays the liquid no wider than the bottle's Dropper (`bottleReach`), once a step
+per hand. So a Pour of Oil is a held Dropper's worth of oil bodies, not a body a
+fifth of the plate across every step. Checked by `npm run bottles` on the Mac (tools shard).
+The app does not step on software WebGPU, so this check cannot run in a cloud
+session.
+
+### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
+
+Every liquid rides one velocity field, which is held to `MAX_SPEED` 0.002
+(`src/gpu/fluid.ts`, `decayVel`). The idle plate already runs at that limit. A
+tool's velocity folds in before the step, carries the liquid once, and the clamp
+then cuts it back to idle. The comments in `fingerDrag` and `blowAir` say the
+projection removes the push. In the lab, the clamp accounts for about three times as
+much as the projection does. Lab, 256², fingerDrag's own velocity dragged 30 cells
+across a disc of dye and ferrofluid over 60 steps (centroid shift, cells):
+
+| | dye | ferrofluid |
+|---|---|---|
+| left alone | 0.00 | 0.00 |
+| today | 0.17 | 0.20 |
+| clamp lifted | 0.56 | 0.63 |
+| at the hand's own speed, no swirl, clamp on | 0.87 | 1.09 |
+
+Only liquids with a hand-written carry actually move under a tool: the dye (Finger's
+`carryDye`, Press's `squeezeOut`) and the oil (Finger's `carryMix`). A likely fix is
+to feed a hand's velocity into the lasting current (`cur`, capped at 0.75 of a cell a
+step, which remembers for about a hundred steps) instead of the clamped field. That
+would carry every field alike. It changes how every tool feels, so it goes to Steve
+first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
+these numbers.
+
+### 15c. Blow's wind erases colour rather than pushing it
+
+A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
+its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
+under it", so the check asserts the eraser. Whether wind should push the colour
+aside instead is a question for Steve, taken with 15b.
+
+### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
+
+`squeezeOut` carries the dye into a ring and nothing else. With Oil Bodies on, a
+press takes the oil's colour out of its body, which is what the Finger did before
+`carryMix`. The ferrofluid under a palm doesn't move either. Wanted: the same ring
+for the oil (a radial `carryMix`) and for the phase.
+
+### 15e. The liquids' own forces are measured only on a stand-in plate
+
+Soap, milk, silicone and glycerine push the plate through the same clamped velocity
+(`liquidPhase.apply`). `npm run liquids` measures them on a 96² stand-in, never on
+the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. Also
+minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
+remote Blow never makes a straw bubble.
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
 
