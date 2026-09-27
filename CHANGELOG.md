@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a take button and a fade time on every Mixer row
+
+- **Each row has a Fade button beside its level**: it takes the row out to
+  nothing over the row's fade time and brings it back to where it was (a
+  film graded to 40% comes back at 40%). Pressed while it runs, it turns
+  round from where it is. A fader moved during a fade stops it there, and
+  a take pressed while a Go runs is the take's to the end of the Go, the
+  gel's and the lumia's too, whose levels the look also sets.
+- **The fade time is in bars**, in the row's Grade drawer (0 to 8; 0 is a
+  cut), counted at the tempo the desk sends or taps, else the one heard in
+  the music, else 120. Every row starts at two bars, four seconds at 120.
+- Seven pads, Mixer: Fade In/Out for each row, and each fade time is
+  MIDI-learnable. On the desk, in Settings, on the phone's Mix sheet and on
+  the remote.
+- `npm run rowfade` drives whole fades at the show timer's rate and holds
+  them to the curve (no step past its steepest, at rest at both ends), the
+  turn-round, the hand, the cut, a Go during a fade on every row and a
+  Back after Lucky (48 checks); `npm run phone` presses the front plate's on the phone, rides
+  its slider mid-fade and sets it to one bar.
+
+### Changed — a Go leaves the room as it is
+
+- A look fade (Go, Back, a new song's look) now leaves the room's settings
+  (the dimmer, the film's and the logo's levels, the Mixer) as they are at
+  each step, instead of putting them back to where they were when the fade
+  began. A film taken out, or a fader ridden, during a Go stays where it is
+  put. So Back undoes the look and no longer the room: a film's level
+  changed after the Go stays changed.
+
 ### Added — a blend per row in the Mixer
 
 - **Every row but the front plate has a blend**, in its Grade drawer: Own

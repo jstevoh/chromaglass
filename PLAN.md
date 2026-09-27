@@ -59,7 +59,7 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
-| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); none yet judged on the Mac; steps 4–6 not started |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); none yet judged on the Mac; steps 5–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
@@ -1199,9 +1199,30 @@ version in the same PR (see the operating rules below).
    row's name whole beside its tag. **Owed:** the Mac look in `docs/judging.md` §13
    (the key's edge on a real film; Add over a bright plate). The front plate has no
    blend: it is the glass the rest is laid on.
-4. **Crossfade a row.** A level ridden by hand is a fade; a row's own fade time and a
-   cut/fade pad, so a film can come in over two bars from a pad. *Check:* a node
-   harness on the fade curve, and the film table (no hard cuts).
+4. **Crossfade a row**, *shipped* (#195). Each row has a Fade button beside its level
+   that takes it out over the row's fade time and brings it back to where it was (a
+   film at 40% comes back at 40%); pressed while it runs, it turns round from where it
+   is, in its share of the time; a fader moved during a fade stops it there. The fade
+   time is in bars, in the row's drawer (0 to 8, 0 is a cut, two bars to start),
+   counted at the tempo the desk sends or taps, else the one heard, else 120. Seven
+   pads (Mixer: Fade In/Out, per row), each fade time MIDI-learnable; the desk,
+   Settings, the phone's Mix sheet and the remote all have the buttons. `npm run
+   rowfade` 48/48 drives whole fades at the show timer's 16 ms: no step past the
+   curve's steepest (0.0024 on a four-second fade from 0.4), at rest at both ends,
+   on time, the turn-round, the hand, the cut, a Go during a fade on every row, the tempo the bars
+   are counted at, and the wiring; held red against twenty broken fades. A song's glide
+   of a level, and a sequence stage's writes, stop a take on it, as a hand does; a
+   new look forgets where its gel and lumia were taken out from; the remote's
+   buttons light from the display's state. `npm run phone` presses the front plate's
+   button on a phone and reads it walk to 0 in 3.8 s over 41 levels, turn round and
+   come back. Found on the way and fixed here: a Go laid each step of its fade down
+   whole, the room's settings as they were when it was pressed, so a film taken out
+   (or a fader ridden) during a Go flickered back once a step; the look fade now
+   keeps the room as it is (`keepRoom`), and a take on the gel or the lumia pressed during
+   a Go, whose levels the look also sets, is the take's to the end of the Go (`lookStep`;
+   the Go undid it, 63 steps back up, before). **Owed:** the Mac look in
+   `docs/judging.md` §13, and a film coming in from a pad filmed by hand
+   (`film.yml`) to show no hard cut in its motion table.
 5. **The mixer on a narrow desk.** At 1024 px the docked sheet covers half the plate.
    A compact layout (the level column only, the grade opening over it) when the window
    is narrow. *Check:* layout at 1024/1280/1440, the plate at least two-thirds
@@ -1220,6 +1241,19 @@ touches the Mixer; the second looks like the adapter going away under the run. W
 after it. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
+Found while building step 4. Changed here, for Steve to confirm: Back reverts the
+look and whatever of the room the change itself moved (Lucky's roll of the
+microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
+changed after it (the film's level, the Mixer, the dimmer), since each step of a look
+fade keeps the room as it is now; that is RIG_KEYS' own rule, but Back used to undo a
+film's level changed after the Go. If Back should undo those too, it wants its own
+path rather than the look fade's. Not done here: a take pressed during a Go wins over
+the Go for that row, but a hand on the gel wheel's or the lumia's slider during a Go
+still does not (the Go's next step puts the look's level back), and inside a sequence
+a take on the gel or the lumia during a stage's glide is stopped by the glide's next
+tick, as a hand's is (the button lights once and nothing moves). The rule a Go now
+keeps (a later press wins, to the end of the change) would settle both.
+
 Found while building step 3, not yet done: the logo darkens what is under it by up to
 8 steps of 255 in the pixel or two where its card meets its clear margin, on its own
 way in as much as any blend, because its texture is filtered with its colour not
@@ -1229,7 +1263,12 @@ Premultiplying on upload would take it out. And once, in a cloud session,
 5.60× (1.40 times, 3.40 wanted): the zoom followed the first of six finger moves
 (50 → 70 px) and none after. It passed on the next run (3.40) and on every run before;
 the Mix sheet is shut by then. Worth reading whether a touchMove can be dropped while
-the page is busy.
+the page is busy. Seen again building step 4: three runs in seven with `PW_WEBGPU=1`
+(1.40, 1.40, 3.00 times), on step 4's tree and once on step 3's. Sending the move the
+pinch's once-a-frame throttle holds back when the frame is up, instead of at the lift,
+did not stop it, so the later moves seem not to reach the pinch at all (inferred, not
+measured): the touch listeners' cleanup drops the pinch, and a plate rebuilt mid-pinch
+would do exactly this.
 
 Found while building step 1, small and not yet done: the remote's Mixer has no check
 of its own (`npm run phone` drives the phone layout, not `?remote=1`), and on landscape

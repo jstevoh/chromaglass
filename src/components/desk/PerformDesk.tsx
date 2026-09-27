@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { MixTakes } from '../../lib/mixFade';
 import { createPortal } from 'react-dom';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import type { ReactNode, Ref } from 'react';
@@ -177,6 +178,8 @@ interface PerformDeskProps {
   /** Whether a film and a logo are loaded, for the Mixer's rows. */
   hasFilm: boolean;
   hasMark: boolean;
+  /** The Mixer rows' take buttons (lib/mixFade.ts). */
+  takes?: MixTakes;
 }
 
 /** The same eight tools on both desks (`tools.ts`). */
@@ -627,7 +630,7 @@ export function PerformDesk(p: PerformDeskProps) {
       {mixerOpen && createPortal(
         <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={440} height={900} testId="mixer-sheet" docked>
           <div className="min-h-0 w-full overflow-y-auto px-5 py-4">
-            <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} testId="desk-mixer" />
+            <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} testId="desk-mixer" />
           </div>
         </Sheet>,
         document.body,

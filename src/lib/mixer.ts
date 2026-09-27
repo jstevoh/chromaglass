@@ -215,8 +215,12 @@ export const OWN_BLEND: Record<MixMover, string> = {
 /** The next blend along, for a pad that steps a row's (Mixer: Next Blend). */
 export const nextBlend = (b: unknown): MixBlend => MIX_BLENDS[(mixBlendIndex(b) + 1) % MIX_BLENDS.length];
 
+/** The setting a row's fade time is kept in, in bars: `filmFade` (lib/mixFade.ts). */
+export const fadeKey = (id: MixSource): keyof VisualizerSettings => `${id}Fade` as keyof VisualizerSettings;
+export const MIX_FADE_KEYS: (keyof VisualizerSettings)[] = ROWS.map(fadeKey);
+
 /** Every setting the mixer owns, the order included: the room's rig, not a look's. */
-export const MIX_KEYS: (keyof VisualizerSettings)[] = [...MIX_CONTROLS.map(c => c.key), 'mixOrder', ...MIX_BLEND_KEYS];
+export const MIX_KEYS: (keyof VisualizerSettings)[] = [...MIX_CONTROLS.map(c => c.key), 'mixOrder', ...MIX_BLEND_KEYS, ...MIX_FADE_KEYS];
 
 /** The short label a row's own slider carries, without the source's name. */
 export const gradeLabel = (g: MixGrade): string => GRADE_LABEL[g];

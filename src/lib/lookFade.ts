@@ -114,6 +114,80 @@ export function lookOf(look: Partial<VisualizerSettings>): Partial<VisualizerSet
   return out as Partial<VisualizerSettings>;
 }
 
+/**
+ * A step of a look change laid over the settings as they are now: the look's
+ * part from the step, the room's (RIG_KEYS) as it is. A look fade's `from`
+ * and `to` both carry the room as it was when the fade began, and a step laid
+ * down whole put back anything the room did since, every step: a film taken
+ * out from its Mixer button, a fader ridden, while a Go ran.
+ */
+export function keepRoom(step: VisualizerSettings, now: VisualizerSettings): VisualizerSettings {
+  const out = { ...step } as Record<string, unknown>;
+  const live = now as unknown as Record<string, unknown>;
+  for (const key of RIG_KEYS) if (key in live) out[key] = live[key];
+  return out as unknown as VisualizerSettings;
+}
+
+/**
+ * One tick of a look fade (a Go, a Back, a new song's look), as the App's
+ * timer lays it down: the blend `t` of the way from `from` to `to`, over the
+ * room as it is now (`keepRoom`), and over whatever `held` names as it is now.
+ *
+ * `held` is the Mixer rows whose take button was pressed after the Go began.
+ * The room's levels are kept anyway; the gel wheel's and the lumia's are the
+ * look's, so a gel taken out from its button while a Go ran had two timers
+ * writing one setting, the take's walking it down and the Go's walking it to
+ * the new look, and the Go won: 63 steps back up in the check, then the new
+ * look's 0.55. The take was pressed later than the Go, and a later hand wins
+ * everywhere else on the desk, so it wins here too, to the end of the Go.
+ *
+ * Kept out of the App so the check (`npm run rowfade`) drives the same
+ * composition the timer does rather than a copy of it: the first version was
+ * checked by counting the calls in the source, and handing the step its two
+ * arguments the wrong way round (a Go that fades to nothing) passed.
+ */
+export function lookStep(
+  from: VisualizerSettings, to: VisualizerSettings, t: number, now: VisualizerSettings, held: Iterable<string> = [],
+): VisualizerSettings {
+  const out = keepRoom(t >= 1 ? to : blendLooks(from, to, t), now) as unknown as Record<string, unknown>;
+  const live = now as unknown as Record<string, unknown>;
+  for (const key of held) if (key in live) out[key] = live[key];
+  return out as unknown as VisualizerSettings;
+}
+
+/**
+ * The room's settings a look change moved by itself, before and after: for a
+ * Back to put back. A look fade leaves the room as it is (`keepRoom`), so a
+ * Back that runs through one puts back nothing of the room, which is right for
+ * a film taken out since the Go (the hand's, not the Go's) and wrong for what
+ * the change itself did: Lucky rolls the microphone's Sensitivity and Bass
+ * Boost, which are the room's, and Back after Lucky left the roll in place
+ * once each step kept the room. So the change says what it moved, and Back
+ * puts back each of those the hand has not touched since (`roomBack`).
+ */
+export interface RoomMove { before: Partial<VisualizerSettings>; after: Partial<VisualizerSettings> }
+export function roomMoved(before: VisualizerSettings, after: VisualizerSettings): RoomMove {
+  const b = before as unknown as Record<string, unknown>;
+  const a = after as unknown as Record<string, unknown>;
+  const out: RoomMove = { before: {}, after: {} };
+  for (const key of RIG_KEYS) {
+    if (JSON.stringify(b[key]) === JSON.stringify(a[key])) continue;
+    (out.before as Record<string, unknown>)[key] = b[key];
+    (out.after as Record<string, unknown>)[key] = a[key];
+  }
+  return out;
+}
+/** What a Back puts back of the room: each setting the change moved that is still where the change left it. */
+export function roomBack(move: RoomMove, now: VisualizerSettings): Partial<VisualizerSettings> {
+  const live = now as unknown as Record<string, unknown>;
+  const after = move.after as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, was] of Object.entries(move.before)) {
+    if (JSON.stringify(live[key]) === JSON.stringify(after[key])) out[key] = was;
+  }
+  return out as Partial<VisualizerSettings>;
+}
+
 /** Where a look change is aiming: the room as it is, with the look complete over it. */
 export function targetLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {
   return { ...current, ...lookOf(look) } as VisualizerSettings;

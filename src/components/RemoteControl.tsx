@@ -742,6 +742,8 @@ export default function RemoteControl() {
                   hasFilm={!!state?.filmLoaded}
                   hasMark={!!state?.markLoaded}
                   touch
+                  onFade={(id) => action(`mix-fade-${id}` as RemoteAction)}
+                  fading={state?.rowFading}
                   testId="remote-mixer-panel"
                 />
               </div>

@@ -41,6 +41,7 @@ import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -138,17 +139,18 @@ const mixerLinks = {
   'and each of its grades': /MIX_GRADES\.map\(g => slider\(gradeKey\(id, g\)/.test(mixerSrc),
   'at the registry\'s range': /PIN_RANGE\.get\(String\(key\)\)/.test(mixerSrc) && /min=\{spec\.min\}/.test(mixerSrc) && /max=\{spec\.max\}/.test(mixerSrc),
   'offering the chips beside each': /chips\(key\)/.test(mixerSrc),
+  'and each row\'s fade time in its drawer': /slider\(fadeKey\(id\), 'Fade time'\)/.test(mixerSrc),
 };
 const brokenLinks = Object.entries(mixerLinks).filter(([, ok]) => !ok).map(([k]) => k);
 check('the Mixer draws its controls in the sheet, from the registry', brokenLinks.length === 0,
-  brokenLinks.length ? `missing: ${brokenLinks.join('; ')}` : `${MIX_CONTROLS.length} controls`);
-const mixerOff = MIX_CONTROLS.filter(c => {
+  brokenLinks.length ? `missing: ${brokenLinks.join('; ')}` : `${MIX_CONTROLS.length} controls and ${FADE_CONTROLS.length} fade times`);
+const mixerOff = [...MIX_CONTROLS, ...FADE_CONTROLS].filter(c => {
   const spec = PIN_RANGE.get(String(c.key));
   return !spec || spec.min !== c.min || spec.max !== c.max || spec.section !== 'mixer';
 });
 check('and every one of them is in the registry at its own range, in the Mixer section', mixerOff.length === 0,
   mixerOff.map(c => String(c.key)).join(', '));
-const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : MIX_CONTROLS.map(c => String(c.key)))]);
+const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key)))]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');

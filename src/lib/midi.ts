@@ -16,6 +16,7 @@ import type { VisualizerSettings } from '../types';
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
 import { MIX_CONTROLS } from './mixer.ts';
+import { FADE_CONTROLS } from './mixFade.ts';
 
 /** Where a message comes from: a controller or a note, on a channel (0–15). */
 export interface MidiSource {
@@ -82,7 +83,14 @@ export type MidiAction =
    * can take a film from through the dye to keyed over it between songs.
    */
   | 'mix-blend-led' | 'mix-blend-gel' | 'mix-blend-lumia'
-  | 'mix-blend-back' | 'mix-blend-film' | 'mix-blend-mark';
+  | 'mix-blend-back' | 'mix-blend-film' | 'mix-blend-mark'
+  /**
+   * A row's take button (lib/mixFade.ts): out to nothing over the row's fade
+   * time, in bars, or back to where it was; pressed mid-fade, it turns round.
+   * The front plate has one too: taking the glass out leaves the lamp.
+   */
+  | 'mix-fade-led' | 'mix-fade-gel' | 'mix-fade-lumia' | 'mix-fade-front'
+  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -231,6 +239,10 @@ const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
   // And its blends: on a kick the row would flicker through all five.
   'mix-blend-led', 'mix-blend-gel', 'mix-blend-lumia',
   'mix-blend-back', 'mix-blend-film', 'mix-blend-mark',
+  // And its take buttons: on every kick a fade turns round before it lands,
+  // and the row hangs half-way, flickering.
+  'mix-fade-led', 'mix-fade-gel', 'mix-fade-lumia', 'mix-fade-front',
+  'mix-fade-back', 'mix-fade-film', 'mix-fade-mark',
 ]);
 export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
 
@@ -257,7 +269,9 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
  */
 // Pacing is not a master, but like them the patch bay does not ride it:
 // see NOT_A_TARGET in sceneMap.ts.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow']);
+// Nor the Mixer rows' fade times: see the same list there.
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow',
+  ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
 
@@ -390,6 +404,10 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'mix-blend-led': 'Mixer: Next Blend, LED Ring', 'mix-blend-gel': 'Mixer: Next Blend, Gel Wheel',
   'mix-blend-lumia': 'Mixer: Next Blend, Lumia', 'mix-blend-back': 'Mixer: Next Blend, Back Plate',
   'mix-blend-film': 'Mixer: Next Blend, Film', 'mix-blend-mark': 'Mixer: Next Blend, Logo',
+  'mix-fade-led': 'Mixer: Fade In/Out, LED Ring', 'mix-fade-gel': 'Mixer: Fade In/Out, Gel Wheel',
+  'mix-fade-lumia': 'Mixer: Fade In/Out, Lumia', 'mix-fade-front': 'Mixer: Fade In/Out, Front Plate',
+  'mix-fade-back': 'Mixer: Fade In/Out, Back Plate', 'mix-fade-film': 'Mixer: Fade In/Out, Film',
+  'mix-fade-mark': 'Mixer: Fade In/Out, Logo',
 };
 
 /**
@@ -511,8 +529,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
     is what the shift banks are for. The rows' blends are not here: each is
     a choice of five, not a fader, so it is stepped by its Mixer: Next Blend
     pad (mix-blend-*) the way the order is walked by the raise pads.
+    The rows' fade times are, in bars (lib/mixFade.ts): a knob per row is
+    how a mixer sets its take time, and one turned between songs is the
+    difference between a film cut in on the One and one eased in over a verse.
   */
   ...MIX_CONTROLS.map(({ key, label, min, max }) => ({ key, label, min, max })),
+  ...FADE_CONTROLS,
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));
