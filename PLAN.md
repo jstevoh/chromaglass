@@ -60,7 +60,7 @@ Where each batch stands, as of 2026-09-27:
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
-| 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
+| 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; the rest not started |
 
@@ -1543,11 +1543,35 @@ forms and a 15 % cut.
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
    starts, 12 testers for 14 days, while the iPhone work carries on. *Not started.*
-4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`, the
-   `native` tier, no service worker on that tier, permission strings, the audio
-   session set to play and record through the speaker, the idle timer off while the
-   plate runs, status bar and home indicator hidden, minimum iOS 26, and an
-   `xcodebuild` step on the macOS runner. *Not started.*
+4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`,
+   no service worker in the app, permission strings, status bar hidden, minimum
+   iOS 26, and an `xcodebuild` step on the macOS runner. ***Built*** (the "iPhone
+   app" workflow compiles it for the simulator; `npm run ios` opens it in Xcode on
+   the Mac), not yet run on a phone (`docs/judging.md` §16). Changed from the
+   plan: the app takes the website's quality ladder, not the `native` tier's,
+   because `capacitor://localhost` read as a laptop serving itself and would
+   have offered a phone 1024² at three device pixels (`detectTier`, checked by
+   `npm run applink`); it gets more once a phone's heat over a set is measured.
+   Still owed from this step: the audio session (music through the speaker
+   while the mic is on) and the idle timer, which lean on WebKit's own
+   handling until the phone shows whether they need native code; the home
+   indicator.
+4a. **The app is also the laptop's remote** (asked for 2026-09-27: "make the
+   remote control work on the iPhone app … switch back and forth between
+   modes"). More › Laptop remote asks once for the laptop's address (paste the
+   Phone line `npm run remote` prints, or type it) and remembers it; the remote
+   carries it as `?relay=` and connects there, since the app's own origin has
+   no relay (`src/lib/appLink.ts`). Play here goes back to the plate. Only in
+   the app: the website's https page cannot open a plain ws:// socket to a
+   laptop. Only the app's remote follows `?relay=`: review found that the
+   laptop's display followed it too, so a crafted link opened on the laptop
+   handed its show key and the show to any host it named; fixed before
+   merge. `npm run applink` (Measure) checks all of it on a real relay with a
+   stand-in laptop, the page on another origin and a stranger's host. ***Built***, not yet on a
+   phone. Open: the iPad in the app gets the full layout, which has no Laptop
+   remote button yet, and neither does a phone that took More › Full layout
+   (until the app is reopened); a QR code on the laptop that opens the app straight
+   into its remote (a `chromaglass://` link) would save the typing.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
