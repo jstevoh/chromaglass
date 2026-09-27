@@ -481,7 +481,7 @@ try {
       check('portrait: set to one bar in the drawer, the same take lands in about half the time',
         /Fade time 1 bar\b/.test(oneBar) && topAgain === 1 && short.last.v === 0 && short.last.t >= 1200 && short.last.t <= 3300
           && short.last.t < out.last.t * 0.7 && !short.jumped,
-        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms)${short.jumped ? ', with a jump' : ''}`);
+        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms), largest step between samples ${short.most.toFixed(3)}${short.jumped ? ' (a jump for its time)' : ''}`);
       await page.getByTestId(take).first().tap();
       await walk(1, 8000, 2000);
       await page.getByTestId('phone-mixer-frontFade').locator('input').first().focus();

@@ -1494,6 +1494,21 @@ while this batch's plan was going in (#177), and no cause is known yet:
   line read 2.1 to 9.1 against allowances of 8.3 to 36.4, at most 63 % of it. Worth
   asking whether a drop's drift should be read on both sides of the drop, so that a
   region starting up is in the drift and not only in the change.
+- `phone.mjs`, "portrait: set to one bar in the drawer, the same take lands in about
+  half the time": on #210 (the Press; no mixer or phone code) it landed where it
+  should (0 at 1944 ms against two bars' 3849 ms; #201's run 1936 against 3838) and
+  went red on "with a jump", whose size the line did not print (it does now). The fade is stepped by
+  a 16 ms show interval against the show clock and the slider shows React's state,
+  so a main thread that stalls on a busy Mac runner moves the level a stall's worth
+  at once, and at one bar the allowance per 80 ms sample (0.106) is half two bars'.
+  Worth printing the largest step and its gap first, then asking whether the walk
+  should stamp the level with the show's time rather than the harness's.
+- `bottles.mjs`, "an Oil Pour lays the dye a Water Pour does per push": red once on
+  #210 (9.05 against 10.22; #201: 9.17 against 9.29). Water's ratio moved, not
+  Oil's: the mouse's stir is a push with no dye once a move event, the Pour's once a
+  step, so the ratio read how many steps the runner fitted into each move. **Fixed
+  in #210:** only the hand's own Pour counts (pushes made in the task that laid its
+  dye, nothing through autoInject); the detail line prints what was left out.
 
 ## Not doing
 

@@ -141,14 +141,35 @@ try {
     const L = f.size;
     if (!f.__bottleSpied) {
       f.__bottleSpied = true;
+      /*
+        The Pour's dye per push is the hand's Pour's own, two ways.
+        What the show lays by itself goes through autoInject (the look laying
+        its pools again after a clear, the music's drops, replayed hands), so
+        its calls are marked. And the mouse's stir (the canvas's mousemove:
+        a shove along each move, for every tool but the Drop and the Finger)
+        is a push with no dye, once a move event, while the Pour's is once a
+        step: counted in, the ratio read how many steps the runner fitted
+        into each move. So every call carries the task it was made in (the
+        batch, closed at the next microtask), and only pushes made in a task
+        that also laid the hand's dye count. On #210's first run a Water
+        Pour read 10.22 where #201's read 9.29 on the same Pour code, and the
+        Oil Pour (9.05; 9.17 on #201) went red against the higher one.
+      */
+      let auto = 0, batch = 0, open = false;
+      const task = () => {
+        if (!open) { open = true; batch++; queueMicrotask(() => { open = false; }); }
+        return batch;
+      };
+      const autoInject = f.autoInject.bind(f);
+      f.autoInject = (...a) => { auto++; try { return autoInject(...a); } finally { auto--; } };
       const addDensity = f.addDensity.bind(f);
-      f.addDensity = (x, y, amount, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount) }); return addDensity(x, y, amount, ...rest); };
+      f.addDensity = (x, y, amount, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount), auto: auto > 0, b: task() }); return addDensity(x, y, amount, ...rest); };
       const squeezeOut = f.squeezeOut.bind(f);
       f.squeezeOut = (...a) => { window.__bottleLog.squeeze++; return squeezeOut(...a); };
       const addVelocity = f.addVelocity.bind(f);
       f.addVelocity = (x, y, vx, vy) => {
         const l = window.__bottleLog; const v = Math.hypot(vx, vy);
-        l.push.push({ x: x / L, y: y / L, a: v }); l.vy += vy; l.vabs += v;
+        l.push.push({ x: x / L, y: y / L, a: v, auto: auto > 0, b: task() }); l.vy += vy; l.vabs += v;
         return addVelocity(x, y, vx, vy);
       };
     }
@@ -204,7 +225,17 @@ try {
       };
     };
     return {
-      phase: tally(l.phase), oil: tally(l.oil), dye: tally(l.dye).a, push: tally(l.push).a,
+      phase: tally(l.phase), oil: tally(l.oil),
+      ...(() => {
+        const hand = l.dye.filter((c) => !c.auto);
+        const laid = new Set(hand.map((c) => c.b));
+        const push = l.push.filter((c) => !c.auto && laid.has(c.b));
+        return {
+          dye: tally(hand).a, push: tally(push).a,
+          shown: tally(l.dye.filter((c) => c.auto)).a,
+          stir: tally(l.push.filter((c) => !c.auto && !laid.has(c.b))).a,
+        };
+      })(),
       vy: l.vy, vabs: l.vabs,
       same: window.chromaglassDebug().fluids[0].gpu === window.__bottleGpu,
     };
@@ -322,10 +353,11 @@ try {
     LAYING.map((t) => `${t} ${water[t].phase.n}/${water[t].oil.n}/${water[t].soap.toFixed(1)}${same(water[t])}`).join(', '));
   const perPush = (r) => r.dye / Math.max(1e-9, r.push);
   const wp = perPush(water.pour), fp = perPush(ferro.pour), op = perPush(oil.pour);
-  check('a Ferrofluid Pour lays a tenth of the dye a Water Pour does per push, or less', water.pour.push > 0 && fp <= 0.1 * wp,
+  check('a Ferrofluid Pour lays a tenth of the dye a Water Pour does per push, or less', water.pour.push > 0 && ferro.pour.push > 0 && ferro.pour.dye > 0 && ferro.pour.same && fp <= 0.1 * wp,
     `${fp.toFixed(2)} against ${wp.toFixed(2)} (by design 0.05 / 0.8 = 0.0625 of it)`);
   check('an Oil Pour lays the dye a Water Pour does per push (only a magnetic bottle changes it)',
-    water.pour.push > 0 && Math.abs(op - wp) < 0.1 * wp, `${op.toFixed(2)} against ${wp.toFixed(2)}`);
+    water.pour.push > 0 && oil.pour.push > 0 && oil.pour.same && Math.abs(op - wp) < 0.1 * wp,
+    `${op.toFixed(2)} against ${wp.toFixed(2)}; not counted: the show's own dye near the strokes (oil ${oil.pour.shown.toFixed(1)}, water ${water.pour.shown.toFixed(1)}), the mouse's stir (oil ${oil.pour.stir.toFixed(2)} of ${(oil.pour.stir + oil.pour.push).toFixed(2)}, water ${water.pour.stir.toFixed(2)} of ${(water.pour.stir + water.pour.push).toFixed(2)})`);
 
   // ── The other hands ──────────────────────────────────────────────
   const AT = [0.3, 0.25];
