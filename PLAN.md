@@ -64,7 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15b–15e open, the ferrofluid's under 9n |
-| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by Steve 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 16a first; nothing built |
+| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 16a first; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1363,7 +1363,7 @@ frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
 
 Found while building step 4, and settled: step 4 made Back keep the room's settings
 the hand changed after the Go (the film's level, the Mixer, the dimmer), since each
-step of a look fade kept the room as it was. Steve asked for Back to go fully back
+step of a look fade kept the room as it was. The owner asked for Back to go fully back
 (2026-09-27), so it has its own path now, **done** (#204): a Back fades the wall's
 part of the room back with the look (`backStep`), leaves the machine's setup
 (`SETUP_KEYS`: the grid, the microphone's latency and prediction, the room camera's
@@ -2269,7 +2269,7 @@ one size for every layer (`resolveSimResolution` from the quality ladder,
 **The decision rig-plan leaves open, taken here as the default:** up to **four**
 plates, and with three or four each runs one rung of the ladder below the grid a
 single plate gets (512 becomes 384 on a local GPU), so four plates cost about what two
-do now. Steve can say otherwise; the ladder is one table.
+do now. The owner can say otherwise; the ladder is one table.
 
 Each step ships its phone version in the same PR (the rule) and one PR each:
 

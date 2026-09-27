@@ -187,7 +187,7 @@ export const SETUP_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof V
  * room as it is: right for a Go, which must not flatten a film brought in
  * while it runs, and wrong for Back, whose job is undo. A film brought up, the
  * dimmer pulled or the Mixer regraded after the Go stayed where it was on
- * Back, and Steve asked for Back to go fully back (2026-09-27). So a Back
+ * Back, and the owner asked for Back to go fully back (2026-09-27). So a Back
  * fades the wall's part of the room too, from where it is to where it was.
  *
  * `held` is what a hand (or a take button, or a song's glide) wrote after the
