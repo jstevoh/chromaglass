@@ -772,6 +772,13 @@ export default function App() {
       // calibration and the beat clock are all exercised for real.
       const band = startSimulatedMusic();
       simulatedRef.current = band;
+      // Under ?debug, the band's kick count for a check to set the heard
+      // kicks against. It stays defined after the source changes and then
+      // reads null: "no band now", which a check must not read as a band
+      // that played nothing.
+      if (new URLSearchParams(window.location.search).has('debug')) {
+        (window as unknown as { __band?: () => unknown }).__band = () => simulatedRef.current?.stats() ?? null;
+      }
       void band.resume();
       setAudioStream(band.stream);
       return;

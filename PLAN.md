@@ -62,7 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); none yet judged on the Mac; steps 5–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; the rest not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1040,6 +1040,20 @@ The steps, most visible first. Each is one PR with its own check, and every step
      hands the plate, on the CPU; neither reads the GPU (next item). Every look changes with music
      playing; waiting on the owner's eyes (judging.md 15).
    - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.**
+     **Shipped** (with 14d): two causes, both measured by `npm run kicks`, which plays
+     the band's own score (`bandStep`) through the live ear. The clock's onset, the
+     smoothed bass crossing 0.45, never crossed in the chorus, where the sawtooth
+     bass holds the level over the line: 59 of 160 chorus kicks heard at 20 fps (110
+     at 60). And a loop reading the onset's `hit` loses the kicks that land on
+     readings it never sees, since the ear reads at 60 Hz and the loop is handed the
+     latest reading: 46 of 160 at a 20 fps plate. The clock and the song's shape now
+     read the kick's onset by its time (`at` moving), and the onset calls a kick that
+     lands with a bass note (next item but one): 155–160 of 160 chorus kicks, every
+     intro and verse kick bar one, at 60, 30 and 20 fps, 48 and 44.1 kHz, late frames
+     or not. The
+     band's scheduler was not a cause (0 of 62 kicks late on the cloud's busy page,
+     `window.__band()` under `?debug`). Still owed: the count in the app on the Mac
+     (next item). What was found:
      The band plays four on the floor at 122 bpm, two kicks a second, outside its
      break. `npm run squeeze` counted the kicks the show heard on the Mac shard: 6 in
      12 s and 9 in 12 s on #192's run, and on the #190 deploy (main, 2026-09-27) 3 in
@@ -1054,6 +1068,24 @@ The steps, most visible first. Each is one PR with its own check, and every step
      these kicks, so a band the show hears one kick in four of is a quarter of the
      show. *Check to write:* heard kicks against the kicks the band played, in the
      app on the Mac, logged by section.
+   - **Count the heard kicks in the app on the Mac.** `npm run kicks` hears the band
+     offline, through the ear's code; nothing yet counts it in the running app, where
+     the plate's frames and the band's timer share a busy page. Both counts are there
+     under `?debug`: `chromaglassDebug().heardKicks()` (onsets the loop saw) and `window.__band()`
+     (kicks the band scheduled, and how many late). *Check to write:* a Mac check
+     that plays the band for 30 s and asks for nine in ten of its kicks heard.
+   - **A kick with its bass note read as low mids.** **Shipped** with the item above.
+     The kick onset would not fire when a frame's new energy at 150–400 Hz came
+     within 6 dB of the new energy under 120 Hz (`KICK_TILT_DB`, which keeps snare
+     bodies off the kick). The band starts a bass note on every kick, and its
+     harmonics put the kick's lead at 3.9–5.9 dB: the ear called 134 of the chorus's
+     160 kicks at 48 kHz and 124 at 44.1 kHz (a Mac runs at either; the bins fall
+     differently), and 4 of the intro's 31. At 3 dB it calls all of them at both
+     rates, and the lone snare in `npm run bands` still fires no kick (it first does
+     at 1 dB). `npm run kicks` now runs at both rates and holds the ear's own onsets
+     to 95 % in every section. Not yet heard on real records: a kick under a bass
+     guitar played on the beat is the same case, and a floor tom the other side of
+     it, and `bands` has no tom.
    - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
      cells and depth the kick hands the plate and the gap its release gives back, on
      the CPU: a regression in the upload (the plate not marked dirty, the flush
@@ -1721,6 +1753,16 @@ take.
 onset by a gain (about 0.3) rather than snapping it. *Measure:* a `learn` case that
 drives the clock the way the live loop does (smoothed bass, trust 0.7) and prints
 kicks to lock and the spread of the lead.
+
+**Shipped.** The loop hands the clock the kick's onset and the time it landed (the
+reading's `at`, watched for a change, so no kick is lost between frames), and `npm
+run learn` drives the clock that way at the shipped trust, 0.7. `npm run kicks`
+measures it on the band's own score: locked after 8 kicks at 60, 30 and 20 fps (8
+or 9 before, the heard kicks it did lock on being early ones), 170 of 256 kicks
+fired ahead at 20 fps against 99, lead −8 ± 13 ms (−14 ± 20 before). The phase
+pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
+20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
+the onset's, a few ms, not the smoothed level's 30–55.
 
 ### 14e. The picture and the room disagree about when the kick is
 
