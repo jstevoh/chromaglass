@@ -136,6 +136,12 @@ export interface GpuStepParams {
   particles: number;
   /** Seconds a particle carries its colour before it is reborn somewhere with dye. */
   particleLife: number;
+  /**
+   * The share of the grid's checkerboard the dye loses a step (dampGrid).
+   * Left out, the solver's own GRID_DAMP; the app never sets it. For
+   * `npm run grating`, to step the same pressed plate with the pass off.
+   */
+  gridDamp?: number;
 }
 
 /**

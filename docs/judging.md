@@ -269,6 +269,25 @@ dye, whether colour visibly seeps out of a pool for the first seconds.
 ?set=phaseDisplace=0    the black over still colour, as before
 ```
 
+## 10. No grating over the dye at 2.8x
+
+Red Cabbage at 2.8x drew a fine blue and white lattice over the violet: a
+checkerboard one grid cell across, seen along its diagonal, which the dye kept
+because a look with no diffusion had nothing to take it out and the closeup
+stretches thin dye's contrast about ten times. The dye now loses that one
+pattern (`dampGrid`, 5% of it left after a second) in every look whose
+diffusion does not already remove it. Measured only in the lab (`npm run
+grating`), which never drew the lattice itself: the app's frames cannot be
+read on software WebGPU. Two things to look at, on Red Cabbage and one other
+look with no diffusion (Diffusion Rate at 0), at 2.8x and above:
+whether the lattice is gone, including on dye that has sat still for a minute;
+and whether the finest diagonal wisps look softer than they did (texture four
+cells across keeps 81% over a second, so a slow softening of the very finest
+diagonal detail is the price, if there is one to see). And the cost: the pass
+is new work on every step of those looks, not yet timed on a real GPU.
+`npm run stages` (or `?stages`) times each stage, `dye grid` among them; its
+milliseconds on Red Cabbage at your usual grid are the number to report.
+
 ---
 
 ## Reading the frame time while you do it

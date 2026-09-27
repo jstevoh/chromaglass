@@ -8447,7 +8447,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
              * of its hundred-odd dispatches that is. Turned on, every stage
              * gets its own pass and its own timestamps, and `solver` names
              * them: squeeze, viscosity, project 1, advect velocity, project
-             * 2, forces, current, dye diffuse, advect dye, sharpen, grain,
+             * 2, forces, current, dye diffuse, advect dye, dye grid, sharpen, grain,
              * decay. It costs a dozen pass boundaries a step, so the total
              * reads a little high — the shares are the point, not the sum.
              */

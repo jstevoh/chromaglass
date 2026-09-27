@@ -51,6 +51,12 @@ const api = {
       dyeAdd[k] += rgb[0] * f * d; dyeAdd[k + 1] += rgb[1] * f * d; dyeAdd[k + 2] += rgb[2] * f * d; dyeAdd[k + 3] += f * d;
     }
   },
+  /** Any dye at all, cell for cell: L × L × 4, added on the next flush. */
+  addDye(data: number[]) {
+    const { dyeAdd } = lab!;
+    if (data.length !== dyeAdd.length) throw new Error(`addDye: ${data.length} values for a ${dyeAdd.length}-value plate`);
+    for (let k = 0; k < dyeAdd.length; k++) dyeAdd[k] += data[k];
+  },
   /** A velocity kick / heat / gap delta at (x, y): channels vx, vy, temp, gap. */
   vel(x: number, y: number, r: number, v: [number, number, number, number]) {
     const { L, velAdd } = lab!;

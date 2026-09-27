@@ -2262,6 +2262,75 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), textureLoad(src, vec2i(id.xy), 0) * A.a.x);
 }`,
 
+  /*
+    Take the grid's own pattern out of the dye, and nothing else.
+
+    What was reported: on Red Cabbage at 2.8x, a fine blue and white lattice
+    over the violet. The screenshot's spectrum is periods of 10 to 15 px at
+    45° and 135°, ±15°: at 2.8x on a 768 grid, a checkerboard, every other
+    cell up and every other down, seen along its diagonal. The liquid makes
+    patterns at any angle; only the grid makes one locked to its diagonals.
+
+    Nothing in the dye's step removes that pattern once it is there. The
+    diffusion would (Jacobi takes about 8a/(1+8a) of it a step), but a quarter of
+    the looks have none. MacCormack takes 2d² of it for a step of d cells,
+    and Red Cabbage moves about a two-thousandth of a cell a step. So the
+    little the presses and the wide-stencil projection leave at grid scale
+    stays, and slowly grows (1.3e-5 to 3.0e-5 over a thousand pressed steps
+    at 768 in the lab). On the plate that is nothing. The closeup stretches
+    thin dye's contrast about ten times (film level and gain, then the gooey
+    contrast), and there it is.
+
+    Not a blur. A blur would take the checkerboard and, with it, every hard
+    edge Red Cabbage keeps by having no diffusion. This is
+
+        f' = f - s · K(f),   K = k ⊗ k / 256,   k = [1 -4 6 -4 1]
+
+    whose response to a wave (kx, ky) is s · ((1 - cos kx)/2)² ((1 - cos ky)/2)².
+    That is s at the checkerboard (π, π) and falls off as the eighth power
+    toward anything smoother; and it is exactly zero for anything that
+    varies along one axis only, since k sums to zero across it, so a line or
+    edge along the grid is not touched at all. A diagonal ripple four cells
+    across loses s/16 a step, six cells across s/256. The kernel sums to
+    zero, so dye is moved, not made or lost.
+
+    And the result is held to the range of its eight neighbours and itself.
+    A filter this sharp rings like any other: a hard diagonal edge is a
+    staircase, the staircase is a checkerboard one cell wide, and taking it
+    out left a ring past the edge 12.9% of its height after five seconds
+    (`npm run grating`'s disc with the clamp taken out; the Gibbs overshoot
+    of any sharp cutoff). Held to its
+    neighbours, a cell can soften toward them but never pass them, so the
+    ring is gone (0.003% of the edge) and the checkerboard, whose every cell
+    sits inside its neighbours' range, goes as fast as before. The clamp is
+    the one place dye can be made: 15 parts per million in ten seconds on a
+    plate of hard edges. `npm run grating` holds it to all of this.
+
+    A.a.x is s.
+  */
+  dampGrid: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  var c = vec4f(0.0);
+  var lo = vec4f(1e30);
+  var hi = vec4f(-1e30);
+  for (var j = 0; j < 5; j++) {
+    var row = vec4f(0.0);
+    for (var i = 0; i < 5; i++) {
+      let q = textureLoad(src, clampP(p + vec2i(i - 2, j - 2), S.n), 0);
+      row += k[i] * q;
+      if (abs(i - 2) <= 1 && abs(j - 2) <= 1) { lo = min(lo, q); hi = max(hi, q); }
+    }
+    c += k[j] * row;
+  }
+  let f = textureLoad(src, p, 0) - A.a.x * c * (1.0 / 256.0);
+  textureStore(dst, p, clamp(f, max(lo, vec4f(0.0)), max(hi, vec4f(0.0))));
+}`,
+
   // Box-filter a field down to the logical grid, for the CPU's readers.
   downsample: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
