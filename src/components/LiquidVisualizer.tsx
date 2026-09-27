@@ -5387,7 +5387,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // The ear reads for this frame first, if its own loop has not yet
       // (lib/earClock.ts plateFrame, PLAN.md §14f), so the frame hears itself.
       plateTsRef.current = ts ?? null;
-      if (ts !== undefined) plateFrame(ts);
+      // Guarded: the whole ear reads here now, and a throw in it must cost
+      // this frame its fresh reading, never the loop its re-arm (draw's own
+      // guard below is what keeps the plate going).
+      if (ts !== undefined) {
+        try { plateFrame(ts); } catch (err) { console.error('ChromaGlass: the ear threw reading for the plate\'s frame', err); }
+      }
       draw();
     };
     /** One frame, guarded; whichever window asked for it has already been let through the gate. */

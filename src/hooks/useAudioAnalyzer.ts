@@ -265,9 +265,19 @@ export function useAudioAnalyzer(
         for (const fn of listenersRef.current) {
           try { fn(next); } catch (err) { console.error('ChromaGlass: a listener to the ear threw', err); }
         }
+        /*
+          On a schedule, not "a tenth of a second since the last": readings
+          come on frames, so the last would publish on the first frame past
+          100 ms, which at 30 frames a second is the fourth (three are 99.99
+          ms) and seven and a half a second, and a slow Mac draws about that.
+          Stepping the mark by EAR_VIEW_MS keeps ten a second at any frame
+          rate of ten or more; it never falls more than one step behind now,
+          so a stall does not buy a burst after it.
+        */
         const now = performance.now();
-        if (now - publishedAtRef.current >= EAR_VIEW_MS) {
-          publishedAtRef.current = now;
+        const due = publishedAtRef.current;
+        if (now - due >= EAR_VIEW_MS) {
+          publishedAtRef.current = Number.isFinite(due) ? Math.max(due + EAR_VIEW_MS, now - EAR_VIEW_MS) : now;
           publishedRef.current++;
           setAudioData(next);
         }

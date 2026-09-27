@@ -2,7 +2,7 @@
 /**
  * Does the sound re-render the page?
  *
- *   npm run renders                 # builds, then about half a minute
+ *   npm run renders                 # builds, then about a minute
  *
  * Reported as PLAN.md §14f, found by reading the code and then measured: the
  * ear (hooks/useAudioAnalyzer.ts) handed every reading to React as state, so
@@ -196,7 +196,10 @@ try {
         w.every(x => x.renders >= 0.9 * x.published && x.renders <= x.published + ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s for ${f(x.published)}`).join(', '));
       check(`${screen.name}, the band: and nothing else on the page commits more`,
-        w.every(x => x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s`).join(', '));
+        // A floor too: every App render React finishes is a commit, so a
+        // counter the devtools hook stopped feeding (React swallows its own
+        // errors injecting it) reads 0 and must not pass as "nothing".
+        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', '));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
         check(hears, w.every(x => x.frames >= 45 && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
@@ -215,7 +218,7 @@ try {
         quiet for the wrong reason.
       */
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= 45)),
+        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= 45)),
         w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', '));
       await ctx.close();
     }
