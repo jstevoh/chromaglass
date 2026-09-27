@@ -73,6 +73,10 @@ When CI is red, use the `steward` skill.
 ## Branches, PRs, deploys
 
 - One PR per piece of work, a draft until CI is green. Squash-merge.
+- Every PR updates `PLAN.md`: what it shipped marked shipped, and anything found
+  along the way that needs fixing or adding written in as a plan item.
+- Every feature ships its phone version in the same PR.
+- Merge as soon as CI is green; the owner does not need to be asked (2026-09-27).
 - After a PR merges, a branch that carries on is restarted from `main`
   (`git fetch origin main && git checkout -B <branch> origin/main`), never stacked
   on merged history.
