@@ -349,9 +349,15 @@ in the lab). Worth looking at:
   second once the hand is off;
 - two fingers on the phone with the Press, one let go while the other
   holds: the one let go should lift into fingers where it was;
-- Beat Squeeze is not here to judge: it has never reached the plate (PLAN
-  §10 step 4, a fix waiting for your eyes). What the Fillmore does on a kick
-  now is its plate rock alone;
+- Beat Squeeze, new: until now it never reached the plate (its press landed
+  a fraction of a cell off the grid), so every look with music playing
+  changes. On Fillmore East, 1969 and on a default look with the band
+  playing (Sound → Simulated), each kick should press the big dish, the dye
+  spreading out in a ring and settling back within half a second, with
+  at most a faint ripple at the rim as it lets go (the big sunburst is still
+  a hand's); the middle of the dish should
+  never go flat black. Too faint, too strong, or the plate pumping instead
+  of breathing are all worth a word (PLAN §10 step 4);
 - Crowd Plate with someone standing still and then walking off.
 
 ```

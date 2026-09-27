@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **built** (`npm run lift`), not yet seen on the Mac, and Beat Squeeze found never to have pressed the plate (fix waiting on the owner's eyes); step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: video out through Syphon, Spout and NDI, OSC control, Ableton Link, video in; the OBS bridge first, the desktop app for the proper route; nothing built |
@@ -923,8 +923,8 @@ The steps, most visible first. Each is one PR with its own check, and every step
    one and three keep their press and two and four lose it; where it knows nothing,
    every kick is 1. Settings → Show, MIDI, the desks, the remote, a sequence's
    stages, and the phone's Sound sheet with a line saying what the grid hears. The
-   squeeze's weighting weighs nothing until Beat Squeeze reaches the plate (step 4's
-   found items: its press has never laid a cell); the rock's works today.
+   squeeze's weighting reaches the plate since Beat Squeeze does (step 4's found
+   items); until then only the rock's showed.
    *Check:* `npm run downbeat` (90): on eight synthesised songs, a real beat within
    70 ms on every tick of every groove, at the song's tempo within 2 % on 1326 of 1326
    ticks; no kick but the one ever called the one (0 of 528, 519 of them placed); the
@@ -1002,21 +1002,49 @@ The steps, most visible first. Each is one PR with its own check, and every step
    there (uncapped, 0.081 against a rest of 0.030). 25 checks. Waiting on the owner's
    eyes on a real GPU (judging.md 15).
    *Found while building it, not yet done:*
-   - **Beat Squeeze has never pressed the plate.** Its centre is `GRID_SIZE / 2` plus
-     a random fraction of 30 cells (`DICE.music.centred()`, and `Math.random()` before
-     the seeded dice), never rounded, so every cell index `squishDisc` reports is
-     fractional, and a write to a Float32Array at a fractional index is silently
-     dropped. Found checking that a kick's press lifts: it lays no cells at all. So
-     the rhythm plate every Fillmore description promises (README, CHANGELOG's Beat
-     squeeze entry, the kick's sunburst) has been the plate rock alone, and Accent the
-     One's weighting of the squeeze weighs nothing until it is fixed; its weighting of
-     the rock works. The fix is one `Math.round` on each of `cx`, `cy` (or in
-     `squishDisc`), but it turns on a press every look with Beat Squeeze up has never
-     had (Fillmore East among them), so it waits for the owner's eyes rather than
-     going out overnight. With it, a check: a kick with Beat Squeeze at 1 thins the
-     lead plate's film, which nothing asks today. The press and its lift are wired
-     for it already (a kick is its own presser in `PressLifts`; until then a press at a
-     fraction of a cell is not remembered).
+   - **Beat Squeeze has never pressed the plate. Fixed (shipped with this item's fix
+     PR, the owner's call on 2026-09-27: "Fix it tonight").** Its centre was
+     `GRID_SIZE / 2` plus a random fraction of 30 cells, never rounded, so every cell
+     index `squishDisc` reported was fractional, and a Float32Array drops a write at a
+     fractional index without a word: the rhythm plate every Fillmore description
+     promises was the plate rock alone. Every stroke now lands on a whole cell
+     (`applySquish` and `squishDisc` both round). Rounding alone would have floored
+     the lead plate: a kick pressed and nothing let it go but the gap's spring (the
+     glass half way back in about 24 s at the default look, 50 on the Fillmore's):
+     at 140 bpm with the bass at 0.7, 100 % of the pressed disc is on the floor after
+     40 s on the Fillmore's glass (`npm run lift`; a one-off run at 120 bpm put the
+     default look at 93 % and Soap Film at 76 %).
+     So a kick is held for the lift's pause (0.15 s) and its gap given back over a
+     third of a second (`KickRelease`, lib/squish.ts): 0 % on the floor, the mean back
+     at rest, each kick still pressing the film under it to 0.0255 to 0.0258 a tenth
+     of a second after it lands. *Check:* `npm run lift` (a kick lands on whole cells, all 319,800 of
+     its writes kept, where with the rounding taken out none are; pressed and never let go at 140 bpm the disc floors,
+     let go it stays at rest on no spring, the Fillmore's and the default look's
+     glass, and at half the step rate); `npm run squeeze` in the app on the Mac shard
+     (Fillmore East with the band: the kicks press the lead plate as deep as the
+     look's squeeze, each is let go, the gap given back over the run is the depth
+     pressed, and at Beat Squeeze 0 nothing is pressed). Both count what the code
+     hands the plate, on the CPU; neither reads the GPU (next item). Every look changes with music
+     playing; waiting on the owner's eyes (judging.md 15).
+   - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
+     cells and depth the kick hands the plate and the gap its release gives back, on
+     the CPU: a regression in the upload (the plate not marked dirty, the flush
+     skipped, `squeezeUpdate` ignoring a delta) would pass it. The Mac reads back the
+     velocity (`rbVx`, `rbVy`); the outward flow round a kick's centre a frame or two
+     after it lands, against the same seconds at Beat Squeeze 0, would say the press
+     reached the solver. (The hand's press goes up the same path, and the Mac's tool
+     checks read that.)
+   - **A kick dirties the plate for about half a second.** With Fingering up a
+     kick's press is remembered and lifts for over a second, and its release lays a
+     third of a second; on the Fillmore with a band the lead plate is marked dirty,
+     a full delta upload, on most steps. Nothing measures the frame cost yet; worth
+     reading on the Mac's frame timings before a show.
+   - **Whether a kick's press should show more.** Held and released, a kick at the
+     Fillmore's squeeze thins the film under it by about a seventh (0.030 to 0.0255) for
+     a tenth of a second; the ring it spreads is the flow the shader derives from
+     that. If it reads too faint on the Mac, the press can go deeper now that it no
+     longer adds up (the 0.0024 a disc was doubled when the press laid nothing, so
+     it was never judged by its own look).
    - **The lab's glass is forty times springier than the app's.** BASE's `gapSpring`
      is 0.02 a step; the app derives it from dt and Plate Spring, 0.00048 at the
      default look (the glass half way back in about 24 s), 0.0080 at the fastest look
@@ -1034,11 +1062,14 @@ The steps, most visible first. Each is one PR with its own check, and every step
      about 24 s is a long time for a hand on glass; worth judging on the Mac whether
      the glass should come up faster by default (Plate Spring).
    - **The Fillmore East sequence's Sunburst stage leans on Beat Squeeze** (1.0, with
-     Fingering 1.0): until the squeeze reaches the plate, the stage's sunburst comes
-     only from a hand on the Press. Its description now says the dish is rocked.
-   - **Stroke centres are not checked to be whole cells anywhere.** Every caller of
-     `applySquish` rounds (or passes whole numbers) by habit; `squishDisc` could
-     round, or throw in development, so the next fractional caller is not silent.
+     Fingering 1.0): with the squeeze reaching the plate, each kick now lifts with a
+     faint ripple at the rim's spokes (a tap's lift, 0.004 in `npm run lift`), and the
+     big sunburst still comes from a hand on the Press; a kick's lift strong enough to
+     read as the sunburst is a plan item for after the owner has seen it. Its
+     description says the dish is pressed on every kick again. Judge it on the Mac.
+   - **Stroke centres are not checked to be whole cells anywhere. Done:** `squishDisc`
+     and `applySquish` round every centre now, so the next fractional caller lands on
+     the nearest cell instead of laying nothing (`npm run lift`).
    - **The fingers are drawn, not grown.** The lift lays spokes from the CPU as the
      press did; the solver's own squeeze flow is still symmetric in the sign of dh/dt.
      An instability in `squeezeUpdate` keyed on a rising gap would let the fingers'
@@ -1149,6 +1180,15 @@ while this batch's plan was going in (#177), and no cause is known yet:
   DROP_EVERY steps with a splash.
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
+- `npm run startup`, the same check, a second kind of stop: on #186's run on 1f627f3
+  (2026-09-27) the frames stopped 2.22 s from 1.34 s, *before* the device was given
+  (asked at 0.53 s, given at 3.50 s; the first step at 13.61 s), where the check
+  names the stop at the GPU's start as a separate 0.30 s from 1.04 s. The same app
+  passed the shard on the commit before (40dee25; only a check script differed).
+  Not #181's stop (that one sat a quarter second after the first step). Worth
+  measuring what the page does while Chromium creates the device (the table shows
+  no frames counted between 0.77 s and 3.48 s), and whether 4b should own every
+  stop before the device is given rather than only the first.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames

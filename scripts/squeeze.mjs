@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+/**
+ * `npm run squeeze`: Beat Squeeze presses the lead plate on a kick.
+ *
+ * What was found: the rhythm plate never pressed. Its centre was the middle
+ * of the plate plus a fraction of thirty cells, never rounded, so every cell
+ * index its disc reported was a fraction, and the plate's typed arrays drop a
+ * write at a fractional index without a word. From the day it was written
+ * until #185 (PLAN §10 step 4), every kick on every look with Beat Squeeze up
+ * (Fillmore East, 1969 at 0.9 among them) rocked the plate and pressed
+ * nothing. No check asked, because none counted what a kick laid.
+ *
+ * So this counts it, in the app itself, with the band playing: the cells
+ * the lead plate's kick strokes lay (`pressedCells.kick`, counted as the
+ * stroke reports them, whole cells only, since a fractional one is the bug)
+ * against the kicks the show heard over the same seconds, on Fillmore East,
+ * 1969. And the control: the same seconds with Beat Squeeze at 0, where the
+ * kicks go on and nothing is pressed, which says the count is the squeeze's
+ * and not something else a kick does.
+ *
+ * It needs the app's plate to step. On software WebGPU (a cloud session)
+ * the full app barely does, so the kicks never reach the squeeze and there
+ * is nothing to ask: it says so and passes only there. The Mac shard always
+ * asks (SQUEEZE_GPU=1 there, as `npm run phone` has PHONE_GPU).
+ */
+import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
+import { spawn } from 'node:child_process';
+
+const PORT = Number(process.env.SQUEEZE_PORT ?? 4371);
+const NEED_GPU = process.env.SQUEEZE_GPU === '1';
+const checks = [];
+const check = (name, ok, detail = '') => {
+  checks.push({ name, ok });
+  console.log(`${ok ? ' ok  ' : ' FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
+};
+
+const notes = [];
+async function serve() {
+  const proc = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'],
+    { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  await new Promise((resolve, reject) => {
+    const bail = setTimeout(() => reject(new Error('preview server did not start')), 30_000);
+    proc.stdout.on('data', d => { if (String(d).includes('localhost')) { clearTimeout(bail); resolve(); } });
+    proc.stderr.on('data', d => { notes.push(String(d).trim()); });
+    proc.on('exit', c => { clearTimeout(bail); reject(new Error(`preview exited ${c}: ${notes.join(' ').slice(0, 200)}`)); });
+  });
+  return proc;
+}
+const server = await serve();
+const stopServer = () => { try { process.kill(-server.pid, 'SIGTERM'); } catch { server.kill('SIGTERM'); } };
+process.on('exit', stopServer);
+
+const browser = await launchChromium(chromium);
+try {
+  const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+  const errors = [];
+  page.on('pageerror', (e) => { errors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
+  // The band, chosen before the page loads: simulated audio otherwise waits
+  // for a first gesture a harness never makes (`npm run killer` found that).
+  await page.addInitScript(() => {
+    try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
+  });
+  await page.goto(`http://localhost:${PORT}/?debug&look=fillmore-1969`, { waitUntil: 'load' });
+  await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && window.chromaglassDebug().fluids?.length > 0, null, { timeout: 60_000 });
+  const settings = (patch) => page.evaluate((p) => {
+    if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is gone');
+    window.chromaglassSettings(p);
+  }, patch);
+  const read = () => page.evaluate(() => {
+    const d = window.chromaglassDebug();
+    const lead = d.fluids[0];
+    if (!lead.pressedCells) throw new Error('the lead plate has no pressedCells');
+    if (!lead.kickRelease) throw new Error('the lead plate has no kickRelease');
+    return {
+      kicks: d.kicks(), kick: lead.pressedCells.kick, depth: lead.pressedDepth.kick, steps: lead.stepCount, squeeze: d.settings.beatSqueeze,
+      released: lead.kickRelease.steps, given: lead.kickRelease.given, pressedKicks: lead.kickRelease.kicks, owed: lead.kickRelease.size,
+    };
+  });
+  // Settle into the look and let the band start before counting anything.
+  await page.waitForTimeout(8000);
+  /*
+    A window of at least `ms`, held open until the band has kicked six times
+    or 45 s have passed. The simulated band plays a song with sections: on
+    the Mac's first run it kicked 9 times in the first 12 s and not once in
+    the next 12 (a breakdown), and the control, which needs kicks to show
+    that at 0 they press nothing, had none to ask about. Counting to a
+    number of kicks asks the same thing whatever section the song is in.
+  */
+  const window_ = async (ms) => {
+    const a = await read();
+    const t0 = Date.now();
+    await page.waitForTimeout(ms);
+    let b = await read();
+    while (b.kicks - a.kicks < 6 && Date.now() - t0 < 45_000) {
+      await page.waitForTimeout(1000);
+      b = await read();
+    }
+    return {
+      seconds: (Date.now() - t0) / 1000,
+      kicks: b.kicks - a.kicks, cells: b.kick - a.kick, depth: b.depth - a.depth, steps: b.steps - a.steps, squeeze: b.squeeze,
+      released: b.released - a.released, pressedKicks: b.pressedKicks - a.pressedKicks, owed: b.owed, total: b,
+    };
+  };
+  const on = await window_(12000);
+  await settings({ beatSqueeze: 0 });
+  /*
+    Until the setting has reached the loop and the last kick pressed before
+    it is given back. A fixed half second was not enough (check-skeptic): a
+    kick pressed just before is owed 0.48 s of *plate* time, which runs
+    slower than the wall's whenever the plate steps below its rate, and its
+    last release steps would land in the window that asks for none.
+  */
+  await page.waitForFunction(() => {
+    const d = window.chromaglassDebug();
+    return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
+  }, null, { timeout: 10_000 }).catch(() => {});
+  const off = await window_(12000);
+  console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
+
+  if (errors.length) {
+    check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
+  } else if ((on.kicks < 5 || on.steps < 200) && !NEED_GPU) {
+    console.log(' --   the app heard too few kicks or stepped too little here to ask (SQUEEZE_GPU=1 on the Mac shard asks it)');
+  } else {
+    /*
+      Each kick lays three nested discs (radii 40, 27 and 15 at GRID_SCALE),
+      a few thousand cells, but only on a kick that lands on a plate step
+      with the plate active and not draining, so not every kick heard is a
+      kick pressed. Asked: kicks were heard, the squeeze pressed on them (at
+      least a thousand cells a kick heard, which one fractional disc could
+      never reach, since it lays none).
+    */
+    const perKick = on.cells / Math.max(1, on.kicks);
+    // The look and the setting it measured, and a plate that stepped: an
+    // unknown look falls back to a random one, and a stalled plate presses
+    // nothing while the kicks, counted a frame, go on.
+    check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
+      on.squeeze === 0.9 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
+      `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
+    check('with the band playing, the show hears kicks', on.kicks >= 5, `${on.kicks} in ${on.seconds.toFixed(0)} s`);
+    /*
+      And pressed as deep as a kick at this look's squeeze: each cell 0.0024
+      × 0.9 × the bass (/70, capped at 1) × the accent (1 at Accent 0), so
+      the mean depth a cell is at least 0.0024 × 0.9 × 0.1, a tenth of the
+      bass; a cell counted at a depth of nothing would not count as pressed
+      at all (only cells that close the gap are counted).
+    */
+    const meanDepth = on.depth / Math.max(1, on.cells);
+    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.0024 * 0.9 * 0.1,
+      `${on.cells} cells laid by kicks, ${perKick.toFixed(0)} a kick heard, ${meanDepth.toFixed(5)} deep a cell`);
+    check('while at 0 the kicks go on and press nothing', off.kicks >= 5 && off.cells === 0, `${off.kicks} kicks, ${off.cells} cells`);
+    /*
+      And every kick lets go (lib/squish.ts KickRelease): pressed and never
+      released, the lead plate's middle goes to the floor a few seconds into
+      a song on every look whose glass comes back slowly, which is nearly all
+      of them. A third of a second at the plate's step rate is a handful of
+      release steps a kick, so the release laid at least three steps for each
+      kick the plate pressed, is not piling up kicks it owes (a kick is
+      owed for under half a second, so a few at most at any tempo a band
+      plays), and at 0, with nothing pressed, lays nothing.
+    */
+    check('and lets each kick go again, the glass given back after it', on.pressedKicks >= 1 && on.released >= 3 * on.pressedKicks && on.owed <= 4,
+      `${on.released} release steps for ${on.pressedKicks} kicks pressed (${on.kicks} heard); ${on.owed} still owed at the end`);
+    /*
+      Given back where it was taken, and as much: the release lays the kick's
+      own discs with its sign turned, so over the whole run, once nothing is
+      owed, the gap it gave back is the depth the kicks pressed, cell for
+      cell. The app's glue (the radii at GRID_SCALE handed to the release)
+      is asked here and nowhere else: discs of the wrong size would give back
+      a different sum.
+    */
+    const t = off.total;
+    check('every kick\'s gap given back, as much as it pressed', t.owed === 0 && t.depth > 0 && Math.abs(t.given - t.depth) <= 0.01 * t.depth,
+      `${t.given.toFixed(3)} given back against ${t.depth.toFixed(3)} pressed over the run`);
+    check('with nothing pressed, nothing is given back', off.released === 0 && off.owed === 0, `${off.released} release steps, ${off.owed} owed`);
+  }
+} finally {
+  await browser.close();
+}
+
+const failed = checks.filter((c) => !c.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+process.exit(failed.length ? 1 : 0);
