@@ -39,6 +39,7 @@ import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
+import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -559,6 +560,13 @@ export interface VisualizerRender {
   end: () => void;
 }
 
+/** What the song's shape tracker has heard, for the app to read (`songShape` on the handle). */
+export interface SongShapeReport {
+  now: SongShapeState;
+  /** The last few events, oldest first; `seq` counts every event since the plate started. */
+  events: (SongEvent & { seq: number })[];
+}
+
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
@@ -572,6 +580,12 @@ export interface LiquidVisualizerHandle {
   pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
   /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
   kicks: () => number;
+  /**
+   * The song's shape (`lib/songShape.ts`): where the song is now, and the
+   * builds, drops and breakdowns heard lately, each numbered so a reader that
+   * polls can take only the ones it has not seen.
+   */
+  songShape: () => SongShapeReport;
   /** Move the look's working dyes on by one, the way the hue journey would. */
   stepDyes: () => void;
   /** Where a paced scene is (`lib/scenePacing.ts`); the plate follows it at its own rate. 1 and 1 is no pacing. */
@@ -4170,6 +4184,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     the app, and neither is a reason to rebuild the loop.
   */
   const soundLearnRef = useRef(new SoundLearn());
+  /*
+    The song's shape, heard live (lib/songShape.ts). Fed every frame, whether
+    or not anything is bound to it, so the section is known the moment a
+    sequence or a binding asks. Its events go to sound learn's triggers on the
+    frame they are heard, and are kept, numbered, for the app to poll.
+  */
+  const songShapeRef = useRef(new SongShape());
+  const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
+  const songSeqRef = useRef(0);
+  const songClockRef = useRef(0);
   const soundBindingsRef = useRef(soundBindings);
   soundBindingsRef.current = soundBindings;
   const onSoundTriggerRef = useRef(onSoundTrigger);
@@ -4672,6 +4696,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fluid.injectImage(flipped);
     },
     kicks: () => kickCountRef.current,
+    songShape: () => ({ now: { ...songShapeRef.current.now }, events: songEventsRef.current.slice() }),
     pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
     pour: (gust = 0.8) => {
       const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
@@ -5314,16 +5339,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             handed no reading and forgets its patterns, so nothing fires until
             the music is back and has been heard again.
           */
+          /*
+            The song's shape, on the reading's own clock (the page's seconds
+            live, the song's in a render), and on from the last reading by the
+            frame's length while there is none, so its quiet timer runs.
+            Paused, it hears nothing, as sound learn does.
+          */
+          const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
+          songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
+          const songEvents = songShapeRef.current.update(heard, songClockRef.current);
+          for (const e of songEvents) {
+            songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
+            if (songEventsRef.current.length > 16) songEventsRef.current.shift();
+          }
           const learned = soundBindingsRef.current;
           if (learned && learned.length > 0) {
             const clock = beatClockRef.current;
-            const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
             const fired = soundLearnRef.current.step(nowMs, heard, {
               period: clock.period,
               nextBeat: clock.nextBeat,
               locked: clock.isLocked(nowMs, trust),
               leadMs: Math.max(0, currentSettings.beatLead ?? 0),
-            }, learned);
+            }, learned, songEvents);
             for (const f of fired) onSoundTriggerRef.current?.(f.binding);
           }
           /*
@@ -7334,6 +7371,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       beatClockRef.current = new BeatClock();
       soundLearnRef.current.reset();
+      // The song's shape is timed on the readings' clock, which a render
+      // starts again at zero: its history and references belong to the song
+      // before, so it starts fresh with the song it is about to hear.
+      songShapeRef.current.reset();
+      // And the events it heard go with it: they are stamped on the old clock,
+      // and a poll after a render would otherwise read the film's drops as
+      // the song's.
+      songEventsRef.current = [];
     };
     const resetPlateClocks = () => {
       resetStamps();
