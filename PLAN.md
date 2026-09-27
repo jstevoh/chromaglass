@@ -1296,7 +1296,7 @@ frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
 Found while building step 4, and settled: step 4 made Back keep the room's settings
 the hand changed after the Go (the film's level, the Mixer, the dimmer), since each
 step of a look fade kept the room as it was. Steve asked for Back to go fully back
-(2026-09-27), so it has its own path now, **done** (#PRB): a Back fades the wall's
+(2026-09-27), so it has its own path now, **done** (#204): a Back fades the wall's
 part of the room back with the look (`backStep`), leaves the machine's setup
 (`SETUP_KEYS`: the grid, the microphone's latency and prediction, the room camera's
 reading, the set's pacing, the logo's place, each row's take time), anything a hand, a
