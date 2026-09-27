@@ -3,8 +3,9 @@ import { ArrowUp, ArrowDown, ChevronDown, RotateCcw } from 'lucide-react';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { Slider } from './ui';
 import {
-  MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, MIX_LAMP, gradeKey, gradeLabel, mixStack, moveInMix,
-  type MixSource, type MixMover,
+  MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, MIX_LAMP, MIX_BLENDS, MIX_BLEND_LABEL, OWN_BLEND,
+  blendKey, gradeKey, gradeLabel, mixStack, moveInMix,
+  type MixSource, type MixMover, type MixBlend,
 } from '../lib/mixer';
 import { PIN_RANGE } from '../lib/deskPins';
 import { readSetting } from '../lib/readout';
@@ -23,6 +24,11 @@ import { readSetting } from '../lib/readout';
  * its place (the arrows), and its level, always in view, because the level
  * is what a hand reaches for mid-song; the grade opens under it on a tap,
  * one row at a time, because four more sliders on every row is a page.
+ *
+ * The blend (PLAN.md §11 step 3) is in the same drawer, over the grade: it is
+ * set for a song rather than ridden, like the grade. A row whose blend is not
+ * its own says so in its tag, so a film left on Add is seen with the drawer
+ * shut; the front plate has none, being the glass the rest is laid on.
  *
  * Nothing here decides anything: the order's rules (the front plate stays,
  * only the lamp's sources pass it) are `moveInMix`'s, so an arrow that cannot
@@ -47,6 +53,14 @@ export interface MixerPanelProps {
   testId?: string;
 }
 
+/** One line on what each of the four does, for its button's tooltip. */
+const BLEND_HINT: Record<Exclude<MixBlend, 'own'>, string> = {
+  screen: 'Screen: its light added to what is under it, never past white',
+  add: 'Add: its light added, as two projectors on one wall add',
+  multiply: 'Multiply: a slide in front of the lens; its dark darkens what is under it',
+  key: 'Key: its dark drops out, and only its light parts are laid over',
+};
+
 const SPEC = (key: keyof VisualizerSettings) => PIN_RANGE.get(String(key)) ?? { min: 0, max: 1 };
 
 export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = false, chips, testId = 'mixer' }: MixerPanelProps) {
@@ -59,6 +73,38 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   const s = settings as unknown as Record<string, number>;
   const lampish = (id: MixSource) => (MIX_LAMP as readonly string[]).includes(id);
   const ownKey = (key: keyof VisualizerSettings) => MIX_CONTROLS.some(c => c.key === key);
+  const blendOf = (id: MixMover): MixBlend => {
+    const b = (settings as unknown as Record<string, unknown>)[String(blendKey(id))];
+    return (MIX_BLENDS as readonly unknown[]).includes(b) ? b as MixBlend : 'own';
+  };
+  /** What a row's Own is, said on its button: the back plate's is whichever Blend Mode the look has. */
+  const ownIs = (id: MixMover) => id === 'back' ? `the Blend Mode under Multi-Layer Mixer (${settings.blendMode})` : OWN_BLEND[id];
+
+  const blendPicker = (id: MixMover) => {
+    const now = blendOf(id);
+    return (
+      <div className="mb-3" role="radiogroup" aria-label={`${MIX_SOURCE_INFO[id].name}'s blend`} data-testid={`${testId}-${id}-blend`}>
+        <div className="mb-1 text-[12px] text-text-2">Blend</div>
+        <div className="grid grid-cols-5 gap-1">
+          {MIX_BLENDS.map(b => (
+            <button
+              key={b}
+              role="radio"
+              aria-checked={now === b}
+              onClick={() => onSetting({ [blendKey(id)]: b } as Partial<VisualizerSettings>)}
+              title={b === 'own' ? `Its own way in: ${ownIs(id)}` : BLEND_HINT[b]}
+              data-testid={`${testId}-${id}-blend-${b}`}
+              className={`rounded-md border text-[12px] transition-colors ${touch ? 'h-12' : 'h-7'} ${
+                now === b ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
+              }`}
+            >
+              {MIX_BLEND_LABEL[b]}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   /** Why a row has nothing on the wall right now, or null when it does. */
   const absent = (id: MixSource): { why: string; fix?: { label: string; patch: Partial<VisualizerSettings> } } | null => {
@@ -129,7 +175,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   return (
     <div className="flex flex-col gap-1.5" data-testid={testId}>
       <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} leading-snug text-muted`}>
-        Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens.
+        Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens. Grade opens a row's blend and grade.
       </p>
       {rows.map(id => {
         const info = MIX_SOURCE_INFO[id];
@@ -137,6 +183,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
         const isOpen = open === id;
         const under = stack.indexOf(id) < stack.indexOf('front');
         const role = !lampish(id) ? null : under ? 'lamp' : id === 'gel' ? 'lens' : 'beam';
+        const blend = id === 'front' ? 'own' : blendOf(id);
         const graded = MIX_GRADES.some(g => {
           const c = MIX_CONTROLS.find(m => m.key === gradeKey(id, g));
           return c && s[String(c.key)] !== undefined && s[String(c.key)] !== c.none;
@@ -155,13 +202,26 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
             */}
             <div className="flex items-center gap-1">
               <div className={`flex min-w-0 flex-1 items-center gap-2 px-1 ${touch ? 'min-h-[48px]' : 'min-h-[32px]'}`} title={info.hint}>
-                <span className={`truncate ${touch ? 'text-[15px]' : 'text-[13px]'} font-medium ${off ? 'text-dim' : 'text-text'}`}>{info.name}</span>
-                {role && <span className="shrink-0 rounded-xs bg-hover px-1.5 py-0.5 text-[11px] text-text-2">{role}</span>}
+                <span className={`shrink-0 ${touch ? 'text-[15px]' : 'text-[13px]'} font-medium ${off ? 'text-dim' : 'text-text'}`} data-testid={`${testId}-${id}-name`}>{info.name}</span>
+                {/*
+                  One tag for where the row sits and how it is laid in ("lamp · add"),
+                  not two: on a phone the row's name, two tags, the Grade button and
+                  two thumb-sized arrows left "Gel Wheel" about 46 px (the pre-push
+                  review), and the name is what the row is found by. So the name
+                  keeps its width and the tag gives way: even one tag, "lamp ·
+                  multiply", cut "Gel Wheel" by 27 px on a 390 px phone (`npm run phone`).
+                */}
+                {(role || blend !== 'own') && (
+                  <span className="min-w-0 truncate rounded-xs bg-hover px-1.5 py-0.5 text-[11px] text-text-2">
+                    {role}{role && blend !== 'own' && ' · '}
+                    {blend !== 'own' && <span className="text-accent-text" data-testid={`${testId}-${id}-blendtag`}>{MIX_BLEND_LABEL[blend].toLowerCase()}</span>}
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setOpen(isOpen ? null : id)}
                 aria-expanded={isOpen}
-                aria-label={`${info.name}'s grade: brightness, contrast, saturation, hue`}
+                aria-label={id === 'front' ? `${info.name}'s grade: brightness, contrast, saturation, hue` : `${info.name}'s blend and grade`}
                 className={`flex shrink-0 items-center gap-1 rounded-md px-2 text-[12px] transition-colors hover:bg-hover ${
                   touch ? 'h-12' : 'h-7'
                 } ${graded ? 'text-accent-text' : 'text-text-2'}`}
@@ -191,6 +251,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
             )}
             {isOpen && (
               <div className="border-t border-border px-1 pt-3" data-testid={`${testId}-${id}-grade`}>
+                {id !== 'front' && blendPicker(id)}
                 {MIX_GRADES.map(g => slider(gradeKey(id, g), gradeLabel(g)))}
                 <button
                   onClick={() => onSetting(Object.fromEntries(MIX_GRADES.map(g => {

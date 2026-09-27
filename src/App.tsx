@@ -87,7 +87,7 @@ import { CrashReportButton, QuickReportDot, openCrashReport } from './components
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
-import { raiseInMix, type MixMover } from './lib/mixer';
+import { blendKey, nextBlend, raiseInMix, type MixMover } from './lib/mixer';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -2682,6 +2682,12 @@ export default function App() {
     setSettings(prev => ({ ...prev, mixOrder: raiseInMix(prev.mixOrder, id) }));
     setDocDirty(true);
   };
+  /** A row's blend, one along (lib/mixer.ts, nextBlend), from the state being updated for the same reason. */
+  const stepBlend = (id: MixMover) => {
+    const key = blendKey(id);
+    setSettings(prev => ({ ...prev, [key]: nextBlend(prev[key]) }));
+    setDocDirty(true);
+  };
   const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
@@ -2729,6 +2735,12 @@ export default function App() {
       case 'mix-raise-mark':  raiseMix('mark'); break;
       case 'mix-raise-gel':   raiseMix('gel'); break;
       case 'mix-raise-lumia': raiseMix('lumia'); break;
+      case 'mix-blend-led':   stepBlend('led'); break;
+      case 'mix-blend-gel':   stepBlend('gel'); break;
+      case 'mix-blend-lumia': stepBlend('lumia'); break;
+      case 'mix-blend-back':  stepBlend('back'); break;
+      case 'mix-blend-film':  stepBlend('film'); break;
+      case 'mix-blend-mark':  stepBlend('mark'); break;
       // Every action, or `tsc` names the one that is missing. A pad wired to
       // an action nobody wrote a case for is a dead pad, and silent.
       default: unhandled('an action', a);

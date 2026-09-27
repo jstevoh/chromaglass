@@ -307,6 +307,34 @@ try {
       const graded = await visible(page, 'phone-mixer-back-grade');
       check('portrait: and a tap moves the film under the back plate, and opens a row\'s grade',
         after === 'mark back film front lumia gel led' && graded, `${after}; grade ${graded ? 'open' : 'not open'}`);
+      /*
+        Each row's blend (PLAN.md §11 step 3), in its drawer: five buttons a
+        thumb's size, and one pressed reaches the show. The tag on the row is
+        drawn from the settings the app hands back, not from the button, so
+        it only appears if the press went all the way round. Every row that
+        has a blend, not one: the six keys are six settings, and a row whose
+        buttons wrote another row's key would pass on any other row.
+      */
+      const blendRows = [];
+      for (const id of ['mark', 'film', 'back', 'lumia', 'gel', 'led']) {
+        if (!(await visible(page, `phone-mixer-${id}-grade`))) await tap(page, `phone-mixer-${id}-open`);
+        const blends = await Promise.all(['own', 'screen', 'add', 'multiply', 'key'].map(b => box(page, `phone-mixer-${id}-blend-${b}`)));
+        const small = Math.min(...blends.map(b => (b ? Math.min(b.width, b.height) : 0)));
+        const tagBefore = await visible(page, `phone-mixer-${id}-blendtag`);
+        await tap(page, `phone-mixer-${id}-blend-add`);
+        const tags = await page.$$eval('[data-testid$="-blendtag"]', els => els.map(e => e.getAttribute('data-testid')).join(','));
+        const tagAdd = (await visible(page, `phone-mixer-${id}-blendtag`)) ? (await page.getByTestId(`phone-mixer-${id}-blendtag`).first().innerText()).trim() : '';
+        const checked = await page.getByTestId(`phone-mixer-${id}-blend-add`).first().getAttribute('aria-checked');
+        // The longest tag a row can wear, and its name must still be whole beside it.
+        await tap(page, `phone-mixer-${id}-blend-multiply`);
+        const cut = await page.getByTestId(`phone-mixer-${id}-name`).first().evaluate(e => e.scrollWidth - e.clientWidth);
+        await tap(page, `phone-mixer-${id}-blend-own`);
+        const tagOwn = await visible(page, `phone-mixer-${id}-blendtag`);
+        blendRows.push({ id, ok: small >= 48 && !tagBefore && tagAdd === 'add' && tags === `phone-mixer-${id}-blendtag` && checked === 'true' && !tagOwn && cut <= 0,
+          say: `${id} ${Math.round(small)} px ${tagAdd || 'no tag'}${tags === `phone-mixer-${id}-blendtag` ? '' : ` (tags: ${tags || 'none'})`}${cut > 0 ? `, name cut by ${cut} px` : ''}` });
+      }
+      check('portrait: every row\'s blend is five buttons of 48 px or more, Add pressed is what that row, and only that row, then says, and its name stays whole beside the tag',
+        blendRows.every(r => r.ok), blendRows.map(r => r.say).join(' · '));
       // And back up, so the rest of the run plays the default stack.
       await tap(page, 'phone-mixer-film-up');
       const back = await rowsOf();

@@ -163,8 +163,11 @@ its own. At the default order and grades the picture is identical to before to
 the bit; `npm run mixer` measures the rest. The gel wheel and the lumia
 followed as rows of their own (PLAN.md §11 step 2): with the LED ring they
 are the lamp's three, the only rows that can go under the front plate, and
-above it the lumia is a beam and the gel a filter on the lens. What is still R1's: a row per
-projector, once there is more than one live plate.
+above it the lumia is a beam and the gel a filter on the lens. Then a blend per
+row (step 3): each row but the front plate keeps its own way in as Own and can
+be set to screen, add, multiply or key instead, which is R3's additive light
+made a choice per source rather than the whole rig's default. What is still
+R1's: a row per projector, once there is more than one live plate.
 
 ## Order, and why
 

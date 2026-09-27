@@ -1072,6 +1072,40 @@ fn gradeMix(c: vec3f, g: vec4f) -> vec3f {
 }
 
 /*
+  A mixer row laid over what is under it by the blend the operator picked
+  (lib/mixer.ts, \`MixBlend\`; PLAN.md §11 step 3). \`c\` is what is under the
+  row, \`s\` the row's own graded picture, \`a\` its level times whatever alpha
+  it has of its own (the logo's card, the back plate's dye).
+
+  Mode 0 is the row's own way in, which each row keeps where it always was,
+  so a caller only asks this for 0 when its own way *is* a plain mix by \`a\`
+  (the logo). Screen is written as the mix of the screen formula by \`a\`, not
+  as screening \`s·a\`: the two are the same number for light at or under
+  white (c + a·s·(1 − c) either way), and writing all four as a mix by \`a\`
+  (add aside) makes the level mean the same thing on each: how far from
+  what is under the row toward the blend. Add is not clamped here, because a
+  frame carries light above 1 into the camera and the post chain and is
+  clamped once, at the end. Key is a luma key on the row itself: its dark
+  drops out over a soft edge 0.18 wide from \`keyLo\`, the Film Key's own
+  width. The film passes its Film Key there, so that control keys the film
+  on either of its two ways in; every other row passes 0.18, Film Key's
+  default, so that a key on any row starts where the film's does.
+*/
+fn mixBlendOf(v: f32) -> i32 { return i32(v + 0.5); }
+
+const MIX_KEY_LO = 0.18;
+
+fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
+  if (mode == 1) { return mix(c, 1.0 - (1.0 - c) * (1.0 - clamp(s, vec3f(0.0), vec3f(1.0))), a); }
+  if (mode == 2) { return c + s * a; }
+  if (mode == 3) { return mix(c, c * s, a); }
+  if (mode == 4) { return mix(c, s, a * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
+  return mix(c, s, a);
+}
+
+fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKeyed(c, s, a, mode, MIX_KEY_LO); }
+
+/*
   The logo, laid over a picture at level. The finish lays it over the
   finished frame when it is at the top of the mixer's stack, as it always
   was; the display pass lays it in lower down when the operator has moved it
@@ -1083,7 +1117,7 @@ fn markLayer(color: vec3f, uvScreen: vec2f, level: f32, markTex: texture_2d<f32>
   let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + 0.5;
   if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
     let mark = tex2(markTex, vec2f(m.x, 1.0 - m.y));
-    return mix(color, gradeMix(mark.rgb, U.markGrade), mark.a * level);
+    return blendRow(color, gradeMix(mark.rgb, U.markGrade), mark.a * level, mixBlendOf(U.markBlend));
   }
   return color;
 }
@@ -1555,11 +1589,22 @@ fn lumiaLight(uv: vec2f) -> vec3f {
   return lcol * (0.12 + 0.9 * sheet) * veil;
 }
 
-/** The film projector's frame, through the dye it lands on, as it always was; graded first. */
+/** The film projector's frame where it lands, bent a little by the dye, graded. */
+fn filmFrame(uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
+  let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
+  return gradeMix(tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb, U.mixGrade[3]);
+}
+
+/**
+ * The film projector's frame over the picture. Its own way in, as it always
+ * was: through the dye it lands on, keyed on its dark by Film Key. Any other
+ * blend lays the frame itself, by Film Mix, and Key keys it by Film Key too.
+ */
 fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
   if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
-  let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
-  let filmC = gradeMix(tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb, U.mixGrade[3]);
+  let filmC = filmFrame(uv, fluid0, normal0);
+  let fm = mixBlendOf(U.mixBlend.w);
+  if (fm != 0) { return blendRowKeyed(color, filmC, U.filmMix, fm, U.filmKey); }
   let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
   let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
   let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
@@ -1583,9 +1628,18 @@ fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
   for (var p = 0; p < 7; p++) {
     let fp = f32(p);
     if (fp >= U.mixPos2.z) { break; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); }
-    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) { c = mix(c, max(c, vec3f(0.10)) * gelColor(uv) * 1.5, U.gelWheel); }
-    if (U.lumia > 0.001 && U.mixPos2.y == fp) { c += lumiaLight(uv) * U.lumia; }
+    if (U.ledPlatform != 0 && U.mixPos.x == fp) {
+      let m = mixBlendOf(U.mixBlend.x);
+      if (m == 0) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
+    }
+    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
+      let m = mixBlendOf(U.mixBlend.y);
+      if (m == 0) { c = mix(c, max(c, vec3f(0.10)) * gelColor(uv) * 1.5, U.gelWheel); } else { c = blendRow(c, gelColor(uv), U.gelWheel, m); }
+    }
+    if (U.lumia > 0.001 && U.mixPos2.y == fp) {
+      let m = mixBlendOf(U.mixBlend.z);
+      if (m == 0) { c += lumiaLight(uv) * U.lumia; } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
+    }
   }
   return c;
 }
@@ -1606,9 +1660,18 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   for (var p = 0; p < 7; p++) {
     let fp = f32(p);
     if (fp < lo || fp >= hi) { continue; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp) { c = screenOver(c, ledLight(uv) * U.mixLevel.x); }
-    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) { c = mix(c, c * gelColor(uv) * 1.5, U.gelWheel); }
-    if (U.lumia > 0.001 && U.mixPos2.y == fp) { c = screenOver(c, lumiaLight(uv) * U.lumia); }
+    if (U.ledPlatform != 0 && U.mixPos.x == fp) {
+      let m = mixBlendOf(U.mixBlend.x);
+      if (m == 0) { c = screenOver(c, ledLight(uv) * U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
+    }
+    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
+      let m = mixBlendOf(U.mixBlend.y);
+      if (m == 0) { c = mix(c, c * gelColor(uv) * 1.5, U.gelWheel); } else { c = blendRow(c, gelColor(uv), U.gelWheel, m); }
+    }
+    if (U.lumia > 0.001 && U.mixPos2.y == fp) {
+      let m = mixBlendOf(U.mixBlend.z);
+      if (m == 0) { c = screenOver(c, lumiaLight(uv) * U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
+    }
     if (U.mixPos.z == fp) { c = filmOver(c, uv, fluid0, normal0); }
     if (U.mixPos.w == fp && fp < U.mixPos2.w) { c = markLayer(c, uvScreen, U.mixLevel.w, markTex); }
   }
@@ -2133,12 +2196,26 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     // The mixer's grade and level for the back plate, on its own picture.
     fluid1 = vec4f(gradeMix(fluid1.rgb, U.mixGrade[2]), fluid1.a * U.mixLevel.z);
 
+    /*
+      The back plate's blend: its own is the Blend Mode under Multi-Layer
+      Mixer, and any other the mixer's row picked lays the plate's dye by
+      that, with the dye's coverage as its alpha, as the Blend Mode does. On
+      paper the plate is lit as a photograph whatever its blend: the dye's
+      light through the drop is worked out first and it is that which is
+      blended, and the drop's rim and its crescent of sky go on after, since
+      they are the glass's and not the picture's. Blending the bare dye there
+      instead drew every drop of the back plate flat and unlit (the pre-push
+      review).
+    */
+    let bm = mixBlendOf(U.backBlend);
     if (U.photo > 0.5) {
       let lit1 = pow(fluid1.rgb, vec3f(1.0 + 0.9 * fluid1.a)) * mix(outColor, vec3f(1.0), 0.22 * smoothstep(0.1, 0.6, fluid1.a)) * (1.0 + 0.2 * fluid1.a);
-      outColor = mix(outColor, lit1, fluid1.a);
+      if (bm != 0) { outColor = blendRow(outColor, lit1, fluid1.a, bm); } else { outColor = mix(outColor, lit1, fluid1.a); }
       let rim1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
       outColor *= 1.0 - rim1 * fluid1.a * 0.4;
       outColor += vec3f(0.95, 0.97, 1.0) * pow(1.0 - clamp(normal1.z, 0.0, 1.0), 3.0) * fluid1.a * 0.15;
+    } else if (bm != 0) {
+      outColor = blendRow(outColor, fluid1.rgb, fluid1.a, bm);
     } else {
       let blended = applyBlend(outColor, fluid1.rgb, U.blendMode);
       outColor = mix(outColor, blended, fluid1.a);

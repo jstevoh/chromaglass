@@ -310,6 +310,13 @@ lamp (is 1.5 the right gain there, or does it burn the dye out?), and the
 lumia raised over the front plate, a beam screened over the dye (does it
 read as a second projector, or as fog?).
 
+Each row but the front plate has a blend now (PLAN.md §11 step 3): Own (the
+way it always came in), Screen, Add, Multiply and Key, in the row's Grade
+drawer. The lab holds each to its formula; what it cannot say is whether the
+key's edge (a row's dark dropping out between luma 0.18 and 0.36, where Film
+Key starts, and on the film at Film Key itself) is the right place on a real film, and whether Add over a
+bright plate blows out too soon to be useful on a projector.
+
 ## 14. Oil & Water as two bodies
 
 Oil & Water now pours oil as bodies that keep their own colour (Oil Bodies,

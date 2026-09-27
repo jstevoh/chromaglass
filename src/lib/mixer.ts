@@ -60,7 +60,9 @@
  * two go in under the front plate, where they always were.
  */
 
-import type { VisualizerSettings } from '../types';
+import type { MixBlend, VisualizerSettings } from '../types';
+
+export type { MixBlend };
 
 /** The sources that can be moved in the stack. */
 export type MixMover = 'led' | 'back' | 'film' | 'mark' | 'gel' | 'lumia';
@@ -149,8 +151,72 @@ export const MIX_CONTROLS: MixControl[] = [
   }))),
 ];
 
+/**
+ * How a row is laid over what is under it (PLAN.md §11 step 3).
+ *
+ * Until this, each row had one way in, fixed by what it is: the LED ring and
+ * the lumia screened over the picture as beams, the gel multiplied in as a
+ * filter, the film laid through the dye it lands on with a key on its dark
+ * parts, the logo drawn over by its own alpha, the back plate by the Blend
+ * Mode under Multi-Layer Mixer. Those stay, as `own`, and are every row's
+ * default, so a look or a rig saved before this is the same picture.
+ *
+ * The four a video mixer offers on every channel go beside them. They are
+ * R3's "additive light" made a choice rather than a rewrite: two projectors
+ * on one wall add, which is what `add` is; `screen` is add that cannot pass
+ * white; `multiply` is a slide in front of the lens; and `key` drops the
+ * dark of a row out, so a film of a figure on black lays only the figure.
+ * The formulas, with `c` what is under the row, `s` the row's own graded
+ * picture, and `a` its level times its own alpha (the logo's card, the back
+ * plate's dye):
+ *
+ *   screen    c + a·s·(1 − c)            = mix(c, 1 − (1 − c)(1 − s), a)
+ *   add       c + a·s                    (the frame clips at white)
+ *   multiply  c·(1 − a + a·s)            = mix(c, c·s, a)
+ *   key       mix(c, s, a·smoothstep(k, k + 0.18, luma(s)))   (k: Film Key on the film, 0.18 elsewhere)
+ *
+ * `npm run mixer` renders each and holds the picture to these formulas.
+ *
+ * The front plate has none: it is the glass everything is drawn relative to,
+ * and what is under it is the lamp it transmits, which is optics, not a blend.
+ * Under the glass the lamp's three take a blend too, built into the lamp's
+ * light the same way, since a performer who wants the gel to add rather
+ * than filter wants it wherever the gel is.
+ *
+ * Two things follow from `own` being each row's old way in. The film's Film
+ * Key belongs to its own way (through the dye, its dark keyed out) and to
+ * its Key; on Screen, Add and Multiply the frame itself is laid, dark and
+ * all, and Film Key does nothing until the film is back on one of those two. And
+ * the blends are the rig's, like the order (MIX_KEYS below), while the back
+ * plate's Own is the look's Blend Mode: a back plate set to Add stays on Add
+ * through every look until it is set back, which is what a mixer channel
+ * does. They are choices, so neither MIDI's faders nor the patch bay
+ * (sceneMap) drive them; the Next Blend pads step them.
+ */
+export const MIX_BLENDS: readonly MixBlend[] = ['own', 'screen', 'add', 'multiply', 'key'];
+export const MIX_BLEND_LABEL: Record<MixBlend, string> = { own: 'Own', screen: 'Screen', add: 'Add', multiply: 'Multiply', key: 'Key' };
+/** The number the shader reads: 0 is the row's own way in. */
+export const mixBlendIndex = (b: unknown): number => Math.max(0, MIX_BLENDS.indexOf(b as MixBlend));
+
+/** The setting that is a row's blend (every row but the front plate): `filmBlend`, `ledBlend`. */
+export const blendKey = (id: MixMover): keyof VisualizerSettings => `${id}Blend` as keyof VisualizerSettings;
+export const MIX_BLEND_KEYS: (keyof VisualizerSettings)[] = MIX_MOVERS.map(blendKey);
+
+/** What `own` is for each row, said the way the row's tooltip says it. */
+export const OWN_BLEND: Record<MixMover, string> = {
+  led: 'the lamp\'s light under the glass, a screened beam over it',
+  gel: 'a filter: it colours what is under it',
+  lumia: 'added to the lamp under the glass, a screened beam over it',
+  back: 'the Blend Mode under Multi-Layer Mixer (on paper, lit as a photograph)',
+  film: 'through the dye it lands on, keyed on its dark by Film Key, which Own and Key read',
+  mark: 'drawn over, by the logo\'s own transparency',
+};
+
+/** The next blend along, for a pad that steps a row's (Mixer: Next Blend). */
+export const nextBlend = (b: unknown): MixBlend => MIX_BLENDS[(mixBlendIndex(b) + 1) % MIX_BLENDS.length];
+
 /** Every setting the mixer owns, the order included: the room's rig, not a look's. */
-export const MIX_KEYS: (keyof VisualizerSettings)[] = [...MIX_CONTROLS.map(c => c.key), 'mixOrder'];
+export const MIX_KEYS: (keyof VisualizerSettings)[] = [...MIX_CONTROLS.map(c => c.key), 'mixOrder', ...MIX_BLEND_KEYS];
 
 /** The short label a row's own slider carries, without the source's name. */
 export const gradeLabel = (g: MixGrade): string => GRADE_LABEL[g];
