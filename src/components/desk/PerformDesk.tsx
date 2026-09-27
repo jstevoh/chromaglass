@@ -182,6 +182,9 @@ interface PerformDeskProps {
   takes?: MixTakes;
 }
 
+/** The rides' column, the desk's third; the docked Mixer is its width, so it covers the rides and not the plate. */
+const RIDES_WIDTH = 312;
+
 /** The same eight tools on both desks (`tools.ts`). */
 const TOOLS = DESK_TOOLS;
 
@@ -213,7 +216,7 @@ export function PerformDesk(p: PerformDeskProps) {
 
   return (
     <div className="fixed inset-0 z-10 grid bg-bg text-text"
-      style={{ gridTemplateColumns: '272px minmax(0, 1fr) 312px', gridTemplateRows: '48px 1fr 28px' }}
+      style={{ gridTemplateColumns: `272px minmax(0, 1fr) ${RIDES_WIDTH}px`, gridTemplateRows: '48px 1fr 28px' }}
       data-testid="perform-desk">
 
       <DeskHeader
@@ -628,8 +631,22 @@ export function PerformDesk(p: PerformDeskProps) {
         the plate took every click meant for it.
       */}
       {mixerOpen && createPortal(
-        <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={440} height={900} testId="mixer-sheet" docked>
-          <div className="min-h-0 w-full overflow-y-auto px-5 py-4">
+        /*
+          The width of the rides' column (RIDES_WIDTH, the grid's third), so
+          the docked Mixer lies over the rides and not over the plate
+          (PLAN.md §11 step 5). At 440 it reached 128 px into the plate
+          whatever the window, which at 1024 was 29% of a plate only 408 wide,
+          and the plate is what a grade is judged on. The rides are what the
+          Mixer stands in for while it is open (a level is a ride), so they
+          are what it covers. Less the docked sheet's 8 px margin on the
+          right, so its left edge is the column's. The panel is laid out to
+          fit the column: the row's name keeps its width and the tag gives
+          way (MixerPanel).
+          `npm run layout` opens it at 1440, 1280 and 1024 and asks that the
+          plate is all uncovered and nothing in the sheet is cut or crowded.
+        */
+        <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={RIDES_WIDTH - 8} height={900} testId="mixer-sheet" docked>
+          <div className="min-h-0 w-full overflow-y-auto px-3 py-3">
             <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} testId="desk-mixer" />
           </div>
         </Sheet>,

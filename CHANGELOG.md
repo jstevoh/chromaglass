@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the desk's Mixer lies over the rides, not the plate
+
+- **The docked Mixer on the Perform desk is the rides' column wide** (304
+  px, was 440), so it covers the rides it stands in for and none of the
+  plate: at 1024 px it covered 29% of the plate, at 1280 18%, at 1440 15%;
+  now 0% at all three. The row's name keeps its width and its tag gives
+  way; the blend buttons sit closer. `npm run layout` opens it at the three
+  widths with a row's drawer open (27 checks). The phone's Mix sheet is
+  its own layout and is unchanged.
+
 ### Added — a take button and a fade time on every Mixer row
 
 - **Each row has a Fade button beside its level**: it takes the row out to
