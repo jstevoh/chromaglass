@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import type { MixTakes } from '../../lib/mixFade';
 import {
   Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Sparkles, MoreHorizontal, ChevronDown,
@@ -162,7 +163,7 @@ export interface PhoneStageProps {
     draw, at the phone's sizes, so the order and the grades are one thumb
     away like everything else here.
   */
-  mixer: { settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void; hasFilm: boolean; hasMark: boolean };
+  mixer: { settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void; hasFilm: boolean; hasMark: boolean; takes?: MixTakes };
   // The rest
   onSettings: () => void;
   onSongs: () => void;
@@ -666,6 +667,8 @@ export function PhoneStage(p: PhoneStageProps) {
             onSetting={p.mixer.onSetting}
             hasFilm={p.mixer.hasFilm}
             hasMark={p.mixer.hasMark}
+            onFade={p.mixer.takes?.onFade}
+            fading={p.mixer.takes?.fading}
             touch
             testId="phone-mixer"
           />
