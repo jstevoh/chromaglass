@@ -929,6 +929,12 @@ while this batch's plan was going in (#177), and no cause is known yet:
   two seconds just after the first step, on a runner slow enough that the control's
   own device took 5.3 s. Three deploys in a row stopped here while their PRs passed;
   a thread cannot re-run a job (403), so each costs a re-run by hand.
+- `magnet.mjs`, "dragging the Magnet gathers the ferrofluid along where the hand
+  goes": on #180 (PLAN.md only, the same code #179's PR and deploy passed), the drag
+  gathered 300 → 363 against 266 → 300 left alone, a gain of 29 where the check asks
+  a tenth of 300. It asks the gain against what was there, on a hand path drawn at
+  random each run, so a run whose best spot starts full reads low; worth reading
+  the gain's spread over the last runs before touching its tenth.
 
 ## Not doing
 
