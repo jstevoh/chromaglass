@@ -1247,6 +1247,19 @@ touches the Mixer; the second looks like the adapter going away under the run. W
 after it. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
+Found while shipping step 4, not yet done: #195's deploy (main 6c6d17e) went red on
+two Mac checks that passed on the same tree in its PR run and again in #196's run
+right after, so step 4 went live only with #196. `npm run ears` on the open shard:
+"visible with the wall asking too" drew 14 frames in 2 s where it asks more than 20
+(35 in #196's run); every reading was in the right place, so the floor counted the
+runner's frame rate, not the ear, and the "Gaps in the plan" thread has a fix on #194.
+`npm run squeeze` on the show shard: "the tapped beat drives the show's clock" read a
+beat every 396.6 ms against 401.4 ms tapped (2 ms allowed), with the plate stepping
+255 times in 12 s where it steps about 320; the Mixer's fades only read the tempo. The
+tempo the taps set is the plain mean of their gaps, so something moved the clock off it
+after the taps; worth reading whether the clock falls back to the heard beat when a
+frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
+
 Found while building step 4. Changed here, for Steve to confirm: Back reverts the
 look and whatever of the room the change itself moved (Lucky's roll of the
 microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
