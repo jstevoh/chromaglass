@@ -60,6 +60,7 @@ Where each batch stands, as of 2026-09-27:
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **built** (`npm run lift`), not yet seen on the Mac, and Beat Squeeze found never to have pressed the plate (fix waiting on the owner's eyes); step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
+| 12 | The App Store and Google Play (at the end of this plan) | **Not started**: an iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; first a smoke test of the site on both phones |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1229,3 +1230,98 @@ pick them up from `docs/roadmap.md` now that step 1 is in.
 - This plan is kept current: every PR that ships a batch step marks it shipped here,
   and anything found along the way that should be fixed or added goes in as an item,
   in the batch it belongs to or a new one (Steve, 2026-09-27).
+
+## 12. ChromaGlass in the App Store and Google Play
+
+Asked on 2026-09-27: "What would it take to create an Apple iPhone app and put it in
+the store?", then "expand on this idea with the Android store". Nothing is built. The
+full iPhone write-up, with a table of every browser feature the app leans on, is in
+the project files (`iphone-app/iphone-app-plan.md`); this is the plan.
+
+**The shape.** Neither store needs a rewrite. The show is one web build, and both
+stores take a thin shell around it, but not the same shell, because the two phones'
+web views differ in what matters here:
+
+| | iPhone | Android |
+|---|---|---|
+| Shell | Capacitor: the built site **bundled** in the app, drawn by WKWebView | A Trusted Web Activity (Bubblewrap): the **live** site in full-screen Chrome |
+| WebGPU | iOS 26 (iPhone 11 and newer), Safari and WKWebView alike | Chrome on Android 12+, Qualcomm and ARM GPUs; the app's "needs WebGPU" screen covers the rest |
+| Web MIDI | None in WebKit; a CoreMIDI plugin later | Chrome has it, so USB controllers work from day one |
+| Record and Render | A web download does not save in a web view: route to the share sheet or Photos | Chrome downloads as it does now |
+| Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | Every deploy to `main` reaches the app at once; the store only sees a new build when the shell changes |
+| Offline | Everything is inside the app | The service worker (`public/sw.js`) already caches the build |
+| Account | Apple Developer Program, $99 a year | Google Play Console, $25 once |
+| Tools | Xcode on the Mac | Bubblewrap (JDK and Android SDK), on the Mac or in CI; Android Studio optional |
+
+A Trusted Web Activity is Chrome itself, not a web view, so Android gets WebGPU, Web
+MIDI, WebCodecs, wake lock and downloads exactly as the website has them today. A
+Capacitor Android app would run in Android's WebView instead, which has no Web MIDI
+and whose WebGPU would need its own test; the TWA is less work and does more. iOS
+has no equivalent (every iPhone browser is WebKit, and Apple does not take a shell
+that just points at a website), so there the build ships inside the app.
+
+`detectTier()` in `src/lib/platform.ts` already has a `native` tier keyed on
+`window.__CHROMAGLASS_NATIVE__`; the iPhone shell sets it. The Android app is the
+hosted site in Chrome and keeps the `hosted` tier.
+
+**What each store asks for.**
+
+- *Apple.* A bundle ID and App Store Connect record; permission strings for the
+  microphone, camera, adding to Photos, and motion if Tilt goes native; a privacy
+  policy URL and the App Privacy label (crash reports from `crashLog.ts` as
+  Diagnostics, not linked; audio clips to AudD/ACRCloud when song ID is on; lyrics
+  lookups to lrclib.net; no tracking); a privacy manifest; export compliance (HTTPS
+  only); a 1024 px icon, 6.9" iPhone screenshots, an age rating and a review note.
+  The review risk is guideline 4.2, minimum functionality ("a website in a wrapper"),
+  which the bundled build, offline play and native mic, camera, motion and Photos
+  answer. TestFlight puts it on the owner's phone before review.
+- *Google.* Identity verification for the developer account; Digital Asset Links
+  (`/.well-known/assetlinks.json` on Firebase Hosting, holding the app's signing
+  certificate fingerprint) so Chrome drops its address bar; an Android App Bundle
+  signed through Play App Signing, targeting the API level Google currently requires;
+  the Data safety form (the same three data flows as Apple's label); a privacy policy
+  (required, since the app uses the microphone and camera); the IARC content rating;
+  a 512 px icon, a 1024×500 feature graphic and phone screenshots. A personal
+  developer account made since late 2023 must run a **closed test with at least 12
+  testers opted in for 14 days in a row** before it can publish to everyone; that is
+  the longest wait on the Android side and cannot be hurried, so it starts early.
+  Play's minimum-functionality and WebView policies are aimed at wrappers of other
+  people's sites; our own interactive instrument is not what they catch.
+
+Both listings say the show flashes, and that the flash guard (`src/lib/flashGuard.ts`)
+limits it. Free is simplest on both: a price or in-app purchase adds agreements, tax
+forms and a 15 % cut.
+
+**Running order.** Steps marked *(owner)* need Steve's phone, card or account.
+
+1. **Smoke test the site on both phones** *(owner)*: chromaglass.web.app in Safari on
+   an iOS 26 iPhone and in Chrome on a recent Android phone. Does the plate start,
+   hold its frame rate, take fingers, hear the mic? Nobody has run it on either;
+   `docs/webgpu-plan.md` still lists the Safari test as open. Whatever breaks here is
+   fixed on the website first, and both apps inherit the fix. *Not started.*
+2. **Open both accounts** *(owner)*: Apple Developer Program and Play Console, and
+   install Xcode. *Not started.*
+3. **The Android shell** (one PR): a Bubblewrap project, `assetlinks.json` in
+   `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
+   manifest checked for what a TWA needs, and a CI step that builds the bundle.
+   The upload key stays with the owner, never in the repo. Then the closed test
+   starts, 12 testers for 14 days, while the iPhone work carries on. *Not started.*
+4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`, the
+   `native` tier, no service worker on that tier, permission strings, the audio
+   session set to play and record through the speaker, the idle timer off while the
+   plate runs, status bar and home indicator hidden, minimum iOS 26, and an
+   `xcodebuild` step on the macOS runner. *Not started.*
+5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
+   Photos. The only feature that needs new code to work at all. *Not started.*
+6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
+   screenshots from the lab and a real phone, icons, the feature graphic. *Not started.*
+7. **TestFlight and the closed test** *(owner)*: a full set played on each phone,
+   watching heat, battery and audio routing; a by-hand check in `docs/judging.md`.
+   *Not started.*
+8. **Submit to both stores.** *Not started.*
+9. **Later:** a CoreMIDI plugin so controllers work on the iPhone and iPad; the iPad
+   and a Mac App Store build from the same Xcode project; Android tablets and
+   Chromebooks come with the Play listing.
+
+The phone layout (#173) is what both apps show, so the operating rule that every
+feature ships its phone version is what keeps them whole.
