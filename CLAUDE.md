@@ -37,8 +37,8 @@ weekly limit stood at 74% with five days left.
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
   one fallback check-in, not a chain of half-hourly ones: each wake re-reads the whole
   context even when all it finds is "still running".
-- When a PR has merged and the next piece is unrelated, say so in the closing reply,
-  so it starts in a new thread instead of inheriting this one's context.
+- One thread per PR (Steve, 2026-09-27). When a thread's PR has merged, its next
+  piece starts in a new thread, not this one: say what it is in the closing reply.
 
 ## What can be verified where
 
