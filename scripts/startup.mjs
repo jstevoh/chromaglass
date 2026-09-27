@@ -265,6 +265,51 @@ async function open(query, looks) {
       const firsts = new Map();
       window.__startupFirsts = firsts;
       /*
+        And when the GPU finished each piece of work the page handed it, with
+        what was in it. Through the stop after the first step the page's own
+        timers kept firing (the timeline's rows every quarter second) while
+        frames, heartbeats and steps all waited: the page's thread is free,
+        so the wait is on the GPU. Writing every texel of the show's 75.8 MB
+        of fields on a bare page stopped nothing (0.08 s, run 36304683847),
+        nor did clearing them, nor a first dispatch of every kernel on
+        scraps. So which of the first steps' submits the GPU takes the second
+        over is the next thing to see: each submit's time handed over, its
+        time done (onSubmittedWorkDone after it), and the pipelines it ran
+        with their workgroup counts.
+      */
+      const subs = [];
+      window.__startupSubs = subs;
+      const passOf = new WeakMap(), workOf = new WeakMap(), bufOf = new WeakMap();
+      const note = (enc, label, n) => {
+        let w = workOf.get(enc);
+        if (!w) { w = new Map(); workOf.set(enc, w); }
+        w.set(label, (w.get(label) ?? 0) + n);
+      };
+      for (const [begin, Pass] of [['beginComputePass', globalThis.GPUComputePassEncoder], ['beginRenderPass', globalThis.GPURenderPassEncoder]]) {
+        const b = GPUCommandEncoder.prototype[begin];
+        GPUCommandEncoder.prototype[begin] = function (...a) { const pass = b.apply(this, a); passOf.set(pass, { enc: this, label: '' }); return pass; };
+        const sp = Pass?.prototype?.setPipeline;
+        if (sp) Pass.prototype.setPipeline = function (pl) { const r = passOf.get(this); if (r) r.label = pl?.label || '?'; return sp.call(this, pl); };
+      }
+      const dw = globalThis.GPUComputePassEncoder?.prototype?.dispatchWorkgroups;
+      if (dw) GPUComputePassEncoder.prototype.dispatchWorkgroups = function (x, y = 1, z = 1) { const r = passOf.get(this); if (r) note(r.enc, r.label, x * y * z); return dw.call(this, x, y, z); };
+      const dr = globalThis.GPURenderPassEncoder?.prototype?.draw;
+      if (dr) GPURenderPassEncoder.prototype.draw = function (...a) { const r = passOf.get(this); if (r) note(r.enc, `draw ${r.label}`, 1); return dr.apply(this, a); };
+      const fin = GPUCommandEncoder.prototype.finish;
+      GPUCommandEncoder.prototype.finish = function (...a) { const cb = fin.apply(this, a); bufOf.set(cb, workOf.get(this)); return cb; };
+      const sub = GPUQueue.prototype.submit;
+      GPUQueue.prototype.submit = function (cbs) {
+        const r = sub.call(this, cbs);
+        if (subs.length < 6000) {
+          const work = new Map();
+          for (const cb of cbs ?? []) for (const [k, n] of bufOf.get(cb) ?? []) work.set(k, (work.get(k) ?? 0) + n);
+          const row = [performance.now(), null, [...work]];
+          subs.push(row);
+          this.onSubmittedWorkDone().then(() => { row[1] = performance.now(); }, () => {});
+        }
+        return r;
+      };
+      /*
         And how much memory the page asked for, and wrote, when. The stop
         after the first step kept on a warm cache (median 1.15 s over the
         forty looks' openings, run 36300733762), so it is not a compile:
@@ -484,6 +529,7 @@ async function open(query, looks) {
         made: window.__startupMade.filter(([t]) => t <= now).map(([t, d]) => [t / 1000, d]),
         bytes: window.__startupBytes.filter(([t]) => t <= now).map(([t, k, n]) => [t / 1000, k, n]),
         firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
+        subs: window.__startupSubs.filter(([t]) => t <= now).map(([t, d, w]) => [t / 1000, d == null ? null : d / 1000, w]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
       };
     }, [watch, MAX_GAP_S]);
@@ -769,6 +815,33 @@ const underWay = (o, gap) => {
     + `; asked of WebGPU for the first time from a second before it: ${asked.length ? asked.map(([w, at]) => `${w} at ${at.toFixed(2)} s`).join(', ') : 'nothing'}`;
 };
 
+/*
+  What the GPU was doing through the stop: each submit from a second before
+  the first step to three after it, and the time the GPU spent on it (from
+  when it was handed over, or when the GPU finished the one before, to when
+  it was done). The page hands the GPU its first ~8 steps in a quarter
+  second and then waits a second for any frame; this names the submits the
+  GPU spent that second on, and the pipelines in them. Printed, not judged.
+*/
+const gpuTime = (o) => {
+  const step = o.firstStep == null ? null : o.firstStep / 1000;
+  if (step == null || !o.subs?.length) return ['no submits to say'];
+  const win = o.subs.filter(([t]) => t >= step - 1 && t <= step + 3);
+  let prev = 0;
+  const rows = win.map(([t, d, w]) => {
+    const from = Math.max(t, prev);
+    const took = d == null ? null : d - from;
+    if (d != null) prev = Math.max(prev, d);
+    return { t, d, took, w };
+  });
+  const undone = rows.filter((r) => r.d == null).length;
+  const total = rows.reduce((a, r) => a + (r.took ?? 0), 0);
+  const top = (w) => [...w].sort((x, y) => y[1] - x[1]).slice(0, 5).map(([k, n]) => `${k}×${n}`).join(' ') || 'no passes';
+  const slow = [...rows].filter((r) => r.took != null).sort((x, y) => y.took - x.took).slice(0, 8).sort((x, y) => x.t - y.t);
+  return [`${rows.length} submits from a second before the first step to three after (${undone} never done), ${total.toFixed(2)} s of GPU time among them; the longest:`,
+    ...slow.map((r) => `  handed ${r.t.toFixed(2)} s, done ${r.d.toFixed(2)} s, ${r.took.toFixed(2)} s on it: ${top(r.w)}`)];
+};
+
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, cold = null) => {
   // Whether the page's own thread was busy through a gap (a long task
@@ -860,6 +933,7 @@ try {
     coldAt == null ? 'the control drew no frame before its device, so there is no moment to compare'
       : `${cold ? `${say(cold)}` : `no stop beginning within ${COLD_AT_S} s of ${coldAt.toFixed(2)} s`}, against ${say(c.framesAsking)} before its device (given ${c.given?.toFixed(2)} s) for ?prepare=0; held to ${bound.toFixed(2)} s`);
   console.log(`     ${underWay(o, o.frames)}`);
+  for (const line of gpuTime(o)) console.log(`     ${line}`);
   /*
     The quarter seconds round the first step, on every run, with what the
     page had made, written and submitted by each: whether the page was still
