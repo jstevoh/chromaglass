@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **built** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -825,7 +825,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.
-   *Built 2026-09-27 for oil and water* (Oil Bodies, on in Oil & Water): the oil
+   *Shipped 2026-09-27 for oil and water* (#179, Oil Bodies, on in Oil & Water): the oil
    carries its own share of the dye, so amber oil on teal water stays two colours
    as the drops round, merge and are dragged. *Check:* `npm run bodies`. Waiting on
    the owner's eyes on a real GPU (judging.md 14).
@@ -924,6 +924,17 @@ while this batch's plan was going in (#177), and no cause is known yet:
   steps 1.89 s), just after the first step while the remaining pipelines build
   behind it; main's deploy of the same code read 1.70 s. Before touching the limit,
   read the spread over the last runs (the `steward` skill's rule for a margin).
+  Since: 2.43 s at 19.6 s on #177's deploy, 1.30 s on #179's PR and 2.03 s at
+  16.40 s on its deploy (2026-09-27), each time the frames standing still for about
+  two seconds just after the first step, on a runner slow enough that the control's
+  own device took 5.3 s. Three deploys in a row stopped here while their PRs passed;
+  a thread cannot re-run a job (403), so each costs a re-run by hand.
+- `magnet.mjs`, "dragging the Magnet gathers the ferrofluid along where the hand
+  goes": on #180 (PLAN.md only, the same code #179's PR and deploy passed), the drag
+  gathered 300 → 363 against 266 → 300 left alone, a gain of 29 where the check asks
+  a tenth of 300. It asks the gain against what was there, on a hand path drawn at
+  random each run, so a run whose best spot starts full reads low; worth reading
+  the gain's spread over the last runs before touching its tenth.
 
 ## Not doing
 
