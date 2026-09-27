@@ -317,6 +317,13 @@ key's edge (a row's dark dropping out between luma 0.18 and 0.36, where Film
 Key starts, and on the film at Film Key itself) is the right place on a real film, and whether Add over a
 bright plate blows out too soon to be useful on a projector.
 
+Each row has a take button and a fade time in bars now (PLAN.md §11 step 4).
+`npm run rowfade` holds the curve and `npm run phone` watches the front plate
+walk out on a phone; what neither can say is how a two-bar fade of a real
+film looks on the wall at 60 fps (is smoothstep's slow start read as a late
+start on a projector?), and whether a film filmed with the tool (`film.yml`,
+by hand) coming in from a pad shows no hard cut in its motion table.
+
 ## 14. Oil & Water as two bodies
 
 Oil & Water now pours oil as bodies that keep their own colour (Oil Bodies,

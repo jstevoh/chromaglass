@@ -111,6 +111,7 @@
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
+    "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
     "finger": "npm run build && node scripts/finger.mjs",

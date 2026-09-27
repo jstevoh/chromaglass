@@ -18,7 +18,15 @@
 
 import type { VisualizerSettings } from '../types';
 import { curveOf, travelOf } from './midi';
-import { MIX_CONTROLS } from './mixer';
+import { MIX_CONTROLS, MIX_FADE_KEYS } from './mixer';
+
+/** A fade time as said on its slider: "cut", "1 bar", "2.5 bars". */
+export const fadeBarsLabel = (v: number): string => {
+  if (!(v > 0)) return 'cut';
+  // Anything above none fades, so it never reads as a cut: at least half a bar.
+  const b = Math.max(0.5, Math.round(v * 2) / 2);
+  return `${b} bar${b === 1 ? '' : 's'}`;
+};
 
 /** The settings a number reads better on than a percentage. */
 const UNITS: Record<string, (v: number) => string> = {
@@ -38,6 +46,8 @@ const UNITS: Record<string, (v: number) => string> = {
       ? (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}°`
       : (v: number) => `${Math.round(v * 100)}%`,
   ])),
+  // A row's fade time is bars of the song, and none at all is a cut.
+  ...Object.fromEntries(MIX_FADE_KEYS.map(k => [String(k), fadeBarsLabel])),
 };
 
 /**

@@ -167,6 +167,11 @@ jobs:
       # 8-bit colour, the textbook sequence in the shader's table, and the shader carrying it.
       - name: The film table
         run: npm run filmtable
+      # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
+      # whole fades driven at the show timer's 16 ms, no step past the curve's
+      # steepest, the turn-round, the hand, the cut, and the pads wired.
+      - name: A row's fade
+        run: npm run rowfade
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist

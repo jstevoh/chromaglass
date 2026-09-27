@@ -61,7 +61,10 @@ export type RemoteAction =
   /** Record the show to a video file / stop. */
   | 'record-toggle'
   /** Start or stop recording a performance: what is painted, with the song playing. */
-  | 'performance-toggle';
+  | 'performance-toggle'
+  /** A Mixer row's take button (lib/mixFade.ts): out over its fade time, or back in. */
+  | 'mix-fade-led' | 'mix-fade-gel' | 'mix-fade-lumia' | 'mix-fade-front'
+  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -102,6 +105,12 @@ export interface RemoteState {
   /** Whether a film and a logo are loaded, so the remote's mixer can say when a row has nothing on the wall. */
   filmLoaded?: boolean;
   markLoaded?: boolean;
+  /**
+   * The Mixer rows fading now, and which way (lib/mixFade.ts), so the remote's
+   * take buttons light and say what a press will do as the desk's do: from the
+   * level alone, a fade half-way out read "Fade out", and a press turned it back in.
+   */
+  rowFading?: Partial<Record<'led' | 'gel' | 'lumia' | 'front' | 'back' | 'film' | 'mark', 'in' | 'out'>>;
 }
 
 export type RemoteMessage =
