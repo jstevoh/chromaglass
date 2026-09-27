@@ -181,42 +181,35 @@ const MAZE_UNIFORM = 0.45;
   the domes stayed packed in one raspberry, and at four times the flow the
   pool thinned to grey, the plate past half full falling from 8.6% to 7.3%
   in five seconds on 384². Without a maze field (the Magnet on Classic,
-  which pours ferrofluid to gather) the pull eases by HAND_PULL instead:
-  gathering along the hand is what `npm run magnet` holds that tool to.
-  SPIKE_RELAX: see the phase stage.
+  which pours ferrofluid to gather) the pull stays whole: gathering along
+  the hand is what `npm run magnet` holds that tool to, and the domes were
+  only tuned on the ferrofluid looks. SPIKE_RELAX: see the phase stage.
 */
 const SPIKE_PULL = 0.5;
 const SPIKE_FLOW = 2;
 const SPIKE_RELAX = 16;
 /*
   Past the spikes, fingers (PLAN.md §9i, `npm run fingers`). A pool bigger
-  than the spikes' reach stayed round past them: on a look with no
-  Labyrinth the magnet's field pushed nothing apart (α was 0 with no maze
-  field), and a real magnet's field under a ferrofluid layer is exactly
-  what makes its dipoles repel, Labyrinth or not. So the hand's magnet is a
-  maze field of its own, as strong as its spikes (field, in step), on any
-  look; the look's coil (MAZE_UNIFORM) still only comes from Labyrinth.
+  than the spikes' reach stayed round past them: the maze's repulsion was
+  screened at the look's own reach, and a dipole's field reaches a long
+  way. So under the hand's magnet the maze field is at least as strong as
+  its spikes (field, in step), and pushes from further.
 
   HAND_SCREEN: how far the push reaches, as the screening's share of the
   maze's wavenumber squared (0.16 for the look's own maze, which sets its
-  period: m = 0.4 k*). A dipole's field reaches a long way, and a pool
-  pushed only from within five cells of each point had its edge wrinkle
-  and stop; from four times as far (0.04) it goes out in fingers. The
-  repulsion α is set with it so the fastest wavelength stays the maze's:
-  k*² = √α − m², so √α = (1 + share) k*².
+  period: m = 0.4 k*). A pool pushed only from within five cells of each
+  point had its edge wrinkle and stop; from four times as far (0.04) it
+  goes out in fingers. The repulsion α is set with it so the fastest
+  wavelength stays the maze's: k*² = √α − m², so √α = (1 + share) k*².
 
-  HAND_PULL: the magnet's pull, with no maze field, down to this with the
-  spikes. At full the pull held the pool's edge in against the push and it
-  only rippled. Whether 0.35 still lets a pool gather along where the
-  hand is dragged is `npm run magnet`'s to say, and it runs only on the
-  Mac: not yet measured when this was set (PLAN.md §9l).
-
-  And the push comes in with the spikes, not at once: with no Labyrinth
-  the repulsion is α times the spikes' share (spikeAmt), so a magnet
-  brought up slowly, or held at a Ferrofluid Scale that stops short of
-  full spikes, pushes a little and never steps from nothing to half.
+  Only on a look with a Labyrinth. The first version gave the hand's magnet
+  this field on every look, Classic too, with the pull eased so the edge
+  could get out; on the Mac `npm run ferro` then found a close magnet on
+  Classic no longer gathered scattered drops, which is that tool's job
+  there, and with the pull whole Classic's fingers came out grey (7, 1, 0
+  and 0 on the four circles of `npm run fingers`). Classic is left as it
+  was; fingering it is PLAN.md §9o.
 */
-const HAND_PULL = 0.35;
 const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
@@ -1052,11 +1045,11 @@ export class WebGPUFluid {
       axis, where the field is strongest): then the spikes' wells go into μ
       and the maze's flow carries the liquid into them, maze field or not.
       And the magnet's own field is a maze field as strong as its spikes, on
-      any look (see HAND_SCREEN).
+      a look with a Labyrinth (see HAND_SCREEN).
     */
     const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
     const spikes = spikeAmt > 0;
-    const field = Math.max(maze, spikeAmt);
+    const field = maze > 0.001 ? Math.max(maze, spikeAmt) : 0;
     // Never under twelve cells a period: the edge is three or four wide, and
     // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
     // the period by up to three (MAZE_FINEST), and that floor is why it is
@@ -1237,9 +1230,7 @@ export class WebGPUFluid {
         // repulsion: pulled hard to one spot, the ferrofluid stacks into
         // rings round it rather than a maze (the gradient orders the
         // stripes across it). Still enough that the maze follows the hand.
-        // With no Labyrinth the hand's own field does the same as its
-        // spikes come in (HAND_PULL), so the fingers can get out.
-        const pull = maze > 0.001 ? (1 - 0.75 * maze) * (1 - (1 - SPIKE_PULL) * spikeAmt) : 1 - (1 - HAND_PULL) * spikeAmt;
+        const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
             Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
@@ -1485,8 +1476,8 @@ export class WebGPUFluid {
         and it rounds. The pairwise sharpening that stood in for it without
         a maze (phaseSeparate) exchanged only along the axes, and a plate of
         drops set into blocky squares with holes punched in them. Under a
-        maze field, the look's or the hand's magnet's own, the dipoles'
-        repulsion (phaseMu's ψ term) is added.
+        maze field (the look's, stronger under the hand's magnet) the
+        dipoles' repulsion (phaseMu's ψ term) is added.
       */
       if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
       if (!this.phaseMuT) {
@@ -1506,7 +1497,7 @@ export class WebGPUFluid {
       // Phase Edge is how fast it separates: its mobility, M dt, from 0.006
       // to 0.018 (under the explicit limit, about 0.028).
       const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
-        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), field > 0.001 ? mazeK.alpha * (maze > 0.001 ? 0.5 + 0.5 * field : spikeAmt) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
+        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), field > 0.001 ? mazeK.alpha * (0.5 + 0.5 * field) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
       for (let k = 0; k < CH_SUBSTEPS; k++) {
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);

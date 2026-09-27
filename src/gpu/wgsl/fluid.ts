@@ -303,9 +303,11 @@ const MAGNET_BSAT = 150.0;
   plate (drawing the half-full line) does not draw at all.
 
   FINGER_REPEL: the same past the spikes, where the fingers grow. Rendered
-  in the lab (Classic, a pool poured past the spikes' reach, 384², six
-  seconds): at 1 the fingers are black with round tips; at 0 they stopped
-  as stubs a finger's width long, and at 5 went out as haze.
+  in the lab (a pool poured past the spikes' reach, 384², six seconds, on
+  Classic's settings while the hand's push still ran there too; it runs
+  only under a Labyrinth now, fluid.ts HAND_SCREEN): at 1 the fingers are
+  black with round tips; at 0 they stopped as stubs a finger's width long,
+  and at 5 went out as haze.
 
   STRIPE_CURVE: see phaseMu, where the double well is steepened for the
   push.
@@ -2427,10 +2429,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     So μ is written twice: .r, all of it, for that flow; .g, for the
     separation, without the push in the share the hand's magnet is in
     (spikesClose), so with no hand every look's maze is as it was. With no
-    Labyrinth (no uniform share, A.b.z) the only push is the hand's, and
-    none of it goes to the separation at any strength: a magnet short of
-    full spikes would otherwise send the rest of it down the diffusion
-    that makes the grey.
+    Labyrinth there is no push (α, A.b.y, is 0) and the two are the same;
+    the step() on A.b.z keeps it so if the hand's push ever runs there
+    again, where a magnet short of full spikes would otherwise send the
+    rest of it down the diffusion that makes the grey.
 
     And the double well steepened as the push grows, so what the flow
     carries out stays past half full: a stripe survives the push where

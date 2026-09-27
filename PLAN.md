@@ -776,22 +776,22 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 - **9i. Fingers past the spikes** (**shipped**, this PR). A pool bigger than the
-  spikes' reach stayed a round blob past them under the Magnet: on a look with no
-  Labyrinth setting the magnet's field pushed nothing apart at all, and on Magnet
-  Garden the push it did give went in through the separation's own diffusion and
-  thinned the edge to a grey the plate does not draw. Now the hand's magnet brings
-  its own maze field on every look, with a longer reach (screening 0.04 of the
-  look's), the dipoles' push moves the liquid only by flow (`phaseMu` writes the
-  flow's potential and the separation's apart), the well steepens where the push
-  is on so a finger stays liquid, and the pull under the hand eases (HAND_PULL) so
-  the edge can go out. With no Labyrinth the push ramps in with the spikes and
-  none of it goes to the separation. A pool poured 0.17 of the plate in radius,
-  the Magnet held six seconds at 384², counted as black fingers crossing circles
-  in the plate's picture: on Magnet Garden 12, 9 and 9 on the circles 0.06, 0.09
-  and 0.12 past the poured edge, in 7 of 12 sectors; on main 6, 3 and 1, grey
-  stubs. On a look with no Labyrinth (Classic's Phase Edge) 6, 4 and 3, against
-  none on main. The phone's fingers holding the Magnet get the same, from the
-  same solver. `npm run fingers`; Mac look in `docs/judging.md` §16.
+  spikes' reach stayed a round blob past them under the Magnet: on Magnet Garden
+  the push it gave went in through the separation's own diffusion and thinned the
+  edge to a grey the plate does not draw. Now, on a look with a Labyrinth, the
+  hand's magnet's field is at least as strong as its spikes and reaches further
+  (screening 0.04 of the look's), the dipoles' push moves the liquid only by flow
+  (`phaseMu` writes the flow's potential and the separation's apart), and the
+  well steepens where the push is on so a finger stays liquid. A pool poured 0.17
+  of the plate in radius, the Magnet held six seconds at 384², counted as black
+  fingers crossing circles in the plate's picture: on Magnet Garden 12, 9 and 9
+  on the circles 0.06, 0.09 and 0.12 past the poured edge, in 7 of 12 sectors; on
+  main 6, 3 and 1, grey stubs. The phone's fingers holding the Magnet get the
+  same, from the same solver. Looks with no Labyrinth (Classic) are as they were:
+  giving the hand its push there too, with its pull eased so the edge could get
+  out, stopped a close magnet gathering scattered drops (`npm run ferro` on the
+  Mac), and with the pull whole the fingers came out grey (9o). `npm run
+  fingers`; Mac look in `docs/judging.md` §16.
 
 - **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
   kick. The spikes now answer the magnet's field, so the maze's audio breathing
@@ -806,19 +806,21 @@ Open, from building 9i:
   out, so a finger reads as a round tip on a grey stem in the field: the plate
   draws the half-full line and shows it whole in the lab, but a Mac look should
   say whether it breaks up at 60 fps.
-- **9l. The magnet still has to pull.** The pull under the hand eases to 0.35 of
-  what it was while the fingers push out. `npm run magnet` (Mac only) holds that a
-  pool still follows the magnet when it is dragged; if it goes red, the ease is too
-  much.
+- **9l. The magnet still has to pull under a Labyrinth.** Under a maze field the
+  pull under the hand was already halved with the spikes (SPIKE_PULL); the longer
+  push now works against it too. `npm run magnet` (Mac only) holds that a pool
+  still follows the magnet when it is dragged, on Classic; nothing holds it on
+  Magnet Garden.
 - **9m. The spikes' outline margin is thin.** `npm run spikes` asks for an outline
   2.78 times a disc's; it reads 2.85 now, 2.62 with the finger push reaching all
   the way in. Anything that softens the spikes' repulsion will turn it red.
-- **9o. Grey fingers at a soft Phase Edge.** With no Labyrinth and Phase Edge at
-  its default 0.35, the fingers the magnet draws out stay a grey film (a fifth
-  to two thirds full) that Classic draws as pale outlines, and only three reach
-  0.12 out; at Magnet Garden's 0.75 they are black. The separation is too slow
-  to keep up with the flow pulling them out. A floor on the separation's speed
-  under the hand's field is the likely fix.
+- **9o. Fingers on Classic.** With no Labyrinth the Magnet only gathers: no
+  fingers past the spikes. A push of the hand's own there (tried in 9i) either
+  stopped the magnet gathering scattered drops, with the pull eased, or drew
+  grey fingers (7, 1, 0 and 0 on `npm run fingers`' circles), with it whole:
+  Classic's Phase Edge, 0.35, separates too slowly to keep up with the flow
+  pulling them out. Wants a push that switches on only once the liquid has
+  gathered under the hand, and a floor on the separation's speed there.
 - **9p. What `npm run fingers` does not measure.** The magnet between no spikes
   and full (a low Tool Amount, or a Ferrofluid Scale that holds it higher),
   where the push ramps in; and a maze look's labyrinth far from the hand while

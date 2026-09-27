@@ -13,9 +13,8 @@
  * sunflower: a pool under a magnet whose edge goes out in thin black
  * fingers all round it, with the dish showing between them. Before this, a
  * pool bigger than the spikes' reach (about 0.15 of the plate from a hand's
- * magnet) stayed round past them: on a look with no Labyrinth the magnet's
- * field pushed nothing apart at all, and on Magnet Garden what it pushed
- * out thinned to grey stubs a tenth of the plate long.
+ * magnet) stayed round past them: on Magnet Garden (the look the Magnet is
+ * for) what it pushed out thinned to grey stubs a tenth of the plate long.
  *
  * So, a pool poured bigger than the spikes' reach, the Magnet held close
  * over it the way the tool holds it, six seconds; then the picture the plate
@@ -27,30 +26,27 @@
  * of full) where the ferrofluid is (past a fifth full), narrower than 20°;
  * a wider dark run is the pool itself having grown, and counts against it.
  *
- *   1. its edge goes out in fingers all round. On Magnet Garden (the look
- *      the Magnet is for): at least seven fingers on the circles 0.06 and
- *      0.09 out, no wide dark run, and spread round, in at least five of
- *      the twelve 30° sectors on the 0.09 circle. On Classic's settings (no
- *      Labyrinth, Phase Edge 0.35: ferrofluid dropped on any look), at least
- *      four on the 0.06 circle. With no magnet, and under Magnet Garden's
- *      own magnet (held further off, below the spikes' onset), none on any
- *      circle
- *   2. they reach: on the 0.12 circle, at least seven on Magnet Garden and
- *      two on Classic
+ *   1. its edge goes out in fingers all round: at least seven fingers on
+ *      the circles 0.06 and 0.09 out, no wide dark run, and spread round, in
+ *      at least five of the twelve 30° sectors on the 0.09 circle. With no
+ *      magnet, and under Magnet Garden's own magnet (held further off,
+ *      below the spikes' onset), none on any circle
+ *   2. they reach: at least seven on the 0.12 circle
  *   3. they are drawn black with the dish lit between them: on the 0.09
  *      circle the fingers' mean brightness is under 15 % of full and the
  *      gaps' over a third (a picture that came back black, or a plate drawn
  *      upside down against the field, fails here or in 1)
  *   4. none of it makes or loses ferrofluid
  *
- * Classic is asked for less because it has less: its Phase Edge (0.35, the
- * default) separates about a quarter slower than Magnet Garden's (0.75),
- * and the fingers the push draws out stay a grey film between a fifth and
- * two thirds full, which Classic draws as a pale outline rather than black
- * (PLAN.md §9o). Measured on first run, at 384² in a cloud session: Magnet
+ * Only on Magnet Garden. The first version of this asked for fingers on
+ * Classic's settings too (no Labyrinth, Phase Edge 0.35: ferrofluid dropped
+ * on any look), which took giving the hand's magnet a push of its own on
+ * every look and easing its pull; on the Mac `npm run ferro` then found a
+ * close magnet on Classic no longer gathered scattered drops, which is that
+ * tool's job there. Classic is left as it was, and its fingers are PLAN.md
+ * §9o. Measured at 384² in a cloud session and the same on the Mac: Magnet
  * Garden 12, 9, 9 and 3 fingers on the four circles in 7 sectors, drawn at
- * 8 % against the gaps' 58 %; Classic 6, 4, 3 and 1; main's Magnet Garden
- * 6, 3, 1 and 0 in 3 sectors, main's Classic none.
+ * 8 % against the gaps' 58 %; main's 6, 3, 1 and 0 in 3 sectors.
  *
  * Read on the picture rather than on the field, because the picture is what
  * the owner sees and the field misleads here: a finger's stem runs about
@@ -71,11 +67,11 @@
  *
  * On 384², the grid the app runs on most machines: at 256 the maze's
  * period is at its twelve-cell floor (fluid.ts, MAZE_PERIOD) and the
- * fingers come out fewer and blunt. About forty minutes in a cloud session.
+ * fingers come out fewer and blunt. About half an hour in a cloud session.
  *
  * Not measured here: the magnet between no spikes and full (a lower Tool
  * Amount, or a Ferrofluid Scale that holds it higher), where the push is
- * ramped in with the spikes (fluid.ts, HAND_PULL); and a maze look's
+ * ramped in with the spikes (fluid.ts, field); and a maze look's
  * labyrinth far from the hand while the hand is held. PLAN.md §9.
  */
 import { openLab } from './lab.mjs';
@@ -96,8 +92,7 @@ const AT = { x: 0.5, y: 0.5 };
 const POUR = 0.25;
 // The phase settings the app runs each look on (LiquidVisualizer: Phase
 // Edge as set, else 0.35; the tension 0.45 of Ferrofluid Scale, else of
-// 0.4). Classic sets neither, so it runs the lab's own defaults.
-const CLASSIC = { ferroLabyrinth: 0, phaseSharp: 0.35, phaseTension: 0.4 * 0.45 };
+// 0.4).
 const GARDEN = { ferroLabyrinth: 0.8, phaseSharp: 0.75, phaseTension: 0.3 * 0.45 };
 const S = 420;
 const CIRCLES = [0.06, 0.09, 0.12, 0.15];
@@ -147,8 +142,7 @@ try {
   };
 
   const cases = [
-    ['Classic, no magnet', { ...CLASSIC, magnetStrength: 0 }, 'classic'],
-    ['Classic, the hand\'s magnet', { ...CLASSIC, ...HAND }, 'classic'],
+    ['Magnet Garden, no magnet', { ...GARDEN, magnetStrength: 0 }, 'magnet-garden'],
     ['Magnet Garden, the hand\'s magnet', { ...GARDEN, ...HAND }, 'magnet-garden'],
     ['Magnet Garden, its own magnet', { ...GARDEN, ...FAR }, 'magnet-garden'],
   ];
@@ -167,21 +161,19 @@ try {
       `${on[1].sectors} of 12 sectors; drawn at ${(on[1].dark * 100).toFixed(0)}% against the gaps' ${(on[1].lit * 100).toFixed(0)}%; mass ${mass0.toFixed(0)} → ${mass.toFixed(0)} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   }
   console.log('');
-  const none = got['Classic, no magnet'], own = got['Magnet Garden, its own magnet'];
-  const held = [got['Classic, the hand\'s magnet'], got['Magnet Garden, the hand\'s magnet']];
-  const [classic, garden] = held;
+  const none = got['Magnet Garden, no magnet'], own = got['Magnet Garden, its own magnet'];
+  const garden = got['Magnet Garden, the hand\'s magnet'];
   const counts = (m) => m.on.map(c => c.fingers + c.wide).join('/');
-  check('held close, the magnet pulls the pool\'s edge out in fingers all round, on Magnet Garden and on Classic',
+  check('held close, the magnet pulls the pool\'s edge out in fingers all round',
     garden.on.slice(0, 2).every(c => c.fingers >= 7 && c.wide === 0) && garden.on[1].sectors >= 5 &&
-      classic.on[0].fingers >= 4 && classic.on[0].wide === 0 &&
       [none, own].every(m => m.on.every(c => c.fingers + c.wide === 0)),
-    `Magnet Garden ${counts(garden)} on the circles 0.06/0.09/0.12/0.15 out, in ${garden.on[1].sectors} sectors; Classic ${counts(classic)}; ${counts(none)} with no magnet, ${counts(own)} under Magnet Garden's own`);
+    `${counts(garden)} on the circles 0.06/0.09/0.12/0.15 out, in ${garden.on[1].sectors} sectors; ${counts(none)} with no magnet, ${counts(own)} under Magnet Garden's own`);
   check('and they reach out',
-    garden.on[2].fingers >= 7 && classic.on[2].fingers >= 2,
-    `${garden.on[2].fingers} on Magnet Garden and ${classic.on[2].fingers} on Classic 0.12 past the poured edge`);
+    garden.on[2].fingers >= 7,
+    `${garden.on[2].fingers} 0.12 past the poured edge`);
   check('drawn black, with the dish lit between them',
-    held.every(h => h.on[1].dark < 0.15 && h.on[1].lit > 1 / 3),
-    held.map(h => `fingers ${(h.on[1].dark * 100).toFixed(0)}%, gaps ${(h.on[1].lit * 100).toFixed(0)}%`).join('; '));
+    garden.on[1].dark < 0.15 && garden.on[1].lit > 1 / 3,
+    `fingers ${(garden.on[1].dark * 100).toFixed(0)}%, gaps ${(garden.on[1].lit * 100).toFixed(0)}%`);
   const drift = Math.max(...Object.values(got).map(m => Math.abs(m.mass / m.mass0 - 1)));
   check('and none is made or lost', drift < 0.005, `worst ${(drift * 100).toFixed(3)}%`);
 } finally {
