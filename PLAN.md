@@ -70,6 +70,15 @@ it opens, so a cold Mac no longer freezes for 6–19 s at the start (#164, `npm 
 startup`), and draws with each of them once before it opens, so the first frames no longer
 stop for a second or two either (#181); the magnet stays where the hand leaves it (#159).
 
+For the work itself: a second reviewer from a different model, the `gemini-reviewer`
+agent over `npm run gemini-review`, sends a branch's diff to Gemini and checks each of
+its findings against the code (2026-09-27). It reads `GEMINI_API_KEY`, funded by the
+Ultra plan's monthly Cloud credits. Still open: the key is not yet in the cloud
+environment's settings and its project had no prepaid credit when this landed, so it
+has not yet reviewed a real diff; and Antigravity on the Mac reads `AGENTS.md`, not
+`CLAUDE.md`, so a session there does not see this repo's rules until one points at
+the other.
+
 ### 0. The dye a tool makes, and the deploys it is blocking
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`

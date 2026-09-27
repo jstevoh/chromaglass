@@ -96,6 +96,8 @@ When CI is red, use the `steward` skill.
   return an account with numbers, or the app compared against a reference.
 - `.claude/skills/ship/`: merge, confirm the deploy, restart the branch.
 - `.claude/agents/prepush-reviewer.md`: adversarial review of the diff before a push.
+- `.claude/agents/gemini-reviewer.md`: a second opinion on the diff from Gemini (`npm run gemini-review`),
+  each finding checked against the code before it is reported. Needs `GEMINI_API_KEY` in the environment.
 - `.claude/agents/preset-auditor.md`: photograph every preset and flag the broken ones.
 - `.claude/skills/crash-triage/`: turn a crash report or the report Worker's digest
   into a cause, a reproduction and a fix (`docs/crash-plan.md`).
