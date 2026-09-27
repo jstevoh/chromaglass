@@ -2176,7 +2176,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     rounding the fastest flow was still 0.77 (the solver's velocity), the
     "parasitic currents" every diffuse-interface code fights. The curvature
     form reads only first derivatives of a blurred field, and the normal's
-    divergence is smooth wherever the edge is: 88% of the dye kept (`npm run bodies`), the
+    divergence is smooth wherever the edge is: 88% of the plate's dye kept, and 86% of
+    it still inside the drop (`npm run bodies`), the
     settled disc's fastest flow 0.031, and a strip of oil still pulls round (the
     physics check's aspect 5.58 → 1.89). Blurring and capping the old force
     was tried first: the dye was lost more slowly and the strip no longer

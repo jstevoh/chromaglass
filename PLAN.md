@@ -796,7 +796,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
      the other bottles are still properties that blend. Each immiscible pair wants
      the same treatment (roadmap §I, and batch 4's liquids).
    - **Oil on Water with Oil Bodies at 0 still loses colour.** The rebuilt tension
-     took a settled drop from 41% to 88% of its dye kept, but MacCormack still drops
+     took a settled drop from 41% to 88% of its dye kept (86% still inside it), but MacCormack still drops
      the rest; the flux transport Oil Bodies uses keeps all of it. Worth trying the
      flux transport for any look with oil, bodies or not, and measuring the cost.
    - **A seam inside freshly merged bodies** lingers for a few seconds in the lab
@@ -807,6 +807,12 @@ The steps, most visible first. Each is one PR with its own check, and every step
      Mac gives the number.
    - **The lab's default diffusion (1e-4) is harsher than Oil & Water (0).** Checks
      of the dye near oil should set the look's own diffusion, or say why not.
+   - **Oil poured in the first seconds of a show may stall a frame.** The bodies'
+     six kernels, like the oil's surface tension before them, are built behind the
+     show (about fifteen seconds after it opens on the Mac), because no look runs
+     them until oil is poured and `npm run startup` holds the opening to what its
+     first steps use. Oil poured before they are ready builds them on that frame.
+     A check that pours oil at once in Oil & Water would say how long it stops.
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field

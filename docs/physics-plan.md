@@ -50,7 +50,8 @@ What went wrong on the way, and why the code is as it is:
   limiter caps a thickening and not a thinning, so that flow took the dye out
   of the oil cell by cell: a settled drop kept 41% of its colour after 120
   steps, and on the plate an oil drop went black in about a second. The
-  curvature form reads only first derivatives of a blurred field: 88% kept,
+  curvature form reads only first derivatives of a blurred field: 88% kept
+  (86% still inside the drop, which is what `npm run bodies` holds),
   and the fastest flow left in a drop that has stopped rounding (the
   "parasitic current") fell from 0.77 to 0.031. Blurring and capping the old
   force was tried first; it lost the dye more slowly and no longer rounded

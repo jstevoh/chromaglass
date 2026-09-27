@@ -22,7 +22,7 @@
  *      runs the plate it always did, and pays nothing
  *   4. dye poured over a body becomes the body's colour, and dye poured on
  *      open water stays the water's (bodyLand)
- *   5. a hand dragging the oil moves the oil and keeps all of it (carryMix)
+ *   5. a hand dragging the oil moves the oil and keeps all of it (mixCarry)
  *   6. and the oil's own surface tension no longer eats the colour inside a
  *      drop: a settled drop keeps its dye with the setting off too. It kept
  *      41% in 120 steps before the tension was rebuilt (mixForce), which on
@@ -41,12 +41,23 @@
  * Measured while writing this, on software WebGPU (the bounds below are set
  * well short of these, and well clear of the control or the old solver):
  *
- *   ① amber in open water after the stir   0.14%   (off 7.76%)    < 0.5%, off > 10×
+ *   ① the plate moved: 51.4% of the start's body cells were not body cells
+ *     at the end, on and off alike                                  > 25%
+ *     and the oil the same on and off, cell for cell   0.0 apart   < 1e-3
+ *     amber in open water after the stir   0.14%   (off 7.76%)    < 0.5%, off > 10×
  *     teal inside the bodies               0.01%   (off 0.30%)    < 0.1%, off > 3×
- *   ② dye 30702.2 → 30702.2, oil 3026.8 → 3026.8 (off lost 11.5% of its dye)
- *   ④ a dab over a body: 100.0% the oil's, 100.0% after 30 steps; on water 0.00%
- *   ⑤ the oil's middle moved 0.0103 of the plate; 100.00% of it kept
- *   ⑥ a settled drop keeps 88.1% of its dye (41% with the old force)   > 80%
+ *     amber per unit of oil 1.225, teal per unit of water 0.801 (laid 1.2
+ *     and 0.8; off 0.600 and 0.766)                                 ±10%
+ *     negative residue of the two-colour reading 0.00%              < 0.5%
+ *   ② dye 30702.2 → 30702.2, amber 3633.1 → 3633.2, teal 27069.1 → 27069.3,
+ *     oil 3026.8 → 3026.8 (off lost 11.5% of its dye)               < 1%
+ *   ④ a dab over a body: 100.0% the oil's, and all the oil took still its own
+ *     30 steps on; on water 0.00%, 99.9% of both dabs arrived; across the
+ *     edge 46.1% the oil's against 46.1% predicted from the oil under it
+ *   ⑤ the oil's middle moved 0.0102 of the plate right, 0.0000 across (the
+ *     CPU copy of mixCarry predicts 0.0103); 100.00% of it kept
+ *   ⑥ a settled drop keeps 85.7% of the dye inside it (41% with the old
+ *     force, as a share of the whole plate's)                       > 80%
  *
  * And what it took to get ① there, each found by this check: the colour laid
  * as dye landed a tenth of the amber as the water's (so the check now lays
@@ -61,8 +72,11 @@
  */
 import { openLab } from './lab.mjs';
 
-// The share of the body cells a stir of 360 steps must move (see ①).
-const MOVED = 0.02;
+// The share of the start's body cells a stir of 360 steps must leave (see ①):
+// half the 51.4% it measured, on and off alike. A plate whose step was
+// dropped (a kernel that failed validation drops the whole encoder) moves
+// none, and fails here before any colour row can pass on it.
+const MOVED = 0.25;
 
 const checks = [];
 const check = (name, ok, detail = '') => {

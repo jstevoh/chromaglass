@@ -510,20 +510,22 @@ export class WebGPUFluid {
       ['mixMu', [RGBA32], open.mix],
       ['mixUpdate', [RGBA32], open.mix],
       /*
-        The oil's smoothed shape, for its surface tension (mixForce) and
-        Oil Bodies' reach. Waited for only when Oil Bodies opens the show.
-        With Oil Tension alone it runs only where mixForce runs, and
-        mixForce has always been built behind the show (below): the two
-        come ready together, so this adds no wait mixForce did not have.
+        Oil Bodies, and the oil's smoothed shape that its reach and the
+        oil's surface tension (mixForce) both read: built behind the show,
+        like mixForce. They were first waited for whenever a look with Oil
+        Bodies opened the show, and `npm run startup` on Metal failed it:
+        Oil & Water, opened on its own, asked for none of the six in its
+        first forty steps, because nothing runs them until oil has been
+        poured, and the opening's rule is to wait only for what a look's
+        first steps use. Behind the show they are ready some fifteen
+        seconds after it opens, as mixForce always has been.
       */
-      ['mixSmooth', [R32], open.bodies],
-      // Oil Bodies: the dye carried as the oil is, and each liquid's colour
-      // kept in it. Run once a look with it on has poured oil.
-      ['bodyAdvect', [dye], open.bodies],
-      ['bodyPartition', [dye], open.bodies],
-      ['bodyUnspread', [dye], open.bodies],
-      ['bodyLand', [dye], open.bodies],
-      ['mixCarry', [RGBA32], open.bodies],
+      ['mixSmooth', [R32], false],
+      ['bodyAdvect', [dye], false],
+      ['bodyPartition', [dye], false],
+      ['bodyUnspread', [dye], false],
+      ['bodyLand', [dye], false],
+      ['mixCarry', [RGBA32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
       ['rxnStep', [RGBA32], open.reaction],
