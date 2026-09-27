@@ -671,9 +671,14 @@ async function replay(descs) {
       const t0 = performance.now();
       const enc = device.createCommandEncoder();
       let made = 0, cleared = 0;
+      const textures = [];
       for (const d of descs) {
+        // One entry per descriptor, null where it could not be made, so the
+        // writes below find each texture at its descriptor's index.
+        textures.push(null);
         try {
-          const tex = device.createTexture({ ...d, usage: d.usage | GPUTextureUsage.RENDER_ATTACHMENT });
+          const tex = device.createTexture({ ...d, usage: d.usage | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST });
+          textures[textures.length - 1] = tex;
           made++;
           if ((d.dimension ?? '2d') === '2d') {
             enc.beginRenderPass({ colorAttachments: [{ view: tex.createView({ baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 }), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }] }).end();
@@ -682,13 +687,40 @@ async function replay(descs) {
         } catch { /* a format that cannot be drawn to: made, not cleared */ }
       }
       device.queue.submit([enc.finish()]);
+      /*
+        And then written through, every texel. A clear of a fresh texture
+        can be a flag in its compression metadata and touch no memory at
+        all; the show's first steps write every texel of every field. The
+        clears alone stopped nothing (0.07 and 0.13 s, runs 36303170127 and
+        36304243400); if this does, the stop is the runner putting memory
+        under 75.8 MB of fields the first time they are written.
+      */
+      await new Promise((r) => setTimeout(r, 3000));
+      const t1 = performance.now();
+      const bpp = { rgba32float: 16, rgba32uint: 16, rgba32sint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
+      let written = 0;
+      for (const [i, d] of descs.entries()) {
+        const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
+        const b = bpp[d.format] ?? 4;
+        try {
+          const tex = textures[i];
+          if (!tex || (d.dimension ?? '2d') !== '2d') continue;
+          const data = new Uint8Array(w * h * b).fill(1);
+          for (let layer = 0; layer < z; layer++) device.queue.writeTexture({ texture: tex, origin: [0, 0, layer] }, data, { bytesPerRow: w * b, rowsPerImage: h }, [w, h, 1]);
+          written += w * h * b * z;
+        } catch { /* not writable this way */ }
+      }
       await new Promise((r) => setTimeout(r, 4000));
       presenting = false;
       const now = performance.now();
-      const after = [t0, ...frames.filter((t) => t > t0), now];
-      let gap = 0, at = null;
-      for (let i = 1; i < after.length; i++) if (after[i] - after[i - 1] > gap) { gap = after[i] - after[i - 1]; at = after[i - 1]; }
-      return { made, cleared, at0: t0 / 1000, gap: gap / 1000, at: at / 1000 };
+      const longest = (from, to) => {
+        const ts = [from, ...frames.filter((t) => t > from && t < to), to];
+        let gap = 0, at = null;
+        for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
+        return { gap: gap / 1000, at: at / 1000 };
+      };
+      const c = longest(t0, t1), w = longest(t1, now);
+      return { made, cleared, at0: t0 / 1000, gap: c.gap, at: c.at, at1: t1 / 1000, wgap: w.gap, wat: w.at, written };
     }, descs) };
   } finally { await browser.close(); }
 }
@@ -853,7 +885,8 @@ try {
   const descs = (o.made ?? []).filter(([t]) => o.firstStep != null && t >= o.firstStep / 1000 - 1 && t <= o.firstStep / 1000 + 1).map(([, d]) => d);
   const rp = descs.length ? await replay(descs).catch((err) => ({ error: String(err).split('\n')[0] })) : { error: 'no textures made round the first step' };
   console.log(rp.error ? `  the show's textures on a bare page: could not be made (${rp.error})`
-    : `  the show's ${rp.made} textures made again on a bare page (shader cache ${rp.cache}), ${rp.cleared} cleared once: longest wait for a frame after ${rp.gap.toFixed(2)} s from ${rp.at.toFixed(2)} s (made at ${rp.at0.toFixed(2)} s)`);
+    : `  the show's ${rp.made} textures made again on a bare page (shader cache ${rp.cache}), ${rp.cleared} cleared once: longest wait for a frame after ${rp.gap.toFixed(2)} s from ${rp.at.toFixed(2)} s (made at ${rp.at0.toFixed(2)} s);`
+      + ` then every texel written (${(rp.written / 2 ** 20).toFixed(1)} MB at ${rp.at1.toFixed(2)} s): longest wait for a frame after ${rp.wgap.toFixed(2)} s from ${rp.wat.toFixed(2)} s`);
 
   // ── Every look, opened on its own ─────────────────────────────────
   const each = await openings(presetIds);
