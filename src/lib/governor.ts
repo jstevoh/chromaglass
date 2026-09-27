@@ -115,7 +115,13 @@ export class QualityGovernor {
    */
   private readonly pinned: boolean;
 
-  constructor(private readonly rungs: QualityRung[], start: number, now: number, pin = false) {
+  /**
+   * `rungs` is public, read-only, so the Mac's smoke check can ask the running
+   * show which ladder it is on: a stage's ladder has rungs at 0.75 of the
+   * projector, which no laptop's ladder has (PLAN.md §14c), and nothing else
+   * says whether the app handed the stage to the ladder at all.
+   */
+  constructor(readonly rungs: QualityRung[], start: number, now: number, pin = false) {
     this.index = Math.max(0, Math.min(rungs.length - 1, start));
     this.start = this.index;
     this.pinned = pin;

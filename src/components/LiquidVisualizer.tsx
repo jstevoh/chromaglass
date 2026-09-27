@@ -29,7 +29,7 @@ import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
-import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -4407,6 +4407,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const frameRef = useRef(frame);
   frameRef.current = frame;
   const resizeRef = useRef<() => void>(() => {});
+  /** Build the governor's ladder again for the stage now attached, or none (PLAN.md §14c). */
+  const reladderRef = useRef<() => void>(() => {});
   const [staged, setStaged] = useState(false);
   /**
    * A song render in progress: its rate, the steps a second it holds the
@@ -4899,6 +4901,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     setStage: (size) => {
       stageRef.current = size && size.width > 0 && size.height > 0 ? { width: Math.round(size.width), height: Math.round(size.height) } : null;
       setStaged(stageRef.current !== null);
+      reladderRef.current();
       resizeRef.current();
     },
     loadFilmFile: async (file: File) => {
@@ -7968,6 +7971,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       gridCapRef.current = Math.min(gridCapRef.current, grid - 1);
       const governor = governorRef.current;
       console.warn(`ChromaGlass: out of GPU memory at ${grid}² (${detail}); capping the grid below it.`);
+      /*
+        On a projector the ladder is rebuilt under the cap instead: its rungs
+        below the opening grid are all at half the stage, so stepping down
+        from a grid that ran out of memory would give up the wall's pixels
+        for good along with the grid (`stageLadder`). The new ladder opens
+        at the largest grid that fits, on the whole stage.
+      */
+      if (governor && stageRef.current && renderer && !cancelled) {
+        govern(renderer, true);
+        return;
+      }
       if (governor && governor.failRung(performance.now() * 0.001)) return;
       if (!healStage(`out of GPU memory at the smallest grid (${grid}²)`)) {
         setGpuFailure({ failure: 'no-adapter', detail: `out of GPU memory even at ${grid}²` });
@@ -8022,19 +8036,53 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
 
-    /** The renderer is up: size it, give the governor its ladder, and go. */
-    const startWith = (r: PlateRenderer) => {
-      renderer = r;
-      const ladder = qualityLadder(tier, r.info.gpuClass);
+    /*
+      The governor, on the ladder for what the canvas is drawn for: the
+      laptop's screen, or a projector's own pixels when one is attached
+      (PLAN.md §14c, `stageLadder` in lib/platform.ts).
+
+      A stage comes and goes during a show, so this runs again when it does
+      (`setStage`), and not only when the renderer starts. It used to run
+      only here, which was harmless while a stage's rungs were the laptop's
+      rungs anyway. Now they are not: a governor left holding the laptop's
+      ladder under a stage would read its rungs as shares of the projector.
+      The wall window announces its size on every resize and fullscreen
+      change, and most of those change nothing the ladder depends on, so a
+      new governor is built only when the rungs differ: a new one starts its
+      settling period again and forgets a step rate it had given up.
+
+      And when the rungs do differ but the one it is on is still among them,
+      it stays on it. A wall window dragged across 1920×1200, or opened on a
+      Retina screen and then fullscreened on the projector, gains or loses
+      the 1024² rung and nothing else; opening the new ladder at its start
+      would drop a plate that had climbed to 768² back to 512² and rebuild
+      the solver mid-show (the pre-push review). Attaching or detaching a
+      wall changes every rung, so those still open at the start.
+    */
+    let ladderKey = '';
+    const govern = (r: PlateRenderer, fresh: boolean) => {
+      const ladder = qualityLadder(tier, r.info.gpuClass, stageRef.current, gridCapRef.current);
+      const key = ladder.rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ');
+      if (!fresh && key === ladderKey && governorRef.current) return;
+      ladderKey = key;
+      const was = fresh ? null : governorRef.current?.rung;
+      const keep = was ? ladder.rungs.findIndex((x) => x.grid === was.grid && x.dpr === was.dpr) : -1;
       governorRef.current = new QualityGovernor(
         ladder.rungs,
-        PINNED_RUNG ?? ladder.start,
+        PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start),
         performance.now() * 0.001,
         PINNED_RUNG !== null,
       );
       // Below whatever ran out of memory before.
       const g = governorRef.current;
       while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }
+    };
+    reladderRef.current = () => { if (renderer && !cancelled) govern(renderer, false); };
+
+    /** The renderer is up: size it, give the governor its ladder, and go. */
+    const startWith = (r: PlateRenderer) => {
+      renderer = r;
+      govern(r, true);
       r.resize();
       render();
     };
@@ -8060,7 +8108,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const dpr = dprRef.current;
       const px = renderingRef.current ?? canvasPixelsFor(
         dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
-        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+        { width: window.innerWidth, height: window.innerHeight },
       );
       canvas.width = px.width;
       canvas.height = px.height;
@@ -8763,7 +8811,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const resize = () => {
       const px = renderingRef.current ?? canvasPixelsFor(
         dprRef.current, stageRef.current, renderer?.maxTexture ?? 8192,
-        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+        { width: window.innerWidth, height: window.innerHeight },
       );
       canvas.width = px.width;
       canvas.height = px.height;
