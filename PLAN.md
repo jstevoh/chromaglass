@@ -74,6 +74,17 @@ it opens, so a cold Mac no longer freezes for 6–19 s at the start (#164, in pr
 −16 and −7 left alone), as do the Blow and the Press, and plates hold less dye at the
 same point than before. What follows is how it was found.
 
+*Found 2026-09-27, not yet done:* **"adds none" still goes red on runs that do not
+touch the Finger.** #182's tools shard (a Pacing change; the same code had passed the
+shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5.
+The check allows |Δ − d| < 0.15·total + 5 + |d| with d the larger-magnitude idle
+reading, signed. So when the plate's two idle readings have opposite signs, the
+allowance is centred on one of them rather than spanning both, which is not the
+bracket its comment describes ("a Finger that makes dye still has to beat both").
+Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
+for the check's owner, taken with §0's "what the check should mean" below, since on
+the positive side it is looser whenever the larger idle reading is the negative one.
+
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream
