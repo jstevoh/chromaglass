@@ -2733,6 +2733,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ oilTension: v })}
           settingKey="oilTension"
         />
+        {/* Each liquid keeps its own colour: needs Oil Tension, which is what puts oil on the plate. */}
+        <Slider
+          label="Oil Bodies"
+          value={settings.oilBodies ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilBodies: v })}
+          settingKey="oilBodies"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}

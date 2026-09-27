@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; steps 3–7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **built** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -825,6 +825,32 @@ The steps, most visible first. Each is one PR with its own check, and every step
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.
+   *Built 2026-09-27 for oil and water* (Oil Bodies, on in Oil & Water): the oil
+   carries its own share of the dye, so amber oil on teal water stays two colours
+   as the drops round, merge and are dragged. *Check:* `npm run bodies`. Waiting on
+   the owner's eyes on a real GPU (judging.md 14).
+   *Found while building it, not yet done:*
+   - **Only oil is a body.** Silicone lands in the same oil field; soap, milk, ink and
+     the other bottles are still properties that blend. Each immiscible pair wants
+     the same treatment (roadmap §I, and batch 4's liquids).
+   - **Oil on Water with Oil Bodies at 0 still loses colour.** The rebuilt tension
+     took a settled drop from 41% to 88% of its dye kept (86% still inside it), but MacCormack still drops
+     the rest; the flux transport Oil Bodies uses keeps all of it. Worth trying the
+     flux transport for any look with oil, bodies or not, and measuring the cost.
+   - **A seam inside freshly merged bodies** lingers for a few seconds in the lab
+     (each drop's old rim). Judge it on the Mac; if it reads as a drawn line, blend
+     the oil's own colour faster where two bodies have just joined.
+   - **The cost is untimed.** Oil Bodies adds a transport, four partition passes, four
+     blurs and a landing pass to every step of Oil & Water; `npm run stages` on the
+     Mac gives the number.
+   - **The lab's default diffusion (1e-4) is harsher than Oil & Water (0).** Checks
+     of the dye near oil should set the look's own diffusion, or say why not.
+   - **Oil poured in the first seconds of a show may stall a frame.** The bodies'
+     six kernels, like the oil's surface tension before them, are built behind the
+     show (about fifteen seconds after it opens on the Mac), because no look runs
+     them until oil is poured and `npm run startup` holds the opening to what its
+     first steps use. Oil poured before they are ready builds them on that frame.
+     A check that pours oil at once in Oil & Water would say how long it stops.
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field

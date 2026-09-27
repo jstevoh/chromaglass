@@ -85,8 +85,24 @@ const PHASE_RELAX = 6;
   The mix's forces, each in plate widths a second at full strength (see
   mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
   there at full and gone at zero.
+
+  OIL_TENSION is σ for the capillary force (σ κ ∇c̃, see mixForce), in
+  plate widths: κ and ∇c̃ are taken in cells, so the step multiplies it by
+  N² and a drop rounds up in the same time on a 256 grid as on a 512. At
+  full a drop a tenth of the plate across goes from a smear to round in
+  about a second, which is how an oil drop on a real dish behaves; the
+  Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
+  second-derivative field under it that did not scale either.
 */
-const OIL_TENSION = 10;
+const OIL_TENSION = 4e-4;
+/*
+  The most the oil's surface tension may move the liquid in a step, in cells
+  (see mixForce). A drop rounding up is a slow thing, a second or so for a
+  drop a tenth of the plate across, which is a fraction of a cell a step on
+  any grid; the cap is there for the moment a fresh pour is breaking up,
+  when the force is at its largest and least real.
+*/
+const OIL_CELLS = 0.5;
 const SOAP_PULL = 0.5;
 const DYE_WEIGHT = 0.12;
 const HEAT_LIFT = 0.06;
@@ -212,6 +228,27 @@ const MAGNET_CELLS = 2.4;
   the edge eventually, since the middle is drawn black.
 */
 export const DISPLACE_PUSH = 0.18;
+/*
+  Oil Bodies at full (bodyPartition): how fast each colour is evened out
+  through its own liquid across an edge, a pass; how much of the colour
+  stranded in the wrong liquid, deep in it, is handed over a pass; how fast
+  the oil's colour evens out inside a body; and passes a step. The first is
+  a diffusion's rate and stays at or under a quarter; each exchange is held
+  besides to a fifth of what the giver has.
+*/
+export const BODY_EVEN = 0.2;
+export const BODY_HAND = 0.1;
+export const BODY_INSIDE = 0.02;
+const BODY_PASSES = 2;
+/*
+  How strongly colour astray from its liquid is steered back (bodyPartition):
+  the gain on the blurred oil's step across a face, so that any step at all
+  points the way (it saturates at a fifth of a cell's colour a face), and how
+  many blurs make the field it follows, each reaching two cells further.
+  Beyond the reach, colour with no oil anywhere near is the water's.
+*/
+const BODY_DRIFT = 2000;
+const BODY_REACH_BLURS = 4;
 export const DISPLACE_INSIDE = 0.06;
 const DISPLACE_ITERS = 2;
 const PHASE_SUBSTEPS = 6;
@@ -338,11 +375,33 @@ export class WebGPUFluid {
     never pours any pays nothing.
   */
   private mix: PingPong | null = null;
+  /*
+    Oil Bodies: the oil's own share of the dye (see bodyPartition), in the
+    dye's format, made the first step a plate has oil on it with Oil Bodies
+    up. The water's share is the dye less this, so nothing else that reads
+    the dye needs to know it exists.
+  */
+  private oilDye: PingPong | null = null;
+  /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
+  private oilReach: PingPong | null = null;
+  /** Whether the last step asked for Oil Bodies (the setting, and oil's tension to have oil at all). */
+  private bodiesWanted = false;
+  /** The oil's share went unkept for a step: stale, to be emptied before it is used again. */
+  private oilDyeStale = false;
   private rxn: PingPong | null = null;
   /** Liesegang's four species (A, B, their product C, the precipitate P). */
   private lies: PingPong | null = null;
   private liesLive = false;
   private mixLive = false;
+  /*
+    How much of the plate the oil poured since it was last cleared covers,
+    as a share of its area. Cahn–Hilliard and the flux transport both keep
+    the oil exactly (npm run physics), so what went in is what is there,
+    and a tally is the whole measurement: Oil Bodies stops pouring bodies
+    when the plate is full of them.
+  */
+  private oilPoured = 0;
+  get oilCover(): number { return this.oilPoured; }
   private rxnLive = false;
   get chemistryLive(): { rxn: boolean; lies: boolean } { return { rxn: this.rxnLive, lies: this.liesLive }; }
   /** What the plate draws from the liquids' own physics, packed (see packView). */
@@ -450,6 +509,23 @@ export class WebGPUFluid {
       ['mixRelax', [RGBA32], open.mix],
       ['mixMu', [RGBA32], open.mix],
       ['mixUpdate', [RGBA32], open.mix],
+      /*
+        Oil Bodies, and the oil's smoothed shape that its reach and the
+        oil's surface tension (mixForce) both read: built behind the show,
+        like mixForce. They were first waited for whenever a look with Oil
+        Bodies opened the show, and `npm run startup` on Metal failed it:
+        Oil & Water, opened on its own, asked for none of the six in its
+        first forty steps, because nothing runs them until oil has been
+        poured, and the opening's rule is to wait only for what a look's
+        first steps use. Behind the show they are ready some fifteen
+        seconds after it opens, as mixForce always has been.
+      */
+      ['mixSmooth', [R32], false],
+      ['bodyAdvect', [dye], false],
+      ['bodyPartition', [dye], false],
+      ['bodyUnspread', [dye], false],
+      ['bodyLand', [dye], false],
+      ['mixCarry', [RGBA32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
       ['rxnStep', [RGBA32], open.reaction],
@@ -686,6 +762,8 @@ export class WebGPUFluid {
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;
@@ -861,6 +939,16 @@ export class WebGPUFluid {
 
   /** Dye, velocity and the plate gap take up whatever is in the delta fields. */
   private foldDeltas(pass: GPUComputePassEncoder): void {
+    /*
+      Oil Bodies: the dye that lands this frame is shared between the two
+      liquids by how much of each is where it lands (bodyLand), before the
+      whole is added to, so both read the same plate.
+    */
+    if (this.bodiesWanted && this.mix && this.mixLive && !this.oilDyeStale) {
+      const od = this.ensureOilDye();
+      this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
+      od.swap();
+    }
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('none', [0, 0, 0, 0]));
@@ -1111,6 +1199,18 @@ export class WebGPUFluid {
     const buoy = Math.max(Math.max(0, Math.min(1, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
     if (buoy > 0.001) this.ensureMix();
     const mix = this.mix;
+    /*
+      Oil Bodies (see bodyPartition): only where there is oil for the colour
+      to keep to, which takes the oil's own surface tension, since the oil is
+      poured into the mix only while that is on.
+    */
+    const bodies = Math.max(0, Math.min(1, p.oilBodies ?? 0));
+    this.bodiesWanted = bodies > 0.001 && oil > 0.001;
+    const bodiesOn = this.bodiesWanted && !!mix && this.mixLive;
+    if (bodiesOn) this.ensureOilDye();
+    const bodiesFresh = bodiesOn && this.oilDyeStale;
+    if (bodiesOn) this.oilDyeStale = false;
+    else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
     stage('mix force', (pass) => {
       /*
@@ -1128,8 +1228,10 @@ export class WebGPUFluid {
       const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
       const gx = upright * (p.gravityX ?? 0) / gl, gy = upright * (p.gravityY ?? -1) / gl;
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
-      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read],
-        this.arg('mix force', [oil * OIL_TENSION * perSecond, 0, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+      const smooth = this.scratch();
+      this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
+      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth],
+        this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
           gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
@@ -1163,8 +1265,51 @@ export class WebGPUFluid {
 
     // 9. Dye: diffuse, then advect through the forced velocity
     const a = p.dt * p.diff * n2;
-    stage('dye diffuse', (pass) => this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye'), a > 0);
-    stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
+    stage('dye diffuse', (pass) => {
+      this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
+      /*
+        With Oil Bodies on, only the water's colour diffuses. The oil's
+        share is diffused too, but only to know how much of the whole's
+        diffusion was the oil's (the diffusion is linear, so the water's
+        part of it is the whole's less the oil's); bodyUnspread then keeps
+        the water's part and puts the oil's colour back where it was.
+        Diffusing only the whole spread the oil's colour into the water as
+        the water's own, where nothing could tell it apart again: a green
+        haze of amber in teal round every body. Diffusing both alike, as
+        this first did, spread it into the water as the oil's, a cell or
+        two a second past the edge's tail, where the evening-out has no oil
+        to carry it back to: the oil's colour in open water grew from 1.1%
+        to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
+        not stop. The oil's colour does mix inside a body, slowly
+        (bodyPartition's inside rate), as two dyed oils do. (A share begun
+        this step is empty, and the transport below clears it first.)
+      */
+      if (bodiesOn && !bodiesFresh) {
+        const od = this.oilDye!;
+        this.jacobi(pass, od, [a, a, a, a], DYE_ITERS, 'oil dye');
+        // The oil's share before the diffusion is the Jacobi's x0, still in scratchB.
+        this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
+        this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
+        this.dye.swap();
+        od.swap();
+      }
+    }, a > 0);
+    stage('advect dye', (pass) => {
+      if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
+      /*
+        With Oil Bodies, the dye and the oil's share of it cross the same
+        faces as the oil does (bodyAdvect, and why). A share left from an
+        earlier stretch with it off is stale, so it starts empty: whatever
+        is inside a body is handed to it within a few steps.
+      */
+      const od = this.oilDye!;
+      if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
+      this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], adv);
+      this.dye.swap();
+      this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
+      od.swap();
+    });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
       GRID_DAMP a step in every look. Jacobi above removes about 8a/(1+8a)
@@ -1179,8 +1324,14 @@ export class WebGPUFluid {
     const gridDiff = (8 * a) / (1 + 8 * a);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
-      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], this.arg('dye grid', [gridTop, 0, 0, 0]));
+      const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
+      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], k);
       this.dye.swap();
+      // The oil's share has the same grid in it, from the same faces.
+      if (bodiesOn) {
+        this.run(pass, 'dampGrid', this.oilDye!.write, [this.oilDye!.read], k);
+        this.oilDye!.swap();
+      }
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
@@ -1347,6 +1498,37 @@ export class WebGPUFluid {
         }
       }
     }, !!mix && this.mixLive);
+
+    /*
+      Oil Bodies: each liquid keeps its own colour (bodyPartition, and why).
+
+      After the mix, so the colour is kept to where the oil is at the end of
+      this step, carried and rounded. Two passes, each writing the whole dye
+      and then the oil's share from the same inputs before either is
+      swapped: an edge moves a fraction of a cell a step and the evening-out
+      moves up to a fifth of a cell's colour to each side a pass, which in
+      one pass left the water's colour a step behind a fast edge.
+    */
+    stage('bodies', (pass) => {
+      const od = this.oilDye!;
+      const reach = this.ensureReach();
+      // The oil blurred wide (four 5×5 binomials: a reach of eight cells),
+      // for colour astray from its liquid to find the way back.
+      this.run(pass, 'mixSmooth', reach.write, [mix!.read], none);
+      reach.swap();
+      for (let k = 1; k < BODY_REACH_BLURS; k++) {
+        this.run(pass, 'mixSmooth', reach.write, [reach.read], none);
+        reach.swap();
+      }
+      const tint = this.arg('bodies dye', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 0, BODY_DRIFT * bodies]);
+      const share = this.arg('bodies oil', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 1, BODY_DRIFT * bodies]);
+      for (let k = 0; k < BODY_PASSES; k++) {
+        this.run(pass, 'bodyPartition', this.dye.write, [this.dye.read, od.read, mix!.read, reach.read], tint);
+        this.run(pass, 'bodyPartition', od.write, [this.dye.read, od.read, mix!.read, reach.read], share);
+        this.dye.swap();
+        od.swap();
+      }
+    }, bodiesOn);
 
     /*
       The reactions: BZ's spirals and Liesegang's rings, each in a gel on a
@@ -1588,10 +1770,31 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
+    // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
+    this.oilPoured += Math.max(0, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius;
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.mixLive = true;
+  }
+
+  /**
+   * Drag the oil along a gesture, as the app drags the dye (carryDye in
+   * LiquidVisualizer): taken from each cell under the hand in proportion to
+   * how near its middle the cell is, and put down a hop ahead. In plate
+   * units. Only the oil moves; the soap and the acidity stay where they are.
+   */
+  carryMix(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void {
+    if (!this.mix || !this.mixLive || !(radius > 0) || !(take > 0)) return;
+    const m = this.mix;
+    const enc = this.device.createCommandEncoder({ label: 'carry mix' });
+    const pass = enc.beginComputePass({ label: 'carry mix' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', [x, y, radius, take, ux * hop, uy * hop, 0, 0]));
+    m.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
   }
 
   /** Pour into the BZ reaction: its activator, and a wake of oxidised catalyst behind it (a wave broken on one side curls into a spiral). */
@@ -1609,11 +1812,24 @@ export class WebGPUFluid {
     this.rxnLive = true;
   }
 
+  private ensureReach(): PingPong {
+    if (!this.oilReach) this.oilReach = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'oil reach');
+    return this.oilReach;
+  }
+
+  private ensureOilDye(): PingPong {
+    if (!this.oilDye) this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye');
+    return this.oilDye;
+  }
+
   /** Take the mix and the reactions off the plate. */
   clearChemistry(): void {
     const enc = this.device.createCommandEncoder({ label: 'clear chemistry' });
     const pass = enc.beginComputePass();
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    // With the oil gone its colour is the water's: the share is emptied, the dye kept.
+    if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     pass.end();
@@ -2125,8 +2341,8 @@ export class WebGPUFluid {
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain'): Promise<Float32Array> {
-    const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : this.grain?.read;
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye'): Promise<Float32Array> {
+    const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);

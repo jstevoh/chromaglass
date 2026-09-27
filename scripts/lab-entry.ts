@@ -22,6 +22,18 @@ export const BASE: GpuStepParams = {
   twist: 0, meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
 
+/** Numbers as IEEE half floats, for writing an rgba16float texture. */
+function halves(data: number[]): ArrayBuffer {
+  const out = new Uint16Array(data.length);
+  const f = new Float32Array(1), u = new Uint32Array(f.buffer);
+  for (let k = 0; k < data.length; k++) {
+    f[0] = data[k];
+    const x = u[0], sign = (x >>> 16) & 0x8000, e = ((x >>> 23) & 0xff) - 127 + 15, m = x & 0x7fffff;
+    out[k] = e <= 0 ? sign : e >= 31 ? sign | 0x7c00 : sign | (e << 10) | (m >>> 13);
+  }
+  return out.buffer;
+}
+
 type Lab = {
   solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
@@ -56,6 +68,26 @@ const api = {
     const { dyeAdd } = lab!;
     if (data.length !== dyeAdd.length) throw new Error(`addDye: ${data.length} values for a ${dyeAdd.length}-value plate`);
     for (let k = 0; k < dyeAdd.length; k++) dyeAdd[k] += data[k];
+  },
+  /**
+   * The oil's share of the dye (Oil Bodies), cell for cell: N × N × 4,
+   * replacing what is there, each value clamped to the dye under it by the
+   * solver's next pass. The plate must already have stepped once with the
+   * bodies on, so the share exists and is live. For a check that starts
+   * from colours already in their liquids: laying them as dye would land
+   * them split by the oil under each cell (bodyLand), which on a rim a few
+   * cells wide hands a tenth of the oil's colour to the water before the
+   * check has begun (measured, `npm run bodies`).
+   */
+  share(data: number[]) {
+    const { solver, N } = lab!;
+    const od = solver['oilDye'];
+    if (!od) throw new Error('share: no oil share on this plate (step once with oilBodies on first)');
+    if (data.length !== N * N * 4) throw new Error(`share: ${data.length} values for a ${N * N * 4}-value grid`);
+    const f32 = od.format === 'rgba32float';
+    const row = N * (f32 ? 16 : 8);
+    const bytes = f32 ? new Float32Array(data).buffer : halves(data);
+    solver['device'].queue.writeTexture({ texture: od.read }, bytes, { bytesPerRow: row }, [N, N]);
   },
   /** A velocity kick / heat / gap delta at (x, y): channels vx, vy, temp, gap. */
   vel(x: number, y: number, r: number, v: [number, number, number, number]) {
@@ -118,7 +150,7 @@ const api = {
     s.device.queue.submit([enc.finish()]);
     await s.device.queue.onSubmittedWorkDone();
   },
-  async field(which: 'dye' | 'vel') { return Array.from(await lab!.solver.readField(which)); },
+  async field(which: 'dye' | 'vel' | 'oilDye') { return Array.from(await lab!.solver.readField(which)); },
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },

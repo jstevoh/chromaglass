@@ -497,6 +497,8 @@ with.
 | Tempo | Settings → Sound: MIDI clock from the desk, four taps, or a typed bpm, instead of working it out from the microphone |
 | Labyrinth / Maze Detail | Settings → Squish Plate, under Physics & chemistry: under a strong field the ferrofluid fingers out into a maze; Maze Detail makes its fingers up to three times finer, as fine as the grid holds: on the hosted site's 512² it stops at about 0.6, and a local 1024² run reaches the full range (on the phone while a maze is up) |
 | Pushes Dye | Settings → Squish Plate, under the ferrofluid: the black pushes the colour aside where it grows and packs it along its edges; at 0 it is drawn over still dye (on the phone while there is ferrofluid) |
+| Oil Tension | Settings → Squish Plate, under Physics & chemistry: oil and silicone poured on the plate pull into drops that round up and merge, as oil does on water; at 0 they spread as any other liquid |
+| Oil Bodies | Settings → Squish Plate, under Oil Tension: the oil and the water each keep their own colour, so oil drops round up, merge and are dragged as bodies of their own colour; at 0 one dye blends across every edge (on the phone while there is oil) |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp & Light | Settings → Lamp & Light: light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth, exposure |
 | Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film, film physics (the rainbow to a real soap film's colours, for Thin Film and the bubbles' Iridescence; on the phone while a film is up) |

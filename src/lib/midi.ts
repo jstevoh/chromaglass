@@ -473,6 +473,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
   { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
+  // How firmly the oil and the water each keep their own colour. A fader
+  // because the way down is a gesture too: the colours start to cross the
+  // edges and the bodies bleed into the water they sit in.
+  { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.

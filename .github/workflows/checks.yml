@@ -323,6 +323,12 @@ jobs:
       - name: The ferrofluid pushes the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrodye
+      # Oil Bodies: amber oil on teal water stays two colours while the drops
+      # round, merge and turn; poured dye lands in the liquid under it, a
+      # hand drags the oil, nothing is made or lost, and at 0 nothing runs.
+      - name: Oil and water as bodies
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run bodies
       # No grating over the dye: the grid's one-cell checkerboard goes in a
       # second, in every look, and edges, blobs and fine diagonals stay.
       - name: No grating over the dye

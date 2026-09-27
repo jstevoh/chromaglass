@@ -303,6 +303,39 @@ you would use, or should the beam go over the film too by default?); and
 whether 0–200% is the right travel for brightness, contrast and
 saturation on a projector, or too much at the top.
 
+## 14. Oil & Water as two bodies
+
+Oil & Water now pours oil as bodies that keep their own colour (Oil Bodies,
+roadmap §I): amber oil drops round up on teal water, merge when they touch,
+and carry their colour when they move, and teal does not creep into them.
+Seen only in the lab on software WebGPU (`npm run bodies`); the app's frames
+cannot be read there. Things to look at, on Oil & Water:
+
+- whether the drops read as oil on water, bodies with an edge, or as
+  coloured blobs drawn on top;
+- whether their rims are clean or show a fine radial hatching where the flow
+  shears them (the lab showed a faint one);
+- two drops that have just merged: in the lab a faint seam where their
+  rims met stays inside the body for a few seconds before it fades; say
+  whether it reads as two oils blending or as a line drawn inside;
+- dragging a finger through a drop: it should go with the finger and keep
+  its colour;
+- after a few minutes of pouring: the pours stop adding oil once the bodies
+  cover about a third of the plate, and you should see that as the plate
+  filling, not as the oil stopping at an odd moment.
+
+Every look with Oil Tension (Oil on Water among them) also has the rebuilt
+surface tension: a drop rounds in about a second and should no longer go
+dark inside. Say if Oil on Water looks different from before in any other way.
+
+```
+?set=oilBodies=0      Oil & Water as it was, one dye
+```
+
+And the cost: the bodies add several passes to every step of that one look,
+not yet timed on a real GPU. `npm run stages` (or `?stages`) times each stage;
+`bodies` and `advect dye` on Oil & Water are the numbers to report.
+
 ---
 
 ## Reading the frame time while you do it

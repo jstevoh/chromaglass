@@ -23,6 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   minutes of steady groove with drum fills, nothing on the app's own ambient
   music, and a two-second gap between songs heard as the gap it is.
 
+### Added — oil and water as bodies
+
+- **Oil Bodies.** The oil and the water each keep their own colour: amber
+  oil on teal water stays two colours while the drops round up, merge, are
+  stirred and are dragged by a finger, and dye poured over a body becomes
+  the body's colour. With it on, an oil pour lands as a body rather than a
+  film, until bodies cover about a third of the plate. At 0 the plate is
+  one dye as before and nothing new runs; Oil & Water uses 1. On the sheet
+  under Oil Tension, MIDI, the desks and the phone. `npm run bodies`
+  measures it.
+
+### Changed
+
+- **The oil's surface tension** is a curvature force now, not the
+  Korteweg force, which was mostly grid noise and ate the colour inside an
+  oil drop (a settled drop kept 41% of its dye in two seconds; now 88%).
+  Every look with Oil Tension changes a little: a drop rounds in about a
+  second, and an oil pour lands flat and sharp instead of breaking into a
+  ring of beads.
+
 ### Added — the mixer
 
 - **A Mixer** over every picture the plate draws: the LED ring, the front
