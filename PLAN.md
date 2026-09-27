@@ -88,6 +88,19 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+*Measured 2026-09-27 over 40 Mac tools shards, and not a flake:* the Finger adds dye
+on a thin plate. The pool the check strokes is laid by holding Drop for 1.5 s of wall
+time, so its size follows the runner's speed: 49 to 279 across the 40. On all 12 pools
+under 150 the stroke added +11 to +21 while the plate alone had lost 1 to 34 before it
+(and gained 7 to 11 after); on settled pools it read about what the plate did alone.
+That is up to a third of a thin pool, §0's fault at a smaller size, and the three reds
+(106 → 127, 50 → 66, 73 → 90) were all thin pools. Bracketing would have made all 40
+pass, which is why it was not done (the check-skeptic review: the after window carries
+the stroke's own aftermath). Two things follow, in order: a control on the Mac (the
+same timing with the Finger picked and no stroke) to settle whether the after window
+is the plate or the stroke; then the advection fix below, which is what makes this
+check green for good. Laying the pool by solver steps rather than milliseconds would
+make it one size every run, but only after the fault is fixed, or it hides it.
 
 *Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
 exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
@@ -110,7 +123,14 @@ the guard's reading comes back null). The plain frame was unusually dark (0.040,
 against 0.164 for the same plate earlier in the run), so a guess, unmeasured: most of
 its light was in a few bright cells that a 2.2 gain clips at white, which lifts the
 mean far less than the grade. If so, the check should read cells the gain cannot clip
-(below 1/2.2 before the grade) rather than the whole frame's mean.
+(below 1/2.2 before the grade) rather than the whole frame's mean. *Later that day:* over 40 tools
+shards the lift read 1.52 to 1.90 in 37, 1.15 and 1.19 in the two reds, 2.20 and 2.27
+at the top: single odd readings, not a spread, so clipping (which would spread them)
+is the weaker guess. The frame is the flip's stripe plate, not the show's (0.02 to 0.05
+where the keystone before it read 0.05 to 0.19). The wait after a config change counted
+the page's animation frames, not the stage's drawn ones, and did not wait for the guard
+to be off; it now waits for both, and the check prints all seven readings in order, so
+the next red says which frame was odd (this PR).
 
 **Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
 deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
