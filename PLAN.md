@@ -2252,7 +2252,7 @@ machine whose capacity sinks, rung changes in ten minutes bounded.
 
 ### 14l. LiquidVisualizer.tsx is one 9,400-line component
 
-**Suggested 2026-09-27 (a review Steve passed on); measured by line count only.** The
+**Suggested 2026-09-27 (a review the owner passed on); measured by line count only.** The
 show's component holds the WebGPU renderer's lifecycle, the frame loop and its gates,
 the pointer, touch and magnet handling, the cast and projector hooks and the debug
 surface, in one file several threads edit at once. Split it into a renderer module
