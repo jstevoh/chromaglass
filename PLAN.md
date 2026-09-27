@@ -1021,11 +1021,27 @@ The steps, most visible first. Each is one PR with its own check, and every step
      its writes kept, where with the rounding taken out none are; pressed and never let go at 140 bpm the disc floors,
      let go it stays at rest on no spring, the Fillmore's and the default look's
      glass, and at half the step rate); `npm run squeeze` in the app on the Mac shard
-     (Fillmore East with the band: the kicks press the lead plate as deep as the
-     look's squeeze, each is let go, the gap given back over the run is the depth
-     pressed, and at Beat Squeeze 0 nothing is pressed). Both count what the code
+     (Fillmore East with the band, on a beat tapped in at 130 bpm: the kicks press
+     the lead plate as deep as the look's squeeze, each is let go, the gap given back
+     over the run is the depth pressed, and at Beat Squeeze 0 nothing is pressed;
+     tapped since the #190 deploy, next item). Both count what the code
      hands the plate, on the CPU; neither reads the GPU (next item). Every look changes with music
      playing; waiting on the owner's eyes (judging.md 15).
+   - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.**
+     The band plays four on the floor at 122 bpm, two kicks a second, outside its
+     break. `npm run squeeze` counted the kicks the show heard on the Mac shard: 6 in
+     12 s and 9 in 12 s on #192's run, and on the #190 deploy (main, 2026-09-27) 3 in
+     45 s at Beat Squeeze 0.9 and 6 in 42 s at 0, the plate stepping at the same rate
+     both ways (898 and 805 steps). That run failed the deploy, since the check then
+     asked for 5 heard kicks; it now taps its beat in, so it asks the press and not
+     the ear. The ear is still open: whether the onset (bass over 0.45 from under
+     it, `beatClock.ts`) misses kicks the bassline holds the level over, whether a
+     main thread busy enough to step the plate 20 times a second leaves the band's
+     25 ms scheduler late past its 0.12 s lookahead (a note scheduled in the past
+     plays its envelope already over, so silent), or both. Every beat ride reads
+     these kicks, so a band the show hears one kick in four of is a quarter of the
+     show. *Check to write:* heard kicks against the kicks the band played, in the
+     app on the Mac, logged by section.
    - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
      cells and depth the kick hands the plate and the gap its release gives back, on
      the CPU: a regression in the upload (the plate not marked dirty, the flush
@@ -1185,6 +1201,15 @@ while this batch's plan was going in (#177), and no cause is known yet:
   fingers' cells moved between picking and holding, and it read 0.0 on the next
   run. Look next at the held Drop's drops (`dropHeight`), which land every
   DROP_EVERY steps with a splash.
+  **Again on #186's deploy (5831ff7, 2026-09-27 12:34Z), where it stopped the
+  deploy:** A 234 against B 81, 0.35, the mirrors clear (0/0/0 and 2/0/0), the
+  fingers 0.0 cells from where they were picked; the same shard passed on all four
+  of #186's own runs. It is not one finger: the first time A was the low one, this
+  time B. With two failures now at 0.34–0.35 and nine to thirteen
+  passes at 0.63–0.99, the split is bimodal, which reads like one finger's drops
+  landing a beat later than the other's in the window, not noise round a mean.
+  (#186 changed where a press lands; the held Drop's splash lands on whole cells
+  already, so it lays the same as before.)
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
 - `npm run startup`, the same check, a second kind of stop: on #186's run on 1f627f3
