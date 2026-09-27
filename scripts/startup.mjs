@@ -283,6 +283,14 @@ async function open(query, looks) {
         proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
       };
       log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
+      // What each texture was, so a bare page can make the same (see replay).
+      const made = [];
+      window.__startupMade = made;
+      const ct = GPUDevice.prototype.createTexture;
+      GPUDevice.prototype.createTexture = function (d) {
+        try { made.push([performance.now(), { size: Array.isArray(d.size) ? [...d.size] : { ...d.size }, format: d.format, usage: d.usage, dimension: d.dimension, mipLevelCount: d.mipLevelCount }]); } catch { /* measure only */ }
+        return ct.call(this, d);
+      };
       log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
       log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
       log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
@@ -473,6 +481,7 @@ async function open(query, looks) {
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
           return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
         })(),
+        made: window.__startupMade.filter(([t]) => t <= now).map(([t, d]) => [t / 1000, d]),
         bytes: window.__startupBytes.filter(([t]) => t <= now).map(([t, k, n]) => [t / 1000, k, n]),
         firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
@@ -627,6 +636,63 @@ async function bare() {
   } finally { await browser.close(); }
 }
 
+/**
+ * The textures the show made round its first step, made again by a bare
+ * page on a cold cache, in a browser of its own, while it draws a clear
+ * every frame; each is then cleared once, as its first use. Printed, not
+ * judged: the bar for the stop after the first step (see where it is
+ * printed).
+ */
+async function replay(descs) {
+  const cache = coldCache();
+  const browser = await launchChromium(chromium);
+  try {
+    const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+    await page.route(`http://localhost:${PORT}/bare`, (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body style="margin:0;background:#000"><canvas width="1060" height="700"></canvas></body>' }));
+    await page.goto(`http://localhost:${PORT}/bare`, { waitUntil: 'load' });
+    return { cache, ...await page.evaluate(async (descs) => {
+      const frames = [];
+      const tick = (t) => { frames.push(t); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      const adapter = await navigator.gpu.requestAdapter();
+      const device = await adapter.requestDevice();
+      const context = document.querySelector('canvas').getContext('webgpu');
+      context.configure({ device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode: 'opaque' });
+      let presenting = true;
+      const draw = () => {
+        const enc = device.createCommandEncoder();
+        enc.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.1, g: 0, b: 0.2, a: 1 } }] }).end();
+        device.queue.submit([enc.finish()]);
+        if (presenting) requestAnimationFrame(draw);
+      };
+      draw();
+      // Past the stop at the GPU's start and the canvas's first frame.
+      await new Promise((r) => setTimeout(r, 4000));
+      const t0 = performance.now();
+      const enc = device.createCommandEncoder();
+      let made = 0, cleared = 0;
+      for (const d of descs) {
+        try {
+          const tex = device.createTexture({ ...d, usage: d.usage | GPUTextureUsage.RENDER_ATTACHMENT });
+          made++;
+          if ((d.dimension ?? '2d') === '2d') {
+            enc.beginRenderPass({ colorAttachments: [{ view: tex.createView({ baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 }), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }] }).end();
+            cleared++;
+          }
+        } catch { /* a format that cannot be drawn to: made, not cleared */ }
+      }
+      device.queue.submit([enc.finish()]);
+      await new Promise((r) => setTimeout(r, 4000));
+      presenting = false;
+      const now = performance.now();
+      const after = [t0, ...frames.filter((t) => t > t0), now];
+      let gap = 0, at = null;
+      for (let i = 1; i < after.length; i++) if (after[i] - after[i - 1] > gap) { gap = after[i] - after[i - 1]; at = after[i - 1]; }
+      return { made, cleared, at0: t0 / 1000, gap: gap / 1000, at: at / 1000 };
+    }, descs) };
+  } finally { await browser.close(); }
+}
+
 /** When the device came and the pipelines were built, against load. */
 const milestones = (o) => {
   const at = (t) => (t == null ? 'never' : `${t.toFixed(2)} s`);
@@ -773,6 +839,21 @@ try {
     for (const r of o.rows.filter((r) => r[0] >= o.firstStep / 1000 - 1 && r[0] <= o.firstStep / 1000 + 3)) console.log(`       ${r.join('  ')}`);
   }
   if (worst > MAX_GAP_S || !coldOk || process.env.STARTUP_TIMELINE) timeline(o, cold);
+
+  /*
+    The stop after the first step, made again without the show. Round its
+    first step the show makes seventy-three textures (75.8 MB) in a quarter
+    second and hands the GPU its first frames, then the page waits 1.0 to
+    2.4 s for a frame (run 36302471171: everything submitted by 12.58 s,
+    nothing new until 13.93 s), cold or warm (median 1.2 to 1.35 s over the
+    forty warm openings). A bare page makes the same textures and clears
+    each once: if it stops as long, the stop is what this runner charges
+    for that memory, not the show's frames.
+  */
+  const descs = (o.made ?? []).filter(([t]) => o.firstStep != null && t >= o.firstStep / 1000 - 1 && t <= o.firstStep / 1000 + 1).map(([, d]) => d);
+  const rp = descs.length ? await replay(descs).catch((err) => ({ error: String(err).split('\n')[0] })) : { error: 'no textures made round the first step' };
+  console.log(rp.error ? `  the show's textures on a bare page: could not be made (${rp.error})`
+    : `  the show's ${rp.made} textures made again on a bare page (shader cache ${rp.cache}), ${rp.cleared} cleared once: longest wait for a frame after ${rp.gap.toFixed(2)} s from ${rp.at.toFixed(2)} s (made at ${rp.at0.toFixed(2)} s)`);
 
   // ── Every look, opened on its own ─────────────────────────────────
   const each = await openings(presetIds);
