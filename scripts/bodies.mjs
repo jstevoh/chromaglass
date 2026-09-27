@@ -38,10 +38,23 @@
  * red and blue channels; "open water" is a cell under 0.05 oil and "inside a
  * body" over 0.95, the band between is the edge and belongs to neither.
  *
- * Measured while writing this, on software WebGPU (see the numbers the run
- * prints; the bounds below are set well inside them):
+ * Measured while writing this, on software WebGPU (the bounds below are set
+ * well short of these, and well clear of the control or the old solver):
  *
- *   MEASURED_TABLE
+ *   ① amber in open water after the stir   0.14%   (off 7.76%)    < 0.5%, off > 10×
+ *     teal inside the bodies               0.01%   (off 0.30%)    < 0.1%, off > 3×
+ *   ② dye 30702.2 → 30702.2, oil 3026.8 → 3026.8 (off lost 11.5% of its dye)
+ *   ④ a dab over a body: 100.0% the oil's, 100.0% after 30 steps; on water 0.00%
+ *   ⑤ the oil's middle moved 0.0103 of the plate; 100.00% of it kept
+ *   ⑥ a settled drop keeps 88.1% of its dye (41% with the old force)   > 80%
+ *
+ * And what it took to get ① there, each found by this check: the colour laid
+ * as dye landed a tenth of the amber as the water's (so the check now lays
+ * each liquid's colour as its own); the evening-out's regulariser let open
+ * water hold a fiftieth of the oil's colour by right, which the hand-over
+ * then gave to the water; the dye's diffusion spread the oil's colour past
+ * the rim; and the flow's transport smeared it out a cell or two a second,
+ * which only a drift back toward the oil undoes. 10.3% → 6.5% → 2.0% → 0.14%.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
  * a Linux box's software WebGPU anywhere else (a few minutes there).
@@ -128,10 +141,10 @@ try {
 
   // ── 1 ──
   check('the oil\'s colour stays out of the open water',
-    on.end.amberOut < 0.02 && off.end.amberOut > 3 * on.end.amberOut,
+    on.end.amberOut < 0.005 && off.end.amberOut > 10 * on.end.amberOut,
     `${(on.end.amberOut * 100).toFixed(2)}% of the amber in open water after the stir, against ${(off.end.amberOut * 100).toFixed(2)}% with it off`);
   check('and the water\'s colour out of the bodies',
-    on.end.tealIn < 0.004 && off.end.tealIn > 3 * on.end.tealIn,
+    on.end.tealIn < 0.001 && off.end.tealIn > 3 * on.end.tealIn,
     `${(on.end.tealIn * 100).toFixed(2)}% of the teal inside a body, against ${(off.end.tealIn * 100).toFixed(2)}% with it off`);
   // ── 2 ──
   check('no dye is made or lost', Math.abs(on.end.mass / on.start.mass - 1) < 0.01,
@@ -186,7 +199,7 @@ try {
     const b = await cm();
     return { moved: b.x - a.x, kept: b.t / a.t };
   });
-  check('a hand drags the oil the way it went', carry.moved > 0.01,
+  check('a hand drags the oil the way it went', carry.moved > 0.005,
     `the oil's middle moved ${carry.moved.toFixed(4)} of the plate to the right`);
   check('and keeps all of it', Math.abs(carry.kept - 1) < 0.005, `${(carry.kept * 100).toFixed(2)}% of the oil`);
 
