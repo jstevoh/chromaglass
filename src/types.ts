@@ -489,6 +489,18 @@ export interface VisualizerSettings {
    * during them, and the clock itself leans forward and back.
    */
   surge: number;
+  /**
+   * How much a running sequence plays each stage as a scene of a light show
+   * (`lib/scenePacing.ts`, PLAN.md §10): swells opened by a pour, a press or
+   * the next dyes, the plate left to rest between them, and from a half up the
+   * light going down to near-black at each stage's end.
+   *
+   * 0 is today's plate exactly: nothing is planned and the clock and the
+   * dimmer are untouched. It does nothing without a sequence playing, because
+   * a scene is a stage; a stage may set it, and it survives a look change,
+   * since it belongs to the set rather than to any one look.
+   */
+  pacing: number;
   automateRate: number;
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
@@ -518,6 +530,15 @@ export interface VisualizerSettings {
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press breaks into radial fingers (Saffman–Taylor) instead of a smooth ring
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
+  /*
+    How far the beads go from dark-rimmed rings to drops (PLAN.md batch 3):
+    each its own colour from the look's palette, a lens over what is under it
+    (no highlight: a plate lit from beneath shows transmitted light), walls
+    pressed flat where drops crowd, droplets round the big ones, and a drop
+    that swallowed a smaller one still showing it. 0 is the rings exactly as they
+    were, so every look made before this is the same picture.
+  */
+  beadDrops: number;
   dishSpread: number;         // each layer its own dish, spread apart like three projectors on one screen
   cells: number;              // fine cell network on the lead plate, strongest in the dish core
   /** A logo or title over the finished frame: opacity, where it sits and how big. */
@@ -569,6 +590,7 @@ export interface VisualizerSettings {
   refraction: number;         // how much the dye and the bubbles bend what is under them
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
+  filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -747,6 +769,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // beat it invented: a busy few seconds every ten or so, and genuinely quiet
   // in between.
   surge: 0.55,
+  pacing: 0,
   automateRate: 0.12,
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
@@ -784,6 +807,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   refraction: 0.6,
   microDroplets: 0,
   thinFilm: 0,
+  filmPhysics: 0,           // the rainbow: the film every look was made with
   lumia: 0,
   chemistry: 0,
   gelWheel: 0,
@@ -805,6 +829,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // that a preset which wants a clean wash still reads as one; Fillmore asks
   // for 0.8 when it wants a field of them.
   beads: 0.18,
+  beadDrops: 0,             // rings: the look every preset was made with
   dishSpread: 0,
   cells: 0,
   markMix: 1,

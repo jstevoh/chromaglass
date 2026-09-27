@@ -226,7 +226,9 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
  * `npm run learn` holds the two together: for every learnable setting, this
  * says yes exactly when `SETTING_TRAVEL` has it.
  */
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact']);
+// Pacing is not a master, but like them the patch bay does not ride it:
+// see NOT_A_TARGET in sceneMap.ts.
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing']);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
 
@@ -388,6 +390,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   { key: 'fingering',       label: 'Fingering',        min: 0, max: 1 },
   { key: 'beads',           label: 'Oil Beads',        min: 0, max: 1 },
+  { key: 'beadDrops',       label: 'Bead Drops',       min: 0, max: 1 },
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
@@ -444,10 +447,17 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The grid sets how far it goes: on the hosted 512² nothing changes past
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
+  // The film's colours, the rainbow to a real soap film's. A fader because
+  // the mix between them is a look of its own, not only the two ends.
+  { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
   { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
+  // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
+  // A knob because a set breathes: flat for the opener, deeper as the night
+  // goes on, back to 0 to hand the plate to the hands.
+  { key: 'pacing',          label: 'Pacing',           min: 0, max: 1 },
 ];
 const SETTING_LABELS: Partial<Record<keyof VisualizerSettings, string>> = Object.fromEntries(LEARNABLE_SETTINGS.map(s => [s.key, s.label]));
 const LEARNABLE_BY_KEY = new Map(LEARNABLE_SETTINGS.map(s => [s.key, s]));

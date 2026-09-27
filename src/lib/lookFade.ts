@@ -45,6 +45,9 @@ import { PIN_RANGE } from './deskPins';
 export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof VisualizerSettings>([
   'sensitivity', 'bassBoost', 'autoCalibrate', 'beatPrediction', 'beatLead', 'onNewSong',
   'dimmer',
+  // The set's shape, not a look's: a pad laying a new look mid-set must not
+  // flatten the scenes the sequence is playing.
+  'pacing',
   'markMix', 'markX', 'markY', 'markScale',
   'filmMix', 'filmKey',
   'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',

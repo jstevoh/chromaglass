@@ -557,6 +557,14 @@ export default function RemoteControl() {
             <Slider label="Maze Detail" field="mazeDetail" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
+            Only while there is a film to colour (Thin Film on the dye, or the
+            bubbles' Iridescence), as Maze Detail is only there with a maze:
+            Film Physics does nothing without one.
+          */}
+          {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
+            <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/*
             And, by the same rule, Pushes Dye only while there is ferrofluid
             on the plate to do the pushing.
           */}
@@ -645,6 +653,16 @@ export default function RemoteControl() {
                   <Square size={16} className="mx-auto" />
                 </button>
               </div>
+              {/*
+                Pacing only while a sequence runs, by the Maze Detail rule
+                above: it does nothing without one, and with one how deep the
+                scenes go is the thing a thumb wants from across the room.
+              */}
+              {state.sequencer.running && (
+                <div className="mt-4">
+                  <Slider label="Pacing" field="pacing" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('pacing') as number | undefined} {...sliderProps} connected={connected} />
+                </div>
+              )}
             </div>
           )}
 

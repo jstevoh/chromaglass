@@ -14,6 +14,7 @@ import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
+import { PACE_MOMENTS, type PaceMoment, type StagePace } from './scenePacing';
 
 export const PRESET_FORMAT = 'chromaglass-preset';
 export const SEQUENCE_FORMAT = 'chromaglass-sequence';
@@ -140,6 +141,17 @@ export function serializeSequence(seq: ShowSequence, presets: UserPreset[]): str
   return JSON.stringify(file, null, 2) + '\n';
 }
 
+/** A stage's scene (lib/scenePacing.ts), from a file: only a boolean ending and the known moments are kept. */
+function parseStagePace(raw: unknown): StagePace | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as { endDark?: unknown; moments?: unknown };
+  const endDark = typeof o.endDark === 'boolean' ? o.endDark : undefined;
+  const moments = Array.isArray(o.moments)
+    ? o.moments.filter((m): m is PaceMoment => PACE_MOMENTS.includes(m as PaceMoment))
+    : undefined;
+  return endDark === undefined && moments === undefined ? undefined : { endDark, moments };
+}
+
 export function parseSequenceFile(text: string): SequenceFile {
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new Error('That is not a JSON file.'); }
@@ -160,6 +172,7 @@ export function parseSequenceFile(text: string): SequenceFile {
       paletteLead: Number.isFinite(st.paletteLead) ? st.paletteLead : undefined,
       macro: typeof st.macro === 'boolean' ? st.macro : undefined,
       transition: Number.isFinite(st.transition) ? Math.max(0, st.transition!) : 8,
+      pace: parseStagePace(st.pace),
     }));
   const name = typeof s.name === 'string' && s.name.trim() ? s.name.trim() : 'Untitled sequence';
   const presets = Array.isArray(o.presets)

@@ -51,14 +51,14 @@ Where each batch stands, as of 2026-09-26:
 | 0 | The dye a tool makes | **Shipped** (#152) |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
-| 3 | Drops, not rings | **In progress** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
+| 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
 | 4 | Liquids that behave differently | **Shipped**; milk's opacity still owed |
 | 5 | Playing it | Sound learn **shipped** (#155, on #154's bands); shutter and look link **not started** |
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **in progress** |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; steps 1–7 not started |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; steps 2–7 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -244,6 +244,82 @@ the app in its ranked order, on the same PR. The gate becomes: the size range an
 flattened contacts as written, the dark-ring fraction matching the rule above for oil
 and for air, and no highlight in a projected look. Batch 2's deferred structure gate
 (4 px ≥ 0.9 %, 8 px ≥ 1.2 %) is measured once this lands.
+
+**Built, and waiting on the Mac.** `beadDrops` is in, at zero in every look.
+`npm run drops` holds three of the gate's four on a plate a current has crowded,
+at the app's 192² grid: a 10:1 size range across one cluster of 84 touching
+drops (crowded rings make 11:1, so this is the population's range kept, not
+made), every pair pressed a pixel and a half or more into each other meeting
+along one straight wall with the dome under a pixel high there, and every
+compound drop showing its passenger. Each of those claims was run against the
+fault it names (a dome that ignores its walls, a gap down every contact, a
+passenger drawn white, the rings' arithmetic touched at 0) and goes red. The
+fourth, the highlight, is the shader's, and was later dropped (below: the
+photographs have none). On the lab's plate, same
+field, rings against drops: structure at 8 px 3.0 % → 4.7 %, and on a 2× crop
+0.9 % → 1.7 %, with 4 px 0.5 % → 0.8 %. That lab plate is not the Fillmore
+plate batch 2 was measured on, so the 4 and 8 px gate carried here from batch 2
+is still to be read on the Mac with `npm run detail`.
+
+Three things the first version got wrong and the check caught. Pressing a pair
+in by a share of their combined size pushed small drops past a big one's rim,
+and the wall between them landed beyond the small one's middle, so small drops
+vanished into big ones; the press is now set by the smaller drop. A current
+into one point let a drop swallow everything it was brought, one reaching
+thirty-nine cells in twenty seconds; only a drop no bigger than the
+population's own big lenses swallows now. And a passenger held forever meant
+two drops in five were compound after twenty crowded seconds; they dissolve.
+
+**Reshaded against photographs, and the highlight is gone.** On "very cartoon
+like", the drops were matched to pictures of the real thing
+(the project's shared files, drops/references, not in the repo: oil on backlit water, projected light
+shows, water drops, emulsions, foam). They agree, and they disagree with the
+gate's "visible highlights": a plate lit from beneath shows transmitted light,
+and not one of the backlit pictures has a white dot. What they do show is now
+drawn, and `npm run droplens` measures each on a single drop over a two-colour
+plate: a small drop turns the plate round it over (its near half reads 0.88 of
+the way to the far side's colour, 0.06 without it); a big drop is flat on top,
+so an edge under it stays on the same pixel; a thin dark line at the contact,
+23 % of the plate at its darkest, under seven tenths for 12 % of the radius and
+the flank inside it at full brightness (the first reshade's shadow held it to
+77 %); and nothing in a drop more than 1.08 × the plate under it, where the
+glint made it 2.4 ×. Whether to bring a highlight back (for the camera pass,
+which looks at the plate rather than through it) is the owner's.
+
+Then, on the owner's reading of the same photographs ("some of the bubbles
+have multiple background colors in them … a great diversity of bubble
+sizes"): every drop's view reaches the same stretch of plate, so a droplet
+carries several colours (`npm run droplens`: a stripe three radii off is in
+it, one seven radii off is not), and with drops on, a second population of
+droplets rings the big drops (`npm run drops`: 61 of 170 big drops have three
+or more a sixth their size touching them, against 1 of 107 for the rings;
+one cluster spans 17:1). The mask for the larger crowd takes 11.7 ms in the
+sandbox against 8.6, a number for the Mac's `frameMs`.
+
+**A projector and a camera see a drop differently, and the owner chose both.**
+The research (the project's shared files, drops/research/bubbles-and-drops.md,
+item 1) traced what a projection lens focused on the plate sees: nothing turned
+over, and a dark band wherever the drop's curve bends the light past its
+aperture, from u* = X/sqrt(1 + X²), X = NA / (2 n_water (1 − n_water/n_oil)), of
+the curved part out. The plate now draws that; the macro closeup keeps the
+camera's inverting lens. The aperture is an effective NA of 0.25 (the bare lens's
+0.08 drew a field of black doughnuts; the one measurement matched 0.30 to 0.35),
+so a droplet is dark over its outer three tenths. And item 3: the gap sets the
+shape, a ball until its radius is half the gap and a pool with an edge half the
+gap wide past that, so a press flattens every drop and thins every edge
+(`npm run droplens`: 20 checks, projected and closeup; the dark band's half
+point lands within 0.011 of the radius of where the aperture puts it; bowing the
+glasses to half the gap under a drop takes its dark edge from 18 to 6 pixels).
+The lens changes from projector to camera over the middle fifth of the zoom's
+fade, near 1.45x, because the blend between them reads a whole drop from its
+centre at one point, which on the zoom's own fade sat at 1.2x.
+
+And item 6: the wall between two pressed drops is the arc their pressures give,
+radius Rs·Rb/(Rb − Rs) through the points where their circles cross, bowed into the
+bigger one, so a crowd of mixed sizes reads as packed drops rather than as a Voronoi
+diagram (`npm run drops`: a 3- and an 8-cell drop meet 5.5 px from the small one's
+centre, the arc says 5.2, the straight wall was at 2.7). The mask takes a square root
+more per wall: 15 ms for the crowd of 529 in the sandbox, against 11.
 
 ### 4. Liquids that behave differently
 
@@ -632,7 +708,7 @@ What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
   was, bit for bit, and Ferro Maze uses 0.5. `npm run maze`: finger width 0.0296 at 0.5
   against 0.0431 at 0 (ratio 0.69). Whether it now matches the reference is for the
   Mac.
-- **9c. The dye rides the ferrofluid** (in progress, picked 2026-09-26). In Ferro Paint the dye is not carried by the
+- **9c. The dye rides the ferrofluid** (**shipped**, #168). In Ferro Paint the dye is not carried by the
   ferrofluid, so the patchwork does not deform with the fingers the way the reference's
   does.
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
@@ -683,6 +759,18 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
    10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
    from a seeded run, and the film table.
+   *Shipped* (#170) on the stage sequencer rather than the phrase generator, because a
+   stage is already a scene: `src/lib/scenePacing.ts` plans each stage of a running
+   sequence (a pour, press or dye change opening each swell, rests where the plate's clock
+   drops as low as a fifth, and from Pacing ½ a slow fade to near-black at the stage's
+   end, the next coming up out of it), and the plate follows it on its clock, its
+   automation and its light. A **Pacing** setting (0 keeps today's show; sheet, MIDI,
+   desks, phone; a stage may set it and it is put back when the sequence stops), an
+   ending choice per stage, and a built-in **Light Show Night** of 22–30 s scenes.
+   `npm run pacing` measures what the sequence asks for with the footage's `shape()`,
+   counting a fade as the change in every pixel it is: 2.35 swells a minute, calm 25–28 %,
+   swells 2.4× the median, the light under a quarter 19 % of the set, every drain in the
+   dark. Whether the plate delivers it is the film's to say: film Light Show Night.
 2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
    accumulating intensity from #154's bands, and from them live build, drop and
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
@@ -720,19 +808,18 @@ Batches 5 and 6 were the ones that mattered most, and the seeded generator was t
 hinge between them. The generator, the render and sound learn are in; batch 5's shutter
 and look link are not. The order from here, as of 2026-09-26:
 
-1. **Batch 10, step 0 then step 1.** Run `film.yml` by hand for the
-   first full baseline, then build rest, big events and darkness. It is the change an
-   audience would notice first, it needs no new physics (the events exist and
-   `phrasing.ts` has the shape), and the film table can measure it.
+1. **Batch 10, the film.** Step 1, rest, big events and darkness, shipped in #170.
+   Run `film.yml` by hand for the first full baseline, and film Light Show Night with
+   Pacing up: the harness measured what the sequence asks for, and only the film can
+   say whether the plate delivers it.
 2. **The rest of batch 5**: the look link and the shutter are independent of
    everything else and can be built while the Mac is judging a look.
-3. **Batch 9c, the dye rides the ferrofluid**, being built now in the ferrofluid
-   thread: the other visible gap between Ferro Paint and its reference.
+3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
 
 Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
-freeze (#164) finish in their own threads first.
+freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
-pick them up from `docs/roadmap.md` when step 1 is in.
+pick them up from `docs/roadmap.md` now that step 1 is in.
 
 ## Operating rules
 
