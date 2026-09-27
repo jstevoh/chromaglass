@@ -525,10 +525,28 @@ const milestones = (o) => {
   const p = o.prepared;
   if (p?.at != null) parts.push(`built ahead from ${at(p.at / 1000)} to ${at((p.at + p.ms) / 1000)}`);
   const b = o.behind;
-  if (b?.at != null) parts.push(`the rest behind it from ${at(b.at / 1000)} to ${at((b.at + b.ms) / 1000)}`);
+  if (b?.at != null) parts.push(`the rest behind it from ${at(b.at / 1000)} to ${at((b.at + b.ms) / 1000)}${b.held != null ? ` (after ${at(b.held / 1000)} waiting for the show to draw steadily)` : ''}`);
   parts.push(`first step ${at(o.firstStep == null ? null : o.firstStep / 1000)}`);
   parts.push(`longest wait for a frame before it ${say(o.framesBefore)}`);
   return parts.join('; ');
+};
+
+/*
+  Which builds were under way through a stop, and the slowest of each half.
+  Printed on every run, red or green: a stop that one build spans end to end
+  is that build's compile holding the GPU process, and a stop with none under
+  way is the show's own frame. The three deploys that went red on check 4 in
+  a row (2.43, 2.02 and 2.03 s against 2 s, runs 36294600123, 36295658452 and
+  36297416845) each stopped a quarter second after the first step, with the
+  half behind the show started a quarter second before it; which of the two
+  held the frames could not be told from what was printed then.
+*/
+const underWay = (o, gap) => {
+  const all = [...(o.prepared?.builds ?? []).map((x) => ['ahead', ...x]), ...(o.behind?.builds ?? []).map((x) => ['behind', ...x])];
+  const fmt = ([, key, at, ms]) => `${key} ${(ms / 1000).toFixed(2)} s from ${(at / 1000).toFixed(2)} s`;
+  const inGap = gap?.at == null ? [] : all.filter(([, , at, ms]) => at < (gap.at + gap.gap) * 1000 && at + ms > gap.at * 1000);
+  const slowest = (half) => all.filter(([h]) => h === half).sort((x, y) => y[3] - x[3]).slice(0, 4).map(fmt).join(', ') || 'none';
+  return `builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`;
 };
 
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
@@ -607,6 +625,7 @@ try {
     coldOk,
     coldAt == null ? 'the control drew no frame before its device, so there is no moment to compare'
       : `${cold ? `${say(cold)}` : `no stop beginning within ${COLD_AT_S} s of ${coldAt.toFixed(2)} s`}, against ${say(c.framesAsking)} before its device (given ${c.given?.toFixed(2)} s) for ?prepare=0; held to ${bound.toFixed(2)} s`);
+  console.log(`     ${underWay(o, o.frames)}`);
   if (worst > MAX_GAP_S || !coldOk || process.env.STARTUP_TIMELINE) timeline(o, cold);
 
   // ── Every look, opened on its own ─────────────────────────────────

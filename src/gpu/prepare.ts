@@ -90,6 +90,14 @@ export interface Prepared {
   timedOut: boolean;
   /** What it asked for, by the ledger's `scope/name`. */
   keys: string[];
+  /**
+   * Each build as it went: its key, when it was asked for (ms from load) and
+   * how long it took to settle. What `npm run startup` holds a stop against:
+   * a stop that one build spans end to end is that build's.
+   */
+  builds: [key: string, at: number, ms: number][];
+  /** For the half behind the show: how long it waited for the show to be drawing steadily first. */
+  held?: number;
 }
 
 /**
@@ -99,6 +107,57 @@ export interface Prepared {
  * asking the new stage for "the" prepare got nothing until that one ended.
  */
 export const prepareLog: Prepared[] = [];
+
+/*
+  The half behind the show used to start the moment the opening's was done,
+  a quarter second before the show's first step. On CI's cold Mac every
+  opening then stopped drawing for 1.3 to 2.4 s about a quarter second after
+  that step (`npm run startup`, check 4: 2.43 s, 2.02 s and 2.03 s on the
+  deploys of #177, #178 and #179, 1.50 s on #179's own PR run), with no long
+  task on the page's thread: the GPU process held the frames while the show's
+  first frames (its textures made and cleared, forty-odd pipelines used for
+  the first time) and the first compiles behind it arrived together. The
+  limit is two seconds, so the same stop went red or green by chance, which
+  is why a PR passed and its deploy did not.
+
+  So the rest waits until the show has been drawing steadily first, and each
+  of its compiles is then one more thing between two drawn frames rather than
+  part of the opening's pile. It costs a second or two before a look changed
+  to mid-show finds its own pipelines built, against the fifteen to twenty
+  the half behind takes on a cold Mac anyway.
+*/
+
+/**
+ * How long the show must have been drawing steadily, every animation frame
+ * within STEADY_FRAME_MS of the one before, before the half behind it starts;
+ * and the longest that is waited for, so a page that never draws smoothly (a
+ * slow machine, a hidden tab) still gets its pipelines built.
+ */
+const STEADY_MS = 1500;
+const STEADY_FRAME_MS = 100;
+const STEADY_CAP_MS = 10_000;
+
+/**
+ * Resolves once the page has drawn STEADY_MS of animation frames with no gap
+ * over STEADY_FRAME_MS, or after STEADY_CAP_MS whatever it drew; with how
+ * long it waited.
+ */
+function drawingSteadily(): Promise<number> {
+  const t0 = performance.now();
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame !== 'function') { resolve(0); return; }
+    let from = t0, last = t0;
+    const tick = (t: number) => {
+      if (t - last > STEADY_FRAME_MS) from = t;
+      last = t;
+      if (t - from >= STEADY_MS || t - t0 >= STEADY_CAP_MS) resolve(Math.round(performance.now() - t0));
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    // A tab in the background draws nothing: the cap still ends the wait.
+    setTimeout(() => resolve(Math.round(performance.now() - t0)), STEADY_CAP_MS + 100);
+  });
+}
 
 /** Whether `p` settles within `ms`. */
 function within(p: Promise<void>, ms: number): Promise<boolean> {
@@ -114,7 +173,7 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  * PREPARE_TIMEOUT_MS has passed. A device lost part way would otherwise have
  * every remaining build refused one after another, each counted as a try.
  */
-async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[]): Promise<Prepared> {
+async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], held?: number): Promise<Prepared> {
   const t0 = performance.now();
   let gone = false;
   void device.lost.then(() => { gone = true; });
@@ -122,17 +181,21 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // Counted here and not off the ledger's page-wide count, which another
   // device's builds (a replacement's, mid-way) would add to.
   let ready = 0;
+  const times: Prepared['builds'] = [];
   for (const prep of builds) {
     if (gone) break;
     const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
     if (left <= 0) { timedOut = true; break; }
+    const b0 = performance.now();
     const built = prep.build();
-    if (!(await within(built.then(() => undefined), left))) { timedOut = true; break; }
+    const settled = await within(built.then(() => undefined), left);
+    times.push([prep.key, Math.round(b0), Math.round(performance.now() - b0)]);
+    if (!settled) { timedOut = true; break; }
     if (await built) ready++;
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key),
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times, held,
   };
   prepareLog.push(done);
   return done;
@@ -156,7 +219,9 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
   const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later));
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
-  void buildInTurn(device, 'later', builds.filter((b) => b.later))
+  const rest = builds.filter((b) => b.later);
+  void drawingSteadily()
+    .then((held) => buildInTurn(device, 'later', rest, held))
     .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
   return opening;
 }
