@@ -55,6 +55,12 @@ export interface GpuStepParams {
   magnetHeight: number;
   magnetStrength: number;
   /**
+    The other fingers holding a magnet on a touch screen, up to three, in
+    plate coordinates; each at this magnet's height and strength. Only read
+    while this one is on.
+  */
+  extraMagnets?: readonly { x: number; y: number }[];
+  /**
     Seconds of real time this step stands for, as the magnet counts it. The
     flow moves by `dt × advection`, which a slow look keeps tiny on purpose;
     a magnet pulls in real time however slow the look is, or a hand dragging

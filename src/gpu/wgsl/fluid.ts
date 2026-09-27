@@ -23,6 +23,8 @@
  * - Ping-pong everywhere, so no pass reads the texture it writes.
  */
 
+import { SPIKES_WGSL } from './spikes';
+
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
  * written once a step (the fields that change between passes of one step
@@ -77,6 +79,13 @@ struct Sim {
   gapMemory: f32,
   // Up the screen, in the plate: the dish is drawn turned, the room is not.
   up: vec2f,
+  /*
+    The other magnets: one per finger past the first on a touch screen, each
+    at the first one's height and strength (x, y, height, strength; strength
+    0 is none). The first stays in Args with the pass that uses it; these
+    ride the Sim because every magnet pass reads them the same way.
+  */
+  mags: array<vec4f, 3>,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -276,6 +285,29 @@ const MAGNET_WGSL = /* wgsl */ `
 // in. Without it the pull right over the magnet was a spike hundreds of times
 // the pull a little way off, which no real ferrofluid feels.
 const MAGNET_BSAT = 150.0;
+/*
+  The spikes in the solver (spikeWell, spikesClose below; phaseMu).
+
+  SPIKE_WELL: how deep the spikes' wells are, against the double well's
+  barrier of about 0.19: deep enough to empty the valleys of a pool. At 0.8
+  the domes only dimpled the pool; at 3 they packed further past full than
+  at 2 (1.27 against 1.17, before the relax passes that now hold 2 to 1.01)
+  and parted the pool no more.
+
+  SPIKE_REPEL: how many times more the dipoles repel with a magnet that
+  close, under a maze field (spikesClose).
+
+  SPIKE_SHARP: the double well steepened by up to 1 + this under the
+  spikes, so a dome's side is a line and not a slope of grey: the wells set
+  the liquid anywhere between empty and full, and with the double well as
+  it is more than half the cells round the magnet sat between 0.2 and 0.6.
+  Its stiffness is explicit: with M dt at Phase Edge's most (0.018), the
+  update's largest factor is (64 + 16 (1 + 1.5)) × 0.018 = 1.87, under the
+  2 it must stay below; 2 would be 2.02.
+*/
+const SPIKE_WELL = 2.0;
+const SPIKE_REPEL = 5.0;
+const SPIKE_SHARP = 1.5;
 fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
   let toM = m.xy - uv;
   let r2 = dot(toM, toM);
@@ -285,6 +317,63 @@ fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
   let q2 = q * q;
   let b2 = (r2 + 4.0 * h2) / (q2 * q2);
   return m.w * b2 / (1.0 + sqrt(b2) / MAGNET_BSAT);
+}
+// All the magnets: the one in Args and the fingers' (S.mags). Their energies
+// add, which is only exact for magnets far enough apart that each one's field
+// is small under the others; two fingers close together pull a little less
+// than one magnet twice as strong would, which a hand does not notice.
+fn magnetsEnergy(uv: vec2f, m: vec4f) -> f32 {
+  var e = magnetEnergy(uv, m);
+  for (var k = 0; k < 3; k++) {
+    if (S.mags[k].w > 0.0) { e += magnetEnergy(uv, S.mags[k]); }
+  }
+  return e;
+}
+${SPIKES_WGSL}
+/*
+  The spikes' hold on the liquid, as a chemical potential: lowest on each
+  spike (spikes.ts) and highest in the valleys between them, as deep as the
+  field there is into spikes; where two magnets' spikes overlap, the stronger
+  field's. What it stands in for is the peak's own height, which a plan view
+  of the gap does not have: a peak's surface is pulled up along the field,
+  and in a thin layer the liquid under it comes from the valleys round it,
+  so the valleys run dry and the pool, seen from above, parts into a field of
+  domes. Zero at 0.45 of the way to the valley, so about a third of each
+  spike's patch stays in liquid: the domes the references show, a little
+  less than half a pitch across, with water between them.
+*/
+fn spikeWell(uv: vec2f, m: vec4f) -> vec2f {
+  let a = spikeAmp(uv, m);
+  if (a <= 0.001) { return vec2f(0.0); }
+  let s = clamp(spikeTip(uv, m).z / (0.5 * SPIKE_PITCH), 0.0, 1.0);
+  return vec2f(a * (2.0 * smoothstep(0.2, 0.7, s) - 1.0), a);
+}
+/*
+  How far into spikes the closest magnet is on its own axis: 0 for every
+  look's own magnet, 1 for the Magnet tool pressed up under the glass. The
+  dipoles' repulsion (χ in phaseMu, so only where there is a maze field: on
+  a look without one the α it is scaled by is 0) grows by up to SPIKE_REPEL
+  times with it, across the whole reach of the magnet's saturation and not
+  only where the spikes stand, since the pool's edge lies past them. Rendered in the lab (a
+  pool 0.25 in radius under the held magnet, 384², five seconds), six times
+  the repulsion with half the pull grew thin fingers out of its edge, the
+  plate's edge length 1.33 → 2.39 plate widths, where the pull alone left it
+  round. On a larger pool at 256² it did not finger in four seconds; PLAN.md
+  §9i has that as still open.
+*/
+fn spikesClose(m: vec4f) -> f32 {
+  var a = spikeAmp(m.xy, m);
+  for (var k = 0; k < 3; k++) { a = max(a, spikeAmp(S.mags[k].xy, S.mags[k])); }
+  return a;
+}
+// (the well, the field's share of full spikes), of whichever magnet is strongest here.
+fn spikesWell(uv: vec2f, m: vec4f) -> vec2f {
+  var best = spikeWell(uv, m);
+  for (var k = 0; k < 3; k++) {
+    let w = spikeWell(uv, S.mags[k]);
+    if (w.y > best.y) { best = w; }
+  }
+  return best;
 }
 `;
 
@@ -550,8 +639,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let uv = uvOf(id);
   let h = 1.0 / n;
-  let gpsi = vec2f(magnetEnergy(uv + vec2f(h, 0.0), A.a) - magnetEnergy(uv - vec2f(h, 0.0), A.a),
-                   magnetEnergy(uv + vec2f(0.0, h), A.a) - magnetEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
+  let gpsi = vec2f(magnetsEnergy(uv + vec2f(h, 0.0), A.a) - magnetsEnergy(uv - vec2f(h, 0.0), A.a),
+                   magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
   var f = phs(p, n) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
@@ -2302,11 +2391,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = cc(p, n);
   let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
   let uv = uvOf(id);
-  let e = magnetEnergy(uv, A.a);
+  let e = magnetsEnergy(uv, A.a);
   let sat = e / (e + 800.0);
-  let chi = (A.b.z + (1.0 - A.b.z) * sat) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
+  let sw = spikesWell(uv, A.a);
+  let chi = (A.b.z + (1.0 - A.b.z) * sat * (1.0 + SPIKE_REPEL * spikesClose(A.a))) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
   let w = textureLoad(psi, p, 0).r;
-  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap + A.b.y * chi * w, 0.0, 0.0, 0.0));
+  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * (1.0 + SPIKE_SHARP * sw.y) - lap + A.b.y * chi * w + SPIKE_WELL * sw.x, 0.0, 0.0, 0.0));
 }`,
 
   /*
