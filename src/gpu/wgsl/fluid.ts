@@ -294,8 +294,21 @@ const MAGNET_BSAT = 150.0;
   at 2 (1.27 against 1.17, before the relax passes that now hold 2 to 1.01)
   and parted the pool no more.
 
-  SPIKE_REPEL: how many times more the dipoles repel with a magnet that
-  close, under a maze field (spikesClose).
+  SPIKE_REPEL: how many times more the dipoles repel among the spikes
+  (where spikeWell's share is), with a magnet that close: it is what parts
+  a small pool between its domes ("npm run spikes": the outline 2.62 times
+  a disc's at 1, 2.85 at 5). Only among them (PLAN.md §9i): across the whole
+  reach of the magnet it drove the pool's edge out as a grey haze past the
+  spikes, the fingers' liquid spread to a tenth or a fifth full, which the
+  plate (drawing the half-full line) does not draw at all.
+
+  FINGER_REPEL: the same past the spikes, where the fingers grow. Rendered
+  in the lab (Classic, a pool poured past the spikes' reach, 384², six
+  seconds): at 1 the fingers are black with round tips; at 0 they stopped
+  as stubs a finger's width long, and at 5 went out as haze.
+
+  STRIPE_CURVE: see phaseMu, where the double well is steepened for the
+  push.
 
   SPIKE_SHARP: the double well steepened by up to 1 + this under the
   spikes, so a dome's side is a line and not a slope of grey: the wells set
@@ -308,6 +321,8 @@ const MAGNET_BSAT = 150.0;
 const SPIKE_WELL = 2.0;
 const SPIKE_REPEL = 5.0;
 const SPIKE_SHARP = 1.5;
+const STRIPE_CURVE = 0.52;
+const FINGER_REPEL = 1.0;
 fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
   let toM = m.xy - uv;
   let r2 = dot(toM, toM);
@@ -350,16 +365,9 @@ fn spikeWell(uv: vec2f, m: vec4f) -> vec2f {
 }
 /*
   How far into spikes the closest magnet is on its own axis: 0 for every
-  look's own magnet, 1 for the Magnet tool pressed up under the glass. The
-  dipoles' repulsion (χ in phaseMu, so only where there is a maze field: on
-  a look without one the α it is scaled by is 0) grows by up to SPIKE_REPEL
-  times with it, across the whole reach of the magnet's saturation and not
-  only where the spikes stand, since the pool's edge lies past them. Rendered in the lab (a
-  pool 0.25 in radius under the held magnet, 384², five seconds), six times
-  the repulsion with half the pull grew thin fingers out of its edge, the
-  plate's edge length 1.33 → 2.39 plate widths, where the pull alone left it
-  round. On a larger pool at 256² it did not finger in four seconds; PLAN.md
-  §9i has that as still open.
+  look's own magnet, 1 for the Magnet tool pressed up under the glass. What
+  turns the magnet's own push on (phaseMu), and how much of it moves the
+  liquid only by flow.
 */
 fn spikesClose(m: vec4f) -> f32 {
   var a = spikeAmp(m.xy, m);
@@ -2391,7 +2399,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   phaseMu: `${HEAD}${MAGNET_WGSL}${NOISE_WGSL}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var psi: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<rg32float, write>;
 fn cc(p: vec2i, n: f32) -> f32 { return clamp(textureLoad(src, clampP(p, n), 0).r, 0.0, 1.0); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -2403,9 +2411,43 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let e = magnetsEnergy(uv, A.a);
   let sat = e / (e + 800.0);
   let sw = spikesWell(uv, A.a);
-  let chi = (A.b.z + (1.0 - A.b.z) * sat * (1.0 + SPIKE_REPEL * spikesClose(A.a))) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
+  let chi = (A.b.z + (1.0 - A.b.z) * sat * (1.0 + max(SPIKE_REPEL * sw.y, FINGER_REPEL * spikesClose(A.a)))) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
   let w = textureLoad(psi, p, 0).r;
-  textureStore(dst, p, vec4f(2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * (1.0 + SPIKE_SHARP * sw.y) - lap + A.b.y * chi * w + SPIKE_WELL * sw.x, 0.0, 0.0, 0.0));
+  /*
+    Under the hand's magnet the push moves the liquid by flow and not by
+    diffusion (PLAN.md §9i, "npm run fingers"). The push is α χ ψ, and ψ is
+    c smoothed: in the Cahn–Hilliard update (phaseCH) it is a diffusion
+    that relaxes c toward its own blur, which is how a labyrinth's stripes
+    are set at a period, and also how a strong push spread a pool's edge
+    into a grey film fainter than half full, which then cannot separate
+    again (under 0.21 the double well is convex: nothing is left to
+    sharpen). Between glass a real ferrofluid never thins like that; it is
+    pushed about as a whole, by the Hele-Shaw flow the maze force makes
+    from the gradient of μ (mazeForce), which carries it without mixing.
+    So μ is written twice: .r, all of it, for that flow; .g, for the
+    separation, without the push in the share the hand's magnet is in
+    (spikesClose), so with no hand every look's maze is as it was. With no
+    Labyrinth (no uniform share, A.b.z) the only push is the hand's, and
+    none of it goes to the separation at any strength: a magnet short of
+    full spikes would otherwise send the rest of it down the diffusion
+    that makes the grey.
+
+    And the double well steepened as the push grows, so what the flow
+    carries out stays past half full: a stripe survives the push where
+    W |f''(c)| > 2 √(α χ) (the screened repulsion's least cost over all
+    wavelengths, taking m² as nothing), asked of c down to 0.3, where
+    |f''| is 0.52 (STRIPE_CURVE). Held under the explicit limit, 1.9 over
+    M dt: at Phase Edge's most that is 2.6, on Magnet Garden 3.9. The
+    steepest the limit allows everywhere under the hand drew a bead at each
+    finger's tip and left the rest grey: the surface tension goes as √W,
+    and pulled the fingers back in.
+  */
+  let close = spikesClose(A.a);
+  let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
+  let well = min(max(1.0 + SPIKE_SHARP * sw.y, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
+  let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap + SPIKE_WELL * sw.x;
+  let repel = A.b.y * chi * w;
+  textureStore(dst, p, vec4f(local + repel, local + repel * (1.0 - close) * step(1e-6, A.b.z), 0.0, 0.0));
 }`,
 
   /*
@@ -2457,7 +2499,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mu: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
-fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).r; }
+fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).g; }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);

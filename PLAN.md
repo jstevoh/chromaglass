@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (`npm run fingers`), not yet judged on the Mac; 9f–9h, 9j and 9k–9p open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); none yet judged on the Mac; steps 4–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
@@ -752,7 +752,7 @@ What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
   does.
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
   white table clips (32 % of the frame blown); no visible pulse on the kick.
-- **9e. The magnet stands it up** (this PR). Reported: "doesn't make spikes or fingers.
+- **9e. The magnet stands it up** (**shipped**, #183). Reported: "doesn't make spikes or fingers.
   It's just a big blob that gets pulled around by the magnet." The magnet's pull held a
   gathered pool round, and a full pool is stable in the maze's physics, so nothing
   broke it. Now a magnet brought up close (the Magnet tool; no look's own magnet is
@@ -775,15 +775,60 @@ Open, from building 9e (in the order to do them):
   some phones) needs a coarser pitch.
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
-- **9i. Fingers past the spikes.** A pool bigger than the spikes' reach (0.28 of the
-  plate in radius) neither parts nor fingers at its far edge under the Magnet in four
-  seconds: between glass the layer cannot thin in the middle with nowhere to go, and
-  the stronger repulsion alone did not push its edge out. The references' sunflower
-  (a labyrinth inside, radial fingers round it) needs the edge to go unstable under a
-  close magnet: a stronger radial term at the rim, or the maze force scaled up there.
+- **9i. Fingers past the spikes** (**shipped**, this PR). A pool bigger than the
+  spikes' reach stayed a round blob past them under the Magnet: on a look with no
+  Labyrinth setting the magnet's field pushed nothing apart at all, and on Magnet
+  Garden the push it did give went in through the separation's own diffusion and
+  thinned the edge to a grey the plate does not draw. Now the hand's magnet brings
+  its own maze field on every look, with a longer reach (screening 0.04 of the
+  look's), the dipoles' push moves the liquid only by flow (`phaseMu` writes the
+  flow's potential and the separation's apart), the well steepens where the push
+  is on so a finger stays liquid, and the pull under the hand eases (HAND_PULL) so
+  the edge can go out. With no Labyrinth the push ramps in with the spikes and
+  none of it goes to the separation. A pool poured 0.17 of the plate in radius,
+  the Magnet held six seconds at 384², counted as black fingers crossing circles
+  in the plate's picture: on Magnet Garden 12, 9 and 9 on the circles 0.06, 0.09
+  and 0.12 past the poured edge, in 7 of 12 sectors; on main 6, 3 and 1, grey
+  stubs. On a look with no Labyrinth (Classic's Phase Edge) 6, 4 and 3, against
+  none on main. The phone's fingers holding the Magnet get the same, from the
+  same solver. `npm run fingers`; Mac look in `docs/judging.md` §16.
+
 - **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
   kick. The spikes now answer the magnet's field, so the maze's audio breathing
   could drive their height too.
+
+Open, from building 9i:
+
+- **9k. More fingers, and a labyrinth in the middle.** The reference ("Magnetic
+  pattern I") has sixty or more fingers round a pool and its middle turns to
+  stripes; ours has about sixteen, and the middle stays a field of domes (9e's
+  spikes win there). A finger's neck also thins to about half full on its way
+  out, so a finger reads as a round tip on a grey stem in the field: the plate
+  draws the half-full line and shows it whole in the lab, but a Mac look should
+  say whether it breaks up at 60 fps.
+- **9l. The magnet still has to pull.** The pull under the hand eases to 0.35 of
+  what it was while the fingers push out. `npm run magnet` (Mac only) holds that a
+  pool still follows the magnet when it is dragged; if it goes red, the ease is too
+  much.
+- **9m. The spikes' outline margin is thin.** `npm run spikes` asks for an outline
+  2.78 times a disc's; it reads 2.85 now, 2.62 with the finger push reaching all
+  the way in. Anything that softens the spikes' repulsion will turn it red.
+- **9o. Grey fingers at a soft Phase Edge.** With no Labyrinth and Phase Edge at
+  its default 0.35, the fingers the magnet draws out stay a grey film (a fifth
+  to two thirds full) that Classic draws as pale outlines, and only three reach
+  0.12 out; at Magnet Garden's 0.75 they are black. The separation is too slow
+  to keep up with the flow pulling them out. A floor on the separation's speed
+  under the hand's field is the likely fix.
+- **9p. What `npm run fingers` does not measure.** The magnet between no spikes
+  and full (a low Tool Amount, or a Ferrofluid Scale that holds it higher),
+  where the push ramps in; and a maze look's labyrinth far from the hand while
+  the hand is held: the hand's share (spikesClose) is one number for the plate,
+  so the push leaves the far labyrinth's separation too, and it rests on the
+  maze's flow alone there.
+- **9n. Blow and Finger on the ferrofluid.** Asked by the owner (2026-09-27):
+  shouldn't blowing and Finger also move the ferrofluid round? Both push the flow
+  the ferrofluid rides; whether it moves, and how far against the dye, is next to
+  measure, and to fix in its own PR if it does not.
 
 ### 10. Playing like a show
 

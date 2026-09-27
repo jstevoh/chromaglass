@@ -341,6 +341,12 @@ jobs:
       - name: The ferrofluid's spikes
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run spikes
+      # Past the spikes, the held magnet pulls a big pool's edge out in black
+      # fingers, on Classic and on Magnet Garden; with no magnet or the look's
+      # own far one the edge stays put.
+      - name: The ferrofluid's fingers
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run fingers
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
