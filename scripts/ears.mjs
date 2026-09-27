@@ -214,6 +214,54 @@ const check = (name, ok, detail = '') => {
   check('visible but its frames stopped, the tick reads within a third of a second',
     firstTick !== null && firstTick - 500 <= 330, `${firstTick === null ? 'never' : `${(firstTick - 500).toFixed(0)} ms`} after the last frame`);
 }
+/*
+  A long task on the page: the worker's timer kept running, so its ticks were
+  queued and land all at once when the page is free. One reading of that
+  moment, not one per queued tick; then one per tick again.
+*/
+{
+  const ear = new EarClock();
+  for (let t = 0; t < 500; t += 1000 / 60) ear.offer('frame', t, true);
+  let burst = 0;
+  for (let i = 0; i < 40; i++) if (ear.offer('tick', 1100 + i * 0.05, true)) burst++;
+  let after = 0;
+  for (let t = 1116; t < 1500; t += 16) if (ear.offer('tick', t, true)) after++;
+  check('forty ticks queued behind a long task read once, then every tick reads',
+    burst === 1 && after === 24, `${burst} of the queued 40 read; ${after} of the 24 after`);
+}
+/*
+  The other side of that spacing: a busy page gets the worker's messages a
+  few milliseconds late each, so two ticks can land 10 ms apart. Every one of
+  them has to read (the tick is the only ear there is behind a wall-less
+  cover); at a spacing of 12 ms, 118 of 125 did.
+*/
+{
+  const ear = new EarClock();
+  let seed = 11;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let offered = 0, took = 0;
+  for (let t = 0; t < 2000; t += 16) {
+    offered++;
+    if (ear.offer('tick', t + rand() * 6, true)) took++;
+  }
+  check('covered with no wall, ticks each arriving 0 to 6 ms late all read',
+    took === offered, `${took} of ${offered}`);
+}
+/*
+  And the quarter second itself, from below: a visible page whose frames come
+  240 ms apart is slow, not stalled, and hears on its frames alone. A stall
+  lowered into the 200s reads ticks here, where the ragged case above (gaps to
+  200 ms) would not notice.
+*/
+{
+  const ear = new EarClock();
+  let ticks = 0;
+  for (let t = 0; t < 3000; t += 1) {
+    if (t % 240 === 0) ear.offer('frame', t, false);
+    if (t % 16 === 3 && ear.offer('tick', t, false)) ticks++;
+  }
+  check('visible with frames 240 ms apart, the tick stays out', ticks === 0, `${ticks} ticks`);
+}
 
 // ── The app ────────────────────────────────────────────────────────────
 const notes = [];
@@ -256,8 +304,24 @@ try {
     // another covers as hidden; the ear listens to that (lib/earClock.ts).
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__covered });
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__covered ? 'hidden' : 'visible') });
+    /*
+      When the page's frames actually came, so the check can tell a tick
+      that read between ordinary frames (wrong: a second clock) from one that
+      read in a stall past a quarter second (what the tick is for). Every
+      callback in one frame lands within a millisecond, so one stamp a frame.
+    */
+    window.__rafTimes = [];
+    const stamp = (cb) => (ts) => {
+      const now = performance.now();
+      const a = window.__rafTimes;
+      if (!a.length || now - a[a.length - 1] > 1) {
+        a.push(now);
+        if (a.length > 4000) a.splice(0, 2000);
+      }
+      cb(ts);
+    };
     window.requestAnimationFrame = (cb) => {
-      if (!window.__covered) return raf(cb);
+      if (!window.__covered) return raf(stamp(cb));
       const id = nextId++;
       held.set(id, cb);
       return id;
@@ -267,7 +331,7 @@ try {
       window.__covered = false;
       const cbs = [...held.values()];
       held.clear();
-      for (const cb of cbs) raf(cb);
+      for (const cb of cbs) raf(stamp(cb));
     };
   });
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
@@ -294,12 +358,64 @@ try {
   };
   const delta = (a, b) => ({ frame: b.reads.frame - a.reads.frame, ask: b.reads.ask - a.reads.ask, tick: b.reads.tick - a.reads.tick });
   const frames = () => page.evaluate(() => window.chromaglassDebug().frames);
+  /*
+    Where each reading by the wall or the tick landed, against the page's own
+    frames. A visible page's tick and wall are meant to read only once its
+    frames have stalled for a quarter second (lib/earClock.ts: a visible page
+    whose frames stop still hears, a quarter second late), and such stalls
+    happen on a visible page on the Mac runner, whose show is still building
+    pipelines behind it for its first half minute (`npm run startup`: frame
+    gaps to 0.36 s there). The third run of this check read 3 ticks against
+    46 frames in one, and a check that wanted none went red on the feature
+    working.
+
+    So every such reading is held to the frame before it: more than 250 ms
+    after the page's last frame, or it is a second clock beside the frames
+    (the first run's 11 ticks between frames 36 ms apart). Each one on its
+    own, not a count against the stalls in the window: a pooled allowance let
+    a long task's stall, where the queued ticks read once, pay for ticks read
+    between ordinary frames elsewhere, and a covered gap straddling the
+    window's start paid for hundreds (the check-skeptic's controls, both green
+    on broken builds). The 250 is written here, not imported, so a stall
+    lowered in the code shows up as readings this refuses (a node case above
+    holds it at 240 ms gaps).
+
+    Two cross-checks keep the instrument honest: the clock's record of these
+    readings has to agree with its counts, and the stamps have to keep up
+    with the ear's own frames, or a stamp gone quiet would make every reading
+    look like one in a stall.
+  */
+  const snap = () => page.evaluate(() => ({
+    ear: window.chromaglassCastState().ear, frames: window.chromaglassDebug().frames, now: performance.now(),
+  }));
+  const placed = (t0, t1, d) => page.evaluate(([t0, t1, d]) => {
+    const stamps = window.__rafTimes;
+    const recent = window.chromaglassCastState().ear.recent.filter(r => r.at > t0 && r.at <= t1);
+    let misplaced = 0, closest = Infinity;
+    for (const r of recent) {
+      let last = -Infinity;
+      for (const t of stamps) { if (t < r.at) last = t; else break; }
+      const gap = r.at - last;
+      closest = Math.min(closest, gap);
+      if (gap <= 250) misplaced++;
+    }
+    const counted = { ask: recent.filter(r => r.driver === 'ask').length, tick: recent.filter(r => r.driver === 'tick').length };
+    const stamped = stamps.filter(t => t > t0 && t <= t1).length;
+    return {
+      misplaced, closest, n: recent.length, stamped,
+      honest: counted.ask === d.ask && counted.tick === d.tick && stamped >= d.frame - 1,
+    };
+  }, [t0, t1, d]);
   const watch = async (ms) => {
-    const a = await ear(); const fa = await frames();
+    const a = await snap();
     const lv = await levels(ms);
-    const b = await ear(); const fb = await frames();
-    return { lv, d: delta(a, b), drawn: fb - fa, ear: b };
+    const b = await snap();
+    const d = delta(a.ear, b.ear);
+    return { lv, d, drawn: b.frames - a.frames, ear: b.ear, at: await placed(a.now, b.now, d) };
   };
+  const inStalls = (v) => v.at.honest && v.at.misplaced === 0;
+  const stallNote = (v) => `; ${v.at.n ? `${v.at.misplaced} of ${v.at.n} read within 250 ms of a frame (closest ${v.at.closest.toFixed(0)} ms)` : 'none read off a frame'}` +
+    `${v.at.honest ? '' : `; the record does not agree (${v.at.stamped} frames stamped)`}`;
 
   /*
     How many readings make "hearing": more than ten a second. Not sixty: on the
@@ -313,9 +429,9 @@ try {
   // Let the band start and the room calibrate.
   await page.waitForTimeout(4000);
   const v1 = await watch(2000);
-  check('visible, the band is heard on the frames alone',
-    v1.lv.size >= 10 && v1.d.frame > 20 && v1.d.ask === 0 && v1.d.tick === 0,
-    `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick; context ${v1.ear.state}`);
+  check('visible, the band is heard on the frames alone (the tick only where its frames stalled past 250 ms)',
+    v1.lv.size >= 10 && v1.d.frame > 20 && v1.d.ask === 0 && inStalls(v1),
+    `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick; context ${v1.ear.state}${stallNote(v1)}`);
 
   /*
     The wall: a second window asking for frames on its own animation frames,
@@ -337,9 +453,9 @@ try {
   });
   await page.waitForTimeout(300);
   const v2 = await watch(2000);
-  check('visible with the wall asking too, still only the frames read',
-    v2.d.frame > 20 && v2.d.ask === 0 && v2.d.tick === 0,
-    `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick`);
+  check('visible with the wall asking too, still only the frames read (the wall only where the frames stalled past 250 ms)',
+    v2.d.frame > 20 && inStalls(v2),
+    `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick${stallNote(v2)}`);
 
   // Covered, the wall still asking.
   await page.evaluate(() => { window.__covered = true; });
@@ -393,7 +509,7 @@ try {
   await page.waitForTimeout(300);
   const v5 = await watch(2000);
   check('uncovered, the frames read again and the tick stands back',
-    v5.d.frame > 20 && v5.d.tick === 0 && v5.d.ask === 0, `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick`);
+    v5.d.frame > 20 && v5.d.ask === 0 && inStalls(v5), `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick${stallNote(v5)}`);
 
   // Deaf: the context suspended.
   const line = () => page.evaluate(() => document.body.innerText.includes('not hearing'));

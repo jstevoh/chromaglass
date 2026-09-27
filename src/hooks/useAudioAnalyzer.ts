@@ -65,7 +65,7 @@ export interface Ear {
    */
   deaf: boolean;
   /** For `?debug` and `npm run ears`: readings by who offered them, and the context's state. */
-  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; state: string; deaf: boolean } | null;
+  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; recent: { driver: 'frame' | 'ask' | 'tick'; at: number }[]; state: string; deaf: boolean } | null;
 }
 
 export function useAudioAnalyzer(
@@ -294,7 +294,7 @@ export function useAudioAnalyzer(
     const ear = earRef.current;
     const ctx = audioContextRef.current;
     if (!ear || !ctx) return null;
-    return { reads: { ...ear.reads }, state: ctx.state, deaf: deafRef.current };
+    return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, deaf: deafRef.current };
   }, []);
 
   return { audioData, deaf: deaf && isActive, debug };

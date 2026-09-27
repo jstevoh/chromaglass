@@ -1536,9 +1536,15 @@ measured from the frames alone went red on the Mac runner's first run: its busy 
 drew 28 frames a second, and the tick read between them. The same went red on its
 second run behind the wall: covered, the wall drew 44 a second and the tick read 5
 times in its gaps. The tick now gives the wall's asks a quarter second whether the
-page is hidden or not, so it takes over a quarter second after the wall closes.)
+page is hidden or not, so it takes over a quarter second after the wall closes. On
+its third run a visible page read 3 ticks against 46 frames: the Mac's show is still
+building pipelines behind it for its first half minute, and its frames stalled past a
+quarter second, which is what the tick is for; the check now holds each tick or ask a
+visible page reads against the page's last frame before it (more than 250 ms), which
+a broken build with a long task or a slow uncover cannot pass. Queued ticks after a
+long task read once, not once each.)
 
-`npm run ears` (23 checks, no GPU needed; on the Mac's `open` shard) measures it. A
+`npm run ears` (26 checks, no GPU needed; on the Mac's `open` shard) measures it. A
 headless window is never hidden, so it withholds the show's animation frames itself.
 Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
 frame asked for (120 over 121); with no wall, 38 on the tick; the control on the

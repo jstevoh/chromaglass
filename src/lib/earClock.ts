@@ -92,6 +92,20 @@ export const EAR_ASK_HOLD_MS = 250;
  */
 export const EAR_MIN_GAP_MS = 4;
 
+/**
+ * The tick reads no closer than this to the last reading. A worker's timer
+ * keeps running while the page's main thread is busy, and its messages queue:
+ * after a long task (a pipeline built on the main thread, a garbage
+ * collection) they all land in the same instant, and each would be a
+ * reading of the same sound, running the per-reading smoothing several times
+ * over for one moment. Frames are never held to it (240 Hz is 4.2 ms apart).
+ * Well under the tick's own 16 ms: a busy page receives the worker's messages
+ * late by a few milliseconds each, and at 12 a stream of ticks each delayed
+ * 0 to 6 ms read 118 of 125 in the pre-push review, where 6 reads them all.
+ * Queued messages run back to back, well under a millisecond apart.
+ */
+export const EAR_TICK_MIN_MS = 6;
+
 /** How long without a reading, while listening, before the ear is called deaf (twice in a row; see the hook). */
 export const EAR_DEAF_MS = 500;
 
@@ -103,6 +117,13 @@ export class EarClock {
   private lastDriver: EarDriver | null = null;
   /** Readings taken, by who offered them. For the check and `?debug`. */
   readonly reads: Record<EarDriver, number> = { frame: 0, ask: 0, tick: 0 };
+  /**
+   * When the last readings by the wall or the tick were taken, oldest first,
+   * the last 256. `npm run ears` holds each of them against the page's own
+   * frames: on a visible page every one must land in a stall of its frames,
+   * which a count of them cannot show.
+   */
+  readonly recent: { driver: EarDriver; at: number }[] = [];
 
   /**
    * Whether the reading `driver` offers at `now` (ms) should be taken; counts
@@ -116,10 +137,15 @@ export class EarClock {
     else if (driver === 'ask') take = now - this.offered.frame > stall;
     else take = now - this.offered.frame > stall && now - this.offered.ask > EAR_ASK_HOLD_MS;
     if (take && driver !== this.lastDriver && now - this.lastRead < EAR_MIN_GAP_MS) take = false;
+    if (take && driver === 'tick' && now - this.lastRead < EAR_TICK_MIN_MS) take = false;
     if (take) {
       this.reads[driver]++;
       this.lastRead = now;
       this.lastDriver = driver;
+      if (driver !== 'frame') {
+        this.recent.push({ driver, at: now });
+        if (this.recent.length > 256) this.recent.shift();
+      }
     }
     return take;
   }
