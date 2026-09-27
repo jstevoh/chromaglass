@@ -53,9 +53,49 @@ export interface AudioData {
 const TICK_WORKER = 'let t=null;onmessage=e=>{clearInterval(t);t=e.data>0?setInterval(()=>postMessage(0),e.data):null;};';
 const TICK_MS = 16;
 
+/*
+  How often the ear tells React what it heard (PLAN.md §14f).
+
+  Every reading used to be React state: `setAudioData` sixty times a second
+  or more (and more again while the wall's asks and the worker's tick were
+  both reading), and each one re-rendered the whole App, with its desks, its
+  panels and the plate's component, about seventy times a second with a band
+  playing, measured under `?debug` before this change. Nothing that renders
+  needs that: the meters, the desk's level, the song-change watch and the
+  track picker all read a level a person looks at or a gap of seconds. The
+  one reader that does need every reading, the plate, never needed React for
+  it: it read the prop through an effect into a ref, so it heard each
+  reading one frame late, after the render that carried it had committed.
+
+  So the ear keeps two things. `live` is a ref holding every reading the
+  moment it is made, and the plate (and the cast feed) read it on their own
+  clocks. `audioData` is the same reading published as state at most every
+  EAR_VIEW_MS, for what renders. 100 ms is ten a second: faster than a meter
+  needs to look alive, and slow enough that a render of the App is no longer
+  a per-frame cost.
+*/
+const EAR_VIEW_MS = 100;
+
 export interface Ear {
-  /** The show's analysis is running and hearing. */
+  /**
+   * The show's analysis is running and hearing, as React state at most ten
+   * times a second, for the desks, meters and anything else that renders.
+   */
   audioData: AudioData | null;
+  /**
+   * Every reading, the moment it is made, for readers on their own clock (the
+   * plate's frame, the cast feed). Null while the ear is off. Reading it
+   * never renders anything.
+   */
+  live: { readonly current: AudioData | null };
+  /**
+   * Called with every reading as it is made, on the ear's own clock, which
+   * keeps reading while the window is hidden behind the wall (§14a) and page
+   * timers are held to one a second. For a feed that has to keep up with the
+   * sound without re-rendering anything (the cast's audio). Returns the
+   * unsubscribe.
+   */
+  onReading: (fn: (a: AudioData) => void) => () => void;
   /**
    * Listening, but nothing is arriving: the audio context is suspended or
    * interrupted (a phone call on iOS, a page that has not been touched yet),
@@ -77,6 +117,9 @@ export function useAudioAnalyzer(
   calibrateNonce: number = 0,
 ): Ear {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
+  const liveRef = useRef<AudioData | null>(null);
+  const publishedAtRef = useRef(-Infinity);
+  const listenersRef = useRef(new Set<(a: AudioData) => void>());
   const [deaf, setDeaf] = useState(false);
   const deafRef = useRef(false);
   const earRef = useRef<EarClock | null>(null);
@@ -105,6 +148,8 @@ export function useAudioAnalyzer(
     audioContextRef.current = null;
     analyzerRef.current = null;
     sourceRef.current = null;
+    liveRef.current = null;
+    publishedAtRef.current = -Infinity;
     setAudioData(null);
     deafRef.current = false;
     setDeaf(false);
@@ -194,13 +239,22 @@ export function useAudioAnalyzer(
         const calibration: RoomCalibration | null = raw.calibration;
 
         // ── Exponential smoothing (per-feature) ──────────────────
-        setAudioData(prev => ({
+        // Smoothed against the last reading, not the last one React was
+        // shown: the smoothing is per reading, and the plate hears every one.
+        const next: AudioData = {
           frequencyData: new Uint8Array(frequencyData),
           timeDomainData: new Uint8Array(timeDomainData),
-          ...smoothLevels(prev, raw),
+          ...smoothLevels(liveRef.current, raw),
           calibration,
           features: reading,
-        }));
+        };
+        liveRef.current = next;
+        for (const fn of listenersRef.current) fn(next);
+        const now = performance.now();
+        if (now - publishedAtRef.current >= EAR_VIEW_MS) {
+          publishedAtRef.current = now;
+          setAudioData(next);
+        }
         if (deafRef.current && audioContext.state === 'running') { deafRef.current = false; setDeaf(false); }
       };
 
@@ -297,5 +351,11 @@ export function useAudioAnalyzer(
     return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, deaf: deafRef.current };
   }, []);
 
-  return { audioData, deaf: deaf && isActive, debug };
+  const onReading = useCallback((fn: (a: AudioData) => void) => {
+    const set = listenersRef.current;
+    set.add(fn);
+    return () => { set.delete(fn); };
+  }, []);
+
+  return { audioData, live: liveRef, onReading, deaf: deaf && isActive, debug };
 }

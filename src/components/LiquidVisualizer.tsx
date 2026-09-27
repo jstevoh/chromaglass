@@ -61,7 +61,16 @@ const HAND_MOVING = 0.06;
 
 
 interface LiquidVisualizerProps {
+  /** The sound as React last saw it (ten times a second from the room's ear; every frame from a render). */
   audioData: AudioData | null;
+  /**
+   * The sound now, asked for at the top of each frame (PLAN.md §14f). The
+   * room's ear makes a reading every frame but tells React only ten times a
+   * second, so a plate that read only `audioData` would move in steps. A
+   * plate without one (the cast receiver, whose sound arrives as messages)
+   * reads `audioData`.
+   */
+  hear?: () => AudioData | null;
   settings: VisualizerSettings;
   seedCount?: number;
   /**
@@ -3981,7 +3990,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
@@ -4260,6 +4269,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The sound the app is handing over, for a render to give back to when it ends. */
   const audioDataPropRef = useRef(audioData);
   audioDataPropRef.current = audioData;
+  const hearRef = useRef(hear);
+  hearRef.current = hear;
+  /*
+    The sound the live show hears now: the app's ear asked directly, else the
+    prop. It used to be the prop alone, copied into `audioDataRef` by an
+    effect after each render, so the plate heard every reading one frame late
+    (the frame that made it had already drawn by the time the render that
+    carried it committed), and the whole App re-rendered once per reading to
+    deliver it. Asked at the top of the frame, it is this frame's reading.
+  */
+  const liveHeard = () => (hearRef.current ? hearRef.current() : audioDataPropRef.current);
+  /**
+   * The live frames, and how many of them heard a reading the frame before
+   * had not, for `npm run renders`: with the ear reading once a frame, nearly
+   * every frame should. A plate stepping on ten readings a second (the ear's
+   * React state) would hear a new one on about one frame in six.
+   */
+  const hearingRef = useRef({ frames: 0, fresh: 0, last: null as AudioData | null });
   const settingsRef = useRef(settings);
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
@@ -5204,7 +5231,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     applyGesture: (g) => performGesture(g),
   }));
 
-  useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
+  // Outside a render: a harness's `pour` between frames reads the ref too.
+  useEffect(() => { if (!renderingRef.current) audioDataRef.current = liveHeard(); }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   /**
@@ -5407,6 +5435,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const rendering = renderingRef.current;
       const stepRate = rendering?.stepRate ?? PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
       const simStepS = 1 / stepRate;
+      // A render sets the frame's reading itself (`step`); the live show asks.
+      if (!rendering) {
+        audioDataRef.current = liveHeard();
+        const h = hearingRef.current;
+        h.frames++;
+        if (audioDataRef.current !== h.last) { h.fresh++; h.last = audioDataRef.current; }
+      }
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
@@ -7902,7 +7937,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // room's: built again, as at the start (see `begin`).
         probe?.dispose();
         probe = null;
-        audioDataRef.current = audioDataPropRef.current;
+        audioDataRef.current = liveHeard();
         setStaged(stageRef.current !== null);
         // The loop first, so that a resize which throws on a half-dead
         // device still leaves the show drawing (its guard handles the rest).
@@ -7982,6 +8017,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
         heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
+        /** Live frames drawn, and how many of them read a reading the frame before had not (§14f). */
+        hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -9382,7 +9419,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (renderingRef.current) {
         renderingRef.current = null;
         trackReadbacks(false);
-        audioDataRef.current = audioDataPropRef.current;
+        audioDataRef.current = liveHeard();
         setStaged(stageRef.current !== null);
       }
       renderApiRef.current = null;
