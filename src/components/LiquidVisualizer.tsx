@@ -274,6 +274,61 @@ const BODY_COVER = 0.35;
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
 
+/*
+  The bottle, from every tool that lays liquid.
+
+  Only the Dropper put the selected bottle's liquid on the plate. Pour,
+  Spray, Splat and Streak laid its colour and nothing else, so with the
+  Ferrofluid bottle picked a Pour laid a pool of near-black dye that the
+  Magnet could not move, and Oil laid orange water that never became an
+  oil body; soap, milk, silicone and glycerine were only colours. That is
+  the first row of the tool-by-liquid audit (PLAN §15), and the one a
+  performer meets first: you pick a liquid and a way of putting it down,
+  and you get the liquid.
+
+  Each laying tool now calls this on the disc it lays, at the dose it lays
+  with (1 is the Dropper's at the default Amount). A deposit is a pass on
+  the GPU when the liquid reaches one of its fields (addPhase, addMix: a
+  whole-plate dispatch and a submit each, two for Silicone with Oil
+  Bodies), so every tool makes one a step per hand, as a held Dropper
+  always has: the many-point tools (Spray, Splat) at one of their points,
+  which wanders over the mist as the hand goes, not at all twelve.
+*/
+function layBottle(af: FluidSimulation, x: number, y: number, r: number, liq: LiquidType | undefined, dose: number): void {
+  if (!liq?.behaviour || !(dose > 0)) return;
+  af.liquid.deposit(x, y, Math.max(1, r), liq.behaviour, dose);
+}
+
+/*
+  How wide a tool lays the bottle: its own reach, but never wider than the
+  bottle's own Dropper. An oil body is BODY_DROP times the radius it is
+  poured at, and at the Pour's reach that was a body a fifth of the plate
+  across every step, filling BODY_COVER in a fifth of a second; so the
+  tools lay the liquid no wider than the Dropper does, and a Pour is a held
+  Dropper's worth of the liquid (with its own, wider colour).
+*/
+function bottleReach(liq: LiquidType | undefined, r: number): number {
+  return Math.min(r, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE));
+}
+
+/*
+  How much of a tool's usual dye a bottle lays with it.
+
+  One, except for a liquid the plate draws itself. The ferrofluid's black is
+  the second phase, drawn by the plate from where the phase is; its bottle's
+  dye is a whisper (injectAmount 0.05, against 0.6 for Water) that the
+  Dropper already honours by laying injectAmount. The other tools lay a
+  fixed amount of whatever colour is picked, which for the Ferrofluid
+  bottle was a heavy stain of near-black dye under the pool: the Magnet
+  drew the ferrofluid off it and the stain stayed where it had been poured.
+  So a magnetic bottle scales their dye by its own dose against the
+  Dropper's default; every other bottle lays what it always did.
+*/
+function bottleDye(liq: LiquidType | undefined): number {
+  if (!((liq?.behaviour?.magnetic ?? 0) > 0)) return 1;
+  return Math.min(1, (liq?.injectAmount ?? 0.8) / 0.8);
+}
+
 /** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
 const DRIP_SPEED = 0.5;
 const GRID_AREA = GRID_SIZE * GRID_SIZE;
@@ -2631,7 +2686,7 @@ class FluidSimulation {
     this.gpu.carryPhase(c.x, c.y, c.r, c.ux, c.uy, c.take, c.hop, c.outward);
   }
 
-  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number) {
+  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false) {
     const S = this.size;
     const k = GRID_SCALE;
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -2675,7 +2730,17 @@ class FluidSimulation {
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
             const w = Math.pow(1 - dd / pourR, 1.5);
             this.addDensity(nx, ny, amount * 1.3 * w, r, g, b);
-            this.addVelocity(nx, ny, 0, 0.1 * w);
+            /*
+              `outward` is a hand's Pour from anywhere but the mouse, which
+              spreads from where it lands as the mouse's does (see the hand
+              loop's Pour: the camera looks straight down, and any downhill is
+              Gravity's). Without it this is the show's own pour, for Evolve,
+              the music, Seed and a score of looks' inject styles, which has
+              always run toward +y and which the lyric theme `earth` leans on
+              to settle low; those are left as they were.
+            */
+            if (outward) { if (dd > 0) this.addVelocity(nx, ny, (ddx / dd) * 0.1 * w, (ddy / dd) * 0.1 * w); }
+            else this.addVelocity(nx, ny, 0, 0.1 * w);
           }
         break;
       }
@@ -4524,7 +4589,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'drop': {
         const liq = selectedLiquidRef.current;
         if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt, rgb.r, rgb.g, rgb.b, 0.5 * amt);
+        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -4532,13 +4597,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Directional smear along the recorded movement
         const dx = g.dx ?? 1, dy = g.dy ?? 0;
         const len = 8 * GRID_SCALE;
+        const liq = selectedLiquidRef.current;
+        const tint = bottleDye(liq);
         for (let t = -len; t <= len; t += 0.8) {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
           if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
           const w = 1.0 - Math.abs(t) / len;
-          af.addDensity(sx, sy, 0.6 * w, rgb.r, rgb.g, rgb.b);
+          af.addDensity(sx, sy, 0.6 * w * tint, rgb.r, rgb.g, rgb.b);
           af.addVelocity(sx, sy, dx * 0.3 * w, dy * 0.3 * w);
         }
+        layBottle(af, x, y, 2 * GRID_SCALE, liq, kTool);
         break;
       }
       case 'press': {
@@ -4570,17 +4638,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
         break;
       }
-      case 'spray':
-        af.autoInject('spray', x, y, 5 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
+      /*
+        The laying tools from any other hand lay the bottle as the mouse's
+        do (layBottle): a replayed take records the tool the hand held
+        ('dropper', 'pour', ...), not 'drop', and every one of these fell
+        through to colour alone, so a take played back with Oil or
+        Ferrofluid in the bottle laid dye where the take had laid liquid.
+        The bottle is the one picked now, which is what 'drop' has always
+        read too: a take does not record which bottle it poured. So its dye
+        follows the bottle as well (bottleDye): a take recorded with Water
+        and played back with Ferrofluid picked lays the ferrofluid's whisper
+        of dye, not the take's colour at full.
+      */
+      case 'spray': {
+        const liq = selectedLiquidRef.current;
+        const tint = bottleDye(liq);
+        af.autoInject('spray', x, y, 5 * kTool * tint, rgb.r, rgb.g, rgb.b, 0.5);
+        layBottle(af, x, y, 6 * GRID_SCALE, liq, kTool * 0.5);
         break;
-      case 'splatter':
-        af.autoInject('splatter', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
+      }
+      case 'splatter': {
+        const liq = selectedLiquidRef.current;
+        af.autoInject('splatter', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5);
+        layBottle(af, x, y, 3 * GRID_SCALE, liq, kTool);
         break;
-      case 'pour':
-        af.autoInject('pour', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
+      }
+      case 'pour': {
+        const liq = selectedLiquidRef.current;
+        af.autoInject('pour', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, true);
+        layBottle(af, x, y, 4 * GRID_SCALE, liq, kTool);
         break;
-      default: // dropper
-        af.autoInject('drop', x, y, 4 * kTool, rgb.r, rgb.g, rgb.b, 0.5);
+      }
+      default: { // dropper
+        const liq = selectedLiquidRef.current;
+        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5);
+        layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
+      }
     }
   };
 
@@ -6157,6 +6250,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
                 const sprayR = 10 * GRID_SCALE * kSoft;
+                const tint = bottleDye(liq);
                 for (let p = 0; p < 12; p++) {
                   const angle = DICE.hands.angle();
                   const dist = DICE.hands.float() * sprayR;
@@ -6164,14 +6258,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const py = Math.floor(y + Math.sin(angle) * dist);
                   if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
                   const w = (1 - dist / sprayR) * 0.4 * k;
-                  af.addDensity(px, py, w, rgb.r, rgb.g, rgb.b);
+                  af.addDensity(px, py, w * tint, rgb.r, rgb.g, rgb.b);
                   if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+                  // The liquid too, at the first point of the mist a step: one
+                  // deposit a step, as a held Dropper makes (see layBottle).
+                  if (p === 0) layBottle(af, px, py, bottleReach(liq, 1.5 * GRID_SCALE), liq, 1 - dist / sprayR);
                 }
 
               } else if (tool === 'splatter') {
                 // Fling droplets outward from cursor — random sizes, random directions
                 // More droplets, not bigger ones, for a heavier hand.
                 const flings = Math.max(1, Math.round(5 * k));
+                const tint = bottleDye(liq);
                 for (let p = 0; p < flings; p++) {
                   const angle = DICE.hands.angle();
                   const flingDist = (3 + DICE.hands.float() * 15) * GRID_SCALE;
@@ -6187,9 +6285,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const nx = px + ddx, ny = py + ddy;
                       if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                       const w = (1 - dd / dropR);
-                      af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
+                      af.addDensity(nx, ny, amt * w * tint, rgb.r, rgb.g, rgb.b);
                     }
                   }
+                  // The first droplet a step is the liquid as well as its colour.
+                  if (p === 0) layBottle(af, px, py, bottleReach(liq, dropR), liq, k);
                   // Fling velocity outward
                   af.addVelocity(px, py, Math.cos(angle) * 0.5 * kSoft, Math.sin(angle) * 0.5 * kSoft);
                 }
@@ -6197,7 +6297,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               } else if (tool === 'pour') {
                 // Heavy thick stream — wide, dense, with downward velocity
                 const pourR = Math.max(1, Math.round(4 * GRID_SCALE * kSoft));
-                const amt = 2.0 * k;
+                const amt = 2.0 * k * bottleDye(liq);
                 for (let ddy = -pourR; ddy <= pourR; ddy++) {
                   for (let ddx = -pourR; ddx <= pourR; ddx++) {
                     const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -6217,6 +6317,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
+                // The stream is the liquid, on the disc it lands on, as a held Dropper's is.
+                layBottle(af, x, y, bottleReach(liq, pourR), liq, k);
 
               } else if (tool === 'streak') {
                 // Thin high-velocity smear along mouse movement direction
@@ -6224,14 +6326,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
                 const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
                 const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
+                const tint = bottleDye(liq);
                 for (let t = -streakLen; t <= streakLen; t += 0.8) {
                   const sx = Math.floor(x + nx_dir * t);
                   const sy = Math.floor(y + ny_dir * t);
                   if (sx < 1 || sx >= GRID_SIZE - 1 || sy < 1 || sy >= GRID_SIZE - 1) continue;
                   const w = 1.0 - Math.abs(t) / streakLen;
-                  af.addDensity(sx, sy, 0.6 * w * k, rgb.r, rgb.g, rgb.b);
+                  af.addDensity(sx, sy, 0.6 * w * k * tint, rgb.r, rgb.g, rgb.b);
                   af.addVelocity(sx, sy, nx_dir * 0.3 * w * kSoft, ny_dir * 0.3 * w * kSoft);
                 }
+                // The liquid under the middle of the smear: the hand moves every
+                // step, so the discs it leaves are the stroke.
+                layBottle(af, x, y, bottleReach(liq, 2 * GRID_SCALE), liq, k);
 
               } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
                 // The dropper held above the plate lets go of drops rather than
@@ -7928,6 +8034,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         active: () => isActiveRef.current,
         /** Where the pointer is on the plate, in grid cells: where a tool acts. */
         pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
+        /** A gesture from a hand that is not the pointer (a replayed take, the pad, OSC): `npm run bottles`. */
+        gesture: (g: Parameters<typeof performGesture>[0]) => performGesture(g),
+        /** The tool the hand holds now, once the pick has reached the loop (`npm run bottles` waits on it). */
+        tool: () => activeToolRef.current,
         /** Every finger on the glass, the pointer first, and whether two of them are the camera (npm run phone). */
         /**
          * Every magnet the lead plate was last stepped with (the fingers'

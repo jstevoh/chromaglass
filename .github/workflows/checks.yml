@@ -502,6 +502,12 @@ jobs:
       - name: Every tool does what it says
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/tools.mjs
+      # And the liquid in the bottle, from every tool that lays one: Pour,
+      # Spray, Splat and Streak laid only its colour, so a Ferrofluid Pour
+      # was black dye the Magnet could not move (scripts/bottles.mjs).
+      - name: Every tool lays the bottle
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/bottles.mjs
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.

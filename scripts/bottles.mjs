@@ -1,0 +1,355 @@
+#!/usr/bin/env node
+/**
+ * Does every tool that lays liquid lay the liquid in the bottle, or only its colour?
+ *
+ *   npm run bottles
+ *
+ * Found auditing every tool against every liquid (PLAN §15, 2026-09-27):
+ * only the Dropper put the picked bottle's liquid on the plate. Pour, Spray,
+ * Splat and Streak laid its colour and nothing else, so a Pour with the
+ * Ferrofluid bottle was a pool of near-black dye the Magnet could not touch,
+ * and Oil was orange water that never became an oil body. The hands that
+ * are not the mouse (a replayed take, the pad, OSC) had the same hole in
+ * their own copy of the tools, and their Pour still ran downhill.
+ *
+ * Through the real pointer on the running app, for each laying tool and
+ * three bottles, it listens where each liquid reaches the plate:
+ *
+ *   Ferrofluid  the GPU's second phase (addPhase), near the hand
+ *   Oil         the GPU's oil (addMix with oil), near the hand, Oil Bodies on
+ *   Soap        the plate's soap field (liquidPhase), near the hand
+ *
+ * and asks that each tool lays each one, along the stroke: a few calls on
+ * mouse-down would not do, so it asks for a steady run of them, the early
+ * ones at the start of the stroke and the late ones at its end. It listens
+ * at those calls because they carry where each pour landed; it also reads
+ * the ferrofluid a Pour laid back off the plate itself. Mac only: the app
+ * does not step on a cloud session's software WebGPU, and this says so and
+ * stops rather than passing on nothing.
+ *
+ * The stroke is off the middle, at (0.25, 0.3) to (0.4, 0.3), and nothing
+ * may land at its point reflection: a stroke through the centre is its own
+ * mirror image, so a flipped coordinate anywhere between the pointer and the
+ * field would have passed.
+ *
+ * Controls, so "laid" is not something the plate does anyway:
+ *   - the same tools with Water in the bottle lay no ferrofluid and no oil
+ *   - Finger and Blow with Ferrofluid in the bottle lay none (they lay nothing)
+ *   - Water in the bottle lays no soap
+ *   - a replayed Finger with Ferrofluid in the bottle lays none
+ *   - only calls near the hand count: picking the Ferrofluid bottle pours the
+ *     look's own ferrofluid over the whole plate, and that is not the tool
+ *   - the grid is pinned (`sim=256`) and every arm asks that the solver it
+ *     listened to is still the plate's: a governor that moved the grid would
+ *     hand the plate a new solver with no listener on it, and every "lays
+ *     none" would pass on an empty log
+ *
+ * And two things a bottle changes about the dye, per push of the Pour (its
+ * push is not scaled by the bottle, so dye per push does not depend on how
+ * many steps a stroke got): a Ferrofluid Pour lays a tenth of Water's dye
+ * or less (0.05 / 0.8 by design: the plate draws the black itself, and a
+ * stain was left behind when the Magnet drew the pool away), and an Oil
+ * Pour lays what Water's does.
+ *
+ * The other hands: a replayed Drop, Pour, Spray, Splat and Streak each lay
+ * the Ferrofluid, and a replayed Pour pushes out from where it lands rather
+ * than toward the bottom of the plate.
+ */
+import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
+import { spawn } from 'node:child_process';
+import { isGpuEngine } from './frame.mjs';
+
+const PORT = 4351;
+const checks = [];
+const check = (name, ok, detail = '') => {
+  checks.push({ name, ok: !!ok, detail });
+  console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
+};
+
+const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
+  { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* gone */ } };
+process.on('exit', stop);
+for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
+await new Promise((r) => setTimeout(r, 2500));
+
+const browser = await launchChromium(chromium);
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
+  // The grid pinned: a governor that moved it would lay a new solver under the listeners.
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256`, { waitUntil: 'load' });
+  await page.waitForTimeout(8000);
+
+  // A slow adapter takes longer than a runner to open the stage.
+  let engine = null;
+  for (let k = 0; k < 10 && !isGpuEngine(engine); k++) {
+    engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    if (!isGpuEngine(engine)) await page.waitForTimeout(2000);
+  }
+  check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
+  if (!isGpuEngine(engine)) process.exit(1);
+  const fresh = await page.evaluate(() => ['chromaglassLiquid', 'chromaglassTool', 'chromaglassSettings', 'chromaglassAction'].every((k) => typeof window[k] === 'function')
+    && typeof window.chromaglassDebug().gesture === 'function' && typeof window.chromaglassDebug().tool === 'function');
+  check('the page is running the build that was just made', fresh, fresh ? 'bottle, tool, gesture hooks present' : 'stale bundle');
+  if (!fresh) process.exit(1);
+  // The lead plate's solver is attached a moment after the stage reports.
+  let solver = false;
+  for (let k = 0; k < 15 && !solver; k++) {
+    solver = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.gpu);
+    if (!solver) await page.waitForTimeout(1000);
+  }
+  /*
+    And it steps. Software WebGPU opens the stage and attaches a solver but
+    never steps the app's plate (CLAUDE.md), and every arm would then read
+    nothing: say so and stop, rather than print a column of zeros.
+  */
+  const stepAt = () => page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.stepIndex ?? -1);
+  const s0 = await stepAt(); await page.waitForTimeout(1500); const s1 = await stepAt();
+  const steps = solver && s1 > s0 && s0 >= 0;
+  check('the lead plate has its GPU solver, and it steps', steps,
+    !solver ? 'no solver after 15 s' : steps ? `${s1 - s0} steps in 1.5 s` : `stepIndex ${s0} → ${s1}: this adapter cannot run the app, use the Mac`);
+  if (!steps) process.exit(1);
+
+  // A calm plate, with Oil Bodies on so an oil pour has a body to become, and
+  // no drop height, so the Dropper lays every step as the others do.
+  await page.evaluate(() => window.chromaglassSettings({
+    rotationSpeed: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+    rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, bubbles: 0, beads: 0, automateRate: 0,
+    dropHeight: 0, oilTension: 0.6, oilBodies: 1, surfactantFlow: 0.5,
+    audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+  }));
+  const canvas = await page.$('canvas');
+  const box = await canvas.boundingBox();
+  const screen = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
+  const settle = (ms) => page.waitForTimeout(ms);
+
+  /*
+    The listeners, on the lead plate's solver and on the plate. Every call is
+    kept with where it landed, in plate units (0..1), so the counts can be of
+    calls near the hand. The flag is on the solver, not the plate: a plate
+    keeps its object through a Clear, and it is the solver a governor would
+    replace. `same` below asks whether the solver listened to is still the
+    plate's.
+  */
+  const install = () => page.evaluate(() => {
+    const f = window.chromaglassDebug().fluids[0];
+    const g = f?.gpu;
+    if (!g) return false;
+    window.__bottleLog ??= { phase: [], oil: [], dye: [], push: [], vy: 0, vabs: 0 };
+    const L = f.size;
+    if (!f.__bottleSpied) {
+      f.__bottleSpied = true;
+      const addDensity = f.addDensity.bind(f);
+      f.addDensity = (x, y, amount, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount) }); return addDensity(x, y, amount, ...rest); };
+      const addVelocity = f.addVelocity.bind(f);
+      f.addVelocity = (x, y, vx, vy) => {
+        const l = window.__bottleLog; const v = Math.hypot(vx, vy);
+        l.push.push({ x: x / L, y: y / L, a: v }); l.vy += vy; l.vabs += v;
+        return addVelocity(x, y, vx, vy);
+      };
+    }
+    if (!g.__bottleSpied) {
+      g.__bottleSpied = true;
+      window.__bottleGpu = g;
+      const addPhase = g.addPhase.bind(g);
+      g.addPhase = (x, y, r, a) => { window.__bottleLog.phase.push({ x, y, a }); return addPhase(x, y, r, a); };
+      const addMix = g.addMix.bind(g);
+      g.addMix = (x, y, r, what) => { if ((what?.oil ?? 0) > 0) window.__bottleLog.oil.push({ x, y, a: what.oil }); return addMix(x, y, r, what); };
+    }
+    window.__soapNear = (pts, rad) => {
+      const s = window.chromaglassDebug().fluids[0].liquid.soap; let t = 0;
+      for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
+        if (pts.some((p) => Math.hypot(x / L - p[0], y / L - p[1]) < rad)) t += s[x + y * L];
+      }
+      return t;
+    };
+    return true;
+  });
+  const clear = async () => {
+    await page.evaluate(() => window.chromaglassAction('clear'));
+    await settle(1500);
+    for (let k = 0; k < 10 && !(await install()); k++) await settle(500);
+  };
+  const reset = async () => {
+    await install();
+    await page.evaluate(() => { const l = window.__bottleLog; l.phase = []; l.oil = []; l.dye = []; l.push = []; l.vy = 0; l.vabs = 0; });
+  };
+
+  /*
+    What the log holds along a path of points (plate 0..1), and at its point
+    reflection. For each kind: how many calls landed within `rad` of the path
+    and their summed amount, how many landed within `rad` of the reflected
+    path, and whether the calls follow the path: the first quarter of them
+    nearer its start than the last quarter.
+  */
+  const along = (pts, rad) => page.evaluate(({ pts, rad }) => {
+    const l = window.__bottleLog;
+    const near = (c, path) => path.some((p) => Math.hypot(c.x - p[0], c.y - p[1]) < rad);
+    const mirror = pts.map((p) => [1 - p[0], 1 - p[1]]);
+    const [s, e] = [pts[0], pts[pts.length - 1]];
+    const t = (c) => ((c.x - s[0]) * (e[0] - s[0]) + (c.y - s[1]) * (e[1] - s[1])) / Math.max(1e-9, (e[0] - s[0]) ** 2 + (e[1] - s[1]) ** 2);
+    const tally = (list) => {
+      const on = list.filter((c) => near(c, pts));
+      const q = Math.max(1, Math.floor(on.length / 4));
+      const mean = (xs) => xs.reduce((a, c) => a + t(c), 0) / Math.max(1, xs.length);
+      return {
+        n: on.length, a: on.reduce((a, c) => a + c.a, 0), mirror: list.filter((c) => near(c, mirror)).length,
+        follows: on.length >= 4 && mean(on.slice(0, q)) < mean(on.slice(-q)),
+      };
+    };
+    return {
+      phase: tally(l.phase), oil: tally(l.oil), dye: tally(l.dye).a, push: tally(l.push).a,
+      vy: l.vy, vabs: l.vabs,
+      same: window.chromaglassDebug().fluids[0].gpu === window.__bottleGpu,
+    };
+  }, { pts, rad });
+
+  const bottle = async (id) => { await page.evaluate((id) => window.chromaglassLiquid(id), id); await settle(1800); };
+  const pickTool = async (t) => {
+    await page.evaluate((t) => window.chromaglassTool(t), t);
+    // The pick is a React render away from the loop, and a hand that pressed
+    // before it landed would be the Dropper: wait until the loop holds it.
+    for (let k = 0; k < 40; k++) {
+      if (await page.evaluate((t) => window.chromaglassDebug().tool() === t, t)) return;
+      await settle(50);
+    }
+    throw new Error(`the tool never became ${t}`);
+  };
+  /** Off the middle, so the stroke is not its own mirror image. */
+  const FROM = [0.25, 0.3], TO = [0.4, 0.3];
+  /** A stroke, and where the hand was on the plate at each step of it (the pointer's own reading). */
+  const stroke = async (t) => {
+    await pickTool(t);
+    await page.mouse.move(...screen(...FROM));
+    await page.mouse.down();
+    const path = [];
+    for (let i = 1; i <= 20; i++) {
+      await page.mouse.move(...screen(FROM[0] + (TO[0] - FROM[0]) * i / 20, FROM[1] + (TO[1] - FROM[1]) * i / 20));
+      await settle(40);
+      path.push(await page.evaluate(() => { const p = window.chromaglassDebug().pointer(); return [p.x / p.grid, p.y / p.grid]; }));
+    }
+    await page.mouse.up();
+    await settle(200);
+    return path;
+  };
+  /** One stroke of a tool with a bottle in the hand: what reached the plate along it. */
+  const arm = async (t) => {
+    await reset();
+    const path = await stroke(t);
+    const r = await along(path, 0.12);
+    const soap = await page.evaluate(({ path }) => window.__soapNear(path, 0.12), { path });
+    const soapMirror = await page.evaluate(({ path }) => window.__soapNear(path.map((p) => [1 - p[0], 1 - p[1]]), 0.12), { path });
+    return { ...r, soap, soapMirror, path };
+  };
+  const same = (r) => r.same ? '' : ' (the solver changed under the stroke)';
+
+  const LAYING = ['dropper', 'pour', 'spray', 'splatter', 'streak'];
+
+  // ── Ferrofluid ───────────────────────────────────────────────────
+  await clear();
+  await bottle('ferrofluid');
+  const ferro = {};
+  for (const t of [...LAYING, 'finger', 'blow']) {
+    ferro[t] = await arm(t);
+    console.log(`     Ferrofluid ${t.padEnd(8)} ${ferro[t].phase.n} pours of ferrofluid along the stroke (amount ${ferro[t].phase.a.toFixed(2)}), ${ferro[t].phase.mirror} at its mirror, dye ${ferro[t].dye.toFixed(1)}`);
+  }
+  for (const t of LAYING) {
+    const r = ferro[t];
+    check(`${t} with the Ferrofluid bottle lays ferrofluid along the stroke, and not at its mirror`,
+      r.same && r.phase.n >= 8 && r.phase.a > 0.5 && r.phase.follows && r.phase.mirror === 0,
+      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand, ${r.phase.mirror} at the mirror${same(r)}`);
+  }
+  check('Finger and Blow with the Ferrofluid bottle lay none',
+    ferro.finger.same && ferro.blow.same && ferro.finger.phase.n === 0 && ferro.blow.phase.n === 0,
+    `Finger ${ferro.finger.phase.n}, Blow ${ferro.blow.phase.n}${same(ferro.finger)}${same(ferro.blow)}`);
+
+  // Read back: the ferrofluid a Pour laid is on the plate along the stroke, not only asked for.
+  await page.evaluate(() => window.chromaglassDebug().fluids[0].gpu.clearPhase());
+  await settle(400);
+  const poured = await arm('pour');
+  await settle(600);
+  const onPlate = await page.evaluate(async ({ path }) => {
+    const d = window.chromaglassDebug();
+    if (typeof d.readPhase !== 'function') return null;
+    const f = await d.readPhase();
+    if (!f) return null;
+    let t = 0, n = 0, m = 0;
+    for (let y = 0; y < f.n; y++) for (let x = 0; x < f.n; x++) {
+      const v = f.data[x + y * f.n]; t += v;
+      if (path.some((p) => Math.hypot(x / f.n - p[0], y / f.n - p[1]) < 0.12)) n += v;
+      if (path.some((p) => Math.hypot(x / f.n - (1 - p[0]), y / f.n - (1 - p[1])) < 0.12)) m += v;
+    }
+    return { total: t, near: n, mirror: m };
+  }, { path: poured.path });
+  check('a Ferrofluid Pour is ferrofluid on the plate along the stroke, read back',
+    onPlate && onPlate.near > 0.5 && onPlate.near > 0.6 * onPlate.total && onPlate.mirror < 0.05 * onPlate.near,
+    onPlate ? `${onPlate.near.toFixed(1)} of ${onPlate.total.toFixed(1)} along the stroke, ${onPlate.mirror.toFixed(1)} at its mirror` : 'the phase does not read back');
+
+  // ── Oil and Soap ─────────────────────────────────────────────────
+  await bottle('oil');
+  const oil = {};
+  for (const t of LAYING) {
+    // Afresh each time: Oil Bodies stops pouring once oil covers a third of the plate.
+    await clear();
+    oil[t] = await arm(t);
+    const r = oil[t];
+    console.log(`     Oil        ${t.padEnd(8)} ${r.oil.n} pours of oil along the stroke, ${r.oil.mirror} at its mirror`);
+    check(`${t} with the Oil bottle lays oil along the stroke`, r.same && r.oil.n >= 3 && r.oil.mirror === 0,
+      `${r.oil.n} pours, ${r.oil.mirror} at the mirror${same(r)}`);
+  }
+  await bottle('soap');
+  for (const t of LAYING) {
+    await clear();
+    const r = await arm(t);
+    console.log(`     Soap       ${t.padEnd(8)} soap along the stroke ${r.soap.toFixed(1)}, at its mirror ${r.soapMirror.toFixed(1)}`);
+    check(`${t} with the Soap bottle lays soap along the stroke`, r.soap > 1 && r.soapMirror < 0.05 * r.soap,
+      `${r.soap.toFixed(1)} along it, ${r.soapMirror.toFixed(1)} at the mirror`);
+  }
+
+  // ── Water: the control, and the dye a bottle leaves unchanged ────────
+  await clear();
+  await bottle('water');
+  const water = {};
+  for (const t of LAYING) water[t] = await arm(t);
+  check('with Water in the bottle no tool lays ferrofluid, oil or soap',
+    LAYING.every((t) => water[t].same && water[t].phase.n === 0 && water[t].oil.n === 0 && water[t].soap < 0.5),
+    LAYING.map((t) => `${t} ${water[t].phase.n}/${water[t].oil.n}/${water[t].soap.toFixed(1)}${same(water[t])}`).join(', '));
+  const perPush = (r) => r.dye / Math.max(1e-9, r.push);
+  const wp = perPush(water.pour), fp = perPush(ferro.pour), op = perPush(oil.pour);
+  check('a Ferrofluid Pour lays a tenth of the dye a Water Pour does per push, or less', water.pour.push > 0 && fp <= 0.1 * wp,
+    `${fp.toFixed(2)} against ${wp.toFixed(2)} (by design 0.05 / 0.8 = 0.0625 of it)`);
+  check('an Oil Pour lays the dye a Water Pour does per push (only a magnetic bottle changes it)',
+    water.pour.push > 0 && Math.abs(op - wp) < 0.1 * wp, `${op.toFixed(2)} against ${wp.toFixed(2)}`);
+
+  // ── The other hands ──────────────────────────────────────────────
+  const AT = [0.3, 0.25];
+  const replay = async (t, n = 4) => {
+    await reset();
+    await page.evaluate(({ t, n, at }) => { for (let k = 0; k < n; k++) window.chromaglassDebug().gesture({ tool: t, x: at[0], y: at[1], dx: 1, dy: 0, layer: 0 }); }, { t, n, at: AT });
+    return along([AT], 0.12);
+  };
+  await bottle('ferrofluid');
+  for (const t of LAYING) {
+    const r = await replay(t);
+    check(`a replayed ${t} with the Ferrofluid bottle lays ferrofluid, and not at its mirror`,
+      r.same && r.phase.n >= 4 && r.phase.mirror === 0, `${r.phase.n} pours, ${r.phase.mirror} at the mirror${same(r)}`);
+  }
+  const rf = await replay('finger');
+  check('a replayed Finger with the Ferrofluid bottle lays none', rf.same && rf.phase.n === 0, `${rf.phase.n} pours${same(rf)}`);
+  await bottle('water');
+  await reset();
+  await page.evaluate((at) => { for (let k = 0; k < 4; k++) window.chromaglassDebug().gesture({ tool: 'pour', x: at[0], y: at[1], layer: 0 }); }, AT);
+  const push = await along([AT], 0.12);
+  check('a replayed Pour pushes out from where it lands, not down the plate',
+    push.vabs > 0 && Math.abs(push.vy) < 0.1 * push.vabs,
+    `net push down the plate ${push.vy.toFixed(2)} of ${push.vabs.toFixed(2)} in all`);
+} finally {
+  await browser.close();
+  stop();
+}
+
+const failed = checks.filter((c) => !c.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} passed`);
+process.exit(failed.length ? 1 : 0);
