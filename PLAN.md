@@ -63,8 +63,9 @@ Where each batch stands, as of 2026-09-27:
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
-it opens, so a cold Mac no longer freezes for 6–19 s at the start (#164, in progress,
-`npm run startup`); the magnet stays where the hand leaves it (#159).
+it opens, so a cold Mac no longer freezes for 6–19 s at the start (#164, `npm run
+startup`), and draws with each of them once before it opens, so the first frames no longer
+stop for a second or two either (#181); the magnet stays where the hand leaves it (#159).
 
 ### 0. The dye a tool makes, and the deploys it is blocking
 
@@ -999,15 +1000,36 @@ while this batch's plan was going in (#177), and no cause is known yet:
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
-  it": the longest wait for a frame was 2.05 s against its 2 s limit (heartbeats and
-  steps 1.89 s), just after the first step while the remaining pipelines build
-  behind it; main's deploy of the same code read 1.70 s. Before touching the limit,
-  read the spread over the last runs (the `steward` skill's rule for a margin).
-  Since: 2.43 s at 19.6 s on #177's deploy, 1.30 s on #179's PR and 2.03 s at
-  16.40 s on its deploy (2026-09-27), each time the frames standing still for about
-  two seconds just after the first step, on a runner slow enough that the control's
-  own device took 5.3 s. Three deploys in a row stopped here while their PRs passed;
-  a thread cannot re-run a job (403), so each costs a re-run by hand.
+  it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
+  #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
+  for 1.0 to 2.4 s a quarter second after the first step, longer on slower runners,
+  and the three deploys that went red (2.43, 2.02, 2.03 s) were the slow ones. The
+  cause, measured by timing each submit the GPU was handed: the first draw with the
+  plate's render pipelines on a new device took the GPU 1.42 s, and the same draw a
+  few frames later 0.03 s. Not a compile (warm openings stopped as long), not the
+  canvas, not the fields' memory (a bare page writing all 75.8 MB stopped 0.08 s),
+  not the builds behind the show. Each render pipeline built ahead now draws once
+  behind the starting frame (`gpu/kit.ts`, firstDraw; only the half the show opens
+  with, since the half built behind a running show would pay the same cost under
+  it): the plate's first draw took
+  0.14 s, the opening's longest wait for a frame fell to 0.82 s (not at the first
+  step), and the forty warm openings' median stop from 1.08 s to 0.12 s. The 2 s
+  limit is unchanged. `npm run startup` now prints the submits the GPU spent longest
+  on round the first step, so the next stop of this kind names itself. Found on the
+  way: on a slow runner the control's own freeze ended right at its twenty-second
+  watch, so it read as never moving and check 1b failed on the control; the opening
+  is now read at least to when the plate was seen running, and 1b asks the control
+  to have run steadily at all.
+- Still owed from that hunt: the solver's first submits cost a few tenths of a second
+  more than later ones even with every compute pipeline dispatched once ahead on
+  scraps (downsample 0.32 s, upsampleDelta 0.40 s, run 36306162647). Worth finding
+  whether a one-workgroup dispatch on one-texel scraps reaches the cost at all.
+- `tools.mjs`, the Finger's "and adds none": red on 4 of about 20 Mac runs across
+  four branches on 2026-09-27 (53 → 66, 56 → 71, 50 → 64, 49 → 64, where the plate
+  left alone drifted −22 to −12 before and +8 to +10 after), green on the rest,
+  including gains as large (61 → 81 against +1 and +8). What differs on the red runs is
+  the drift before the stroke, negative every time, so the margin read off it looks
+  like the thing to read first; nothing measured yet says why.
 - `magnet.mjs`, "dragging the Magnet gathers the ferrofluid along where the hand
   goes": on #180 (PLAN.md only, the same code #179's PR and deploy passed), the drag
   gathered 300 → 363 against 266 → 300 left alone, a gain of 29 where the check asks

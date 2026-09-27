@@ -90,6 +90,12 @@ export interface Prepared {
   timedOut: boolean;
   /** What it asked for, by the ledger's `scope/name`. */
   keys: string[];
+  /**
+   * Each build as it went: its key, when it was asked for (ms from load) and
+   * how long it took to settle. What `npm run startup` holds a stop against:
+   * a stop that one build spans end to end is that build's.
+   */
+  builds: [key: string, at: number, ms: number][];
 }
 
 /**
@@ -122,17 +128,21 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // Counted here and not off the ledger's page-wide count, which another
   // device's builds (a replacement's, mid-way) would add to.
   let ready = 0;
+  const times: Prepared['builds'] = [];
   for (const prep of builds) {
     if (gone) break;
     const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
     if (left <= 0) { timedOut = true; break; }
+    const b0 = performance.now();
     const built = prep.build();
-    if (!(await within(built.then(() => undefined), left))) { timedOut = true; break; }
+    const settled = await within(built.then(() => undefined), left);
+    times.push([prep.key, Math.round(b0), Math.round(performance.now() - b0)]);
+    if (!settled) { timedOut = true; break; }
     if (await built) ready++;
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key),
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times,
   };
   prepareLog.push(done);
   return done;
