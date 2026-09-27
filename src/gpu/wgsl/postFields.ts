@@ -22,6 +22,7 @@ export const POST_FIELDS: Field[] = [
   { name: 'resolution', type: 'vec2f' },
   { name: 'dimmer', type: 'f32', note: 'the house dimmer, with the flash guard folded in' },
   { name: 'markOn', type: 'f32', note: 'the mark’s own fader, not a switch' },
+  { name: 'markBlend', type: 'f32', note: 'the mixer’s blend on the mark: 0 its own alpha, 1 screen, 2 add, 3 multiply, 4 key' },
   { name: 'mode', type: 'i32', note: 'the test effect: 0 none, 1 seeded noise, 2 a frame from the ring' },
   { name: 'layer', type: 'f32', note: 'which layer of the history ring mode 2 reads' },
   { name: 'frame', type: 'u32', note: 'the effect chain’s own frame counter' },

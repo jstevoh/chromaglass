@@ -1,6 +1,8 @@
 import type { SourceName } from './lib/audioFeatures';
 
 export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
+/** How a mixer row is laid over what is under it (lib/mixer.ts, `MixBlend`). */
+export type MixBlend = 'own' | 'screen' | 'add' | 'multiply' | 'key';
 
 /**
  * What a liquid writes into the plate's liquid field when it lands — see
@@ -591,6 +593,15 @@ export interface VisualizerSettings {
   markBright: number; markContrast: number; markSat: number; markHue: number;
   gelBright: number; gelContrast: number; gelSat: number; gelHue: number;
   lumiaBright: number; lumiaContrast: number; lumiaSat: number; lumiaHue: number;
+  /*
+    Each row's blend (lib/mixer.ts, `MixBlend`): `own` is the way the row
+    always came in (the beams screened, the gel a filter, the film through
+    the dye, the logo by its alpha, the back plate by `blendMode`); screen,
+    add, multiply and key are the four a video mixer has on every channel.
+    All `own`, so every look and rig made before this is the same picture.
+  */
+  ledBlend: MixBlend; gelBlend: MixBlend; lumiaBlend: MixBlend;
+  backBlend: MixBlend; filmBlend: MixBlend; markBlend: MixBlend;
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
@@ -905,6 +916,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   markBright: 1, markContrast: 1, markSat: 1, markHue: 0,
   gelBright: 1, gelContrast: 1, gelSat: 1, gelHue: 0,
   lumiaBright: 1, lumiaContrast: 1, lumiaSat: 1, lumiaHue: 0,
+  ledBlend: 'own', gelBlend: 'own', lumiaBlend: 'own',
+  backBlend: 'own', filmBlend: 'own', markBlend: 'own',
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure

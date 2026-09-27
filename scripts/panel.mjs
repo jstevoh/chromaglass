@@ -1095,6 +1095,11 @@ check('and neither starts over the limit',
     // The mixer's order: its rows' arrows and the four raise pads, which are
     // moves in a stack rather than a value a slider could hold (lib/mixer.ts).
     'mixOrder',
+    // The mixer's blends: five buttons in each row's drawer (MixerPanel,
+    // drawn in Settings → Mixer, on the desk and on the phone) and a Next
+    // Blend pad per row, not a slider or a select on this sheet. `npm run phone`
+    // presses them.
+    'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
   ]);
   const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
   const drawn = new Set([

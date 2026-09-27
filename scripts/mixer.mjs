@@ -43,6 +43,18 @@
  *      wherever it is; and with both at 0, where they sit changes nothing,
  *      so the rows they push about (the front plate's, the LED ring's) are
  *      still read where they are
+ *   7. the blends (PLAN.md §11 step 3): on every row but the front plate, the
+ *      lamp's three in the lamp as well as over the glass, each of screen, add,
+ *      multiply and key is its own formula (lib/mixer.ts, MixBlend) pixel by
+ *      pixel, predicted from the picture without the row and the row added at
+ *      full level, and not another's; the back plate, whose dye's coverage
+ *      cannot be told from its colour, for the two that need no more than
+ *      their product, and multiply seen to darken only; the key leaves what
+ *      is under a film's black as it was, and every blend what is outside the
+ *      logo's card; any blend at a level of next to nothing lays next to
+ *      nothing; and the back plate's Own is its Blend Mode, at Screen and at
+ *      Multiply (5b, without a GPU: the post chain's finish is told the
+ *      logo's blend)
  *
  * Each rule was held to a broken shader when it was written (a beam that
  * draws nothing, a logo that vanishes when lowered, the ring left lighting
@@ -61,7 +73,20 @@
  * and a gel over the lens at full density whatever its level. Five of those
  * passed the first version of section 6, which asked only whether light
  * arrived and never where a row sat among others lit; each went red once
- * the checks asked which colour, how much, and under or over what.
+ * the checks asked which colour, how much, and under or over what. The
+ * blends (7) were held to twelve more: add written as screen, screen and
+ * multiply at full strength whatever the level, a key with no edge and a key
+ * that keys nothing, the film reading the LED ring's blend, the back plate's,
+ * the logo's, the lamp's and the lumia beam's blends each ignored, the LED's
+ * and the gel's swapped on the way to the shader, and the back plate blended
+ * by its level alone without its dye's coverage. Then five the check skeptic
+ * found passing: the gel's and the lumia's blends ignored in the lamp (only
+ * the LED ring was asked there), the back plate's Own drawn as Screen whatever
+ * its Blend Mode, a logo multiplied without its alpha (the clear margin
+ * darkened), and the post chain's finish never told the logo's blend (5b).
+ * (A thirteenth of the first twelve, screen written
+ * as screening s·a, drew the same picture, which is the point of it: the
+ * shader's comment says why the two are one formula.)
  *
  * What it does not say: that the default order is today's picture. That was
  * measured once, when the mixer went in, by rendering four scenes (plain; the
@@ -69,6 +94,7 @@
  * change and comparing the bytes, which were identical. A check here could
  * only compare the shader against itself.
  */
+import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 import {
   parseMixOrder, moveInMix, raiseInMix, mixStack, mixPositions, MIX_CONTROLS, MIX_MOVERS,
@@ -79,6 +105,36 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+
+// ── 5b. The finish, told everything it reads ────────────────────────
+{
+  /*
+    The logo at the top of the stack is drawn by the finish, and the finish is
+    one text (FINISH_WGSL) in two shaders: the plate's, which the lab below
+    renders, and the post chain's, which it does not. With any effect on, the
+    post chain's is the one on the wall, and it knows only what
+    WebGPUPostChain.finish() packs from the FinishView the frame hands it. A
+    new uniform the finish reads (the logo's blend was one) has to be in the
+    post chain's fields, packed by finish(), and handed over by the frame, or
+    the logo quietly goes back to its old way whenever an effect is on. No
+    GPU is needed to ask that: it is three places in the source agreeing.
+  */
+  const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const plateSrc = src('src/gpu/wgsl/plate.ts');
+  const finish = plateSrc.slice(plateSrc.indexOf('export const FINISH_WGSL'), plateSrc.indexOf('export const DISPLAY_BINDINGS'));
+  const reads = [...new Set([...finish.matchAll(/\bU\.([A-Za-z_]\w*)/g)].map(m => m[1]))];
+  const postFields = new Set([...src('src/gpu/wgsl/postFields.ts').matchAll(/name: '(\w+)'/g)].map(m => m[1]));
+  const postSrc = src('src/gpu/post.ts');
+  const unpacked = reads.filter(n => n !== 'resolution' && !postSrc.includes(`this.pack.set('${n}'`));
+  const view = postSrc.slice(postSrc.indexOf('export interface FinishView'), postSrc.indexOf('}', postSrc.indexOf('export interface FinishView')));
+  const viewKeys = [...view.matchAll(/^\s+(\w+):/gm)].map(m => m[1]);
+  const lv = src('src/components/LiquidVisualizer.tsx');
+  const call = lv.slice(lv.indexOf('post.finish('), lv.indexOf('}', lv.indexOf('post.finish(')));
+  const unsent = viewKeys.filter(k => !new RegExp(`\\b${k}:`).test(call));
+  check('the post chain\'s finish is told every uniform the finish reads, the logo\'s blend among them',
+    reads.length >= 4 && reads.includes('markBlend') && reads.every(n => postFields.has(n)) && unpacked.length === 0 && viewKeys.includes('markBlend') && unsent.length === 0,
+    `reads ${reads.join(', ')}; not a post field: ${reads.filter(n => !postFields.has(n)).join(', ') || 'none'}; not packed: ${unpacked.join(', ') || 'none'}; not handed over: ${unsent.join(', ') || 'none'}`);
+}
 
 // ── 5. The stack's rules ────────────────────────────────────────────
 {
@@ -232,6 +288,54 @@ const shots = await page.evaluate(async (controls) => {
     allBeamShuffled: await shot({ ledPlatform: true, ledMode: 'rainbow', mixOrder: 'front back led gel lumia film mark' }),
     each: {},
   };
+  /*
+    The blends (7): each row with nothing of it (c), the same row added at
+    full level (so its own picture is that less c), and each of the four at
+    0.6. One plate and the grain's own saturation step at 1, so what is
+    under a row is what the rows under it made. The film here has dark
+    stripes as well as coloured ones, for the key to drop: black, two greys
+    either side of the key's soft edge, and five colours none near white.
+  */
+  const film2 = mk(128, 128, (g, w) => {
+    const bars = ['rgb(0,0,0)', 'rgb(150,90,40)', 'rgb(20,20,20)', 'rgb(40,120,160)', 'rgb(45,45,45)', 'rgb(120,40,140)', 'rgb(90,150,60)', 'rgb(160,60,70)'];
+    for (let x = 0; x < w; x += 16) { g.fillStyle = bars[(x / 16) % bars.length]; g.fillRect(x, 0, 16, 128); }
+  });
+  const one = { layerCount: 1, saturationBoost: 1, filmMix: 0, markMix: 0 };
+  const ROWS = {
+    film: { key: 'filmBlend', set: { ...one, filmBright: 0.6 }, cam: { film: film2 }, off: { filmMix: 0 }, on: (l) => ({ filmMix: l }) },
+    led: { key: 'ledBlend', set: { ...one, ledMode: 'rainbow', ledBright: 0.4, mixOrder: 'gel lumia front back led film mark' }, cam: {}, off: { ledPlatform: false }, on: (l) => ({ ledPlatform: true, ledLevel: l }) },
+    // Each source graded down, so that it and the dye under it add up to
+    // less than white, where every blend would be the same number.
+    gel: { key: 'gelBlend', set: { ...one, gelBright: 0.5, mixOrder: 'led lumia front gel back film mark' }, cam: {}, off: { gelWheel: 0 }, on: (l) => ({ gelWheel: l }) },
+    lumia: { key: 'lumiaBlend', set: { ...one, mixOrder: 'led gel front lumia back film mark' }, cam: {}, off: { lumia: 0 }, on: (l) => ({ lumia: l }) },
+    mark: { key: 'markBlend', set: { ...one, markBright: 0.3, markX: 0.3, markY: 0.2, markScale: 0.4 }, cam: { mark }, off: { markMix: 0 }, on: (l) => ({ markMix: l }) },
+    // Not turned: its dye over the front's, so there is something under it everywhere it is.
+    back: { key: 'backBlend', set: { ...one, layerCount: 2, backBright: 0.5 }, cam: { backPlate: true, backRotation: 0 }, off: { backLevel: 0 }, on: (l) => ({ backLevel: l }) },
+    // In the lamp, under the glass, over the lumia so there is light under it:
+    // the bare glass on the right is the lamp.
+    ledLamp: { key: 'ledBlend', set: { ...one, ledMode: 'rainbow', ledBright: 0.4, lumia: 1, lumiaBright: 1.8, mixOrder: 'lumia led gel front back film mark' }, cam: {}, off: { ledPlatform: false }, on: (l) => ({ ledPlatform: true, ledLevel: l }) },
+    // The gel and the lumia in the lamp, each over the LED ring's light.
+    gelLamp: { key: 'gelBlend', set: { ...one, ledPlatform: true, ledMode: 'rainbow', ledBright: 0.4, gelBright: 0.5 }, cam: {}, off: { gelWheel: 0 }, on: (l) => ({ gelWheel: l }) },
+    lumiaLamp: { key: 'lumiaBlend', set: { ...one, ledPlatform: true, ledMode: 'rainbow', ledBright: 0.4 }, cam: {}, off: { lumia: 0 }, on: (l) => ({ lumia: l }) },
+  };
+  out.blend = {};
+  for (const [id, r] of Object.entries(ROWS)) {
+    const b = out.blend[id] = {
+      c: await shot({ ...r.set, ...r.off }, r.cam),
+      full: await shot({ ...r.set, ...r.on(1), [r.key]: 'add' }, r.cam),
+      own: await shot({ ...r.set, ...r.on(0.6) }, r.cam),
+      // Just past the shader's skip at 0.001, so the blend itself is asked.
+      zero: await shot({ ...r.set, ...r.on(0.002), [r.key]: 'add' }, r.cam),
+    };
+    for (const m of ['screen', 'add', 'multiply', 'key']) b[m] = await shot({ ...r.set, ...r.on(0.6), [r.key]: m }, r.cam);
+  }
+  // The back plate on Own under another Blend Mode: Multiply, whose formula is the row's Multiply.
+  out.blend.back.ownMultiply = await shot({ ...ROWS.back.set, ...ROWS.back.on(0.6), blendMode: 'multiply' }, ROWS.back.cam);
+  // And on paper, where the back plate is lit as a photograph whatever its blend.
+  out.blend.back.photoOwn = await shot({ ...ROWS.back.set, ...ROWS.back.on(0.6), renderStyle: 'photo' }, ROWS.back.cam);
+  out.blend.back.photoAdd = await shot({ ...ROWS.back.set, ...ROWS.back.on(0.6), renderStyle: 'photo', backBlend: 'add' }, ROWS.back.cam);
+  out.blend.back.photoNone = await shot({ ...ROWS.back.set, ...ROWS.back.off, renderStyle: 'photo' }, ROWS.back.cam);
+
   // Every control, moved off its rest, in a scene where its source is on the wall.
   const lit = { ledPlatform: true, ledMode: 'rainbow', gelWheel: 0.6, lumia: 0.6 };
   for (const c of controls) {
@@ -490,6 +594,139 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
   const same = diff(shots.allShuffled, shots.allHome), sameBeam = diff(shots.allBeamShuffled, shots.allBeamHome);
   check('with both at 0, where they sit in the stack changes nothing, though it moves the LED ring\'s row, lamp or beam',
     same.max === 0 && sameBeam.max === 0, `worst ${same.max} and ${sameBeam.max}`);
+}
+
+// ── 7. The blends ───────────────────────────────────────────────────
+{
+  /*
+    Each blend against its formula (lib/mixer.ts, MixBlend), pixel by pixel.
+    c is the picture with nothing of the row, and s·a the row's own picture
+    times its alpha, read off the row added at full level less c. From
+    those two alone each of the four is predicted at level 0.6:
+
+      screen    c + L·sa·(1 − c)
+      add       c + L·sa
+      multiply  c·(1 − L + L·s)            (rows with no alpha of their own)
+      key       mix(c, s, L·smoothstep(0.18, 0.36, luma(s)))   (Film Key's default, and every other row's)
+
+    and the picture drawn with that blend must be its own prediction, and not
+    the other three's. The back plate's dye has a coverage of its own which
+    add at full level cannot tell from its colour, so only the two that need
+    no more than s·a (screen and add) are predicted for it. Pixels are left
+    out where anything is at white, where the frame's clip makes every
+    prediction the same number.
+  */
+  const L = 0.6;
+  const luma = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+  const sstep = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+  const predict = {
+    screen: (c, s) => c.map((v, i) => v + L * s[i] * (1 - v)),
+    add: (c, s) => c.map((v, i) => v + L * s[i]),
+    multiply: (c, s) => c.map((v, i) => v * (1 - L + L * s[i])),
+    key: (c, s) => { const k = L * sstep(0.18, 0.36, luma(...s)); return c.map((v, i) => v + (s[i] - v) * k); },
+  };
+  const MODES = Object.keys(predict);
+  /** Mean error of each prediction against the picture drawn with blend `m`, in 8-bit steps, and how many pixels. */
+  const fit = (b, m, where = () => true) => {
+    const err = Object.fromEntries(MODES.map(k => [k, 0]));
+    let n = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      if (!where(x, y)) continue;
+      const c = px(b.c, x, y).map(v => v / 255), full = px(b.full, x, y), got = px(b[m], x, y);
+      if (Math.max(...full, ...got) >= 250) continue;
+      const s = full.map((v, i) => Math.max(0, v / 255 - c[i]));
+      // Where either is dark every blend but multiply is the same number.
+      if (Math.max(...c) < 40 / 255 || Math.max(...s) < 40 / 255) continue;
+      const preds = MODES.map(k => predict[k](c, s));
+      if (Math.max(...preds.flat()) >= 250 / 255) continue;
+      preds.forEach((p, j) => { err[MODES[j]] += p.reduce((acc, v, i) => acc + Math.abs(v * 255 - got[i]), 0) / 3; });
+      n++;
+    }
+    for (const k of MODES) err[k] = n ? err[k] / n : Infinity;
+    return { err, n };
+  };
+  const table = (id, modes) => modes.map(m => {
+    const { err, n } = fit(shots.blend[id], m);
+    return { m, own: err[m], near: Math.min(...modes.filter(k => k !== m).map(k => err[k])), n };
+  });
+  const say = (rows) => rows.map(r => `${r.m} ${f1(r.own)} (next ${f1(r.near)})`).join(', ') + `; ${rows[0].n} px`;
+  // Within a step and a half of 255 of its own formula, and four times as far
+  // (and never under two and a half steps) from the nearest other. Measured
+  // here: each blend 0.2 to 1.0 steps from its own formula, and 4.2 (the LED
+  // ring's screen against its add, over a dim lamp) to 33 from the nearest other.
+  const good = (rows) => rows.every(r => r.n > 200 && r.own < 1.5 && r.near > Math.max(2.5, 4 * r.own));
+  const NAMES = { film: 'the film', led: 'the LED beam', gel: 'the gel over the lens', lumia: 'the lumia beam', mark: 'the logo', ledLamp: 'the LED ring in the lamp', gelLamp: 'the gel in the lamp', lumiaLamp: 'the lumia in the lamp' };
+  for (const id of ['film', 'led', 'gel', 'lumia', 'mark', 'ledLamp', 'gelLamp', 'lumiaLamp']) {
+    const rows = table(id, MODES);
+    check(`${NAMES[id]}: each of screen, add, multiply and key is its own formula and not another's`, good(rows), say(rows));
+  }
+  const backRows = table('back', ['screen', 'add']);
+  check('the back plate: screen and add are their formulas, with its dye\'s coverage as the alpha', good(backRows), say(backRows));
+  // Multiply cannot be predicted for the back plate (above); it can be seen to
+  // darken, and only where the plate has dye.
+  {
+    const b = shots.blend.back;
+    let darker = 0, lighter = 0, n = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const c = px(b.c, x, y), f = px(b.full, x, y), m = px(b.multiply, x, y);
+      if (Math.max(...c) < 40 || f.every((v, i) => v - c[i] < 20)) continue;
+      n++;
+      const d = (m[0] + m[1] + m[2]) - (c[0] + c[1] + c[2]);
+      if (d < -15) darker++; else if (d > 6) lighter++;
+    }
+    // And where it has none, nothing: a multiply by its level alone would darken the bare glass too.
+    const bare = diff(b.multiply, b.c, (x, y) => px(b.full, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1));
+    check('and multiply darkens what is under it where it has dye, and lightens nothing, and leaves the rest',
+      n > 200 && darker > 0.8 * n && lighter === 0 && bare.n > 1000 && bare.max <= 1,
+      `${darker} of ${n} px darker, ${lighter} lighter; worst ${bare.max} over ${bare.n} px without its dye`);
+    // Its Own is the look's Blend Mode, and Multiply there is the row's Multiply to the formula.
+    const asMode = diff(b.ownMultiply, b.multiply), fromScreen = diff(b.ownMultiply, b.own);
+    check('the back plate\'s Own is its Blend Mode: at Screen the row\'s Screen, at Multiply the row\'s Multiply',
+      diff(b.own, b.screen).max <= 1 && asMode.max <= 1 && fromScreen.mean > 10,
+      `worst ${diff(b.own, b.screen).max} at Screen and ${asMode.max} at Multiply; ${f1(fromScreen.mean)} a channel between the two Blend Modes`);
+  }
+  // On paper: the blend reaches the back plate's lit drops, and nothing where it has none.
+  {
+    const b = shots.blend.back;
+    const dyed = (x, y) => px(b.full, x, y).some((v, i) => v - px(b.c, x, y)[i] > 20);
+    const bare = (x, y) => px(b.full, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1);
+    const onDye = diff(b.photoAdd, b.photoOwn, dyed), offDye = diff(b.photoAdd, b.photoOwn, bare), lit = diff(b.photoOwn, b.photoNone, dyed);
+    // Off the dye is where adding the plate at full level moved no channel a
+    // step, which still leaves a sliver of coverage: there Add (c + a·s) and
+    // Own on paper (a mix toward the lit dye by a) part by a·c, two steps at
+    // most, measured. A blend that reached past the dye would be tens.
+    check('on paper the back plate\'s blend reaches its lit drops, and nothing where it has no dye',
+      lit.mean > 5 && onDye.n > 1000 && onDye.mean > 3 && offDye.n > 1000 && offDye.max <= 2 && offDye.mean < 0.2,
+      `the plate ${f1(lit.mean)} a channel over the paper; Add against Own ${f1(onDye.mean)} over its dye, ${offDye.mean.toFixed(2)} (worst ${offDye.max}) off it`);
+  }
+  // The logo's alpha: every blend leaves what is outside its card, the transparent margin included, as it was.
+  {
+    const b = shots.blend.mark;
+    // Where adding the logo at full level changed nothing, and not because
+    // what is under it was already at white, where an add changes nothing
+    // either; and two pixels clear of the card's edge, where the texture's
+    // filtering blends the card's alpha down together with its colour toward
+    // the clear margin's black, so that the logo's own way in darkens there by
+    // a few steps (8 at most here), as it always did.
+    const clear1 = (x, y) => Math.max(...px(b.c, x, y)) < 250 && px(b.full, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1);
+    const clear = (x, y) => [-2, -1, 0, 1, 2].every(dy => [-2, -1, 0, 1, 2].every(dx => {
+      const u = Math.min(S - 1, Math.max(0, x + dx)), v = Math.min(S - 1, Math.max(0, y + dy));
+      return clear1(u, v);
+    }));
+    const worst = ['own', ...MODES].map(m => [m, diff(b[m], b.c, clear).max]);
+    check('every blend leaves what the logo\'s card does not cover as it was, its clear margin too',
+      worst.every(([, v]) => v <= 1) && diff(b.c, b.c, clear).n > 10000, worst.map(([m, v]) => `${m} ${v}`).join(' · '));
+  }
+  // The key's other half: where the film is black or near it, what is under is left as it was.
+  {
+    const b = shots.blend.film;
+    const dark = (x, y) => { const c = px(b.c, x, y), f = px(b.full, x, y); return Math.max(...c) >= 40 && f.every((v, i) => v - c[i] <= 20); };
+    const keyed = diff(b.key, b.c, dark), mult = diff(b.multiply, b.c, dark);
+    check('the key leaves what is under the film\'s black as it was, where multiply darkens it', keyed.n > 200 && keyed.mean < 1.5 && mult.mean > 20,
+      `${f1(keyed.mean)} a channel keyed, ${f1(mult.mean)} multiplied, over ${keyed.n} px`);
+  }
+  const zeros = Object.keys(shots.blend).map(id => [id, diff(shots.blend[id].zero, shots.blend[id].c).max]);
+  check('any blend at a level of next to nothing (0.002, past the shader\'s skip) lays next to nothing', zeros.every(([, m]) => m <= 1), zeros.map(([id, m]) => `${id} ${m}`).join(' · '));
 }
 
 const failed = checks.filter(c => !c.ok).length;
