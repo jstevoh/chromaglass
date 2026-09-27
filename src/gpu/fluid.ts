@@ -582,6 +582,7 @@ export class WebGPUFluid {
       ['gridSplat', [RGBA32], open.reaction || open.gel],
       // The second phase, single-channel, and what it does to the flow.
       ['phaseSplat', [R32], open.phase],
+      ['phaseCarry', [R32], open.phase],
       ['phaseAdvect', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
       ['phaseRelax', [R32], open.phase],
@@ -1878,6 +1879,29 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', [x, y, radius, take, ux * hop, uy * hop, 0, 0]));
     m.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /**
+   * Carry the ferrofluid along a gesture (the Finger, a directed blow) or
+   * straight out from its middle (a puff): taken from each cell under the
+   * hand in proportion to how near its middle the cell is, and put down a
+   * hop away (phaseCarry). In plate units; the direction need not be unit
+   * length for a stroke and is ignored for a puff. Only with ferrofluid on
+   * the plate.
+   */
+  carryPhase(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number, outward = false): void {
+    if (!this.phaseLive || !(radius > 0) || !(take > 0) || !(hop > 0)) return;
+    const len = Math.hypot(ux, uy);
+    if (!outward && !(len > 1e-6)) return;
+    const enc = this.device.createCommandEncoder({ label: 'carry phase' });
+    const pass = enc.beginComputePass({ label: 'carry phase' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'phaseCarry', this.phase.write, [this.phase.read],
+      this.arg('phase carry', [x, y, radius, Math.min(1, take), outward ? 0 : ux / len, outward ? 0 : uy / len, hop, outward ? 1 : 0]));
+    this.phase.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
   }

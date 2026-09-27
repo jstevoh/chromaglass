@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked } from '../lib/earClock';
@@ -2508,6 +2509,14 @@ class FluidSimulation {
       const L = this.size;
       this.gpu.carryMix(x / L, y / L, r / L, ux, uy, Math.min(0.75, strength * 8), Math.max(1, Math.round(r * 0.45)) / L);
     }
+    /*
+      And the ferrofluid, the same take and the same hop, when the colour
+      went: it rode the flow alone and stayed where it was under a Finger
+      (asked: "Shouldn't blowing and finger also move around the
+      ferrofluid?"; PLAN.md §9n, `npm run ferrohands`).
+    */
+    const fc = carried && this.gpu?.carryPhase ? fingerCarry(x, y, radius, strength, dx, dy, this.size) : null;
+    if (fc) this.gpu!.carryPhase!(fc.x, fc.y, fc.r, fc.ux, fc.uy, fc.take, fc.hop, fc.outward);
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
@@ -2589,6 +2598,24 @@ class FluidSimulation {
         }
       }
     }
+  }
+
+  /**
+   * A hand's Blow on the ferrofluid (PLAN.md §9n): held still it opens a
+   * hole, moved it pushes the ferrofluid along (blowCarry). Its own method,
+   * called where a hand blows, and not inside blowAir: blowAir is also the
+   * pour event's burst, the automation's breath and every bubble's pop,
+   * and a pour-sized carry would punch a hole a fifth of the plate across
+   * in a ferro look (and take 220 times the tool's puff to run).
+   *
+   * The push blowAir and blowDirected add barely moves it: it lasts one
+   * step before the solver's speed clamp cuts it back (phaseCarry, in the
+   * solver's shaders, has the numbers).
+   */
+  blowPhase(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
+    if (!this.gpu?.carryPhase) return;
+    const c = blowCarry(x, y, radius, strength, dx, dy, this.size);
+    this.gpu.carryPhase(c.x, c.y, c.r, c.ux, c.uy, c.take, c.hop, c.outward);
   }
 
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number) {
@@ -4468,8 +4495,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
-        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
-        else af.blowAir(x, y, 4, 0.06 * amt);
+        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
+          af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+          af.blowPhase(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+        } else {
+          af.blowAir(x, y, 4, 0.06 * amt);
+          af.blowPhase(x, y, 4, 0.06 * amt, 0, 0);
+        }
         if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
@@ -6074,6 +6106,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // One straw (bubbles.ts keeps a single straw bubble), so the
                 // first finger blows it and any other finger is the wind.
                 const still = Math.hypot(strokeDx, strokeDy) < 0.75;
+                // And the ferrofluid, held or moved, straw or wind (PLAN.md §9n).
+                af.blowPhase(x, y, 4, 0.06 * k, still ? 0 : strokeDx, still ? 0 : strokeDy);
                 if (activeLayerRef.current === 0 && still && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
                 } else {

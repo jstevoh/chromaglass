@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (`npm run fingers`), not yet judged on the Mac; 9f–9h, 9j and 9k–9p open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (`npm run ferrohands`); 9f–9h, 9j, 9k–9m and 9o–9q open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -775,7 +775,7 @@ Open, from building 9e (in the order to do them):
   some phones) needs a coarser pitch.
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
-- **9i. Fingers past the spikes** (**shipped**, this PR). A pool bigger than the
+- **9i. Fingers past the spikes** (**shipped**, #200). A pool bigger than the
   spikes' reach stayed a round blob past them under the Magnet: on Magnet Garden
   the push it gave went in through the separation's own diffusion and thinned the
   edge to a grey the plate does not draw. Now, on a look with a Labyrinth, the
@@ -827,10 +827,21 @@ Open, from building 9i:
   the hand is held: the hand's share (spikesClose) is one number for the plate,
   so the push leaves the far labyrinth's separation too, and it rests on the
   maze's flow alone there.
-- **9n. Blow and Finger on the ferrofluid.** Asked by the owner (2026-09-27):
-  shouldn't blowing and Finger also move the ferrofluid round? Both push the flow
-  the ferrofluid rides; whether it moves, and how far against the dye, is next to
-  measure, and to fix in its own PR if it does not.
+- **9n. Blow and Finger on the ferrofluid** (**shipped**, this PR). Asked by the owner
+  (2026-09-27): shouldn't blowing and Finger also move the ferrofluid round? They
+  barely did: both only added velocity, which lasts one step before the speed
+  clamp cuts it back (a stroke across a pool moved it 0.2 of a cell), so the dye
+  has long been carried by hand and the ferrofluid never was. Now the Finger
+  carries it along the stroke as it carries the dye, Blow held still blows a hole
+  in a pool and moved pushes it along (`carryPhase`, conserving). Only a hand's
+  Blow: the pour event's burst and a bubble's pop, which also blow, leave it be. Every hand goes
+  through the same three methods, so the phone's fingers on Finger and Blow do it
+  too; a phone finger on the Magnet is still a magnet. `npm run ferrohands`.
+- **9q. A Mac check of the hands on the ferrofluid.** `npm run ferrohands` measures
+  the carry with the app's own numbers (lib/handCarry.ts) but not the app's calls:
+  which method each hand reaches, the Finger's carry waiting on each reading of the
+  dye, and how often a hand acts. A check through the real pointer on Magnet Garden,
+  reading the phase before and after, belongs in `npm run tools` on the Mac.
 
 ### 10. Playing like a show
 
