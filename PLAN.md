@@ -1182,6 +1182,16 @@ version in the same PR (see the operating rules below).
    each projector's plate is a row, with its own grade at the projector's scope (R2).
    This is the large one; it waits on R1.
 
+Found while shipping step 2, not yet done: #189's deploy (main 41ad65e) went red on
+the Mac show shard's `qa` at two checks that passed on the same tree in the PR's run an
+hour before: "the plate, not the hole, takes the pointer" (the cursor over a DIV at the
+desk's preview) and "the run completed" (`__cgFrame` returned null in the look-fade
+colour section), with "requestAdapter did not answer in 10s" in the console. Neither
+touches the Mixer; the second looks like the adapter going away under the run. Worth a
+`qa` guard that says "no frame" rather than throwing, so the run goes on to the checks
+after it. And #193's first show shard died before any test ran: the runner could not
+resolve github.com at checkout.
+
 Found while building step 3, not yet done: the logo darkens what is under it by up to
 8 steps of 255 in the pixel or two where its card meets its clear margin, on its own
 way in as much as any blend, because its texture is filtered with its colour not
