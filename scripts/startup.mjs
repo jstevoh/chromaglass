@@ -325,7 +325,9 @@ async function open(query, looks) {
       const sample = () => {
         const d = window.chromaglassDebug?.();
         const f = d?.fluids?.[0];
-        rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0]);
+        const made = window.__startupBytes ?? [];
+        rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0,
+          made.filter(([, k]) => k === 'texture').length, made.filter(([, k]) => k === 'written').length, window.__startupFirsts?.get('Queue.submit')?.[1] ?? 0]);
         if (rows.length < 2000) setTimeout(sample, 250);
       };
       setTimeout(sample, 250);
@@ -678,7 +680,7 @@ const timeline = (o, cold = null) => {
     return inGap.length ? inGap.map(([s, d]) => `${(s / 1000).toFixed(2)} s for ${(d / 1000).toFixed(2)} s`).join(', ') : 'none';
   };
   console.log(`     (main-thread long tasks in the longest frame gap: ${busy(o.frames)}${cold ? `; in the stop at the GPU's start: ${busy(cold)}` : ''})`);
-  console.log('       seconds · animation frames · heartbeats · steps · grid');
+  console.log('       seconds · animation frames · heartbeats · steps · grid · textures made · writes · submits');
   for (const r of o.rows) console.log(`       ${r.join('  ')}`);
   for (const line of o.box) console.log(`       ${line}`);
 };
@@ -760,6 +762,16 @@ try {
     coldAt == null ? 'the control drew no frame before its device, so there is no moment to compare'
       : `${cold ? `${say(cold)}` : `no stop beginning within ${COLD_AT_S} s of ${coldAt.toFixed(2)} s`}, against ${say(c.framesAsking)} before its device (given ${c.given?.toFixed(2)} s) for ?prepare=0; held to ${bound.toFixed(2)} s`);
   console.log(`     ${underWay(o, o.frames)}`);
+  /*
+    The quarter seconds round the first step, on every run, with what the
+    page had made, written and submitted by each: whether the page was still
+    handing the GPU work through the stop after the first step, or had
+    handed it all over before it and was waiting.
+  */
+  if (o.firstStep != null) {
+    console.log('       seconds · animation frames · heartbeats · steps · grid · textures made · writes · submits (round the first step)');
+    for (const r of o.rows.filter((r) => r[0] >= o.firstStep / 1000 - 1 && r[0] <= o.firstStep / 1000 + 3)) console.log(`       ${r.join('  ')}`);
+  }
   if (worst > MAX_GAP_S || !coldOk || process.env.STARTUP_TIMELINE) timeline(o, cold);
 
   // ── Every look, opened on its own ─────────────────────────────────
