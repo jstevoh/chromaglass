@@ -188,6 +188,29 @@ const MAZE_UNIFORM = 0.45;
 const SPIKE_PULL = 0.5;
 const SPIKE_FLOW = 2;
 const SPIKE_RELAX = 16;
+/*
+  Past the spikes, fingers (PLAN.md §9i, `npm run fingers`). A pool bigger
+  than the spikes' reach stayed round past them: the maze's repulsion was
+  screened at the look's own reach, and a dipole's field reaches a long
+  way. So under the hand's magnet the maze field is at least as strong as
+  its spikes (field, in step), and pushes from further.
+
+  HAND_SCREEN: how far the push reaches, as the screening's share of the
+  maze's wavenumber squared (0.16 for the look's own maze, which sets its
+  period: m = 0.4 k*). A pool pushed only from within five cells of each
+  point had its edge wrinkle and stop; from four times as far (0.04) it
+  goes out in fingers. The repulsion α is set with it so the fastest
+  wavelength stays the maze's: k*² = √α − m², so √α = (1 + share) k*².
+
+  Only on a look with a Labyrinth. The first version gave the hand's magnet
+  this field on every look, Classic too, with the pull eased so the edge
+  could get out; on the Mac `npm run ferro` then found a close magnet on
+  Classic no longer gathered scattered drops, which is that tool's job
+  there, and with the pull whole Classic's fingers came out grey (7, 1, 0
+  and 0 on the four circles of `npm run fingers`). Classic is left as it
+  was; fingering it is PLAN.md §9o.
+*/
+const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 const LIES_GRID = 128;
@@ -563,7 +586,7 @@ export class WebGPUFluid {
       ['phaseSeparate', [R32], open.phase],
       ['phaseRelax', [R32], open.phase],
       ['screenJacobi', [R32], open.phase],
-      ['phaseMu', [R32], open.phase],
+      ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
       ['phaseForce', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
@@ -1016,21 +1039,27 @@ export class WebGPUFluid {
     const disp = stepDisplacement(p.dt, p.advection, N);
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
-    // Never under twelve cells a period: the edge is three or four wide, and
-    // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
-    // the period by up to three (MAZE_FINEST), and that floor is why it is
-    // a setting and not a new constant: see MAZE_FINEST.
-    const period = MAZE_PERIOD / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
-    const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
-    const mazeK = { m2: 0.16 * kk, alpha: (1.16 * kk) ** 2 };
     /*
       Whether a magnet is close enough under the glass to stand the
       ferrofluid up into spikes (wgsl/spikes.ts, spikeAmp on the magnet's
       axis, where the field is strongest): then the spikes' wells go into μ
       and the maze's flow carries the liquid into them, maze field or not.
+      And the magnet's own field is a maze field as strong as its spikes, on
+      a look with a Labyrinth (see HAND_SCREEN).
     */
     const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
     const spikes = spikeAmt > 0;
+    const field = maze > 0.001 ? Math.max(maze, spikeAmt) : 0;
+    // Never under twelve cells a period: the edge is three or four wide, and
+    // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
+    // the period by up to three (MAZE_FINEST), and that floor is why it is
+    // a setting and not a new constant: see MAZE_FINEST. (Finer still under
+    // the hand was tried for thinner fingers: at 384² they came out at the
+    // floor, grey and too thin to draw.)
+    const period = MAZE_PERIOD / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
+    const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
+    const m2f = 0.16 + (HAND_SCREEN - 0.16) * spikeAmt;
+    const mazeK = { m2: m2f * kk, alpha: ((1 + m2f) * kk) ** 2 };
     if (maze <= 0.001 && !spikes) this.mazeReady = false;
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
@@ -1447,17 +1476,18 @@ export class WebGPUFluid {
         and it rounds. The pairwise sharpening that stood in for it without
         a maze (phaseSeparate) exchanged only along the axes, and a plate of
         drops set into blocky squares with holes punched in them. Under a
-        maze field the dipoles' repulsion (phaseMu's ψ term) is added.
+        maze field (the look's, stronger under the hand's magnet) the
+        dipoles' repulsion (phaseMu's ψ term) is added.
       */
       if (!this.psi) this.psi = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'psi');
       if (!this.phaseMuT) {
         this.phaseMuT = this.disposer.track(this.device.createTexture({
-          label: 'phase mu', size: [this.N, this.N], format: R32,
+          label: 'phase mu', size: [this.N, this.N], format: RG32,
           usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
         }));
       }
       const psi = this.psi, mu = this.phaseMuT;
-      if (maze > 0.001) {
+      if (field > 0.001) {
         const screen = this.arg('screen', [mazeK.m2, 0, 0, 0]);
         for (let k = 0; k < 16; k++) {
           this.run(pass, 'screenJacobi', psi.write, [psi.read, this.phase.read], screen);
@@ -1467,7 +1497,7 @@ export class WebGPUFluid {
       // Phase Edge is how fast it separates: its mobility, M dt, from 0.006
       // to 0.018 (under the explicit limit, about 0.028).
       const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
-        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), maze > 0.001 ? mazeK.alpha * (0.5 + 0.5 * maze) : 0, MAZE_UNIFORM, p.time ?? 0]);
+        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), field > 0.001 ? mazeK.alpha * (0.5 + 0.5 * field) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
       for (let k = 0; k < CH_SUBSTEPS; k++) {
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);

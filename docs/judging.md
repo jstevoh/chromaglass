@@ -407,6 +407,31 @@ one is enough for your own phone) and press Run. Worth looking at:
 
 ---
 
+## 16. The Magnet pulls a pool out in fingers
+
+A pool bigger than the spikes' reach used to stay a round blob past them
+under the Magnet tool: on Magnet Garden what it pushed out thinned to a grey
+the plate does not draw. Now, on the looks with a Labyrinth, the edge goes out in black fingers round the magnet,
+the sunflower in the references (PLAN §9i; `npm run fingers` measures it in the
+lab). Worth looking at:
+
+- pour a big pool on Ferro Paint, Ferro Maze and Magnet Garden and hold the
+  Magnet over it for five seconds: spikes in the middle, thin black fingers
+  with round tips running out all round, each about as wide as the gaps;
+- drop ferrofluid on Classic and do the same: it should gather under the
+  magnet as before, with spikes and no fingers (PLAN §9o);
+- let go: the fingers should stay where they are and slowly round off, not
+  spring back into a disc;
+- the same with two fingers on the phone, one over each of two pools;
+- on Magnet Garden, drag the Magnet slowly: the pool should still follow it
+  (PLAN §9l).
+
+```
+?set=ferroLabyrinth=0.8   what Magnet Garden's own field adds to the hand's
+```
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real
