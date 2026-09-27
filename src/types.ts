@@ -553,6 +553,28 @@ export interface VisualizerSettings {
   markX: number;              // centre, 0..1 across the frame
   markY: number;              // centre, 0..1 up the frame
   markScale: number;          // width as a fraction of the frame; height follows the image's own aspect
+  /*
+    The mixer (lib/mixer.ts, docs/rig-plan.md R7): the pictures on the wall in
+    one stack, in an order the operator picks, each with its own level and
+    grade. The film's and the logo's levels are filmMix and markMix above.
+
+    `mixOrder` is the stack, bottom to top, as words: "led front back film
+    mark" is the order the shader always drew them in. The front plate does
+    not move; the LED ring under it is the lamp, and above it is a beam.
+
+    Each grade is brightness (a gain), contrast (about mid-grey), saturation
+    and hue in degrees, the CSS filter functions' definitions. At 1, 1, 1 and
+    0 the shader skips it, so every look made before this is the same picture.
+  */
+  mixOrder: string;
+  ledLevel: number;           // the LED ring: as the lamp, how much of it lights the glass; as a beam, how bright it is
+  frontLevel: number;         // the front plate: 0 leaves the bare lamp
+  backLevel: number;          // the back plate's opacity over what is under it
+  ledBright: number; ledContrast: number; ledSat: number; ledHue: number;
+  frontBright: number; frontContrast: number; frontSat: number; frontHue: number;
+  backBright: number; backContrast: number; backSat: number; backHue: number;
+  filmBright: number; filmContrast: number; filmSat: number; filmHue: number;
+  markBright: number; markContrast: number; markSat: number; markHue: number;
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
@@ -844,6 +866,17 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   markX: 0.5,
   markY: 0.12,              // low, where a logo goes, and out of the plate's busy middle
   markScale: 0.22,
+  // The mixer at the values that change nothing: the order the shader always
+  // drew in, every level full and every grade skipped.
+  mixOrder: 'led front back film mark',
+  ledLevel: 1,
+  frontLevel: 1,
+  backLevel: 1,
+  ledBright: 1, ledContrast: 1, ledSat: 1, ledHue: 0,
+  frontBright: 1, frontContrast: 1, frontSat: 1, frontHue: 0,
+  backBright: 1, backContrast: 1, backSat: 1, backHue: 0,
+  filmBright: 1, filmContrast: 1, filmSat: 1, filmHue: 0,
+  markBright: 1, markContrast: 1, markSat: 1, markHue: 0,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure

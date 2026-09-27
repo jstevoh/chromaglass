@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
-import { Button, CueRow, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
+import { Button, CueRow, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
+import { MixerPanel } from '../MixerPanel';
 import { PALETTE } from '../../constants';
 import { PerformanceButton } from './PerformanceButton';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
@@ -172,6 +174,9 @@ interface PerformDeskProps {
   /** Whether the solver is already stopped, so the button can say so. */
   frozen: boolean;
   onDrain: () => void;
+  /** Whether a film and a logo are loaded, for the Mixer's rows. */
+  hasFilm: boolean;
+  hasMark: boolean;
 }
 
 /** The same eight tools on both desks (`tools.ts`). */
@@ -190,6 +195,7 @@ const dyeKey = (hex: string): string | null => {
 
 export function PerformDesk(p: PerformDeskProps) {
   const [picking, setPicking] = useState(false);
+  const [mixerOpen, setMixerOpen] = useState(false);
   /** A tool's own options, open by a right-click on it or the Amount chip. */
   const [toolMenu, setToolMenu] = useState<{ tool: string; at: { x: number; y: number } } | null>(null);
   /** The row whose menu is open, and the set's own menu. */
@@ -579,7 +585,17 @@ export function PerformDesk(p: PerformDeskProps) {
           to already know about. One line, under the rides, in the pinned part
           so it is never below the fold.
         */}
-        <div className="shrink-0 border-t border-border px-3 pt-3">
+        {/*
+          The Mixer beside it (lib/mixer.ts): every picture on the wall in one
+          stack, asked for "from the top level". A sheet over the desk rather
+          than a column in it, because the desk's three columns are already the
+          set, the plate and the rides, and a mixer is opened, set and closed
+          far more often than it is watched.
+        */}
+        <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
+          <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">
+            Mixer
+          </Button>
           <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings">
             All settings…
           </Button>
@@ -602,6 +618,20 @@ export function PerformDesk(p: PerformDeskProps) {
           {p.status.engine}
         </span>
       </footer>
+
+      {/*
+        Into the body, not the desk: the plate's frame is a fixed layer above
+        the desk's own, so a sheet inside the desk opened under the plate and
+        the plate took every click meant for it.
+      */}
+      {mixerOpen && createPortal(
+        <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={440} height={900} testId="mixer-sheet" docked>
+          <div className="min-h-0 w-full overflow-y-auto px-5 py-4">
+            <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} testId="desk-mixer" />
+          </div>
+        </Sheet>,
+        document.body,
+      )}
     </div>
   );
 }

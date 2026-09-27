@@ -98,6 +98,9 @@ export interface RemoteState {
   cuedName?: string | null;
   /** Seconds the next Go will take, so the remote can print it on the button. */
   fadeSeconds?: number;
+  /** Whether a film and a logo are loaded, so the remote's mixer can say when a row has nothing on the wall. */
+  filmLoaded?: boolean;
+  markLoaded?: boolean;
 }
 
 export type RemoteMessage =

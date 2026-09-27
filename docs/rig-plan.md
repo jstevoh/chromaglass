@@ -147,6 +147,22 @@ that are still at the wrong scope.
 **It comes after R1 and R3 and carries R2**, because a mixer over one source is
 a settings page with extra steps.
 
+**First slice, built (2026-09-27): the mixer over the sources there already
+are.** Steve asked for it ahead of R1, so the part that does not need several
+live plates went first: the LED ring, the front plate, the back plate, the film
+and the logo, in one stack (`src/lib/mixer.ts`, `MixerPanel.tsx`), on the
+Perform desk's Mixer sheet, in Settings → Live → Mixer, on the phone's Mix sheet
+and on the remote. Each row has its level and its own grade, brightness,
+contrast, saturation and hue, applied in the plate pass before the source is
+laid down (R2's per-source grade, at the scope R2 asks for). The order is the
+index-per-source this section called the one thing the renderer could not do:
+the display pass now lays sources in at three places (under the front plate,
+between the plates, over both) by walking the stack. The front plate does not
+move; only the LED ring passes it, from the lamp under the glass to a beam of
+its own. At the default order and grades the picture is identical to before to
+the bit; `npm run mixer` measures the rest. What is still R1's: a row per
+projector, once there is more than one live plate.
+
 ## Order, and why
 
 R1 first, because every other item is meaningless while all the projectors show

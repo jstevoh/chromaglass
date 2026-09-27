@@ -22,6 +22,15 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'lamp', type: 'vec4f' },
   { name: 'lamp2', type: 'vec4f' },
   { name: 'markRect', type: 'vec4f', note: 'where it sits: centre xy, half-size xy, all in screen uv' },
+  /*
+    The mixer (lib/mixer.ts). A grade is brightness, contrast, saturation and
+    hue in radians; the mark's is its own field because the finish reads it,
+    and the finish is shared text with the post chain's, which names it the same.
+  */
+  { name: 'mixGrade', type: 'vec4f', count: 4, note: 'the LED ring, the front plate, the back plate, the film' },
+  { name: 'markGrade', type: 'vec4f', note: 'the logo' },
+  { name: 'mixLevel', type: 'vec4f', note: 'the LED ring, the front plate, the back plate, and the logo while it is under something' },
+  { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of five, 0 the bottom (the LED ring there is the lamp)' },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },

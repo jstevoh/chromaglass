@@ -18,6 +18,7 @@ import { layOut, wgslStruct, type Field } from '../uniforms';
 
 export const POST_FIELDS: Field[] = [
   { name: 'markRect', type: 'vec4f', note: 'where the mark sits: centre xy, half-size xy, screen uv' },
+  { name: 'markGrade', type: 'vec4f', note: 'the mixer’s grade on the mark: brightness, contrast, saturation, hue' },
   { name: 'resolution', type: 'vec2f' },
   { name: 'dimmer', type: 'f32', note: 'the house dimmer, with the flash guard folded in' },
   { name: 'markOn', type: 'f32', note: 'the mark’s own fader, not a switch' },

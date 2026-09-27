@@ -789,7 +789,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Built 2026-09-27 for oil and water* (Oil Bodies, on in Oil & Water): the oil
    carries its own share of the dye, so amber oil on teal water stays two colours
    as the drops round, merge and are dragged. *Check:* `npm run bodies`. Waiting on
-   the owner's eyes on a real GPU (judging.md 13).
+   the owner's eyes on a real GPU (judging.md 14).
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field

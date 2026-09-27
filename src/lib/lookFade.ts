@@ -30,6 +30,7 @@
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { PIN_RANGE } from './deskPins';
+import { MIX_KEYS } from './mixer';
 
 /**
  * What belongs to the room rather than to a look.
@@ -50,6 +51,10 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   'pacing',
   'markMix', 'markX', 'markY', 'markScale',
   'filmMix', 'filmKey',
+  // The mixer (lib/mixer.ts) is the operator's desk, like the logo and the
+  // film's own mix: the order of the stack and each source's grade stay put
+  // when the look changes, or a look would reset a film graded for this room.
+  ...MIX_KEYS,
   'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
   'simResolution',
 ]);

@@ -323,6 +323,13 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # The mixer: each source moved lands only where that source is (the
+      # film under the back plate, the logo under the film), the LED ring
+      # passes the front plate from lamp to beam, every grade does what its
+      # name says, and every one of the 23 controls changes the picture.
+      - name: The mixer's order and grades
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run mixer
       # Ferro Paint pours its ferrofluid over the whole plate, so after it has
       # played the black is worked through nearly every part of the colour;
       # every other look pours exactly what it did.

@@ -168,7 +168,20 @@ const api = {
    * hands it none, and it reads a blank one, a flat gap at rest.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
-    cam: { cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number } = {}) {
+    cam: {
+      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
+      /*
+        The other pictures the plate composites, for the mixer's check
+        (`npm run mixer`): a film frame, a logo, and a second plate. The
+        second plate is the lab's one plate drawn again as the back layer,
+        which is enough to ask what lies over what, as long as it can be
+        turned (`backRotation`, radians): drawn in the same place as the
+        front, "where the back plate has dye" and "where the front plate has
+        dye" are the same pixels, and a fault tied to the wrong plate cannot
+        be told from the right one.
+      */
+      film?: CanvasImageSource; mark?: CanvasImageSource; backPlate?: boolean; backRotation?: number;
+    } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
@@ -176,6 +189,14 @@ const api = {
     // The beads' mask, as the app uploads it: a BeadField's render(), square
     // for rings and twice as wide for drops.
     if (cam.beadMask) plate.setSource('beads', cam.beadMask);
+    const size2 = (img: CanvasImageSource) => {
+      const it = img as unknown as { width: number; height: number };
+      return [it.width, it.height];
+    };
+    if (cam.film) plate.setSource('film', cam.film);
+    if (cam.mark) plate.setSource('mark', cam.mark);
+    const [fw, fh] = cam.film ? size2(cam.film) : [0, 0];
+    const [mw, mh] = cam.mark ? size2(cam.mark) : [1, 1];
     fillPlateUniforms(plate.pack, {
       view: {
         // The plate's clock can be set apart from the solver's, to ask what
@@ -186,17 +207,20 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
-        filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3, mark: null, film: { kind: 'none', video: null },
+        filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
+        mark: cam.mark ? { aspect: mw / Math.max(1, mh) } : null,
+        film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
       },
-      fluids: [{ gpu: l.solver as never }], width: size, height: size, derived: true, grid: l.N,
+      fluids: cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }],
+      width: size, height: size, derived: true, grid: l.N,
     });
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
-    plate.draw(enc, target.createView(), { width: size, height: size },
-      [{ dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view }]);
+    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
+    plate.draw(enc, target.createView(), { width: size, height: size }, cam.backPlate ? [layer, { ...layer, air: null }] : [layer]);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);

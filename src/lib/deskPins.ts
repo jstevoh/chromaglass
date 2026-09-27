@@ -41,6 +41,7 @@
  */
 
 import { LEARNABLE_SETTINGS } from './midi';
+import { MIX_CONTROLS } from './mixer';
 import type { VisualizerSettings } from '../types';
 
 /**
@@ -135,7 +136,10 @@ const SECTION_OF: Record<string, string> = {
   filmPhysics: 'camera',
   phaseDisplace: 'physics',
   oilBodies: 'physics',
-  pacing: 'automation',};
+  pacing: 'automation',
+  // The mixer's channel strips, all in its own section.
+  ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
+};
 
 const FROM_MIDI: DeskSpec[] = LEARNABLE_SETTINGS.map(s => ({ ...s, section: SECTION_OF[String(s.key)] ?? 'look' }));
 
