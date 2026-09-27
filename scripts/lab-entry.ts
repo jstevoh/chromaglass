@@ -13,6 +13,7 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
 import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
+import { fingerCarry, blowCarry } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -194,6 +195,8 @@ const api = {
     const moved = pressDye(dye, N, cx, cy, R, take, out);
     return { moved, mul: Array.from(out.mul), density: Array.from(out.density) };
   },
+  /** What a hand's Finger and Blow carry of the ferrofluid, as the app works it out (lib/handCarry.ts). */
+  fingerCarry, blowCarry,
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
