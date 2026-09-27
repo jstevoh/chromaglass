@@ -14,7 +14,7 @@ name: Mac app
 # Run workflow) for a download of today's show, and on a `desktop-v*` tag.
 #
 # Signing: with the secrets desktop/README.md lists, the download is signed
-# with Steve's Developer ID and notarized; without them it is signed ad hoc,
+# with the owner's Developer ID and notarized; without them it is signed ad hoc,
 # and macOS asks once before opening it.
 
 on:

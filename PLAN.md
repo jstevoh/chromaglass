@@ -61,7 +61,7 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on Steve's Mac with a projector (`docs/judging.md` §17); steps 2 to 6 not started |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §17); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15b–15e open, the ferrofluid's under 9n |
 
@@ -1720,7 +1720,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    Measured in a cloud session before and after: with a stand-in second screen, no
    projector window opened before, one opened in full screen after; without the
    app's fill, the wall showed the click hint and the laptop the title-bar chip.
-   **Owed:** the Mac look (`docs/judging.md` §17), and signing it with Steve's
+   **Owed:** the Mac look (`docs/judging.md` §17), and signing it with the owner's
    Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
    Privacy & Security before it opens.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
@@ -1785,7 +1785,7 @@ network):
   on CI's Mac runner only if its window server really hides a minimised window.
   The first run's control, a window inside the app, stayed visible at 46 frames/s
   minimised because the app's switches reach every window in its process. Where
-  it is not measured, it is `docs/judging.md` §17 on Steve's Mac.
+  it is not measured, it is `docs/judging.md` §17 on the owner's Mac.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -2108,7 +2108,7 @@ and comes back; a stubbed `getScreenDetails` with a fake `screenschange` in
   has no `googleapis`) and Geist and Geist Mono never load: every page shows the
   fallback fonts. `npm run desktop` saw no request leave the app. Serving the two
   fonts from the site fixes the look and the offline half at once; which one the
-  designs were judged in is for Steve's eyes.
+  designs were judged in is for the owner's eyes.
 - Song ID and lyrics fetch with no timeout (`fingerprint.ts`, `lyrics.ts`), and one
   busy flag gates the local fingerprint match, the song-end detector and the remote
   ID together (`useMusicIntelligence.ts`), so a request that hangs on venue Wi-Fi

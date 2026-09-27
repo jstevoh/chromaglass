@@ -4,7 +4,7 @@
   "version": "1.3.0",
   "private": true,
   "description": "ChromaGlass for the Mac: the show, its server and the projector in one app",
-  "author": "James Higgins",
+  "author": "jstevoh",
   "license": "BUSL-1.1",
   "type": "module",
   "main": "main.js",

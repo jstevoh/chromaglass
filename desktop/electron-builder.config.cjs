@@ -4,9 +4,9 @@
  * The app is this folder's main.js and preload.cjs, the site as `npm run build`
  * left it in the repo's dist/, and the show server's two files from server/,
  * laid out so the server's own `../dist` finds the site. Nothing is fetched
- * when it runs: that is the "complete cached system" Steve asked for.
+ * when it runs: that is the "complete cached system" the owner asked for.
  *
- * Signing. A Developer ID build needs Steve's certificate and Apple account,
+ * Signing. A Developer ID build needs the owner's certificate and Apple account,
  * which a cloud session and CI do not have until they are added as secrets
  * (CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
  * APPLE_TEAM_ID; desktop/README.md). Without them the app is signed ad hoc,
@@ -23,7 +23,7 @@ const notarize = signed && !!process.env.APPLE_TEAM_ID;
 module.exports = {
   appId: 'app.chromaglass.desktop',
   productName: 'ChromaGlass',
-  copyright: 'Copyright © James Higgins',
+  copyright: 'Copyright © jstevoh',
   // The app's version is the site's: one number for what is inside it.
   extraMetadata: { version: root.version },
   directories: { output: 'release', buildResources: 'resources' },
