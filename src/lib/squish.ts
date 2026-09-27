@@ -60,8 +60,8 @@ export const LIFT_TAU = 0.3;
  * a press lays per step, summed over its steps. The film cannot go thinner
  * than the shader's floor, so past about 0.026 (the rest gap of 0.03 down to
  * 0.004) a longer press is not a deeper one: the Press tool held at 1× gets
- * there in about a tenth of a second, and a kick's squeeze at full would be
- * about a tenth of the way (Beat Squeeze lays nothing yet, PLAN §10 step 4).
+ * there in about a tenth of a second, and a kick's squeeze at full is about
+ * a tenth of the way.
  */
 export const DEPTH_CAP = 0.026;
 /**
@@ -77,10 +77,11 @@ export const DEPTH_CAP = 0.026;
  * the cap on the gap it can open no more than it pressed, and on the plate
  * that is a faint ripple at the spokes (0.004), too faint to count fingers.
  *
- * Not yet on every kick: Beat Squeeze has never reached the plate (its
- * centre is a fraction of a cell, and a stroke at a fraction lays nothing;
- * PLAN §10 step 4), so there is no kick's press to lift. When it does, it
- * lifts through the same memory as a hand, as its own presser.
+ * A kick (Beat Squeeze) lifts through the same memory as a hand, as its own
+ * presser; it never did until its centre was rounded (PLAN §10 step 4),
+ * since a stroke at a fraction of a cell laid nothing. Its gap is given back
+ * alongside by `KickRelease`, which the cap keeps from opening past rest
+ * however the two add.
  */
 export const LIFT_GAIN = 0.008;
 
@@ -143,6 +144,10 @@ export function squishDisc(
   S: number, x: number, y: number, radius: number, amount: number, fingering: number,
   stroke: Stroke, pile: number, cell: SquishCell,
 ): void {
+  // A whole cell: a fractional centre makes every index fractional, and a
+  // typed array drops those writes silently (Beat Squeeze, PLAN §10 step 4).
+  x = Math.round(x);
+  y = Math.round(y);
   const sp = spokesAt(x, y, fingering);
   const spokeGain = fingering * 0.9;
   const reach = stroke === 'lift' ? Math.round(radius * 1.15) : radius;
@@ -310,6 +315,101 @@ export class PressLifts {
   get steps(): number { return this.list.reduce((n, q) => n + q.m.steps, 0); }
 
   /** How many presses are remembered. */
+  get size(): number { return this.list.length; }
+
+  forget(): void { this.list = []; }
+}
+
+/** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
+export const KICK_HOLD = RELEASE_MS / 1000;
+/** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
+export const KICK_RELEASE = 1 / 3;
+
+/**
+ * A kick's press, given back.
+ *
+ * The rhythm plate is meant to be a pulse: "on a kick the projectionist
+ * presses the top glass and the dye spreads out in a ring, then relaxes
+ * back". The press half was always there; nothing laid the relaxing half,
+ * because the press itself never landed (its fractional centre, PLAN §10
+ * step 4), so nobody saw it was missing. With the press landing, the only
+ * thing left to bring the glass back up was the gap's spring, and the
+ * app's spring is slow: at the default look the glass comes half way back
+ * in about 24 s, at the Fillmore's in about 50, and a band kicks twice a
+ * second. Pressed again and again, never let go, the lead plate's middle
+ * went to the floor and stayed there. `npm run lift` lays the kick's own
+ * three discs on a plate with the shader's clamps, at the Fillmore's
+ * squeeze and glass, kicks at 140 bpm and the bass at 0.7: without a
+ * release 100 % of the pressed disc is on the floor after 40 s (its mean
+ * 0.0045 against a rest of 0.030). A one-off run of the same at 120 bpm
+ * put the default look at 93 % after 40 s and the Soap Film at 76 %: the
+ * middle of the show a dead black disc a few seconds into a song. A hand on the
+ * Press tool does not have this: a person lets go, and the lift is the glass
+ * coming up.
+ *
+ * So a kick lets go too. It is held for `KICK_HOLD` (the rim stands up and
+ * the ring spreads while it is down, and the lift's spokes, laid after the
+ * same pause, find the film still thin), then the gap it took is given back
+ * evenly over `KICK_RELEASE`, disc for disc, no more than it pressed. The
+ * give-back is the press with its sign turned and nothing else: no Fingering
+ * (a negative amount through the fingered branch would *brighten* the
+ * cleared centre instead of clearing it), no velocity (the shader turns the
+ * opening gap into the inflow itself, dh/dt), and the shader's cap keeps it
+ * from opening past where the glass rests. Measured the same way: with the
+ * release, 0 % of the disc on the floor after 40 s on no spring at all, the
+ * Fillmore's glass and the default look's, the mean gap back at rest
+ * (0.0300), and the film under each kick a tenth of a second after it lands
+ * at 0.0255 to 0.0258: a press you can see, every kick, that does not add
+ * up.
+ *
+ * "No more than it pressed" is what it lays, not always what the press
+ * took: where the film is already near the floor (a hand holding the Press
+ * there, or a thin film), a kick's press is cut off by the floor and takes
+ * less than it lays, and the release still gives back the whole of it,
+ * capped only at rest. So a kick over a held hand lifts the hand's press
+ * a little, up to the kick's own depth (about 0.0045 at the Fillmore's
+ * squeeze), and the hand, still pressing, takes it back the next step.
+ *
+ * Counted in seconds of plate time, not steps: the governor halves the
+ * step rate on a slow machine and doubles each step's `dtSeconds`, and the
+ * release should take the same third of a second either way. What is given
+ * back always sums to what was laid, whatever the steps.
+ *
+ * `npm run lift` drives this on that plate (`npm run squeeze` in the app).
+ */
+export class KickRelease {
+  private list: { x: number; y: number; radii: number[]; amount: number; age: number; given: number }[] = [];
+  /** Release steps laid, over every kick: for a check to see the release run. */
+  steps = 0;
+  /** Kicks pressed, each owed a release: for the same check. */
+  kicks = 0;
+  /** The gap given back, summed over every cell written: the plate's check sets it against the depth its kicks pressed. */
+  given = 0;
+
+  /** A kick pressed `amount` into each disc of `radii` (cells) about (x, y). */
+  kick(x: number, y: number, radii: number[], amount: number): void {
+    if (!(amount > 0) || radii.length === 0) return;
+    this.list.push({ x: Math.round(x), y: Math.round(y), radii: radii.slice(), amount, age: 0, given: 0 });
+    this.kicks++;
+  }
+
+  /** One step of `dtSeconds`: each kick past its hold gives back its share of the gap, through `cell`. */
+  step(S: number, dtSeconds: number, cell: SquishCell): void {
+    const dt = Number.isFinite(dtSeconds) && dtSeconds > 0 ? dtSeconds : 1 / 60;
+    for (const k of this.list) {
+      k.age += dt;
+      if (k.age <= KICK_HOLD + 1e-9) continue;
+      // What should be back by now, less what already is: sums to the press exactly.
+      const owed = k.amount * Math.min(1, (k.age - KICK_HOLD) / KICK_RELEASE) - k.given;
+      if (!(owed > 0)) continue;
+      k.given += owed;
+      for (const r of k.radii) squishDisc(S, k.x, k.y, r, -owed, 0, 'press', 0, (idx, g, vx, vy, m) => { this.given += g; cell(idx, g, vx, vy, m); });
+      this.steps++;
+    }
+    this.list = this.list.filter((k) => k.given < k.amount * (1 - 1e-9));
+  }
+
+  /** Kicks still to give back. */
   get size(): number { return this.list.length; }
 
   forget(): void { this.list = []; }

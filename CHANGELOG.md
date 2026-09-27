@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run mixer` measures the new rows (44 checks, each new one held red
   against a broken shader).
 
+### Fixed — Beat Squeeze presses the plate
+
+- **Beat Squeeze has never pressed the plate, and now does.** Its press
+  landed a fraction of a cell off the grid, and the plate drops a write at
+  a fraction without a word, so every kick on every look only rocked the
+  dish. Every press now lands on a whole cell. Pressed and never let go,
+  though, the lead plate's middle went black a few seconds into a song
+  (the glass comes back up over tens of seconds, a band kicks twice a
+  second), so each kick is now held for a moment and let go over a third
+  of a second: the plate breathes with the kick, and with Fingering up
+  each kick lifts with a faint ripple at the rim's spokes. Every look with the band
+  playing changes; Fillmore East, 1969 most.
+- `npm run lift` measures it: a kick lands on whole cells, every one of
+  319,800 writes kept (with the rounding taken out, none are); pressed on every kick at 140 bpm and never
+  let go the pressed disc was all on the floor in 40 s, let go it stays at
+  rest while each kick still presses the film under it. `npm run squeeze`
+  asks the same of the app on a Mac, with the band playing.
+
 ### Changed — a press goes down round and lifts into fingers
 
 - **Fingering** now works the way two plates of glass do. A press (the
@@ -29,9 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that rim breaks into radial fingers drawn back toward the centre. Two
   hands lift each on their own. Fingering 0 is unchanged, and so is a
   drop's splash. On the phone, Fingering sits on the Press tool's Amount.
-- Found on the way: **Beat Squeeze has never pressed the plate.** Its press
-  lands a fraction of a cell off the grid and lays nothing; the kick's
-  plate rock still works. Written into the plan to fix with an eye on it.
 - `npm run lift` measures one gesture in the lab: round while held, fingers
   once let go, at the spokes' own angles, none for the same press lifted
   by the glass's spring alone, at the default look's glass and the
@@ -46,9 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drummer's fill harder still. The show counts the bar from the music as
   it plays; until it is sure, and at 0 (the default), every kick lands
   alike. In Settings → Show, on MIDI, the desks, the remote and the phone's
-  Sound sheet, which says what it hears of the bar. For now it shows in the
-  rock: Beat Squeeze's own press has never reached the plate (found this
-  night, in the plan to fix), so its share weighs nothing yet.
+  Sound sheet, which says what it hears of the bar.
 - `npm run downbeat` counts eight synthesised songs whose bars are known:
   never a wrong one (0 of 528 other kicks), the one known for 78 % of the
   groove's ones (rock 75 to 100 %, four on the floor 49 to 88 %, the half bar

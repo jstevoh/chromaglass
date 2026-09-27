@@ -218,7 +218,7 @@ export function builtInSequences(): ShowSequence[] {
     {
       id: 'fillmore',
       name: 'Fillmore East',
-      description: 'The Joshua Light Show over a song: a wash of beads on the black screen, the big dish coming in on the first chorus and rocked on every kick, then burning out to the wash.',
+      description: 'The Joshua Light Show over a song: a wash of beads on the black screen, the big dish coming in on the first chorus and pressed on every kick, then burning out to the wash.',
       loop: false,
       builtIn: true,
       stages: [

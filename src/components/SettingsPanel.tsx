@@ -1178,7 +1178,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="beatAccent"
         />
         <Info>
-          Accent the One weighs each kick's squeeze and rock by where it falls in the bar: the one pressed hardest, three lighter, two, four and the offbeat left to the plate. The show counts the bar from the music as it plays; until it is sure, every kick lands alike. 0 is every kick alike. For now the rock carries it: Beat Squeeze's press does not yet reach the plate.
+          Accent the One weighs each kick's squeeze and rock by where it falls in the bar: the one pressed hardest, three lighter, two, four and the offbeat left to the plate. The show counts the bar from the music as it plays; until it is sure, every kick lands alike. 0 is every kick alike.
         </Info>
         <Slider
           label="Fingering"

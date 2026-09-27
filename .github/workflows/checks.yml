@@ -387,6 +387,14 @@ jobs:
       - name: A show night
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: QA_DPR=1 QA_GPU=mid npm run qa
+      # Beat Squeeze presses the lead plate on a kick and lets it go again,
+      # and at 0 presses nothing: counted in the app with the band playing,
+      # on Fillmore East. Until #185 found it, a kick's press landed a
+      # fraction of a cell off the grid and laid nothing, and no check
+      # counted.
+      - name: The rhythm plate presses on the kick
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        run: SQUEEZE_GPU=1 node scripts/squeeze.mjs
       # Render this song in the app itself (PLAN.md §6): a synthetic song
       # rendered ten ways through the visualizer's own frame loop, frame by
       # frame on the film's clock. The same seed draws the same frames hash

@@ -105,6 +105,7 @@
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",
     "lift": "node scripts/lift.mjs",
+    "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "press": "npm run build && node scripts/press.mjs",
