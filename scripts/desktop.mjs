@@ -32,10 +32,10 @@
  *                 with software WebGPU the app's readbacks come back empty
  *                 (CLAUDE.md), and it is reported as skipped
  *   not throttled the show window minimised, and covered by another window,
- *                 still counts as seen and keeps its frames and timers, while
- *                 a window with Chromium's default throttling, minimised,
- *                 does not (the control that shows the measure can see
- *                 throttling at all; without it, as under xvfb, it is skipped)
+ *                 still counts as seen and keeps its frames and timers; each
+ *                 judged only where a window in a bare Electron (Chromium's
+ *                 defaults) is seen to slow down the same way, and said to
+ *                 measure nothing where it does not (as under xvfb)
  *   projector     with one screen no projector window opens; with a second
  *                 screen that is not built in, the show window asks for that
  *                 screen with no click and no key, mirrors the show there, and
@@ -55,7 +55,7 @@
 import { _electron as electron } from 'playwright';
 import { spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -281,23 +281,23 @@ try {
     seconds (what the plate's loop runs on), and how long those two seconds
     really took (a timer that fires late is a throttled one).
 
-    The control is a window with Chromium's own background throttling on,
-    minimised the same way: it must go "hidden" or lose its frames, or
-    minimising does nothing on this display and nothing was measured. Under
-    xvfb, with no window manager, that is what happens, and it is said. The
-    show window is not judged there either: the plate in software WebGPU
-    holds its own main thread for seconds at a time, shown or not (measured
-    2026-09-27: two seconds of timers took 15.9 s with the window shown).
+    The control is the same thing done to a window in a second, bare Electron
+    with Chromium's defaults: no switches and throttling on. It has to be a
+    separate process. The first control was a window inside the app, and on
+    CI's Mac it stayed "visible" at 46 frames/s minimised, because the app's
+    command-line switches (disable-backgrounding-occluded-windows and the
+    rest) apply to every window in the process, the control's too. Each way
+    of hiding is judged only if the bare window is seen to slow down under it;
+    otherwise that way hides nothing on this display and is said to measure
+    nothing. Under xvfb, with no window manager, neither does. The show window
+    is not judged there either: the plate in software WebGPU holds its own
+    main thread for seconds at a time, shown or not (measured 2026-09-27: two
+    seconds of timers took 15.9 s with the window shown).
   */
   const FRAMES_JS = "new Promise((done) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 2000) requestAnimationFrame(f); }; requestAnimationFrame(f); setTimeout(() => done({ fps: n / 2, took: performance.now() - t0, vis: document.visibilityState }), 2000); })";
-  const underCover = (how) => electronApp.evaluate(async ({ BrowserWindow }, [how, find, js]) => {
-    let win, cover = null;
-    if (how === 'control') {
-      win = new BrowserWindow({ show: true, width: 400, height: 300, webPreferences: { backgroundThrottling: true } });
-      await win.loadURL('data:text/html,<title>control</title>');
-    } else {
-      win = new Function('BrowserWindow', `return ${find}`)(BrowserWindow);
-    }
+  const hide = (target, how, find) => target.evaluate(async ({ BrowserWindow }, [how, find, js]) => {
+    const win = new Function('BrowserWindow', `return ${find}`)(BrowserWindow);
+    let cover = null;
     if (how === 'covered') {
       cover = new BrowserWindow({ ...win.getBounds(), frame: false, alwaysOnTop: true, backgroundColor: '#202020', focusable: false });
       cover.show();
@@ -307,19 +307,35 @@ try {
     await new Promise((r) => setTimeout(r, 1500));
     const read = await win.webContents.executeJavaScript(js);
     if (cover) cover.destroy();
-    if (how === 'control') win.destroy(); else win.restore();
+    win.restore();
     return read;
-  }, [how, SHOW_WINDOW, FRAMES_JS]);
-  const control = await underCover('control');
-  const minimised = await underCover('minimised');
+  }, [how, find, FRAMES_JS]);
+  const bare = await (async () => {
+    let exe;
+    try { exe = createRequire(join(DESKTOP, 'package.json'))('electron'); } catch { return null; }
+    const main = join(profile, 'control.cjs');
+    writeFileSync(main, "const { app, BrowserWindow } = require('electron');\napp.whenReady().then(() => new BrowserWindow({ width: 400, height: 300 }).loadURL('data:text/html,<title>control</title>'));\n");
+    const control = await electron.launch({ executablePath: exe, args: [main, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '' } });
+    try {
+      await control.firstWindow();
+      await sleep(500);
+      const find = 'BrowserWindow.getAllWindows()[0]';
+      return { minimised: await hide(control, 'minimised', find), covered: await hide(control, 'covered', find) };
+    } finally {
+      await control.close().catch(() => {});
+    }
+  })();
+  const shows = { minimised: await hide(electronApp, 'minimised', SHOW_WINDOW) };
   await sleep(500);
-  const covered = await underCover('covered');
-  const hidingWorks = control.vis === 'hidden' || control.fps < 5 || control.took > 3000;
+  shows.covered = await hide(electronApp, 'covered', SHOW_WINDOW);
   const say = (r) => `${r.vis}, ${r.fps.toFixed(0)} frames/s, 2 s of timers took ${(r.took / 1000).toFixed(1)} s`;
-  const detail = `the show minimised: ${say(minimised)}; covered: ${say(covered)}; a window with the default throttling, minimised: ${say(control)}`;
+  const slowed = (r) => r.vis === 'hidden' || r.fps < 5 || r.took > 3000;
   const keeps = (r) => r.vis === 'visible' && r.fps >= 20 && r.took < 3000;
-  if (isMac || hidingWorks) check('not throttled: the show minimised or covered still counts as seen, and keeps its frames and timers', hidingWorks && keeps(minimised) && keeps(covered), detail);
-  else skip('not throttled', `minimising a window changes nothing on this display (no window manager), so there is nothing to measure. ${detail}`);
+  for (const how of ['minimised', 'covered']) {
+    const detail = `the show ${how}: ${say(shows[how])}; a bare Electron window ${how}: ${bare ? say(bare[how]) : 'not run (needs desktop/node_modules)'}`;
+    if (bare && slowed(bare[how])) check(`not throttled: the show ${how} still counts as seen, and keeps its frames and timers`, keeps(shows[how]), detail);
+    else skip(`not throttled, ${how}`, `a bare window ${how} does not slow down on this display, so there is nothing to measure. ${detail}`);
+  }
 
   // ── projector ───────────────────────────────────────────────────────
   // The two things the line reads on the page must still be in the build, or

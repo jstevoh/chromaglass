@@ -1759,8 +1759,12 @@ network):
 - No updates in the app: a new version is a new download from Actions. Once it is
   signed, `electron-updater` from GitHub Releases on a `desktop-v*` tag (which
   `desktop.yml` already builds on) would let the app offer the new show itself.
-- On a Linux box the check cannot hide a window (xvfb has no window manager), so
-  the hidden-window line is measured only on CI's Mac.
+- The hidden-window lines are judged only where a window in a bare Electron is seen
+  to slow down when minimised or covered: never under xvfb (no window manager), and
+  on CI's Mac runner only if its window server really hides a minimised window.
+  The first run's control, a window inside the app, stayed visible at 46 frames/s
+  minimised because the app's switches reach every window in its process. Where
+  it is not measured, it is `docs/judging.md` §17 on Steve's Mac.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
