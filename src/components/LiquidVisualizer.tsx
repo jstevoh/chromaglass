@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeH
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { phasePour } from '../lib/phasePour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -4471,7 +4472,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
-      layPhaseRef.current();
+      layPhaseRef.current(presetId);
     }
     for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -4489,22 +4490,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     macroCamRef.current.reset();
     livePresetRef.current = presetId;
   };
-  /** The second phase for the look being laid, if it asks for some and the GPU solver is there to take it. */
-  const layPhase = () => {
+  /**
+   * The second phase for the look being laid, if it asks for some and the GPU
+   * solver is there to take it. Poured in the look's own shape (phasePour):
+   * the id is passed while a look is being laid, because livePresetRef only
+   * becomes that look at the end of layPlate.
+   */
+  const layPhase = (presetId: string = livePresetRef.current) => {
     const amt = settingsRef.current.phaseAmount ?? 0;
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
       lead.clearPhase?.();
-      const scale = Math.max(0, Math.min(1, settingsRef.current.phaseScale ?? 0.4));
-      const count = Math.round(3 + (1 - scale) * 22);
-      const r = 0.04 + scale * 0.16;
-      for (let k = 0; k < count; k++) {
-        // Deterministic placement: the same look laid twice is the same
-        // plate twice, which is what rendering a song depends on.
-        const a = (k * 2.399963229728653);
-        const rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);
-        lead.addPhase(0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, r, 0.9);
-      }
+      const scale = settingsRef.current.phaseScale ?? 0.4;
+      for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);

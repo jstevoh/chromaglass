@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the black grows the colour leaves, and it packs along the black's edges
   instead of sitting under it. At 0 the dye stays where it was; Ferro
   Paint uses 1. `npm run ferrodye` measures it.
+- **Ferro Paint's ferrofluid is worked through the whole plate.** It was
+  poured as a ring of big drops round the middle, like every look's, so
+  its maze only formed in the ring and most of the plate stayed plain
+  colour. It now pours about 180 small drops over the whole plate and
+  uses Maze Detail 0.5: fine black channels through the colour edge to
+  edge, as in Colored I and II. Every other look pours as before.
+  `npm run ferropour` measures it.
 
 ### Added — drops, not rings
 
