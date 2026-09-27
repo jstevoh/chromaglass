@@ -40,13 +40,19 @@
  * bass still playing (measured on `npm run shape`'s club song: the bass
  * region 17 dB under the verse through the build, the kick region 36 under).
  *
- * ## Why a build is a *slope in both halves*
+ * ## Why a build is a *slope in every third*
  *
  * A build is a ramp: the top of the spectrum (1.7–16 kHz, where a riser sweeps
  * and a roll's crack lives) climbing for bars on end. A verse coming in is a
  * step, and a least-squares slope over a window with a step in it is as steep
- * as a ramp's. So the window is cut in two, and each half must climb on its
- * own: a ramp does, a step climbs in one half and is flat in the other.
+ * as a ramp's. So the window is cut in three, and each third must climb on its
+ * own: a ramp does, a step climbs in one and is flat in the others. Thirds and
+ * not halves because a drum fill is a short step at the window's end: the kick
+ * out for two beats under a snare run lifts the top end about 7 dB in a second
+ * and a half, and with halves the hats' own wander in the first half was
+ * enough to call it a build (a rock groove with a fill every four bars: a
+ * build and a drop every ten seconds once the fills took the kick out).
+ * And a build needs the beat to have come in (see BEAT_KICKS).
  *
  * ## What it does not know
  *
@@ -194,13 +200,23 @@ const DROP_FULL_RISE_DB = 36;
   build's riser climbs about 1.1 dB a second, its breakdown's top end falls.
 */
 const ABSENT_DB = 14;
+/*
+  The beat is in once the low end stands over the mix and the kick has hit
+  BEAT_KICKS times in the last BEAT_S seconds: a rock beat at 90 bpm hits six
+  times in four seconds, four on the floor at 120 eight. The low end standing
+  over the mix alone was not enough: an ambient track's drone is weighted to
+  the bottom too, and on the shelf its swells read as builds (two or three a
+  minute on rainy-days.mp3) because nothing had said there was no beat.
+*/
+const BEAT_KICKS = 4;
+const BEAT_S = 4;
 const BREAK_S = 4;
 const SOUNDING_DB = 30;
 const BREAK_MAX_CLIMB = 0.3;
 
 /*
   The build: the top end's least-squares slope over BUILD_S seconds at least
-  BUILD_SLOPE dB a second, and each half of that window at least BUILD_HALF
+  BUILD_SLOPE dB a second, and each third of that window at least BUILD_HALF
   on its own, held for BUILD_HOLD seconds. A build over eight bars at 128 bpm
   with a riser of 24 dB climbs about 1.6 dB a second; at 90 bpm, over 21
   seconds, about 1.1. A build ends at a drop, or when the top has stopped
@@ -214,21 +230,30 @@ const BUILD_END = 3;
 const BUILD_FULL_DB = 20;
 
 /*
-  Quiet: the whole mix QUIET_DB under its reference for QUIET_S seconds, or no
-  reading at all. The references are then forgotten, so the next song (the
-  gap between two tracks is two to four seconds, some of it the last one's
-  tail) is heard on its own terms and its quiet intro is not a breakdown of
-  the last one's drop. Thirty-five decibels and a second and a half: at 45 and
-  two the harness's three-second gap never read as quiet at all, because the
-  half-second average takes most of a second to fall that far.
+  Quiet: the frame's own level QUIET_DB under the mix's reference for QUIET_S
+  seconds (see goQuiet), or no reading at all. The next sound is then heard
+  on its own terms: the gap between two tracks is two to four seconds, some of
+  it the last one's tail, and the next song's quiet intro must not be a
+  breakdown of the last one's drop.
+
+  The frame's level and not the half-second average, which in the power
+  domain falls about nine decibels a second, so took four seconds to fall
+  thirty-five and the harness only passed because its "three second" gap was
+  really six and a half (every synthesised song carried three seconds of tail).
+  Cut to a real gap, measured from the last hit to the next song's first sound,
+  two, three and four seconds all failed: the gap never read as quiet and the
+  intro after it was a breakdown. On the frame's level a bar of nothing inside
+  a song (between a build and its drop) reads as quiet too, from about 1.7 s
+  into it at 126 bpm, which is why going quiet keeps the history: the drop out
+  of the silence is still heard.
 */
 const QUIET_DB = 35;
 const QUIET_S = 1.5;
 /*
-  After a song is forgotten the next one begins with the first frame
-  ROOM_OVER_DB over the level the room had fallen to. Seeded at once instead,
-  the tracker learned the gap's hiss as the new song's floor, and a quiet
-  intro coming up out of it had already been heard as a breakdown.
+  After the music stops, or a song is forgotten, the next sound begins with
+  the first frame ROOM_OVER_DB over the level the room had fallen to. Seeded
+  at once instead, the tracker learned the gap's hiss as the new song's floor,
+  and a quiet intro coming up out of it had already been heard as a breakdown.
 */
 const ROOM_OVER_DB = 10;
 
@@ -258,13 +283,20 @@ const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const dbOf = (p: number) => 10 * Math.log10(p + 1e-30);
 const powOf = (db: number) => Math.pow(10, db / 10);
 
-/** Least-squares slope of `ys` (dB) against time, samples at `HZ`: dB per second. */
-function slope(ys: number[], from: number, to: number): number {
+/**
+ * Least-squares slope of `ys` (dB) against the times they were taken, `ts`
+ * (seconds): dB per second. Against their real times and not their index over
+ * `HZ`, because a sample is taken on the first frame at least a tenth of a
+ * second after the last, which on a 75 Hz display is every 0.107 s and on an
+ * uneven frame rate later still: counted as a tenth apart, a build's slope
+ * read up to a tenth steep there and its window ran long.
+ */
+function slope(ys: number[], ts: number[], from: number, to: number): number {
   const n = to - from;
   if (n < 3) return 0;
   let sx = 0, sy = 0, sxx = 0, sxy = 0;
   for (let i = from; i < to; i++) {
-    const x = (i - from) / HZ, y = ys[i];
+    const x = ts[i] - ts[from], y = ys[i];
     sx += x; sy += y; sxx += x * x; sxy += x * y;
   }
   const d = n * sxx - sx * sx;
@@ -298,7 +330,11 @@ export class SongShape {
   private breakdownReported = false;
   /** When the low end last arrived (a drop, or the song's first sound): the top end's climb just after it is that arrival, not a build. */
   private arrivedAt = -Infinity;
-  /** Whether this song's beat has come in yet: nothing breaks down before it has. */
+  /** The music has stopped (see `goQuiet`), until sound rises ROOM_OVER_DB over the room. */
+  private between = false;
+  /** The kick's hits over the last BEAT_S seconds. */
+  private kicks: number[] = [];
+  /** Whether this song's beat has come in yet: nothing breaks down or builds before it has. */
   private beatIn = false;
   /** The level the room fell to when the last song was forgotten: the next begins when sound rises well over it. */
   private roomDb = -Infinity;
@@ -318,6 +354,8 @@ export class SongShape {
     this.breakdownReported = false;
     this.arrivedAt = -Infinity;
     this.beatIn = false;
+    this.kicks = [];
+    this.between = false;
     this.roomDb = -Infinity;
     this.state = { section: 'quiet', intensity: 0, action: 0, tension: 0, lastDrop: null, time: 0 };
   }
@@ -347,6 +385,8 @@ export class SongShape {
       return events;
     }
     const db = reading.db;
+    if (reading.onsets?.kick?.hit) this.kicks.push(time);
+    while (this.kicks.length > 0 && time - this.kicks[0] > BEAT_S) this.kicks.shift();
     const topP = TOP_BANDS.reduce((s, i) => s + powOf(db[i]), 0) / TOP_BANDS.length;
     // A song begins with its first sound, not with the stream: digital
     // silence before it (a file's lead-in) is not the song's floor.
@@ -366,10 +406,26 @@ export class SongShape {
     this.fullRef = Math.max(fullDb, this.fullRef - REF_FALL * dt);
     this.lowRef = Math.max(lowDb, this.lowRef - REF_FALL * dt);
 
-    // Quiet: between songs, or the music stopped.
-    if (fullDb < this.fullRef - QUIET_DB) {
+    // Quiet: between songs, or the music stopped. On the frame's own level,
+    // not the half-second average: that falls about nine decibels a second,
+    // so it took four seconds to fall far enough and a real gap between two
+    // tracks was over before it did (see QUIET_DB).
+    const level = db[LEVEL];
+    if (this.between) {
+      this.roomDb = Math.min(this.roomDb, level);
+      if (level >= this.roomDb + ROOM_OVER_DB) {
+        // Sound again: a new song, or this one back after a silence. Either
+        // way its levels are learned afresh from here, and the history (the
+        // silence in it included) is kept, so a drop out of a silence is a
+        // drop.
+        this.between = false;
+        this.fullRef = fullDb; this.lowRef = lowDb;
+        this.arrivedAt = time;
+        this.quietFor = 0;
+      }
+    } else if (level < this.fullRef - QUIET_DB) {
       this.quietFor += dt;
-      if (this.quietFor >= QUIET_S) { this.forgetSong(fullDb); return events; }
+      if (this.quietFor >= QUIET_S) this.goQuiet(level, db[KICK]);
     } else this.quietFor = 0;
 
     // The slow intensity, every frame.
@@ -391,16 +447,17 @@ export class SongShape {
     const n = this.tH.length;
     const span = n > 0 ? time - this.tH[0] : 0;
     const s = this.state;
+    if (this.between) { s.section = 'quiet'; s.action = 0; return events; }
 
     // The top end's slope now, and whether a build is climbing.
     const w = Math.min(n, Math.round(BUILD_S * HZ));
-    const whole = w >= BUILD_S * HZ * 0.9 ? slope(this.topH, n - w, n) : 0;
-    const half = Math.floor(w / 2);
-    const early = w >= BUILD_S * HZ * 0.9 ? slope(this.topH, n - w, n - half) : 0;
-    const late = w >= BUILD_S * HZ * 0.9 ? slope(this.topH, n - half, n) : 0;
+    const whole = w >= BUILD_S * HZ * 0.9 ? slope(this.topH, this.tH, n - w, n) : 0;
+    const third = Math.floor(w / 3);
+    const part = (k: number) => (w >= BUILD_S * HZ * 0.9 ? slope(this.topH, this.tH, n - w + k * third, k === 2 ? n : n - w + (k + 1) * third) : 0);
+    const early = part(0), middle = part(1), late = part(2);
     s.action = clamp(whole / 2, -1, 1);
     const settled = time - this.arrivedAt >= BUILD_S / 2 + TOP_BOX_S;
-    const climbing = settled && whole >= BUILD_SLOPE && early >= BUILD_HALF && late >= BUILD_HALF;
+    const climbing = settled && whole >= BUILD_SLOPE && early >= BUILD_HALF && middle >= BUILD_HALF && late >= BUILD_HALF;
     this.climbingFor = climbing ? this.climbingFor + tickDt : 0;
     this.flatFor = whole <= 0.1 ? this.flatFor + tickDt : 0;
 
@@ -432,7 +489,7 @@ export class SongShape {
     }
 
     // ── Build ───────────────────────────────────────────────────────
-    if (this.buildFrom === null && this.climbingFor >= BUILD_HOLD) {
+    if (this.buildFrom === null && this.climbingFor >= BUILD_HOLD && this.beatIn) {
       this.buildFrom = time - this.climbingFor - BUILD_S / 2;
       this.buildPeak = topFastDb;
       this.buildTopFrom = this.topH[Math.max(0, n - w)];
@@ -449,7 +506,7 @@ export class SongShape {
     // The beat is in once the low end stands over the mix (see LOW_OVER_DB),
     // whether or not it came in as a drop: a song that starts on its beat has
     // no silence before it for a drop to rise out of.
-    if (lowDb >= fullDb + LOW_OVER_DB && lowDb >= this.lowRef - ABSENT_DB) this.beatIn = true;
+    if (lowDb >= fullDb + LOW_OVER_DB && lowDb >= this.lowRef - ABSENT_DB && this.kicks.length >= BEAT_KICKS) this.beatIn = true;
     const absent = lowDb < this.lowRef - ABSENT_DB && fullDb >= this.fullRef - SOUNDING_DB;
     if (!absent) {
       this.absentSince = null;
@@ -464,6 +521,30 @@ export class SongShape {
     }
     if (s.section === 'quiet') s.section = 'steady';
     return events;
+  }
+
+  /**
+   * The music has stopped: between songs, or a silence inside one. Whatever
+   * comes next is heard on its own terms: its levels are learned again when
+   * it starts (see `between`), and its beat has to come in before anything
+   * can break down, so a quiet intro after a loud song's drop is an intro and
+   * not a breakdown of the song before. What is kept is the history, so a
+   * drop out of the silence (a bar of nothing before the beat slams back, a
+   * thing songs do) is still heard as a drop, and a build under way, which
+   * ends on its own after BUILD_END seconds without climbing.
+   */
+  private goQuiet(levelDb: number, kickDb: number): void {
+    this.between = true;
+    this.roomDb = levelDb;
+    // The averages start from the room, so the history records the silence
+    // at once rather than a half-second fade out of the last hit.
+    this.full = powOf(levelDb); this.low = powOf(kickDb); this.topFast = 0;
+    this.beatIn = false;
+    this.kicks = [];
+    this.absentSince = null;
+    this.breakdownReported = false;
+    this.climbingFor = 0;
+    this.state.section = 'quiet';
   }
 
   /** Between songs: forget the references, so the next song is heard on its own. */

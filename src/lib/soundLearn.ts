@@ -60,7 +60,7 @@
  * synthesised song, and the render loop drives it with the live one.
  */
 
-import type { AudioReading, SourceName } from './audioFeatures.ts';
+import { SOURCE_NAMES, type AudioReading, type SourceName } from './audioFeatures.ts';
 import type { SongEvent } from './songShape.ts';
 import { isMapping, triggerable, type MidiAction, type MusicSource, type SoundBinding } from './midi.ts';
 import type { SceneMapping } from '../types';
@@ -118,7 +118,10 @@ interface SourceState {
   pending: number[];
 }
 
-const isNamed = (s: MusicSource): s is SourceName => s !== 'beat' && s !== 'bar' && s !== 'build' && s !== 'drop' && s !== 'breakdown';
+// A source the analyser measures, as against one the beat clock or the song's
+// shape keeps: asked of the list of names, so the next kind of source added to
+// MusicSource is not taken for a band by a list here that forgot it.
+const isNamed = (s: MusicSource): s is SourceName => (SOURCE_NAMES as readonly string[]).includes(s);
 
 export class SoundLearn {
   private sources = new Map<SourceName, SourceState>();

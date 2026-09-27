@@ -4,7 +4,8 @@
  * is the one, where the fills are.
  *
  * Not a check of its own. `npm run shape` imports it to ask whether the show
- * hears builds, drops and breakdowns, and whether it finds the downbeat. The
+ * hears builds, drops and breakdowns; the downbeats and fills it knows are for
+ * the downbeat tracker still to come (PLAN.md §10 step 3). The
  * drums are the recipe `npm run bands` and `npm run learn` already use (a
  * 60→50 Hz kick, a snare of a 200 Hz body and high-passed noise, three-pole
  * hats), so what the analyser was tuned on is what it hears here; what this
@@ -22,13 +23,19 @@
  *   drop       everything back and louder, a crash on its first beat;
  *   breakdown  the pad and a quiet hat, no kick, no bass, no snare;
  *   chorus     the verse, louder, a crash every four bars, open hats;
- *   outro      the pad fading away.
+ *   outro      the pad fading away;
+ *   silence    nothing at all: the bar of nothing some songs leave between a
+ *              build and its drop, so the beat slams back out of silence.
  *
  * Two styles. `club` is four on the floor. `band` plays a rock kick (one,
- * three and the "and" of three) and a fill in the last beat of every fourth
- * bar: a snare run of sixteenths and two toms, the thing a drummer does
- * before a chorus and the thing a detector must not call a drop or a
- * breakdown.
+ * three and the "and" of three). Both play fills: over the last two beats of
+ * every fourth bar of the groove (`band`) or every eighth (`club`), the kick
+ * and the backbeat stop and a run of sixteenths on the snare, getting harder,
+ * ends on two toms. The thing a drummer does before a chorus, and the thing a
+ * detector must not call a build, a drop or a breakdown: the low end leaves
+ * for two beats and comes back, and the top end climbs for two beats. A fill
+ * that left the kick in (as this one did at first, a single beat where there
+ * was no kick anyway) asked nothing of the low end at all.
  *
  * The chords are Am, F, C, G, one a bar, so a new chord (and a new bass note)
  * lands on every downbeat: the harmonic change a listener hears the bar line
@@ -221,19 +228,19 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
     const padGain = kind === 'outro'
       ? (x) => Math.max(0, 1 - (x - start) / (end - start))
       : kind === 'intro' ? (x) => Math.min(1, (x - start) / 2) * 0.8 : () => (kind === 'drop' || kind === 'chorus' ? 1.1 : 1);
-    padSpan(out, start, end, bar, lead, padGain);
+    if (kind !== 'silence') padSpan(out, start, end, bar, lead, padGain);
     if (kind === 'build') riser(out, start, end, rand);
 
     for (let b = 0; b < sec.bars; b++) {
       const barAt = start + b * bar;
       const chord = CHORDS[Math.round((barAt - lead) / bar) % 4];
       truth.downbeats.push(barAt);
-      const fillBar = style === 'band' && (kind === 'verse' || kind === 'chorus') && b % 4 === 3;
-      if (fillBar) truth.fills.push(barAt + 3 * beat);
+      const fillBar = (kind === 'verse' || kind === 'chorus' || kind === 'drop') && b % (style === 'band' ? 4 : 8) === (style === 'band' ? 3 : 7);
+      if (fillBar) truth.fills.push(barAt + 2 * beat);
       for (let q = 0; q < 4; q++) {
         const at = barAt + q * beat;
         truth.beats.push(at); truth.beatInBar.push(q);
-        const inFill = fillBar && q === 3;
+        const inFill = fillBar && q >= 2;
         const grooving = kind === 'verse' || kind === 'drop' || kind === 'chorus';
         // Kick.
         const kickHere = grooving && !inFill && (style === 'club' ? true : q === 0 || q === 2)
@@ -260,7 +267,9 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
         if (inFill) {
           for (let s = 0; s < 4; s++) {
             const ft = at + s * beat / 4 + jitter() * 0.5;
-            if (s < 2) snare(out, ft, 0.7 + 0.2 * rand(), rand); else tom(out, ft, 0.9, s === 2 ? 180 : 120);
+            const last = q === 3 && s >= 2;
+            if (!last) snare(out, ft, (0.55 + 0.1 * ((q - 2) * 4 + s) + 0.1 * rand()) * loud, rand);
+            else tom(out, ft, 0.9 * loud, s === 2 ? 180 : 120);
           }
         }
         // Hats: eighths in the groove, open on the "and" in a drop or chorus;

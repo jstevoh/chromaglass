@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a pour or a dye.
 - `npm run shape` measures it on synthesised songs whose sections are known
   to the sample: every drop within a bar (median 0.03 bar), nothing in two
-  minutes of steady groove.
+  minutes of steady groove with drum fills, nothing on the app's own ambient
+  music, and a two-second gap between songs heard as the gap it is.
 
 ### Added — the mixer
 

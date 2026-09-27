@@ -784,25 +784,36 @@ The steps, most visible first. Each is one PR with its own check, and every step
    Sound sheet show it, and sound learn can bind a trigger to each drop, build or
    breakdown. `npm run shape` (in Measure) plays it songs from
    `scripts/arrangement.mjs` whose sections are known to the sample: every drop heard
-   within one bar (median 0.03, latest 0.57, the latter a build that keeps its kick),
-   none anywhere else, builds before their drops, breakdowns within four bars, nothing
-   in two minutes of four on the floor or of a rock beat with sixteen fills, the same
-   at 30 fps and 20 dB down. *Still to do* (the second half, next): Pacing choosing its
+   within one bar (median 0.03, latest 0.53), none anywhere else, builds before their
+   drops, breakdowns within four bars, a bar of silence before a drop not costing it,
+   nothing in two minutes of four on the floor or of a rock beat whose fills take the
+   kick out for two beats, the same at 30 fps and 20 dB down, a real two-to-four-second
+   gap between songs heard as quiet, and nothing at all on the shelf's ambient tracks.
+   A build needs the beat to have come in first (the kick hitting four times in four
+   seconds): before that rule the shelf's swells read as builds two or three times a
+   minute. *Still to do* (the second half, next): Pacing choosing its
    swells from these events, which is where the motion-against-loudness target is
    measured.
    Found on the way, not yet fixed:
-   - A build is recognised about halfway in, not at its start: the hats leave before
-     the riser has climbed far, so the top end falls before it rises. A build that
+   - A build is recognised about halfway in, not at its start (a short one later: the
+     club song's four-bar second build at 65 %): the hats leave before the riser has
+     climbed far, so the top end falls before it rises, and the climb has to show in
+     every third of six seconds so a fill's two-beat jump is not one. A build that
      starts by taking the beat away is heard as a breakdown for its first bars. Onset
      density (a snare roll doubling) would catch it earlier.
+   - A song whose first build comes before its beat has ever played (intro straight
+     into a build) is heard from its drop: builds wait for the beat.
    - The kick onset reads a fast snare roll's 200 Hz body as kicks: in the club song's
      build, 32nd-note snares fired `kick` three to five times a half-second. Sound learn
      on the kick fires through every build.
    - Nothing on the shelf has a beat: its four tracks are ambient, so the tracker is
      measured on synthesised songs only, and on the shelf only for not inventing drops
-     (at most 0.8 a minute; `rainy-days` hears 2.8 builds a minute in its swells). A
-     CC-licensed dance track with known sections on the shelf would let the check hear
-     real drops.
+     or builds (none now). A CC-licensed dance track with known sections on the shelf
+     would let the check hear real drops.
+   - Quiet is thirty-five decibels under the song's loudest, a guess for a room: a
+     noisy club between tracks may never fall that far, and then the next song's
+     intro can still read as a breakdown of the last. Worth measuring on a recording
+     from a gig.
 3. **Choose the accents.** Beat squeeze and plate rock fire on every kick. Let the
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real

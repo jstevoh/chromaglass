@@ -7375,6 +7375,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // starts again at zero: its history and references belong to the song
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
+      // And the events it heard go with it: they are stamped on the old clock,
+      // and a poll after a render would otherwise read the film's drops as
+      // the song's.
+      songEventsRef.current = [];
     };
     const resetPlateClocks = () => {
       resetStamps();

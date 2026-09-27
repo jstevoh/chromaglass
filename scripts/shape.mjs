@@ -20,19 +20,30 @@
  *   - every breakdown reported within four bars, and never in a steady
  *     section. A build that begins by taking the beat away sounds like a
  *     breakdown until it starts to climb, and may be reported as one in its
- *     first half; in its second half it may not;
+ *     first half; in its second half it may not. An outro (the beat gone, the
+ *     pad fading) is a breakdown by the same rule, and at most one is heard
+ *     in it;
+ *   - a bar of silence between a build and its drop does not cost the drop;
  *   - two songs that are nothing but their groove, for two minutes each, one
- *     four on the floor and one a rock beat with a fill every four bars:
+ *     four on the floor with a fill every eight bars and one a rock beat with
+ *     a fill every four (the kick out for two beats under a snare run):
  *     nothing reported at all;
  *   - the same song 20 dB quieter hears the same events, within a tenth of a
- *     second; the same song twice hears them identically;
- *   - a gap between two songs forgets the first: the second's quiet intro is
- *     not a breakdown of the first's drop, and its beat coming in is a drop;
+ *     second; the same song arranged, analysed and heard twice hears them
+ *     identically (each asked only of a song in which drops and builds were
+ *     heard, so nothing matched to nothing does not pass);
+ *   - a gap of two, three or four seconds between two songs forgets the
+ *     first: the gap reads as quiet, the second's quiet intro is not a
+ *     breakdown of the first's drop, and its beat coming in is a drop;
  *   - the slow intensity is higher through the drops than the breakdowns,
- *     and does not move at the beat;
+ *     and holds still through every bar of a groove while the level swings;
+ *   - the line the desk and the phone print says "drop" for four seconds
+ *     after each drop, the build's percentage while one is heard, and
+ *     nothing through a groove;
  *   - the shelf's real tracks (ambient pieces, no beat to drop) are printed
- *     with their events a minute, as a sanity line, and held to at most one
- *     drop a minute.
+ *     with their events a minute, and held to at most one drop and one
+ *     build a minute, having been decoded to sound and heard as sound (not
+ *     quiet) for most of their length.
  *
  * Latency is printed in bars of the song, because that is the unit the PLAN's
  * target is in ("a drop reported within one bar").
@@ -41,7 +52,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { analysePcm } from '../src/lib/audioFeatures.ts';
-import { SongShape } from '../src/lib/songShape.ts';
+import { SongShape, songShapeLine } from '../src/lib/songShape.ts';
 import { SoundLearn } from '../src/lib/soundLearn.ts';
 import { parseMidiMap, serializeMidiMap, MUSIC_SOURCES, MIDI_FORMAT } from '../src/lib/midi.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
@@ -151,6 +162,14 @@ function score(name, song, heard) {
   });
   check(`${name}: no breakdown where the beat plays on`, strayBreak.length === 0,
     strayBreak.length ? strayBreak.map((e) => `${f1(e.at)} s in the ${sectionAt(e.at)?.kind}`).join(', ') : `${breaks.length} heard`);
+  // An outro is the beat gone and the pad playing on while it fades, which is
+  // what a breakdown is, and one may be heard there (a trigger on "each
+  // breakdown" fires as a song winds down); but only the one.
+  const outroBreaks = truth.sections.filter((s) => s.kind === 'outro')
+    .map((s) => breaks.filter((e) => e.at >= s.start && e.at < s.end + 3).length);
+  if (outroBreaks.length) {
+    check(`${name}: at most one breakdown in the outro`, outroBreaks.every((k) => k <= 1), `${outroBreaks.join(', ')} heard there`);
+  }
   return { late, drops, builds, breaks };
 }
 
@@ -171,6 +190,11 @@ const cases = [
   ['club, 140 bpm, 20 dB down', { bpm: 140, sections: CLUB, seed: 3, gainDb: -20 }],
   ['club, a build that keeps its kick', { bpm: 124, sections: CLUB, seed: 4, buildKick: true }],
   ['band, 110 bpm', { bpm: 110, sections: BAND, style: 'band', seed: 5 }],
+  // The music stops dead for a bar between the build and the drop: long
+  // enough to read as quiet, which must not cost the drop.
+  ['club, a bar of silence before the drop', { bpm: 126, seed: 11, sections: [
+    { kind: 'intro', bars: 2 }, { kind: 'verse', bars: 8 }, { kind: 'build', bars: 8 }, { kind: 'silence', bars: 1 },
+    { kind: 'drop', bars: 8 }, { kind: 'outro', bars: 4 }] }],
 ];
 const allLate = [];
 for (const [name, opts] of cases) {
@@ -179,6 +203,15 @@ for (const [name, opts] of cases) {
   console.log(`  heard: ${heard.events.map((e) => `${e.kind} ${f1(e.at)}`).join(' · ') || 'nothing'}`);
   const { late } = score(name, song, heard);
   allLate.push(...late.filter(Number.isFinite));
+}
+{
+  // The silence has to be heard as quiet for that song to ask anything of
+  // the quiet: a drop out of a silence the tracker never noticed is just a drop.
+  const { song, heard } = songs['club, a bar of silence before the drop'];
+  const sil = song.truth.sections.find((s) => s.kind === 'silence');
+  const quiet = heard.frames.filter((f) => f.t >= sil.start && f.t < sil.end + 0.05 && f.section === 'quiet');
+  check('club, a bar of silence before the drop: the silence reads as quiet', quiet.length > 0,
+    quiet.length ? `from ${f2(quiet[0].t - sil.start)} s into it` : 'never');
 }
 {
   const sorted = allLate.slice().sort((a, b) => a - b);
@@ -206,7 +239,9 @@ console.log('\nAt 30 fps, a render\'s rate');
   // A drop to a quarter second; a build or a breakdown is recognised seconds
   // into it, on a ten-a-second tick, and is held to half a second.
   const same = a.length === b.length && a.every((e, i) => e.kind === b[i].kind && Math.abs(e.at - b[i].at) <= (e.kind === 'drop' ? 0.25 : 0.5));
-  check('at 30 fps it hears what it hears at 60: drops within a quarter second, the rest within a half', same,
+  // And the 60 fps reading is itself a hearing, not nothing matched to nothing.
+  const heard60 = ['drop', 'build'].every((k) => b.filter((e) => e.kind === k).length >= 2);
+  check('at 30 fps it hears what it hears at 60: drops within a quarter second, the rest within a half', heard60 && same,
     `${a.length} events against ${b.length}, and ${heard.events.length - a.length} and ${songs['club, 128 bpm'].heard.events.length - b.length} breakdowns at the start of a build`);
 }
 
@@ -229,39 +264,59 @@ for (const [name, opts] of [
 
 console.log('\nThe same song, quieter, and twice');
 {
+  // Each asked of a song that was heard: the club song's two drops and two
+  // builds at least, or "the same as nothing" would pass for a deaf tracker.
   const loud = songs['club, 128 bpm'].heard.events;
+  const heardSomething = ['drop', 'build'].every((k) => loud.filter((e) => e.kind === k).length >= 2);
   const quiet = listen(analysePcm(arrange({ bpm: 128, sections: CLUB, seed: 1, gainDb: -20 }).pcm, SR, 60)).events;
   const match = quiet.length === loud.length && quiet.every((e, i) => e.kind === loud[i].kind && Math.abs(e.at - loud[i].at) <= 0.1);
-  check('20 dB down, the same events within a tenth of a second', match,
+  check('20 dB down, the same events within a tenth of a second', heardSomething && match,
     `${quiet.map((e) => `${e.kind} ${f1(e.at)}`).join(' · ')}`);
-  const again = listen(songs['club, 128 bpm'].readings).events;
-  check('the same song twice hears the same', JSON.stringify(again) === JSON.stringify(loud), `${again.length} events`);
+  // Twice from the start: arranged, analysed and heard again, not the same
+  // readings heard twice.
+  const again = listen(analysePcm(arrange({ bpm: 128, sections: CLUB, seed: 1 }).pcm, SR, 60)).events;
+  check('the same song twice hears the same', heardSomething && JSON.stringify(again) === JSON.stringify(loud), `${again.length} events`);
 }
 
 // ── Between songs ────────────────────────────────────────────────────────
 
 console.log('\nTwo songs with a gap between');
-{
+/*
+  Between two tracks a player leaves two to four seconds, some of it the last
+  track's tail. Measured from the last song's last hit to the next one's first
+  sound: song a is cut half a second after its music ends (the harness pads
+  every song with three seconds of tail, which at first made a "three second"
+  gap six and a half, and hid that a real one was never heard as quiet), then
+  room hiss, then song b, whose own lead-in is a beat of near silence.
+*/
+for (const silence of [2, 3, 4]) {
   const a = arrange({ bpm: 128, sections: [{ kind: 'verse', bars: 4 }, { kind: 'drop', bars: 8 }], seed: 8 });
   const b = arrange({ bpm: 100, sections: [{ kind: 'intro', bars: 4 }, { kind: 'verse', bars: 8 }], seed: 9 });
-  const gap = Math.round(3 * SR);
-  const pcm = new Float32Array(a.pcm.length + gap + b.pcm.length);
-  pcm.set(a.pcm, 0);
+  const aEnd = a.truth.sections.at(-1).end;
+  const aLen = Math.round((aEnd + 0.5) * SR);
+  const gap = Math.round((silence - 0.5 - b.truth.sections[0].start) * SR);
+  const pcm = new Float32Array(aLen + gap + b.pcm.length);
+  pcm.set(a.pcm.subarray(0, aLen), 0);
   // The gap is a room, not digital silence: a player between tracks through a microphone.
   const hiss = rng(10);
-  for (let i = 0; i < gap; i++) pcm[a.pcm.length + i] = 5e-4 * (hiss() * 2 - 1) * Math.sqrt(3);
-  pcm.set(b.pcm, a.pcm.length + gap);
-  const offset = (a.pcm.length + gap) / SR;
+  for (let i = 0; i < gap; i++) pcm[aLen + i] = 5e-4 * (hiss() * 2 - 1) * Math.sqrt(3);
+  pcm.set(b.pcm, aLen + gap);
+  const offset = (aLen + gap) / SR;
   const heard = listen(analysePcm(pcm, SR, 60));
+  const tag = `${silence} s between them`;
   const introEnd = offset + b.truth.sections[0].end;
-  const inIntro = heard.events.filter((e) => e.at > a.seconds && e.at < introEnd - 0.1);
-  check('the second song\'s quiet intro is not a breakdown of the first', inIntro.length === 0,
+  const inIntro = heard.events.filter((e) => e.at > aEnd && e.at < introEnd - 0.1);
+  check(`${tag}: the second song's quiet intro is not a breakdown of the first`, inIntro.length === 0,
     inIntro.length ? inIntro.map((e) => `${e.kind} ${f1(e.at)}`).join(', ') : 'nothing in the gap or the intro');
   const entry = offset + b.truth.returns[0];
   const drop = heard.events.find((e) => e.kind === 'drop' && e.at >= entry - 0.1 && e.at <= entry + b.truth.bar);
-  check('and its beat coming in is a drop', !!drop, drop ? `${f2((drop.at - entry) / b.truth.bar)} bar late` : `none near ${f1(entry)} s`);
-  const quiet = heard.frames.filter((f) => f.t > a.seconds + 0.5 && f.t < offset).some((f) => f.section === 'quiet');
-  check('the gap reads as quiet', quiet, '');
+  check(`${tag}: and its beat coming in is a drop`, !!drop, drop ? `${f2((drop.at - entry) / b.truth.bar)} bar late` : `none near ${f1(entry)} s`);
+  // Quiet in the gap, having been steady through the first song's drop: a
+  // tracker that never left quiet (it starts there) would pass the second half alone.
+  const drop1 = a.truth.sections.at(-1);
+  const wasSteady = heard.frames.filter((f) => f.t > (drop1.start + drop1.end) / 2 && f.t < drop1.end).every((f) => f.section === 'steady');
+  const quiet = heard.frames.filter((f) => f.t > aEnd && f.t < offset + b.truth.sections[0].start).some((f) => f.section === 'quiet');
+  check(`${tag}: the first song's drop reads as steady and the gap as quiet`, wasSteady && quiet, `steady ${wasSteady}, quiet ${quiet}`);
 }
 
 // ── Intensity ────────────────────────────────────────────────────────────
@@ -277,10 +332,80 @@ console.log('\nThe slow intensity');
   const inDrop = mean('drop'), inBreak = mean('breakdown');
   check('higher through the drops than the breakdowns', inDrop - inBreak >= 0.2,
     `the second half of the drops ${f2(inDrop)}, of the breakdowns ${f2(inBreak)}`);
-  let most = 0;
-  for (let i = 1; i < heard.frames.length; i++) most = Math.max(most, Math.abs(heard.frames[i].intensity - heard.frames[i - 1].intensity));
-  // At 60 fps and an 8 s time constant a full-scale jump moves it 0.002 a frame.
-  check('it does not move at the beat', most < 0.005, `the largest step in a frame ${most.toFixed(4)}`);
+}
+/*
+  And it does not move at the beat. Not asked frame by frame: at 60 fps an
+  8 s time constant cannot move it more than 0.002 in a frame whatever it is
+  fed, so a per-frame limit measured the constant and could not fail. Asked
+  bar by bar, in the two songs that are nothing but their groove, once the
+  intensity has had three time constants to settle: over a bar the constant
+  lets it travel a fifth of the way to its target, so it holds still across a
+  bar only if what it follows holds still across a bar. And beside it, how
+  far the level itself swings inside the same bar, so the check shows there
+  was a beat to follow (a kick is tens of dB over the gap after it) and the
+  intensity did not. The rock song's fills, every fourth bar, are the hardest
+  case: a fill is louder and fuller than the bar before it.
+*/
+for (const name of ['four on the floor, 120 bpm', 'a rock beat with a fill every four bars, 100 bpm']) {
+  const { song, heard, readings } = songs[name];
+  const from = song.truth.sections[0].start + 24, to = song.truth.sections.at(-1).end;
+  let most = 0, swing = Infinity, where = 0;
+  for (let b = from; b + song.truth.bar <= to; b += song.truth.bar) {
+    const inBar = heard.frames.filter((f) => f.t >= b && f.t < b + song.truth.bar).map((f) => f.intensity);
+    const lvl = readings.filter((r) => r.time >= b && r.time < b + song.truth.bar).map((r) => r.db[0]);
+    const range = Math.max(...inBar) - Math.min(...inBar);
+    if (range > most) { most = range; where = b; }
+    swing = Math.min(swing, Math.max(...lvl) - Math.min(...lvl));
+  }
+  check(`${name}: it holds still through every bar while the level swings at the beat`, most < 0.02 && swing >= 10,
+    `the intensity's widest range in a bar ${most.toFixed(4)} (at ${f1(where)} s); the level's narrowest swing in a bar ${f1(swing)} dB`);
+}
+
+// ── What the desk and the phone say ─────────────────────────────────────
+
+/*
+  The line the Perform desk's footer and the phone's Sound sheet print
+  (`songShapeLine`), read off every frame of the club song as the app polls
+  it: "drop" for four seconds after each drop heard, "build N%" from the build
+  heard to its drop with N higher at the end than the start, "breakdown"
+  through a breakdown heard; and nothing at all through the two grooves. The
+  phone's own check (`npm run phone`) can only see that the line is there:
+  without a GPU its render loop never runs the tracker.
+*/
+console.log('\nWhat the desk and the phone say');
+{
+  const { heard } = songs['club, 128 bpm'];
+  const lines = heard.frames.map((f) => ({ t: f.t, line: songShapeLine(f) }));
+  const drops = heard.events.filter((e) => e.kind === 'drop');
+  const dropSaid = drops.every((d) => {
+    const next = heard.events.find((e) => e.kind === 'drop' && e.at > d.at)?.at ?? Infinity;
+    const within = lines.filter((l) => l.t >= d.at && l.t < Math.min(d.at + 4, next));
+    const after = lines.filter((l) => l.t >= d.at + 4.1 && l.t < Math.min(d.at + 5, next));
+    return within.length > 0 && within.every((l) => l.line === 'drop') && after.every((l) => l.line !== 'drop');
+  });
+  check('"drop" for four seconds after each drop, and not after', drops.length >= 2 && dropSaid, `${drops.length} drops`);
+  const builds = heard.events.filter((e) => e.kind === 'build');
+  const buildSaid = builds.map((b) => {
+    const end = drops.find((d) => d.at > b.at)?.at ?? Infinity;
+    const said = lines.filter((l) => l.t >= b.at && l.t < end);
+    const ns = said.map((l) => /^build (\d+)%$/.exec(l.line)).map((m) => (m ? Number(m[1]) : NaN));
+    // Climbing to the drop: high by its end and never falling far on the
+    // way. Not "higher at the end than the start": a short build heard late
+    // has already climbed its twenty decibels when it is heard (the club
+    // song's second, four bars, heard at 65 %, says 100 % from the first).
+    let peak = -Infinity, fell = 0;
+    for (const n of ns) { peak = Math.max(peak, n); fell = Math.max(fell, peak - n); }
+    return { ok: said.length > 0 && ns.every(Number.isFinite) && ns[ns.length - 1] >= 80 && fell <= 15, from: ns[0], to: ns[ns.length - 1], fell };
+  });
+  check('"build N%" from each build heard to its drop, climbing to 80 % or more', builds.length >= 2 && buildSaid.every((b) => b.ok),
+    buildSaid.map((b) => `${b.from}% to ${b.to}%, falling ${b.fell} at most`).join(', '));
+  const breaks = heard.events.filter((e) => e.kind === 'breakdown');
+  const breakSaid = breaks.every((b) => lines.some((l) => l.t >= b.at && l.t < b.at + 0.1 && l.line === 'breakdown'));
+  check('"breakdown" when a breakdown is heard', breaks.length >= 1 && breakSaid, `${breaks.length} breakdowns`);
+  for (const name of ['four on the floor, 120 bpm', 'a rock beat with a fill every four bars, 100 bpm']) {
+    const said = songs[name].heard.frames.map(songShapeLine).filter((l) => l !== '');
+    check(`${name}: nothing said through the groove`, said.length === 0, said.length ? `${said.length} frames, "${said[0]}"` : `${songs[name].heard.frames.length} frames`);
+  }
 }
 
 // ── Sound learn ──────────────────────────────────────────────────────────
@@ -313,8 +438,11 @@ console.log('\nBound to the song\'s shape (sound learn)');
       `${got.length} fired, ${want.length} heard`);
   }
   const map = parseMidiMap(serializeMidiMap({ format: MIDI_FORMAT, version: 1, name: 'shape', bindings: [], sound: bindings }));
-  check('bindings on the song\'s shape come back from the map file', ['drop', 'build', 'breakdown'].every((k) => map.sound?.some((b) => b.source === k))
-    && ['drop', 'build', 'breakdown'].every((k) => MUSIC_SOURCES.includes(k)), `${map.sound?.length ?? 0} of 3`);
+  // Whole, not just the source: a target lost or mangled on the way through
+  // the file is as broken as a source that was.
+  const same = bindings.every((b) => map.sound?.some((m) => JSON.stringify(m) === JSON.stringify(b)));
+  check('bindings on the song\'s shape come back from the map file', same && map.sound?.length === bindings.length
+    && ['drop', 'build', 'breakdown'].every((k) => MUSIC_SOURCES.includes(k)), `${map.sound?.filter((m) => bindings.some((b) => JSON.stringify(m) === JSON.stringify(b))).length ?? 0} of 3 whole`);
 }
 
 // ── The shelf ────────────────────────────────────────────────────────────
@@ -325,6 +453,9 @@ console.log('\nBound to the song\'s shape (sound learn)');
   is a swell of its low end the tracker has taken for the beat coming in. The
   gate is at most one a minute, which is loose on purpose: the pieces do
   swell, and what is being held is "not a drop machine", not "hears nothing".
+  Builds are held to the same: before the tracker asked for a beat (the kick
+  hitting, see BEAT_KICKS in songShape.ts) the pieces' swells read as builds
+  two or three times a minute, and the desk said "build" on music with none.
 */
 const SHELF_SECONDS = 360;
 function viaFfmpeg(file) {
@@ -400,7 +531,17 @@ async function viaChromium(files) {
       const drops = heard.events.filter((e) => e.kind === 'drop');
       console.log(`      ${file.padEnd(20)} ${f1(minutes)} min: ${['drop', 'build', 'breakdown'].map((k) => `${k} ${f1(per(k))}/min`).join(', ')}`
         + `${heard.events.length ? `  (${heard.events.slice(0, 8).map((e) => `${e.kind[0]}${Math.round(e.at)}`).join(' ')}${heard.events.length > 8 ? ' …' : ''})` : ''}`);
+      // Heard as sound first: a decode that returned silence would hear
+      // nothing and pass everything below.
+      let sq = 0;
+      for (let j = 0; j < decoded[i].length; j++) sq += decoded[i][j] * decoded[i][j];
+      const rmsDb = 10 * Math.log10(sq / Math.max(1, decoded[i].length) + 1e-30);
+      const sounding = heard.frames.filter((f) => f.section !== 'quiet').length / heard.frames.length;
+      check(`${file}: decoded to sound, and heard as sound for most of it`, rmsDb > -50 && rmsDb < -3 && sounding >= 0.9,
+        `${f1(rmsDb)} dBFS, ${Math.round(sounding * 100)} % of frames not quiet`);
       check(`${file}: at most one drop a minute`, drops.length <= minutes, `${drops.length} in ${f1(minutes)} min`);
+      const builds = heard.events.filter((e) => e.kind === 'build');
+      check(`${file}: at most one build a minute`, builds.length <= minutes, `${builds.length} in ${f1(minutes)} min`);
       const bad = heard.frames.filter((f) => !(f.intensity >= 0 && f.intensity <= 1) || !(f.action >= -1 && f.action <= 1)).length;
       check(`${file}: intensity and action stay in range`, bad === 0, `${bad} bad frames`);
     });

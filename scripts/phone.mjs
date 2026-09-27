@@ -294,10 +294,10 @@ try {
 
       /*
         The song's shape on the Sound sheet: nothing while nothing is heard,
-        and a line once something is (the Band). Whether the line then says
-        "drop" at a drop is `npm run shape`'s to measure, on the tracker
-        itself; here it is that the phone has the line at all, and only while
-        there is sound to have a shape.
+        and a line once something is (the Band). Only that: without a GPU the
+        render loop never runs, so the tracker hears nothing here and the line
+        is its placeholder. What the line says at a drop, a build and a
+        breakdown is `npm run shape`'s to measure, on `songShapeLine` itself.
       */
       await tap(page, 'phone-open-sound');
       // The page may already be listening to the Band; start from nothing.
@@ -308,7 +308,7 @@ try {
       await tap(page, 'phone-sound-band');
       await page.waitForTimeout(400);
       const line = (await visible(page, 'phone-song-shape')) ? (await page.getByTestId('phone-song-shape').innerText()).trim() : '';
-      check('the Sound sheet says what it hears of the song, once there is sound', !songBefore && /^(Listening for builds|The song: )/.test(line),
+      check('the Sound sheet has the song\'s line only while there is sound', !songBefore && /^(Listening for builds, drops and breakdowns\.|The song: (drop|build \d+%|breakdown))$/.test(line),
         `${songBefore ? `${songBefore}; ` : ''}"${line}"`);
       if (!wasOn) await tap(page, 'phone-sound-band');
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
