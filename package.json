@@ -86,6 +86,7 @@
     "take": "npm run build && node scripts/take.mjs",
     "wgsl": "node scripts/wgsl.mjs",
     "physics": "node scripts/physics.mjs",
+    "bodies": "node scripts/bodies.mjs",
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",

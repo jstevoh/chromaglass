@@ -179,6 +179,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */
+  readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
   carryMix?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void;
   addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;

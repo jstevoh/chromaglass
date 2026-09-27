@@ -571,6 +571,10 @@ export default function RemoteControl() {
           {(settings?.phaseAmount ?? 0) > 0.001 && (
             <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Oil Bodies only while there is oil for the colours to keep to. */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
+          )}
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">

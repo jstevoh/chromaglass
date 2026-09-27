@@ -32,7 +32,9 @@ itself more like water and spreads less.
 A phase field c (0 water, 1 oil) in the mix texture. Cahn–Hilliard:
 μ = f′(c) − κ∇²c with f = c²(1 − c)², ∂c/∂t = M∇²μ, in four explicit
 substeps a step (M dt under the 1/64 limit). The capillary force is the
-Korteweg term in its potential form, −σ c ∇μ, applied before the projection.
+continuum surface force, σ κ ∇c̃ with κ = −∇·(∇c̃/|∇c̃|) and c̃ the oil blurred
+[1 4 6 4 1]² (`mixSmooth`), applied before the projection, capped at half a
+cell a step, and scaled by N² so a drop rounds in the same time on any grid.
 
 What went wrong on the way, and why the code is as it is:
 
@@ -42,9 +44,68 @@ What went wrong on the way, and why the code is as it is:
 - Clamping c to 0..1 made or destroyed oil every step (±30%). Cahn–Hilliard
   overshoots a little and brings itself back; `mixRelax` spreads anything
   outside 0..1 to its neighbours, conservatively.
+- −σ c ∇μ then went the other way (2026-09-27): ∇μ is a third derivative of
+  an edge four cells wide, so the force it made was mostly the grid, a flow
+  full of divergence the projection could not see. MacCormack's conserving
+  limiter caps a thickening and not a thinning, so that flow took the dye out
+  of the oil cell by cell: a settled drop kept 41% of its colour after 120
+  steps, and on the plate an oil drop went black in about a second. The
+  curvature form reads only first derivatives of a blurred field: 88% kept,
+  and the fastest flow left in a drop that has stopped rounding (the
+  "parasitic current") fell from 0.77 to 0.031. Blurring and capping the old
+  force was tried first; it lost the dye more slowly and no longer rounded
+  the strip.
+- An oil pour now lands flat and sharp (`mixSplat`), at full inside and
+  gone a cell past its edge, rather than as the soft cone every other
+  liquid lands as: a cone of c between 0 and 1 is in the spinodal, and
+  Cahn–Hilliard broke every fresh drop into a ring of beads.
 
-Measured: a strip of oil 7:1 rounds to 3.5:1 in three seconds, and the oil is
-exact (438.8 → 438.8).
+Measured (`npm run physics`): a strip of oil rounds from 5.58:1 to 1.89:1,
+and the oil is exact (666.1 → 666.1).
+
+### Oil Bodies (`oilBodies`): each liquid keeps its own colour
+
+Roadmap §I. With the setting off there is one dye field and the oil is a
+field beside it that the dye knows nothing about, so amber oil on teal water
+is amber and teal blending wherever the two meet, and an oil drop that moves
+by Cahn–Hilliard (which moves the oil with no liquid moving) leaves its colour
+behind. With it on, the dye stays the one field everything reads (the plate,
+the optics, the checks) and the oil's share of it sits beside it in a second
+texture (`oilDye`); the water's share is the difference. Five passes keep the
+two apart:
+
+- **Transport** (`bodyAdvect`): both shares move by fluxes through the cell
+  faces, the same scheme the oil itself moves by (`mixAdvect`), instead of by
+  MacCormack's backtrace. A backtrace carries a thing to where it should be
+  and conserves it only when the flow is divergence-free at the grid's scale;
+  a flux takes from one cell exactly what it gives the next. At Oil Tension
+  0.5 the backtrace kept 61% of the dye in the lab.
+- **Partition** (`bodyPartition`): across the edge band each colour levels
+  its concentration per unit of its own liquid, so the oil's colour runs into
+  the oil and the water's into the water as the edge moves; in a
+  neighbourhood that is all oil (or all water) the other liquid's colour is
+  handed over, a tenth a pass. Two passes a step.
+- **Landing** (`bodyLand`): dye poured on the plate is split by the oil
+  under it, so a pour over a body becomes the body's colour.
+- **The hand** (`mixCarry`): a finger drag moves the oil with the dye it
+  moves, so a dragged drop takes its colour along.
+- **Diffusion** (`bodyUnspread`): on a look with dye diffusion, only the
+  water's colour diffuses. Diffused like the dye, the oil's colour crept a
+  cell or two past the edge's tail each second, where no oil was left to
+  carry it back.
+
+Two findings from `npm run bodies` set the partition's constants. The
+evening-out levels o/(c + E), and with E at 0.02 a cell of open water held a
+fiftieth of the oil's colour concentration by right; the hand-over then gave
+it to the water, a steady leak through every rim. E is now 0.001, and the
+hand-over waits until a neighbourhood has under a hundredth of the liquid,
+since a rim's tail at a few hundredths rightly holds its colour.
+
+With the setting on, an oil pour becomes a body: a flat disc (three times
+the pour's radius) rather than a thin film on every drop, and pours stop
+adding oil once bodies cover about a third of the plate. The setting is 0
+everywhere except Oil & Water, and at 0 the second texture is never made.
+Measured by `npm run bodies`; see its header for the numbers.
 
 Oil reaches the field from any liquid whose polarity is below −0.5 (Oil,
 Silicone), through `LiquidPhase.onDeposit`, only while the setting is on.

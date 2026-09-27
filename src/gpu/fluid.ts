@@ -85,6 +85,14 @@ const PHASE_RELAX = 6;
   The mix's forces, each in plate widths a second at full strength (see
   mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
   there at full and gone at zero.
+
+  OIL_TENSION is σ for the capillary force (σ κ ∇c̃, see mixForce), in
+  plate widths: κ and ∇c̃ are taken in cells, so the step multiplies it by
+  N² and a drop rounds up in the same time on a 256 grid as on a 512. At
+  full a drop a tenth of the plate across goes from a smear to round in
+  about a second, which is how an oil drop on a real dish behaves; the
+  Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
+  second-derivative field under it that did not scale either.
 */
 const OIL_TENSION = 4e-4;
 /*
@@ -232,6 +240,15 @@ export const BODY_EVEN = 0.2;
 export const BODY_HAND = 0.1;
 export const BODY_INSIDE = 0.02;
 const BODY_PASSES = 2;
+/*
+  How strongly colour astray from its liquid is steered back (bodyPartition):
+  the gain on the blurred oil's step across a face, so that any step at all
+  points the way (it saturates at a fifth of a cell's colour a face), and how
+  many blurs make the field it follows, each reaching two cells further.
+  Beyond the reach, colour with no oil anywhere near is the water's.
+*/
+const BODY_DRIFT = 2000;
+const BODY_REACH_BLURS = 4;
 export const DISPLACE_INSIDE = 0.06;
 const DISPLACE_ITERS = 2;
 const PHASE_SUBSTEPS = 6;
@@ -365,6 +382,8 @@ export class WebGPUFluid {
     the dye needs to know it exists.
   */
   private oilDye: PingPong | null = null;
+  /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
+  private oilReach: PingPong | null = null;
   /** Whether the last step asked for Oil Bodies (the setting, and oil's tension to have oil at all). */
   private bodiesWanted = false;
   /** The oil's share went unkept for a step: stale, to be emptied before it is used again. */
@@ -374,6 +393,15 @@ export class WebGPUFluid {
   private lies: PingPong | null = null;
   private liesLive = false;
   private mixLive = false;
+  /*
+    How much of the plate the oil poured since it was last cleared covers,
+    as a share of its area. Cahn–Hilliard and the flux transport both keep
+    the oil exactly (npm run physics), so what went in is what is there,
+    and a tally is the whole measurement: Oil Bodies stops pouring bodies
+    when the plate is full of them.
+  */
+  private oilPoured = 0;
+  get oilCover(): number { return this.oilPoured; }
   private rxnLive = false;
   get chemistryLive(): { rxn: boolean; lies: boolean } { return { rxn: this.rxnLive, lies: this.liesLive }; }
   /** What the plate draws from the liquids' own physics, packed (see packView). */
@@ -481,11 +509,12 @@ export class WebGPUFluid {
       ['mixRelax', [RGBA32], open.mix],
       ['mixMu', [RGBA32], open.mix],
       ['mixUpdate', [RGBA32], open.mix],
-      ['mixSmooth', [R32], false],
+      ['mixSmooth', [R32], open.bodies],
       // Oil Bodies: the dye carried as the oil is, and each liquid's colour
       // kept in it. Run once a look with it on has poured oil.
       ['bodyAdvect', [dye], open.bodies],
       ['bodyPartition', [dye], open.bodies],
+      ['bodyUnspread', [dye], open.bodies],
       ['bodyLand', [dye], open.bodies],
       ['mixCarry', [RGBA32], open.bodies],
       // The reaction (chemical-clock) and the gel, each on its own
@@ -725,6 +754,7 @@ export class WebGPUFluid {
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;
@@ -1192,7 +1222,7 @@ export class WebGPUFluid {
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth],
-        this.arg('mix force', [oil * ((p as { oilSigma?: number }).oilSigma ?? OIL_TENSION) * perSecond * N * N, ((p as { oilCells?: number }).oilCells ?? OIL_CELLS) / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+        this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
           gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
@@ -1229,15 +1259,31 @@ export class WebGPUFluid {
     stage('dye diffuse', (pass) => {
       this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
       /*
-        And the oil's share alike, with Oil Bodies on: the diffusion is
-        linear, so diffusing the whole and the oil's part the same way
-        diffuses the water's part the same way too. Diffusing only the whole
-        spread the oil's colour into the water as the water's own, where
-        nothing could tell it apart again: a green haze of amber in teal
-        round every body in the lab. (A share begun this step is empty, and
-        the transport below clears it first.)
+        With Oil Bodies on, only the water's colour diffuses. The oil's
+        share is diffused too, but only to know how much of the whole's
+        diffusion was the oil's (the diffusion is linear, so the water's
+        part of it is the whole's less the oil's); bodyUnspread then keeps
+        the water's part and puts the oil's colour back where it was.
+        Diffusing only the whole spread the oil's colour into the water as
+        the water's own, where nothing could tell it apart again: a green
+        haze of amber in teal round every body. Diffusing both alike, as
+        this first did, spread it into the water as the oil's, a cell or
+        two a second past the edge's tail, where the evening-out has no oil
+        to carry it back to: the oil's colour in open water grew from 1.1%
+        to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
+        not stop. The oil's colour does mix inside a body, slowly
+        (bodyPartition's inside rate), as two dyed oils do. (A share begun
+        this step is empty, and the transport below clears it first.)
       */
-      if (bodiesOn && !bodiesFresh) this.jacobi(pass, this.oilDye!, [a, a, a, a], DYE_ITERS, 'oil dye');
+      if (bodiesOn && !bodiesFresh) {
+        const od = this.oilDye!;
+        this.jacobi(pass, od, [a, a, a, a], DYE_ITERS, 'oil dye');
+        // The oil's share before the diffusion is the Jacobi's x0, still in scratchB.
+        this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
+        this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
+        this.dye.swap();
+        od.swap();
+      }
     }, a > 0);
     stage('advect dye', (pass) => {
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -1456,11 +1502,20 @@ export class WebGPUFluid {
     */
     stage('bodies', (pass) => {
       const od = this.oilDye!;
-      const tint = this.arg('bodies dye', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 0]);
-      const share = this.arg('bodies oil', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 1]);
+      const reach = this.ensureReach();
+      // The oil blurred wide (four 5×5 binomials: a reach of eight cells),
+      // for colour astray from its liquid to find the way back.
+      this.run(pass, 'mixSmooth', reach.write, [mix!.read], none);
+      reach.swap();
+      for (let k = 1; k < BODY_REACH_BLURS; k++) {
+        this.run(pass, 'mixSmooth', reach.write, [reach.read], none);
+        reach.swap();
+      }
+      const tint = this.arg('bodies dye', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 0, BODY_DRIFT * bodies]);
+      const share = this.arg('bodies oil', [BODY_EVEN * bodies, BODY_HAND * bodies, BODY_INSIDE * bodies, 1, BODY_DRIFT * bodies]);
       for (let k = 0; k < BODY_PASSES; k++) {
-        this.run(pass, 'bodyPartition', this.dye.write, [this.dye.read, od.read, mix!.read], tint);
-        this.run(pass, 'bodyPartition', od.write, [this.dye.read, od.read, mix!.read], share);
+        this.run(pass, 'bodyPartition', this.dye.write, [this.dye.read, od.read, mix!.read, reach.read], tint);
+        this.run(pass, 'bodyPartition', od.write, [this.dye.read, od.read, mix!.read, reach.read], share);
         this.dye.swap();
         od.swap();
       }
@@ -1706,6 +1761,8 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
+    // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
+    this.oilPoured += Math.max(0, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius;
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
@@ -1746,6 +1803,11 @@ export class WebGPUFluid {
     this.rxnLive = true;
   }
 
+  private ensureReach(): PingPong {
+    if (!this.oilReach) this.oilReach = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'oil reach');
+    return this.oilReach;
+  }
+
   private ensureOilDye(): PingPong {
     if (!this.oilDye) this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye');
     return this.oilDye;
@@ -1758,6 +1820,7 @@ export class WebGPUFluid {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     pass.end();

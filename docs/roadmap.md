@@ -175,6 +175,13 @@ Two findings from 2026-09-23 set most of this order, and both are written up in
   properties, so "mixing two liquids" means averaging scalars and blending
   colours. There is no interface to deform, finger or break — which is most of
   what a plate of oil and water looks like.
+  *Settled for oil and water, 2026-09-27* (`oilBodies`, on in Oil & Water):
+  the oil is a body with an interface (the Cahn–Hilliard field it already
+  was), and its share of the dye is kept beside the dye, moved by fluxes,
+  levelled across the edge and handed over inside, so each liquid keeps its
+  own colour. The oil's surface tension was rebuilt on the way (curvature,
+  not the Korteweg force, which was eating the dye). The other liquids are
+  still properties. See [`physics-plan.md`](physics-plan.md), `npm run bodies`.
 
 ### Stage 1 — Make the plate behave like liquid between two glasses
 

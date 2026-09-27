@@ -288,6 +288,36 @@ is new work on every step of those looks, not yet timed on a real GPU.
 `npm run stages` (or `?stages`) times each stage, `dye grid` among them; its
 milliseconds on Red Cabbage at your usual grid are the number to report.
 
+## 13. Oil & Water as two bodies
+
+Oil & Water now pours oil as bodies that keep their own colour (Oil Bodies,
+roadmap §I): amber oil drops round up on teal water, merge when they touch,
+and carry their colour when they move, and teal does not creep into them.
+Seen only in the lab on software WebGPU (`npm run bodies`); the app's frames
+cannot be read there. Things to look at, on Oil & Water:
+
+- whether the drops read as oil on water, bodies with an edge, or as
+  coloured blobs drawn on top;
+- whether their rims are clean or show a fine radial hatching where the flow
+  shears them (the lab showed a faint one);
+- dragging a finger through a drop: it should go with the finger and keep
+  its colour;
+- after a few minutes of pouring: the pours stop adding oil once the bodies
+  cover about a third of the plate, and you should see that as the plate
+  filling, not as the oil stopping at an odd moment.
+
+Every look with Oil Tension (Oil on Water among them) also has the rebuilt
+surface tension: a drop rounds in about a second and should no longer go
+dark inside. Say if Oil on Water looks different from before in any other way.
+
+```
+?set=oilBodies=0      Oil & Water as it was, one dye
+```
+
+And the cost: the bodies add several passes to every step of that one look,
+not yet timed on a real GPU. `npm run stages` (or `?stages`) times each stage;
+`bodies` and `advect dye` on Oil & Water are the numbers to report.
+
 ---
 
 ## Reading the frame time while you do it

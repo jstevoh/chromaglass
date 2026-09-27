@@ -1598,7 +1598,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'oil-and-water',
     name: 'Oil & Water',
-    description: 'Amber oil on teal water between two glasses: the oil rounds into drops, threads break into beads, and drops that touch merge.',
+    description: 'Amber oil on teal water between two glasses: each keeps its own colour, the oil rounds into bodies, threads break into beads, and bodies that touch merge.',
     settings: {
       globalSpeed: 0.0126,
       advection: 0.45,
@@ -1606,6 +1606,8 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.5,
       dyeBudget: 0.9,
       oilTension: 0.9,
+      // Oil and water as separate bodies, each with its own colour (roadmap §I).
+      oilBodies: 1,
       thicknessOptics: 0.6,
       spectralOptics: 0.6,
       ledColor: '#0b1a1a',

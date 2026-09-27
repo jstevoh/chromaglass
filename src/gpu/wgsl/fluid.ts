@@ -1809,8 +1809,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let uv = uvOf(id);
   let m = textureLoad(src, p, 0);
-  let from = uv - A.b.xy;
-  let q = vec2i(floor(from * S.n));
+  let back = uv - A.b.xy;
+  let q = vec2i(floor(back * S.n));
   var got = 0.0;
   if (q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
     got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n);
@@ -1844,6 +1844,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = clamp(textureLoad(mixT, p, 0).r, 0.0, 1.0);
   let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + max(textureLoad(addT, p, 0), vec4f(0.0)) * c;
   textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
+    Oil Bodies: the dye's diffusion, for the water's colour only (see the
+    host's 'dye diffuse' stage). In: the whole dye and the oil's share, both
+    diffused, and the oil's share before. Out: the water's colour diffused
+    with the oil's put back as it was (A.a.w = 0), or the oil's share as it
+    was (A.a.w = 1).
+  */
+  bodyUnspread: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var spread: texture_2d<f32>;
+@group(0) @binding(4) var kept: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let o = max(textureLoad(kept, p, 0), vec4f(0.0));
+  let w = max(textureLoad(dye, p, 0) - textureLoad(spread, p, 0), vec4f(0.0));
+  let out = select(w + o, o, A.a.w > 0.5);
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   /*
@@ -1891,7 +1912,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var oil: texture_2d<f32>;
 @group(0) @binding(4) var mixT: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var reachT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn reach(p: vec2i) -> f32 { return textureLoad(reachT, clampP(p, S.n), 0).r; }
 struct Share { w: vec4f, o: vec4f, f: f32 };
 fn share(p: vec2i) -> Share {
   let t = max(textureLoad(dye, p, 0), vec4f(0.0));
@@ -1901,12 +1924,27 @@ fn share(p: vec2i) -> Share {
 // How much of an edge a cell is: 1 from about a sixth to five sixths oil,
 // falling to 0 in open water and deep in a body.
 fn band(f: f32) -> f32 { return clamp(6.0 * f * (1.0 - f), 0.0, 1.0); }
-const E = 0.02;
+// How far a colour is from its own liquid: 1 in a cell with almost none of
+// it (f its liquid's fraction), 0 from a tenth up.
+fn astray(f: f32) -> f32 { return 1.0 - smoothstep(0.02, 0.1, f); }
+/*
+  Keeps the concentrations finite where a cell has none of a liquid. It was
+  0.02, and that is not small here: levelled to equal o/(f + E), a cell with
+  no oil at all holds a fiftieth of the oil's colour concentration, so every
+  cell of open water along a body's rim kept some of the body's colour by
+  right, and the hand-over below then made it the water's. That was a steady
+  leak (the oil's colour in the water went up about 1.6% of it every hundred
+  steps in \`npm run bodies\`, worse than with the setting off). At a
+  thousandth the colour in a cell with no oil is at a concentration so high
+  that the evening-out carries it to the nearest cell that has some.
+*/
+const E = 0.001;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
   let h = share(p);
+  let rh = reach(p);
   var w = h.w;
   var o = h.o;
   let offs = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
@@ -1921,6 +1959,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     w += clamp(A.a.x * gw * (s.w / (1.0 - s.f + E) - h.w / (1.0 - h.f + E)), -0.2 * h.w, 0.2 * s.w);
     let go = edge * (h.f + s.f) * 0.5 + A.a.z * min(h.f, s.f);
     o += clamp(A.a.x * go * (s.o / (s.f + E) - h.o / (h.f + E)), -0.2 * h.o, 0.2 * s.o);
+    /*
+      Colour astray from its liquid drifts back to it, up (the oil's) or
+      down (the water's) a wide blur of the oil, a fifth of a cell's colour
+      a face at most. Nothing else could bring it back: the flow's transport
+      smears the oil's edge and its colour alike every step, Cahn–Hilliard
+      sharpens the oil back and not its colour, and a cell with no oil in
+      it has no concentration to level. So a faint halo of each body's
+      colour spread into the water, a cell or two a second, and at 360
+      steps of the bodies check held 2% of the oil's colour; riding the
+      oil's own Cahn–Hilliard flux instead made it worse (1.2% against 0.9%
+      at 90 steps). Only a cell with almost none of the liquid (astray) is
+      moved, so the colour a rim's tail rightly holds stays. Each face's
+      exchange is the giver's, computed the same from both sides.
+    */
+    let up = clamp(A.b.x * (reach(q) - rh), -0.2, 0.2);
+    o += max(-up, 0.0) * s.o * astray(s.f) - max(up, 0.0) * h.o * astray(h.f);
+    w += max(up, 0.0) * s.w * astray(1.0 - s.f) - max(-up, 0.0) * h.w * astray(1.0 - h.f);
   }
   /*
     Handed over only where the whole neighbourhood is the one liquid: next to
@@ -1928,6 +1983,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     belongs, and a hand-over there turned the oil's colour that a stir had
     left a cell outside its body into the water's, for good. The lab showed
     it as a green haze (amber in teal) along the trailing side of a body.
+
+    And only where there is truly none of the liquid, under a hundredth in
+    all 25 cells: a body's edge is a smooth profile with a tail several
+    cells long at a few hundredths of oil, and that tail holds the oil's
+    colour rightly. Handed over below a tenth, as it first was, it drained
+    the body's colour into the water through its own rim every step.
   */
   var lo = 1.0;
   var hi = 0.0;
@@ -1936,8 +1997,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     lo = min(lo, c);
     hi = max(hi, c);
   } }
-  let toOil = A.a.y * smoothstep(0.85, 0.95, lo) * h.w;
-  let toWater = A.a.y * (1.0 - smoothstep(0.05, 0.15, hi)) * h.o;
+  let toOil = A.a.y * smoothstep(0.99, 0.998, lo) * h.w;
+  let toWater = A.a.y * (1.0 - smoothstep(0.002, 0.01, hi)) * h.o;
   w += toWater - toOil;
   o += toOil - toWater;
   let out = select(w + o, o, A.a.w > 0.5);
@@ -2096,10 +2157,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   /*
     What the mix does to the flow, and what gravity does to the dye.
 
-    **Capillary (Korteweg) force**, −σ c ∇μ: the Cahn–Hilliard free energy's
-    own force on the liquid, which is surface tension in a diffuse
-    interface. It is what makes an oil blob in water pull itself round and
-    carry the dye inside it along. A.a.x = σ, A.a.y the most it may add.
+    **Capillary force**, σ κ ∇c̃ (continuum surface force, Brackbill 1992):
+    surface tension as a push along the edge's normal, as strong as the edge
+    is curved, with κ = −∇·(∇c̃/|∇c̃|) and c̃ the oil blurred [1 4 6 4 1]²
+    (mixSmooth). It is what makes an oil blob in water pull itself round and
+    carry the dye inside it along. A.a.x = σ (in cells, so the host scales it
+    by N² for the same force on every grid), A.a.y the most it may add.
+
+    It was the Korteweg form, −σ c ∇μ, which is the same force on paper and
+    is what the Cahn–Hilliard energy hands you. On a grid it is not: μ is a
+    Laplacian of c, its gradient a third derivative, and a third derivative
+    of an edge four cells wide is mostly the grid. The force it made pointed
+    every way at once, cell to cell, a flow full of divergence at the scale
+    the projection cannot see; MacCormack's conserving limiter then took the
+    dye out cell by cell (it caps a thickening and not a thinning), and an
+    oil drop went black in about a second. Measured in the lab: a settled
+    drop kept 41% of its dye after 120 steps; in a disc that had long stopped
+    rounding the fastest flow was still 0.77 (the solver's velocity), the
+    "parasitic currents" every diffuse-interface code fights. The curvature
+    form reads only first derivatives of a blurred field, and the normal's
+    divergence is smooth wherever the edge is: 88% of the dye kept (`npm run bodies`), the
+    settled disc's fastest flow 0.031, and a strip of oil still pulls round (the
+    physics check's aspect 5.58 → 1.89). Blurring and capping the old force
+    was tried first: the dye was lost more slowly and the strip no longer
+    rounded, since the blur took the curvature with the noise.
 
     (Marangoni flow is not here: see marangoniFlux.)
 
@@ -2130,7 +2211,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let n = S.n;
   var v = textureLoad(vel, p, 0);
-  // CAPILLARY_DOC
+  // σ κ ∇c̃ (see above). The normal's divergence by central differences of
+  // the normals themselves, not a second derivative of c: that is the step
+  // that keeps the grid out of it.
   let g = grad(p, n);
   let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
   var capillary = A.a.x * kappa * g;

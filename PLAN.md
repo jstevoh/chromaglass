@@ -786,6 +786,10 @@ The steps, most visible first. Each is one PR with its own check, and every step
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.
+   *Built 2026-09-27 for oil and water* (Oil Bodies, on in Oil & Water): the oil
+   carries its own share of the dye, so amber oil on teal water stays two colours
+   as the drops round, merge and are dragged. *Check:* `npm run bodies`. Waiting on
+   the owner's eyes on a real GPU (judging.md 13).
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
