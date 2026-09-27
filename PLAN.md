@@ -1298,6 +1298,14 @@ while this batch's plan was going in (#177), and no cause is known yet:
   time B. With two failures now at 0.34–0.35 and nine to thirteen
   passes at 0.63–0.99, the split is bimodal, which reads like one finger's drops
   landing a beat later than the other's in the window, not noise round a mean.
+  **A third time on #196 (ed42edd, 2026-09-27 16:04Z)**, a desk-only change: A 81
+  against B 221, 0.37, the mirrors clear, 0.0 cells of drift, 100 readbacks. The
+  three low fingers read 62, 81 and 81 and the high ones 181 to 234: one finger
+  laying about one drop's dye and the other about three, where a phase difference
+  between the two fingers' drop clocks (each counts DROP_EVERY solver steps from its
+  own touch) can only make them one drop apart. So look at what can take a whole
+  drop away: a drop's splash (`autoInject('drop')`) carried out of the measuring
+  disk, or two drops on one spot capped at the plate's density ceiling.
   (#186 changed where a press lands; the held Drop's splash lands on whole cells
   already, so it lays the same as before.)
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
